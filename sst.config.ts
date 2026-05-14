@@ -1,0 +1,123 @@
+/// <reference path="./.sst/platform/config.d.ts" />
+
+export default $config({
+  app(input) {
+    return {
+      name: "creatorshop-be",
+      removal: "retain",
+      home: "aws",
+      providers: {
+        aws: {
+          region: "ap-south-1",
+          profile: input?.stage === "prod" ? "creator-prod" : "creator-dev",
+        },
+      },
+    };
+  },
+  async run() {
+    const path = await import("path");
+    const dotenv = await import("dotenv");
+    const fs = await import("fs");
+    const cwd = process.cwd();
+    const envPaths = [
+      path.join(cwd, ".env"),
+      path.join(cwd, "creator-commerce-backend-v2", ".env"),
+    ];
+
+    for (const envPath of envPaths) {
+      if (fs.existsSync(envPath)) {
+        dotenv.config({ path: envPath, override: true });
+        break;
+      }
+    }
+
+    const vpc = new sst.aws.Vpc("vpc2", {
+      bastion: $app.stage === "prod",
+    });
+
+    const aurora = new sst.aws.Aurora("core", {
+      engine: "postgres",
+      vpc,
+      scaling: {
+        min: "0 ACU",
+        max: "2 ACU",
+        pauseAfter: "15 minutes",
+      },
+      dev: {
+        username: "postgres",
+        password: "password",
+        database: "thecreatorshop",
+        host: "localhost",
+        port: 5432,
+      },
+    });
+
+    const devDatabaseUrlOverride =
+      $app.stage === "dev" ? process.env.DEV_DATABASE_URL : undefined;
+    const DATABASE_URL =
+      devDatabaseUrlOverride && devDatabaseUrlOverride.trim().length > 0
+        ? devDatabaseUrlOverride
+        : $interpolate`postgresql://${aurora.username}:${aurora.password}@${aurora.host}:${aurora.port}/${aurora.database}`;
+
+    const cluster = new sst.aws.Cluster("api-cluster", { vpc });
+
+    cluster.addService("api", {
+      link: [aurora],
+      architecture: "arm64",
+      memory: "1 GB",
+      cpu: "0.5 vCPU",
+      environment: {
+        STAGE: $app.stage,
+        PORT: "80",
+        DATABASE_URL,
+        APP_BACKEND_URL:
+          $app.stage === "prod"
+            ? "https://api.thecreatorshop.in"
+            : "https://api.dev.thecreatorshop.in",
+        APP_FRONTEND_URL:
+          $app.stage === "prod"
+            ? "https://dashboard.thecreatorshop.in"
+            : "https://dashboard.dev.thecreatorshop.in",
+      },
+      loadBalancer: {
+        ports: [{ listen: "443/https", forward: "80/http" }],
+        health: {
+          "80/http": {
+            path: "/health/live",
+            interval: "10 seconds",
+            timeout: "5 seconds",
+            healthyThreshold: 2,
+            unhealthyThreshold: 5,
+          },
+        },
+        domain: {
+          name:
+            $app.stage === "prod"
+              ? "api.thecreatorshop.in"
+              : "api.dev.thecreatorshop.in",
+          cert:
+            $app.stage === "prod"
+              ? "arn:aws:acm:ap-south-1:250037328530:certificate/9547cda0-07e6-46b2-b4ff-5cdac211ab92"
+              : "arn:aws:acm:ap-south-1:841162679642:certificate/a1a5e51e-510c-4f5d-8f78-baa76c32bab9",
+          dns: false,
+        },
+      },
+      dev: {
+        command: "npm run start:dev",
+      },
+      transform: {
+        service: (args) => {
+          args.healthCheckGracePeriodSeconds = 120;
+        },
+      },
+    });
+
+    new sst.x.DevCommand("Prisma", {
+      environment: { DATABASE_URL },
+      dev: {
+        autostart: false,
+        command: "npx prisma studio",
+      },
+    });
+  },
+});

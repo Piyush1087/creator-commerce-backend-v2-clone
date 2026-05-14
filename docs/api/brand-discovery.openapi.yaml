@@ -1,0 +1,118 @@
+openapi: 3.0.3
+info:
+  title: TheCreatorShop API — Brand discovery
+  version: 0.1.0
+  description: >
+    Step 1 public URL validation. Responses are discriminated by `outcome`.
+    Throttling may return HTTP 429 (not modeled per-operation here).
+servers:
+  - url: http://localhost:3000
+    description: Local API
+paths:
+  /api/v1/discovery/validate:
+    post:
+      summary: Validate a brand website URL (Step 1 gatekeeper)
+      operationId: discoveryValidate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscoverValidateRequest"
+      responses:
+        "200":
+          description: Validation result (check `outcome`)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/DiscoverValidateSuccess"
+                  - $ref: "#/components/schemas/DiscoverValidateWaitlist"
+                  - $ref: "#/components/schemas/DiscoverValidateBlocked"
+                discriminator:
+                  propertyName: outcome
+                  mapping:
+                    success: "#/components/schemas/DiscoverValidateSuccess"
+                    waitlist: "#/components/schemas/DiscoverValidateWaitlist"
+                    blocked: "#/components/schemas/DiscoverValidateBlocked"
+        "400":
+          description: Request body validation failed (Nest validation pipe)
+        "429":
+          description: Too many requests (throttler)
+components:
+  schemas:
+    DiscoverValidateRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          example: brandname.com
+    IndustryVertical:
+      type: string
+      enum:
+        - D2C
+        - SAAS_AI
+        - HEALTHCARE
+        - OFFLINE_SERVICES
+        - REAL_ESTATE
+        - B2B_AGENCY
+        - MEDIA
+        - EDUCATION
+        - ENTERTAINMENT
+        - UNKNOWN
+        - GAMBLING
+        - ADULT
+        - FRAUDULENT_HIGH_RISK
+    DiscoverValidateSuccess:
+      type: object
+      required: [outcome, leadId, normalizedUrl, industry]
+      properties:
+        outcome:
+          type: string
+          enum: [success]
+        leadId:
+          type: string
+          format: uuid
+        normalizedUrl:
+          type: string
+        industry:
+          $ref: "#/components/schemas/IndustryVertical"
+    DiscoverValidateWaitlist:
+      type: object
+      required: [outcome, logId, normalizedUrl, domain, industry]
+      properties:
+        outcome:
+          type: string
+          enum: [waitlist]
+        logId:
+          type: string
+          format: uuid
+        normalizedUrl:
+          type: string
+        domain:
+          type: string
+        industry:
+          $ref: "#/components/schemas/IndustryVertical"
+    DiscoverValidateBlocked:
+      type: object
+      required: [outcome, code, message]
+      properties:
+        outcome:
+          type: string
+          enum: [blocked]
+        code:
+          type: string
+          enum:
+            - INVALID_URL
+            - SOCIAL_OR_MARKETPLACE
+            - PRIVATE_OR_LOCAL_HOST
+            - BLOCKED_TLD
+            - BLOCKED_INDUSTRY
+        message:
+          type: string
+        logId:
+          type: string
+          format: uuid

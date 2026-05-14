@@ -1,0 +1,128 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Platform role. Org linkage is optional: brand accounts often belong to an
+/// organization; influencer and admin accounts typically have no organization.
+enum UserRole {
+  BRAND
+  INFLUENCER
+  ADMIN
+}
+
+enum DiscoveryLeadStatus {
+  PENDING
+  VALIDATING
+  IDENTIFIED
+  REJECTED
+}
+
+/// Single enum aligned with product Step 1 gatekeeper (supported, regret, blocked).
+enum IndustryVertical {
+  D2C
+  SAAS_AI
+  HEALTHCARE
+  OFFLINE_SERVICES
+  REAL_ESTATE
+  B2B_AGENCY
+  MEDIA
+  EDUCATION
+  ENTERTAINMENT
+  UNKNOWN
+  GAMBLING
+  ADULT
+  FRAUDULENT_HIGH_RISK
+}
+
+enum MarketIntelRejectionType {
+  UNSUPPORTED_NICHE
+  GARBAGE_ENTRY
+  BLOCKED_PLATFORM
+  SECURITY_RISK
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String          @id @default(uuid())
+  email          String          @unique
+  role           UserRole
+  organizationId String?
+  organization   Organization?   @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  discoveryLeads DiscoveryLead[]
+
+  @@index([organizationId])
+  @@index([role])
+  @@map("users")
+}
+
+/// Successful / tracked brand URL submissions (supported path per product doc).
+model DiscoveryLead {
+  id            String              @id @default(uuid())
+  rawUrl        String              @map("raw_url")
+  normalizedUrl String              @unique @map("normalized_url")
+  status        DiscoveryLeadStatus @default(PENDING)
+  isSupported   Boolean             @default(false) @map("is_supported")
+  industry      IndustryVertical?
+  subIndustry   String?             @map("sub_industry")
+  industryNiche String?             @map("industry_niche")
+  securityScore Int                 @default(0) @map("security_score")
+  metaHandshake Boolean             @default(false) @map("meta_handshake")
+  userId        String?             @map("user_id")
+  user          User?               @relation(fields: [userId], references: [id])
+  createdAt     DateTime            @default(now()) @map("created_at")
+  waitlistLeads WaitlistLead[]
+
+  @@index([createdAt])
+  @@index([userId])
+  @@map("discovery_leads")
+}
+
+/// Intelligence for unsupported, invalid, or blocked attempts.
+model MarketIntelligenceLog {
+  id               String                   @id @default(uuid())
+  domainName       String                   @unique @map("domain_name")
+  detectedIndustry IndustryVertical         @map("detected_industry")
+  rejectionType    MarketIntelRejectionType @map("rejection_type")
+  geoLocation      String?                  @map("geo_location")
+  attemptCount     Int                      @default(1) @map("attempt_count")
+  lastAttempt      DateTime                 @default(now()) @map("last_attempt")
+  waitlistLeads    WaitlistLead[]
+
+  @@index([lastAttempt])
+  @@map("market_intelligence_logs")
+}
+
+/// Waitlist capture; links to either a discovery lead or a market intel row.
+model WaitlistLead {
+  id                      String                 @id @default(uuid())
+  email                   String
+  industryInterest        IndustryVertical       @map("industry_interest")
+  isNotified              Boolean                @default(false) @map("is_notified")
+  discoveryLeadId         String?                @map("discovery_lead_id")
+  discoveryLead           DiscoveryLead?         @relation(fields: [discoveryLeadId], references: [id])
+  marketIntelligenceLogId String?                @map("market_intelligence_log_id")
+  marketIntelligenceLog   MarketIntelligenceLog? @relation(fields: [marketIntelligenceLogId], references: [id])
+  createdAt               DateTime               @default(now()) @map("created_at")
+
+  @@index([email])
+  @@index([discoveryLeadId])
+  @@index([marketIntelligenceLogId])
+  @@map("waitlist_leads")
+}
