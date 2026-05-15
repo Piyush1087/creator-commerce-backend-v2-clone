@@ -5,4 +5,6 @@ UI ships.
 
 | Document | Description |
 | --- | --- |
-| `brand-discovery.openapi.yaml` | Step 1 `POST /api/v1/discovery/validate` |
+| `brand-discovery.openapi.yaml` | Step 1 `POST /api/v1/discovery/*` (resolve/validate/waitlist) + Step 2 `POST /api/v1/brand/surface-scan` |
+
+Human-oriented pipeline notes (prompt files, cache/`force`, check order): `docs/brand-onboarding/SURFACE_SCAN_AND_PROMPTS.md`.

@@ -8,8 +8,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Platform role. Org linkage is optional: brand accounts often belong to an
-/// organization; influencer and admin accounts typically have no organization.
+// ============================================================================
+// ENUMS
+// ============================================================================
+
 enum UserRole {
   BRAND
   INFLUENCER
@@ -23,7 +25,6 @@ enum DiscoveryLeadStatus {
   REJECTED
 }
 
-/// Single enum aligned with product Step 1 gatekeeper (supported, regret, blocked).
 enum IndustryVertical {
   D2C
   SAAS_AI
@@ -47,12 +48,54 @@ enum MarketIntelRejectionType {
   SECURITY_RISK
 }
 
+enum ScanStatus {
+  PENDING
+  SURFACE_COMPLETE
+  VERIFIED
+  DEEP_SCAN_IN_PROGRESS
+  READY
+}
+
+enum OfferingType {
+  PRODUCT
+  TREATMENT
+  SERVICE
+  COLLECTION
+}
+
+enum IntelStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum PlanType {
+  FREE_TRIAL
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+// ============================================================================
+// CORE MODELS (Organization & User)
+// ============================================================================
+
 model Organization {
   id        String   @id @default(uuid())
   name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  users     User[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users        User[]
+  brandProfile BrandProfile?
 
   @@map("organizations")
 }
@@ -61,10 +104,10 @@ model User {
   id             String          @id @default(uuid())
   email          String          @unique
   role           UserRole
-  organizationId String?
+  organizationId String?         @map("organization_id")
   organization   Organization?   @relation(fields: [organizationId], references: [id])
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
   discoveryLeads DiscoveryLead[]
 
   @@index([organizationId])
@@ -72,7 +115,10 @@ model User {
   @@map("users")
 }
 
-/// Successful / tracked brand URL submissions (supported path per product doc).
+// ============================================================================
+// DISCOVERY MODELS (Step 1)
+// ============================================================================
+
 model DiscoveryLead {
   id            String              @id @default(uuid())
   rawUrl        String              @map("raw_url")
@@ -94,7 +140,6 @@ model DiscoveryLead {
   @@map("discovery_leads")
 }
 
-/// Intelligence for unsupported, invalid, or blocked attempts.
 model MarketIntelligenceLog {
   id               String                   @id @default(uuid())
   domainName       String                   @unique @map("domain_name")
@@ -109,7 +154,6 @@ model MarketIntelligenceLog {
   @@map("market_intelligence_logs")
 }
 
-/// Waitlist capture; links to either a discovery lead or a market intel row.
 model WaitlistLead {
   id                      String                 @id @default(uuid())
   email                   String
@@ -126,3 +170,155 @@ model WaitlistLead {
   @@index([marketIntelligenceLogId])
   @@map("waitlist_leads")
 }
+
+// ============================================================================
+// BRAND ONBOARDING & LIFECYCLE MODELS
+// ============================================================================
+
+model BrandProfile {
+  id             String           @id @default(uuid())
+  organizationId String?          @unique @map("organization_id")
+  organization   Organization?    @relation(fields: [organizationId], references: [id])
+  domain         String           @unique
+  name           String           @map("brand_name")
+  industry       IndustryVertical
+  subIndustry    String?          @map("sub_industry")
+  industryNiche  String?          @map("industry_niche")
+  logoUrl        String?          @map("logo_url")
+  tagline        String?
+  description    String?
+  visualIdentity Json?            @map("visual_identity")
+  brandValues    String[]         @map("brand_values")
+  policyFlags    String[]         @map("policy_flags")
+  targetAudience Json?            @map("target_audience")
+
+  // Step 6: Verification
+  isVerified        Boolean   @default(false) @map("is_verified")
+  verifiedAt        DateTime? @map("verified_at")
+  verificationEmail String?   @map("verification_email")
+
+  // Step 7: Deep Intel
+  scanStatus      ScanStatus  @default(PENDING) @map("scan_status")
+  deepIntelStatus IntelStatus @default(PENDING) @map("deep_intel_status")
+
+  // Regional Context (Captured in Step 2)
+  countryCode  String? @map("country_code")
+  currencyCode String  @default("USD") @map("currency_code")
+
+  // Subscription State (Step 8)
+  planType           PlanType           @default(FREE_TRIAL) @map("plan_type")
+  subscriptionStatus SubscriptionStatus @default(TRIALING) @map("subscription_status")
+  trialEndsAt        DateTime?          @map("trial_ends_at")
+
+  // Usage Tracking (Beta Buffer)
+  deepScanCount   Int @default(0) @map("deep_scan_count")
+  competitorCount Int @default(0) @map("competitor_count")
+  outreachCount   Int @default(0) @map("outreach_count")
+
+  isUserEdited Json?    @map("is_user_edited")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  offerings       Offering[]
+  competitors     Competitor[]
+  locations       Location[]
+  subscriptions   Subscription[]
+  teamInvitations TeamInvitation[]
+
+  @@map("brand_profiles")
+}
+
+model Offering {
+  id             String       @id @default(uuid())
+  brandProfileId String       @map("brand_profile_id")
+  brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id])
+  type           OfferingType
+  name           String
+  description    String?
+  imageUrl       String?      @map("image_url")
+  url            String       @map("offering_url")
+  priceAmount    Decimal?     @map("price_amount")
+  currency       String       @default("USD")
+  locationIds    String[]     @map("location_ids")
+  isActive       Boolean      @default(true) @map("is_active")
+  isDeepScanned  Boolean      @default(false) @map("is_deep_scanned")
+  isUserEdited   Boolean      @default(false) @map("is_user_edited")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@map("offerings")
+}
+
+model Location {
+  id             String       @id @default(uuid())
+  brandProfileId String       @map("brand_profile_id")
+  brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id])
+  name           String?
+  address        String
+  city           String?
+  zip            String?
+  lat            Float?
+  lng            Float?
+  contactDetails Json?        @map("contact_details")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@map("locations")
+}
+
+model Competitor {
+  id             String       @id @default(uuid())
+  brandProfileId String       @map("brand_profile_id")
+  brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id])
+  name           String
+  websiteUrl     String       @map("website_url")
+  logoUrl        String?      @map("logo_url")
+  socialHandles  String[]     @map("social_handles")
+  whyCompetitor  String?      @map("why_competitor")
+  isActive       Boolean      @default(true) @map("is_active")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@map("competitors")
+}
+
+model VerificationCode {
+  id         String   @id @default(uuid())
+  identifier String   @map("identifier") // Email or brand_profile_id
+  code       String
+  expiresAt  DateTime @map("expires_at")
+  attempts   Int      @default(0)
+  isUsed     Boolean  @default(false) @map("is_used")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([identifier])
+  @@map("verification_codes")
+}
+
+model Subscription {
+  id               String       @id @default(uuid())
+  brandProfileId   String       @map("brand_profile_id")
+  brandProfile     BrandProfile @relation(fields: [brandProfileId], references: [id])
+  stripeCustomerId String?      @map("stripe_customer_id")
+  amount           Decimal      @default(99.00) @db.Decimal(10, 2)
+  currency         String       @default("USD")
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  @@map("subscriptions")
+}
+
+model TeamInvitation {
+  id             String       @id @default(uuid())
+  email          String
+  role           String       @default("ADMIN")
+  status         String       @default("PENDING") // PENDING, ACCEPTED, EXPIRED
+  brandProfileId String       @map("brand_profile_id")
+  brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id])
+  token          String       @unique
+  createdAt      DateTime     @default(now()) @map("created_at")
+  expiresAt      DateTime     @map("expires_at")
+
+  @@map("team_invitations")
+}
+
