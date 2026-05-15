@@ -1,27 +1,16 @@
 import { gateAndNormalizeBrandUrl } from "../discovery-url.util";
 
-/**
- * Builds a small allowlist of same-origin URLs for a conservative surface scan.
- * Each candidate is re-validated through the Step 1 URL gate (SSRF-safe).
- */
-export function buildSurfaceScanUrls(seedNormalizedUrl: string): string[] {
+function uniqSameOriginUrls(
+  seedNormalizedUrl: string,
+  paths: string[],
+  max: number,
+): string[] {
   const gated = gateAndNormalizeBrandUrl(seedNormalizedUrl);
   if (!gated.ok) {
     return [];
   }
   const base = new URL(gated.normalizedUrl);
   const origin = `${base.protocol}//${base.hostname}`;
-  const paths = [
-    "/",
-    "/about",
-    "/about-us",
-    "/pages/about",
-    "/our-story",
-    "/collections",
-    "/shop",
-    "/products",
-    "/services",
-  ];
   const unique = new Set<string>();
   for (const path of paths) {
     const candidate = path === "/" ? origin : `${origin}${path}`;
@@ -30,5 +19,39 @@ export function buildSurfaceScanUrls(seedNormalizedUrl: string): string[] {
       unique.add(next.normalizedUrl);
     }
   }
-  return [...unique].slice(0, 10);
+  const list = [...unique];
+  if (list.length === 0) {
+    return [gated.normalizedUrl];
+  }
+  return list.slice(0, max);
+}
+
+/** Product Prompt 1 — homepage + about variants. */
+export function buildIdentitySurfaceUrls(normalizedUrl: string): string[] {
+  return uniqSameOriginUrls(
+    normalizedUrl,
+    ["/", "/about", "/about-us", "/pages/about", "/our-story"],
+    6,
+  );
+}
+
+/** Product Prompt 2 — shop / collections / services / treatments (list views). */
+export function buildInventorySurfaceUrls(normalizedUrl: string): string[] {
+  return uniqSameOriginUrls(
+    normalizedUrl,
+    [
+      "/shop",
+      "/collections",
+      "/services",
+      "/treatments",
+      "/products",
+      "/catalog",
+    ],
+    8,
+  );
+}
+
+/** Product Prompt 3 — root metadata / light context (plus `/` if needed). */
+export function buildCompetitorContextUrls(normalizedUrl: string): string[] {
+  return uniqSameOriginUrls(normalizedUrl, ["/"], 2);
 }

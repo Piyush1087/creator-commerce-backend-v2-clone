@@ -49,3 +49,15 @@ is changed explicitly later.
 
 - `brand-discovery-and-users.md` — Step 1 discovery tables plus minimal
   `User` / `Organization` model and org-linkage rules.
+
+## Migration: `20260515120000_product_surface_scan_alignment`
+
+Adds product-aligned surface-scan fields:
+
+- `brand_profiles.social_links` (`TEXT[]`, default empty) — IG/TikTok (etc.)
+  URLs from Prompt 1.
+- `brand_profiles.surface_offers` (`JSONB`, nullable) — banner offers / coupon
+  hints from Prompt 2.
+- `offerings.category_tag` — collection or healthcare specialty label.
+- `offerings.starting_price_label` — visible list price string before deep
+  scan fills `price_amount`.

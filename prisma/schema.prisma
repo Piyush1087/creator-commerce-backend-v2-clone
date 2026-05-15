@@ -187,6 +187,10 @@ model BrandProfile {
   logoUrl        String?          @map("logo_url")
   tagline        String?
   description    String?
+  /// Official social profile URLs (e.g. Instagram / TikTok) from surface scan (product Prompt 1).
+  socialLinks    String[]         @default([]) @map("social_links")
+  /// Banner offers / coupon codes detected during surface scan (product Prompt 2).
+  surfaceOffers  Json?            @map("surface_offers")
   visualIdentity Json?            @map("visual_identity")
   brandValues    String[]         @map("brand_values")
   policyFlags    String[]         @map("policy_flags")
@@ -237,6 +241,10 @@ model Offering {
   description    String?
   imageUrl       String?      @map("image_url")
   url            String       @map("offering_url")
+  /// Collection or healthcare specialty label from list pages (product Prompt 2).
+  categoryTag    String?      @map("category_tag")
+  /// Human-visible starting price from list view, before deep scan parses `priceAmount`.
+  startingPriceLabel String?  @map("starting_price_label")
   priceAmount    Decimal?     @map("price_amount")
   currency       String       @default("USD")
   locationIds    String[]     @map("location_ids")

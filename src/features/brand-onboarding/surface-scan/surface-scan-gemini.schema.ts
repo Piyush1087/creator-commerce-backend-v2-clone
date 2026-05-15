@@ -5,64 +5,71 @@ const hexColor = z
   .string()
   .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "Invalid hex color");
 
-export const SurfaceScanGeminiSchema = z.object({
+/**
+ * Step 2 surface scan — Gemini JSON after Parallel bundles (product “Revised Gemini Surface Scan”).
+ * Names mirror the product doc; the HTTP runner maps this onto Prisma models.
+ */
+export const Step2SurfaceScanGeminiSchema = z.object({
   suggestedIndustry: z.nativeEnum(IndustryVertical),
   brand: z.object({
     name: z.string().min(1).max(200),
-    tagline: z.string().max(300).nullable().optional(),
-    description: z.string().min(1).max(12_000),
     logoUrl: z.string().url().nullable().optional(),
+    socialLinks: z.array(z.string().url()).max(8).default([]),
+    tagline: z.string().max(300).nullable().optional(),
+    /** Short preview for Step 3 (product: max ~200 chars; allow small buffer). */
+    shortDescription: z.string().max(500).nullable().optional(),
     subIndustry: z.string().max(200).nullable().optional(),
     industryNiche: z.string().max(200).nullable().optional(),
+    primaryHexColors: z.array(hexColor).max(5).default([]),
+    headingFont: z.string().max(120).nullable().optional(),
+    bodyFont: z.string().max(120).nullable().optional(),
+    toneTags: z.array(z.string().max(80)).max(3).default([]),
+    aestheticTags: z.array(z.string().max(80)).max(2).default([]),
+    audience: z
+      .object({
+        personaName: z.string().max(120).nullable().optional(),
+        ageMin: z.number().int().min(13).max(99).nullable().optional(),
+        ageMax: z.number().int().min(13).max(99).nullable().optional(),
+        traits: z.array(z.string().max(80)).max(3).default([]),
+      })
+      .nullable()
+      .optional(),
   }),
-  visualIdentity: z.object({
-    colors: z.array(hexColor).max(12),
-    fonts: z.object({
-      heading: z.string().max(120),
-      body: z.string().max(120),
-    }),
-    toneOfVoice: z
-      .array(
-        z.object({
-          label: z.string().max(80),
-          description: z.string().max(400),
-        }),
-      )
-      .max(8),
-    aesthetic: z.array(z.string().max(80)).max(12),
-  }),
-  brandValues: z.array(z.string().max(120)).max(20),
-  policyFlags: z.array(z.string().max(200)).max(30),
-  targetAudience: z.object({
-    personaName: z.string().min(1).max(120),
-    countries: z.array(z.string().max(80)).max(20),
-    ageMin: z.number().int().min(13).max(99),
-    ageMax: z.number().int().min(13).max(99),
-    affluence: z.number().int().min(1).max(5),
-    traits: z.array(z.string().max(60)).max(12),
-  }),
-  offerings: z
+  products: z
     .array(
       z.object({
         type: z.nativeEnum(OfferingType),
         name: z.string().min(1).max(200),
-        description: z.string().max(2000).nullable().optional(),
         imageUrl: z.string().url().nullable().optional(),
+        startingPriceLabel: z.string().max(120).nullable().optional(),
+        collectionOrCategory: z.string().max(200).nullable().optional(),
+        /** List-view PDP or collection URL seen in markdown / canonical site. */
         url: z.string().url(),
       }),
     )
-    .max(24),
+    .max(6)
+    .default([]),
+  activeOffers: z
+    .array(
+      z.object({
+        name: z.string().max(200),
+        couponCode: z.string().max(80).nullable().optional(),
+        description: z.string().max(400).nullable().optional(),
+      }),
+    )
+    .max(8)
+    .default([]),
   competitors: z
     .array(
       z.object({
         name: z.string().min(1).max(200),
         websiteUrl: z.string().url(),
         logoUrl: z.string().url().nullable().optional(),
-        socialHandles: z.array(z.string().max(240)).max(8),
-        whyCompetitor: z.string().max(2000).nullable().optional(),
+        whyCompetitor: z.string().max(500).nullable().optional(),
       }),
     )
-    .max(12),
+    .max(5)
+    .default([]),
   locations: z
     .array(
       z.object({
@@ -72,7 +79,10 @@ export const SurfaceScanGeminiSchema = z.object({
         zip: z.string().max(40).nullable().optional(),
       }),
     )
-    .max(24),
+    .max(12)
+    .default([]),
 });
 
-export type SurfaceScanGeminiPayload = z.infer<typeof SurfaceScanGeminiSchema>;
+export type Step2SurfaceScanGeminiPayload = z.infer<
+  typeof Step2SurfaceScanGeminiSchema
+>;

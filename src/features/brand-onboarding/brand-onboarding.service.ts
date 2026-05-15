@@ -143,7 +143,10 @@ export class BrandOnboardingService {
       };
     }
 
-    const classified = await this.industryClassifier.classify(gated.hostname);
+    const classified = await this.industryClassifier.classify({
+      hostname: gated.hostname,
+      normalizedUrl: gated.normalizedUrl,
+    });
 
     if (classified.bucket === "supported") {
       const lead = await this.prisma.discoveryLead.findUnique({
@@ -238,7 +241,10 @@ export class BrandOnboardingService {
       };
     }
 
-    const classified = await this.industryClassifier.classify(gated.hostname);
+    const classified = await this.industryClassifier.classify({
+      hostname: gated.hostname,
+      normalizedUrl: gated.normalizedUrl,
+    });
 
     if (classified.bucket === "supported") {
       const lead = await this.ensureDiscoveryLead({

@@ -8,6 +8,8 @@ import { BrandOnboardingService } from "./brand-onboarding.service";
 import { BrandProfileService } from "./brand-profile.service";
 import { GeminiJsonClient } from "./integrations/gemini/gemini-json.client";
 import { ParallelExtractClient } from "./integrations/parallel/parallel-extract.client";
+import { ParallelSearchClient } from "./integrations/parallel/parallel-search.client";
+import { GeminiIndustryClassifier } from "./industry/gemini-industry-classifier.service";
 import { INDUSTRY_CLASSIFIER } from "./industry/industry-classifier.token";
 import { StubIndustryClassifier } from "./industry/stub-industry-classifier.service";
 import { BRAND_SURFACE_SCAN_RUNNER } from "./surface-scan/brand-surface-scan.runner.token";
@@ -21,6 +23,7 @@ import { UnconfiguredBrandSurfaceScanRunner } from "./surface-scan/unconfigured-
     BrandOnboardingService,
     BrandProfileService,
     ParallelExtractClient,
+    ParallelSearchClient,
     GeminiJsonClient,
     HttpBrandSurfaceScanRunner,
     UnconfiguredBrandSurfaceScanRunner,
@@ -47,7 +50,25 @@ import { UnconfiguredBrandSurfaceScanRunner } from "./surface-scan/unconfigured-
       ],
     },
     StubIndustryClassifier,
-    { provide: INDUSTRY_CLASSIFIER, useExisting: StubIndustryClassifier },
+    GeminiIndustryClassifier,
+    {
+      provide: INDUSTRY_CLASSIFIER,
+      useFactory: (
+        config: ConfigService,
+        gemini: GeminiIndustryClassifier,
+        stub: StubIndustryClassifier,
+      ) => {
+        const hasParallel = Boolean(
+          config.get<string>("PARALLEL_API_KEY")?.trim(),
+        );
+        const hasGemini = Boolean(config.get<string>("GEMINI_API_KEY")?.trim());
+        if (hasParallel && hasGemini) {
+          return gemini;
+        }
+        return stub;
+      },
+      inject: [ConfigService, GeminiIndustryClassifier, StubIndustryClassifier],
+    },
   ],
 })
 export class BrandOnboardingModule {}
