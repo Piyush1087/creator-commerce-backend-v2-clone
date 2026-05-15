@@ -77,4 +77,30 @@ npx prisma migrate deploy
 npx sst deploy --stage dev
 ```
 
-*Note: Container startup migrations are intentionally disabled in the Dockerfile. You must run `npx prisma migrate deploy` locally via WSL before or during your deployment pipeline to ensure the database is prepared before the new containers start taking traffic.*
+## Database Access (Tunneling)
+
+Since the database is isolated within the VPC, use the SSM tunnel script to connect from your local machine.
+
+### 1. Identify your Jumpbox/Bastion
+If the IDs in the script change, you can find the current running instance ID using:
+```bash
+node scripts/get-jumpbox-id.mjs
+```
+
+### 2. Start the Tunnel
+Open a dedicated terminal and run:
+```powershell
+# For Dev (uses Jumpbox)
+.\scripts\start-db-tunnel.ps1 -Stage dev
+
+# For Prod (uses Bastion)
+.\scripts\start-db-tunnel.ps1 -Stage prod
+```
+The tunnel will map the remote database to **`localhost:5435`**.
+
+### 3. Connect via Prisma or GUI
+Once the tunnel is active, you can use Prisma Studio or any DB client:
+```bash
+$env:DATABASE_URL="postgresql://postgres:password@localhost:5435/creatorshop_be?schema=public"
+npx prisma studio
+```
