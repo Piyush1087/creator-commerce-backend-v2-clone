@@ -78,6 +78,10 @@ export default $config({
           $app.stage === "prod"
             ? "https://dashboard.thecreatorshop.in"
             : "https://dashboard.dev.thecreatorshop.in",
+        GEMINI_API_KEY: process.env.GEMINI_API_KEY as string,
+        GEMINI_MODEL: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+        PARALLEL_API_KEY: process.env.PARALLEL_API_KEY as string,
+        CORS_ORIGINS: process.env.CORS_ORIGINS || "http://localhost:5173,https://dashboard.dev.thecreatorshop.in",
       },
       loadBalancer: {
         ports: [{ listen: "443/https", forward: "80/http" }],

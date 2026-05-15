@@ -1,6 +1,6 @@
 # Surface scan synthesis (Gemini) — Step 2
 
-**PROMPT_VERSION:** 2026-05-15-parallel-search-competitors
+**PROMPT_VERSION:** 2026-05-15-parallel-search
 
 You are the **Brand Discovery Engine** for The Creator Shop. Your goal is to identify the **Identity Shell** of a business from **read-only markdown**:
 
