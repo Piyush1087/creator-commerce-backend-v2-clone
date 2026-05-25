@@ -12,6 +12,7 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "../../prisma/prisma.service";
+import { BrandScanGateService } from "./brand-scan-gate.service";
 import type { DiscoverWaitlistRequestDto } from "./dto/discover-waitlist-request.dto";
 import { redactUrlForLogs } from "./discovery-redaction";
 import {
@@ -57,23 +58,27 @@ export type DiscoverValidateOrgClaimed = {
   adminEmail: string;
 };
 
+export type DiscoverValidateBrandActive = {
+  outcome: "brand_active";
+  message: string;
+  domain: string;
+};
+
+export type DiscoverValidateVerificationRequired = {
+  outcome: "verification_required";
+  message: string;
+  domain: string;
+  brandProfileId: string;
+  reason: "DOMAIN_LIMIT" | "IP_LIMIT";
+};
+
 export type DiscoverValidateResult =
   | DiscoverValidateSuccess
   | DiscoverValidateWaitlist
   | DiscoverValidateBlocked
-  | DiscoverValidateOrgClaimed;
-
-/** Present on `outcome: "resume"` when a `BrandProfile` row already exists for the apex domain. */
-export type DiscoveryResolveExistingBrandProfile = {
-  brandProfileId: string;
-  name: string;
-  scanStatus: string;
-  tagline: string | null;
-  descriptionPreview: string | null;
-  offerings: number;
-  competitors: number;
-  locations: number;
-};
+  | DiscoverValidateOrgClaimed
+  | DiscoverValidateBrandActive
+  | DiscoverValidateVerificationRequired;
 
 /** Read-only Step 1 entry check: no `discovery_leads` rows are created here. */
 export type DiscoveryResolveResume = {
@@ -81,7 +86,8 @@ export type DiscoveryResolveResume = {
   leadId: string;
   normalizedUrl: string;
   industry: IndustryVertical;
-  existingBrandProfile?: DiscoveryResolveExistingBrandProfile;
+  brandProfileId: string;
+  domain: string;
 };
 
 /**
@@ -95,11 +101,17 @@ export type DiscoveryResolveProceed = {
   industry: IndustryVertical;
 };
 
+export type DiscoveryResolveBrandActive = DiscoverValidateBrandActive;
+export type DiscoveryResolveVerificationRequired =
+  DiscoverValidateVerificationRequired;
+
 export type DiscoveryResolveResult =
   | DiscoveryResolveResume
   | DiscoveryResolveProceed
   | DiscoverValidateBlocked
-  | DiscoverValidateOrgClaimed;
+  | DiscoverValidateOrgClaimed
+  | DiscoveryResolveBrandActive
+  | DiscoveryResolveVerificationRequired;
 
 @Injectable()
 export class BrandOnboardingService {
@@ -107,6 +119,7 @@ export class BrandOnboardingService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly scanGate: BrandScanGateService,
     @Inject(INDUSTRY_CLASSIFIER)
     private readonly industryClassifier: IndustryClassifier,
   ) {}
@@ -117,105 +130,91 @@ export class BrandOnboardingService {
    */
   async resolveUrl(
     rawUrl: string,
-    ctx: { clientIp: string },
+    ctx: { clientIp: string; authenticatedUserId?: string },
   ): Promise<DiscoveryResolveResult> {
     const safe = redactUrlForLogs(rawUrl);
     this.logger.log(
       `discovery.resolve safeUrl=${safe} ip=${this.redactIp(ctx.clientIp)}`,
     );
 
-    const gated = gateAndNormalizeBrandUrl(rawUrl);
-    if (!gated.ok) {
-      return this.mapGateFailure(gated.reason);
+    const entry = await this.scanGate.evaluateEntry({
+      rawUrl,
+      clientIp: ctx.clientIp,
+      authenticatedUserId: ctx.authenticatedUserId,
+    });
+
+    if (entry.kind === "url_blocked" && !entry.reason.ok) {
+      return this.mapGateFailure(entry.reason.reason);
+    }
+    if (entry.kind === "org_claimed") {
+      return { outcome: "org_claimed", ...entry };
+    }
+    if (entry.kind === "brand_active") {
+      return { outcome: "brand_active", ...entry };
+    }
+    if (entry.kind === "verification_required") {
+      return { outcome: "verification_required", ...entry };
+    }
+    if (entry.kind === "resume") {
+      return {
+        outcome: "resume",
+        leadId: entry.leadId,
+        normalizedUrl: entry.normalizedUrl,
+        industry: entry.industry,
+        brandProfileId: entry.brandProfileId,
+        domain: entry.domain,
+      };
     }
 
-    const claimedContact = await this.findClaimedOrganizationContact(
-      gated.hostname,
-      gated.normalizedUrl,
-    );
-    if (claimedContact) {
-      return {
-        outcome: "org_claimed",
-        message:
-          "This brand domain is already set up. Ask your organization admin for an invitation to join the team.",
-        domain: gated.hostname,
-        adminEmail: claimedContact,
-      };
+    if (entry.kind !== "allow") {
+      return this.mapGateFailure("INVALID_SYNTAX");
     }
 
     const classified = await this.industryClassifier.classify({
-      hostname: gated.hostname,
-      normalizedUrl: gated.normalizedUrl,
+      hostname: entry.hostname,
+      normalizedUrl: entry.normalizedUrl,
     });
-
-    if (classified.bucket === "supported") {
-      const lead = await this.prisma.discoveryLead.findUnique({
-        where: { normalizedUrl: gated.normalizedUrl },
-      });
-      if (lead) {
-        const existingProfile = await this.prisma.brandProfile.findUnique({
-          where: { domain: gated.hostname },
-          select: {
-            id: true,
-            name: true,
-            scanStatus: true,
-            tagline: true,
-            description: true,
-            _count: {
-              select: {
-                offerings: true,
-                competitors: true,
-                locations: true,
-              },
-            },
-          },
-        });
-        const existingBrandProfile = existingProfile
-          ? {
-              brandProfileId: existingProfile.id,
-              name: existingProfile.name,
-              scanStatus: existingProfile.scanStatus,
-              tagline: existingProfile.tagline,
-              descriptionPreview: existingProfile.description
-                ? existingProfile.description.slice(0, 280)
-                : null,
-              offerings: existingProfile._count.offerings,
-              competitors: existingProfile._count.competitors,
-              locations: existingProfile._count.locations,
-            }
-          : undefined;
-        return {
-          outcome: "resume",
-          leadId: lead.id,
-          normalizedUrl: lead.normalizedUrl,
-          industry: lead.industry ?? classified.industry,
-          ...(existingBrandProfile ? { existingBrandProfile } : {}),
-        };
-      }
-      return {
-        outcome: "proceed",
-        normalizedUrl: gated.normalizedUrl,
-        domain: gated.hostname,
-        industry: classified.industry,
-      };
-    }
 
     return {
       outcome: "proceed",
-      normalizedUrl: gated.normalizedUrl,
-      domain: gated.hostname,
+      normalizedUrl: entry.normalizedUrl,
+      domain: entry.domain,
       industry: classified.industry,
     };
   }
 
   async validateUrl(
     rawUrl: string,
-    ctx: { clientIp: string },
+    ctx: { clientIp: string; authenticatedUserId?: string },
   ): Promise<DiscoverValidateResult> {
     const safe = redactUrlForLogs(rawUrl);
     this.logger.log(
       `discovery.validate safeUrl=${safe} ip=${this.redactIp(ctx.clientIp)}`,
     );
+
+    const entry = await this.scanGate.evaluateEntry({
+      rawUrl,
+      clientIp: ctx.clientIp,
+      authenticatedUserId: ctx.authenticatedUserId,
+    });
+
+    if (entry.kind === "url_blocked" && !entry.reason.ok) {
+      const logId = await this.recordGateFailureIntel(
+        entry.reason.reason,
+        entry.reason.hostname,
+        rawUrl,
+      );
+      return this.mapGateFailure(entry.reason.reason, logId);
+    }
+    if (entry.kind === "org_claimed") {
+      return { outcome: "org_claimed", ...entry };
+    }
+    if (entry.kind === "brand_active") {
+      return { outcome: "brand_active", ...entry };
+    }
+    if (entry.kind === "verification_required") {
+      return { outcome: "verification_required", ...entry };
+    }
 
     const gated = gateAndNormalizeBrandUrl(rawUrl);
     if (!gated.ok) {
@@ -225,20 +224,6 @@ export class BrandOnboardingService {
         rawUrl,
       );
       return this.mapGateFailure(gated.reason, logId);
-    }
-
-    const claimedContact = await this.findClaimedOrganizationContact(
-      gated.hostname,
-      gated.normalizedUrl,
-    );
-    if (claimedContact) {
-      return {
-        outcome: "org_claimed",
-        message:
-          "This brand domain is already set up. Ask your organization admin for an invitation to join the team.",
-        domain: gated.hostname,
-        adminEmail: claimedContact,
-      };
     }
 
     const classified = await this.industryClassifier.classify({
@@ -328,30 +313,6 @@ export class BrandOnboardingService {
       },
     });
     return { id: row.id };
-  }
-
-  private async findClaimedOrganizationContact(
-    hostname: string,
-    normalizedUrl: string,
-  ): Promise<string | null> {
-    const profile = await this.prisma.brandProfile.findFirst({
-      where: {
-        OR: [{ domain: hostname }, { domain: normalizedUrl }],
-      },
-      select: {
-        isVerified: true,
-        organizationId: true,
-      },
-    });
-    if (!profile?.organizationId || !profile.isVerified) {
-      return null;
-    }
-    const user = await this.prisma.user.findFirst({
-      where: { organizationId: profile.organizationId },
-      orderBy: { createdAt: "asc" },
-      select: { email: true },
-    });
-    return user?.email ?? null;
   }
 
   private redactIp(ip: string): string {

@@ -16,5 +16,10 @@ export type SurfaceScanRunResult = {
  * swapped for an out-of-process MCP tool or a worker job without changing HTTP routes.
  */
 export interface BrandSurfaceScanRunner {
-  run(args: { leadId: string; force?: boolean }): Promise<SurfaceScanRunResult>;
+  run(args: {
+    leadId: string;
+    force?: boolean;
+    clientIp: string;
+    authenticatedUserId?: string;
+  }): Promise<SurfaceScanRunResult>;
 }

@@ -84,6 +84,11 @@ enum SubscriptionStatus {
   CANCELED
 }
 
+/// Vendor surface-scan runs only (cache hits are not counted toward rate limits).
+enum SurfaceScanAttemptKind {
+  SURFACE_VENDOR
+}
+
 // ============================================================================
 // CORE MODELS (Organization & User)
 // ============================================================================
@@ -103,6 +108,8 @@ model Organization {
 model User {
   id             String          @id @default(uuid())
   email          String          @unique
+  /// Display name; brand onboarding sets local-part of work email.
+  name           String?
   role           UserRole
   organizationId String?         @map("organization_id")
   organization   Organization?   @relation(fields: [organizationId], references: [id])
@@ -169,6 +176,20 @@ model WaitlistLead {
   @@index([discoveryLeadId])
   @@index([marketIntelligenceLogId])
   @@map("waitlist_leads")
+}
+
+model SurfaceScanAttempt {
+  id              String                 @id @default(uuid())
+  domain          String
+  clientIp        String                 @map("client_ip")
+  discoveryLeadId String?                @map("discovery_lead_id")
+  brandProfileId  String?                @map("brand_profile_id")
+  kind            SurfaceScanAttemptKind @default(SURFACE_VENDOR)
+  createdAt       DateTime               @default(now()) @map("created_at")
+
+  @@index([domain, createdAt])
+  @@index([clientIp, createdAt])
+  @@map("surface_scan_attempts")
 }
 
 // ============================================================================

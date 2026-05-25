@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { ThrottlerModule } from "@nestjs/throttler";
 
 import { AppController } from "./app.controller";
+import { AuthModule } from "./features/auth/auth.module";
 import { BrandOnboardingModule } from "./features/brand-onboarding/brand-onboarding.module";
 import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -21,6 +22,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     ]),
     PrismaModule,
     HealthModule,
+    AuthModule,
     BrandOnboardingModule,
   ],
   controllers: [AppController],

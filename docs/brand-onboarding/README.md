@@ -35,6 +35,7 @@ See [IMPLEMENTATION_TRACKING.md](./IMPLEMENTATION_TRACKING.md) for phased work, 
 - [ENTRY_RESOLVER.md](./ENTRY_RESOLVER.md) — read-only `POST /api/v1/discovery/resolve` before `validate`.
 - [AI_GUARDRAILS.md](./AI_GUARDRAILS.md) — Parallel + Gemini safety and hygiene (living).
 - [SURFACE_SCAN_AND_PROMPTS.md](./SURFACE_SCAN_AND_PROMPTS.md) — **where to edit prompts**, how Parallel/Gemini scan runs, cache vs `force`, and check order.
+- [VERIFICATION_OTP_TOGGLE.md](./VERIFICATION_OTP_TOGGLE.md) — Step 6 OTP: stub `123456` (default) vs real email for production.
 
 ## Frontend (v2) — deferred checklist
 

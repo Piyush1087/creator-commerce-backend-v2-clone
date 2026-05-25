@@ -59,6 +59,11 @@ export default $config({
         ? devDatabaseUrlOverride
         : $interpolate`postgresql://${aurora.username}:${aurora.password}@${aurora.host}:${aurora.port}/${aurora.database}`;
 
+    const JWT_SECRET_DEV =
+      process.env.JWT_SECRET_DEV ?? "ccs-jwt-dev-placeholder-change-me";
+    const JWT_SECRET_PROD =
+      process.env.JWT_SECRET_PROD ?? "ccs-jwt-prod-placeholder-change-me";
+
     const cluster = new sst.aws.Cluster("api-cluster", { vpc });
 
     cluster.addService("api", {
@@ -82,6 +87,7 @@ export default $config({
         GEMINI_MODEL: process.env.GEMINI_MODEL || "gemini-2.5-flash",
         PARALLEL_API_KEY: process.env.PARALLEL_API_KEY as string,
         CORS_ORIGINS: process.env.CORS_ORIGINS || "http://localhost:5173,https://dashboard.dev.thecreatorshop.in",
+        JWT_SECRET: $app.stage === "prod" ? JWT_SECRET_PROD : JWT_SECRET_DEV,
       },
       loadBalancer: {
         ports: [{ listen: "443/https", forward: "80/http" }],

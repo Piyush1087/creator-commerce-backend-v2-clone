@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@700,900&amp;display=swap" rel="stylesheet"/>
+<title>Creator Hub - Social Sync</title>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Source Sans 3', sans-serif;
+        }
+        .font-satoshi {
+            font-family: 'Satoshi', sans-serif;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#006c4b",
+                        "primary-container": "#34d399",
+                        "aurora-green": "#34D399",
+                        "surface": "#f9f9ff",
+                        "pane-left": "#F8F8F8",
+                        "pane-right": "#061F23",
+                        "on-surface": "#151c27",
+                        "on-surface-variant": "#3c4a42",
+                        "outline-variant": "#bbcac0",
+                        "secondary": "#4b6267",
+                        "on-secondary": "#ffffff",
+                        "error": "#ba1a1a"
+                    },
+                    "fontSize": {
+                        "body": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "h1-desktop": ["32px", {"lineHeight": "1.2", "fontWeight": "700"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface overflow-hidden">
+<!-- TopAppBar -->
+<header class="bg-surface shadow-sm fixed top-0 left-0 right-0 z-50 flex justify-between items-center w-full px-8 h-16 border-b border-outline-variant/30">
+<div class="flex items-center gap-4">
+<span class="font-satoshi text-[24px] font-bold text-primary">The Creator Shop</span>
+</div>
+<div class="flex items-center gap-6">
+<a class="text-on-surface-variant font-semibold text-[14px] hover:text-primary transition-colors" href="#">Help Center</a>
+<div class="flex items-center gap-3">
+<button class="material-symbols-outlined text-primary hover:bg-primary-container/20 p-2 rounded-full transition-colors">help</button>
+<button class="material-symbols-outlined text-primary hover:bg-primary-container/20 p-2 rounded-full transition-colors">settings</button>
+<div class="w-8 h-8 rounded-full bg-slate-200 border border-outline-variant overflow-hidden">
+<img alt="User" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBtdSxMboSZUT-p5MheZWH9lCgCeGCayzVeq762D4L9cycZ4RT7yCGJ9MczT366hDJhK4D-YAipCM97N4lYJcfVvJIECTRwDlSP-M34iYN_wddEEDMtj3tcaJ1xz6UUSyt8IJ0NM_TAHlHwCk5TPok_FrBDXO6fJ47tij6o_e-Lu7kA5aEt7SjnaTgOZCT0TNX8De0rcyh6ILB2Oz9zios2KWaimAcQA8mwLJR58ldRR9ND8Q8bP_DqcUdVzQ-0_ebzcss9lCqy1n0P"/>
+</div>
+</div>
+</div>
+</header>
+<div class="flex h-screen pt-16">
+<!-- SideNavBar -->
+<aside class="h-full w-64 hidden lg:flex flex-col bg-white border-r border-outline-variant fixed left-0 top-16 bottom-0 z-40">
+<div class="p-6 flex flex-col gap-2">
+<div class="flex items-center gap-3 mb-6">
+<div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-white font-bold">CH</div>
+<div>
+<p class="font-bold text-[14px] text-on-surface">Creator Hub</p>
+<p class="text-[12px] text-on-surface-variant">Onboarding Step 8/10</p>
+</div>
+</div>
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-slate-50 rounded-lg transition-colors text-[14px]" href="#">
+<span class="material-symbols-outlined text-[20px]">person</span>
+<span>Profile</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-slate-50 rounded-lg transition-colors text-[14px]" href="#">
+<span class="material-symbols-outlined text-[20px]">business</span>
+<span>Business Info</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-slate-50 rounded-lg transition-colors text-[14px]" href="#">
+<span class="material-symbols-outlined text-[20px]">store</span>
+<span>Storefront</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-slate-50 rounded-lg transition-colors text-[14px]" href="#">
+<span class="material-symbols-outlined text-[20px]">hub</span>
+<span>Integrations</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 bg-aurora-green/20 text-primary font-bold rounded-lg transition-colors text-[14px]" href="#">
+<span class="material-symbols-outlined text-[20px]">sync</span>
+<span>Social Sync</span>
+</a>
+</nav>
+</div>
+</aside>
+<!-- Main Content Area - Split Screen 50/50 -->
+<main class="flex-1 lg:ml-64 flex flex-col md:flex-row h-full overflow-hidden">
+<!-- Left Pane (#F8F8F8) -->
+<section class="flex-1 bg-pane-left p-8 md:p-12 overflow-y-auto flex flex-col">
+<div class="max-w-xl mx-auto w-full flex-1 flex flex-col justify-center">
+<header class="mb-8">
+<h1 class="font-satoshi text-h1-desktop text-on-surface mb-2">Unleash Verified Intelligence</h1>
+<p class="text-[16px] text-on-surface-variant">Sync your Meta Business Manager to transition from AI estimates to verified performance data.</p>
+</header>
+<!-- Permissions Box -->
+<div class="bg-white border border-outline-variant rounded-xl p-6 mb-8 shadow-sm">
+<div class="flex flex-col gap-6">
+<div class="flex gap-4 items-start">
+<span class="material-symbols-outlined text-primary mt-1" data-icon="monitoring">monitoring</span>
+<div>
+<h3 class="font-bold text-[14px] text-on-surface">Performance Insights</h3>
+<p class="text-[14px] text-on-surface-variant">Analyze reach, saves, and conversion metrics.</p>
+</div>
+</div>
+<div class="flex gap-4 items-start">
+<span class="material-symbols-outlined text-primary mt-1" data-icon="travel_explore">travel_explore</span>
+<div>
+<h3 class="font-bold text-[14px] text-on-surface">Business Discovery</h3>
+<p class="text-[14px] text-on-surface-variant">Monitor competitor growth and content shifts in real-time.</p>
+</div>
+</div>
+<div class="flex gap-4 items-start">
+<span class="material-symbols-outlined text-primary mt-1" data-icon="campaign">campaign</span>
+<div>
+<h3 class="font-bold text-[14px] text-on-surface">Creator Marketplace</h3>
+<p class="text-[14px] text-on-surface-variant">Priority DM access to land in creator Primary inboxes.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Meta Button -->
+<div class="mb-8">
+<button class="w-full bg-aurora-green text-primary font-bold text-[16px] py-4 rounded-lg shadow-lg hover:brightness-105 transition-all active:scale-[0.98] flex items-center justify-center gap-3" onclick="showLoading()">
+<svg class="w-6 h-6" fill="currentColor" viewbox="0 0 24 24">
+<path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987H7.898v-2.891h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562v1.875h2.773l-.443 2.891h-2.33v6.987C18.343 21.128 22 16.991 22 12c0-5.523-4.477-10-10-10z"></path>
+</svg>
+                            Connect Meta Business Manager
+                        </button>
+</div>
+<!-- Fallback Section -->
+<div class="p-6 bg-slate-100 border border-outline-variant/50 rounded-xl mb-8">
+<h3 class="font-bold text-[14px] text-on-surface mb-1">Not the Account Admin?</h3>
+<p class="text-[14px] text-on-surface-variant mb-4">Invite your manager or admin to complete the setup.</p>
+<div class="flex flex-col sm:flex-row gap-2">
+<input class="flex-1 bg-white border border-outline-variant rounded-lg px-4 py-3 focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-[14px]" placeholder="Work email address" type="email"/>
+<button class="bg-secondary text-on-secondary px-6 py-3 rounded-lg font-bold text-[14px] hover:bg-on-surface transition-colors whitespace-nowrap">
+                                Send Invite
+                            </button>
+</div>
+</div>
+<!-- Left Footer -->
+<div class="flex flex-col items-center gap-6 mt-auto">
+<button class="text-[14px] font-bold text-on-surface-variant hover:text-error transition-colors underline underline-offset-4">Skip for now</button>
+<div class="flex flex-wrap justify-center gap-8 opacity-60">
+<div class="flex items-center gap-2 text-[#9CA3AF]">
+<span class="material-symbols-outlined text-[18px]">verified_user</span>
+<span class="text-[11px] font-bold uppercase tracking-widest">Meta Tech Provider</span>
+</div>
+<div class="flex items-center gap-2 text-[#9CA3AF]">
+<span class="material-symbols-outlined text-[18px]">lock</span>
+<span class="text-[11px] font-bold uppercase tracking-widest">SSL Secure</span>
+</div>
+<div class="flex items-center gap-2 text-[#9CA3AF]">
+<span class="material-symbols-outlined text-[18px]">gavel</span>
+<span class="text-[11px] font-bold uppercase tracking-widest">GDPR Compliant</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Pane (#061F23) -->
+<section class="flex-1 bg-pane-right text-white p-8 md:p-12 flex flex-col items-center justify-center relative overflow-hidden">
+<!-- Floating Badge -->
+<div class="absolute top-8 left-1/2 -translate-x-1/2 z-20">
+<div class="bg-white/10 backdrop-blur-md border border-aurora-green/30 px-4 py-2 rounded-full flex items-center gap-2 shadow-2xl">
+<span class="material-symbols-outlined text-aurora-green text-[18px]">auto_awesome</span>
+<span class="text-[11px] font-bold text-aurora-green uppercase tracking-widest">API Connected: Creator Marketplace Unlocked</span>
+</div>
+</div>
+<div class="relative z-10 w-full max-w-lg text-center">
+<h2 class="font-satoshi text-[32px] font-bold mb-10 text-aurora-green">Dashboard Sneak-Peek</h2>
+<!-- Dashboard Mockup Card -->
+<div class="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl text-left">
+<div class="flex items-center justify-between mb-6 border-b border-white/5 pb-4">
+<div class="flex items-center gap-1.5">
+<div class="w-2.5 h-2.5 bg-red-400 rounded-full"></div>
+<div class="w-2.5 h-2.5 bg-yellow-400 rounded-full"></div>
+<div class="w-2.5 h-2.5 bg-green-400 rounded-full"></div>
+</div>
+<div class="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">Global Analytics v5.0</div>
+</div>
+<div class="grid grid-cols-2 gap-6 h-64">
+<!-- Estimated Engagement (Blurry) -->
+<div class="flex flex-col gap-3">
+<p class="text-[9px] font-bold text-white/30 uppercase tracking-widest text-center">Estimated Engagement</p>
+<div class="flex-1 bg-white/5 rounded-xl border border-white/5 flex flex-col items-center justify-center p-4 opacity-20 blur-[2px]">
+<div class="w-full space-y-3">
+<div class="h-1.5 bg-white/10 rounded-full w-3/4"></div>
+<div class="h-1.5 bg-white/10 rounded-full w-1/2"></div>
+<div class="h-1.5 bg-white/10 rounded-full w-2/3"></div>
+<div class="text-xl font-bold text-white/20 mt-4 text-center">~42.5k</div>
+</div>
+</div>
+</div>
+<!-- Verified API Data (Glow) -->
+<div class="flex flex-col gap-3">
+<p class="text-[9px] font-bold text-aurora-green uppercase tracking-widest text-center">Verified API Data</p>
+<div class="flex-1 rounded-xl border border-aurora-green/40 bg-aurora-green/5 flex flex-col p-4 shadow-[0_0_30px_rgba(52,211,153,0.15)]">
+<div class="flex justify-between items-start mb-4">
+<div class="flex flex-col">
+<span class="text-[9px] text-aurora-green/60 font-bold uppercase tracking-tight">Accuracy Score</span>
+<span class="text-lg font-bold text-aurora-green">Match: 98%</span>
+</div>
+<span class="material-symbols-outlined text-aurora-green text-[20px] animate-pulse">verified</span>
+</div>
+<div class="flex-1 flex items-end gap-1.5 px-1">
+<div class="flex-1 bg-aurora-green/30 rounded-t-sm h-[35%]"></div>
+<div class="flex-1 bg-aurora-green/50 rounded-t-sm h-[60%]"></div>
+<div class="flex-1 bg-aurora-green/70 rounded-t-sm h-[50%]"></div>
+<div class="flex-1 bg-aurora-green rounded-t-sm h-[95%] shadow-[0_0_15px_rgba(52,211,153,0.6)]"></div>
+<div class="flex-1 bg-aurora-green/80 rounded-t-sm h-[70%]"></div>
+</div>
+<div class="mt-4 pt-3 border-t border-white/5">
+<div class="flex justify-between text-[9px] font-bold text-aurora-green/70">
+<span>REAL-TIME FEED</span>
+<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 bg-aurora-green rounded-full animate-ping"></span> LIVE</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Card Footer -->
+<div class="mt-8 pt-4 border-t border-white/5 flex items-center justify-between">
+<div>
+<p class="text-[10px] text-white/30 font-bold uppercase tracking-tighter">Current Data Source</p>
+<p class="text-[13px] font-bold text-white/80">Meta API Connection</p>
+</div>
+<div class="text-right">
+<p class="text-[10px] text-white/30 font-bold uppercase tracking-tighter">Latency</p>
+<p class="text-[13px] font-bold text-aurora-green">Real-time (0.4ms)</p>
+</div>
+</div>
+</div>
+<!-- Bottom Image -->
+<div class="mt-10 rounded-2xl overflow-hidden border border-white/10 shadow-2xl opacity-60 hover:opacity-100 transition-opacity duration-500">
+<img alt="Analytics Display" class="w-full h-32 object-cover grayscale contrast-125" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCVf24JKXF0AZQu0xmSeH4zOgDNzTho1RjVGAMJ3pMhq1wzhwCi4imtIK5xbfrnxMhBLdGd4sMLKHQi0pDWNX88LnxOBFuv8HiuHVBbhSDW4ouYWVyqC-cZAuWD-QjPV9p-IjLYPkIddKNfmbNyRDJum_QWeYdl0_eOQlemwjjY8viAqc1IyQ8SZ322z9O8VMzORYtTRq7To0Z2tK1oIrhrpF3Iy1cwYeE8P8WDUpvo5oE9dG_0BVL7j0E1-0tXlPKxd0-bk8EibHXP"/>
+</div>
+</div>
+<!-- Decorative Background -->
+<div class="absolute inset-0 pointer-events-none">
+<div class="absolute -top-1/4 -right-1/4 w-full h-full bg-aurora-green/10 rounded-full blur-[150px]"></div>
+<div class="absolute -bottom-1/4 -left-1/4 w-full h-full bg-primary/10 rounded-full blur-[150px]"></div>
+</div>
+</section>
+</main>
+</div>
+<!-- Loading Overlay (Hidden State) -->
+<div class="fixed inset-0 z-[100] bg-on-surface/60 backdrop-blur-sm hidden flex-col items-center justify-center transition-all duration-300" id="loading-overlay">
+<div class="bg-white p-10 rounded-2xl shadow-2xl flex flex-col items-center gap-6">
+<div class="relative">
+<div class="w-16 h-16 border-[5px] border-aurora-green/20 border-t-aurora-green rounded-full animate-spin"></div>
+<div class="absolute inset-0 w-16 h-16 border-[5px] border-aurora-green rounded-full animate-ping opacity-20"></div>
+</div>
+<p class="font-bold text-[18px] text-on-surface tracking-tight">Launching Secure Connection...</p>
+<p class="text-[14px] text-on-surface-variant max-w-[240px] text-center">Verifying credentials with Meta Business Manager</p>
+</div>
+</div>
+<script>
+        function showLoading() {
+            const overlay = document.getElementById('loading-overlay');
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+            
+            // Auto-hide after a few seconds for demo purposes
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+                overlay.classList.remove('flex');
+            }, 3000);
+        }
+    </script>
+</body></html>

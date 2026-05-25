@@ -2,33 +2,39 @@
 
 ## Purpose
 
-Give the **marketing shell** and future authenticated app a **cheap, read-only**
-decision point before running heavier work (Parallel/Gemini) or persisting
-triage rows.
+Read-only Step 1 gate before `validate` or surface scan. Implements product **v2.1** early-gate rules from `changes.md` (see [STEP1_GATE_V2_1.md](./STEP1_GATE_V2_1.md)).
 
-## Behaviour (current)
+**Deep scan is not implemented.**
 
-| Condition | Response `outcome` | DB writes |
-|-----------|-------------------|-----------|
-| URL fails gate (syntax, social host, private host, bad TLD) | `blocked` | **None** (unlike `validate`, which records gate failures in `market_intelligence_logs`) |
-| `BrandProfile` exists for domain, verified, org has user | `org_claimed` + `adminEmail` | None |
-| Supported stub + existing `DiscoveryLead` for `normalizedUrl` | `resume` + `leadId` | None |
-| Otherwise (needs full triage / new lead) | `proceed` | None |
+## Behaviour (priority order)
+
+| Condition | `outcome` | DB writes on resolve |
+|-----------|-----------|---------------------|
+| URL gate failure | `blocked` | None |
+| Verified + org + user | `org_claimed` (+ `adminEmail`) | None |
+| Verified, caller not owner | `brand_active` | None |
+| Domain or IP vendor scans **> 5** in 7d (limits on) | `verification_required` (+ `brandProfileId`) | None |
+| Unverified surface-complete profile **&lt; 7d** + lead | `resume` (+ `brandProfileId`, no preview leak) | None |
+| Else | `proceed` | None |
+
+`validate` applies the same gate before creating/updating leads.
 
 ## Client flow
 
-1. Call **`resolve`** first.
-2. If `resume` → continue onboarding UI with stored `leadId` / `normalizedUrl`
-   (no `validate` call required for the lead row).
-3. If `proceed` → call **`validate`** to persist `discovery_leads` / market
-   intel as today.
-4. If `org_claimed` → show invitation modal (no `validate`).
-5. If `blocked` → show inline error.
+1. **`resolve`** with optional `Authorization: Bearer` (owner bypass).
+2. `org_claimed` / `brand_active` / `verification_required` → modals (no scan).
+3. `resume` → save session → **Brand DNA** (skip scan when surface already complete).
+4. `proceed` → **`validate`** → preview/setup → **surface-scan**.
 
-## Notes
+## Surface scan
 
-- **No cookies:** continuity is keyed off DB entities and auth, not browser
-  storage (see `IMPLEMENTATION_TRACKING.md`).
-- Gate-failure **intel** is intentionally **skipped** on `resolve` to avoid
-  noisy rows from speculative URL checks; `validate` remains the persistence
-  path for those failures.
+Same gate on `POST /api/v1/brand/surface-scan`. Vendor runs log to `surface_scan_attempts`; cache hits do not.
+
+## Limits
+
+Off when `STAGE=local` (unless `BRAND_SCAN_LIMITS_ENABLED=true`). On for dev/prod.
+
+## Related docs
+
+- [STEP1_GATE_V2_1.md](./STEP1_GATE_V2_1.md)
+- [MANUAL_TESTING_STEP1_GATE.md](./MANUAL_TESTING_STEP1_GATE.md)

@@ -27,6 +27,8 @@ export class UnconfiguredBrandSurfaceScanRunner implements BrandSurfaceScanRunne
   async run(args: {
     leadId: string;
     force?: boolean;
+    clientIp: string;
+    authenticatedUserId?: string;
   }): Promise<SurfaceScanRunResult> {
     const lead = await this.prisma.discoveryLead.findUnique({
       where: { id: args.leadId },

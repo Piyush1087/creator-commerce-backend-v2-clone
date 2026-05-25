@@ -4,7 +4,7 @@ This document is the **living checklist** for backend work aligned with product 
 
 **Constraints (current):**
 
-- **Do not change Prisma schema** until explicitly approved; work within existing models and fields.
+- **Prisma schema changes** require review + `npm run db:migrate:dev` / `prisma generate` (see Auth section for latest).
 - **No browser cookies** for onboarding continuity: **server-side state** is keyed by `DiscoveryLead` / `normalizedUrl`, future `BrandProfile`, and authenticated `User` after login.
 
 ---
@@ -13,13 +13,17 @@ This document is the **living checklist** for backend work aligned with product 
 
 | Stream | State | Notes |
 |--------|--------|--------|
-| Step 1 HTTP | **Shipped (stub industry)** | `resolve`, `validate`, and **`waitlist`** under `/api/v1/discovery/*`; OpenAPI + frontend contracts kept in sync. |
+| Step 1 HTTP | **Shipped (v2.1 gate)** | `resolve` / `validate` with `org_claimed`, `brand_active`, `verification_required`, `resume` (7d), scan limits (dev/prod); [STEP1_GATE_V2_1.md](./STEP1_GATE_V2_1.md), [MANUAL_TESTING_STEP1_GATE.md](./MANUAL_TESTING_STEP1_GATE.md). |
 | Step 1 intelligence | **Stub behind DI** | `IndustryClassifier` token + `StubIndustryClassifier`; swap provider for Parallel/Gemini without changing orchestration. |
 | Steps 2–5 (surface) | **MVP shipped** | `POST /api/v1/brand/surface-scan` persists `BrandProfile` + children via Parallel + Gemini when keys are set; **503** when keys are missing (except `mode: "cached"` short-circuit). Frontend v2 scan → DNA → catalogue → competitors wired to APIs + `sessionStorage` handoff. |
-| Auth | **Not started** | No Nest auth module yet; `User` / `Organization` exist in Prisma only. |
+| Auth (brand MVP) | **Shipped (placeholder)** | `src/features/auth/` — email-only registration on pricing CTA; login via email + stub OTP `123456`; `GET /api/v1/auth/me`. **Plan assignment deferred**. |
+| Step 1 purge | **Shipped** | Daily cron deletes unverified profiles (no org) older than 7d. |
+| Deep intel (Step 7) | **Not started** | Post-verify worker deferred; surface-only funnel through login. |
 | DB migrations | **Operator** | Run `npm run db:migrate:dev` when schema changes are approved; local DB must be reachable (`DATABASE_URL`). |
 
-**Next up (suggested order):** (1) S3 mirror for extracted images + stable URLs, (2) optional `DiscoveryLead.userId` when authenticated, (3) replace **Step 1** `IndustryClassifier` stub with vendor-backed classification, (4) deep scan worker + richer PDP crawl post-verify, (5) contract tests / Prisma integration tests for scan + profile patch.
+**Next up (suggested order):** (1) S3 mirror for extracted images + stable URLs, (2) brand plan assignment at org level (free trial / professional / enterprise), (3) replace **Step 1** `IndustryClassifier` stub with vendor-backed classification, (4) deep scan worker + richer PDP crawl post-verify, (5) contract tests / Prisma integration tests for scan + profile patch.
+
+**Frontend auth (v2):** `/login` (brand email + OTP `123456`), `/brand/dashboard` (JWT gate + logout → `/`). Pricing CTA → complete-registration (no password UI); social-sync **Skip** → dashboard.
 
 ---
 
@@ -42,6 +46,18 @@ Throttling: Nest `ThrottlerModule` (global + per-route limits on controllers). S
 | `POST` | `/api/v1/brand/surface-scan` | Run Parallel extract + Gemini synthesis; upsert `BrandProfile` + replace `Offering` / `Competitor` / `Location` children. **201** `{ brandProfileId, domain, mode, counts }`. |
 | `GET` | `/api/v1/brand/profiles/:brandProfileId` | Read persisted scan output for Steps 3–5 UI. |
 | `PATCH` | `/api/v1/brand/profiles/:brandProfileId` | Partial Brand DNA edits (`isUserEdited` merge). |
+| `POST` | `/api/v1/brand/profiles/:brandProfileId/verification/send` | Email OTP send (real when `BRAND_VERIFICATION_USE_REAL_OTP=true`; else stub — see [VERIFICATION_OTP_TOGGLE.md](./VERIFICATION_OTP_TOGGLE.md)). |
+| `POST` | `/api/v1/brand/profiles/:brandProfileId/verification/verify` | OTP verify; sets `isVerified` (stub accepts `123456` pre-prod). |
+
+## Implemented API (Auth — brand MVP)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/api/v1/auth/login` | Email + OTP (stub `123456`) + `role: BRAND` → JWT. |
+| `POST` | `/api/v1/auth/brand/complete-registration` | After Step 6 verify: create `Organization`, `User` (verified email), link `BrandProfile.organizationId`. |
+| `GET` | `/api/v1/auth/me` | Bearer JWT → current user summary. |
+
+**JWT:** `24h` expiry in code; `JWT_SECRET_DEV` / `JWT_SECRET_PROD` in `.env`, mapped in `sst.config.ts` (see [BRAND_AUTH.md](./BRAND_AUTH.md)).
 
 **Env (no secrets in repo):** `PARALLEL_API_KEY`, `GEMINI_API_KEY`, optional `GEMINI_MODEL` (default `gemini-2.0-flash`), optional `PARALLEL_EXTRACT_TIMEOUT_MS`, `GEMINI_REQUEST_TIMEOUT_MS`.
 
@@ -69,14 +85,14 @@ Throttling: Nest `ThrottlerModule` (global + per-route limits on controllers). S
 | Topic | Decision |
 |-------|-----------|
 | Session / resume | **No cookies.** Resume and idempotency use **DB keys** (`DiscoveryLead.normalizedUrl`, later `BrandProfile.domain`) and **auth** after user creation. |
-| Domain already onboarded | If `BrandProfile` exists for the domain, **`isVerified`**, **`organizationId` set**, and **at least one `User`** exists on that org → return **`outcome: "org_claimed"`** with **admin email** for the modal (first org user by `createdAt`, until invitation flow exists). |
+| Domain already onboarded | **`org_claimed`**: verified + org + user (+ admin email for modal). **`brand_active`**: `isVerified` without owner JWT (login CTA). |
 | Invitations / multi-brand | **Later.** No org invitation APIs yet; modal copy only. |
 | Step 6–8 (now) | **OTP + login + user creation** only where schema/auth already allows; **no** full “sneak peek” carousel, deep intel pipeline, or billing until product + schema catch up. |
 | AI vendors | **Parallel.ai** + **Gemini** for extraction/synthesis; **not** Zyte/Playwright in the default path. Guardrails: [AI_GUARDRAILS.md](./AI_GUARDRAILS.md) (expand as vendors wire in). |
 | Async work | **Phase 1:** synchronous API + durable rows; **Phase 2:** queue/worker when jobs exceed SLAs or need retries (document triggers when we measure). |
 | MCP vs direct HTTP | **Direct** Nest providers calling vendor SDKs/HTTP for production paths; MCP remains a **tooling** concern unless we standardize a gateway. |
 | CDN images | On ingest, **mirror to S3** (stage buckets: `creatorshop-v2-files-local` / `-dev` / `-prod` or env-per-deploy) and persist **stable** URLs in DB columns / JSON — not raw third-party CDN URLs as the only copy. |
-| Discovery + saved brand retention | **`BrandProfile` (surface scan output), child rows (`Offering` / `Competitor` / `Location`), and `DiscoveryLead` / related logs are kept indefinitely** for now: **no TTL columns**, **no cron or worker purge**, **no auto-delete after 30 days** (or any horizon) for unclaimed or unverified brands. Product may later add retention (for example **purge or archive drafts after ~30 days if the domain is still unclaimed**); until that ships, treat persisted scan data as durable unless an operator deletes rows or you intentionally re-run with `force` / DB cleanup. **`resolve`** and surface-scan **cache** only avoid redundant **vendor** calls — they **do not** expire stored DB rows. |
+| Discovery + saved brand retention | **Unverified** profiles without org: **purged after 7 days** (daily cron). Verified / org-linked profiles retained. **`resolve`** does not leak preview payloads. |
 
 ---
 
@@ -93,7 +109,11 @@ Throttling: Nest `ThrottlerModule` (global + per-route limits on controllers). S
 
 - [x] URL gate + normalization (`discovery-url.util.ts`) — SSRF-safe (no blind fetch in hot path).
 - [x] `DiscoveryLead` / `MarketIntelligenceLog` persistence for supported / unsupported paths.
-- [x] **`org_claimed`** branch when domain is verified and org has a user (see service + OpenAPI).
+- [x] **`org_claimed`** when verified + org has user.
+- [x] **`brand_active`** when `isVerified` (anonymous re-entry blocked).
+- [x] **`verification_required`** domain/IP vendor scan caps (7d window; local exempt).
+- [x] **`resume`** unverified surface-complete profiles within 7d (`createdAt`).
+- [x] **`surface_scan_attempts`** + enforce gate on `surface-scan`.
 - [x] **Entry resolver** endpoint `POST /api/v1/discovery/resolve`: read-only shell routing (`resume` / `proceed` / `org_claimed` / `blocked` without gate-failure intel writes). See `ENTRY_RESOLVER.md`.
 - [x] **Industry vertical behind `IndustryClassifier`** — Nest token `INDUSTRY_CLASSIFIER`; `StubIndustryClassifier` wraps `discovery-industry.stub.ts` until vendor wiring lands.
 - [ ] **Replace stub output** with Parallel/Gemini-backed classification (new `@Injectable()` provider bound to `INDUSTRY_CLASSIFIER`).
@@ -111,11 +131,12 @@ Throttling: Nest `ThrottlerModule` (global + per-route limits on controllers). S
 - [x] **Waitlist capture API** — implemented under Step 1 (`POST /api/v1/discovery/waitlist`); frontend waitlist UI can wire when ready.
 - [x] **Brand profile bootstrap (MVP)** — `BrandProfile` upsert keyed by apex `domain` from `DiscoveryLead.normalizedUrl` (no `discovery_lead_id` FK yet; implicit link via domain until schema approval).
 
-### Phase 3 — Step 6 verification (product `step-6.md`)
+### Phase 3 — Step 6 verification (product `step-8.md` UI copy)
 
-- [ ] Work email domain vs website domain rules, public-provider blocks, OTP send/verify, rate limits — align with `VerificationCode` model.
-- [ ] UI placeholder acceptable until frontend ships full split pane; backend DTOs and errors must match product strings where feasible.
-- [ ] **Mail provider** — wire transactional email (OTP, invitations later); secrets via env only.
+- [x] APIs: `POST .../verification/send` + `POST .../verification/verify`; `VerificationCode` + Postmark `src/mail/`.
+- [x] Frontend verification screen wired (timers, paste, pricing redirect).
+- [x] **Pre-prod stub:** fixed code `123456` — see **[VERIFICATION_OTP_TOGGLE.md](./VERIFICATION_OTP_TOGGLE.md)** (flip `USE_REAL_BRAND_VERIFICATION_OTP` + `BRAND_VERIFICATION_USE_REAL_OTP=true` for prod).
+- [ ] Re-enable real OTP in production deploy checklist (Postmark env + both toggles).
 
 ### Phase 4 — Step 7 deep intel (background)
 
@@ -184,3 +205,4 @@ Module **folder** name: `brand-onboarding`. **Route prefixes:** `api/v1/discover
 | 2026-05-14 | Phase 1: `CORS_ORIGINS`, `IndustryClassifier` DI + stub provider, `POST /api/v1/discovery/waitlist` + OpenAPI + frontend contract types; tracker checkboxes updated. |
 | 2026-05-14 | Docs: `SURFACE_SCAN_AND_PROMPTS.md` + API README pointer; `resume` may include `existingBrandProfile` preview; surface-scan cache short-circuit (`mode: cached`) with `force` / `BRAND_SCAN_FORCE_REFRESH`; preview modal shows saved scan summary. |
 | 2026-05-14 | Removed surface-scan stub runner and `BRAND_SCAN_FORCE_STUB`; only Parallel+Gemini HTTP pipeline or unconfigured (503) / cache (`mode: cached`). Contracts and OpenAPI `mode` enum updated (`http` \| `cached`). |
+| 2026-05-25 | Step 6 real OTP + Postmark implemented; pre-prod stub `123456` default — [VERIFICATION_OTP_TOGGLE.md](./VERIFICATION_OTP_TOGGLE.md). |

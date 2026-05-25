@@ -3,6 +3,10 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import {
+  BrandScanGateException,
+  BrandScanGateService,
+} from "../brand-scan-gate.service";
 import { gateAndNormalizeBrandUrl } from "../discovery-url.util";
 import { GeminiJsonClient } from "../integrations/gemini/gemini-json.client";
 import { ParallelExtractClient } from "../integrations/parallel/parallel-extract.client";
@@ -50,6 +54,7 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly scanGate: BrandScanGateService,
     private readonly parallel: ParallelExtractClient,
     private readonly parallelSearch: ParallelSearchClient,
     private readonly gemini: GeminiJsonClient,
@@ -59,6 +64,8 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
   async run(args: {
     leadId: string;
     force?: boolean;
+    clientIp: string;
+    authenticatedUserId?: string;
   }): Promise<SurfaceScanRunResult> {
     const lead = await this.prisma.discoveryLead.findUnique({
       where: { id: args.leadId },
@@ -74,6 +81,13 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
       throw new Error("Discovery lead URL failed gate");
     }
     const domain = gated.hostname;
+
+    await this.scanGate.assertSurfaceScanAllowed({
+      domain,
+      normalizedUrl: gated.normalizedUrl,
+      clientIp: args.clientIp,
+      authenticatedUserId: args.authenticatedUserId,
+    });
 
     const forceRefresh =
       args.force === true ||
@@ -352,6 +366,13 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
       }
 
       return profile.id;
+    });
+
+    await this.scanGate.recordVendorSurfaceScan({
+      domain,
+      clientIp: args.clientIp,
+      discoveryLeadId: args.leadId,
+      brandProfileId: profileId,
     });
 
     const counts = await this.prisma.brandProfile.findUnique({
