@@ -1,9 +1,9 @@
-$ErrorActionPreference = "Stop"
-
 param(
   [string]$InstanceId = "i-03447f2aba0c94173",
   [int]$LocalPort = 5435
 )
+
+$ErrorActionPreference = "Stop"
 
 $env:AWS_PROFILE = "creator-dev"
 $Region = "ap-south-1"

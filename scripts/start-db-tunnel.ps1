@@ -1,15 +1,15 @@
-$ErrorActionPreference = "Stop"
-
-# Use Prod instance and host by default if Stage is prod
 param(
   [string]$Stage = "dev",
   [int]$LocalPort = 5435
 )
 
+$ErrorActionPreference = "Stop"
+
+# Use Prod instance and host by default if Stage is prod
 if ($Stage -eq "prod") {
   $env:AWS_PROFILE = "creator-prod"
   # Target Instance: Bastion for Prod (SST Managed or Manual)
-  $InstanceId = "i-xxxxprod-bastion-id" 
+  $InstanceId = "i-xxxxprod-bastion-id"
   $RdsHost = "creatorshop-be-prod-corecluster.cluster-czo4e2u0wc9y.ap-south-1.rds.amazonaws.com"
 } else {
   $env:AWS_PROFILE = "creator-dev"
