@@ -3,9 +3,11 @@ import { ConfigModule } from "@nestjs/config";
 import { ThrottlerModule } from "@nestjs/throttler";
 
 import { AppController } from "./app.controller";
-import { BrandDiscoveryModule } from "./features/brand-discovery/brand-discovery.module";
+import { AuthModule } from "./features/auth/auth.module";
+import { BrandOnboardingModule } from "./features/brand-onboarding/brand-onboarding.module";
 import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { S3Module } from "./shared/s3/s3.module";
 
 @Module({
   imports: [
@@ -20,8 +22,10 @@ import { PrismaModule } from "./prisma/prisma.module";
       },
     ]),
     PrismaModule,
+    S3Module,
     HealthModule,
-    BrandDiscoveryModule,
+    AuthModule,
+    BrandOnboardingModule,
   ],
   controllers: [AppController],
 })

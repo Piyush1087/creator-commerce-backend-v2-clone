@@ -1,11 +1,13 @@
-# Brand discovery (Step 1 gatekeeper)
+# Brand onboarding (Step 1 gatekeeper + journey shell)
 
-Feature module for public brand URL validation aligned with the product Step 1
-spec. Controllers own HTTP shape only; services own persistence and triage.
+Nest feature module for **brand URL validation** (Step 1) and future onboarding
+APIs. Controllers own HTTP shape only; services own persistence and triage.
 
-## Route
+## Route (stable contract)
 
 - `POST /api/v1/discovery/validate`
+- `POST /api/v1/discovery/resolve` (read-only entry resolver; see
+  `docs/brand-onboarding/ENTRY_RESOLVER.md`)
 
 ## Contract
 
@@ -21,8 +23,12 @@ Authoritative HTTP contract (payload, outcomes, status codes):
 - **Industry today** is a deterministic stub (`discovery-industry.stub.ts`) with
   hostname markers for demos (`supported.*`, `regret.*`, `blocked.*`).
 - **Rate limiting**: `@nestjs/throttler` on this controller (see
-  `brand-discovery.controller.ts`); global defaults in `app.module.ts`.
+  `brand-onboarding.controller.ts`); global defaults in `app.module.ts`.
 - **Logging**: URLs and IPs are redacted in service logs (`discovery-redaction.ts`).
+- **Org already claimed:** when a `BrandProfile` exists for the domain, is
+  verified, has an `organizationId`, and the org has at least one `User`, the API
+  returns `outcome: org_claimed` with `adminEmail` (first org user by
+  `createdAt`) for the invitation modal.
 
 ## Persistence
 
@@ -31,3 +37,7 @@ Authoritative HTTP contract (payload, outcomes, status codes):
 - Waitlist submissions: `waitlist_leads` (future endpoint; schema ready)
 
 See `docs/database/brand-discovery-and-users.md`.
+
+## Engineering tracking
+
+See `docs/brand-onboarding/IMPLEMENTATION_TRACKING.md`.
