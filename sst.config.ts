@@ -75,31 +75,53 @@ export default $config({
 
     const cluster = new sst.aws.Cluster("api-cluster", { vpc });
 
+    /** Loaded from deploy machine `.env` via dotenv above — keep in sync with app ConfigService usage. */
+    const apiEnvironment = {
+      STAGE: $app.stage,
+      PORT: "80",
+      DATABASE_URL,
+      APP_BACKEND_URL:
+        $app.stage === "prod"
+          ? "https://api.thecreatorshop.in"
+          : "https://api.dev.thecreatorshop.in",
+      APP_FRONTEND_URL:
+        $app.stage === "prod"
+          ? "https://dashboard.thecreatorshop.in"
+          : "https://dashboard.dev.thecreatorshop.in",
+      CORS_ORIGINS:
+        process.env.CORS_ORIGINS ||
+        "http://localhost:5173,https://dashboard.dev.thecreatorshop.in",
+      JWT_SECRET: $app.stage === "prod" ? JWT_SECRET_PROD : JWT_SECRET_DEV,
+      S3_BUCKET_NAME: filesBucket.name,
+      AWS_REGION: "ap-south-1",
+      POSTMARK_SERVER_TOKEN: process.env.POSTMARK_SERVER_TOKEN as string,
+      POSTMARK_OTP_TEMPLATE_ID: process.env.POSTMARK_OTP_TEMPLATE_ID as string,
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY as string,
+      GEMINI_MODEL: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+      GEMINI_REQUEST_TIMEOUT_MS:
+        process.env.GEMINI_REQUEST_TIMEOUT_MS || "120000",
+      PARALLEL_API_KEY: process.env.PARALLEL_API_KEY as string,
+      PARALLEL_EXTRACT_TIMEOUT_MS:
+        process.env.PARALLEL_EXTRACT_TIMEOUT_MS || "120000",
+      PARALLEL_SEARCH_TIMEOUT_MS:
+        process.env.PARALLEL_SEARCH_TIMEOUT_MS || "90000",
+      PARALLEL_SEARCH_MAX_CHARS_TOTAL:
+        process.env.PARALLEL_SEARCH_MAX_CHARS_TOTAL || "24000",
+      PARALLEL_COMPETITOR_SEARCH_ENABLED:
+        process.env.PARALLEL_COMPETITOR_SEARCH_ENABLED ?? "true",
+      BRAND_VERIFICATION_USE_REAL_OTP:
+        process.env.BRAND_VERIFICATION_USE_REAL_OTP ?? "true",
+      BRAND_SCAN_LIMITS_ENABLED:
+        process.env.BRAND_SCAN_LIMITS_ENABLED ?? "true",
+      DEFAULT_CURRENCY_CODE: process.env.DEFAULT_CURRENCY_CODE || "USD",
+    };
+
     cluster.addService("api", {
       link: [aurora, filesBucket],
       architecture: "arm64",
       memory: "1 GB",
       cpu: "0.5 vCPU",
-      environment: {
-        STAGE: $app.stage,
-        PORT: "80",
-        DATABASE_URL,
-        APP_BACKEND_URL:
-          $app.stage === "prod"
-            ? "https://api.thecreatorshop.in"
-            : "https://api.dev.thecreatorshop.in",
-        APP_FRONTEND_URL:
-          $app.stage === "prod"
-            ? "https://dashboard.thecreatorshop.in"
-            : "https://dashboard.dev.thecreatorshop.in",
-        GEMINI_API_KEY: process.env.GEMINI_API_KEY as string,
-        GEMINI_MODEL: process.env.GEMINI_MODEL || "gemini-2.5-flash",
-        PARALLEL_API_KEY: process.env.PARALLEL_API_KEY as string,
-        CORS_ORIGINS: process.env.CORS_ORIGINS || "http://localhost:5173,https://dashboard.dev.thecreatorshop.in",
-        JWT_SECRET: $app.stage === "prod" ? JWT_SECRET_PROD : JWT_SECRET_DEV,
-        S3_BUCKET_NAME: filesBucket.name,
-        AWS_REGION: "ap-south-1",
-      },
+      environment: apiEnvironment,
       loadBalancer: {
         ports: [{ listen: "443/https", forward: "80/http" }],
         health: {
