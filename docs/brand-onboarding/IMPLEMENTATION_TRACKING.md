@@ -61,6 +61,8 @@ Throttling: Nest `ThrottlerModule` (global + per-route limits on controllers). S
 
 **Env (no secrets in repo):** `PARALLEL_API_KEY`, `GEMINI_API_KEY`, optional `GEMINI_MODEL` (default `gemini-2.0-flash`), optional `PARALLEL_EXTRACT_TIMEOUT_MS`, `GEMINI_REQUEST_TIMEOUT_MS`.
 
+**S3 (surface scan assets):** Mirrors logo + product + competitor images to `creatorshop-v2-files-{stage}`; see [S3_ASSETS.md](./S3_ASSETS.md). Optional local: `S3_BUCKET_NAME` + `AWS_REGION`.
+
 **Runner selection:** `HttpBrandSurfaceScanRunner` when **`PARALLEL_API_KEY` and `GEMINI_API_KEY`** are set. If either is missing, **new** scans return **503** from `POST /api/v1/brand/surface-scan`; existing `SURFACE_COMPLETE` profiles still return **`mode: "cached"`**.
 
 **Future portability:** `BrandSurfaceScanRunner` token is the swap point for MCP tools or a worker queue without changing HTTP routes.

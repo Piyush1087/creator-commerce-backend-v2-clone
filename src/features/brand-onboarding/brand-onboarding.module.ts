@@ -5,6 +5,7 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { AuthModule } from "../auth/auth.module";
 import { MailModule } from "../../mail/mail.module";
 import { PrismaModule } from "../../prisma/prisma.module";
+import { S3Module } from "../../shared/s3/s3.module";
 import { BrandOnboardingPurgeScheduler } from "./brand-onboarding-purge.scheduler";
 import { BrandOnboardingPurgeService } from "./brand-onboarding-purge.service";
 import { BrandScanGateService } from "./brand-scan-gate.service";
@@ -19,12 +20,13 @@ import { GeminiIndustryClassifier } from "./industry/gemini-industry-classifier.
 import { INDUSTRY_CLASSIFIER } from "./industry/industry-classifier.token";
 import { StubIndustryClassifier } from "./industry/stub-industry-classifier.service";
 import { BRAND_SURFACE_SCAN_RUNNER } from "./surface-scan/brand-surface-scan.runner.token";
+import { BrandScanAssetMirrorService } from "./surface-scan/brand-scan-asset-mirror.service";
 import { HttpBrandSurfaceScanRunner } from "./surface-scan/http-brand-surface-scan.runner";
 import { UnconfiguredBrandSurfaceScanRunner } from "./surface-scan/unconfigured-brand-surface-scan.runner";
 import { BrandVerificationService } from "./verification/brand-verification.service";
 
 @Module({
-  imports: [ScheduleModule.forRoot(), PrismaModule, MailModule, AuthModule],
+  imports: [ScheduleModule.forRoot(), PrismaModule, MailModule, AuthModule, S3Module],
   controllers: [BrandOnboardingController, BrandController],
   providers: [
     BrandScanGateService,
@@ -36,6 +38,7 @@ import { BrandVerificationService } from "./verification/brand-verification.serv
     ParallelExtractClient,
     ParallelSearchClient,
     GeminiJsonClient,
+    BrandScanAssetMirrorService,
     HttpBrandSurfaceScanRunner,
     UnconfiguredBrandSurfaceScanRunner,
     {

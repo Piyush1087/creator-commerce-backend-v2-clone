@@ -29,6 +29,7 @@ import {
   buildIdentitySurfaceUrls,
   buildInventorySurfaceUrls,
 } from "./surface-scan-urls";
+import { BrandScanAssetMirrorService } from "./brand-scan-asset-mirror.service";
 import {
   Step2SurfaceScanGeminiSchema,
   type Step2SurfaceScanGeminiPayload,
@@ -58,6 +59,7 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
     private readonly parallel: ParallelExtractClient,
     private readonly parallelSearch: ParallelSearchClient,
     private readonly gemini: GeminiJsonClient,
+    private readonly scanAssets: BrandScanAssetMirrorService,
     private readonly config: ConfigService,
   ) {}
 
@@ -231,7 +233,10 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
       throw new Error("Gemini output failed schema validation");
     }
 
-    const payload = parsed.data;
+    const payload = await this.scanAssets.mirrorPayload(parsed.data, {
+      domain,
+      leadId: lead.id,
+    });
     this.logGeminiSurfaceSummary(domain, payload, {
       identityChars: identityMd.length,
       inventoryChars: inventoryMd.length,

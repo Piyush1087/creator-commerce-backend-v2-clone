@@ -14,6 +14,7 @@ import {
 import { PrismaService } from "../../prisma/prisma.service";
 import { BrandScanGateService } from "./brand-scan-gate.service";
 import type { DiscoverWaitlistRequestDto } from "./dto/discover-waitlist-request.dto";
+import { stubClassifyIndustry } from "./discovery-industry.stub";
 import { redactUrlForLogs } from "./discovery-redaction";
 import {
   gateAndNormalizeBrandUrl,
@@ -23,6 +24,7 @@ import {
   INDUSTRY_CLASSIFIER,
   type IndustryClassifier,
 } from "./industry/industry-classifier.token";
+import type { IndustryClassification } from "./industry/industry.types";
 
 export type DiscoverValidateSuccess = {
   outcome: "success";
@@ -116,6 +118,11 @@ export type DiscoveryResolveResult =
 @Injectable()
 export class BrandOnboardingService {
   private readonly logger = new Logger(BrandOnboardingService.name);
+  private readonly industryClassifyCache = new Map<
+    string,
+    { expiresAt: number; value: IndustryClassification }
+  >();
+  private static readonly INDUSTRY_CLASSIFY_CACHE_MS = 15 * 60 * 1000;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -170,16 +177,14 @@ export class BrandOnboardingService {
       return this.mapGateFailure("INVALID_SYNTAX");
     }
 
-    const classified = await this.industryClassifier.classify({
-      hostname: entry.hostname,
-      normalizedUrl: entry.normalizedUrl,
-    });
+    // Routing-only hint — full Parallel+Gemini gate runs in validateUrl (once).
+    const stub = stubClassifyIndustry(entry.hostname);
 
     return {
       outcome: "proceed",
       normalizedUrl: entry.normalizedUrl,
       domain: entry.domain,
-      industry: classified.industry,
+      industry: stub.industry,
     };
   }
 
@@ -226,7 +231,7 @@ export class BrandOnboardingService {
       return this.mapGateFailure(gated.reason, logId);
     }
 
-    const classified = await this.industryClassifier.classify({
+    const classified = await this.classifyIndustryCached({
       hostname: gated.hostname,
       normalizedUrl: gated.normalizedUrl,
     });
@@ -313,6 +318,27 @@ export class BrandOnboardingService {
       },
     });
     return { id: row.id };
+  }
+
+  private async classifyIndustryCached(input: {
+    hostname: string;
+    normalizedUrl: string;
+  }): Promise<IndustryClassification> {
+    const key = input.normalizedUrl;
+    const cached = this.industryClassifyCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value;
+    }
+    const started = Date.now();
+    const value = await this.industryClassifier.classify(input);
+    this.logger.log(
+      `discovery.industry_classify host=${input.hostname} ms=${Date.now() - started}`,
+    );
+    this.industryClassifyCache.set(key, {
+      expiresAt: Date.now() + BrandOnboardingService.INDUSTRY_CLASSIFY_CACHE_MS,
+      value,
+    });
+    return value;
   }
 
   private redactIp(ip: string): string {

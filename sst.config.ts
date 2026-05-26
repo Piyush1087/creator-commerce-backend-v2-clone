@@ -64,10 +64,19 @@ export default $config({
     const JWT_SECRET_PROD =
       process.env.JWT_SECRET_PROD ?? "ccs-jwt-prod-placeholder-change-me";
 
+    const filesBucket = new sst.aws.Bucket("files-v2", {
+      access: "public",
+      transform: {
+        bucket: (args) => {
+          args.bucket = `creatorshop-v2-files-${$app.stage}`;
+        },
+      },
+    });
+
     const cluster = new sst.aws.Cluster("api-cluster", { vpc });
 
     cluster.addService("api", {
-      link: [aurora],
+      link: [aurora, filesBucket],
       architecture: "arm64",
       memory: "1 GB",
       cpu: "0.5 vCPU",
@@ -88,6 +97,8 @@ export default $config({
         PARALLEL_API_KEY: process.env.PARALLEL_API_KEY as string,
         CORS_ORIGINS: process.env.CORS_ORIGINS || "http://localhost:5173,https://dashboard.dev.thecreatorshop.in",
         JWT_SECRET: $app.stage === "prod" ? JWT_SECRET_PROD : JWT_SECRET_DEV,
+        S3_BUCKET_NAME: filesBucket.name,
+        AWS_REGION: "ap-south-1",
       },
       loadBalancer: {
         ports: [{ listen: "443/https", forward: "80/http" }],

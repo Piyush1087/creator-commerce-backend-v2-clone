@@ -13,12 +13,10 @@ import {
   BRAND_SCAN_LIMIT_MAX_PER_WINDOW,
   BRAND_SCAN_LIMIT_WINDOW_DAYS,
   isBrandScanLimitsEnabled,
+  scanGateVerificationMessage,
 } from "./brand-scan-gate.config";
 import type { BrandScanGateResult } from "./brand-scan-gate.types";
 import { gateAndNormalizeBrandUrl } from "./discovery-url.util";
-
-const VERIFICATION_REQUIRED_MESSAGE =
-  "This brand has been analyzed multiple times recently. Please verify your email to access the latest results.";
 
 const BRAND_ACTIVE_MESSAGE =
   "An account for this domain already exists. If you are the owner, please sign in.";
@@ -105,7 +103,7 @@ export class BrandScanGateService {
       if (limitHit && !profile.isVerified) {
         return {
           kind: "verification_required",
-          message: VERIFICATION_REQUIRED_MESSAGE,
+          message: scanGateVerificationMessage(limitHit, hostname),
           domain: hostname,
           brandProfileId: profile.id,
           reason: limitHit,
@@ -208,7 +206,7 @@ export class BrandScanGateService {
         if (!profileId) {
           throw new BrandScanGateException({
             kind: "verification_required",
-            message: VERIFICATION_REQUIRED_MESSAGE,
+            message: scanGateVerificationMessage(limitHit, args.domain),
             domain: args.domain,
             brandProfileId: "",
             reason: limitHit,
@@ -217,7 +215,7 @@ export class BrandScanGateService {
         if (!profile?.isVerified) {
           throw new BrandScanGateException({
             kind: "verification_required",
-            message: VERIFICATION_REQUIRED_MESSAGE,
+            message: scanGateVerificationMessage(limitHit, args.domain),
             domain: args.domain,
             brandProfileId: profileId,
             reason: limitHit,
