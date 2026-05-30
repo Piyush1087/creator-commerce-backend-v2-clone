@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { UserRole } from "@prisma/client";
+import { PlanType, SubscriptionStatus, UserRole } from "@prisma/client";
 
 import { PrismaService } from "../../prisma/prisma.service";
 import { emailLocalPart } from "../brand-onboarding/verification/brand-verification-email.util";
@@ -31,6 +31,21 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
   ) {}
+
+  private assignPlanAtRegistration(planStartedAt: Date | null): {
+    planType: PlanType;
+    subscriptionStatus: SubscriptionStatus;
+    planStartedAt?: Date;
+  } {
+    const data = {
+      planType: PlanType.FREE_TRIAL,
+      subscriptionStatus: SubscriptionStatus.TRIALING,
+    };
+    if (!planStartedAt) {
+      return { ...data, planStartedAt: new Date() };
+    }
+    return data;
+  }
 
   async login(dto: LoginDto): Promise<AuthTokenResponse> {
     if (dto.role !== UserRole.BRAND) {
@@ -72,6 +87,7 @@ export class AuthService {
         isVerified: true,
         verificationEmail: true,
         organizationId: true,
+        planStartedAt: true,
       },
     });
 
@@ -99,9 +115,19 @@ export class AuthService {
       if (!profile.organizationId && existingUser.organizationId) {
         await this.prisma.brandProfile.update({
           where: { id: profile.id },
-          data: { organizationId: existingUser.organizationId },
+          data: {
+            organizationId: existingUser.organizationId,
+            ...this.assignPlanAtRegistration(profile.planStartedAt),
+          },
         });
         organizationId = existingUser.organizationId;
+      } else {
+        await this.prisma.brandProfile.update({
+          where: { id: profile.id },
+          data: {
+            ...this.assignPlanAtRegistration(profile.planStartedAt),
+          },
+        });
       }
       return {
         accessToken: await this.signToken(existingUser),
@@ -142,7 +168,10 @@ export class AuthService {
 
       await tx.brandProfile.update({
         where: { id: profile.id },
-        data: { organizationId: organization.id },
+        data: {
+          organizationId: organization.id,
+          ...this.assignPlanAtRegistration(profile.planStartedAt),
+        },
       });
 
       return { organization, user };

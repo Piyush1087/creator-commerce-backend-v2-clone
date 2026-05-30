@@ -58,9 +58,66 @@ enum ScanStatus {
 
 enum OfferingType {
   PRODUCT
+  MODULE
   TREATMENT
+  EXPERIENCE
   SERVICE
   COLLECTION
+}
+
+enum PerformanceColor {
+  GREEN
+  YELLOW
+  RED
+}
+
+enum LeakBucket {
+  PDP
+  PAID
+  ROSTER
+  CREATIVE_HOOK
+}
+
+enum PriorityRank {
+  HIGH
+  MEDIUM
+  LOW
+  NEGLIGIBLE
+}
+
+enum LeakPlannerStatus {
+  PENDING_USER_REVIEW
+  PUSHED_TO_PLANNER
+  DISCARDED
+  EXECUTED
+}
+
+enum PlannerCardType {
+  NEW_CAMPAIGN
+  SUGGESTED_UPDATE
+  AUTO_PAUSE_LOG
+}
+
+enum CampaignObjective {
+  PULSE
+  PROOF
+  PUSH
+  PRODUCTION
+}
+
+enum CreatorTier {
+  NANO
+  MICRO
+  MID_TIER
+  MEGA
+  CELEBRITY
+}
+
+enum PlannerWorkflowStatus {
+  PENDING_USER_REVIEW
+  PROCEEDED_TO_PIPELINE
+  DISCARDED
+  AUTO_EXECUTED_BYPASS
 }
 
 enum IntelStatus {
@@ -87,6 +144,31 @@ enum SubscriptionStatus {
 /// Vendor surface-scan runs only (cache hits are not counted toward rate limits).
 enum SurfaceScanAttemptKind {
   SURFACE_VENDOR
+}
+
+enum BrandRoutingType {
+  D2C_SKINCARE
+  SAAS_PRODUCT
+  HEALTHCARE_TREATMENT
+  OFFLINE_EXPERIENCE
+}
+
+enum BudgetAllocationPhase {
+  PHASE_1_COLD_START
+  PHASE_2_SELF_HEALING
+}
+
+enum BrandCentreJobType {
+  DEEP_SCAN
+  INTELLIGENCE_REFRESH
+  PLANNER_AGGREGATE
+}
+
+enum BrandCentreJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
 }
 
 // ============================================================================
@@ -212,6 +294,10 @@ model BrandProfile {
   socialLinks    String[]         @default([]) @map("social_links")
   /// Banner offers / coupon codes detected during surface scan (product Prompt 2).
   surfaceOffers  Json?            @map("surface_offers")
+  /// Parallel markdown bundles from surface scan — Prompt 1 input (REQ-AI-001).
+  surfaceScrapeBundles String?    @map("surface_scrape_bundles") @db.Text
+  /// Last authenticated Brand Centre API activity — session eviction (REQ-EVT-004).
+  brandCentreLastActiveAt DateTime? @map("brand_centre_last_active_at")
   visualIdentity Json?            @map("visual_identity")
   brandValues    String[]         @map("brand_values")
   policyFlags    String[]         @map("policy_flags")
@@ -233,6 +319,7 @@ model BrandProfile {
   // Subscription State (Step 8)
   planType           PlanType           @default(FREE_TRIAL) @map("plan_type")
   subscriptionStatus SubscriptionStatus @default(TRIALING) @map("subscription_status")
+  planStartedAt      DateTime?          @map("plan_started_at")
   trialEndsAt        DateTime?          @map("trial_ends_at")
 
   // Usage Tracking (Beta Buffer)
@@ -240,15 +327,32 @@ model BrandProfile {
   competitorCount Int @default(0) @map("competitor_count")
   outreachCount   Int @default(0) @map("outreach_count")
 
+  // Brand Centre — Tab 1 routing & DNA
+  brandRoutingType    BrandRoutingType @default(D2C_SKINCARE) @map("brand_routing_type")
+  lifecycleStage      String           @default("GROWTH_STAGE") @map("lifecycle_stage")
+  strategicDna        Json?            @map("strategic_dna")
+  igHandle            String?          @map("ig_handle")
+  ytHandle            String?          @map("yt_handle")
+  tiktokHandle        String?          @map("tiktok_handle")
+  deepScanCompletedAt DateTime?        @map("deep_scan_completed_at")
+
   isUserEdited Json?    @map("is_user_edited")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  offerings       Offering[]
-  competitors     Competitor[]
-  locations       Location[]
-  subscriptions   Subscription[]
-  teamInvitations TeamInvitation[]
+  offerings               Offering[]
+  competitors             Competitor[]
+  locations               Location[]
+  subscriptions           Subscription[]
+  teamInvitations         TeamInvitation[]
+  brandCentreJobs         BrandCentreJob[]
+  budgetConfiguration     BrandBudgetConfiguration?
+  audiencePersonas        BrandAudiencePersona[]
+  brandOffers             BrandOffer[]
+  budgetModificationLogs  BrandBudgetModificationLog[]
+  intelligenceBaseline    BrandIntelligenceBaseline?
+  performanceLeaks        BrandPerformanceLeak[]
+  plannerCards            BrandPlannerCard[]
 
   @@map("brand_profiles")
 }
@@ -272,6 +376,8 @@ model Offering {
   isActive       Boolean      @default(true) @map("is_active")
   isDeepScanned  Boolean      @default(false) @map("is_deep_scanned")
   isUserEdited   Boolean      @default(false) @map("is_user_edited")
+  sellingPoints  String[]     @default([]) @map("selling_points")
+  doNotSay       String[]     @default([]) @map("do_not_say")
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
@@ -349,5 +455,146 @@ model TeamInvitation {
   expiresAt      DateTime     @map("expires_at")
 
   @@map("team_invitations")
+}
+
+model BrandCentreJob {
+  id             String               @id @default(uuid())
+  brandProfileId String               @map("brand_profile_id")
+  brandProfile   BrandProfile         @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  type           BrandCentreJobType
+  status         BrandCentreJobStatus @default(QUEUED)
+  payload        Json?
+  attempt        Int                  @default(0)
+  errorMessage   String?              @map("error_message")
+  queuedAt       DateTime             @default(now()) @map("queued_at")
+  startedAt      DateTime?            @map("started_at")
+  finishedAt     DateTime?            @map("finished_at")
+
+  @@index([brandProfileId, type, status])
+  @@map("brand_centre_jobs")
+}
+
+model BrandBudgetConfiguration {
+  id                  String                @id @default(uuid())
+  brandProfileId      String                @unique @map("brand_profile_id")
+  brandProfile        BrandProfile          @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  masterMonthlyBudget Decimal               @map("master_monthly_budget") @db.Decimal(14, 2)
+  allocationPhase     BudgetAllocationPhase @default(PHASE_1_COLD_START) @map("allocation_phase")
+  assetMix            Json                  @map("asset_mix")
+  tierMix             Json                  @map("tier_mix")
+  objectiveMix        Json                  @map("objective_mix")
+  utilizedBooked      Decimal               @default(0) @map("utilized_booked") @db.Decimal(14, 2)
+  utilizedSpent       Decimal               @default(0) @map("utilized_spent") @db.Decimal(14, 2)
+  aiExplanationText   String?               @map("ai_explanation_text")
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @updatedAt @map("updated_at")
+
+  @@map("brand_budget_configurations")
+}
+
+model BrandAudiencePersona {
+  id                 String       @id @default(uuid())
+  brandProfileId     String       @map("brand_profile_id")
+  brandProfile       BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  personaName        String       @map("persona_name")
+  demographicsJson   Json         @map("demographics_json")
+  psychographicsText String?      @map("psychographics_text")
+  sortOrder          Int          @default(0) @map("sort_order")
+  isUserEdited       Boolean      @default(false) @map("is_user_edited")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+
+  @@index([brandProfileId])
+  @@map("brand_audience_personas")
+}
+
+model BrandOffer {
+  id                 String       @id @default(uuid())
+  brandProfileId     String       @map("brand_profile_id")
+  brandProfile       BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  offerName          String       @map("offer_name")
+  promoCode          String       @map("promo_code")
+  applicabilityScope String       @map("applicability_scope")
+  validityStart      DateTime     @map("validity_start")
+  validityEnd        DateTime     @map("validity_end")
+  description        String?
+  entityLink         String?      @map("entity_link")
+  termsText          String?      @map("terms_text")
+  isActive           Boolean      @default(true) @map("is_active")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, promoCode])
+  @@map("brand_offers")
+}
+
+model BrandBudgetModificationLog {
+  id             String       @id @default(uuid())
+  brandProfileId String       @map("brand_profile_id")
+  brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  oldBudget      Decimal      @map("old_budget") @db.Decimal(14, 2)
+  newBudget      Decimal      @map("new_budget") @db.Decimal(14, 2)
+  modifiedAt     DateTime     @default(now()) @map("modified_at")
+
+  @@index([brandProfileId, modifiedAt])
+  @@map("brand_budget_modification_logs")
+}
+
+model BrandIntelligenceBaseline {
+  id                  String       @id @default(uuid())
+  brandProfileId      String       @unique @map("brand_profile_id")
+  brandProfile        BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  growthImpactMatrix  Json         @map("growth_impact_matrix")
+  baselineHealth      Json         @map("baseline_health")
+  shareOfVoice        Json         @map("share_of_voice")
+  source              String       @default("ai_inferred")
+  refreshedAt         DateTime?    @map("refreshed_at")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
+
+  @@map("brand_intelligence_baselines")
+}
+
+model BrandPerformanceLeak {
+  id                      String            @id @default(uuid())
+  brandProfileId          String            @map("brand_profile_id")
+  brandProfile            BrandProfile      @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  insightTitle            String            @map("insight_title")
+  shortDescription        String            @map("short_description")
+  priorityRank            PriorityRank      @map("priority_rank")
+  leakBucket              LeakBucket        @map("leak_bucket")
+  performanceStatus       PerformanceColor  @map("performance_status")
+  projectedLiftPercentage Decimal           @map("projected_lift_percentage") @db.Decimal(6, 2)
+  drawerDeepDive          Json              @map("drawer_deep_dive")
+  plannerStatus           LeakPlannerStatus @default(PENDING_USER_REVIEW) @map("planner_status")
+  plannerCardId           String?           @map("planner_card_id")
+  plannerCard             BrandPlannerCard? @relation(fields: [plannerCardId], references: [id], onDelete: SetNull)
+  isArchived              Boolean           @default(false) @map("is_archived")
+  archivedAt              DateTime?         @map("archived_at")
+  movedByUserId           String?           @map("moved_by_user_id")
+  createdAt               DateTime          @default(now()) @map("created_at")
+  updatedAt               DateTime          @updatedAt @map("updated_at")
+
+  @@index([brandProfileId, isArchived, priorityRank])
+  @@map("brand_performance_leaks")
+}
+
+model BrandPlannerCard {
+  id                       String                 @id @default(uuid())
+  brandProfileId           String                 @map("brand_profile_id")
+  brandProfile             BrandProfile           @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  cardType                 PlannerCardType        @map("card_type")
+  aggregationKey           Json                   @map("aggregation_key")
+  existingTargetCampaignId String?                @map("existing_target_campaign_id")
+  campaignMetadata         Json                   @map("campaign_metadata")
+  assetsAndBriefsMatrix    Json                   @map("assets_and_briefs_matrix")
+  workflowStatus           PlannerWorkflowStatus  @default(PENDING_USER_REVIEW) @map("workflow_status")
+  sourceLeakId             String?                @map("source_leak_id")
+  createdAt                DateTime               @default(now()) @map("created_at")
+  updatedAt                DateTime               @updatedAt @map("updated_at")
+  sourceLeaks              BrandPerformanceLeak[]
+
+  @@index([brandProfileId, workflowStatus])
+  @@map("brand_planner_cards")
 }
 

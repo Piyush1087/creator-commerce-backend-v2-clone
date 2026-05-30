@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
 
 import { AuthModule } from "../auth/auth.module";
+import { BrandCentreModule } from "../brand-centre/brand-centre.module";
 import { MailModule } from "../../mail/mail.module";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { S3Module } from "../../shared/s3/s3.module";
@@ -26,7 +27,14 @@ import { UnconfiguredBrandSurfaceScanRunner } from "./surface-scan/unconfigured-
 import { BrandVerificationService } from "./verification/brand-verification.service";
 
 @Module({
-  imports: [ScheduleModule.forRoot(), PrismaModule, MailModule, AuthModule, S3Module],
+  imports: [
+    ScheduleModule.forRoot(),
+    PrismaModule,
+    MailModule,
+    AuthModule,
+    S3Module,
+    BrandCentreModule,
+  ],
   controllers: [BrandOnboardingController, BrandController],
   providers: [
     BrandScanGateService,
