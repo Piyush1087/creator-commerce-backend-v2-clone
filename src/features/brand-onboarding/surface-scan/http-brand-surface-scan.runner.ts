@@ -3,6 +3,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import { BrandCentreColdStartService } from "../../brand-centre/services/brand-centre-cold-start.service";
 import {
   BrandScanGateException,
   BrandScanGateService,
@@ -61,6 +62,7 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
     private readonly gemini: GeminiJsonClient,
     private readonly scanAssets: BrandScanAssetMirrorService,
     private readonly config: ConfigService,
+    private readonly brandCentreColdStart: BrandCentreColdStartService,
   ) {}
 
   async run(args: {
@@ -113,6 +115,15 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
         this.logger.log(
           `surface-scan.cache_hit domain=${domain} brandProfileId=${cached.id}`,
         );
+        try {
+          await this.brandCentreColdStart.seedFromSurfaceScan(cached.id);
+        } catch (coldStartErr: unknown) {
+          const message =
+            coldStartErr instanceof Error ? coldStartErr.message : "unknown";
+          this.logger.error(
+            `cold-start.failed brandProfileId=${cached.id} error=${message}`,
+          );
+        }
         return {
           brandProfileId: cached.id,
           domain,
@@ -237,6 +248,20 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
       domain,
       leadId: lead.id,
     });
+
+    // Gemini sometimes returns null-ish location fields; avoid failing persistence on bad rows.
+    const normalizedLocations = payload.locations
+      .flatMap((item) => {
+        if (typeof item.address !== "string") {
+          return [];
+        }
+        const address = item.address.trim();
+        if (!address) {
+          return [];
+        }
+        return [{ ...item, address }];
+      });
+
     this.logGeminiSurfaceSummary(domain, payload, {
       identityChars: identityMd.length,
       inventoryChars: inventoryMd.length,
@@ -290,6 +315,7 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
           description: payload.brand.shortDescription ?? undefined,
           socialLinks: payload.brand.socialLinks,
           surfaceOffers: surfaceOffersJson,
+          surfaceScrapeBundles: markdown,
           visualIdentity,
           brandValues: [],
           policyFlags: [],
@@ -306,6 +332,7 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
           description: payload.brand.shortDescription ?? null,
           socialLinks: payload.brand.socialLinks,
           surfaceOffers: surfaceOffersJson,
+          surfaceScrapeBundles: markdown,
           visualIdentity,
           targetAudience,
           scanStatus: ScanStatus.SURFACE_COMPLETE,
@@ -360,7 +387,7 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
 
       if (payload.locations.length > 0) {
         await tx.location.createMany({
-          data: payload.locations.map((item) => ({
+          data: normalizedLocations.map((item) => ({
             brandProfileId: profile.id,
             name: item.name ?? null,
             address: item.address,
@@ -379,6 +406,16 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
       discoveryLeadId: args.leadId,
       brandProfileId: profileId,
     });
+
+    try {
+      await this.brandCentreColdStart.seedFromSurfaceScan(profileId);
+    } catch (coldStartErr: unknown) {
+      const message =
+        coldStartErr instanceof Error ? coldStartErr.message : "unknown";
+      this.logger.error(
+        `cold-start.failed brandProfileId=${profileId} error=${message}`,
+      );
+    }
 
     const counts = await this.prisma.brandProfile.findUnique({
       where: { id: profileId },

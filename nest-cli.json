@@ -8,6 +8,10 @@
       {
         "include": "**/*.prompt.md",
         "watchAssets": true
+      },
+      {
+        "include": "features/brand-centre/prompts/contracts/**/*.md",
+        "watchAssets": true
       }
     ]
   }

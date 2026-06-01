@@ -1,4 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import {
+  GoogleGenerativeAI,
+  type ResponseSchema,
+} from "@google/generative-ai";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
@@ -11,6 +14,8 @@ export class GeminiJsonClient {
   async generateJson(args: {
     systemInstruction: string;
     userText: string;
+    /** OpenAPI-style schema; use `zodToGeminiResponseSchema` from brand-centre prompts. */
+    responseSchema?: ResponseSchema;
   }): Promise<unknown> {
     const apiKey = this.config.get<string>("GEMINI_API_KEY", "");
     if (!apiKey) {
@@ -25,6 +30,9 @@ export class GeminiJsonClient {
       generationConfig: {
         responseMimeType: "application/json",
         temperature: 0.2,
+        ...(args.responseSchema
+          ? { responseSchema: args.responseSchema }
+          : {}),
       },
     });
 

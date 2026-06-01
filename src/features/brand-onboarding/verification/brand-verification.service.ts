@@ -9,6 +9,7 @@ import { addMinutes } from "date-fns";
 
 import { MailService } from "../../../mail/mail.service";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { BrandCentreScanService } from "../../brand-centre/services/brand-centre-scan.service";
 import {
   emailDomainFromAddress,
   emailDomainMatchesBrandDomain,
@@ -45,6 +46,7 @@ export class BrandVerificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
+    private readonly brandCentreScan: BrandCentreScanService,
   ) {}
 
   async sendOtp(brandProfileId: string, rawEmail: string) {
@@ -142,6 +144,8 @@ export class BrandVerificationService {
       },
     });
 
+    await this.enqueueDeepScanAfterVerify(brandProfileId);
+
     this.logger.warn(
       `[STUB OTP] verified brandProfileId=${brandProfileId} email=${email}`,
     );
@@ -210,8 +214,7 @@ export class BrandVerificationService {
       await this.mail.sendOtp(email, otpCode, emailLocalPart(email));
     } catch (error: unknown) {
       const postmark = error as PostmarkInactiveError;
-      const detail =
-        error instanceof Error ? error.message : String(error);
+      const detail = error instanceof Error ? error.message : String(error);
       const isInactive =
         postmark.statusCode === 422 &&
         typeof postmark.message === "string" &&
@@ -273,7 +276,9 @@ export class BrandVerificationService {
     }
 
     if (row.expiresAt < new Date()) {
-      throw new UnauthorizedException("This code has expired. Resend a new code.");
+      throw new UnauthorizedException(
+        "This code has expired. Resend a new code.",
+      );
     }
 
     if (row.attempts >= MAX_VERIFY_ATTEMPTS) {
@@ -315,11 +320,30 @@ export class BrandVerificationService {
       },
     });
 
+    await this.enqueueDeepScanAfterVerify(brandProfileId);
+
     return {
       verified: true,
       brandProfileId: profile.id,
       domain: profile.domain,
     };
+  }
+
+  private async enqueueDeepScanAfterVerify(
+    brandProfileId: string,
+  ): Promise<void> {
+    try {
+      const { jobId } =
+        await this.brandCentreScan.enqueueDeepScan(brandProfileId);
+      this.logger.log(
+        `deep-scan.enqueued brandProfileId=${brandProfileId} jobId=${jobId}`,
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "unknown";
+      this.logger.error(
+        `deep-scan.enqueue_failed brandProfileId=${brandProfileId} error=${message}`,
+      );
+    }
   }
 
   private generateOtpCode(): string {
@@ -352,9 +376,7 @@ export class BrandVerificationService {
       ? Math.max(
           1,
           Math.ceil(
-            (oldestInWindow.createdAt.getTime() +
-              SEND_WINDOW_MS -
-              Date.now()) /
+            (oldestInWindow.createdAt.getTime() + SEND_WINDOW_MS - Date.now()) /
               1000,
           ),
         )

@@ -85,7 +85,12 @@ const surfaceCompetitorSchema = z.object({
 
 const surfaceLocationSchema = z.object({
   name: z.string().max(200).nullable().optional(),
-  address: z.string().min(1).max(500),
+  address: z
+    .preprocess(
+      (val) => (typeof val === "string" ? val.trim() : val),
+      z.string().max(500).nullable().optional(),
+    )
+    .optional(),
   city: z.string().max(120).nullable().optional(),
   zip: z.string().max(40).nullable().optional(),
 });
