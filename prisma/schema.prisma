@@ -172,6 +172,101 @@ enum BrandCentreJobStatus {
 }
 
 // ============================================================================
+// UCE (Universal Campaign Engine) ENUMS
+// ============================================================================
+
+enum UceCampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum UceTimelineStructure {
+  FIXED_DATES
+  DYNAMIC_MILESTONES
+}
+
+enum UceCampaignObjective {
+  BRAND_AWARENESS
+  TRAFFIC_CLICKS
+  SALES_CONVERSIONS
+}
+
+enum UceCompensationType {
+  FIXED_FEE
+  NEGOTIABLE
+}
+
+enum UcePayoutTerms {
+  IMMEDIATE
+  NET_7
+  NET_15
+  NET_30
+}
+
+enum UceCollabStatus {
+  PROSPECT_CURATED
+  PROSPECT_INVITED
+  APPLICANT_PENDING
+  APPLICANT_SHORTLISTED
+  APPLICANT_REJECTED
+  ACTIVE_WORKFLOW
+  TERMINATED_CANCELED
+  ARCHIVED_COMPLETE
+}
+
+enum UceMilestoneStage {
+  STAGE_1_NEGOTIATION
+  STAGE_2_SECUREMENT
+  STAGE_3_LOGISTICS
+  STAGE_4_CONTENT_REVIEW
+  STAGE_5_PUBLISHING
+  STAGE_6_FEEDBACK_SYNC
+}
+
+enum UcePipelineHealthStatus {
+  ON_TRACK
+  APPROACHING_DEADLINE
+  ACTION_OVERDUE
+  SYSTEM_HOLD
+}
+
+enum UceNegotiationSubState {
+  BRAND_COUNTER
+  CREATOR_COUNTER
+  FINAL_OFFER_PENDING
+}
+
+enum UceSecurementSubState {
+  AWAITING_FUNDING
+  AWAITING_SIGNATURE
+}
+
+enum UceLogisticsSubState {
+  AWAITING_DISPATCH
+  IN_TRANSIT
+  DELIVERY_EXCEPTION
+}
+
+enum UceReviewSubState {
+  INITIAL_DRAFT_SUBMITTED
+  REVISION_ROUND_ACTIVE
+  CONTENT_HALTED_LOCK
+}
+
+enum UcePublishingSubState {
+  AWAITING_LIVE_POST
+  COMPLIANCE_CHECK_ACTIVE
+}
+
+enum UceMediaPlatform {
+  INSTAGRAM
+  TIKTOK
+  YOUTUBE
+}
+
+// ============================================================================
 // CORE MODELS (Organization & User)
 // ============================================================================
 
@@ -279,29 +374,29 @@ model SurfaceScanAttempt {
 // ============================================================================
 
 model BrandProfile {
-  id             String           @id @default(uuid())
-  organizationId String?          @unique @map("organization_id")
-  organization   Organization?    @relation(fields: [organizationId], references: [id])
-  domain         String           @unique
-  name           String           @map("brand_name")
-  industry       IndustryVertical
-  subIndustry    String?          @map("sub_industry")
-  industryNiche  String?          @map("industry_niche")
-  logoUrl        String?          @map("logo_url")
-  tagline        String?
-  description    String?
+  id                      String           @id @default(uuid())
+  organizationId          String?          @unique @map("organization_id")
+  organization            Organization?    @relation(fields: [organizationId], references: [id])
+  domain                  String           @unique
+  name                    String           @map("brand_name")
+  industry                IndustryVertical
+  subIndustry             String?          @map("sub_industry")
+  industryNiche           String?          @map("industry_niche")
+  logoUrl                 String?          @map("logo_url")
+  tagline                 String?
+  description             String?
   /// Official social profile URLs (e.g. Instagram / TikTok) from surface scan (product Prompt 1).
-  socialLinks    String[]         @default([]) @map("social_links")
+  socialLinks             String[]         @default([]) @map("social_links")
   /// Banner offers / coupon codes detected during surface scan (product Prompt 2).
-  surfaceOffers  Json?            @map("surface_offers")
+  surfaceOffers           Json?            @map("surface_offers")
   /// Parallel markdown bundles from surface scan — Prompt 1 input (REQ-AI-001).
-  surfaceScrapeBundles String?    @map("surface_scrape_bundles") @db.Text
+  surfaceScrapeBundles    String?          @map("surface_scrape_bundles") @db.Text
   /// Last authenticated Brand Centre API activity — session eviction (REQ-EVT-004).
-  brandCentreLastActiveAt DateTime? @map("brand_centre_last_active_at")
-  visualIdentity Json?            @map("visual_identity")
-  brandValues    String[]         @map("brand_values")
-  policyFlags    String[]         @map("policy_flags")
-  targetAudience Json?            @map("target_audience")
+  brandCentreLastActiveAt DateTime?        @map("brand_centre_last_active_at")
+  visualIdentity          Json?            @map("visual_identity")
+  brandValues             String[]         @map("brand_values")
+  policyFlags             String[]         @map("policy_flags")
+  targetAudience          Json?            @map("target_audience")
 
   // Step 6: Verification
   isVerified        Boolean   @default(false) @map("is_verified")
@@ -340,46 +435,49 @@ model BrandProfile {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  offerings               Offering[]
-  competitors             Competitor[]
-  locations               Location[]
-  subscriptions           Subscription[]
-  teamInvitations         TeamInvitation[]
-  brandCentreJobs         BrandCentreJob[]
-  budgetConfiguration     BrandBudgetConfiguration?
-  audiencePersonas        BrandAudiencePersona[]
-  brandOffers             BrandOffer[]
-  budgetModificationLogs  BrandBudgetModificationLog[]
-  intelligenceBaseline    BrandIntelligenceBaseline?
-  performanceLeaks        BrandPerformanceLeak[]
-  plannerCards            BrandPlannerCard[]
+  offerings              Offering[]
+  competitors            Competitor[]
+  locations              Location[]
+  subscriptions          Subscription[]
+  teamInvitations        TeamInvitation[]
+  brandCentreJobs        BrandCentreJob[]
+  budgetConfiguration    BrandBudgetConfiguration?
+  audiencePersonas       BrandAudiencePersona[]
+  brandOffers            BrandOffer[]
+  budgetModificationLogs BrandBudgetModificationLog[]
+  intelligenceBaseline   BrandIntelligenceBaseline?
+  performanceLeaks       BrandPerformanceLeak[]
+  plannerCards           BrandPlannerCard[]
+
+  // UCE (Universal Campaign Engine)
+  uceCampaigns UceCampaign[]
 
   @@map("brand_profiles")
 }
 
 model Offering {
-  id             String       @id @default(uuid())
-  brandProfileId String       @map("brand_profile_id")
-  brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id])
-  type           OfferingType
-  name           String
-  description    String?
-  imageUrl       String?      @map("image_url")
-  url            String       @map("offering_url")
+  id                 String       @id @default(uuid())
+  brandProfileId     String       @map("brand_profile_id")
+  brandProfile       BrandProfile @relation(fields: [brandProfileId], references: [id])
+  type               OfferingType
+  name               String
+  description        String?
+  imageUrl           String?      @map("image_url")
+  url                String       @map("offering_url")
   /// Collection or healthcare specialty label from list pages (product Prompt 2).
-  categoryTag    String?      @map("category_tag")
+  categoryTag        String?      @map("category_tag")
   /// Human-visible starting price from list view, before deep scan parses `priceAmount`.
-  startingPriceLabel String?  @map("starting_price_label")
-  priceAmount    Decimal?     @map("price_amount")
-  currency       String       @default("USD")
-  locationIds    String[]     @map("location_ids")
-  isActive       Boolean      @default(true) @map("is_active")
-  isDeepScanned  Boolean      @default(false) @map("is_deep_scanned")
-  isUserEdited   Boolean      @default(false) @map("is_user_edited")
-  sellingPoints  String[]     @default([]) @map("selling_points")
-  doNotSay       String[]     @default([]) @map("do_not_say")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
+  startingPriceLabel String?      @map("starting_price_label")
+  priceAmount        Decimal?     @map("price_amount")
+  currency           String       @default("USD")
+  locationIds        String[]     @map("location_ids")
+  isActive           Boolean      @default(true) @map("is_active")
+  isDeepScanned      Boolean      @default(false) @map("is_deep_scanned")
+  isUserEdited       Boolean      @default(false) @map("is_user_edited")
+  sellingPoints      String[]     @default([]) @map("selling_points")
+  doNotSay           String[]     @default([]) @map("do_not_say")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
 
   @@map("offerings")
 }
@@ -541,16 +639,16 @@ model BrandBudgetModificationLog {
 }
 
 model BrandIntelligenceBaseline {
-  id                  String       @id @default(uuid())
-  brandProfileId      String       @unique @map("brand_profile_id")
-  brandProfile        BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  growthImpactMatrix  Json         @map("growth_impact_matrix")
-  baselineHealth      Json         @map("baseline_health")
-  shareOfVoice        Json         @map("share_of_voice")
-  source              String       @default("ai_inferred")
-  refreshedAt         DateTime?    @map("refreshed_at")
-  createdAt           DateTime     @default(now()) @map("created_at")
-  updatedAt           DateTime     @updatedAt @map("updated_at")
+  id                 String       @id @default(uuid())
+  brandProfileId     String       @unique @map("brand_profile_id")
+  brandProfile       BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  growthImpactMatrix Json         @map("growth_impact_matrix")
+  baselineHealth     Json         @map("baseline_health")
+  shareOfVoice       Json         @map("share_of_voice")
+  source             String       @default("ai_inferred")
+  refreshedAt        DateTime?    @map("refreshed_at")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
 
   @@map("brand_intelligence_baselines")
 }
@@ -598,3 +696,253 @@ model BrandPlannerCard {
   @@map("brand_planner_cards")
 }
 
+// ============================================================================
+// UCE (Universal Campaign Engine) MODELS
+// ============================================================================
+
+model UceCampaign {
+  id             String            @id @default(uuid())
+  brandProfileId String            @map("brand_profile_id")
+  brandProfile   BrandProfile      @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  name           String            @map("campaign_name")
+  status         UceCampaignStatus @default(DRAFT) @map("current_status")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  performanceAggregate UceCampaignPerformanceAggregate?
+  strategy             UceCampaignStrategy?
+  targeting            UceCampaignTargeting?
+  commercials          UceCampaignCommercials?
+  products             UceCampaignProduct[]
+  briefs               UceCampaignBrief[]
+  collaborations       UceCampaignCollaboration[]
+  reportingSnapshots   UceCampaignReportingSnapshot[]
+  reportingTimeseries  UceCampaignReportingTimeseriesHourly[]
+  reportingAssets      UceCampaignReportingAssetGallery[]
+
+  @@index([brandProfileId, status])
+  @@map("uce_campaigns")
+}
+
+model UceCampaignPerformanceAggregate {
+  campaignId              String      @id @map("campaign_id")
+  campaign                UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  totalSpendToDate        Decimal     @default(0) @map("total_spend_to_date") @db.Decimal(14, 2)
+  totalImpressionsCount   BigInt      @default(0) @map("total_impressions_count")
+  totalClicksCount        BigInt      @default(0) @map("total_clicks_count")
+  totalConversionsCount   Int         @default(0) @map("total_conversions_count")
+  totalProspectsCount     Int         @default(0) @map("total_prospects_count")
+  totalApplicantsCount    Int         @default(0) @map("total_applicants_count")
+  totalActiveCollabsCount Int         @default(0) @map("total_active_collabs_count")
+  updatedAt               DateTime    @updatedAt @map("updated_at")
+
+  @@map("uce_campaign_performance_aggregates")
+}
+
+model UceCampaignStrategy {
+  campaignId           String               @id @map("campaign_id")
+  campaign             UceCampaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  timelineType         UceTimelineStructure @map("timeline_type")
+  fixedStartDate       DateTime?            @map("fixed_start_date")
+  fixedEndDate         DateTime?            @map("fixed_end_date")
+  dynamicDaysLimit     Int?                 @map("dynamic_days_limit")
+  coreObjective        UceCampaignObjective @map("core_objective")
+  platformDeliverables Json                 @map("platform_deliverables")
+
+  @@map("uce_campaign_strategy")
+}
+
+model UceCampaignTargeting {
+  campaignId            String      @id @map("campaign_id")
+  campaign              UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  industryVertical      String      @map("industry_vertical")
+  creatorArchetypes     String[]    @default([]) @map("creator_archetypes")
+  followerTiers         String[]    @default([]) @map("follower_tiers")
+  audienceAgeMin        Int         @default(18) @map("audience_age_min")
+  audienceAgeMax        Int         @default(65) @map("audience_age_max")
+  audienceGender        String      @default("ALL") @map("audience_gender")
+  targetLocations       String[]    @default([]) @map("target_locations")
+  disqualifyingKeywords String[]    @default([]) @map("disqualifying_keywords")
+
+  @@map("uce_campaign_targeting")
+}
+
+model UceCampaignCommercials {
+  campaignId               String              @id @map("campaign_id")
+  campaign                 UceCampaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  compensationType         UceCompensationType @map("compensation_type")
+  fixedFeeAmount           Decimal?            @default(0) @map("fixed_fee_amount") @db.Decimal(12, 2)
+  negotiableMinFee         Decimal?            @default(0) @map("negotiable_min_fee") @db.Decimal(12, 2)
+  negotiableMaxFee         Decimal?            @default(0) @map("negotiable_max_fee") @db.Decimal(12, 2)
+  totalCampaignBudgetPool  Decimal             @map("total_campaign_budget_pool") @db.Decimal(14, 2)
+  advancePaymentPercentage Int                 @default(30) @map("advance_payment_percentage")
+  finalBalanceTerms        UcePayoutTerms      @default(NET_30) @map("final_balance_terms")
+
+  @@map("uce_campaign_commercials")
+}
+
+model UceCampaignProduct {
+  id             String      @id @default(uuid()) @map("product_id")
+  campaignId     String      @map("campaign_id")
+  campaign       UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  skuCode        String      @map("sku_code")
+  productName    String      @map("product_name")
+  inventoryCount Int         @default(0) @map("inventory_count")
+  costPerUnit    Decimal     @default(0) @map("cost_per_unit") @db.Decimal(10, 2)
+  imageUrl       String?     @map("image_url")
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  collaborations UceCampaignCollaboration[]
+
+  @@unique([campaignId, skuCode])
+  @@index([campaignId])
+  @@map("uce_campaign_products")
+}
+
+model UceCampaignBrief {
+  id                    String             @id @default(uuid()) @map("brief_id")
+  campaignId            String             @map("campaign_id")
+  campaign              UceCampaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  internalTitle         String             @map("internal_title")
+  creativeGuidelines    String             @map("creative_guidelines") @db.Text
+  requiredPlatforms     UceMediaPlatform[] @map("required_platforms")
+  deliverableFormatTags String[]           @default([]) @map("deliverable_format_tags")
+  createdAt             DateTime           @default(now()) @map("created_at")
+
+  collaborations UceCampaignCollaboration[]
+
+  @@index([campaignId])
+  @@map("uce_campaign_briefs")
+}
+
+model UceCampaignCollaboration {
+  id         String              @id @default(uuid()) @map("collaboration_id")
+  campaignId String              @map("campaign_id")
+  campaign   UceCampaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  briefId    String              @map("brief_id")
+  brief      UceCampaignBrief    @relation(fields: [briefId], references: [id], onDelete: Restrict)
+  productId  String?             @map("product_id")
+  product    UceCampaignProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  instagramHandle String  @map("instagram_handle")
+  creatorEmail    String  @map("creator_email")
+  matchScore      Decimal @default(0) @map("match_score") @db.Decimal(5, 2)
+  vettingRemark   String? @map("vetting_remark")
+  rejectionReason String? @map("rejection_reason")
+
+  collabStatus     UceCollabStatus         @default(PROSPECT_CURATED) @map("collab_status")
+  currentMilestone UceMilestoneStage       @default(STAGE_1_NEGOTIATION) @map("current_milestone")
+  pipelineHealth   UcePipelineHealthStatus @default(ON_TRACK) @map("pipeline_health")
+
+  negotiationState UceNegotiationSubState? @map("negotiation_state")
+  securementState  UceSecurementSubState?  @map("securement_state")
+  logisticsState   UceLogisticsSubState?   @map("logistics_state")
+  reviewState      UceReviewSubState?      @map("review_state")
+  publishingState  UcePublishingSubState?  @map("publishing_state")
+
+  negotiationRoundCount Int @default(0) @map("negotiation_round_count")
+  fulfillmentIssueCount Int @default(0) @map("fulfillment_issue_count")
+  revisionRoundCount    Int @default(0) @map("revision_round_count")
+
+  totalQuote     Decimal @default(0) @map("total_quote") @db.Decimal(12, 2)
+  advance30Value Decimal @default(0) @map("advance_30_value") @db.Decimal(12, 2)
+  balance70Value Decimal @default(0) @map("balance_70_value") @db.Decimal(12, 2)
+
+  logisticsCarrier        String? @map("logistics_carrier")
+  logisticsTrackingNumber String? @map("logistics_tracking_number")
+  contentDraftUrl         String? @map("content_draft_url")
+  livePublishedUrl        String? @map("live_published_url")
+  complianceVerified      Boolean @default(false) @map("compliance_verified")
+
+  autoApprovalDeadline72h  DateTime? @map("auto_approval_deadline_72h")
+  currentMilestoneDeadline DateTime  @map("current_milestone_deadline")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  auditLogs       UceCollaborationAuditLog[]
+  reportingAssets UceCampaignReportingAssetGallery[]
+
+  @@unique([campaignId, instagramHandle])
+  @@index([campaignId, collabStatus, currentMilestone])
+  @@index([pipelineHealth, currentMilestoneDeadline])
+  @@map("uce_campaign_collaborations")
+}
+
+model UceCollaborationAuditLog {
+  id              String                   @id @default(uuid()) @map("log_id")
+  collaborationId String                   @map("collaboration_id")
+  collaboration   UceCampaignCollaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  stageContext    UceMilestoneStage        @map("stage_context")
+  systemEventTag  String                   @map("system_event_tag")
+  messagePayload  String                   @map("log_message_payload") @db.Text
+  actorIdentifier String                   @map("actor_identifier")
+  loggedAt        DateTime                 @default(now()) @map("logged_at")
+
+  @@index([collaborationId, loggedAt])
+  @@map("uce_collaboration_audit_logs")
+}
+
+model UceCampaignReportingSnapshot {
+  id                        String               @id @default(uuid()) @map("snapshot_id")
+  campaignId                String               @map("campaign_id")
+  campaign                  UceCampaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  primaryObjective          UceCampaignObjective @map("primary_objective")
+  totalSpendAllocated       Decimal              @default(0) @map("total_spend_allocated") @db.Decimal(12, 2)
+  totalEarnedMediaValue     Decimal              @default(0) @map("total_earned_media_value") @db.Decimal(12, 2)
+  totalVerifiedImpressions  BigInt               @default(0) @map("total_verified_impressions")
+  totalVerifiedReach        BigInt               @default(0) @map("total_verified_reach")
+  calculatedCpmRate         Decimal              @default(0) @map("calculated_cpm_rate") @db.Decimal(10, 2)
+  calculatedCpeRate         Decimal              @default(0) @map("calculated_cpe_rate") @db.Decimal(10, 2)
+  totalTrackedLinkClicks    BigInt               @default(0) @map("total_tracked_link_clicks")
+  aggregatedCtrPercentage   Decimal              @default(0) @map("aggregated_ctr_percentage") @db.Decimal(5, 2)
+  calculatedCpcRate         Decimal              @default(0) @map("calculated_cpc_rate") @db.Decimal(10, 2)
+  attributedSalesRevenue    Decimal              @default(0) @map("attributed_sales_revenue") @db.Decimal(14, 2)
+  attributedConversionCount Int                  @default(0) @map("attributed_conversion_count")
+  aggregatedConversionRate  Decimal              @default(0) @map("aggregated_conversion_rate") @db.Decimal(5, 2)
+  calculatedCacRate         Decimal              @default(0) @map("calculated_cac_rate") @db.Decimal(10, 2)
+  lastApiSyncTimestamp      DateTime             @map("last_api_sync_timestamp")
+  updatedAt                 DateTime             @updatedAt @map("updated_at")
+
+  @@index([campaignId, updatedAt])
+  @@map("uce_campaign_reporting_snapshots")
+}
+
+model UceCampaignReportingTimeseriesHourly {
+  id                     String      @id @default(uuid()) @map("log_id")
+  campaignId             String      @map("campaign_id")
+  campaign               UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  recordedHour           DateTime    @map("recorded_hour")
+  hourlyLikesCount       Int         @default(0) @map("hourly_likes_count")
+  hourlyCommentsCount    Int         @default(0) @map("hourly_comments_count")
+  hourlySavesCount       Int         @default(0) @map("hourly_saves_count")
+  hourlySharesCount      Int         @default(0) @map("hourly_shares_count")
+  hourlyImpressionsDelta Int         @default(0) @map("hourly_impressions_delta")
+  createdAt              DateTime    @default(now()) @map("created_at")
+
+  @@unique([campaignId, recordedHour])
+  @@map("uce_campaign_reporting_timeseries_hourly")
+}
+
+model UceCampaignReportingAssetGallery {
+  id                       String                   @id @default(uuid()) @map("asset_id")
+  campaignId               String                   @map("campaign_id")
+  campaign                 UceCampaign              @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  collaborationId          String                   @map("collaboration_id")
+  collaboration            UceCampaignCollaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  instagramHandle          String                   @map("instagram_handle")
+  platform                 UceMediaPlatform         @map("platform")
+  mediaThumbnailUrl        String                   @map("media_thumbnail_url")
+  highResSourceDownloadUrl String                   @map("high_res_source_download_url")
+  engagementRatePercentage Decimal                  @default(0) @map("engagement_rate_percentage") @db.Decimal(5, 2)
+  savesCount               Int                      @default(0) @map("saves_count")
+  sharesCount              Int                      @default(0) @map("shares_count")
+  storyStickerClicksCount  Int                      @default(0) @map("story_sticker_clicks_count")
+  sparkAdAuthorizationCode String?                  @map("spark_ad_authorization_code")
+  isWhitelistingActive     Boolean                  @default(false) @map("is_whitelisting_active")
+  publishedAt              DateTime                 @map("published_at")
+  createdAt                DateTime                 @default(now()) @map("created_at")
+
+  @@index([campaignId, engagementRatePercentage])
+  @@map("uce_campaign_reporting_asset_gallery")
+}

@@ -39,6 +39,10 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
     IntelligenceRefreshWorker,
     PlannerAggregateWorker,
   ],
-  exports: [BrandCentreColdStartService, BrandCentreScanService],
+  exports: [
+    BrandCentreAuthService,
+    BrandCentreColdStartService,
+    BrandCentreScanService,
+  ],
 })
 export class BrandCentreModule {}
