@@ -8,9 +8,14 @@ import { AppModule } from "./app.module";
 
 const DEFAULT_CORS_ORIGINS = [
   "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://[::1]:5173",
   "https://dashboard.dev.thecreatorshop.in",
   "https://dashboard.thecreatorshop.in",
 ] as const;
+
+const LOCAL_DEV_ORIGIN =
+  /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
 
 function parseCorsOrigins(
   raw: string | undefined,
@@ -26,9 +31,36 @@ function parseCorsOrigins(
   return list.length > 0 ? list : [...defaults];
 }
 
+function resolveCorsOrigin(
+  allowedOrigins: readonly string[],
+  stage: string | undefined,
+) {
+  const allowLocalDevOrigins = stage === "local";
+
+  return (
+    origin: string | undefined,
+    callback: (err: Error | null, allow?: boolean | string) => void,
+  ) => {
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+    if (allowedOrigins.includes(origin)) {
+      callback(null, origin);
+      return;
+    }
+    if (allowLocalDevOrigins && LOCAL_DEV_ORIGIN.test(origin)) {
+      callback(null, origin);
+      return;
+    }
+    callback(new Error(`Origin ${origin} is not allowed by CORS`));
+  };
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
+  const stage = config.get<string>("STAGE");
 
   const corsOrigins = parseCorsOrigins(
     config.get<string>("CORS_ORIGINS"),
@@ -36,8 +68,16 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: corsOrigins,
+    origin: resolveCorsOrigin(corsOrigins, stage),
     credentials: true,
+    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept",
+      "Origin",
+      "X-Requested-With",
+    ],
   });
 
   app.useGlobalPipes(
