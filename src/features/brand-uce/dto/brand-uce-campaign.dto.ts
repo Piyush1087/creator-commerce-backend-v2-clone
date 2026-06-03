@@ -1,5 +1,6 @@
 import { UceCampaignStatus } from "@prisma/client";
 import {
+  Allow,
   IsEnum,
   IsIn,
   IsOptional,
@@ -25,9 +26,15 @@ export class ListCampaignsQueryDto {
   objective?: "BRAND_AWARENESS" | "TRAFFIC_CLICKS" | "SALES_CONVERSIONS";
 }
 
+/** Nested shape is validated in the service via Zod; `@Allow()` keeps keys through global whitelist. */
 export class CreateCampaignWizardDto {
+  @Allow()
   strategy!: IntegratedCampaignWizardPayload["strategy"];
+
+  @Allow()
   targeting!: IntegratedCampaignWizardPayload["targeting"];
+
+  @Allow()
   commercials!: IntegratedCampaignWizardPayload["commercials"];
 }
 

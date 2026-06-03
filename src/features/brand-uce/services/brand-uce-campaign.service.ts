@@ -259,6 +259,32 @@ export class BrandUceCampaignService {
               : 0,
           }
         : null,
+      zone_1_targeting: campaign.targeting
+        ? {
+            industry_vertical: campaign.targeting.industryVertical,
+            creator_archetypes: campaign.targeting.creatorArchetypes,
+            follower_tiers: campaign.targeting.followerTiers,
+            audience_age_min: campaign.targeting.audienceAgeMin,
+            audience_age_max: campaign.targeting.audienceAgeMax,
+            audience_gender: campaign.targeting.audienceGender,
+            target_locations: campaign.targeting.targetLocations,
+            disqualifying_keywords: campaign.targeting.disqualifyingKeywords,
+          }
+        : null,
+      zone_1_commercials: campaign.commercials
+        ? {
+            compensation_type: campaign.commercials.compensationType,
+            fixed_fee_amount: decimalToNumber(campaign.commercials.fixedFeeAmount),
+            negotiable_min_fee: decimalToNumber(campaign.commercials.negotiableMinFee),
+            negotiable_max_fee: decimalToNumber(campaign.commercials.negotiableMaxFee),
+            total_campaign_budget_pool: decimalToNumber(
+              campaign.commercials.totalCampaignBudgetPool,
+            ),
+            advance_payment_percentage:
+              campaign.commercials.advancePaymentPercentage,
+            final_balance_terms: campaign.commercials.finalBalanceTerms,
+          }
+        : null,
       zone_2_tactics: {
         products: campaign.products.map((p) => ({
           product_id: p.id,
@@ -272,8 +298,10 @@ export class BrandUceCampaignService {
         briefs: campaign.briefs.map((b) => ({
           brief_id: b.id,
           internal_title: b.internalTitle,
+          creative_guidelines: b.creativeGuidelines,
           required_platforms: b.requiredPlatforms,
           deliverable_format_tags: b.deliverableFormatTags,
+          created_at: b.createdAt.toISOString(),
         })),
       },
       performance_aggregate: campaign.performanceAggregate

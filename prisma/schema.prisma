@@ -452,6 +452,9 @@ model BrandProfile {
   // UCE (Universal Campaign Engine)
   uceCampaigns UceCampaign[]
 
+  // Bridge ledger (Brand Centre → UCE)
+  integrationBridgeSignals IntegrationBridgeSignalLedger[]
+
   @@map("brand_profiles")
 }
 
@@ -719,6 +722,7 @@ model UceCampaign {
   reportingSnapshots   UceCampaignReportingSnapshot[]
   reportingTimeseries  UceCampaignReportingTimeseriesHourly[]
   reportingAssets      UceCampaignReportingAssetGallery[]
+  bridgeSignals        IntegrationBridgeSignalLedger[]
 
   @@index([brandProfileId, status])
   @@map("uce_campaigns")
@@ -787,6 +791,7 @@ model UceCampaignProduct {
   campaign       UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   skuCode        String      @map("sku_code")
   productName    String      @map("product_name")
+  isActive       Boolean     @default(true) @map("is_active")
   inventoryCount Int         @default(0) @map("inventory_count")
   costPerUnit    Decimal     @default(0) @map("cost_per_unit") @db.Decimal(10, 2)
   imageUrl       String?     @map("image_url")
@@ -805,6 +810,7 @@ model UceCampaignBrief {
   campaign              UceCampaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   internalTitle         String             @map("internal_title")
   creativeGuidelines    String             @map("creative_guidelines") @db.Text
+  isActive              Boolean            @default(true) @map("is_active")
   requiredPlatforms     UceMediaPlatform[] @map("required_platforms")
   deliverableFormatTags String[]           @default([]) @map("deliverable_format_tags")
   createdAt             DateTime           @default(now()) @map("created_at")
@@ -813,6 +819,42 @@ model UceCampaignBrief {
 
   @@index([campaignId])
   @@map("uce_campaign_briefs")
+}
+
+enum PlannerSignalType {
+  LAUNCH_NEW_FRAMEWORK
+  INJECT_ASSET_LINE
+  FAST_TRACK_INTERRUPT
+
+  @@map("planner_signal_type_enum")
+}
+
+enum BridgeSyncStatus {
+  RECEIVED
+  PROCESSING
+  SYNCHRONIZED
+  VALIDATION_FAILED
+
+  @@map("bridge_sync_status_enum")
+}
+
+model IntegrationBridgeSignalLedger {
+  id                  String           @id @default(uuid()) @map("signal_id")
+  brandProfileId      String           @map("brand_profile_id")
+  brandProfile        BrandProfile     @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  campaignId          String?          @map("campaign_id")
+  campaign            UceCampaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  signalType          PlannerSignalType @map("signal_type")
+  syncStatus          BridgeSyncStatus @default(RECEIVED) @map("sync_status")
+  rawPayloadSnapshot  Json             @map("raw_payload_snapshot")
+  executionErrorLogs  String?          @map("execution_error_logs") @db.Text
+  synchronizedAt      DateTime?        @map("synchronized_at")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+
+  @@index([syncStatus, signalType])
+  @@index([brandProfileId, createdAt])
+  @@map("integration_bridge_signals_ledger")
 }
 
 model UceCampaignCollaboration {
