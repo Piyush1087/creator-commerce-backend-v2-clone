@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { AuthModule } from "../auth/auth.module";
 import { BrandCentreModule } from "../brand-centre/brand-centre.module";
+import { CollaborationModule } from "../collaboration/collaboration.module";
 import { BrandUceController } from "./brand-uce.controller";
 import { BrandUceAccessService } from "./services/brand-uce-access.service";
 import { BrandUceBriefService } from "./services/brand-uce-brief.service";
@@ -12,7 +13,7 @@ import { BrandUceProductService } from "./services/brand-uce-product.service";
 import { BrandUceReportingService } from "./services/brand-uce-reporting.service";
 
 @Module({
-  imports: [PrismaModule, AuthModule, BrandCentreModule],
+  imports: [PrismaModule, AuthModule, BrandCentreModule, CollaborationModule],
   controllers: [BrandUceController],
   providers: [
     BrandUceAccessService,
