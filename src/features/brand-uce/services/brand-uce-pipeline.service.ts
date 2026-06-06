@@ -28,6 +28,7 @@ import {
   decimalToNumber,
   splitEscrowQuote,
 } from "../utils/uce-decimal.util";
+import { CollaborationProvisionService } from "../../collaboration/services/collaboration-provision.service";
 import { BrandUceAccessService } from "./brand-uce-access.service";
 
 const PROSPECT_STATUSES: UceCollabStatus[] = [
@@ -51,6 +52,7 @@ export class BrandUcePipelineService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: BrandUceAccessService,
+    private readonly collaborationProvision: CollaborationProvisionService,
   ) {}
 
   async listProspects(
@@ -109,8 +111,10 @@ export class BrandUcePipelineService {
       take: 50,
     });
 
+    const row = mapCollaborationRow(collab);
+    const [enriched] = await this.enrichRowsWithWorkflowIds([row]);
     return {
-      row: mapCollaborationRow(collab),
+      row: enriched,
       drawer: {
         performance_matrix: {
           match_score: decimalToNumber(collab.matchScore),
@@ -325,15 +329,12 @@ export class BrandUcePipelineService {
         if (!product) {
           throw new BadRequestException("Product not found");
         }
-        if (product.inventoryCount <= 0) {
-          throw new BadRequestException(
-            "Fulfillment Halted: Inventory depleted. Allocate additional stock to resume automated shipping tracking.",
-          );
+        if (product.inventoryCount > 0) {
+          await tx.uceCampaignProduct.update({
+            where: { id: productId },
+            data: { inventoryCount: { decrement: 1 } },
+          });
         }
-        await tx.uceCampaignProduct.update({
-          where: { id: productId },
-          data: { inventoryCount: { decrement: 1 } },
-        });
       }
 
       const row = await tx.uceCampaignCollaboration.update({
@@ -372,7 +373,26 @@ export class BrandUcePipelineService {
       return row;
     });
 
-    return mapCollaborationRow(updated);
+    const creatorUserId =
+      await this.collaborationProvision.ensureCreatorUser(
+        collab.creatorEmail,
+        collab.instagramHandle,
+      );
+
+    const workflow = await this.collaborationProvision.provisionFromUceApproval({
+      brandProfileId,
+      campaignId,
+      briefId: collab.briefId,
+      creatorUserId,
+      productId: productId ?? collab.productId,
+      ucePipelineCollaborationId: collaborationId,
+      initialQuote: totalQuote,
+      welcomeMessage: `Congrats @${collab.instagramHandle}! You're approved. View your brief and secure your spot.`,
+    });
+
+    const row = mapCollaborationRow(updated);
+    row.workflow_collaboration_id = workflow.collaboration_id;
+    return row;
   }
 
   async rejectApplicant(
@@ -696,17 +716,42 @@ export class BrandUcePipelineService {
       include: COLLAB_INCLUDE,
     });
 
+    const mapped = rows.map(mapCollaborationRow);
+    const enriched = await this.enrichRowsWithWorkflowIds(mapped);
+
     return {
       overview: {
-        total: rows.length,
+        total: enriched.length,
         mean_match_score:
-          rows.length > 0
-            ? rows.reduce((s, r) => s + decimalToNumber(r.matchScore), 0) /
-              rows.length
+          enriched.length > 0
+            ? enriched.reduce((s, r) => s + r.match_score, 0) / enriched.length
             : 0,
       },
-      rows: rows.map(mapCollaborationRow),
+      rows: enriched,
     };
+  }
+
+  private async enrichRowsWithWorkflowIds<
+    T extends { collaboration_id: string; workflow_collaboration_id: string | null },
+  >(rows: T[]): Promise<T[]> {
+    if (rows.length === 0) {
+      return rows;
+    }
+    const pipelineIds = rows.map((r) => r.collaboration_id);
+    const links = await this.prisma.collaboration.findMany({
+      where: { ucePipelineCollaborationId: { in: pipelineIds } },
+      select: { id: true, ucePipelineCollaborationId: true },
+    });
+    const byPipelineId = new Map(
+      links
+        .filter((l) => l.ucePipelineCollaborationId != null)
+        .map((l) => [l.ucePipelineCollaborationId as string, l.id]),
+    );
+    return rows.map((row) => ({
+      ...row,
+      workflow_collaboration_id:
+        byPipelineId.get(row.collaboration_id) ?? null,
+    }));
   }
 
   private defaultMilestoneDeadline(days = 7): Date {

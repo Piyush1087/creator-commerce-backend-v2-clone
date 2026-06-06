@@ -29,6 +29,7 @@ export function mapCollaborationRow(collab: CollaborationWithRelations) {
 
   return {
     collaboration_id: collab.id,
+    workflow_collaboration_id: null as string | null,
     campaign_id: collab.campaignId,
     brief_id: collab.briefId,
     brief_internal_title: collab.brief.internalTitle,

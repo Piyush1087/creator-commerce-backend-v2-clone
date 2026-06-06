@@ -15,6 +15,7 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
+    "db:seed:dev-creator": "ts-node -r dotenv/config scripts/seed-dev-creator.ts",
     "db:tunnel:dev": "powershell -ExecutionPolicy Bypass -File scripts/start-dev-tunnel.ps1",
     "db:tunnel:prod": "powershell -ExecutionPolicy Bypass -File scripts/start-prod-tunnel.ps1"
   },
@@ -28,9 +29,11 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^10.4.15",
+    "@nestjs/platform-socket.io": "^10.4.15",
     "@nestjs/schedule": "^6.1.3",
     "@nestjs/terminus": "^10.2.3",
     "@nestjs/throttler": "^6.0.0",
+    "@nestjs/websockets": "^10.4.15",
     "@prisma/client": "^6.2.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
@@ -41,6 +44,7 @@
     "postmark": "^4.0.7",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "socket.io": "^4.8.1",
     "zod": "^3.24.1",
     "zod-to-json-schema": "^3.24.3"
   },

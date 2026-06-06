@@ -48,12 +48,6 @@ export class AuthService {
   }
 
   async login(dto: LoginDto): Promise<AuthTokenResponse> {
-    if (dto.role !== UserRole.BRAND) {
-      throw new BadRequestException(
-        "Only brand accounts can sign in here for now.",
-      );
-    }
-
     if (dto.otp !== BRAND_LOGIN_STUB_OTP) {
       throw new UnauthorizedException("Invalid verification code.");
     }
@@ -63,9 +57,21 @@ export class AuthService {
       where: { email },
     });
 
-    if (!user || user.role !== UserRole.BRAND) {
+    if (!user) {
       throw new UnauthorizedException(
-        "No brand account found for this email. Complete onboarding first.",
+        "No account found for this email.",
+      );
+    }
+
+    if (user.role !== UserRole.BRAND && user.role !== UserRole.CREATOR) {
+      throw new BadRequestException(
+        "This account type cannot sign in through the app yet.",
+      );
+    }
+
+    if (dto.role && dto.role !== user.role) {
+      throw new UnauthorizedException(
+        `This email is registered as ${user.role.toLowerCase()}, not ${dto.role.toLowerCase()}.`,
       );
     }
 

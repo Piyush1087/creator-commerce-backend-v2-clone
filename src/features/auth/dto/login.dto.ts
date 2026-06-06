@@ -3,6 +3,7 @@ import {
   IsEmail,
   IsEnum,
   IsNotEmpty,
+  IsOptional,
   IsString,
   Length,
 } from "class-validator";
@@ -20,7 +21,8 @@ export class LoginDto {
   @Length(6, 6)
   otp!: string;
 
+  /** Optional — when omitted, role is inferred from the user record. */
+  @IsOptional()
   @IsEnum(UserRole)
-  @IsNotEmpty()
-  role!: UserRole;
+  role?: UserRole;
 }

@@ -18,6 +18,8 @@ import { BrandCentreJobDispatcherService } from "./brand-centre-job-dispatcher.s
 
 const STALE_HOURS = 24;
 const ARCHIVE_RETENTION_DAYS = 30;
+/** QUEUED jobs older than this are re-dispatched (survives process restarts). */
+const ORPHAN_QUEUED_MS = 2 * 60 * 1000;
 
 @Injectable()
 export class BrandCentreIntelligenceService {
@@ -51,6 +53,8 @@ export class BrandCentreIntelligenceService {
       where: { brandProfileId, isArchived: false },
       orderBy: [{ priorityRank: "asc" }, { createdAt: "desc" }],
     });
+
+    await this.reconcileOrphanedIntelligenceJobs(brandProfileId);
 
     if (this.shouldRefresh(baseline?.refreshedAt, leaks.length)) {
       const reason = this.refreshReason(baseline?.refreshedAt, leaks.length);
@@ -119,6 +123,8 @@ export class BrandCentreIntelligenceService {
   }
 
   async enqueueRefresh(brandProfileId: string): Promise<{ jobId: string }> {
+    await this.reconcileOrphanedIntelligenceJobs(brandProfileId);
+
     const active = await this.prisma.brandCentreJob.findFirst({
       where: {
         brandProfileId,
@@ -270,6 +276,29 @@ export class BrandCentreIntelligenceService {
       BrandCentreJobType.PLANNER_AGGREGATE,
     );
     return { jobId: job.id };
+  }
+
+  private async reconcileOrphanedIntelligenceJobs(
+    brandProfileId: string,
+  ): Promise<void> {
+    const cutoff = new Date(Date.now() - ORPHAN_QUEUED_MS);
+    const staleQueued = await this.prisma.brandCentreJob.findMany({
+      where: {
+        brandProfileId,
+        type: BrandCentreJobType.INTELLIGENCE_REFRESH,
+        status: BrandCentreJobStatus.QUEUED,
+        queuedAt: { lt: cutoff },
+      },
+    });
+    for (const job of staleQueued) {
+      this.logger.warn(
+        `intelligence-refresh.re-dispatch-orphan brandProfileId=${brandProfileId} jobId=${job.id}`,
+      );
+      this.dispatcher.dispatchInBackground(
+        job.id,
+        BrandCentreJobType.INTELLIGENCE_REFRESH,
+      );
+    }
   }
 
   private mapLeakSummary(leak: {
