@@ -65,7 +65,7 @@ Creates or updates:
 
 Sign in on the frontend with that email and OTP `123456` (same stub as brand login).
 
-For **dev RDS**, point `DATABASE_URL` at the tunnel target, then run the same command once (ops — not on container startup).
+For **dev RDS**, open the SSM tunnel, export `DATABASE_URL` to `localhost:5435`, then run the same command once (ops — not on container startup). Tunnel steps: [../deployment/README.md](../deployment/README.md#dev-rds--tunnel--migrate).
 
 ## Migration: `20260604120000_collaboration_module`
 
