@@ -3,6 +3,7 @@ import "reflect-metadata";
 import { ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 
 import { AppModule } from "./app.module";
 
@@ -58,7 +59,9 @@ function resolveCorsOrigin(
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
   const config = app.get(ConfigService);
   const stage = config.get<string>("STAGE");
 
@@ -77,6 +80,7 @@ async function bootstrap() {
       "Accept",
       "Origin",
       "X-Requested-With",
+      "x-idempotency-key",
     ],
   });
 

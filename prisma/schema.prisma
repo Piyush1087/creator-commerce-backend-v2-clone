@@ -316,6 +316,40 @@ enum CollaborationMessageKind {
 }
 
 // ============================================================================
+// BRAND ESCROW ENUMS
+// ============================================================================
+
+enum EscrowTransactionType {
+  VBA_TOPUP_WIRE
+  GATEWAY_TOPUP_CARD
+  CONTRACT_LOCK_RESERVE
+  TRANCHE_ADVANCE_RELEASE
+  TRANCHE_FINAL_RELEASE
+  PLATFORM_FEE_CAPTURE
+  TDS_BUFFER_REVERSAL
+  FAILED_COLLAB_REFUND
+}
+
+enum EscrowTransactionStatus {
+  PROCESSING_GATEWAY
+  CLEARED
+  FAILED
+  REVERSED
+}
+
+enum EscrowPayoutTranche {
+  ADVANCE_30
+  FINAL_70
+  PLATFORM_COMMISSION
+}
+
+enum IdempotencyExecutionState {
+  IN_FLIGHT
+  COMPLETED
+  FAILED
+}
+
+// ============================================================================
 // CORE MODELS (Organization & User)
 // ============================================================================
 
@@ -507,6 +541,7 @@ model BrandProfile {
   integrationBridgeSignals IntegrationBridgeSignalLedger[]
 
   collaborations Collaboration[]
+  escrowVault    BrandEscrowVault?
 
   @@map("brand_profiles")
 }
@@ -1062,6 +1097,7 @@ model CreatorProfile {
 
   bankDetails       CreatorBankDetails[]
   shippingAddresses CreatorShippingAddress[]
+  settlementProfile CreatorSettlementProfile?
 
   @@map("creator_profiles")
 }
@@ -1148,6 +1184,7 @@ model Collaboration {
   media          CollaborationMedia[]
   finalization   CollaborationFinalization?
   messages       CollaborationMessage[]
+  escrowLock     CollaborationEscrowLock?
 
   @@unique([campaignId, creatorUserId])
   @@index([brandProfileId, currentStage])
@@ -1259,4 +1296,106 @@ model CollaborationMessage {
 
   @@index([collaborationId, createdAt])
   @@map("collaboration_messages")
+}
+
+// ============================================================================
+// BRAND ESCROW MODELS
+// ============================================================================
+
+model BrandEscrowVault {
+  id                       String   @id @default(uuid()) @map("vault_id")
+  brandProfileId           String   @unique @map("brand_id")
+  brandProfile             BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
+  razorpayVirtualAccountId String   @unique @map("razorpay_virtual_account_id")
+  virtualAccountNumber     String   @unique @map("virtual_account_number")
+  ifscCode                 String   @map("ifsc_code")
+  bankName                 String   @default("RBL Bank (Razorpay Escrow Partner Node)") @map("bank_name")
+  currency                 String   @default("INR") @db.VarChar(3)
+  totalPooledBalance       Decimal  @default(0) @map("total_pooled_balance") @db.Decimal(15, 4)
+  lockedCampaignFunds      Decimal  @default(0) @map("locked_campaign_funds") @db.Decimal(15, 4)
+  availableBalance         Decimal  @default(0) @map("available_balance") @db.Decimal(15, 4)
+  tdsBufferBalance         Decimal  @default(0) @map("tds_buffer_balance") @db.Decimal(15, 4)
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  ledgerEntries EscrowTransactionLedger[]
+
+  @@index([brandProfileId])
+  @@map("brand_escrow_vaults")
+}
+
+model CollaborationEscrowLock {
+  id                      String        @id @default(uuid()) @map("lock_id")
+  collaborationId         String        @unique @map("collaboration_id")
+  collaboration           Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Restrict)
+  brandProfileId          String        @map("brand_id")
+  grossCreatorQuote       Decimal       @map("gross_creator_quote") @db.Decimal(15, 4)
+  platformCommissionFee   Decimal       @map("platform_commission_fee") @db.Decimal(15, 4)
+  platformCommissionGst     Decimal       @default(0) @map("platform_commission_gst") @db.Decimal(15, 4)
+  totalEscrowLockedAmount Decimal       @map("total_escrow_locked_amount") @db.Decimal(15, 4)
+  expectedTdsPercentage   Decimal       @default(0) @map("expected_tds_percentage") @db.Decimal(4, 2)
+  calculatedTdsDeduction  Decimal       @default(0) @map("calculated_tds_deduction") @db.Decimal(15, 4)
+  netCreatorPayoutPool    Decimal       @map("net_creator_payout_pool") @db.Decimal(15, 4)
+  advanceTrancheDisbursed Boolean       @default(false) @map("advance_tranche_disbursed")
+  finalTrancheDisbursed   Boolean       @default(false) @map("final_tranche_disbursed")
+  lockReleasedViaRefund   Boolean       @default(false) @map("lock_released_via_refund")
+  createdAt               DateTime      @default(now()) @map("created_at")
+  updatedAt               DateTime      @updatedAt @map("updated_at")
+
+  @@index([collaborationId])
+  @@index([brandProfileId])
+  @@map("collaboration_escrow_locks")
+}
+
+model EscrowTransactionLedger {
+  id                         String                  @id @default(uuid()) @map("transaction_id")
+  vaultId                    String                  @map("vault_id")
+  vault                      BrandEscrowVault        @relation(fields: [vaultId], references: [id], onDelete: Restrict)
+  brandProfileId             String                  @map("brand_id")
+  collaborationId            String?                 @map("collaboration_id")
+  transactionType            EscrowTransactionType   @map("transaction_type")
+  payoutTrancheTarget        EscrowPayoutTranche?    @map("payout_tranche_target")
+  amount                     Decimal                 @db.Decimal(15, 4)
+  currency                   String                  @db.VarChar(3)
+  gatewayProcessingSurcharge Decimal                 @default(0) @map("gateway_processing_surcharge") @db.Decimal(15, 4)
+  gatewaySurchargeGst        Decimal                 @default(0) @map("gateway_surcharge_gst") @db.Decimal(15, 4)
+  idempotencyKey             String                  @unique @map("idempotency_key")
+  gatewayReferenceId         String?                 @unique @map("gateway_reference_id")
+  transactionStatus          EscrowTransactionStatus @default(PROCESSING_GATEWAY) @map("transaction_status")
+  errorDiagnosticPayload     Json?                   @map("error_diagnostic_payload")
+  createdAt                  DateTime                @default(now()) @map("created_at")
+
+  @@index([vaultId])
+  @@index([brandProfileId, collaborationId, transactionType])
+  @@index([collaborationId])
+  @@map("escrow_transaction_ledger")
+}
+
+model CreatorSettlementProfile {
+  id                    String         @id @default(uuid()) @map("settlement_profile_id")
+  creatorProfileId      String         @unique @map("creator_profile_id")
+  creatorProfile        CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  accountHolderName     String         @map("account_holder_name")
+  bankAccountNumber     String         @map("bank_account_number")
+  ifscCode              String         @map("ifsc_code")
+  panNumber             String?        @map("pan_number") @db.VarChar(10)
+  isPanVerified         Boolean        @default(false) @map("is_pan_verified")
+  razorpayFundAccountId String?        @unique @map("razorpay_fund_account_id")
+  isSettlementRouteActive Boolean      @default(false) @map("is_settlement_route_active")
+  createdAt             DateTime       @default(now()) @map("created_at")
+  updatedAt             DateTime       @updatedAt @map("updated_at")
+
+  @@index([creatorProfileId])
+  @@map("creator_settlement_profiles")
+}
+
+model IdempotencyRegistry {
+  idempotencyKey String                    @id @map("idempotency_key")
+  requestPath    String                    @map("request_path")
+  executionState IdempotencyExecutionState @default(IN_FLIGHT) @map("execution_state")
+  cachedResponse Json?                     @map("cached_response")
+  lockedAt       DateTime                  @default(now()) @map("locked_at")
+  updatedAt      DateTime                  @updatedAt @map("updated_at")
+
+  @@map("idempotency_registry")
 }
