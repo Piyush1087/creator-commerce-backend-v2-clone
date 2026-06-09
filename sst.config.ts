@@ -101,6 +101,11 @@ export default $config({
       POSTMARK_OTP_TEMPLATE_ID: process.env.POSTMARK_OTP_TEMPLATE_ID as string,
       PARALLEL_API_KEY: process.env.PARALLEL_API_KEY as string,
       GEMINI_API_KEY: process.env.GEMINI_API_KEY as string,
+      RAZORPAY_API_KEY_ID: process.env.RAZORPAY_API_KEY_ID as string,
+      RAZORPAY_API_KEY_SECRET: process.env.RAZORPAY_API_KEY_SECRET as string,
+      RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET as string,
+      EXTERNAL_API_TIMEOUT_MS:
+        process.env.EXTERNAL_API_TIMEOUT_MS ?? "10000",
     };
 
     cluster.addService("api", {
