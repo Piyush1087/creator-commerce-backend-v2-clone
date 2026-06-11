@@ -11,6 +11,7 @@ export interface CalculateEscrowStructureInput {
   grossCreatorQuote: number;
   currency: EscrowCurrency;
   expectedTdsPercentage: EscrowTdsPercentage;
+  platformTakeRate: number;
 }
 
 @Injectable()
@@ -19,7 +20,7 @@ export class EscrowComputationEngine {
     input: CalculateEscrowStructureInput,
   ): EscrowCalculationOutput {
     const grossCreatorQuote = new Decimal(input.grossCreatorQuote);
-    const platformCommissionFee = grossCreatorQuote.mul(0.07);
+    const platformCommissionFee = grossCreatorQuote.mul(input.platformTakeRate);
     const platformCommissionGst =
       input.currency === "INR"
         ? platformCommissionFee.mul(0.18)

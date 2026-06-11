@@ -8,6 +8,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { mapEscrowVault } from "../utils/map-escrow-vault.util";
 import { resolveEscrowCurrency } from "../utils/resolve-escrow-currency.util";
 import { EscrowComputationEngine } from "./escrow-computation.engine";
+import { EscrowSubscriptionContextService } from "./escrow-subscription-context.service";
 import { extractBankReceiver, RazorpayClient } from "./razorpay.client";
 
 @Injectable()
@@ -16,6 +17,7 @@ export class BrandEscrowService {
     private readonly prisma: PrismaService,
     private readonly razorpay: RazorpayClient,
     private readonly computationEngine: EscrowComputationEngine,
+    private readonly escrowBilling: EscrowSubscriptionContextService,
   ) {}
 
   async initializeSecureVault(brandProfileId: string) {
@@ -175,16 +177,25 @@ export class BrandEscrowService {
     };
   }
 
-  calculateBreakdown(input: {
-    grossCreatorQuote: number;
-    currency: "INR" | "USD";
-    expectedTdsPercentage: 0 | 1 | 2;
-  }) {
-    const metrics = this.computationEngine.calculateStructure(input);
+  async calculateBreakdown(
+    brandProfileId: string,
+    input: {
+      grossCreatorQuote: number;
+      currency: "INR" | "USD";
+      expectedTdsPercentage: 0 | 1 | 2;
+    },
+  ) {
+    const platformTakeRate =
+      await this.escrowBilling.resolveTakeRateForBrand(brandProfileId);
+    const metrics = this.computationEngine.calculateStructure({
+      ...input,
+      platformTakeRate,
+    });
     return {
       gross_creator_quote: metrics.grossCreatorQuote.toNumber(),
       platform_commission_fee: metrics.platformCommissionFee.toNumber(),
       platform_commission_gst: metrics.platformCommissionGst.toNumber(),
+      platform_take_rate: platformTakeRate,
       total_escrow_locked_amount: metrics.totalEscrowLockedAmount.toNumber(),
       calculated_tds_deduction: metrics.calculatedTdsDeduction.toNumber(),
       net_creator_payout_pool: metrics.netCreatorPayoutPool.toNumber(),

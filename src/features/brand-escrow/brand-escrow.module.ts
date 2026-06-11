@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { AuthModule } from "../auth/auth.module";
 import { BrandCentreModule } from "../brand-centre/brand-centre.module";
+import { PricingModule } from "../pricing/pricing.module";
 import { BrandEscrowController } from "./brand-escrow.controller";
 import {
   BrandEscrowEngineController,
@@ -17,11 +18,12 @@ import { BrandEscrowInterlockService } from "./services/brand-escrow-interlock.s
 import { BrandEscrowService } from "./services/brand-escrow.service";
 import { BrandEscrowWebhookService } from "./services/brand-escrow-webhook.service";
 import { EscrowComputationEngine } from "./services/escrow-computation.engine";
+import { EscrowSubscriptionContextService } from "./services/escrow-subscription-context.service";
 import { IdempotencyManager } from "./services/idempotency.manager";
 import { RazorpayClient } from "./services/razorpay.client";
 
 @Module({
-  imports: [PrismaModule, AuthModule, BrandCentreModule],
+  imports: [PrismaModule, AuthModule, BrandCentreModule, PricingModule],
   controllers: [
     BrandEscrowController,
     BrandEscrowEngineController,
@@ -37,6 +39,7 @@ import { RazorpayClient } from "./services/razorpay.client";
     BrandEscrowHardenedService,
     BrandEscrowWebhookService,
     EscrowComputationEngine,
+    EscrowSubscriptionContextService,
     IdempotencyManager,
     RazorpayClient,
   ],

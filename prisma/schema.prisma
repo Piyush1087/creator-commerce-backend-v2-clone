@@ -139,6 +139,19 @@ enum SubscriptionStatus {
   ACTIVE
   PAST_DUE
   CANCELED
+  HALTED
+}
+
+enum SubscriptionTier {
+  FOUNDERS_BETA
+  GROWTH_STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionCurrency {
+  INR
+  USD
 }
 
 /// Vendor surface-scan runs only (cache hits are not counted toward rate limits).
@@ -540,8 +553,9 @@ model BrandProfile {
   // Bridge ledger (Brand Centre → UCE)
   integrationBridgeSignals IntegrationBridgeSignalLedger[]
 
-  collaborations Collaboration[]
-  escrowVault    BrandEscrowVault?
+  collaborations    Collaboration[]
+  escrowVault       BrandEscrowVault?
+  brandSubscription BrandSubscription?
 
   @@map("brand_profiles")
 }
@@ -1398,4 +1412,73 @@ model IdempotencyRegistry {
   updatedAt      DateTime                  @updatedAt @map("updated_at")
 
   @@map("idempotency_registry")
+}
+
+// ---------------------------------------------------------------------------
+// Pricing — subscription lifecycle & entitlement (product: brand_subscriptions)
+// ---------------------------------------------------------------------------
+
+model BrandSubscription {
+  id                     String               @id @default(uuid()) @map("subscription_id")
+  brandProfileId         String               @unique @map("brand_id")
+  brandProfile           BrandProfile         @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  tier                   SubscriptionTier     @default(FOUNDERS_BETA)
+  status                 SubscriptionStatus   @default(TRIALING)
+  currency               SubscriptionCurrency @default(USD)
+  razorpayCustomerId     String?              @map("razorpay_customer_id")
+  razorpaySubscriptionId String?              @unique @map("razorpay_subscription_id")
+  razorpayPlanId         String?              @map("razorpay_plan_id")
+  trialEndsAt            DateTime?            @map("trial_ends_at")
+  currentPeriodStart     DateTime             @default(now()) @map("current_period_start")
+  currentPeriodEnd       DateTime             @map("current_period_end")
+  createdAt              DateTime             @default(now()) @map("created_at")
+  updatedAt              DateTime             @updatedAt @map("updated_at")
+
+  featureUsages   FeatureUsage[]
+  billingInvoices BrandBillingInvoice[]
+
+  @@index([brandProfileId])
+  @@index([status])
+  @@map("brand_subscriptions")
+}
+
+model BrandBillingInvoice {
+  id                     String            @id @default(uuid()) @map("invoice_row_id")
+  brandProfileId         String            @map("brand_id")
+  brandSubscriptionId    String            @map("subscription_id")
+  brandSubscription      BrandSubscription @relation(fields: [brandSubscriptionId], references: [id], onDelete: Cascade)
+  razorpayInvoiceId      String            @unique @map("razorpay_invoice_id")
+  razorpaySubscriptionId String            @map("razorpay_subscription_id")
+  razorpayPaymentId      String?           @map("razorpay_payment_id")
+  shortUrl               String?           @map("short_url")
+  status                 String
+  amount                 Int
+  amountPaid             Int               @default(0) @map("amount_paid")
+  currency               String            @default("USD")
+  invoiceNumber          String?           @map("invoice_number")
+  paidAt                 DateTime?         @map("paid_at")
+  billingPeriodStart     DateTime?         @map("billing_period_start")
+  billingPeriodEnd       DateTime?         @map("billing_period_end")
+  issuedAt               DateTime?         @map("issued_at")
+  createdAt              DateTime          @default(now()) @map("created_at")
+  updatedAt              DateTime          @updatedAt @map("updated_at")
+
+  @@index([brandProfileId])
+  @@index([brandSubscriptionId])
+  @@index([paidAt])
+  @@map("brand_billing_invoices")
+}
+
+model FeatureUsage {
+  id                String            @id @default(uuid()) @map("usage_id")
+  subscriptionId    String            @map("subscription_id")
+  subscription      BrandSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  featureKey        String            @map("feature_key")
+  currentUsageCount Int               @default(0) @map("current_usage_count")
+  resetAt           DateTime?         @map("reset_at")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  @@unique([subscriptionId, featureKey])
+  @@map("feature_usages")
 }
