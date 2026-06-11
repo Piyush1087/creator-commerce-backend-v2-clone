@@ -144,6 +144,12 @@ export default $config({
         service: (args) => {
           args.healthCheckGracePeriodSeconds = 120;
         },
+        // Surface scan holds the HTTP connection through Parallel + Gemini (~3–5 min).
+        // ALB default idle timeout is 60s, which drops the client with "Failed to fetch"
+        // while the ECS task still completes and persists the profile.
+        loadBalancer: (args) => {
+          args.idleTimeout = 600;
+        },
       },
     });
 

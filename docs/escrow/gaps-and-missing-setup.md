@@ -17,6 +17,8 @@ What is **done**, what is **partially done**, and what still needs work before t
 | Brand Settings → Escrow UI wired to APIs | Done |
 | Mock / preview data removed from escrow UI | Done |
 | Missing values show **—** in UI | Done |
+| Pricing tier → escrow take rate + aggregate cap on lock/breakdown | Done (`EscrowSubscriptionContextService` + `PricingModule`) |
+| Billing gate on escrow lock (ACTIVE / TRIALING only) | Done |
 
 ---
 
@@ -40,8 +42,8 @@ What is **done**, what is **partially done**, and what still needs work before t
 
 ### Settings → Billing page
 
-- **Gap:** Plan name (**FREE Plan**) and some billing blocks are still static placeholders — not connected to escrow APIs.
-- **Action:** Separate billing/subscription workstream; escrow card on billing page uses same live component as Escrow tab.
+- **Gap:** Billing overview is wired to **pricing** APIs (separate from escrow vault). Escrow sub-tab remains the vault/top-up surface.
+- **Deferred:** Tier-based concurrent campaign limits, per-lock single-ticket caps, custom tranche modes — see `docs/pricing/product-docs/Pricing-escrow-connection.md` and `docs/pricing/gaps-and-missing-setup.md`.
 
 ---
 

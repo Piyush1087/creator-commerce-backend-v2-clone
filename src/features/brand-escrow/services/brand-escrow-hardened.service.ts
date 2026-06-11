@@ -9,6 +9,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import type { EscrowCurrency, VaultRowLock } from "../types";
 import type { ExecuteLockAllocationInput } from "./brand-escrow-computation.service";
 import { EscrowComputationEngine } from "./escrow-computation.engine";
+import { EscrowSubscriptionContextService } from "./escrow-subscription-context.service";
 import { IdempotencyManager } from "./idempotency.manager";
 
 @Injectable()
@@ -17,6 +18,7 @@ export class BrandEscrowHardenedService {
     private readonly prisma: PrismaService,
     private readonly idempotencyManager: IdempotencyManager,
     private readonly computationEngine: EscrowComputationEngine,
+    private readonly escrowBilling: EscrowSubscriptionContextService,
   ) {}
 
   async secureCollaborationFundsHardened(
@@ -45,11 +47,27 @@ export class BrandEscrowHardenedService {
         const lockedFunds = new Decimal(rawVault.locked_campaign_funds);
         const currency = String(rawVault.currency) as EscrowCurrency;
 
+        const billingContext =
+          await this.escrowBilling.assertEscrowBillingAuthorized(
+            input.brandProfileId,
+          );
+
         const metrics = this.computationEngine.calculateStructure({
           grossCreatorQuote: input.grossCreatorQuote,
           currency,
           expectedTdsPercentage: input.expectedTdsPercentage,
+          platformTakeRate: billingContext.platformTakeRate,
         });
+
+        if (
+          lockedFunds
+            .add(metrics.totalEscrowLockedAmount)
+            .greaterThan(new Decimal(billingContext.aggregateCap))
+        ) {
+          throw new BadRequestException(
+            `Transaction blocked: Active plan tier ${billingContext.tier} caps aggregate escrow locks at ${billingContext.aggregateCap}.`,
+          );
+        }
 
         if (availableBalance.lessThan(metrics.totalEscrowLockedAmount)) {
           throw new BadRequestException(

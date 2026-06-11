@@ -334,6 +334,7 @@ Frontend deploy (`creator-commerce-frontend-v2`): set `VITE_RAZORPAY_KEY_ID` (sa
 | `pulumi/bin/pulumi: not a directory` | `unset SST_PULUMI_PATH` — never point it at the binary; use only `SST_SKIP_DEPENDENCY_CHECK=1` |
 | Stuck on “Installing pulumi…” | Wait for first install, or `rm -rf ~/.config/sst/bin/pulumi` and redeploy without `SST_PULUMI_PATH` |
 | Frontend has Pulumi, backend re-downloads | Deploy both from same WSL user; Windows vs WSL paths differ |
+| Onboarding scan shows **Failed to fetch** but ECS logs show `cold-start.complete` | ALB idle timeout was too low for `POST /api/v1/brand/surface-scan`. Redeploy backend (`sst.config.ts` sets `idleTimeout` 600s). Retry the same URL — cached scan returns immediately |
 
 ---
 

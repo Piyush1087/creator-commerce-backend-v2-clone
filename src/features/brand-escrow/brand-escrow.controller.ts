@@ -84,8 +84,12 @@ export class BrandEscrowController {
 
   @Post("calculate-breakdown")
   @HttpCode(HttpStatus.OK)
-  calculateBreakdown(@Body() body: CalculateEscrowBreakdownDto) {
-    return this.escrow.calculateBreakdown({
+  async calculateBreakdown(
+    @Req() req: RequestWithAuthUser,
+    @Body() body: CalculateEscrowBreakdownDto,
+  ) {
+    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    return this.escrow.calculateBreakdown(brandProfileId, {
       grossCreatorQuote: body.gross_creator_quote,
       currency: body.currency,
       expectedTdsPercentage: body.expected_tds_percentage,
