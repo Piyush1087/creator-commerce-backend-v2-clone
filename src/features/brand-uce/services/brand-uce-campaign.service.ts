@@ -321,6 +321,58 @@ export class BrandUceCampaignService {
     };
   }
 
+  async updateDraftWizard(
+    brandProfileId: string,
+    campaignId: string,
+    body: {
+      campaign_name?: string;
+      budget_allocation?: number;
+      marketing_objective?: UceCampaignObjective;
+    },
+  ) {
+    await this.access.assertCampaignOwned(brandProfileId, campaignId);
+
+    const campaign = await this.prisma.uceCampaign.findFirst({
+      where: { id: campaignId, brandProfileId },
+      include: { strategy: true, commercials: true },
+    });
+    if (!campaign) {
+      throw new BadRequestException("Campaign not found");
+    }
+    if (campaign.status !== UceCampaignStatus.DRAFT) {
+      throw new BadRequestException(
+        "Only DRAFT campaigns can be edited from co-pilot.",
+      );
+    }
+
+    if (body.campaign_name?.trim()) {
+      await this.prisma.uceCampaign.update({
+        where: { id: campaignId },
+        data: { name: body.campaign_name.trim() },
+      });
+    }
+
+    if (body.marketing_objective) {
+      await this.prisma.uceCampaignStrategy.updateMany({
+        where: { campaignId },
+        data: { coreObjective: body.marketing_objective },
+      });
+    }
+
+    if (
+      body.budget_allocation !== undefined &&
+      Number.isFinite(body.budget_allocation) &&
+      body.budget_allocation > 0
+    ) {
+      await this.prisma.uceCampaignCommercials.updateMany({
+        where: { campaignId },
+        data: { totalCampaignBudgetPool: body.budget_allocation },
+      });
+    }
+
+    return this.getCampaignShell(brandProfileId, campaignId);
+  }
+
   async patchStatus(
     brandProfileId: string,
     campaignId: string,

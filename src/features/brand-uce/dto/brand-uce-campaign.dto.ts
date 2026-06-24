@@ -50,3 +50,18 @@ export class PatchCampaignMasterDto {
   @MaxLength(255)
   campaign_name?: string;
 }
+
+export class PatchDraftCampaignWizardDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(3)
+  @MaxLength(255)
+  campaign_name?: string;
+
+  @IsOptional()
+  budget_allocation?: number;
+
+  @IsOptional()
+  @IsIn(["BRAND_AWARENESS", "TRAFFIC_CLICKS", "SALES_CONVERSIONS"])
+  marketing_objective?: "BRAND_AWARENESS" | "TRAFFIC_CLICKS" | "SALES_CONVERSIONS";
+}

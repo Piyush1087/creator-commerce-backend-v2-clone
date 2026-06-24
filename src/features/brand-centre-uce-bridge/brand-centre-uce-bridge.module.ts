@@ -10,6 +10,7 @@ import { BrandCentreUceBridgeService } from "./services/brand-centre-uce-bridge.
   imports: [PrismaModule, AuthModule, BrandCentreModule],
   controllers: [BrandCentreUceBridgeController],
   providers: [BrandCentreUceBridgeService],
+  exports: [BrandCentreUceBridgeService],
 })
 export class BrandCentreUceBridgeModule {}
 

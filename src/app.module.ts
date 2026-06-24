@@ -11,6 +11,7 @@ import { BrandEscrowModule } from "./features/brand-escrow/brand-escrow.module";
 import { PricingModule } from "./features/pricing/pricing.module";
 import { BrandUceModule } from "./features/brand-uce/brand-uce.module";
 import { CollaborationModule } from "./features/collaboration/collaboration.module";
+import { CoPilotModule } from "./features/co-pilot/co-pilot.module";
 import { CreatorUceModule } from "./features/creator-uce/creator-uce.module";
 import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -39,6 +40,7 @@ import { S3Module } from "./shared/s3/s3.module";
     BrandEscrowModule,
     PricingModule,
     CollaborationModule,
+    CoPilotModule,
     CreatorUceModule,
   ],
   controllers: [AppController],

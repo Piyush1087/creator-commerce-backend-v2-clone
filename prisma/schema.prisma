@@ -154,6 +154,43 @@ enum SubscriptionCurrency {
   USD
 }
 
+enum CoPilotScopeContext {
+  GLOBAL
+  BRAND_CENTRE
+  ANALYTICS
+  ESCROW
+}
+
+enum CoPilotMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum CoPilotFormatType {
+  CONVERSATIONAL_NARRATIVE
+  METRIC_HIGHLIGHT_GRID
+  TABULAR_AUDIT_DATA
+  POLYMORPHIC_ENTITY_CAROUSEL
+  INTERACTIVE_EXECUTION_WIDGET
+  SLOT_FILLING_CLARIFICATION
+}
+
+enum CoPilotInteractionStatus {
+  SUCCESS
+  QUOTA_DENIED
+  MODERATION_BLOCKED
+  VALIDATION_ERROR
+  ERROR
+}
+
+enum CoPilotLinkedEntityType {
+  CAMPAIGN
+  COLLABORATION
+  PLANNER_CARD
+  NONE
+}
+
 /// Vendor surface-scan runs only (cache hits are not counted toward rate limits).
 enum SurfaceScanAttemptKind {
   SURFACE_VENDOR
@@ -391,6 +428,8 @@ model User {
   discoveryLeads DiscoveryLead[]
   creatorProfile CreatorProfile?
   collaborationsAsCreator Collaboration[] @relation("CollaborationCreator")
+  coPilotThreads CoPilotThread[]
+  coPilotMessageFeedback CoPilotMessageFeedback[]
 
   @@index([organizationId])
   @@index([role])
@@ -556,6 +595,9 @@ model BrandProfile {
   collaborations    Collaboration[]
   escrowVault       BrandEscrowVault?
   brandSubscription BrandSubscription?
+  coPilotThreads           CoPilotThread[]
+  coPilotInteractionLogs   CoPilotInteractionLog[]
+  coPilotMessageFeedback   CoPilotMessageFeedback[]
 
   @@map("brand_profiles")
 }
@@ -1481,4 +1523,110 @@ model FeatureUsage {
 
   @@unique([subscriptionId, featureKey])
   @@map("feature_usages")
+}
+
+// ============================================================================
+// CO-PILOT (Brand Home Chat Engine)
+// ============================================================================
+
+model CoPilotThread {
+  id               String                  @id @default(uuid())
+  brandProfileId   String                  @map("brand_profile_id")
+  brandProfile     BrandProfile            @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  createdByUserId  String                  @map("created_by_user_id")
+  createdByUser    User                    @relation(fields: [createdByUserId], references: [id])
+  title            String
+  scopeContext     CoPilotScopeContext     @default(BRAND_CENTRE) @map("scope_context")
+  linkedEntityType CoPilotLinkedEntityType @default(NONE) @map("linked_entity_type")
+  linkedEntityId   String?                 @map("linked_entity_id")
+  archivedAt       DateTime?               @map("archived_at")
+  lastMessageAt    DateTime                @map("last_message_at")
+  createdAt        DateTime                @default(now()) @map("created_at")
+  updatedAt        DateTime                @updatedAt @map("updated_at")
+
+  messages        CoPilotMessage[]
+  messageFeedback CoPilotMessageFeedback[]
+  slotSession     CoPilotSlotSession?
+  interactionLogs CoPilotInteractionLog[] @relation("CoPilotThreadLogs")
+
+  @@index([brandProfileId, lastMessageAt(sort: Desc)])
+  @@index([brandProfileId, archivedAt])
+  @@map("co_pilot_threads")
+}
+
+enum CoPilotFeedbackRating {
+  THUMBS_UP
+  THUMBS_DOWN
+}
+
+model CoPilotMessage {
+  id          String              @id @default(uuid())
+  threadId    String              @map("thread_id")
+  thread      CoPilotThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  role        CoPilotMessageRole
+  textContent String?             @map("text_content") @db.Text
+  payloadJson Json?               @map("payload_json")
+  formatType  CoPilotFormatType?  @map("format_type")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  feedback    CoPilotMessageFeedback?
+
+  @@index([threadId, createdAt])
+  @@map("co_pilot_messages")
+}
+
+model CoPilotMessageFeedback {
+  id             String                @id @default(uuid())
+  messageId      String                @unique @map("message_id")
+  message        CoPilotMessage        @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  threadId       String                @map("thread_id")
+  thread         CoPilotThread         @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  brandProfileId String                @map("brand_profile_id")
+  brandProfile   BrandProfile          @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  userId         String                @map("user_id")
+  user           User                  @relation(fields: [userId], references: [id])
+  rating         CoPilotFeedbackRating
+  reason         String?
+  createdAt      DateTime              @default(now()) @map("created_at")
+
+  @@index([brandProfileId, createdAt])
+  @@map("co_pilot_message_feedback")
+}
+
+model CoPilotSlotSession {
+  id                     String        @id @default(uuid())
+  threadId               String        @unique @map("thread_id")
+  thread                 CoPilotThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  intentWorkspaceContext String        @map("intent_workspace_context")
+  stagedPayload          Json          @map("staged_payload")
+  missingSlots           Json          @map("missing_slots")
+  expiresAt              DateTime      @map("expires_at")
+  createdAt              DateTime      @default(now()) @map("created_at")
+  updatedAt              DateTime      @updatedAt @map("updated_at")
+
+  @@map("co_pilot_slot_sessions")
+}
+
+model CoPilotInteractionLog {
+  id                 String                   @id @default(uuid())
+  brandProfileId     String                   @map("brand_profile_id")
+  brandProfile       BrandProfile             @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  userId             String                   @map("user_id")
+  threadId           String?                  @map("thread_id")
+  thread             CoPilotThread?           @relation("CoPilotThreadLogs", fields: [threadId], references: [id], onDelete: SetNull)
+  messageId          String?                  @map("message_id")
+  scopeContext       CoPilotScopeContext      @map("scope_context")
+  intentKey          String?                  @map("intent_key")
+  modelId            String                   @map("model_id")
+  inputTokens        Int?                     @map("input_tokens")
+  outputTokens       Int?                     @map("output_tokens")
+  estimatedCostMinor Int?                     @map("estimated_cost_minor")
+  toolsInvoked       String[]                 @default([]) @map("tools_invoked")
+  status             CoPilotInteractionStatus
+  latencyMs          Int?                     @map("latency_ms")
+  idempotencyKey     String?                  @map("idempotency_key")
+  errorCode          String?                  @map("error_code")
+  createdAt          DateTime                 @default(now()) @map("created_at")
+
+  @@index([brandProfileId, createdAt])
+  @@map("co_pilot_interaction_logs")
 }
