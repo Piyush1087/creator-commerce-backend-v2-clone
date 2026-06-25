@@ -43,6 +43,9 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
     BrandCentreAuthService,
     BrandCentreColdStartService,
     BrandCentreScanService,
+    BrandCentreDnaService,
+    BrandCentreIntelligenceService,
+    BrandCentrePlannerService,
   ],
 })
 export class BrandCentreModule {}

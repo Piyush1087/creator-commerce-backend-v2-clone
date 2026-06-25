@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   UnprocessableEntityException,
 } from "@nestjs/common";
@@ -7,6 +8,7 @@ import {
   Prisma,
   UceCampaignObjective,
   UceCampaignStatus,
+  UceCollabStatus,
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
@@ -25,6 +27,13 @@ const APPLICANT_STATUSES = [
   "APPLICANT_SHORTLISTED",
   "APPLICANT_REJECTED",
 ] as const;
+
+const ESSENTIALS_EDIT_BLOCKING_STATUSES: UceCollabStatus[] = [
+  UceCollabStatus.APPLICANT_PENDING,
+  UceCollabStatus.APPLICANT_SHORTLISTED,
+  UceCollabStatus.ACTIVE_WORKFLOW,
+  UceCollabStatus.ARCHIVED_COMPLETE,
+];
 
 @Injectable()
 export class BrandUceCampaignService {
@@ -185,6 +194,8 @@ export class BrandUceCampaignService {
               audienceGender: targeting.audience_gender,
               targetLocations: targeting.target_locations,
               disqualifyingKeywords: targeting.disqualifying_keywords,
+              visibilityScopes: targeting.visibility_scopes,
+              applicationScope: targeting.application_scope,
             },
           },
           commercials: {
@@ -237,11 +248,18 @@ export class BrandUceCampaignService {
     }
 
     const activationChecklist = await this.buildActivationChecklist(campaign.id);
+    const canEditEssentials = await this.canEditCampaignEssentials(campaign.id);
+    const totalInventoryAllocated = campaign.products.reduce(
+      (sum, product) => sum + product.inventoryCount,
+      0,
+    );
 
     return {
       campaign_id: campaign.id,
       campaign_name: campaign.name,
       current_status: campaign.status,
+      can_edit_essentials: canEditEssentials,
+      total_inventory_allocated: totalInventoryAllocated,
       pause_warning:
         campaign.status === UceCampaignStatus.PAUSED
           ? "Campaign Paused. Inbound application links are offline. Active collaboration workflows remain accessible for processing."
@@ -321,6 +339,129 @@ export class BrandUceCampaignService {
     };
   }
 
+  async updateDraftWizard(
+    brandProfileId: string,
+    campaignId: string,
+    body: {
+      campaign_name?: string;
+      budget_allocation?: number;
+      marketing_objective?: UceCampaignObjective;
+    },
+  ) {
+    await this.access.assertCampaignOwned(brandProfileId, campaignId);
+
+    const campaign = await this.prisma.uceCampaign.findFirst({
+      where: { id: campaignId, brandProfileId },
+      include: { strategy: true, commercials: true },
+    });
+    if (!campaign) {
+      throw new BadRequestException("Campaign not found");
+    }
+    if (campaign.status !== UceCampaignStatus.DRAFT) {
+      throw new BadRequestException(
+        "Only DRAFT campaigns can be edited from co-pilot.",
+      );
+    }
+
+    if (body.campaign_name?.trim()) {
+      await this.prisma.uceCampaign.update({
+        where: { id: campaignId },
+        data: { name: body.campaign_name.trim() },
+      });
+    }
+
+    if (body.marketing_objective) {
+      await this.prisma.uceCampaignStrategy.updateMany({
+        where: { campaignId },
+        data: { coreObjective: body.marketing_objective },
+      });
+    }
+
+    if (
+      body.budget_allocation !== undefined &&
+      Number.isFinite(body.budget_allocation) &&
+      body.budget_allocation > 0
+    ) {
+      await this.prisma.uceCampaignCommercials.updateMany({
+        where: { campaignId },
+        data: { totalCampaignBudgetPool: body.budget_allocation },
+      });
+    }
+
+    return this.getCampaignShell(brandProfileId, campaignId);
+  }
+
+  async patchCampaignEssentials(
+    brandProfileId: string,
+    campaignId: string,
+    body: {
+      campaign_name?: string;
+      budget_pool?: number;
+      product_inventories?: Array<{
+        product_id: string;
+        inventory_count: number;
+      }>;
+    },
+  ) {
+    await this.access.assertCampaignOwned(brandProfileId, campaignId);
+
+    const campaign = await this.prisma.uceCampaign.findFirst({
+      where: { id: campaignId, brandProfileId },
+    });
+    if (!campaign) {
+      throw new BadRequestException("Campaign not found");
+    }
+    if (campaign.status === UceCampaignStatus.COMPLETED) {
+      throw new BadRequestException("Completed campaigns cannot be edited.");
+    }
+
+    const canEdit = await this.canEditCampaignEssentials(campaignId);
+    if (!canEdit) {
+      throw new ConflictException(
+        "Campaign name, budget, and inventory can only be edited before any creator applications or active collaborations exist.",
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      if (body.campaign_name?.trim()) {
+        await tx.uceCampaign.update({
+          where: { id: campaignId },
+          data: { name: body.campaign_name.trim() },
+        });
+      }
+
+      if (
+        body.budget_pool !== undefined &&
+        Number.isFinite(body.budget_pool) &&
+        body.budget_pool > 0
+      ) {
+        await tx.uceCampaignCommercials.updateMany({
+          where: { campaignId },
+          data: { totalCampaignBudgetPool: body.budget_pool },
+        });
+      }
+
+      if (body.product_inventories?.length) {
+        for (const row of body.product_inventories) {
+          const product = await tx.uceCampaignProduct.findFirst({
+            where: { id: row.product_id, campaignId },
+          });
+          if (!product) {
+            throw new BadRequestException(
+              `Product ${row.product_id} not found for campaign`,
+            );
+          }
+          await tx.uceCampaignProduct.update({
+            where: { id: row.product_id },
+            data: { inventoryCount: row.inventory_count },
+          });
+        }
+      }
+    });
+
+    return this.getCampaignShell(brandProfileId, campaignId);
+  }
+
   async patchStatus(
     brandProfileId: string,
     campaignId: string,
@@ -382,5 +523,15 @@ export class BrandUceCampaignService {
         satisfied: budgetOk,
       },
     ];
+  }
+
+  private async canEditCampaignEssentials(campaignId: string): Promise<boolean> {
+    const blockingRows = await this.prisma.uceCampaignCollaboration.count({
+      where: {
+        campaignId,
+        collabStatus: { in: ESSENTIALS_EDIT_BLOCKING_STATUSES },
+      },
+    });
+    return blockingRows === 0;
   }
 }

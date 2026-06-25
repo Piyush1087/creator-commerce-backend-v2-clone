@@ -11,6 +11,7 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import { generateInvitationToken } from "../../creator-marketplace/utils/invitation-token.util";
 import type {
   AddTrackingDto,
   ApproveApplicantDto,
@@ -258,9 +259,16 @@ export class BrandUcePipelineService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      const invitationToken =
+        collab.invitationToken ?? generateInvitationToken();
+
       const row = await tx.uceCampaignCollaboration.update({
         where: { id: collaborationId },
-        data: { collabStatus: UceCollabStatus.PROSPECT_INVITED },
+        data: {
+          collabStatus: UceCollabStatus.PROSPECT_INVITED,
+          invitationToken,
+          invitationSourceChannel: collab.invitationSourceChannel ?? "BRAND_UCE_PIPELINE",
+        },
         include: COLLAB_INCLUDE,
       });
 

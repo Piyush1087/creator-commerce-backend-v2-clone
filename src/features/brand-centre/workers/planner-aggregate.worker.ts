@@ -34,7 +34,7 @@ export class PlannerAggregateWorker {
     const payload = job.payload as { leakId?: string } | null;
     const leakId = payload?.leakId;
     if (!leakId) {
-      await this.failJob(jobId, "Missing leakId in job payload");
+      await this.failJob(jobId, "Missing leakId in job payload", undefined);
       return;
     }
 
@@ -172,21 +172,46 @@ export class PlannerAggregateWorker {
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "unknown";
-      await this.failJob(jobId, message);
+      await this.failJob(jobId, message, leakId);
       this.logger.error(
         `planner-aggregate.failed jobId=${jobId} error=${message}`,
       );
     }
   }
 
-  private async failJob(jobId: string, message: string): Promise<void> {
-    await this.prisma.brandCentreJob.update({
-      where: { id: jobId },
-      data: {
-        status: BrandCentreJobStatus.FAILED,
-        finishedAt: new Date(),
-        errorMessage: message.slice(0, 2000),
-      },
+  private async failJob(
+    jobId: string,
+    message: string,
+    leakId?: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.brandCentreJob.update({
+        where: { id: jobId },
+        data: {
+          status: BrandCentreJobStatus.FAILED,
+          finishedAt: new Date(),
+          errorMessage: message.slice(0, 2000),
+        },
+      });
+
+      if (leakId) {
+        const leak = await tx.brandPerformanceLeak.findUnique({
+          where: { id: leakId },
+        });
+        if (
+          leak &&
+          leak.plannerStatus === LeakPlannerStatus.PUSHED_TO_PLANNER &&
+          !leak.plannerCardId
+        ) {
+          await tx.brandPerformanceLeak.update({
+            where: { id: leakId },
+            data: {
+              plannerStatus: LeakPlannerStatus.PENDING_USER_REVIEW,
+              movedByUserId: null,
+            },
+          });
+        }
+      }
     });
   }
 }

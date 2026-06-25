@@ -15,6 +15,10 @@ import { ThrottlerGuard } from "@nestjs/throttler";
 
 import type { RequestWithAuthUser } from "../auth/auth.controller";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import {
+  domainToPublicSlug,
+  buildPublicBrandPath,
+} from "../public-brand/utils/brand-slug.util";
 import { BrandCentreAuthService } from "./brand-centre-auth.service";
 import {
   CreateCompetitorDto,
@@ -71,6 +75,18 @@ export class BrandCentreController {
     return {
       routingType: profile.brandRoutingType,
       template,
+    };
+  }
+
+  @Get("collaboration-page")
+  async getCollaborationPage(@Req() req: RequestWithAuthUser) {
+    const profile = await this.auth.resolveBrandProfile(req.user);
+    const slug = domainToPublicSlug(profile.domain);
+    return {
+      brand_id: profile.id,
+      slug,
+      company_name: profile.name,
+      public_path: buildPublicBrandPath(slug),
     };
   }
 

@@ -20,6 +20,8 @@ import {
   CreateCampaignWizardDto,
   ListCampaignsQueryDto,
   PatchCampaignStatusDto,
+  PatchCampaignEssentialsDto,
+  PatchDraftCampaignWizardDto,
 } from "./dto/brand-uce-campaign.dto";
 import {
   CreateCampaignBriefDto,
@@ -92,6 +94,20 @@ export class BrandUceController {
     return this.campaigns.getCampaignShell(brandProfileId, campaignId);
   }
 
+  @Patch("campaigns/:campaignId/wizard")
+  async patchDraftWizard(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Body() body: PatchDraftCampaignWizardDto,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.campaigns.updateDraftWizard(brandProfileId, campaignId, {
+      campaign_name: body.campaign_name,
+      budget_allocation: body.budget_allocation,
+      marketing_objective: body.marketing_objective,
+    });
+  }
+
   @Patch("campaigns/:campaignId/status")
   async patchCampaignStatus(
     @Req() req: RequestWithAuthUser,
@@ -104,6 +120,20 @@ export class BrandUceController {
       campaignId,
       body.status,
     );
+  }
+
+  @Patch("campaigns/:campaignId/essentials")
+  async patchCampaignEssentials(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Body() body: PatchCampaignEssentialsDto,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.campaigns.patchCampaignEssentials(brandProfileId, campaignId, {
+      campaign_name: body.campaign_name,
+      budget_pool: body.budget_pool,
+      product_inventories: body.product_inventories,
+    });
   }
 
   @Get("campaigns/:campaignId/products")

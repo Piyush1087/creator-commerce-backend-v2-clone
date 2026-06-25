@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
+  UceApplicationScope,
   UceCampaignStatus,
   UceCollabStatus,
   UceMilestoneStage,
@@ -14,6 +15,9 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import { CreatorEligibilityService } from "../../creator-marketplace/services/creator-eligibility.service";
+import type { CreatorAudienceDemographicsMatrix } from "../../creator-marketplace/types/creator-audience.types";
+import { isInvitedCollaboration } from "../../creator-marketplace/utils/visibility-scope.util";
 import type { CreatorApplyToCampaignDto } from "../dto/creator-apply.dto";
 import { normalizeInstagramHandle } from "../../brand-uce/utils/instagram-handle.util";
 import { decimalToNumber } from "../../brand-uce/utils/uce-decimal.util";
@@ -22,7 +26,10 @@ type AuthUser = { id: string; email: string; role: UserRole };
 
 @Injectable()
 export class CreatorUceCampaignsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eligibility: CreatorEligibilityService,
+  ) {}
 
   async listOpenCampaigns(user: AuthUser) {
     this.assertCreator(user);
@@ -105,9 +112,41 @@ export class CreatorUceCampaignsService {
 
     const campaign = await this.prisma.uceCampaign.findFirst({
       where: { id: campaignId, status: UceCampaignStatus.ACTIVE },
+      include: { targeting: true },
     });
-    if (!campaign) {
+    if (!campaign || !campaign.targeting) {
       throw new NotFoundException("Campaign not found or not open for applications");
+    }
+
+    const handle = normalizeInstagramHandle(profile.instagramHandle);
+
+    const creatorContext = {
+      primaryRegion: profile.primaryRegion ?? "US",
+      followerCount: profile.followerCount ?? 0,
+      audienceDemographicsMatrix: (profile.audienceDemographicsMatrix ??
+        {}) as CreatorAudienceDemographicsMatrix,
+      instagramHandle: profile.instagramHandle,
+    };
+
+    const pipelineRow = await this.prisma.uceCampaignCollaboration.findUnique({
+      where: {
+        campaignId_instagramHandle: { campaignId, instagramHandle: handle },
+      },
+    });
+
+    const isInvited =
+      pipelineRow !== null && isInvitedCollaboration(pipelineRow.collabStatus);
+    const eligibility = this.eligibility.evaluateTargeting(
+      creatorContext,
+      campaign.targeting,
+    );
+    const inviteBypass =
+      campaign.targeting.applicationScope === UceApplicationScope.DIRECT_BYPASS;
+
+    if (!eligibility.is_eligible && !(isInvited && inviteBypass)) {
+      throw new BadRequestException(
+        "Your profile does not meet this campaign's targeting criteria.",
+      );
     }
 
     const brief = await this.prisma.uceCampaignBrief.findFirst({
@@ -124,9 +163,13 @@ export class CreatorUceCampaignsService {
       if (!product) {
         throw new BadRequestException("Product not found for campaign");
       }
+      if (product.inventoryCount <= 0) {
+        throw new BadRequestException(
+          "Selected product is out of stock for this campaign.",
+        );
+      }
     }
 
-    const handle = normalizeInstagramHandle(profile.instagramHandle);
     const existing = await this.prisma.uceCampaignCollaboration.findUnique({
       where: {
         campaignId_instagramHandle: { campaignId, instagramHandle: handle },
