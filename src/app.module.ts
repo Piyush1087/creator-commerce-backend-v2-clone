@@ -12,7 +12,9 @@ import { PricingModule } from "./features/pricing/pricing.module";
 import { BrandUceModule } from "./features/brand-uce/brand-uce.module";
 import { CollaborationModule } from "./features/collaboration/collaboration.module";
 import { CoPilotModule } from "./features/co-pilot/co-pilot.module";
+import { CreatorMarketplaceModule } from "./features/creator-marketplace/creator-marketplace.module";
 import { CreatorUceModule } from "./features/creator-uce/creator-uce.module";
+import { PublicBrandModule } from "./features/public-brand/public-brand.module";
 import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { S3Module } from "./shared/s3/s3.module";
@@ -41,7 +43,9 @@ import { S3Module } from "./shared/s3/s3.module";
     PricingModule,
     CollaborationModule,
     CoPilotModule,
+    CreatorMarketplaceModule,
     CreatorUceModule,
+    PublicBrandModule,
   ],
   controllers: [AppController],
 })

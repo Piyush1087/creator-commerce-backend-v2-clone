@@ -9,7 +9,7 @@
  */
 import { PrismaClient, UserRole } from "@prisma/client";
 
-const CREATOR_EMAIL = "test@creator.com";
+const CREATOR_EMAIL = "test1@creator.com";
 const CREATOR_DISPLAY_NAME = "Test Creator";
 const CREATOR_HANDLE = "test_creator";
 const STUB_BANK = {
@@ -27,6 +27,12 @@ const STUB_ADDRESS = {
   postalCode: "400001",
   countryCode: "IN",
   phone: "+919876543210",
+};
+
+const STUB_AUDIENCE_MATRIX = {
+  age_distribution: { "18-24": 0.35, "25-34": 0.4, "35-44": 0.25 },
+  top_countries: { IN: 0.72, US: 0.15 },
+  gender_skew: { female: 0.58, male: 0.42 },
 };
 
 async function main() {
@@ -48,6 +54,9 @@ async function main() {
             create: {
               displayName: CREATOR_DISPLAY_NAME,
               instagramHandle: CREATOR_HANDLE,
+              primaryRegion: "IN",
+              followerCount: 45_000,
+              audienceDemographicsMatrix: STUB_AUDIENCE_MATRIX,
             },
           },
         },
@@ -70,6 +79,9 @@ async function main() {
             userId: user.id,
             displayName: CREATOR_DISPLAY_NAME,
             instagramHandle: CREATOR_HANDLE,
+            primaryRegion: "IN",
+            followerCount: 45_000,
+            audienceDemographicsMatrix: STUB_AUDIENCE_MATRIX,
           },
         });
       } else {
@@ -78,6 +90,9 @@ async function main() {
           data: {
             displayName: CREATOR_DISPLAY_NAME,
             instagramHandle: CREATOR_HANDLE,
+            primaryRegion: "IN",
+            followerCount: 45_000,
+            audienceDemographicsMatrix: STUB_AUDIENCE_MATRIX,
           },
         });
       }

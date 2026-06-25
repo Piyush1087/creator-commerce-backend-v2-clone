@@ -248,6 +248,21 @@ enum UceCompensationType {
   NEGOTIABLE
 }
 
+enum UceVisibilityScope {
+  EVERYONE
+  ELIGIBLE_ONLY
+  INVITED_ONLY
+}
+
+enum UceApplicationScope {
+  EVERYONE
+  ELIGIBLE_ONLY
+  INVITED_ONLY
+  DIRECT_BYPASS
+  BLENDED_SMART_FUNNEL
+  VETTED_STEALTH
+}
+
 enum UcePayoutTerms {
   IMMEDIATE
   NET_7
@@ -902,16 +917,18 @@ model UceCampaignStrategy {
 }
 
 model UceCampaignTargeting {
-  campaignId            String      @id @map("campaign_id")
-  campaign              UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  industryVertical      String      @map("industry_vertical")
-  creatorArchetypes     String[]    @default([]) @map("creator_archetypes")
-  followerTiers         String[]    @default([]) @map("follower_tiers")
-  audienceAgeMin        Int         @default(18) @map("audience_age_min")
-  audienceAgeMax        Int         @default(65) @map("audience_age_max")
-  audienceGender        String      @default("ALL") @map("audience_gender")
-  targetLocations       String[]    @default([]) @map("target_locations")
-  disqualifyingKeywords String[]    @default([]) @map("disqualifying_keywords")
+  campaignId            String                @id @map("campaign_id")
+  campaign              UceCampaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  industryVertical      String                @map("industry_vertical")
+  creatorArchetypes     String[]              @default([]) @map("creator_archetypes")
+  followerTiers         String[]              @default([]) @map("follower_tiers")
+  audienceAgeMin        Int                   @default(18) @map("audience_age_min")
+  audienceAgeMax        Int                   @default(65) @map("audience_age_max")
+  audienceGender        String                @default("ALL") @map("audience_gender")
+  targetLocations       String[]              @default([]) @map("target_locations")
+  disqualifyingKeywords String[]              @default([]) @map("disqualifying_keywords")
+  visibilityScopes      UceVisibilityScope[]  @default([EVERYONE]) @map("visibility_scopes")
+  applicationScope      UceApplicationScope   @default(EVERYONE) @map("application_scope")
 
   @@map("uce_campaign_targeting")
 }
@@ -1046,6 +1063,9 @@ model UceCampaignCollaboration {
   autoApprovalDeadline72h  DateTime? @map("auto_approval_deadline_72h")
   currentMilestoneDeadline DateTime  @map("current_milestone_deadline")
 
+  invitationToken         String? @unique @map("invitation_token")
+  invitationSourceChannel String? @map("invitation_source_channel")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -1142,14 +1162,18 @@ model UceCampaignReportingAssetGallery {
 // ============================================================================
 
 model CreatorProfile {
-  id              String   @id @default(uuid())
-  userId          String   @unique @map("user_id")
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  displayName     String?  @map("display_name")
-  instagramHandle String?  @map("instagram_handle")
-  avatarUrl       String?  @map("avatar_url")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id                        String   @id @default(uuid())
+  userId                    String   @unique @map("user_id")
+  user                      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName               String?  @map("display_name")
+  instagramHandle           String?  @map("instagram_handle")
+  tiktokHandle              String?  @map("tiktok_handle")
+  avatarUrl                 String?  @map("avatar_url")
+  primaryRegion             String   @default("US") @map("primary_region")
+  followerCount             Int      @default(0) @map("follower_count")
+  audienceDemographicsMatrix Json  @default("{}") @map("audience_demographics_matrix")
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
 
   bankDetails       CreatorBankDetails[]
   shippingAddresses CreatorShippingAddress[]

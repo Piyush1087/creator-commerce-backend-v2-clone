@@ -401,6 +401,29 @@
 
 ---
 
+## creator-marketplace
+
+### API (`class-validator` + Zod in service)
+
+| DTO | Field | Rules |
+| --- | --- | --- |
+| `MarketplaceQueryDto` | `search_query` | optional, max 100 |
+| | `niche` | optional, max 100 |
+| | `deliverable_type` | optional enum: INSTAGRAM_REEL, INSTAGRAM_STORY, TIKTOK_VIDEO, YOUTUBE_SHORTS |
+| | `show_match_eligible_only` | optional boolean |
+| | `creator_tier` | optional array: NANO, MICRO, MID, MACRO, MEGA |
+| | `target_geography` | optional ISO-2 string |
+| | `production_timeline` | optional array: URGENT_PIPELINE, STANDARD_RUNWAY |
+
+### Brand wizard (Zod) — new Step 2 fields
+
+| Field | Rules |
+| --- | --- |
+| `visibility_scopes` | array min 1; EVERYONE, ELIGIBLE_ONLY, INVITED_ONLY; default `[EVERYONE]` |
+| `application_scope` | enum; default `EVERYONE` |
+
+---
+
 ## frontend — brand-onboarding
 
 ### Zod

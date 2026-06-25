@@ -20,6 +20,7 @@ import {
   CreateCampaignWizardDto,
   ListCampaignsQueryDto,
   PatchCampaignStatusDto,
+  PatchCampaignEssentialsDto,
   PatchDraftCampaignWizardDto,
 } from "./dto/brand-uce-campaign.dto";
 import {
@@ -119,6 +120,20 @@ export class BrandUceController {
       campaignId,
       body.status,
     );
+  }
+
+  @Patch("campaigns/:campaignId/essentials")
+  async patchCampaignEssentials(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Body() body: PatchCampaignEssentialsDto,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.campaigns.patchCampaignEssentials(brandProfileId, campaignId, {
+      campaign_name: body.campaign_name,
+      budget_pool: body.budget_pool,
+      product_inventories: body.product_inventories,
+    });
   }
 
   @Get("campaigns/:campaignId/products")

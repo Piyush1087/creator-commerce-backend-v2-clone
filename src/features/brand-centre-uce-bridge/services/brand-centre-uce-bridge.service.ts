@@ -169,6 +169,8 @@ export class BrandCentreUceBridgeService {
                   audienceGender: "ALL",
                   targetLocations: [],
                   disqualifyingKeywords: [],
+                  visibilityScopes: ["EVERYONE"],
+                  applicationScope: "EVERYONE",
                 },
               },
               commercials: {

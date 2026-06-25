@@ -247,6 +247,8 @@ export class CoPilotHitlService {
         audience_gender: "ALL",
         target_locations: [profile.countryCode ?? "IN"],
         disqualifying_keywords: [],
+        visibility_scopes: ["EVERYONE"],
+        application_scope: "EVERYONE",
       },
       commercials: {
         compensation_type: "NEGOTIABLE" as const,

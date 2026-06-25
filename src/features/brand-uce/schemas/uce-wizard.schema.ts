@@ -82,6 +82,21 @@ export const Step1StrategySchema = z
     }
   });
 
+export const UceVisibilityScopeSchema = z.enum([
+  "EVERYONE",
+  "ELIGIBLE_ONLY",
+  "INVITED_ONLY",
+]);
+
+export const UceApplicationScopeSchema = z.enum([
+  "EVERYONE",
+  "ELIGIBLE_ONLY",
+  "INVITED_ONLY",
+  "DIRECT_BYPASS",
+  "BLENDED_SMART_FUNNEL",
+  "VETTED_STEALTH",
+]);
+
 export const Step2TargetingSchema = z
   .object({
     industry_vertical: z.string().min(1),
@@ -92,6 +107,11 @@ export const Step2TargetingSchema = z
     audience_gender: z.string().default("ALL"),
     target_locations: z.array(z.string()).min(1),
     disqualifying_keywords: z.array(z.string()).optional().default([]),
+    visibility_scopes: z
+      .array(UceVisibilityScopeSchema)
+      .min(1)
+      .default(["EVERYONE"]),
+    application_scope: UceApplicationScopeSchema.default("EVERYONE"),
   })
   .refine((data) => data.audience_age_min <= data.audience_age_max, {
     message: "Minimum age cannot exceed maximum age.",
