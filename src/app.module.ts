@@ -9,10 +9,12 @@ import { BrandCentreUceBridgeModule } from "./features/brand-centre-uce-bridge/b
 import { BrandOnboardingModule } from "./features/brand-onboarding/brand-onboarding.module";
 import { BrandEscrowModule } from "./features/brand-escrow/brand-escrow.module";
 import { PricingModule } from "./features/pricing/pricing.module";
+import { BrandPayoutsModule } from "./features/brand-payouts/brand-payouts.module";
 import { BrandUceModule } from "./features/brand-uce/brand-uce.module";
 import { CollaborationModule } from "./features/collaboration/collaboration.module";
 import { CoPilotModule } from "./features/co-pilot/co-pilot.module";
 import { CreatorMarketplaceModule } from "./features/creator-marketplace/creator-marketplace.module";
+import { CreatorPayoutsModule } from "./features/creator-payouts/creator-payouts.module";
 import { CreatorUceModule } from "./features/creator-uce/creator-uce.module";
 import { PublicBrandModule } from "./features/public-brand/public-brand.module";
 import { HealthModule } from "./health/health.module";
@@ -40,10 +42,12 @@ import { S3Module } from "./shared/s3/s3.module";
     BrandCentreUceBridgeModule,
     BrandUceModule,
     BrandEscrowModule,
+    BrandPayoutsModule,
     PricingModule,
     CollaborationModule,
     CoPilotModule,
     CreatorMarketplaceModule,
+    CreatorPayoutsModule,
     CreatorUceModule,
     PublicBrandModule,
   ],

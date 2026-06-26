@@ -10,6 +10,7 @@ interface RazorpayReceiver {
   account_number?: string;
   ifsc?: string;
   bank_name?: string;
+  address?: string;
 }
 
 interface RazorpayVirtualAccountResponse {
@@ -87,7 +88,7 @@ export class RazorpayClient {
   }): Promise<RazorpayVirtualAccountResponse> {
     return this.postJson<RazorpayVirtualAccountResponse>("virtual_accounts", {
       receivers: {
-        types: ["bank_account"],
+        types: ["bank_account", "vpa"],
       },
       description: params.description,
       ...(params.customerId ? { customer_id: params.customerId } : {}),
@@ -126,4 +127,11 @@ export function extractBankReceiver(
     );
   }
   return bankAccount;
+}
+
+export function extractVpaReceiver(
+  receivers: RazorpayReceiver[] | undefined,
+): string | null {
+  const vpa = receivers?.find((receiver) => receiver.entity === "vpa");
+  return vpa?.address ?? null;
 }

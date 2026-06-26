@@ -7,6 +7,7 @@ export function mapEscrowVault(vault: BrandEscrowVault) {
     razorpay_virtual_account_id: vault.razorpayVirtualAccountId,
     virtual_account_number: vault.virtualAccountNumber,
     ifsc_code: vault.ifscCode,
+    upi_vpa: vault.upiVpa,
     bank_name: vault.bankName,
     currency: vault.currency,
     total_pooled_balance: vault.totalPooledBalance.toNumber(),

@@ -375,6 +375,17 @@ enum CollaborationEscrowStatus {
   REFUNDED
 }
 
+enum BrandPayoutsWorkspaceRole {
+  CAMPAIGN_MANAGER
+  FINANCE_ADMIN
+}
+
+enum CreatorBankVerificationStatus {
+  PENDING
+  VERIFIED
+  SUSPENDED
+}
+
 enum CollaborationMessageKind {
   USER
   SYSTEM
@@ -568,6 +579,9 @@ model BrandProfile {
   subscriptionStatus SubscriptionStatus @default(TRIALING) @map("subscription_status")
   planStartedAt      DateTime?          @map("plan_started_at")
   trialEndsAt        DateTime?          @map("trial_ends_at")
+
+  /// Payouts hub permission scope — Campaign Manager is read-only on funding actions.
+  payoutsWorkspaceRole BrandPayoutsWorkspaceRole @default(FINANCE_ADMIN) @map("payouts_workspace_role")
 
   // Usage Tracking (Beta Buffer)
   deepScanCount   Int @default(0) @map("deep_scan_count")
@@ -1191,6 +1205,7 @@ model CreatorBankDetails {
   accountNumber    String         @map("account_number")
   ifscOrRouting    String         @map("ifsc_or_routing")
   isPrimary        Boolean        @default(true) @map("is_primary")
+  verificationStatus CreatorBankVerificationStatus @default(VERIFIED) @map("verification_status")
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt        DateTime       @updatedAt @map("updated_at")
 
@@ -1389,6 +1404,7 @@ model BrandEscrowVault {
   razorpayVirtualAccountId String   @unique @map("razorpay_virtual_account_id")
   virtualAccountNumber     String   @unique @map("virtual_account_number")
   ifscCode                 String   @map("ifsc_code")
+  upiVpa                   String?  @map("upi_vpa")
   bankName                 String   @default("RBL Bank (Razorpay Escrow Partner Node)") @map("bank_name")
   currency                 String   @default("INR") @db.VarChar(3)
   totalPooledBalance       Decimal  @default(0) @map("total_pooled_balance") @db.Decimal(15, 4)
