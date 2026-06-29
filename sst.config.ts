@@ -104,6 +104,8 @@ export default $config({
       RAZORPAY_API_KEY_ID: process.env.RAZORPAY_API_KEY_ID as string,
       RAZORPAY_API_KEY_SECRET: process.env.RAZORPAY_API_KEY_SECRET as string,
       RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET as string,
+      SETTINGS_FIELD_ENCRYPTION_KEY:
+        process.env.SETTINGS_FIELD_ENCRYPTION_KEY as string,
       EXTERNAL_API_TIMEOUT_MS:
         process.env.EXTERNAL_API_TIMEOUT_MS ?? "10000",
     };
