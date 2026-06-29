@@ -3,10 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { UserRole } from "@prisma/client";
+import { CreatorBankVerificationStatus, UserRole } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
+import { isValidBankRoutingCode } from "../utils/bank-routing-validation.util";
 import type {
   UpsertCreatorBankDetailsDto,
   UpsertCreatorShippingAddressDto,
@@ -43,6 +44,10 @@ export class CollaborationCreatorProfileService {
       data: { isPrimary: false },
     });
 
+    const verificationStatus = isValidBankRoutingCode(dto.ifsc_or_routing)
+      ? CreatorBankVerificationStatus.VERIFIED
+      : CreatorBankVerificationStatus.SUSPENDED;
+
     const row = await this.prisma.creatorBankDetails.create({
       data: {
         creatorProfileId: profile.id,
@@ -51,6 +56,7 @@ export class CollaborationCreatorProfileService {
         accountNumber: dto.account_number,
         ifscOrRouting: dto.ifsc_or_routing,
         isPrimary: true,
+        verificationStatus,
       },
     });
 
@@ -59,6 +65,7 @@ export class CollaborationCreatorProfileService {
       account_holder: row.accountHolder,
       bank_name: row.bankName,
       is_primary: row.isPrimary,
+      verification_status: row.verificationStatus,
     };
   }
 

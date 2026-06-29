@@ -375,6 +375,60 @@ enum CollaborationEscrowStatus {
   REFUNDED
 }
 
+enum BrandPayoutsWorkspaceRole {
+  CAMPAIGN_MANAGER
+  FINANCE_ADMIN
+}
+
+enum BrandRole {
+  BRAND_OWNER
+  FINANCE_ADMIN
+  CAMPAIGN_MANAGER
+}
+
+enum SettingsNotificationChannel {
+  EMAIL
+  IN_APP
+  SLACK_WEBHOOK
+}
+
+enum SettingsNotificationCategory {
+  ESCROW_LOW_BALANCE
+  MILESTONE_RELEASE_REQUEST
+  TAX_COMPLIANCE_ALERT
+  CAMPAIGN_BUDGET_OVERRUN
+}
+
+enum SocialNetworkProvider {
+  INSTAGRAM
+  TIKTOK
+  YOUTUBE
+}
+
+enum OAuthTokenStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum CreatorTeamRole {
+  OWNER
+  MANAGER
+  ASSISTANT
+}
+
+enum WorkspaceInvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}
+
+enum CreatorBankVerificationStatus {
+  PENDING
+  VERIFIED
+  SUSPENDED
+}
+
 enum CollaborationMessageKind {
   USER
   SYSTEM
@@ -445,6 +499,7 @@ model User {
   collaborationsAsCreator Collaboration[] @relation("CollaborationCreator")
   coPilotThreads CoPilotThread[]
   coPilotMessageFeedback CoPilotMessageFeedback[]
+  brandTeamMemberships BrandTeamMember[]
 
   @@index([organizationId])
   @@index([role])
@@ -569,6 +624,9 @@ model BrandProfile {
   planStartedAt      DateTime?          @map("plan_started_at")
   trialEndsAt        DateTime?          @map("trial_ends_at")
 
+  /// Payouts hub permission scope — Campaign Manager is read-only on funding actions.
+  payoutsWorkspaceRole BrandPayoutsWorkspaceRole @default(FINANCE_ADMIN) @map("payouts_workspace_role")
+
   // Usage Tracking (Beta Buffer)
   deepScanCount   Int @default(0) @map("deep_scan_count")
   competitorCount Int @default(0) @map("competitor_count")
@@ -613,6 +671,11 @@ model BrandProfile {
   coPilotThreads           CoPilotThread[]
   coPilotInteractionLogs   CoPilotInteractionLog[]
   coPilotMessageFeedback   CoPilotMessageFeedback[]
+
+  teamMembers          BrandTeamMember[]
+  billingProfile       BrandBillingProfile?
+  withdrawalAccounts   BrandWithdrawalAccount[]
+  notificationSettings BrandNotificationSetting[]
 
   @@map("brand_profiles")
 }
@@ -1178,6 +1241,9 @@ model CreatorProfile {
   bankDetails       CreatorBankDetails[]
   shippingAddresses CreatorShippingAddress[]
   settlementProfile CreatorSettlementProfile?
+  ownedWorkspaces   CreatorWorkspace[]         @relation("CreatorWorkspaceOwner")
+  workspaceSeats    CreatorWorkspaceMember[]   @relation("CreatorWorkspaceMemberProfile")
+  socialIntegrations CreatorSocialIntegration[]
 
   @@map("creator_profiles")
 }
@@ -1191,6 +1257,7 @@ model CreatorBankDetails {
   accountNumber    String         @map("account_number")
   ifscOrRouting    String         @map("ifsc_or_routing")
   isPrimary        Boolean        @default(true) @map("is_primary")
+  verificationStatus CreatorBankVerificationStatus @default(VERIFIED) @map("verification_status")
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt        DateTime       @updatedAt @map("updated_at")
 
@@ -1211,13 +1278,149 @@ model CreatorShippingAddress {
   stateRegion      String?        @map("state_region")
   postalCode       String         @map("postal_code")
   countryCode      String         @default("IN") @map("country_code")
-  phone            String?
-  isDefault        Boolean        @default(true) @map("is_default")
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime       @updatedAt @map("updated_at")
+  phone                         String?
+  deliveryInstructionsNarrative String?  @map("delivery_instructions_narrative") @db.Text
+  isDefault                     Boolean  @default(true) @map("is_default")
+  createdAt                     DateTime @default(now()) @map("created_at")
+  updatedAt                     DateTime @updatedAt @map("updated_at")
 
-  @@index([creatorProfileId])
+  @@index([creatorProfileId, isDefault], map: "creator_shipping_addresses_profile_default_idx")
   @@map("creator_shipping_addresses")
+}
+
+// ============================================================================
+// SETTINGS MODULE — BRAND & CREATOR
+// ============================================================================
+
+model BrandTeamMember {
+  id             String       @id @default(uuid()) @map("membership_id")
+  brandProfileId String       @map("brand_id")
+  brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  userId         String       @map("user_id")
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           BrandRole    @default(CAMPAIGN_MANAGER)
+  isActive       Boolean      @default(true) @map("is_active")
+  joinedAt       DateTime     @default(now()) @map("joined_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, userId])
+  @@index([userId, brandProfileId, role])
+  @@map("brand_team_members")
+}
+
+model BrandBillingProfile {
+  id                      String       @id @default(uuid()) @map("profile_id")
+  brandProfileId          String       @unique @map("brand_id")
+  brandProfile            BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  registeredCompanyName   String       @map("registered_company_name") @db.VarChar(255)
+  corporateBillingAddress String       @map("corporate_billing_address") @db.Text
+  gstin                   String?      @db.VarChar(15)
+  pan                     String?      @db.VarChar(10)
+  defaultTdsPercentage    Decimal      @default(2.00) @map("default_tds_percentage") @db.Decimal(5, 2)
+  currencyPreference      String       @default("INR") @map("currency_preference") @db.VarChar(3)
+  updatedAt               DateTime     @updatedAt @map("updated_at")
+
+  @@map("brand_billing_profiles")
+}
+
+model BrandWithdrawalAccount {
+  id                          String       @id @default(uuid()) @map("account_id")
+  brandProfileId              String       @map("brand_id")
+  brandProfile                BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  beneficiaryName             String       @map("beneficiary_name") @db.VarChar(255)
+  bankName                    String       @map("bank_name") @db.VarChar(255)
+  accountNumberEncrypted      String       @map("account_number_encrypted") @db.Text
+  ifscCode                    String       @map("ifsc_code") @db.VarChar(11)
+  isVerifiedPayoutDestination Boolean      @default(false) @map("is_verified_payout_destination")
+  createdAt                   DateTime     @default(now()) @map("created_at")
+  updatedAt                   DateTime     @updatedAt @map("updated_at")
+
+  @@index([brandProfileId])
+  @@map("brand_withdrawal_accounts")
+}
+
+model BrandNotificationSetting {
+  id              String                       @id @default(uuid()) @map("setting_id")
+  brandProfileId  String                       @map("brand_id")
+  brandProfile    BrandProfile                 @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  category        SettingsNotificationCategory
+  channel         SettingsNotificationChannel
+  isEnabled       Boolean                      @default(true) @map("is_enabled")
+  slackWebhookUrl String?                      @map("slack_webhook_url") @db.Text
+  updatedAt       DateTime                     @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, category, channel])
+  @@index([brandProfileId, category])
+  @@map("brand_notification_settings")
+}
+
+model CreatorWorkspace {
+  id                      String         @id @default(uuid())
+  ownerProfileId          String         @map("owner_profile_id")
+  ownerProfile            CreatorProfile @relation("CreatorWorkspaceOwner", fields: [ownerProfileId], references: [id], onDelete: Cascade)
+  organizationDisplayName String         @default("My Creative Workspace") @map("organization_display_name") @db.VarChar(150)
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
+
+  members     CreatorWorkspaceMember[]
+  invitations CreatorWorkspaceInvitation[]
+
+  @@map("creator_workspaces")
+}
+
+model CreatorWorkspaceMember {
+  id                String           @id @default(uuid())
+  workspaceId       String           @map("workspace_id")
+  workspace         CreatorWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assignedProfileId String?          @map("assigned_profile_id")
+  assignedProfile   CreatorProfile?  @relation("CreatorWorkspaceMemberProfile", fields: [assignedProfileId], references: [id], onDelete: SetNull)
+  associatedEmail   String           @map("associated_email") @db.VarChar(255)
+  securityRole      CreatorTeamRole  @default(ASSISTANT) @map("security_role_token")
+  isActive          Boolean          @default(true) @map("is_active_active")
+  joinedAt          DateTime?        @map("joined_at")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, associatedEmail])
+  @@index([associatedEmail, isActive])
+  @@map("creator_workspace_members")
+}
+
+model CreatorWorkspaceInvitation {
+  id               String                    @id @default(uuid())
+  workspaceId      String                    @map("workspace_id")
+  workspace        CreatorWorkspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  recipientEmail   String                    @map("recipient_email") @db.VarChar(255)
+  allocatedRole    CreatorTeamRole           @default(ASSISTANT) @map("allocated_role")
+  invitationStatus WorkspaceInvitationStatus @default(PENDING) @map("invitation_status")
+  secureTokenHash  String                    @unique @map("secure_token_hash") @db.VarChar(255)
+  expiresAt        DateTime                  @map("expires_at")
+  createdAt        DateTime                  @default(now()) @map("created_at")
+
+  @@map("creator_workspace_invitations")
+}
+
+model CreatorSocialIntegration {
+  id                         String                @id @default(uuid())
+  creatorProfileId           String                @map("creator_profile_id")
+  creatorProfile             CreatorProfile        @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  platformNetwork            SocialNetworkProvider @map("platform_network")
+  nativePlatformUserId       String                @map("native_platform_user_id") @db.VarChar(100)
+  channelHandleString        String                @map("channel_handle_string") @db.VarChar(100)
+  channelDisplayTitle        String?               @map("channel_display_title") @db.VarChar(255)
+  verifiedAvatarUrl          String?               @map("verified_avatar_url") @db.Text
+  oauthAccessTokenEncrypted  String                @map("oauth_access_token_encrypted") @db.Text
+  oauthRefreshTokenEncrypted String?               @map("oauth_refresh_token_encrypted") @db.Text
+  tokenScopePermissions      String[]              @default([]) @map("token_scope_permissions")
+  tokenStateCondition        OAuthTokenStatus      @default(ACTIVE) @map("token_state_condition")
+  tokenExpiresAt             DateTime?             @map("token_expires_at")
+  lastMetadataSyncAt         DateTime?             @map("last_metadata_sync_at")
+  createdAt                  DateTime              @default(now()) @map("created_at")
+  updatedAt                  DateTime              @updatedAt @map("updated_at")
+
+  @@unique([creatorProfileId, platformNetwork], map: "creator_social_integrations_profile_platform_key")
+  @@index([creatorProfileId, platformNetwork, tokenStateCondition], map: "creator_social_integrations_profile_platform_state_idx")
+  @@map("creator_social_integrations")
 }
 
 // ============================================================================
@@ -1389,6 +1592,7 @@ model BrandEscrowVault {
   razorpayVirtualAccountId String   @unique @map("razorpay_virtual_account_id")
   virtualAccountNumber     String   @unique @map("virtual_account_number")
   ifscCode                 String   @map("ifsc_code")
+  upiVpa                   String?  @map("upi_vpa")
   bankName                 String   @default("RBL Bank (Razorpay Escrow Partner Node)") @map("bank_name")
   currency                 String   @default("INR") @db.VarChar(3)
   totalPooledBalance       Decimal  @default(0) @map("total_pooled_balance") @db.Decimal(15, 4)

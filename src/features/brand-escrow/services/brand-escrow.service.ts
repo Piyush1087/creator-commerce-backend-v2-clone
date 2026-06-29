@@ -9,7 +9,7 @@ import { mapEscrowVault } from "../utils/map-escrow-vault.util";
 import { resolveEscrowCurrency } from "../utils/resolve-escrow-currency.util";
 import { EscrowComputationEngine } from "./escrow-computation.engine";
 import { EscrowSubscriptionContextService } from "./escrow-subscription-context.service";
-import { extractBankReceiver, RazorpayClient } from "./razorpay.client";
+import { extractBankReceiver, extractVpaReceiver, RazorpayClient } from "./razorpay.client";
 
 @Injectable()
 export class BrandEscrowService {
@@ -44,6 +44,9 @@ export class BrandEscrowService {
       description: `Escrow vault for ${brand.name}`,
     });
     const bankAccount = extractBankReceiver(rzpData.receivers);
+    const upiVpa =
+      extractVpaReceiver(rzpData.receivers) ??
+      `${brand.domain.replace(/[^a-z0-9]/gi, "").toLowerCase()}.escrow@razorpay`;
 
     const vault = await this.prisma.brandEscrowVault.create({
       data: {
@@ -51,6 +54,7 @@ export class BrandEscrowService {
         razorpayVirtualAccountId: rzpData.id,
         virtualAccountNumber: bankAccount.account_number!,
         ifscCode: bankAccount.ifsc!,
+        upiVpa,
         bankName:
           bankAccount.bank_name ?? "RBL Bank (Razorpay Escrow Partner Node)",
         currency,
