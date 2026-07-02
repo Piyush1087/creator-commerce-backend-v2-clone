@@ -88,6 +88,9 @@ export default $config({
       PORT: "80",
       DATABASE_URL,
       RUN_MIGRATIONS_ON_START: $app.stage === "dev" ? "true" : "false",
+      // One-time: clear failed notifications migration after UUID→TEXT fix. Remove after successful deploy.
+      PRISMA_MIGRATE_RESOLVE_ROLLED_BACK:
+        $app.stage === "dev" ? "20260629120000_notifications_module" : "",
       APP_BACKEND_URL:
         $app.stage === "prod"
           ? "https://api.thecreatorshop.in"
