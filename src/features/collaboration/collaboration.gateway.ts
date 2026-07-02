@@ -16,6 +16,7 @@ import type { Server, Socket } from "socket.io";
 
 import { resolveJwtSecret } from "../auth/auth-jwt.config";
 import type { AuthUser, JwtPayload } from "../auth/types/auth-user";
+import { NotificationProcessorService } from "../notifications/services/notification-processor.service";
 import { CollaborationAccessService } from "./services/collaboration-access.service";
 import { CollaborationRealtimeService } from "./services/collaboration-realtime.service";
 
@@ -43,10 +44,12 @@ export class CollaborationGateway
     private readonly config: ConfigService,
     private readonly access: CollaborationAccessService,
     private readonly realtime: CollaborationRealtimeService,
+    private readonly notificationProcessor: NotificationProcessorService,
   ) {}
 
   afterInit(server: Server): void {
     this.realtime.attachServer(server);
+    this.notificationProcessor.attachServer(server);
   }
 
   async handleConnection(client: Socket): Promise<void> {

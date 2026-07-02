@@ -1,5 +1,7 @@
 /// <reference path="./.sst/platform/config.d.ts" />
 
+import { buildNotificationPostmarkTemplateEnv } from "./src/features/notifications/config/notification-postmark-env";
+
 export default $config({
   app(input) {
     return {
@@ -87,10 +89,6 @@ export default $config({
         $app.stage === "prod"
           ? "https://api.thecreatorshop.in"
           : "https://api.dev.thecreatorshop.in",
-      APP_FRONTEND_URL:
-        $app.stage === "prod"
-          ? "https://dashboard.thecreatorshop.in"
-          : "https://dashboard.dev.thecreatorshop.in",
       CORS_ORIGINS:
         process.env.CORS_ORIGINS ||
         "http://localhost:5173,https://dashboard.dev.thecreatorshop.in,https://dashboard.thecreatorshop.in",
@@ -99,6 +97,23 @@ export default $config({
       AWS_REGION: process.env.AWS_REGION ?? "ap-south-1",
       POSTMARK_SERVER_TOKEN: process.env.POSTMARK_SERVER_TOKEN as string,
       POSTMARK_OTP_TEMPLATE_ID: process.env.POSTMARK_OTP_TEMPLATE_ID as string,
+      POSTMARK_NOTIFICATION_FROM:
+        process.env.POSTMARK_NOTIFICATION_FROM ??
+        "no-reply@thecreatorshop.in",
+      POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID:
+        process.env.POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID ??
+        process.env.POSTMARK_OTP_TEMPLATE_ID ??
+        "",
+      NOTIFICATIONS_DEV_EMIT_ENABLED:
+        $app.stage === "prod"
+          ? "false"
+          : (process.env.NOTIFICATIONS_DEV_EMIT_ENABLED ?? "false"),
+      APP_FRONTEND_URL:
+        process.env.APP_FRONTEND_URL ??
+        ($app.stage === "prod"
+          ? "https://dashboard.thecreatorshop.in"
+          : "https://dashboard.dev.thecreatorshop.in"),
+      ...buildNotificationPostmarkTemplateEnv(process.env),
       PARALLEL_API_KEY: process.env.PARALLEL_API_KEY as string,
       GEMINI_API_KEY: process.env.GEMINI_API_KEY as string,
       RAZORPAY_API_KEY_ID: process.env.RAZORPAY_API_KEY_ID as string,

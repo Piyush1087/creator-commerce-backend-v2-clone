@@ -10,9 +10,11 @@ import { CollaborationCreatorProfileService } from "./services/collaboration-cre
 import { CollaborationProvisionService } from "./services/collaboration-provision.service";
 import { CollaborationRealtimeService } from "./services/collaboration-realtime.service";
 import { CollaborationService } from "./services/collaboration.service";
+import { NotificationsModule } from "../notifications/notifications.module";
+import { NotificationProcessorService } from "../notifications/services/notification-processor.service";
 
 @Module({
-  imports: [PrismaModule, AuthModule, BrandCentreModule],
+  imports: [PrismaModule, AuthModule, BrandCentreModule, NotificationsModule],
   controllers: [CollaborationController],
   providers: [
     CollaborationGateway,

@@ -1,6 +1,8 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ServerClient } from "postmark";
 
+import { resolveNotificationTemplateIdFromEnv } from "../features/notifications/config/notification-postmark-env";
+
 /** ANSI colors for Postmark logs in dev terminals (request vs response vs error). */
 const MAIL_LOG = {
   reset: "\x1b[0m",
@@ -86,6 +88,59 @@ export class MailService {
           `statusCode=${err.statusCode ?? "n/a"} code=${err.code ?? "n/a"} ` +
           `message=${err.message ?? String(error)} — ` +
           `${MAIL_LOG.dim}verification flow still returns success; use BrandVerificationService OTP log${MAIL_LOG.reset}`,
+      );
+      throw error;
+    }
+  }
+
+  async sendNotificationEmail(args: {
+    to: string;
+    eventType: string;
+    templateModel: {
+      name: string;
+      title: string;
+      body: string;
+      action_url: string;
+      event_type: string;
+    };
+  }) {
+    const templateId = resolveNotificationTemplateIdFromEnv(args.eventType);
+    const from =
+      process.env.POSTMARK_NOTIFICATION_FROM ?? "no-reply@thecreatorshop.in";
+    const payload = {
+      From: from,
+      To: args.to,
+      TemplateId: templateId,
+      TemplateModel: args.templateModel,
+      MessageStream: "outbound" as const,
+    };
+
+    this.logger.log(
+      `${MAIL_LOG.cyan}[Postmark] SEND NOTIFICATION${MAIL_LOG.reset} ` +
+        `${MAIL_LOG.dim}to=${args.to} templateId=${templateId} event=${args.eventType}${MAIL_LOG.reset}`,
+    );
+
+    try {
+      const response = await this.postmarkClient.sendEmailWithTemplate({
+        From: payload.From,
+        To: args.to,
+        TemplateId: templateId,
+        TemplateModel: args.templateModel,
+        MessageStream: payload.MessageStream,
+      });
+
+      this.logger.log(
+        `${MAIL_LOG.green}[Postmark] NOTIFICATION OK${MAIL_LOG.reset} ` +
+          `MessageID=${response.MessageID ?? "n/a"} To=${response.To ?? args.to}`,
+      );
+
+      return response;
+    } catch (error: unknown) {
+      const err = error as { statusCode?: number; message?: string };
+      this.logger.warn(
+        `${MAIL_LOG.red}[Postmark] NOTIFICATION FAILED${MAIL_LOG.reset} ` +
+          `to=${args.to} event=${args.eventType} ` +
+          `statusCode=${err.statusCode ?? "n/a"} message=${err.message ?? String(error)}`,
       );
       throw error;
     }

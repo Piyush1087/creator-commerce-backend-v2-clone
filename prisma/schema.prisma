@@ -399,6 +399,19 @@ enum SettingsNotificationCategory {
   CAMPAIGN_BUDGET_OVERRUN
 }
 
+enum NotificationUrgencyLevel {
+  CRITICAL
+  MEDIUM
+  LOW
+}
+
+enum NotificationJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 enum SocialNetworkProvider {
   INSTAGRAM
   TIKTOK
@@ -500,6 +513,8 @@ model User {
   coPilotThreads CoPilotThread[]
   coPilotMessageFeedback CoPilotMessageFeedback[]
   brandTeamMemberships BrandTeamMember[]
+  triggeredNotifications Notification[] @relation("NotificationTriggerUser")
+  notificationRecipients NotificationRecipient[]
 
   @@index([organizationId])
   @@index([role])
@@ -676,6 +691,7 @@ model BrandProfile {
   billingProfile       BrandBillingProfile?
   withdrawalAccounts   BrandWithdrawalAccount[]
   notificationSettings BrandNotificationSetting[]
+  notifications        Notification[]
 
   @@map("brand_profiles")
 }
@@ -1857,4 +1873,64 @@ model CoPilotInteractionLog {
 
   @@index([brandProfileId, createdAt])
   @@map("co_pilot_interaction_logs")
+}
+
+// ============================================================================
+// NOTIFICATIONS MODULE (Phase 1 — Postgres job queue, no Redis)
+// ============================================================================
+
+model Notification {
+  id            String                   @id @default(uuid())
+  workspaceId   String                   @map("workspace_id")
+  brandProfile  BrandProfile             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  triggerUserId String?                  @map("trigger_user_id")
+  triggerUser   User?                    @relation("NotificationTriggerUser", fields: [triggerUserId], references: [id], onDelete: SetNull)
+  eventType     String                   @map("event_type") @db.VarChar(100)
+  urgencyLevel  NotificationUrgencyLevel @map("urgency_level")
+  payload       Json
+  createdAt     DateTime                 @default(now()) @map("created_at")
+  updatedAt     DateTime                 @updatedAt @map("updated_at")
+
+  recipients NotificationRecipient[]
+
+  @@index([workspaceId])
+  @@index([workspaceId, eventType, createdAt])
+  @@map("notifications")
+}
+
+model NotificationRecipient {
+  id             String       @id @default(uuid())
+  notificationId String       @map("notification_id")
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  userId         String       @map("user_id")
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isRead         Boolean      @default(false) @map("is_read")
+  isEmailed      Boolean      @default(false) @map("is_emailed")
+  readAt         DateTime?    @map("read_at")
+
+  @@unique([notificationId, userId])
+  @@index([userId, isRead])
+  @@map("notification_recipients")
+}
+
+model NotificationJob {
+  id            String                   @id @default(uuid())
+  workspaceId   String                   @map("workspace_id")
+  eventType     String                   @map("event_type") @db.VarChar(100)
+  urgencyLevel  NotificationUrgencyLevel @map("urgency_level")
+  triggerUserId String?                  @map("trigger_user_id")
+  payload       Json
+  actorName     String?                  @map("actor_name") @db.VarChar(200)
+  status        NotificationJobStatus    @default(PENDING)
+  attempts      Int                      @default(0)
+  maxAttempts   Int                      @default(5) @map("max_attempts")
+  scheduledAt   DateTime                 @default(now()) @map("scheduled_at")
+  lockedAt      DateTime?                @map("locked_at")
+  lockedBy      String?                  @map("locked_by") @db.VarChar(100)
+  lastError     String?                  @map("last_error") @db.Text
+  completedAt   DateTime?                @map("completed_at")
+  createdAt     DateTime                 @default(now()) @map("created_at")
+
+  @@index([status, scheduledAt])
+  @@map("notification_jobs")
 }
