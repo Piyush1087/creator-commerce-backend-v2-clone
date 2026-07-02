@@ -6,7 +6,7 @@ Backend-only tests. Requires a brand JWT and running API (`npm run dev`).
 
 ## Prerequisites
 
-1. Migration applied: `npm run db:migrate:deploy`
+1. **Dev:** migrations applied via `sst deploy --stage dev` (auto on ECS task start) or local `npm run db:migrate:deploy`
 2. `.env` includes:
    - `POSTMARK_SERVER_TOKEN`
    - `POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID` (can reuse OTP template ID for smoke tests)

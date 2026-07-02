@@ -77,7 +77,11 @@ SST deploy wires all `POSTMARK_TEMPLATE_*` keys via `buildNotificationPostmarkTe
 
 ## Quick start
 
-1. Apply migration: `npm run db:migrate:deploy`
-2. Set env vars above in `.env` (per-event IDs optional until real templates exist)
+**Dev deploy (migrations included):** see [../deployment/README.md](../deployment/README.md#default-dev-release-current-workflow) — `prisma:generate` → `build` → `sst deploy --stage dev`.
+
+**Local API test:**
+
+1. `npm run db:migrate:deploy` against local Docker Postgres
+2. Set env in `.env` (Postmark, `NOTIFICATIONS_DEV_EMIT_ENABLED=true` or `STAGE=local`)
 3. `npm run dev`
 4. Follow [TESTING.md](./TESTING.md)

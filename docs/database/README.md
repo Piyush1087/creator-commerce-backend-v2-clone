@@ -37,10 +37,24 @@ Apply existing migrations manually to a target database:
 npm run db:migrate:deploy
 ```
 
-## Dev Deploy Override
+## Dev RDS migrations
+
+**Default (routine dev deploy):** migrations apply automatically when ECS starts the API
+container after `npx sst deploy --stage dev`. The entrypoint runs `prisma migrate deploy`
+when `RUN_MIGRATIONS_ON_START=true` (dev only). See
+[../deployment/README.md](../deployment/README.md#default-dev-release-current-workflow).
+
+**Fallback (jumpbox):** open the SSM tunnel, export `DATABASE_URL` to `localhost:5435`, then
+run `npm run db:migrate:deploy` or `npm run db:studio`. Use when debugging migrations,
+inspecting dev RDS directly, or if auto-migrate is disabled. Tunnel steps:
+[../deployment/README.md](../deployment/README.md#fallback--dev-rds-via-jumpbox--tunnel-manual-migrate).
+
+**Prod:** manual `migrate deploy` after review — never auto-migrate on container start.
+
+## Dev deploy database URL
 
 SST supports `DEV_DATABASE_URL` for the `dev` stage. This mirrors the old repo
-pattern for pointing dev deployments at a separate RDS/t4g-style database.
+pattern for pointing dev deployments at a separate RDS instance.
 
 Prod continues to use the SST Aurora resource connection unless that decision
 is changed explicitly later.
@@ -65,7 +79,12 @@ Creates or updates:
 
 Sign in on the frontend with that email and OTP `123456` (same stub as brand login).
 
-For **dev RDS**, open the SSM tunnel, export `DATABASE_URL` to `localhost:5435`, then run the same command once (ops — not on container startup). Tunnel steps: [../deployment/README.md](../deployment/README.md#dev-rds--tunnel--migrate).
+For **dev RDS** seed via tunnel (optional — only if jumpbox is available):
+
+```bash
+# Tunnel open, DATABASE_URL -> localhost:5435, then:
+npm run db:seed:dev-creator
+```
 
 ## Migration: `20260604120000_collaboration_module`
 

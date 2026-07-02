@@ -22,7 +22,7 @@ Last updated: 2026-06-29
 | **WebSocket push** | Done | `notification:new` on `user:{userId}` via `/collaboration` namespace |
 | **Brand REST API** | Done | `GET/PATCH/POST` under `api/v1/brand/notifications` |
 | **Dev test emit** | Done | `POST .../test-emit` when `STAGE=local` or `NOTIFICATIONS_DEV_EMIT_ENABLED=true` |
-| **Dispatch export** | Done | `NotificationDispatchService` exported for other modules |
+| **Postgres auto-migrate on dev deploy** | Done | `RUN_MIGRATIONS_ON_START` + `docker-entrypoint.sh`; see `docs/deployment/README.md` |
 
 ---
 
