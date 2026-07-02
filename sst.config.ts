@@ -1,7 +1,5 @@
 /// <reference path="./.sst/platform/config.d.ts" />
 
-import { buildNotificationPostmarkTemplateEnv } from "./src/features/notifications/config/notification-postmark-env";
-
 export default $config({
   app(input) {
     return {
@@ -65,6 +63,10 @@ export default $config({
       process.env.JWT_SECRET_DEV ?? "ccs-jwt-dev-placeholder-change-me";
     const JWT_SECRET_PROD =
       process.env.JWT_SECRET_PROD ?? "ccs-jwt-prod-placeholder-change-me";
+
+    const { buildNotificationPostmarkTemplateEnv } = await import(
+      "./src/features/notifications/config/notification-postmark-env"
+    );
 
     const filesBucket = new sst.aws.Bucket("files-v2", {
       access: "public",
