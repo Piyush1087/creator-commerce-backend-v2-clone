@@ -85,6 +85,7 @@ export default $config({
       STAGE: $app.stage,
       PORT: "80",
       DATABASE_URL,
+      RUN_MIGRATIONS_ON_START: $app.stage === "dev" ? "true" : "false",
       APP_BACKEND_URL:
         $app.stage === "prod"
           ? "https://api.thecreatorshop.in"
