@@ -15,6 +15,7 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import { buildPhaseSyncPatch, mapContentFormatFromTags } from "../../../shared/uce/uce-production-phase.util";
 import { CreatorEligibilityService } from "../../creator-marketplace/services/creator-eligibility.service";
 import type { CreatorAudienceDemographicsMatrix } from "../../creator-marketplace/types/creator-audience.types";
 import { isInvitedCollaboration } from "../../creator-marketplace/utils/visibility-scope.util";
@@ -184,6 +185,15 @@ export class CreatorUceCampaignsService {
 
     const milestoneDeadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
+    const phaseSeed = {
+      collabStatus: UceCollabStatus.APPLICANT_PENDING,
+      currentMilestone: UceMilestoneStage.STAGE_1_NEGOTIATION,
+      logisticsState: null as null,
+      reviewState: null as null,
+      contentDraftUrl: null as null,
+      currentMilestoneDeadline: milestoneDeadline,
+    };
+
     const collab = await this.prisma.$transaction(async (tx) => {
       if (existing?.collabStatus === UceCollabStatus.APPLICANT_REJECTED) {
         await tx.uceCampaignCollaboration.delete({ where: { id: existing.id } });
@@ -196,10 +206,13 @@ export class CreatorUceCampaignsService {
           productId: dto.product_id ?? null,
           instagramHandle: handle,
           creatorEmail: user.email,
+          creatorProfileId: profile.id,
+          contentFormatType: mapContentFormatFromTags(brief.deliverableFormatTags),
           matchScore: dto.match_score ?? 0,
           collabStatus: UceCollabStatus.APPLICANT_PENDING,
           negotiationState: UceNegotiationSubState.CREATOR_COUNTER,
           currentMilestoneDeadline: milestoneDeadline,
+          ...buildPhaseSyncPatch(phaseSeed),
         },
       });
 

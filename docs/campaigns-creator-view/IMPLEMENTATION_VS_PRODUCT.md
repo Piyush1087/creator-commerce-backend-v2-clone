@@ -56,7 +56,10 @@ Comparison of current v2 implementation against `product-docs/` (PRD, Develop Do
 | Active production workspace | ✅ | `GET /api/v1/creator/campaigns/workspace` |
 | Pending applications / invitations | ✅ | Status mapping from UCE collab status |
 | Pending invitation deep-link CTA | ✅ | `invitation_token` on row → detail with `?invite_token=` |
-| Velocity / panic alerts | 🟡 | Overdue + approaching deadline only; not full panic panel spec |
+| Velocity / panic alerts | ✅ | Panic panel engine + `panic_panel` payload on workspace |
+| Phase-aware rows (`current_phase`, `action_required_by_role`) | ✅ | Denormalized on `uce_campaign_collaborations` |
+| Workspace query filters (view, search, platform, dependency) | ✅ | `commandCenterQuerySchema` on `GET .../workspace` |
+| Creator workflow mutations (claim, logistics receipt, submit draft) | ✅ | Zod-validated POST endpoints |
 | Milestone-aware CTAs | 🟡 | Mapper covers logistics, review, publishing; negotiation stages generic |
 | Link to collaboration chat | 🟡 | When `workflow_collaboration_id` exists on row |
 | Tab counts | ✅ | |
@@ -69,6 +72,7 @@ Comparison of current v2 implementation against `product-docs/` (PRD, Develop Do
 | Product requirement | Status | Notes |
 |---------------------|--------|-------|
 | Closed collaboration list | ✅ | `GET /api/v1/creator/campaigns/history` |
+| Paginated history archive | ✅ | `historyArchiveQuerySchema` (`page`, `limit`, `archiveStatus`) |
 | Summary stats (escrow, deliverables, match) | 🟡 | Computed from pipeline rows; not full escrow ledger |
 | Payout column | 🟡 | Uses `total_quote` on complete rows |
 | Read-only | ✅ | |
@@ -82,7 +86,8 @@ Comparison of current v2 implementation against `product-docs/` (PRD, Develop Do
 | Standalone product-doc tables | ❌ | Intentionally not used |
 | UCE campaign / targeting / commercials | ✅ | Extended with `visibility_scopes`, `application_scope` |
 | Creator profile audience matrix | ✅ | Mock in dev seed |
-| `uce_campaign_collaborations` pipeline | ✅ | Workspace + history source; `invitation_token` on invite |
+| `uce_campaign_collaborations` pipeline | ✅ | Workspace + history source; command-center phase columns |
+| Command-center child registries (logistics, drafts, telemetry) | ✅ | `uce_collaboration_*` tables |
 | `Collaboration` workflow chat link | 🟡 | Optional relation on active rows |
 | Dedicated `MarketplaceCrossSell` model | ❌ | Alternatives computed from eligible marketplace rows |
 
@@ -116,7 +121,7 @@ Comparison of current v2 implementation against `product-docs/` (PRD, Develop Do
 ## Recommended next increments
 
 1. Instagram OAuth + real Graph API metrics ingestion.
-2. Full panic panel rules from Command Center DD.
+2. Redis-backed panic panel cache (in-memory TTL used today).
 3. Brand wizard for visibility / application scope configuration.
 4. Dedicated cross-sell persistence model (if product requires curated trays).
 5. Brand-side share router modal with invitation token generation UI.

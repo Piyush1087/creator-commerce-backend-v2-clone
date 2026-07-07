@@ -18,6 +18,10 @@ const DEFAULT_CORS_ORIGINS = [
 const LOCAL_DEV_ORIGIN =
   /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
 
+/** ngrok and similar tunnels used for local Meta OAuth */
+const NGROK_ORIGIN =
+  /^https:\/\/[a-z0-9-]+\.(ngrok-free\.app|ngrok\.app|ngrok\.io)$/;
+
 function parseCorsOrigins(
   raw: string | undefined,
   defaults: readonly string[],
@@ -51,6 +55,10 @@ function resolveCorsOrigin(
       return;
     }
     if (allowLocalDevOrigins && LOCAL_DEV_ORIGIN.test(origin)) {
+      callback(null, origin);
+      return;
+    }
+    if (allowLocalDevOrigins && NGROK_ORIGIN.test(origin)) {
       callback(null, origin);
       return;
     }

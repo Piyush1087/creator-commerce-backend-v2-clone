@@ -1,7 +1,4 @@
-import {
-  GoogleGenerativeAI,
-  type ResponseSchema,
-} from "@google/generative-ai";
+import { GoogleGenerativeAI, type ResponseSchema } from "@google/generative-ai";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
@@ -30,9 +27,7 @@ export class GeminiJsonClient {
       generationConfig: {
         responseMimeType: "application/json",
         temperature: 0.2,
-        ...(args.responseSchema
-          ? { responseSchema: args.responseSchema }
-          : {}),
+        ...(args.responseSchema ? { responseSchema: args.responseSchema } : {}),
       },
     });
 
@@ -61,5 +56,44 @@ export class GeminiJsonClient {
       );
       throw new Error("Gemini returned invalid JSON");
     }
+  }
+
+  async generateText(args: {
+    systemInstruction: string;
+    userText: string;
+    temperature?: number;
+  }): Promise<string> {
+    const apiKey = this.config.get<string>("GEMINI_API_KEY", "");
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY is not configured");
+    }
+    const modelId = this.config.get<string>("GEMINI_MODEL", "gemini-2.5-flash");
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: modelId,
+      systemInstruction: args.systemInstruction,
+      generationConfig: {
+        temperature: args.temperature ?? 0.2,
+      },
+    });
+
+    const timeoutMs = this.config.get<number>(
+      "GEMINI_REQUEST_TIMEOUT_MS",
+      120_000,
+    );
+    const result = await Promise.race([
+      model.generateContent({
+        contents: [{ role: "user", parts: [{ text: args.userText }] }],
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Gemini request timed out")),
+          timeoutMs,
+        ),
+      ),
+    ]);
+
+    return result.response.text();
   }
 }

@@ -1,7 +1,7 @@
 import { ConfigService } from "@nestjs/config";
 
 /** Access token lifetime for brand auth (login + complete-registration). */
-export const JWT_EXPIRES_IN = "24h" as const;
+export const JWT_EXPIRES_IN = "7d" as const;
 
 /** Resolves signing key: `JWT_SECRET` if set, else stage-specific env vars. */
 export function resolveJwtSecret(config: ConfigService): string {

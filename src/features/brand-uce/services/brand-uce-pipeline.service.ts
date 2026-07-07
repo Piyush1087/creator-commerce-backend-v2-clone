@@ -6,11 +6,13 @@ import {
 import {
   Prisma,
   UceCollabStatus,
+  UceLogisticsSubState,
   UceMilestoneStage,
   UceNegotiationSubState,
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import { buildPhaseSyncPatch } from "../../../shared/uce/uce-production-phase.util";
 import { generateInvitationToken } from "../../creator-marketplace/utils/invitation-token.util";
 import type {
   AddTrackingDto,
@@ -356,6 +358,12 @@ export class BrandUcePipelineService {
           balance70Value,
           negotiationState: UceNegotiationSubState.CREATOR_COUNTER,
           currentMilestoneDeadline: this.defaultMilestoneDeadline(14),
+          ...buildPhaseSyncPatch({
+            ...collab,
+            collabStatus: UceCollabStatus.ACTIVE_WORKFLOW,
+            currentMilestone: UceMilestoneStage.STAGE_1_NEGOTIATION,
+            currentMilestoneDeadline: this.defaultMilestoneDeadline(14),
+          }),
         },
         include: COLLAB_INCLUDE,
       });
@@ -422,6 +430,10 @@ export class BrandUcePipelineService {
         data: {
           collabStatus: UceCollabStatus.APPLICANT_REJECTED,
           rejectionReason: dto.rejection_reason,
+          ...buildPhaseSyncPatch({
+            ...collab,
+            collabStatus: UceCollabStatus.APPLICANT_REJECTED,
+          }),
         },
         include: COLLAB_INCLUDE,
       });
@@ -467,7 +479,12 @@ export class BrandUcePipelineService {
         data: {
           logisticsCarrier: dto.logistics_carrier,
           logisticsTrackingNumber: dto.logistics_tracking_number,
-          logisticsState: "IN_TRANSIT",
+          logisticsState: UceLogisticsSubState.IN_TRANSIT,
+          ...buildPhaseSyncPatch({
+            ...collab,
+            currentMilestone: UceMilestoneStage.STAGE_3_LOGISTICS,
+            logisticsState: UceLogisticsSubState.IN_TRANSIT,
+          }),
         },
         include: COLLAB_INCLUDE,
       });
@@ -495,7 +512,7 @@ export class BrandUcePipelineService {
     dto: SubmitContentDraftDto,
     actorId: string,
   ) {
-    await this.access.assertCollaborationOwned(
+    const collab = await this.access.assertCollaborationOwned(
       brandProfileId,
       campaignId,
       collaborationId,
@@ -511,6 +528,12 @@ export class BrandUcePipelineService {
           currentMilestone: UceMilestoneStage.STAGE_4_CONTENT_REVIEW,
           reviewState: "INITIAL_DRAFT_SUBMITTED",
           autoApprovalDeadline72h: autoDeadline,
+          ...buildPhaseSyncPatch({
+            ...collab,
+            currentMilestone: UceMilestoneStage.STAGE_4_CONTENT_REVIEW,
+            reviewState: "INITIAL_DRAFT_SUBMITTED",
+            contentDraftUrl: dto.content_draft_url,
+          }),
         },
         include: COLLAB_INCLUDE,
       });
