@@ -4,55 +4,91 @@ import {
 } from "@nestjs/common";
 import {
   UceCollabStatus,
-  UcePipelineHealthStatus,
+  UceProductionPhase,
+  UceWorkflowActionRole,
   UserRole,
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
-import { normalizeInstagramHandle } from "../../brand-uce/utils/instagram-handle.util";
+import {
+  ACTIVE_PRODUCTION_PHASES,
+  ARCHIVED_PRODUCTION_PHASES,
+  PENDING_PRODUCTION_PHASES,
+} from "../../../shared/uce/uce-production-phase.util";
 import { decimalToNumber } from "../../brand-uce/utils/uce-decimal.util";
+import type {
+  CommandCenterQueryInput,
+  HistoryArchiveQueryInput,
+} from "../schemas/command-center.schema";
 import {
   mapActiveMilestone,
   mapContentFormat,
   mapHistoryClosedLabel,
   mapPendingStatus,
 } from "../utils/collaboration-row.mapper";
+import { CreatorCampaignsPanicService } from "./creator-campaigns-panic.service";
 
 type AuthUser = { id: string; email: string; role: UserRole };
 
-const PENDING_STATUSES: UceCollabStatus[] = [
-  UceCollabStatus.PROSPECT_CURATED,
-  UceCollabStatus.PROSPECT_INVITED,
-  UceCollabStatus.APPLICANT_PENDING,
-  UceCollabStatus.APPLICANT_SHORTLISTED,
-];
-
-const HISTORY_STATUSES: UceCollabStatus[] = [
-  UceCollabStatus.ARCHIVED_COMPLETE,
-  UceCollabStatus.APPLICANT_REJECTED,
-  UceCollabStatus.TERMINATED_CANCELED,
-];
-
 @Injectable()
 export class CreatorCampaignsWorkspaceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly panic: CreatorCampaignsPanicService,
+  ) {}
 
-  async getWorkspace(user: AuthUser) {
+  async getWorkspace(user: AuthUser, query: CommandCenterQueryInput) {
     this.assertCreator(user);
-    const handle = await this.resolveHandle(user.id);
-    if (!handle) {
-      return {
-        active_count: 0,
-        pending_count: 0,
-        completed_count: 0,
-        velocity_alerts: [],
-        active_rows: [],
-        pending_rows: [],
-      };
+    const profile = await this.resolveProfile(user.id);
+    if (!profile) {
+      return this.emptyWorkspace();
     }
 
+    const phaseFilter =
+      query.currentView === "PENDING_APPLICATIONS"
+        ? PENDING_PRODUCTION_PHASES
+        : ACTIVE_PRODUCTION_PHASES;
+
+    const dependencyRole =
+      query.dependencyFilter === "AWAITING_CREATOR"
+        ? UceWorkflowActionRole.CREATOR
+        : query.dependencyFilter === "AWAITING_BRAND"
+          ? UceWorkflowActionRole.BRAND
+          : undefined;
+
     const collabs = await this.prisma.uceCampaignCollaboration.findMany({
-      where: { instagramHandle: handle },
+      where: {
+        creatorProfileId: profile.id,
+        currentPhase: { in: phaseFilter },
+        ...(dependencyRole ? { actionRequiredByRole: dependencyRole } : {}),
+        ...(query.platformFilter
+          ? { contentFormatType: query.platformFilter }
+          : {}),
+        ...(query.searchQuery
+          ? {
+              OR: [
+                {
+                  campaign: {
+                    name: {
+                      contains: query.searchQuery,
+                      mode: "insensitive",
+                    },
+                  },
+                },
+                {
+                  campaign: {
+                    brandProfile: {
+                      name: {
+                        contains: query.searchQuery,
+                        mode: "insensitive",
+                      },
+                    },
+                  },
+                },
+              ],
+            }
+          : {}),
+      },
       orderBy: { updatedAt: "desc" },
       include: {
         campaign: {
@@ -69,37 +105,46 @@ export class CreatorCampaignsWorkspaceService {
       },
     });
 
-    const activeCollabs = collabs.filter(
-      (c) => c.collabStatus === UceCollabStatus.ACTIVE_WORKFLOW,
+    const [pendingCount, activeCount, historyCount, panicPanel] =
+      await Promise.all([
+        this.prisma.uceCampaignCollaboration.count({
+          where: {
+            creatorProfileId: profile.id,
+            currentPhase: { in: PENDING_PRODUCTION_PHASES },
+          },
+        }),
+        this.prisma.uceCampaignCollaboration.count({
+          where: {
+            creatorProfileId: profile.id,
+            currentPhase: { in: ACTIVE_PRODUCTION_PHASES },
+          },
+        }),
+        this.prisma.uceCampaignCollaboration.count({
+          where: {
+            creatorProfileId: profile.id,
+            currentPhase: { in: ARCHIVED_PRODUCTION_PHASES },
+          },
+        }),
+        this.panic.evaluatePanicPanelTelemetry(profile.id),
+      ]);
+
+    const activeCollabs = collabs.filter((c) =>
+      ACTIVE_PRODUCTION_PHASES.includes(c.currentPhase),
     );
     const pendingCollabs = collabs.filter((c) =>
-      PENDING_STATUSES.includes(c.collabStatus),
-    );
-    const historyCollabs = collabs.filter((c) =>
-      HISTORY_STATUSES.includes(c.collabStatus),
+      PENDING_PRODUCTION_PHASES.includes(c.currentPhase),
     );
 
-    const velocityAlerts = activeCollabs
-      .filter(
-        (c) =>
-          c.pipelineHealth === UcePipelineHealthStatus.ACTION_OVERDUE ||
-          c.pipelineHealth === UcePipelineHealthStatus.APPROACHING_DEADLINE,
-      )
-      .slice(0, 5)
-      .map((c) => ({
-        collaboration_id: c.id,
-        tone:
-          c.pipelineHealth === UcePipelineHealthStatus.ACTION_OVERDUE
-            ? ("critical" as const)
-            : ("amber" as const),
-        headline:
-          c.pipelineHealth === UcePipelineHealthStatus.ACTION_OVERDUE
-            ? "Critical Action Required: Overdue Deliverable"
-            : "Approaching Deadline",
-        body: `[${c.campaign.brandProfile.name}] ${c.campaign.name} milestone deadline requires attention.`,
-        cta_label: "Open Collaboration",
-        campaign_id: c.campaignId,
-      }));
+    const velocityAlerts = panicPanel.alerts.map((alert) => ({
+      collaboration_id: alert.id,
+      tone: "critical" as const,
+      headline: "Critical Action Required: Overdue Deliverable",
+      body: `[${alert.campaign_name}] requires your attention before the production deadline.`,
+      cta_label: "Open Collaboration",
+      campaign_id: alert.campaign_id,
+      current_phase: alert.current_phase,
+      production_deadline_at: alert.production_deadline_at,
+    }));
 
     const active_rows = activeCollabs.map((c) => {
       const milestone = mapActiveMilestone(c);
@@ -109,7 +154,10 @@ export class CreatorCampaignsWorkspaceService {
         brand_name: c.campaign.brandProfile.name,
         brand_avatar_url: c.campaign.brandProfile.logoUrl,
         campaign_name: c.campaign.name,
-        content_format: mapContentFormat(c),
+        content_format: c.contentFormatType ?? mapContentFormat(c),
+        current_phase: c.currentPhase,
+        action_required_by_role: c.actionRequiredByRole,
+        production_deadline_at: c.productionDeadlineAt?.toISOString() ?? null,
         milestone_label: milestone.milestone_label,
         milestone_subtext: milestone.milestone_subtext,
         cta_label: milestone.cta_label,
@@ -126,6 +174,8 @@ export class CreatorCampaignsWorkspaceService {
         brand_name: c.campaign.brandProfile.name,
         brand_avatar_url: c.campaign.brandProfile.logoUrl,
         campaign_name: c.campaign.name,
+        current_phase: c.currentPhase,
+        action_required_by_role: c.actionRequiredByRole,
         status_label: pending.status_label,
         context_copy: pending.context_copy,
         cta_label: pending.cta_label,
@@ -136,20 +186,25 @@ export class CreatorCampaignsWorkspaceService {
     });
 
     return {
-      active_count: active_rows.length,
-      pending_count: pending_rows.length,
-      completed_count: historyCollabs.length,
+      current_view: query.currentView,
+      active_count: activeCount,
+      pending_count: pendingCount,
+      completed_count: historyCount,
+      panic_panel: panicPanel,
       velocity_alerts: velocityAlerts,
       active_rows,
       pending_rows,
     };
   }
 
-  async getHistory(user: AuthUser) {
+  async getHistory(user: AuthUser, query: HistoryArchiveQueryInput) {
     this.assertCreator(user);
-    const handle = await this.resolveHandle(user.id);
-    if (!handle) {
+    const profile = await this.resolveProfile(user.id);
+    if (!profile) {
       return {
+        page: query.page,
+        limit: query.limit,
+        total: 0,
         stats: {
           total_escrow_extracted: null,
           deliverables_dispatched: null,
@@ -159,18 +214,32 @@ export class CreatorCampaignsWorkspaceService {
       };
     }
 
-    const collabs = await this.prisma.uceCampaignCollaboration.findMany({
-      where: {
-        instagramHandle: handle,
-        collabStatus: { in: HISTORY_STATUSES },
-      },
-      orderBy: { updatedAt: "desc" },
-      include: {
-        campaign: {
-          include: { brandProfile: { select: { name: true } } },
+    const phaseFilter: UceProductionPhase[] =
+      query.archiveStatus === "ARCHIVED_COMPLETED"
+        ? [UceProductionPhase.ARCHIVED_COMPLETED]
+        : query.archiveStatus === "ARCHIVED_CLOSED"
+          ? [UceProductionPhase.ARCHIVED_CLOSED]
+          : ARCHIVED_PRODUCTION_PHASES;
+
+    const where = {
+      creatorProfileId: profile.id,
+      currentPhase: { in: phaseFilter },
+    };
+
+    const [total, collabs] = await Promise.all([
+      this.prisma.uceCampaignCollaboration.count({ where }),
+      this.prisma.uceCampaignCollaboration.findMany({
+        where,
+        orderBy: { updatedAt: "desc" },
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+        include: {
+          campaign: {
+            include: { brandProfile: { select: { name: true } } },
+          },
         },
-      },
-    });
+      }),
+    ]);
 
     let totalEscrow = 0;
     let completedCount = 0;
@@ -178,7 +247,7 @@ export class CreatorCampaignsWorkspaceService {
 
     const rows = collabs.map((c) => {
       const quote = decimalToNumber(c.totalQuote);
-      if (c.collabStatus === UceCollabStatus.ARCHIVED_COMPLETE) {
+      if (c.currentPhase === UceProductionPhase.ARCHIVED_COMPLETED) {
         totalEscrow += quote;
         completedCount += 1;
       }
@@ -187,9 +256,13 @@ export class CreatorCampaignsWorkspaceService {
         collaboration_id: c.id,
         brand_name: c.campaign.brandProfile.name,
         campaign_name: c.campaign.name,
-        closed_label: mapHistoryClosedLabel(c.collabStatus),
+        current_phase: c.currentPhase,
+        closed_label:
+          c.currentPhase === UceProductionPhase.ARCHIVED_COMPLETED
+            ? "Completed & Released"
+            : mapHistoryClosedLabel(c.collabStatus),
         payout_amount:
-          c.collabStatus === UceCollabStatus.ARCHIVED_COMPLETE && quote > 0
+          c.currentPhase === UceProductionPhase.ARCHIVED_COMPLETED && quote > 0
             ? quote
             : null,
         closed_at: c.updatedAt.toISOString(),
@@ -197,6 +270,9 @@ export class CreatorCampaignsWorkspaceService {
     });
 
     return {
+      page: query.page,
+      limit: query.limit,
+      total,
       stats: {
         total_escrow_extracted:
           completedCount > 0 ? totalEscrow : null,
@@ -209,12 +285,29 @@ export class CreatorCampaignsWorkspaceService {
     };
   }
 
-  private async resolveHandle(userId: string): Promise<string | null> {
+  private emptyWorkspace() {
+    return {
+      current_view: "ACTIVE_PRODUCTION" as const,
+      active_count: 0,
+      pending_count: 0,
+      completed_count: 0,
+      panic_panel: {
+        hasUrgentAlerts: false,
+        alertCount: 0,
+        alerts: [],
+      },
+      velocity_alerts: [],
+      active_rows: [],
+      pending_rows: [],
+    };
+  }
+
+  private async resolveProfile(userId: string) {
     const profile = await this.prisma.creatorProfile.findUnique({
       where: { userId },
     });
     if (!profile?.instagramHandle) return null;
-    return normalizeInstagramHandle(profile.instagramHandle);
+    return profile;
   }
 
   private assertCreator(user: AuthUser): void {

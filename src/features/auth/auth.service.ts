@@ -9,6 +9,10 @@ import { JwtService } from "@nestjs/jwt";
 import { PlanType, SubscriptionStatus, UserRole } from "@prisma/client";
 
 import { PrismaService } from "../../prisma/prisma.service";
+import {
+  hashPassword,
+  verifyPassword,
+} from "../../shared/crypto/password.util";
 import { emailLocalPart } from "../brand-onboarding/verification/brand-verification-email.util";
 import { JWT_EXPIRES_IN } from "./auth-jwt.config";
 import { CompleteBrandRegistrationDto } from "./dto/complete-brand-registration.dto";
@@ -48,19 +52,13 @@ export class AuthService {
   }
 
   async login(dto: LoginDto): Promise<AuthTokenResponse> {
-    if (dto.otp !== BRAND_LOGIN_STUB_OTP) {
-      throw new UnauthorizedException("Invalid verification code.");
-    }
-
     const email = dto.email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
 
     if (!user) {
-      throw new UnauthorizedException(
-        "No account found for this email.",
-      );
+      throw new UnauthorizedException("No account found for this email.");
     }
 
     if (user.role !== UserRole.BRAND && user.role !== UserRole.CREATOR) {
@@ -73,6 +71,34 @@ export class AuthService {
       throw new UnauthorizedException(
         `This email is registered as ${user.role.toLowerCase()}, not ${dto.role.toLowerCase()}.`,
       );
+    }
+
+    if (dto.password) {
+      if (user.role !== UserRole.CREATOR) {
+        throw new BadRequestException(
+          "Password sign-in is only available for creator accounts.",
+        );
+      }
+      if (!user.hashedPassword) {
+        throw new UnauthorizedException(
+          "This account uses Google or OTP sign-in. Try those instead.",
+        );
+      }
+      if (!this.verifyPassword(dto.password, user.hashedPassword)) {
+        throw new UnauthorizedException("Invalid email or password.");
+      }
+      return {
+        accessToken: await this.signToken(user),
+        user: this.toAuthUser(user),
+      };
+    }
+
+    if (!dto.otp) {
+      throw new BadRequestException("Provide an OTP or password.");
+    }
+
+    if (dto.otp !== BRAND_LOGIN_STUB_OTP) {
+      throw new UnauthorizedException("Invalid verification code.");
     }
 
     return {
@@ -114,7 +140,9 @@ export class AuthService {
     });
     if (existingUser) {
       if (existingUser.role !== UserRole.BRAND) {
-        throw new ConflictException("This email cannot be used for a brand account.");
+        throw new ConflictException(
+          "This email cannot be used for a brand account.",
+        );
       }
       let organizationId =
         profile.organizationId ?? existingUser.organizationId;
@@ -149,7 +177,9 @@ export class AuthService {
       );
     }
 
-    const adminEmail = await this.findClaimedOrganizationContact(profile.domain);
+    const adminEmail = await this.findClaimedOrganizationContact(
+      profile.domain,
+    );
     if (adminEmail) {
       throw new ConflictException(
         "This brand domain is already set up. Ask your organization admin for an invitation to join the team.",
@@ -193,6 +223,25 @@ export class AuthService {
 
   getMe(user: AuthUser): AuthUser {
     return user;
+  }
+
+  hashPassword(plain: string): string {
+    return hashPassword(plain);
+  }
+
+  verifyPassword(plain: string, storedHash: string): boolean {
+    return verifyPassword(plain, storedHash);
+  }
+
+  async issueTokenForUserId(userId: string): Promise<AuthTokenResponse> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException("User not found.");
+    }
+    return {
+      accessToken: await this.signToken(user),
+      user: this.toAuthUser(user),
+    };
   }
 
   private async signToken(user: {

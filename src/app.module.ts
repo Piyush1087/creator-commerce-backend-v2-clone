@@ -14,12 +14,17 @@ import { BrandSettingsModule } from "./features/brand-settings/brand-settings.mo
 import { BrandUceModule } from "./features/brand-uce/brand-uce.module";
 import { CollaborationModule } from "./features/collaboration/collaboration.module";
 import { CoPilotModule } from "./features/co-pilot/co-pilot.module";
+import { CreatorCoPilotModule } from "./features/creator-co-pilot/creator-co-pilot.module";
+import { CreatorCentreModule } from "./features/creator-centre/creator-centre.module";
 import { CreatorMarketplaceModule } from "./features/creator-marketplace/creator-marketplace.module";
+import { CreatorOnboardingModule } from "./features/creator-onboarding/creator-onboarding.module";
 import { CreatorPayoutsModule } from "./features/creator-payouts/creator-payouts.module";
 import { CreatorSettingsModule } from "./features/creator-settings/creator-settings.module";
 import { CreatorUceModule } from "./features/creator-uce/creator-uce.module";
+import { InstagramModule } from "./features/instagram/instagram.module";
 import { NotificationsModule } from "./features/notifications/notifications.module";
 import { PublicBrandModule } from "./features/public-brand/public-brand.module";
+import { PublicCreatorModule } from "./features/public-creator/public-creator.module";
 import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { S3Module } from "./shared/s3/s3.module";
@@ -52,10 +57,15 @@ import { S3Module } from "./shared/s3/s3.module";
     CollaborationModule,
     CoPilotModule,
     CreatorMarketplaceModule,
+    CreatorOnboardingModule,
+    CreatorCentreModule,
+    CreatorCoPilotModule,
+    InstagramModule,
     CreatorPayoutsModule,
     CreatorSettingsModule,
     CreatorUceModule,
     PublicBrandModule,
+    PublicCreatorModule,
   ],
   controllers: [AppController],
 })

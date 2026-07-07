@@ -119,6 +119,11 @@ export default $config({
       ...buildNotificationPostmarkTemplateEnv(process.env),
       PARALLEL_API_KEY: process.env.PARALLEL_API_KEY as string,
       GEMINI_API_KEY: process.env.GEMINI_API_KEY as string,
+      INSTAGRAM_API_ID: process.env.INSTAGRAM_API_ID as string,
+      INSTAGRAM_APP_SECRET: process.env.INSTAGRAM_APP_SECRET as string,
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID as string,
+      CREATOR_VERIFICATION_USE_REAL_OTP:
+        process.env.CREATOR_VERIFICATION_USE_REAL_OTP ?? "false",
       RAZORPAY_API_KEY_ID: process.env.RAZORPAY_API_KEY_ID as string,
       RAZORPAY_API_KEY_SECRET: process.env.RAZORPAY_API_KEY_SECRET as string,
       RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET as string,

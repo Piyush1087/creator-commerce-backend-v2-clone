@@ -86,6 +86,29 @@ For **dev RDS** seed via tunnel (optional — only if jumpbox is available):
 npm run db:seed:dev-creator
 ```
 
+## Migration: `20260704120000_command_center_phase_alignment`
+
+- Command-center workspace phases on `uce_campaign_collaborations` (`current_phase`, `action_required_by_role`, `production_deadline_at`, `creator_profile_id`, `content_format_type`).
+- Child registries: `uce_collaboration_logistics`, `uce_collaboration_content_drafts`, `uce_collaboration_live_telemetry`.
+- Panic-panel and workspace indexes (`idx_panic_panel_evaluation`, `idx_workspace_phase_router`).
+- Backfills phase columns from legacy UCE status/milestone fields.
+- Apply with `npm run db:migrate:deploy`.
+
+## Migration: `20260703140000_creator_deferred_features`
+
+- `users.google_subject_id`, `users.email_verified_at` (Google signup).
+- `creator_profiles.public_slug`, `creator_profiles.is_media_kit_public` (public media kit).
+- Apply with `npm run db:migrate:deploy`.
+
+## Migration: `20260703120000_creator_onboarding_and_centre`
+
+- Creator onboarding (`creator_onboarding_tracks`, `ip_validation_limits`, `email_otp_verifications`).
+- Creator centre (`user_profiles`, `historic_chat_threads`, `metric_post_pulses`).
+- Creator co-pilot tables (`creator_co_pilot_*`).
+- Re-adds `users.hashed_password` for creator signup.
+- Extends `creator_social_integrations` with global Instagram ID uniqueness.
+- Apply with `npm run db:migrate:deploy` (preferred when shadow DB replay fails).
+
 ## Migration: `20260604120000_collaboration_module`
 
 - Renames `UserRole` value `INFLUENCER` → `CREATOR`.

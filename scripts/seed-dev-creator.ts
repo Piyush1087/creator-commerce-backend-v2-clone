@@ -108,6 +108,28 @@ async function main() {
       throw new Error("Creator profile missing after seed");
     }
 
+    const existingUserProfile = await prisma.userProfile.findUnique({
+      where: { userId: user.id },
+    });
+    if (!existingUserProfile) {
+      await prisma.userProfile.create({
+        data: {
+          userId: user.id,
+          displayName: CREATOR_DISPLAY_NAME,
+          totalReachCache: profile.followerCount,
+          engagementRateCache: 6.2,
+          topLocationCache: "Mumbai, IN",
+          showTotalReach: true,
+          showEngagementRate: true,
+          showViewsMetric: true,
+          showRatesColumn: true,
+          shortFormVideoRate: 1250,
+          storyBundleRate: 450,
+        },
+      });
+      console.log("Created user profile (media kit layer)");
+    }
+
     const existingBank = await prisma.creatorBankDetails.findFirst({
       where: { creatorProfileId: profile.id, isPrimary: true },
     });

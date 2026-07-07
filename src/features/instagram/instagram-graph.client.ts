@@ -1,0 +1,215 @@
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { InstagramProfessionalAccountType } from "@prisma/client";
+
+export type InstagramMeProfile = {
+  userId: string;
+  username: string;
+  name: string | null;
+  accountType: InstagramProfessionalAccountType;
+  profilePictureUrl: string | null;
+  followersCount: number;
+  followsCount: number;
+  mediaCount: number;
+};
+
+@Injectable()
+export class InstagramGraphClient {
+  private readonly logger = new Logger(InstagramGraphClient.name);
+
+  async fetchMe(accessToken: string): Promise<InstagramMeProfile> {
+    const url = new URL("https://graph.instagram.com/v21.0/me");
+    url.searchParams.set(
+      "fields",
+      "username,user_id,name,account_type,profile_picture_url,followers_count,follows_count,media_count",
+    );
+    url.searchParams.set("access_token", accessToken);
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      const errText = await res.text();
+      this.logger.warn(`Instagram /me failed: ${errText.slice(0, 200)}`);
+      throw new BadRequestException("Failed to read Instagram profile.");
+    }
+
+    const data = (await res.json()) as {
+      user_id?: string;
+      username?: string;
+      name?: string;
+      account_type?: string;
+      profile_picture_url?: string;
+      followers_count?: number;
+      follows_count?: number;
+      media_count?: number;
+    };
+
+    if (!data.user_id || !data.username) {
+      throw new BadRequestException("Instagram profile response incomplete.");
+    }
+
+    return {
+      userId: data.user_id,
+      username: data.username,
+      name: data.name ?? null,
+      accountType: mapAccountType(data.account_type),
+      profilePictureUrl: data.profile_picture_url ?? null,
+      followersCount: data.followers_count ?? 0,
+      followsCount: data.follows_count ?? 0,
+      mediaCount: data.media_count ?? 0,
+    };
+  }
+
+  async fetchRecentMedia(
+    accessToken: string,
+    limit = 30,
+  ): Promise<
+    Array<{
+      id: string;
+      mediaType: string;
+      mediaUrl: string | null;
+      thumbnailUrl: string | null;
+      caption: string | null;
+      timestamp: string;
+    }>
+  > {
+    const url = new URL("https://graph.instagram.com/v21.0/me/media");
+    url.searchParams.set(
+      "fields",
+      "id,media_type,media_url,thumbnail_url,caption,timestamp",
+    );
+    url.searchParams.set("limit", String(limit));
+    url.searchParams.set("access_token", accessToken);
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      const errText = await res.text();
+      this.logger.warn(`Instagram media failed: ${errText.slice(0, 200)}`);
+      throw new BadRequestException("Failed to read Instagram media.");
+    }
+
+    const data = (await res.json()) as {
+      data?: Array<{
+        id: string;
+        media_type?: string;
+        media_url?: string;
+        thumbnail_url?: string;
+        caption?: string;
+        timestamp?: string;
+      }>;
+    };
+
+    return (data.data ?? []).map((row) => ({
+      id: row.id,
+      mediaType: row.media_type ?? "UNKNOWN",
+      mediaUrl: row.media_url ?? null,
+      thumbnailUrl: row.thumbnail_url ?? null,
+      caption: row.caption ?? null,
+      timestamp: row.timestamp ?? new Date().toISOString(),
+    }));
+  }
+
+  async fetchMediaInsights(
+    mediaId: string,
+    accessToken: string,
+    mediaType: string,
+  ): Promise<MediaInsightsResult> {
+    const metrics = pickInsightMetrics(mediaType);
+    const url = new URL(`https://graph.instagram.com/v21.0/${mediaId}/insights`);
+    url.searchParams.set("metric", metrics.join(","));
+    url.searchParams.set("access_token", accessToken);
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      const errText = await res.text();
+      if (isPreBusinessConversionInsightError(errText)) {
+        return {
+          ...ZERO_MEDIA_INSIGHTS,
+          unavailableReason: "pre_business_conversion",
+        };
+      }
+      if (isInvalidInsightMetricError(errText)) {
+        return {
+          ...ZERO_MEDIA_INSIGHTS,
+          unavailableReason: "invalid_metric",
+        };
+      }
+      this.logger.warn(
+        `Instagram insights failed mediaId=${mediaId}: ${errText.slice(0, 200)}`,
+      );
+      return { ...ZERO_MEDIA_INSIGHTS };
+    }
+
+    const data = (await res.json()) as {
+      data?: Array<{ name: string; values: Array<{ value: number }> }>;
+    };
+
+    const values: Record<string, number> = {};
+    for (const row of data.data ?? []) {
+      values[row.name] = row.values?.[0]?.value ?? 0;
+    }
+
+    return {
+      impressions: values.impressions ?? values.reach ?? 0,
+      reach: values.reach ?? 0,
+      saves: values.saved ?? values.saves ?? 0,
+      shares: values.shares ?? 0,
+      views: values.views ?? values.plays ?? values.video_views ?? 0,
+    };
+  }
+}
+
+function pickInsightMetrics(mediaType: string): string[] {
+  const type = mediaType.toUpperCase();
+  // Instagram Login API — `plays` is not valid; use `views` for video/reels.
+  if (type === "VIDEO" || type === "REEL") {
+    return ["reach", "saved", "shares", "views"];
+  }
+  if (type === "CAROUSEL_ALBUM") {
+    return ["reach", "saved", "shares", "likes"];
+  }
+  return ["reach", "saved", "shares"];
+}
+
+export type MediaInsightsResult = {
+  impressions: number;
+  reach: number;
+  saves: number;
+  shares: number;
+  views: number;
+  unavailableReason?: "pre_business_conversion" | "invalid_metric";
+};
+
+export const ZERO_MEDIA_INSIGHTS: MediaInsightsResult = {
+  impressions: 0,
+  reach: 0,
+  saves: 0,
+  shares: 0,
+  views: 0,
+};
+
+function isPreBusinessConversionInsightError(errText: string): boolean {
+  const lower = errText.toLowerCase();
+  return (
+    lower.includes("converted to a business account") ||
+    lower.includes("posted before the most recent time")
+  );
+}
+
+function isInvalidInsightMetricError(errText: string): boolean {
+  return errText.includes("metric[") && errText.includes("must be one of");
+}
+
+function mapAccountType(
+  raw: string | undefined,
+): InstagramProfessionalAccountType {
+  switch ((raw ?? "").toUpperCase()) {
+    case "PERSONAL":
+      return InstagramProfessionalAccountType.PERSONAL;
+    case "BUSINESS":
+      return InstagramProfessionalAccountType.BUSINESS;
+    case "CREATOR":
+    case "MEDIA_CREATOR":
+      return InstagramProfessionalAccountType.CREATOR;
+    default:
+      return InstagramProfessionalAccountType.UNKNOWN;
+  }
+}
