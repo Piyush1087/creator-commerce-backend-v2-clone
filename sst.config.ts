@@ -64,6 +64,18 @@ export default $config({
     const JWT_SECRET_PROD =
       process.env.JWT_SECRET_PROD ?? "ccs-jwt-prod-placeholder-change-me";
 
+    const defaultFrontendUrl =
+      $app.stage === "prod"
+        ? "https://dashboard.thecreatorshop.in"
+        : $app.stage === "dev"
+          ? "https://dashboard.dev.thecreatorshop.in"
+          : "http://localhost:5173";
+
+    const defaultCorsOrigins =
+      $app.stage === "prod"
+        ? "https://dashboard.thecreatorshop.in"
+        : "http://localhost:5173,https://dashboard.dev.thecreatorshop.in,https://dashboard.thecreatorshop.in";
+
     const { buildNotificationPostmarkTemplateEnv } = await import(
       "./src/features/notifications/config/notification-postmark-env"
     );
@@ -92,9 +104,7 @@ export default $config({
         $app.stage === "prod"
           ? "https://api.thecreatorshop.in"
           : "https://api.dev.thecreatorshop.in",
-      CORS_ORIGINS:
-        process.env.CORS_ORIGINS ||
-        "http://localhost:5173,https://dashboard.dev.thecreatorshop.in,https://dashboard.thecreatorshop.in",
+      CORS_ORIGINS: process.env.CORS_ORIGINS?.trim() || defaultCorsOrigins,
       JWT_SECRET: $app.stage === "prod" ? JWT_SECRET_PROD : JWT_SECRET_DEV,
       S3_BUCKET_NAME: filesBucket.name,
       AWS_REGION: process.env.AWS_REGION ?? "ap-south-1",
@@ -112,18 +122,34 @@ export default $config({
           ? "false"
           : (process.env.NOTIFICATIONS_DEV_EMIT_ENABLED ?? "false"),
       APP_FRONTEND_URL:
-        process.env.APP_FRONTEND_URL ??
-        ($app.stage === "prod"
-          ? "https://dashboard.thecreatorshop.in"
-          : "https://dashboard.dev.thecreatorshop.in"),
+        $app.stage === "prod"
+          ? (process.env.APP_FRONTEND_URL_PROD?.trim() || defaultFrontendUrl)
+          : $app.stage === "dev"
+            ? (process.env.APP_FRONTEND_URL_DEV?.trim() || defaultFrontendUrl)
+            : (process.env.APP_FRONTEND_URL?.trim() || defaultFrontendUrl),
       ...buildNotificationPostmarkTemplateEnv(process.env),
       PARALLEL_API_KEY: process.env.PARALLEL_API_KEY as string,
       GEMINI_API_KEY: process.env.GEMINI_API_KEY as string,
+      GEMINI_MODEL: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+      GEMINI_REQUEST_TIMEOUT_MS:
+        process.env.GEMINI_REQUEST_TIMEOUT_MS ?? "120000",
+      PARALLEL_EXTRACT_TIMEOUT_MS:
+        process.env.PARALLEL_EXTRACT_TIMEOUT_MS ?? "300000",
+      PARALLEL_SEARCH_TIMEOUT_MS:
+        process.env.PARALLEL_SEARCH_TIMEOUT_MS ?? "60000",
+      PARALLEL_SEARCH_MAX_CHARS_TOTAL:
+        process.env.PARALLEL_SEARCH_MAX_CHARS_TOTAL ?? "24000",
       INSTAGRAM_API_ID: process.env.INSTAGRAM_API_ID as string,
       INSTAGRAM_APP_SECRET: process.env.INSTAGRAM_APP_SECRET as string,
-      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID as string,
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? "",
       CREATOR_VERIFICATION_USE_REAL_OTP:
         process.env.CREATOR_VERIFICATION_USE_REAL_OTP ?? "false",
+      BRAND_VERIFICATION_USE_REAL_OTP:
+        process.env.BRAND_VERIFICATION_USE_REAL_OTP ?? "false",
+      BRAND_SCAN_LIMITS_ENABLED:
+        process.env.BRAND_SCAN_LIMITS_ENABLED ?? "true",
+      BRAND_SCAN_FORCE_REFRESH:
+        process.env.BRAND_SCAN_FORCE_REFRESH ?? "false",
       RAZORPAY_API_KEY_ID: process.env.RAZORPAY_API_KEY_ID as string,
       RAZORPAY_API_KEY_SECRET: process.env.RAZORPAY_API_KEY_SECRET as string,
       RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET as string,
