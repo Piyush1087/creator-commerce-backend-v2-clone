@@ -6,7 +6,7 @@
 
 export const PARALLEL_SURFACE_OBJECTIVE_IDENTITY = `Analyze the homepage and about page of the provided URLs.
 
-1. **Identity:** Find official Brand Name, Logo URL, and Social Media links (IG/TikTok).
+1. **Identity:** Find official Brand Name, Logo URL (or OG image / apple-touch icon if the logo is only linked that way), and Social Media links (IG/TikTok).
 2. **Description:** Extract the 'Tagline' and a 'Short Brand Description' (max 200 chars).
 3. **Visuals:** Identify the dominant hex color codes and primary font families used in headers.
 4. **Tone & Aesthetic:** Provide 3 tags for 'Tone of Voice' (e.g., Playful, Clinical) and 2 tags for 'Visual Aesthetic' (e.g., Clean, Bold).
@@ -18,12 +18,12 @@ export const PARALLEL_SURFACE_OBJECTIVE_INVENTORY = `Target shop / services list
 
 Crawl the main navigation menu and the primary shop/services page.
 
-1. **Inventory:** List the first 6 products or services found. For each, extract: **Name**, **Image URL**, and **Starting Price** (if visible on the list view).
+1. **Inventory:** List the first 6 products or services found. For each, extract: **Name**, **Image URL** (required whenever a product thumbnail/CDN image appears in the list markdown — copy the absolute https image URL), and **Starting Price** (if visible on the list view).
 2. **Categorization:** Identify 2-3 'Collections' or 'Service Categories' (e.g., 'Bestsellers', 'Skincare', 'Dental Surgery').
 3. **Active Offers:** Find the name and coupon code for any visible banner offers (e.g., '10% off', 'Free Trial').
 4. **Healthcare/Offline:** If addresses are visible in the footer, extract the City and Name of the locations.
 
-**Constraint:** Do not click into individual product pages. Extract only from the list view.`;
+**Constraint:** Do not click into individual product pages. Extract only from the list view. Prefer product image URLs from list cards when present; do not invent them.`;
 
 export const PARALLEL_SURFACE_OBJECTIVE_COMPETITORS = `Focus on homepage / root metadata and on-page competitor mentions.
 

@@ -1,8 +1,26 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 
 import { PrismaService } from "../../prisma/prisma.service";
+import { S3Service } from "../../shared/s3/s3.service";
+import { parseUploadImageBase64 } from "../../shared/s3/image-upload.util";
 import type { PatchBrandProfileDto } from "./dto/brand-profile.dto";
+import type { UploadBrandImageDto } from "./dto/brand-image-upload.dto";
+
+function domainSlug(domain: string): string {
+  const slug = domain
+    .replace(/^www\./, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase()
+    .slice(0, 80);
+  return slug.length > 0 ? slug : "brand";
+}
 
 function serializeDecimal(
   value: Prisma.Decimal | null | undefined,
@@ -15,7 +33,12 @@ function serializeDecimal(
 
 @Injectable()
 export class BrandProfileService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(BrandProfileService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly s3: S3Service,
+  ) {}
 
   async getById(brandProfileId: string) {
     const profile = await this.prisma.brandProfile.findUnique({
@@ -158,5 +181,53 @@ export class BrandProfileService {
     });
 
     return this.getById(brandProfileId);
+  }
+
+  async uploadLogo(brandProfileId: string, dto: UploadBrandImageDto) {
+    if (!this.s3.isConfigured()) {
+      throw new BadRequestException(
+        "S3 is not configured for image uploads in this environment.",
+      );
+    }
+    const profile = await this.prisma.brandProfile.findUnique({
+      where: { id: brandProfileId },
+      select: { id: true, domain: true },
+    });
+    if (!profile) {
+      throw new NotFoundException("Brand profile not found");
+    }
+
+    const { buffer, contentType } = parseUploadImageBase64(dto);
+    const slug = domainSlug(profile.domain);
+    const directory = `brand-onboarding/v2/${slug}/${brandProfileId}/logo`;
+    const uploaded = await this.s3.uploadImageFromBuffer(
+      buffer,
+      directory,
+      this.s3.mirrorFilename(`upload-logo-${brandProfileId}`, contentType),
+      contentType,
+    );
+    const publicUrl = this.s3.getPublicUrl(uploaded.key);
+
+    const prevEdited =
+      ((
+        await this.prisma.brandProfile.findUnique({
+          where: { id: brandProfileId },
+          select: { isUserEdited: true },
+        })
+      )?.isUserEdited as Record<string, unknown> | null) ?? {};
+
+    await this.prisma.brandProfile.update({
+      where: { id: brandProfileId },
+      data: {
+        logoUrl: publicUrl,
+        isUserEdited: { ...prevEdited, logoUrl: true } as Prisma.InputJsonValue,
+      },
+    });
+
+    this.logger.log(
+      `brand-logo.upload_ok brandProfileId=${brandProfileId} bytes=${buffer.length} contentType=${contentType} key=${uploaded.key} publicUrl=${publicUrl}`,
+    );
+
+    return { imageUrl: publicUrl };
   }
 }

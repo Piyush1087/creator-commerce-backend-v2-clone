@@ -14,6 +14,8 @@ import { BrandController } from "./brand.controller";
 import { BrandOnboardingController } from "./brand-onboarding.controller";
 import { BrandOnboardingService } from "./brand-onboarding.service";
 import { BrandProfileService } from "./brand-profile.service";
+import { BrandOfferingsService } from "./brand-offerings.service";
+import { BrandCompetitorsService } from "./brand-competitors.service";
 import { GeminiJsonClient } from "./integrations/gemini/gemini-json.client";
 import { ParallelExtractClient } from "./integrations/parallel/parallel-extract.client";
 import { ParallelSearchClient } from "./integrations/parallel/parallel-search.client";
@@ -24,6 +26,7 @@ import { BRAND_SURFACE_SCAN_RUNNER } from "./surface-scan/brand-surface-scan.run
 import { BrandScanAssetMirrorService } from "./surface-scan/brand-scan-asset-mirror.service";
 import { HttpBrandSurfaceScanRunner } from "./surface-scan/http-brand-surface-scan.runner";
 import { UnconfiguredBrandSurfaceScanRunner } from "./surface-scan/unconfigured-brand-surface-scan.runner";
+import { SurfaceScanProgressStore } from "./surface-scan/surface-scan-progress.store";
 import { BrandVerificationService } from "./verification/brand-verification.service";
 
 @Module({
@@ -42,7 +45,10 @@ import { BrandVerificationService } from "./verification/brand-verification.serv
     BrandOnboardingPurgeScheduler,
     BrandOnboardingService,
     BrandProfileService,
+    BrandOfferingsService,
+    BrandCompetitorsService,
     BrandVerificationService,
+    SurfaceScanProgressStore,
     ParallelExtractClient,
     ParallelSearchClient,
     GeminiJsonClient,

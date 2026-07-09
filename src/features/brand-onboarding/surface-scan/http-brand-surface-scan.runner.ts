@@ -24,17 +24,27 @@ import {
   PARALLEL_SURFACE_OBJECTIVE_IDENTITY,
   PARALLEL_SURFACE_OBJECTIVE_INVENTORY,
 } from "./surface-scan-parallel-objectives";
+import { enrichProductsFromShopifyJson } from "./shopify-products-json.enricher";
+import { enrichFromMetaHtml } from "./meta-html.enricher";
 import { buildCompetitorParallelSearch } from "./competitor-parallel-search";
 import {
   buildCompetitorContextUrls,
   buildIdentitySurfaceUrls,
   buildInventorySurfaceUrls,
 } from "./surface-scan-urls";
-import { BrandScanAssetMirrorService } from "./brand-scan-asset-mirror.service";
+import {
+  BrandScanAssetMirrorService,
+  extractImageUrlsFromMarkdown,
+} from "./brand-scan-asset-mirror.service";
+import {
+  formatMarkdownImageProbeLog,
+  probeMarkdownForImages,
+} from "./surface-scan-markdown-image-probe";
 import {
   Step2SurfaceScanGeminiSchema,
   type Step2SurfaceScanGeminiPayload,
 } from "./surface-scan-gemini.schema";
+import { SurfaceScanProgressStore } from "./surface-scan-progress.store";
 
 function tryParseStartingPriceLabel(
   label: string | null | undefined,
@@ -63,9 +73,29 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
     private readonly scanAssets: BrandScanAssetMirrorService,
     private readonly config: ConfigService,
     private readonly brandCentreColdStart: BrandCentreColdStartService,
+    private readonly scanProgress: SurfaceScanProgressStore,
   ) {}
 
   async run(args: {
+    leadId: string;
+    force?: boolean;
+    clientIp: string;
+    authenticatedUserId?: string;
+  }): Promise<SurfaceScanRunResult> {
+    this.scanProgress.begin(args.leadId);
+    try {
+      const result = await this.runInner(args);
+      this.scanProgress.complete(args.leadId);
+      return result;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Surface scan failed";
+      // Gate exceptions still surface as HTTP 403; progress should show failure too.
+      this.scanProgress.fail(args.leadId, message);
+      throw err;
+    }
+  }
+
+  private async runInner(args: {
     leadId: string;
     force?: boolean;
     clientIp: string;
@@ -86,16 +116,12 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
     }
     const domain = gated.hostname;
 
-    await this.scanGate.assertSurfaceScanAllowed({
-      domain,
-      normalizedUrl: gated.normalizedUrl,
-      clientIp: args.clientIp,
-      authenticatedUserId: args.authenticatedUserId,
-    });
-
     const forceRefresh =
       args.force === true ||
       this.config.get<string>("BRAND_SCAN_FORCE_REFRESH")?.trim() === "true";
+    // Serve completed profiles before the vendor gate so a duplicate POST
+    // (e.g. React StrictMode) cannot race into a limit 403 after the first
+    // scan succeeds and then bounce the UI back to landing.
     if (!forceRefresh) {
       const cached = await this.prisma.brandProfile.findUnique({
         where: { domain },
@@ -113,7 +139,7 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
       });
       if (cached?.scanStatus === ScanStatus.SURFACE_COMPLETE) {
         this.logger.log(
-          `surface-scan.cache_hit domain=${domain} brandProfileId=${cached.id}`,
+          `surface-scan.cache_hit domain=${domain} brandProfileId=${cached.id} note=skipping_vendor_and_asset_remirror`,
         );
         try {
           await this.brandCentreColdStart.seedFromSurfaceScan(cached.id);
@@ -136,6 +162,19 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
         };
       }
     }
+
+    await this.scanGate.assertSurfaceScanAllowed({
+      domain,
+      normalizedUrl: gated.normalizedUrl,
+      clientIp: args.clientIp,
+      authenticatedUserId: args.authenticatedUserId,
+    });
+
+    this.scanProgress.setPhase(
+      args.leadId,
+      "signals",
+      "Extracting public pages (Parallel)",
+    );
 
     const identityUrls = buildIdentitySurfaceUrls(lead.normalizedUrl);
     const inventoryUrls = buildInventorySurfaceUrls(lead.normalizedUrl);
@@ -203,6 +242,21 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
       competitorSearchMd,
     );
 
+    // Short rollup for local/manual testing — confirms Parallel returned payloads
+    // without dumping page content.
+    const identityRows = identityEx.results?.length ?? 0;
+    const inventoryRows = inventoryEx.results?.length ?? 0;
+    const competitorRows = competitorEx.results?.length ?? 0;
+    const searchRows = competitorSearchRaw?.results?.length ?? 0;
+    const parallelGaveSomething =
+      identityMd.trim().length > 0 ||
+      inventoryMd.trim().length > 0 ||
+      competitorMd.trim().length > 0 ||
+      competitorSearchMd.trim().length > 0;
+    this.logger.log(
+      `surface-scan.parallel_received domain=${domain} ok=${parallelGaveSomething} identity={rows:${identityRows},chars:${identityMd.length}} inventory={rows:${inventoryRows},chars:${inventoryMd.length}} competitor_extract={rows:${competitorRows},chars:${competitorMd.length}} parallel_search={enabled:${competitorSearchEnabled},rows:${searchRows},chars:${competitorSearchMd.length}}`,
+    );
+
     const markdown = [
       "# BUNDLE: IDENTITY_AND_ABOUT\n",
       identityMd,
@@ -224,6 +278,32 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
       `surface-scan.bundles domain=${domain} totalChars=${markdown.length} identityChars=${identityMd.length} inventoryChars=${inventoryMd.length} competitorBundleChars=${competitorMd.length} parallelSearchChars=${competitorSearchMd.length} parallelSearchRows=${competitorSearchRaw?.results?.length ?? 0}`,
     );
 
+    const identityImageUrls = extractImageUrlsFromMarkdown(identityMd);
+    const inventoryImageUrls = extractImageUrlsFromMarkdown(inventoryMd);
+    this.logger.log(
+      `surface-scan.images_in_markdown domain=${domain} identityCount=${identityImageUrls.length} inventoryCount=${inventoryImageUrls.length} identitySample=${JSON.stringify(identityImageUrls.slice(0, 8))} inventorySample=${JSON.stringify(inventoryImageUrls.slice(0, 12))}`,
+    );
+
+    // One-shot quality probe: CDN / JSON-LD / loose URL signals vs our strict regex.
+    this.logger.log(
+      formatMarkdownImageProbeLog(
+        domain,
+        probeMarkdownForImages("identity", identityMd),
+      ),
+    );
+    this.logger.log(
+      formatMarkdownImageProbeLog(
+        domain,
+        probeMarkdownForImages("inventory", inventoryMd),
+      ),
+    );
+
+    this.scanProgress.setPhase(
+      args.leadId,
+      "products",
+      "Synthesizing products & positioning (Gemini)",
+    );
+
     const systemInstruction = loadPromptMarkdown(
       "surface-scan-synthesis.prompt.md",
     );
@@ -235,6 +315,10 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
       markdown,
     ].join("\n");
 
+    this.logger.log(
+      `surface-scan.gemini_input domain=${domain} userTextChars=${userText.length} systemChars=${systemInstruction.length} identityImageUrls=${identityImageUrls.length} inventoryImageUrls=${inventoryImageUrls.length}`,
+    );
+
     const raw = await this.gemini.generateJson({ systemInstruction, userText });
     const parsed = Step2SurfaceScanGeminiSchema.safeParse(raw);
     if (!parsed.success) {
@@ -244,10 +328,67 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
       throw new Error("Gemini output failed schema validation");
     }
 
-    const payload = await this.scanAssets.mirrorPayload(parsed.data, {
+    this.logGeminiImageQuality(domain, parsed.data, {
+      identityImageUrls,
+      inventoryImageUrls,
+    });
+
+    const shopify = await enrichProductsFromShopifyJson(domain, parsed.data);
+    let workingPayload = shopify.payload;
+    if (shopify.result.filled > 0) {
+      this.logger.log(
+        `surface-scan.shopify_enrich_applied domain=${domain} filled=${shopify.result.filled}/${workingPayload.products.length}`,
+      );
+      this.logGeminiImageQuality(domain, workingPayload, {
+        identityImageUrls,
+        inventoryImageUrls,
+      });
+    }
+
+    const needsMeta =
+      !workingPayload.brand.logoUrl?.trim() ||
+      workingPayload.products.some((p) => !p.imageUrl?.trim());
+    if (needsMeta) {
+      const meta = await enrichFromMetaHtml(domain, workingPayload);
+      workingPayload = meta.payload;
+      if (
+        meta.result.logoStatus === "filled" ||
+        meta.result.productsFilled > 0
+      ) {
+        this.logger.log(
+          `surface-scan.meta_enrich_applied domain=${domain} logoStatus=${meta.result.logoStatus} productsFilled=${meta.result.productsFilled}/${workingPayload.products.length}`,
+        );
+        this.logGeminiImageQuality(domain, workingPayload, {
+          identityImageUrls,
+          inventoryImageUrls,
+        });
+      }
+    }
+
+    this.scanProgress.setPhase(
+      args.leadId,
+      "audience",
+      "Mirroring brand visuals & audience fields",
+    );
+
+    this.logger.log(
+      `surface-scan.asset_mirror_begin domain=${domain} brandLogo=${Boolean(workingPayload.brand.logoUrl)} products=${workingPayload.products.length} competitors=${workingPayload.competitors.length}`,
+    );
+    const payload = await this.scanAssets.mirrorPayload(workingPayload, {
       domain,
       leadId: lead.id,
+      identityMarkdown: identityMd,
+      inventoryMarkdown: inventoryMd,
     });
+    this.logger.log(
+      `surface-scan.asset_mirror_done domain=${domain} brandLogo=${payload.brand.logoUrl ?? "(none)"} productImages=${payload.products.filter((p) => Boolean(p.imageUrl)).length}/${payload.products.length} competitorLogos=${payload.competitors.filter((c) => Boolean(c.logoUrl)).length}/${payload.competitors.length}`,
+    );
+
+    this.scanProgress.setPhase(
+      args.leadId,
+      "competitors",
+      "Persisting competitors & catalogue",
+    );
 
     // Gemini sometimes returns null-ish location fields; avoid failing persistence on bad rows.
     const normalizedLocations = payload.locations
@@ -300,6 +441,12 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
 
     const surfaceOffersJson: Prisma.InputJsonValue =
       payload.activeOffers as unknown as Prisma.InputJsonValue;
+
+    this.scanProgress.setPhase(
+      args.leadId,
+      "persisting",
+      "Saving BrandProfile to database",
+    );
 
     const profileId = await this.prisma.$transaction(async (tx) => {
       const profile = await tx.brandProfile.upsert({
@@ -491,6 +638,58 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
     this.logger.log(
       `surface-scan.parallel_search domain=${domain} search_id=${search.search_id} session_id=${search.session_id} resultRows=${rows.length} markdownChars=${markdownBody.length} rows=[${rowSummaries.join(" | ")}]${warnSnippet ? ` warnings=${warnSnippet}` : ""}`,
     );
+  }
+
+  private logGeminiImageQuality(
+    domain: string,
+    payload: Step2SurfaceScanGeminiPayload,
+    markdownImages: {
+      identityImageUrls: string[];
+      inventoryImageUrls: string[];
+    },
+  ): void {
+    const productsWithImage = payload.products.filter((p) =>
+      Boolean(p.imageUrl?.trim()),
+    ).length;
+    const competitorsWithLogo = payload.competitors.filter((c) =>
+      Boolean(c.logoUrl?.trim()),
+    ).length;
+    const productRows = payload.products.map((p, index) => ({
+      i: index + 1,
+      name: (p.name ?? "").slice(0, 60),
+      imageUrl: p.imageUrl ?? null,
+    }));
+    const competitorRows = payload.competitors.map((c, index) => ({
+      i: index + 1,
+      name: (c.name ?? "").slice(0, 60),
+      websiteUrl: c.websiteUrl,
+      logoUrl: c.logoUrl ?? null,
+    }));
+
+    this.logger.log(
+      `surface-scan.gemini_images domain=${domain} brandLogo=${payload.brand.logoUrl ?? "(none)"} productsWithImage=${productsWithImage}/${payload.products.length} competitorsWithLogo=${competitorsWithLogo}/${payload.competitors.length} markdownIdentityImages=${markdownImages.identityImageUrls.length} markdownInventoryImages=${markdownImages.inventoryImageUrls.length}`,
+    );
+    this.logger.log(
+      `surface-scan.gemini_images_detail domain=${domain} brandLogoUrl=${payload.brand.logoUrl ?? "(none)"} products=${JSON.stringify(productRows)} competitors=${JSON.stringify(competitorRows)}`,
+    );
+
+    if (
+      markdownImages.inventoryImageUrls.length > 0 &&
+      productsWithImage === 0 &&
+      payload.products.length > 0
+    ) {
+      this.logger.warn(
+        `surface-scan.gemini_image_gap domain=${domain} inventoryHad=${markdownImages.inventoryImageUrls.length} imageUrls but gemini returned 0 product imageUrls — check synthesis prompt / model grounding`,
+      );
+    }
+    if (
+      markdownImages.identityImageUrls.length > 0 &&
+      !payload.brand.logoUrl?.trim()
+    ) {
+      this.logger.warn(
+        `surface-scan.gemini_logo_gap domain=${domain} identityHad=${markdownImages.identityImageUrls.length} imageUrls but gemini returned null brand.logoUrl`,
+      );
+    }
   }
 
   private logGeminiSurfaceSummary(

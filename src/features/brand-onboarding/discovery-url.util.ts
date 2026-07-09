@@ -1,13 +1,30 @@
-const BLOCKED_HOST_SUBSTRINGS = [
-  "facebook.",
+const BLOCKED_APEX_HOSTS = [
+  "facebook.com",
   "fb.com",
-  "instagram.",
-  "twitter.",
+  "instagram.com",
+  "twitter.com",
   "x.com",
-  "tiktok.",
+  "tiktok.com",
   "youtube.com",
   "youtu.be",
-];
+  "linkedin.com",
+] as const;
+
+/** Marketplace brand labels present as a hostname segment (amazon.in, flipkart.com, …). */
+const BLOCKED_MARKETPLACE_LABELS = [
+  "amazon",
+  "flipkart",
+  "myntra",
+  "meesho",
+  "ajio",
+  "snapdeal",
+  "nykaa",
+  "ebay",
+  "walmart",
+  "aliexpress",
+  "alibaba",
+  "shopee",
+] as const;
 
 const SUSPICIOUS_TLDS = new Set([
   "zip",
@@ -72,7 +89,13 @@ function isPrivateOrReservedHost(hostname: string): boolean {
 
 function hasBlockedSocialMarketplace(hostname: string): boolean {
   const h = hostname.toLowerCase();
-  return BLOCKED_HOST_SUBSTRINGS.some((frag) => h.includes(frag));
+  if (
+    BLOCKED_APEX_HOSTS.some((apex) => h === apex || h.endsWith(`.${apex}`))
+  ) {
+    return true;
+  }
+  const labels = h.split(".");
+  return BLOCKED_MARKETPLACE_LABELS.some((label) => labels.includes(label));
 }
 
 function hasSuspiciousPublicSuffix(hostname: string): boolean {
