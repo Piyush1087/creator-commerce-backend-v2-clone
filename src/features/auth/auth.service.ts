@@ -163,6 +163,7 @@ export class AuthService {
           },
         });
       }
+      await this.markDiscoverySignupCompleted(profile.domain);
       return {
         accessToken: await this.signToken(existingUser),
         user: this.toAuthUser(existingUser),
@@ -212,6 +213,8 @@ export class AuthService {
 
       return { organization, user };
     });
+
+    await this.markDiscoverySignupCompleted(profile.domain);
 
     return {
       accessToken: await this.signToken(result.user),
@@ -277,6 +280,19 @@ export class AuthService {
       role: user.role,
       organizationId: user.organizationId,
     };
+  }
+
+  /** Marks Step 1 discovery cache rows complete after brand signup. */
+  private async markDiscoverySignupCompleted(domain: string): Promise<void> {
+    const host = domain.trim().toLowerCase().replace(/^www\./, "");
+    if (!host) {
+      return;
+    }
+    const variants = [`https://${host}`, `https://www.${host}`];
+    await this.prisma.discoveryLead.updateMany({
+      where: { normalizedUrl: { in: variants } },
+      data: { signupCompleted: true },
+    });
   }
 
   private async findClaimedOrganizationContact(

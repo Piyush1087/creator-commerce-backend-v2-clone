@@ -10,10 +10,6 @@ export class BrandOnboardingPurgeService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Deletes unverified brand drafts with no organization older than the purge horizon.
-   * Children (offerings, competitors, locations) cascade via Prisma relations.
-   */
   async purgeStaleUnverifiedBrandProfiles(): Promise<{ deletedProfileCount: number }> {
     const cutoff = subDays(new Date(), BRAND_UNVERIFIED_PURGE_AFTER_DAYS);
 
@@ -40,5 +36,28 @@ export class BrandOnboardingPurgeService {
       `purge: deleted ${result.count} unverified profiles older than ${BRAND_UNVERIFIED_PURGE_AFTER_DAYS}d`,
     );
     return { deletedProfileCount: result.count };
+  }
+
+  /**
+   * Deletes expired Step 1 discovery cache rows (unsigned, past expires_at).
+   * Waitlist children cascade via Prisma relations.
+   */
+  async purgeExpiredDiscoveryLeads(): Promise<{ deletedLeadCount: number }> {
+    const now = new Date();
+    const result = await this.prisma.discoveryLead.deleteMany({
+      where: {
+        signupCompleted: false,
+        expiresAt: { lt: now },
+      },
+    });
+
+    if (result.count > 0) {
+      this.logger.log(
+        `purge: deleted ${result.count} expired discovery leads (unsigned, past expires_at)`,
+      );
+    } else {
+      this.logger.log("purge: no expired discovery leads");
+    }
+    return { deletedLeadCount: result.count };
   }
 }

@@ -626,6 +626,12 @@ model DiscoveryLead {
   industryNiche String?             @map("industry_niche")
   securityScore Int                 @default(0) @map("security_score")
   metaHandshake Boolean             @default(false) @map("meta_handshake")
+  /// Step 1 session cache payload (AI classification output — populated when Neika/Invuet pipeline ships).
+  temporaryPayload       Json?     @map("temporary_payload")
+  /// TTL for unverified Step 1 cache rows (change doc: 7-day horizon).
+  expiresAt              DateTime? @map("expires_at")
+  signupCompleted        Boolean   @default(false) @map("signup_completed")
+  classificationEvidence String?   @map("classification_evidence") @db.VarChar(250)
   userId        String?             @map("user_id")
   user          User?               @relation(fields: [userId], references: [id])
   createdAt     DateTime            @default(now()) @map("created_at")
@@ -633,6 +639,7 @@ model DiscoveryLead {
 
   @@index([createdAt])
   @@index([userId])
+  @@index([normalizedUrl, signupCompleted, expiresAt], map: "idx_discovery_cache_lookup")
   @@map("discovery_leads")
 }
 

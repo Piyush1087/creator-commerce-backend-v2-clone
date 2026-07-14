@@ -4,8 +4,8 @@ Scope: **surface scan funnel** landing → scan → DNA → catalogue → compet
 
 Prerequisites:
 
-- Backend `STAGE=local` (limits off) or `STAGE=dev` (limits on).
-- Postgres running; migrations applied.
+- Backend `STAGE=local` with `BRAND_SCAN_LIMITS_ENABLED=false` (or unset) for open scanning; set `BRAND_SCAN_LIMITS_ENABLED=true` to test limits locally.
+- Postgres running; migrations applied (`npx prisma migrate deploy`).
 - Frontend `VITE_API_URL` points at backend.
 - Optional: `PARALLEL_API_KEY` + `GEMINI_API_KEY` for real scans; without them, cached/unconfigured paths still test gates.
 
@@ -14,8 +14,8 @@ Prerequisites:
 
 | #   | Setup                                         | Action                                                                                 | Expected                                                  |
 | --- | --------------------------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| A1  | `STAGE=local`                                 | Run 6+ surface scans (force refresh) same domain                                       | All allowed (no `verification_required`)                  |
-| A2  | `STAGE=dev`, `BRAND_SCAN_LIMITS_ENABLED=true` | 6 vendor scans same domain in 7d                                                       | 6th blocked: `verification_required` modal → verify route |
+| A1  | `STAGE=local`, `BRAND_SCAN_LIMITS_ENABLED=false` (or unset) | Run 6+ surface scans (force refresh) same domain                                       | All allowed (no `verification_required`)                  |
+| A2  | `BRAND_SCAN_LIMITS_ENABLED=true` (any STAGE)                | 6 vendor scans same domain in 7d                                                       | 6th blocked: `verification_required` modal → verify route |
 | A3  | A2                                            | Repeat from new browser profile, same IP, different domains until 6 vendor scans total | IP limit: same modal/message                              |
 
 

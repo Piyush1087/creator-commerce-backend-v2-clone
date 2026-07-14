@@ -11,8 +11,8 @@ export const BRAND_UNVERIFIED_PURGE_AFTER_DAYS = 7;
 export const BRAND_RESUME_PROFILE_MAX_AGE_DAYS = 7;
 
 /**
- * Scan limits apply on dev and prod only. Local (`STAGE=local`) skips counters.
- * Override with `BRAND_SCAN_LIMITS_ENABLED=true|false` if needed.
+ * Scan limits: set `BRAND_SCAN_LIMITS_ENABLED=true|false` to force on/off.
+ * When unset: `STAGE=local` skips counters; dev/prod enable them (SST mirrors this).
  */
 export type BrandScanLimitReason = "DOMAIN_LIMIT" | "IP_LIMIT";
 

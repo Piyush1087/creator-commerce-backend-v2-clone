@@ -147,7 +147,8 @@ export default $config({
       BRAND_VERIFICATION_USE_REAL_OTP:
         process.env.BRAND_VERIFICATION_USE_REAL_OTP ?? "false",
       BRAND_SCAN_LIMITS_ENABLED:
-        process.env.BRAND_SCAN_LIMITS_ENABLED ?? "true",
+        process.env.BRAND_SCAN_LIMITS_ENABLED ??
+        ($app.stage === "local" ? "false" : "true"),
       BRAND_SCAN_FORCE_REFRESH:
         process.env.BRAND_SCAN_FORCE_REFRESH ?? "false",
       RAZORPAY_API_KEY_ID: process.env.RAZORPAY_API_KEY_ID as string,

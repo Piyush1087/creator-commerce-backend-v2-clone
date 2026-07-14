@@ -10,8 +10,10 @@ import {
   MarketIntelRejectionType,
   Prisma,
 } from "@prisma/client";
+import { addDays } from "date-fns";
 
 import { PrismaService } from "../../prisma/prisma.service";
+import { BRAND_RESUME_PROFILE_MAX_AGE_DAYS } from "./brand-scan-gate.config";
 import { BrandScanGateService } from "./brand-scan-gate.service";
 import type { DiscoverWaitlistRequestDto } from "./dto/discover-waitlist-request.dto";
 import { stubClassifyIndustry } from "./discovery-industry.stub";
@@ -36,6 +38,7 @@ export type DiscoverValidateSuccess = {
 export type DiscoverValidateWaitlist = {
   outcome: "waitlist";
   logId: string;
+  leadId: string;
   normalizedUrl: string;
   domain: string;
   industry: IndustryVertical;
@@ -237,10 +240,19 @@ export class BrandOnboardingService {
     });
 
     if (classified.bucket === "supported") {
-      const lead = await this.ensureDiscoveryLead({
+      const lead = await this.upsertDiscoveryLeadSession({
         rawUrl: rawUrl.trim(),
         normalizedUrl: gated.normalizedUrl,
         industry: classified.industry,
+        isSupported: true,
+        status: DiscoveryLeadStatus.IDENTIFIED,
+        temporaryPayload: {
+          bucket: "supported",
+          industry: classified.industry,
+          classifier: "stub_or_gemini",
+          pipelineVersion: "step1_v2.1_placeholder",
+        },
+        classificationEvidence: `Supported vertical: ${classified.industry}`,
       });
       return {
         outcome: "success",
@@ -256,9 +268,24 @@ export class BrandOnboardingService {
         industry: classified.industry,
         rejectionType: MarketIntelRejectionType.UNSUPPORTED_NICHE,
       });
+      const lead = await this.upsertDiscoveryLeadSession({
+        rawUrl: rawUrl.trim(),
+        normalizedUrl: gated.normalizedUrl,
+        industry: classified.industry,
+        isSupported: false,
+        status: DiscoveryLeadStatus.REJECTED,
+        temporaryPayload: {
+          bucket: "regret",
+          industry: classified.industry,
+          marketIntelligenceLogId: log.id,
+          pipelineVersion: "step1_v2.1_placeholder",
+        },
+        classificationEvidence: `Regret vertical: ${classified.industry}`,
+      });
       return {
         outcome: "waitlist",
         logId: log.id,
+        leadId: lead.id,
         normalizedUrl: gated.normalizedUrl,
         domain: gated.hostname,
         industry: classified.industry,
@@ -386,6 +413,13 @@ export class BrandOnboardingService {
             code: "BLOCKED_TLD",
             message: "This domain type is not accepted for automated scans.",
           };
+        case "BLOCKED_RESTRICTED_SEGMENT":
+          return {
+            outcome: "blocked",
+            code: "BLOCKED_TLD",
+            message:
+              "Access Denied: This target website belongs to a restricted segment, or is not supported by the platform.",
+          };
         default:
           return {
             outcome: "blocked",
@@ -449,11 +483,55 @@ export class BrandOnboardingService {
         return MarketIntelRejectionType.SECURITY_RISK;
       case "BLOCKED_TLD":
         return MarketIntelRejectionType.BLOCKED_PLATFORM;
+      case "BLOCKED_RESTRICTED_SEGMENT":
+        return MarketIntelRejectionType.SECURITY_RISK;
       default:
         return MarketIntelRejectionType.GARBAGE_ENTRY;
     }
   }
 
+  private discoveryLeadExpiresAt(): Date {
+    return addDays(new Date(), BRAND_RESUME_PROFILE_MAX_AGE_DAYS);
+  }
+
+  private async upsertDiscoveryLeadSession(args: {
+    rawUrl: string;
+    normalizedUrl: string;
+    industry: IndustryVertical;
+    isSupported: boolean;
+    status: DiscoveryLeadStatus;
+    temporaryPayload: Prisma.InputJsonValue;
+    classificationEvidence: string;
+  }) {
+    const expiresAt = this.discoveryLeadExpiresAt();
+    const evidence = args.classificationEvidence.slice(0, 250);
+    return this.prisma.discoveryLead.upsert({
+      where: { normalizedUrl: args.normalizedUrl },
+      create: {
+        rawUrl: args.rawUrl,
+        normalizedUrl: args.normalizedUrl,
+        status: args.status,
+        isSupported: args.isSupported,
+        industry: args.industry,
+        securityScore: 0,
+        temporaryPayload: args.temporaryPayload,
+        expiresAt,
+        signupCompleted: false,
+        classificationEvidence: evidence,
+      },
+      update: {
+        rawUrl: args.rawUrl,
+        status: args.status,
+        isSupported: args.isSupported,
+        industry: args.industry,
+        temporaryPayload: args.temporaryPayload,
+        expiresAt,
+        classificationEvidence: evidence,
+      },
+    });
+  }
+
+  /** @deprecated Use upsertDiscoveryLeadSession — kept for internal resume paths. */
   private async ensureDiscoveryLead(args: {
     rawUrl: string;
     normalizedUrl: string;
@@ -463,7 +541,15 @@ export class BrandOnboardingService {
       where: { normalizedUrl: args.normalizedUrl },
     });
     if (existing) {
-      return existing;
+      return this.prisma.discoveryLead.update({
+        where: { id: existing.id },
+        data: {
+          industry: args.industry,
+          isSupported: true,
+          status: DiscoveryLeadStatus.IDENTIFIED,
+          expiresAt: this.discoveryLeadExpiresAt(),
+        },
+      });
     }
     try {
       return await this.prisma.discoveryLead.create({
@@ -474,6 +560,8 @@ export class BrandOnboardingService {
           isSupported: true,
           industry: args.industry,
           securityScore: 0,
+          expiresAt: this.discoveryLeadExpiresAt(),
+          signupCompleted: false,
         },
       });
     } catch (e) {

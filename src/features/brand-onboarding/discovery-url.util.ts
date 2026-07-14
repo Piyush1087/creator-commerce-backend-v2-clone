@@ -38,11 +38,14 @@ const SUSPICIOUS_TLDS = new Set([
   "ml",
 ]);
 
+const HARD_BLOCKED_SUFFIXES = [".gov", ".mil", ".edu"] as const;
+
 export type UrlGateFailureReason =
   | "INVALID_SYNTAX"
   | "BLOCKED_SOCIAL_HOST"
   | "BLOCKED_PRIVATE_HOST"
-  | "BLOCKED_TLD";
+  | "BLOCKED_TLD"
+  | "BLOCKED_RESTRICTED_SEGMENT";
 
 export type UrlGateResult =
   | { ok: true; normalizedUrl: string; hostname: string }
@@ -104,6 +107,13 @@ function hasSuspiciousPublicSuffix(hostname: string): boolean {
   return SUSPICIOUS_TLDS.has(tld);
 }
 
+function hasRestrictedSegmentSuffix(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return HARD_BLOCKED_SUFFIXES.some(
+    (suffix) => h === suffix.slice(1) || h.endsWith(suffix),
+  );
+}
+
 /**
  * Lightweight syntax gate aligned with Step 1 tri-layer validation. This does
  * not perform outbound HTTP fetches (SSRF-safe by construction here).
@@ -140,6 +150,9 @@ export function gateAndNormalizeBrandUrl(raw: string): UrlGateResult {
   }
   if (isPrivateOrReservedHost(hostname)) {
     return { ok: false, reason: "BLOCKED_PRIVATE_HOST", hostname };
+  }
+  if (hasRestrictedSegmentSuffix(hostname)) {
+    return { ok: false, reason: "BLOCKED_RESTRICTED_SEGMENT", hostname };
   }
   if (hasSuspiciousPublicSuffix(hostname)) {
     return { ok: false, reason: "BLOCKED_TLD", hostname };
