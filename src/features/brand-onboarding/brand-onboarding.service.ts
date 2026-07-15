@@ -244,15 +244,18 @@ export class BrandOnboardingService {
         rawUrl: rawUrl.trim(),
         normalizedUrl: gated.normalizedUrl,
         industry: classified.industry,
+        subIndustry: classified.subIndustry ?? null,
         isSupported: true,
         status: DiscoveryLeadStatus.IDENTIFIED,
         temporaryPayload: {
           bucket: "supported",
           industry: classified.industry,
-          classifier: "stub_or_gemini",
-          pipelineVersion: "step1_v2.1_placeholder",
+          subIndustry: classified.subIndustry ?? null,
+          confidence: classified.confidence ?? null,
+          classifier: "stage0_gatekeeper",
+          pipelineVersion: "stage0_gatekeeper_v1",
         },
-        classificationEvidence: `Supported vertical: ${classified.industry}`,
+        classificationEvidence: `Supported vertical: ${classified.industry}${classified.subIndustry ? ` / ${classified.subIndustry}` : ""}`,
       });
       return {
         outcome: "success",
@@ -272,13 +275,17 @@ export class BrandOnboardingService {
         rawUrl: rawUrl.trim(),
         normalizedUrl: gated.normalizedUrl,
         industry: classified.industry,
+        subIndustry: classified.subIndustry ?? null,
         isSupported: false,
         status: DiscoveryLeadStatus.REJECTED,
         temporaryPayload: {
           bucket: "regret",
           industry: classified.industry,
+          subIndustry: classified.subIndustry ?? null,
+          confidence: classified.confidence ?? null,
           marketIntelligenceLogId: log.id,
-          pipelineVersion: "step1_v2.1_placeholder",
+          classifier: "stage0_gatekeeper",
+          pipelineVersion: "stage0_gatekeeper_v1",
         },
         classificationEvidence: `Regret vertical: ${classified.industry}`,
       });
@@ -498,6 +505,7 @@ export class BrandOnboardingService {
     rawUrl: string;
     normalizedUrl: string;
     industry: IndustryVertical;
+    subIndustry?: string | null;
     isSupported: boolean;
     status: DiscoveryLeadStatus;
     temporaryPayload: Prisma.InputJsonValue;
@@ -513,6 +521,7 @@ export class BrandOnboardingService {
         status: args.status,
         isSupported: args.isSupported,
         industry: args.industry,
+        subIndustry: args.subIndustry ?? null,
         securityScore: 0,
         temporaryPayload: args.temporaryPayload,
         expiresAt,
@@ -524,6 +533,7 @@ export class BrandOnboardingService {
         status: args.status,
         isSupported: args.isSupported,
         industry: args.industry,
+        subIndustry: args.subIndustry ?? null,
         temporaryPayload: args.temporaryPayload,
         expiresAt,
         classificationEvidence: evidence,

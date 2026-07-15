@@ -46,7 +46,7 @@ export class BrandOfferingsService {
     }
 
     for (const item of dto.offerings) {
-      const gated = gateAndNormalizeBrandUrl(item.url);
+      const gated = gateAndNormalizeBrandUrl(item.url, { keepPath: true });
       if (!gated.ok) {
         throw new BadRequestException(
           `Offering URL is not allowed: ${item.url}`,

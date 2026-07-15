@@ -79,7 +79,7 @@ export class UnconfiguredBrandSurfaceScanRunner implements BrandSurfaceScanRunne
 
     throw new Error(
       `${SURFACE_SCAN_NOT_CONFIGURED_PREFIX}` +
-        "Surface scan requires PARALLEL_API_KEY and GEMINI_API_KEY to be set on the server.",
+        "Surface scan requires ZYTE_API_KEY (or PLAYWRIGHT_ENABLED=true) and GEMINI_API_KEY to be set on the server.",
     );
   }
 }

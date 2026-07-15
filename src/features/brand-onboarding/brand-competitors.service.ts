@@ -85,7 +85,9 @@ export class BrandCompetitorsService {
     }
 
     for (const item of dto.competitors) {
-      const gated = gateAndNormalizeBrandUrl(item.websiteUrl);
+      const gated = gateAndNormalizeBrandUrl(item.websiteUrl, {
+        keepPath: true,
+      });
       if (!gated.ok) {
         throw new BadRequestException(
           `Competitor URL is not allowed: ${item.websiteUrl}`,

@@ -276,7 +276,7 @@ function sameHostProductUrl(
   domain: string,
   rawUrl: string,
 ): string | null {
-  const gated = gateAndNormalizeBrandUrl(rawUrl);
+  const gated = gateAndNormalizeBrandUrl(rawUrl, { keepPath: true });
   if (!gated.ok || gated.hostname !== domain) {
     return null;
   }

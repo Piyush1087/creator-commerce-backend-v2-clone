@@ -180,7 +180,9 @@ async function fetchJsonPage(
 async function fetchShopifyProductsJson(
   domain: string,
 ): Promise<{ status: ShopifyEnrichResult["status"]; products: ShopifyProduct[] }> {
-  const gated = gateAndNormalizeBrandUrl(`https://${domain}/products.json`);
+  const gated = gateAndNormalizeBrandUrl(`https://${domain}/products.json`, {
+    keepPath: true,
+  });
   if (!gated.ok || gated.hostname !== domain) {
     return { status: "gate_blocked", products: [] };
   }

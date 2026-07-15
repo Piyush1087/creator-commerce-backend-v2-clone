@@ -40,7 +40,9 @@ import {
   type BrandSurfaceScanRunner,
 } from "./surface-scan/brand-surface-scan.runner.token";
 import { SURFACE_SCAN_NOT_CONFIGURED_PREFIX } from "./surface-scan/unconfigured-brand-surface-scan.runner";
+import { isSurfaceScanConnectionFailure } from "./surface-scan/surface-scan-connection-failure.error";
 import { SurfaceScanProgressStore } from "./surface-scan/surface-scan-progress.store";
+import { CoreIdentitySnapshotService } from "./surface-scan/stage1a/core-identity-snapshot.service";
 
 @Controller("api/v1/brand")
 @UseGuards(ThrottlerGuard)
@@ -53,6 +55,7 @@ export class BrandController {
     private readonly brandCompetitors: BrandCompetitorsService,
     private readonly brandVerification: BrandVerificationService,
     private readonly scanProgress: SurfaceScanProgressStore,
+    private readonly coreIdentitySnapshots: CoreIdentitySnapshotService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -73,6 +76,17 @@ export class BrandController {
     return snapshot;
   }
 
+  /**
+   * Stage 1A Checkpoint 1 payload — typed Core Identity snapshot for the
+   * temporary review UI (value/confidence/evidence wrappers).
+   */
+  @Get("surface-scan/core-identity/:leadId")
+  async coreIdentitySnapshot(
+    @Param("leadId", new ParseUUIDPipe({ version: "4" })) leadId: string,
+  ) {
+    return this.coreIdentitySnapshots.getByLeadId(leadId);
+  }
+
   @Post("surface-scan")
   @HttpCode(201)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
@@ -90,6 +104,16 @@ export class BrandController {
       });
     } catch (err: unknown) {
       throwBrandScanGateHttp(err);
+      if (isSurfaceScanConnectionFailure(err)) {
+        // Landing Page State F: typed payload so the frontend can render the
+        // dedicated infrastructure-error / "Retry Connection Check" state.
+        throw new BadGatewayException({
+          outcome: "infrastructure_error",
+          reason: err.reason,
+          httpStatus: err.httpStatus ?? null,
+          message: err.message,
+        });
+      }
       const message = err instanceof Error ? err.message : "Surface scan failed";
       if (message.includes(SURFACE_SCAN_NOT_CONFIGURED_PREFIX)) {
         throw new ServiceUnavailableException(
