@@ -6,7 +6,11 @@ import {
   SurfaceScanConnectionFailureError,
 } from "../surface-scan-connection-failure.error";
 import type { RawScrapeResult } from "./core-identity.schema";
-import { pickSocials } from "./zyte-homepage.strategy";
+import {
+  decodeHtmlEntities,
+  isPlaceholderAsset,
+  pickSocials,
+} from "./zyte-homepage.strategy";
 
 /**
  * Playwright dynamic DOM homepage acquisition (logos + social anchors).
@@ -107,16 +111,26 @@ export class PlaywrightHomepageStrategy {
         };
       });
 
-      const logoCandidate =
-        absoluteUrl(extracted.ogImage, targetUrl) ||
-        absoluteUrl(extracted.appleTouch, targetUrl) ||
-        absoluteUrl(extracted.icon, targetUrl) ||
-        undefined;
+      const logoCandidates = [
+        ...new Set(
+          [
+            absoluteUrl(extracted.ogImage, targetUrl),
+            absoluteUrl(extracted.appleTouch, targetUrl),
+            absoluteUrl(extracted.icon, targetUrl),
+          ].filter((u): u is string => Boolean(u) && !isPlaceholderAsset(u as string)),
+        ),
+      ];
+
+      const brandName = decodeHtmlEntities(
+        extracted.ogTitle || extracted.title || "",
+      );
+      const tagline = decodeHtmlEntities(extracted.ogDesc ?? "").slice(0, 180);
 
       return {
-        brand_name: extracted.ogTitle || extracted.title || undefined,
-        logo_url: logoCandidate,
-        tagline: extracted.ogDesc?.slice(0, 180) || undefined,
+        brand_name: brandName || undefined,
+        logo_url: logoCandidates[0],
+        logo_candidates: logoCandidates,
+        tagline: tagline || undefined,
         socials: pickSocials(extracted.hrefs),
         source_url: targetUrl,
         discovered_links: extracted.sameOrigin.slice(0, 40),

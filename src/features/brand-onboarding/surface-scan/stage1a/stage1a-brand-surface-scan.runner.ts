@@ -237,41 +237,79 @@ export class Stage1aBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
     };
   }
 
+  /**
+   * Mirrors the brand logo to S3, walking the ordered candidate list when the
+   * primary URL is dead (sites often declare stale JSON-LD logos that 404).
+   * If every candidate fails, the logo degrades to null so the UI renders the
+   * initials avatar (Phase 3 Case A) instead of a broken remote image.
+   */
   private async mirrorBrandLogo(
     snapshot: CoreIdentitySnapshot,
     domain: string,
   ): Promise<CoreIdentitySnapshot> {
-    const logoUrl = snapshot.brand_logo.value;
-    if (!logoUrl || !this.s3.isConfigured()) {
+    const primary = snapshot.brand_logo.value;
+    if (!primary || !this.s3.isConfigured()) {
       return snapshot;
     }
-    try {
-      const mirrored = await this.s3.mirrorRemoteAssetToS3({
-        url: logoUrl,
-        directory: `brand-onboarding/${domain}/logo`,
-        filename: "brand-logo",
-      });
-      return {
-        ...snapshot,
-        brand_logo: {
-          ...snapshot.brand_logo,
-          value: mirrored.publicUrl,
-          evidence: [
-            ...snapshot.brand_logo.evidence,
-            {
-              page_url: logoUrl,
-              page_type: "asset_mirror",
-              excerpt: `Mirrored logo to S3: ${mirrored.publicUrl}`,
-            },
-          ],
-        },
-      };
-    } catch (err) {
-      this.logger.warn(
-        `stage1a.logo_mirror_failed domain=${domain} err=${err instanceof Error ? err.message : String(err)}`,
-      );
-      return snapshot;
+
+    const candidates = [
+      ...new Set([primary, ...snapshot.logo_candidates]),
+    ];
+
+    for (const candidate of candidates) {
+      try {
+        const mirrored = await this.s3.mirrorRemoteAssetToS3({
+          url: candidate,
+          directory: `brand-onboarding/${domain}/logo`,
+          filename: "brand-logo",
+        });
+        if (candidate !== primary) {
+          this.logger.log(
+            `stage1a.logo_candidate_used domain=${domain} candidate=${candidate}`,
+          );
+        }
+        return {
+          ...snapshot,
+          brand_logo: {
+            ...snapshot.brand_logo,
+            value: mirrored.publicUrl,
+            evidence: [
+              ...snapshot.brand_logo.evidence,
+              {
+                page_url: candidate,
+                page_type: "asset_mirror",
+                excerpt: `Mirrored logo to S3: ${mirrored.publicUrl}`,
+              },
+            ],
+          },
+        };
+      } catch (err) {
+        this.logger.warn(
+          `stage1a.logo_mirror_failed domain=${domain} candidate=${candidate} err=${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
+
+    // Every candidate is dead: degrade to null → initials avatar fallback.
+    this.logger.warn(
+      `stage1a.logo_all_candidates_dead domain=${domain} tried=${candidates.length}`,
+    );
+    return {
+      ...snapshot,
+      brand_logo: {
+        ...snapshot.brand_logo,
+        value: null,
+        confidence: 0,
+        evidence: [
+          ...snapshot.brand_logo.evidence,
+          {
+            page_url: primary,
+            page_type: "asset_mirror",
+            excerpt: "All logo candidates unreachable; degraded to avatar fallback.",
+          },
+        ],
+      },
+    };
   }
 }
 

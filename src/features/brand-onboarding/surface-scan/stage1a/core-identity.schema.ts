@@ -46,6 +46,9 @@ export const CoreIdentitySnapshotSchema = z.object({
   social_handles: createUniversalWrapper(SocialHandlesSchema),
   tagline: createUniversalWrapper(z.string().nullable()),
   discovered_root_links: z.array(z.string().url()).default([]),
+  // Ordered alternates for the logo (og:image, apple-touch-icon, favicon).
+  // The asset mirror walks these when the primary logo URL is dead (404).
+  logo_candidates: z.array(z.string().url()).max(5).default([]),
 });
 
 export type CoreIdentitySnapshot = z.infer<typeof CoreIdentitySnapshotSchema>;
@@ -53,6 +56,8 @@ export type CoreIdentitySnapshot = z.infer<typeof CoreIdentitySnapshotSchema>;
 export type RawScrapeResult = {
   brand_name?: string;
   logo_url?: string;
+  /** Ordered fallback logo URLs (absolute), best candidate first. */
+  logo_candidates?: string[];
   country?: string;
   currency?: string;
   socials: Partial<z.infer<typeof SocialHandlesSchema>>;

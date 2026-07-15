@@ -1,8 +1,8 @@
-import { GoogleGenAI } from "@google/genai";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { z } from "zod";
 
+import { GeminiJsonClient } from "../../integrations/gemini/gemini-json.client";
 import { loadPromptMarkdown } from "../../prompts/prompt-loader";
 
 const PlannedUrlsSchema = z.array(z.string().url()).max(7);
@@ -10,12 +10,16 @@ const PlannedUrlsSchema = z.array(z.string().url()).max(7);
 /**
  * Stage 1B MCP Planner — Gemini picks up to 7 high-value crawl targets from
  * the Stage 1A homepage link inventory. Falls back to first N links on error.
+ * Uses the shared GeminiJsonClient (@google/generative-ai).
  */
 @Injectable()
 export class McpPlannerService {
   private readonly logger = new Logger(McpPlannerService.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly gemini: GeminiJsonClient,
+  ) {}
 
   async generateCrawlStrategy(args: {
     industry: string;
@@ -28,6 +32,7 @@ export class McpPlannerService {
       return fallback;
     }
 
+    const startedAt = Date.now();
     try {
       const modelId =
         this.config.get<string>("MCP_PLANNER_GEMINI_MODEL")?.trim() ||
@@ -41,41 +46,28 @@ export class McpPlannerService {
           JSON.stringify(args.discoveredUrls, null, 2),
         );
 
-      const ai = new GoogleGenAI({ apiKey });
-      const timeoutMs = this.config.get<number>(
-        "GEMINI_REQUEST_TIMEOUT_MS",
-        120_000,
-      );
-      const response = await Promise.race([
-        ai.models.generateContent({
-          model: modelId,
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-            temperature: 0.1,
-          },
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("MCP planner request timed out")),
-            timeoutMs,
-          ),
-        ),
-      ]);
+      const raw = await this.gemini.generateJson({
+        systemInstruction:
+          "You are a crawl planner. Respond with a JSON array of URLs only.",
+        userText: prompt,
+        modelId,
+        temperature: 0.1,
+      });
 
-      const text = (response.text ?? "").trim();
-      const parsed = PlannedUrlsSchema.safeParse(JSON.parse(text));
+      const parsed = PlannedUrlsSchema.safeParse(raw);
       if (!parsed.success) {
         this.logger.warn(
-          `mcp-planner schema_fail issues=${JSON.stringify(parsed.error.issues).slice(0, 400)}`,
+          `mcp-planner schema_fail ms=${Date.now() - startedAt} issues=${JSON.stringify(parsed.error.issues).slice(0, 400)}`,
         );
         return fallback;
       }
-      this.logger.log(`mcp-planner ok urls=${parsed.data.length}`);
+      this.logger.log(
+        `mcp-planner ok ms=${Date.now() - startedAt} urls=${parsed.data.length}`,
+      );
       return parsed.data;
     } catch (err) {
       this.logger.warn(
-        `mcp-planner failed err=${String(err)} — using fallback (${fallback.length} urls)`,
+        `mcp-planner failed ms=${Date.now() - startedAt} err=${String(err)} — using fallback (${fallback.length} urls)`,
       );
       return fallback;
     }

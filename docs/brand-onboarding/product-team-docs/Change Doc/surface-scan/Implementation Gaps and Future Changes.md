@@ -272,11 +272,39 @@ production.
 - Flat core identity values are written to `BrandProfile`.
 - There is no durable job queue, retry budget, dead-letter handling, or
   cross-process progress store.
-- Stage 1A's global timeout can classify a slow vendor/platform response as a
-  target connection failure; vendor health and target health should be
-  separated with structured driver errors.
 - Controlled automated contract tests are still needed for all State F
   variants and partial-driver behavior.
+
+### Stage 1A production acquisition plan (agreed 2026-07-15)
+
+Current state (feasibility mode): Zyte and Playwright run fully concurrent
+with **no orchestrator timeouts** so real per-driver latency can be measured
+via `stage1a.zyte_ok/fail` and `stage1a.playwright_ok/fail` log timings.
+Measured baseline on mamaearth.in: Zyte ~8s, Playwright (cold launch) ~11-14s,
+concurrent total ~11.4s versus ~22.4s sequential.
+
+Before production traffic, apply all of the following:
+
+1. **Warm browser reuse.** Launch one shared Chromium instance and open a new
+   browser context per scan (contexts are cheap and isolated) instead of a
+   `chromium.launch()` per scan (~150-300MB RAM and CPU spike each). Cold
+   per-scan launches are the main scale risk and the reason the Phase 3
+   5000ms budget is currently unrealistic.
+2. **Concurrency cap.** Add a semaphore (3-5 concurrent Playwright contexts);
+   queue the rest. Without it, a signup burst can exhaust host memory since
+   scans run in-process via `setImmediate`.
+3. **Hedged Playwright start.** Start Zyte immediately; start Playwright only
+   after a short head start (~1-2s) and only if Zyte has not already returned
+   a complete identity payload. Skips browser work entirely on well-structured
+   sites while keeping the concurrent worst case.
+4. **Restore generous timeouts.** Re-add per-driver budgets informed by the
+   measured timings (roughly 15s Zyte / 25s Playwright), plus an
+   `AbortController` on the Zyte fetch, which currently has no abort timeout
+   and can hang a scan indefinitely on a stalled vendor connection.
+5. **Cost posture.** Zyte homepage `httpResponseBody` requests are fractions
+   of a cent and not a cost concern; the real cost/scale factor is Playwright
+   compute. Prefer reducing Playwright invocations (hedging, Zyte-side icon
+   extraction) over reducing Zyte calls.
 
 ### Later phases
 

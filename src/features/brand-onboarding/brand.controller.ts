@@ -4,6 +4,7 @@ import {
   Body,
   Controller,
   Get,
+  GatewayTimeoutException,
   Headers,
   HttpCode,
   Inject,
@@ -41,6 +42,7 @@ import {
 } from "./surface-scan/brand-surface-scan.runner.token";
 import { SURFACE_SCAN_NOT_CONFIGURED_PREFIX } from "./surface-scan/unconfigured-brand-surface-scan.runner";
 import { isSurfaceScanConnectionFailure } from "./surface-scan/surface-scan-connection-failure.error";
+import { isSurfaceScanAcquisitionTimeout } from "./surface-scan/surface-scan-acquisition-timeout.error";
 import { SurfaceScanProgressStore } from "./surface-scan/surface-scan-progress.store";
 import { CoreIdentitySnapshotService } from "./surface-scan/stage1a/core-identity-snapshot.service";
 
@@ -104,6 +106,13 @@ export class BrandController {
       });
     } catch (err: unknown) {
       throwBrandScanGateHttp(err);
+      if (isSurfaceScanAcquisitionTimeout(err)) {
+        throw new GatewayTimeoutException({
+          outcome: "scan_timeout",
+          timeoutMs: err.timeoutMs,
+          message: err.message,
+        });
+      }
       if (isSurfaceScanConnectionFailure(err)) {
         // Landing Page State F: typed payload so the frontend can render the
         // dedicated infrastructure-error / "Retry Connection Check" state.
