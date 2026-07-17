@@ -15,7 +15,12 @@ export type MetaHtmlEnrichResult = {
   logoSource: string | null;
   productsFetched: number;
   productsFilled: number;
-  samples: Array<{ name: string; url: string; imageUrl: string; source: string }>;
+  samples: Array<{
+    name: string;
+    url: string;
+    imageUrl: string;
+    source: string;
+  }>;
 };
 
 function decodeHtmlEntities(value: string): string {
@@ -52,7 +57,9 @@ function looksLikeLogoUrl(url: string): boolean {
 
 async function fetchHtml(
   url: string,
-): Promise<{ ok: true; html: string; finalUrl: string } | { ok: false; detail: string }> {
+): Promise<
+  { ok: true; html: string; finalUrl: string } | { ok: false; detail: string }
+> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -77,7 +84,10 @@ async function fetchHtml(
       return { ok: false, detail: `too_large bytes=${buffer.byteLength}` };
     }
     const html = buffer.toString("utf8");
-    if (!/html|text\/plain/i.test(contentType) && !/<html|<head|og:image|apple-touch/i.test(html.slice(0, 2000))) {
+    if (
+      !/html|text\/plain/i.test(contentType) &&
+      !/<html|<head|og:image|apple-touch/i.test(html.slice(0, 2000))
+    ) {
       return {
         ok: false,
         detail: `unlikely_html contentType=${contentType}`,
@@ -272,10 +282,7 @@ function extractProductImageCandidate(
   return null;
 }
 
-function sameHostProductUrl(
-  domain: string,
-  rawUrl: string,
-): string | null {
+function sameHostProductUrl(domain: string, rawUrl: string): string | null {
   const gated = gateAndNormalizeBrandUrl(rawUrl, { keepPath: true });
   if (!gated.ok || gated.hostname !== domain) {
     return null;
@@ -291,7 +298,10 @@ function sameHostProductUrl(
 export async function enrichFromMetaHtml(
   domain: string,
   payload: Step2SurfaceScanGeminiPayload,
-): Promise<{ payload: Step2SurfaceScanGeminiPayload; result: MetaHtmlEnrichResult }> {
+): Promise<{
+  payload: Step2SurfaceScanGeminiPayload;
+  result: MetaHtmlEnrichResult;
+}> {
   const result: MetaHtmlEnrichResult = {
     logoStatus: "skipped",
     logoUrl: null,
@@ -353,9 +363,7 @@ export async function enrichFromMetaHtml(
     }
     const image = extractProductImageCandidate(page.html, page.finalUrl);
     if (!image) {
-      logger.log(
-        `meta.product_no_image domain=${domain} url=${pdpUrl}`,
-      );
+      logger.log(`meta.product_no_image domain=${domain} url=${pdpUrl}`);
       continue;
     }
     result.productsFilled += 1;

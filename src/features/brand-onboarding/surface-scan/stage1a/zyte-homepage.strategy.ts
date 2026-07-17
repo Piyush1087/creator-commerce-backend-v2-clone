@@ -36,6 +36,28 @@ export class ZyteHomepageStrategy {
     return parseHomepageHtml(html, targetUrl);
   }
 
+  /**
+   * Generic HTML fetch for Stage 1B: Zyte HTTP first, then browserHtml when
+   * the body is empty or shorter than 500 characters. Playwright stays off.
+   */
+  async fetchHtml(targetUrl: string): Promise<string> {
+    let html = "";
+    try {
+      html = await this.fetchZyteHtml(targetUrl, "http");
+    } catch (err) {
+      this.logger.warn(
+        `zyte fetchHtml http_fail url=${targetUrl} err=${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    if (html.trim().length >= 500) {
+      return html;
+    }
+    this.logger.log(
+      `zyte fetchHtml browser_fallback url=${targetUrl} httpLen=${html.trim().length}`,
+    );
+    return this.fetchZyteHtml(targetUrl, "browser");
+  }
+
   private async fetchZyteHtml(
     targetUrl: string,
     mode: "http" | "browser",
@@ -168,7 +190,9 @@ export function parseHomepageHtml(
     brand_name: brandName || undefined,
     logo_url: logoCandidates[0],
     logo_candidates: logoCandidates,
-    country: jsonLd.country || matchMeta(html, "og:locale")?.slice(3, 5)?.toUpperCase(),
+    country:
+      jsonLd.country ||
+      matchMeta(html, "og:locale")?.slice(3, 5)?.toUpperCase(),
     currency: jsonLd.currency,
     tagline: tagline || undefined,
     socials,
@@ -198,9 +222,7 @@ export function decodeHtmlEntities(text: string): string {
     .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
       safeFromCodePoint(parseInt(hex, 16)),
     )
-    .replace(/&#(\d+);/g, (_, dec: string) =>
-      safeFromCodePoint(Number(dec)),
-    )
+    .replace(/&#(\d+);/g, (_, dec: string) => safeFromCodePoint(Number(dec)))
     .replace(
       /&([a-z]+);/gi,
       (match, name: string) => NAMED_ENTITIES[name.toLowerCase()] ?? match,
@@ -301,9 +323,11 @@ function extractJsonLdBrand(html: string): {
   country?: string;
   currency?: string;
 } {
-  const blocks = [...html.matchAll(
-    /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
-  )];
+  const blocks = [
+    ...html.matchAll(
+      /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+    ),
+  ];
   for (const block of blocks) {
     try {
       const json = JSON.parse(block[1] ?? "") as Record<string, unknown>;

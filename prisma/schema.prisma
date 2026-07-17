@@ -56,6 +56,37 @@ enum ScanStatus {
   READY
 }
 
+/// Stage lifecycle for the Brand Intelligence pipeline (Phases 4–7).
+enum BrandIntelligenceStage {
+  STAGE_1A_COMPLETE
+  CORE_IDENTITY_APPROVED
+  STAGE_1B_COMPLETE
+  STAGE_1B_FAILED
+  STAGE_2_BRAND_DNA_COMPLETE
+  STAGE_2_BRAND_DNA_FAILED
+  STAGE_2_BRAND_DNA_ARCHIVED
+  STAGE_2_NEEDS_REVIEW
+  CHECKPOINT_2_CONFIRMED
+}
+
+enum BrandIntelligenceJobType {
+  STAGE_1B_PIPELINE
+}
+
+enum BrandIntelligenceJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum WaitlistReason {
+  UNSUPPORTED_INDUSTRY
+  FOREIGN_LANGUAGE
+  CONTENT_UNREADABLE
+  PARKED_DOMAIN
+}
+
 enum OfferingType {
   PRODUCT
   MODULE
@@ -635,12 +666,62 @@ model DiscoveryLead {
   userId        String?             @map("user_id")
   user          User?               @relation(fields: [userId], references: [id])
   createdAt     DateTime            @default(now()) @map("created_at")
-  waitlistLeads WaitlistLead[]
+  waitlistLeads          WaitlistLead[]
+  brandIntelligenceScan  BrandIntelligenceScan?
+  intelligenceJobs       BrandIntelligenceJob[]
 
   @@index([createdAt])
   @@index([userId])
   @@index([normalizedUrl, signupCompleted, expiresAt], map: "idx_discovery_cache_lookup")
   @@map("discovery_leads")
+}
+
+/// Brand Intelligence pipeline state (Checkpoint 1 → Stage 1B → Brand DNA).
+/// Replaces ad-hoc temporaryPayload.stage1a/stage1b for Phases 4–7.
+model BrandIntelligenceScan {
+  id                       String                 @id @default(uuid())
+  discoveryLeadId          String                 @unique @map("discovery_lead_id")
+  discoveryLead            DiscoveryLead          @relation(fields: [discoveryLeadId], references: [id], onDelete: Cascade)
+  brandProfileId           String?                @map("brand_profile_id")
+  brandProfile             BrandProfile?          @relation(fields: [brandProfileId], references: [id], onDelete: SetNull)
+  websiteUrl               String                 @map("website_url")
+  currentStage             BrandIntelligenceStage @map("current_stage")
+  stage1aSnapshot          Json?                  @map("stage1a_snapshot")
+  authoritativeIdentity    Json?                  @map("authoritative_identity")
+  runtimeContext           Json?                  @map("runtime_context")
+  brandDnaRaw              Json?                  @map("brand_dna_raw")
+  brandDnaVerifiedSnapshot Json?                  @map("brand_dna_verified_snapshot")
+  checkpoint2Confirmation  Json?                  @map("checkpoint2_confirmation")
+  errorLogs                String?                @map("error_logs") @db.Text
+  createdAt                DateTime               @default(now()) @map("created_at")
+  updatedAt                DateTime               @updatedAt @map("updated_at")
+  intelligenceJobs         BrandIntelligenceJob[]
+
+  @@index([brandProfileId])
+  @@index([currentStage])
+  @@map("brand_intelligence_scans")
+}
+
+/// Durable queue for Stage 1B → Prompt A pipeline after Checkpoint 1.
+model BrandIntelligenceJob {
+  id              String                     @id @default(uuid())
+  discoveryLeadId String                     @map("discovery_lead_id")
+  discoveryLead   DiscoveryLead              @relation(fields: [discoveryLeadId], references: [id], onDelete: Cascade)
+  scanId          String?                    @map("scan_id")
+  scan            BrandIntelligenceScan?     @relation(fields: [scanId], references: [id], onDelete: SetNull)
+  type            BrandIntelligenceJobType   @default(STAGE_1B_PIPELINE)
+  status          BrandIntelligenceJobStatus @default(QUEUED)
+  payload         Json?
+  attempt         Int                        @default(0)
+  maxAttempts     Int                        @default(3) @map("max_attempts")
+  errorMessage    String?                    @map("error_message") @db.Text
+  queuedAt        DateTime                   @default(now()) @map("queued_at")
+  startedAt       DateTime?                  @map("started_at")
+  finishedAt      DateTime?                  @map("finished_at")
+
+  @@index([status, queuedAt])
+  @@index([discoveryLeadId])
+  @@map("brand_intelligence_jobs")
 }
 
 model MarketIntelligenceLog {
@@ -661,6 +742,8 @@ model WaitlistLead {
   id                      String                 @id @default(uuid())
   email                   String
   industryInterest        IndustryVertical       @map("industry_interest")
+  domain                  String?                @db.VarChar(255)
+  reason                  WaitlistReason?        @map("reason")
   isNotified              Boolean                @default(false) @map("is_notified")
   discoveryLeadId         String?                @map("discovery_lead_id")
   discoveryLead           DiscoveryLead?         @relation(fields: [discoveryLeadId], references: [id])
@@ -670,6 +753,7 @@ model WaitlistLead {
   createdAt               DateTime               @default(now()) @map("created_at")
 
   @@index([email])
+  @@index([domain])
   @@index([discoveryLeadId])
   @@index([marketIntelligenceLogId])
   @@map("waitlist_leads")
@@ -771,6 +855,7 @@ model BrandProfile {
   intelligenceBaseline   BrandIntelligenceBaseline?
   performanceLeaks       BrandPerformanceLeak[]
   plannerCards           BrandPlannerCard[]
+  brandIntelligenceScans BrandIntelligenceScan[]
 
   // UCE (Universal Campaign Engine)
   uceCampaigns UceCampaign[]

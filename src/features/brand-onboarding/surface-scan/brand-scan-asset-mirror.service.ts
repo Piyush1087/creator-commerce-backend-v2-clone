@@ -96,7 +96,9 @@ function faviconCandidates(origin: string): string[] {
 }
 
 /** Collect absolute http(s) image-like URLs from Parallel markdown. */
-export function extractImageUrlsFromMarkdown(markdown: string | undefined): string[] {
+export function extractImageUrlsFromMarkdown(
+  markdown: string | undefined,
+): string[] {
   if (!markdown?.trim()) {
     return [];
   }

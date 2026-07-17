@@ -45,6 +45,7 @@ const HARD_BLOCKED_SUFFIXES = [
   ".mil",
   ".mil.in",
   ".edu",
+  ".ac.in",
 ] as const;
 
 export type UrlGateFailureReason =
@@ -107,9 +108,7 @@ function isPrivateOrReservedHost(hostname: string): boolean {
 
 function hasBlockedSocialMarketplace(hostname: string): boolean {
   const h = hostname.toLowerCase();
-  if (
-    BLOCKED_APEX_HOSTS.some((apex) => h === apex || h.endsWith(`.${apex}`))
-  ) {
+  if (BLOCKED_APEX_HOSTS.some((apex) => h === apex || h.endsWith(`.${apex}`))) {
     return true;
   }
   const labels = h.split(".");

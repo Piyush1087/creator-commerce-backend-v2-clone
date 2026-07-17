@@ -109,7 +109,9 @@ function scoreTitleMatch(geminiName: string, shopifyTitle: string): number {
   return Math.round(coverage * 55 + density * 35 + Math.min(overlap, 4) * 2);
 }
 
-function looksLikeShopifyCatalog(payload: unknown): payload is ShopifyProductsJson {
+function looksLikeShopifyCatalog(
+  payload: unknown,
+): payload is ShopifyProductsJson {
   if (!payload || typeof payload !== "object") {
     return false;
   }
@@ -118,7 +120,10 @@ function looksLikeShopifyCatalog(payload: unknown): payload is ShopifyProductsJs
 
 async function fetchJsonPage(
   url: string,
-): Promise<{ ok: true; products: ShopifyProduct[] } | { ok: false; status: ShopifyEnrichResult["status"]; detail: string }> {
+): Promise<
+  | { ok: true; products: ShopifyProduct[] }
+  | { ok: false; status: ShopifyEnrichResult["status"]; detail: string }
+> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -177,9 +182,10 @@ async function fetchJsonPage(
   }
 }
 
-async function fetchShopifyProductsJson(
-  domain: string,
-): Promise<{ status: ShopifyEnrichResult["status"]; products: ShopifyProduct[] }> {
+async function fetchShopifyProductsJson(domain: string): Promise<{
+  status: ShopifyEnrichResult["status"];
+  products: ShopifyProduct[];
+}> {
   const gated = gateAndNormalizeBrandUrl(`https://${domain}/products.json`, {
     keepPath: true,
   });
@@ -261,7 +267,10 @@ function findBestShopifyMatch(
 export async function enrichProductsFromShopifyJson(
   domain: string,
   payload: Step2SurfaceScanGeminiPayload,
-): Promise<{ payload: Step2SurfaceScanGeminiPayload; result: ShopifyEnrichResult }> {
+): Promise<{
+  payload: Step2SurfaceScanGeminiPayload;
+  result: ShopifyEnrichResult;
+}> {
   const fetched = await fetchShopifyProductsJson(domain);
   if (fetched.status !== "enriched") {
     const result: ShopifyEnrichResult = {

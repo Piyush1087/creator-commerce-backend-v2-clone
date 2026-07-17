@@ -1,4 +1,9 @@
-import { IndustryVertical, Prisma, ScanStatus } from "@prisma/client";
+import {
+  BrandIntelligenceStage,
+  IndustryVertical,
+  Prisma,
+  ScanStatus,
+} from "@prisma/client";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
@@ -128,8 +133,7 @@ export class Stage1aBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
 
     this.scanProgress.setPhase(args.leadId, "signals");
 
-    const industry =
-      lead.industry ?? IndustryVertical.UNKNOWN;
+    const industry = lead.industry ?? IndustryVertical.UNKNOWN;
     const subIndustry = lead.subIndustry ?? "General";
 
     const snapshot = await this.orchestrator.execute({
@@ -186,13 +190,34 @@ export class Stage1aBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
             ...existingPayload,
             stage1a: mirroredSnapshot as unknown as Prisma.InputJsonValue,
             stage1aCompletedAt: new Date().toISOString(),
-            // Stage 1B remains scaffolded; MCP dispatch waits for
-            // Checkpoint 1 confirmation in a later phase.
+            // Stage 1B waits for Checkpoint 1 confirmation (POST confirm-identity).
             stage1b: {
               status: "AWAITING_IDENTITY_CONFIRMATION",
               deferred: true,
             },
           } as Prisma.InputJsonValue,
+        },
+      });
+
+      await tx.brandIntelligenceScan.upsert({
+        where: { discoveryLeadId: lead.id },
+        create: {
+          discoveryLeadId: lead.id,
+          brandProfileId: upserted.id,
+          websiteUrl: gated.normalizedUrl,
+          currentStage: BrandIntelligenceStage.STAGE_1A_COMPLETE,
+          stage1aSnapshot: mirroredSnapshot as unknown as Prisma.InputJsonValue,
+        },
+        update: {
+          brandProfileId: upserted.id,
+          websiteUrl: gated.normalizedUrl,
+          currentStage: BrandIntelligenceStage.STAGE_1A_COMPLETE,
+          stage1aSnapshot: mirroredSnapshot as unknown as Prisma.InputJsonValue,
+          authoritativeIdentity: Prisma.DbNull,
+          runtimeContext: Prisma.DbNull,
+          brandDnaRaw: Prisma.DbNull,
+          brandDnaVerifiedSnapshot: Prisma.DbNull,
+          errorLogs: null,
         },
       });
 
@@ -252,9 +277,7 @@ export class Stage1aBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
       return snapshot;
     }
 
-    const candidates = [
-      ...new Set([primary, ...snapshot.logo_candidates]),
-    ];
+    const candidates = [...new Set([primary, ...snapshot.logo_candidates])];
 
     for (const candidate of candidates) {
       try {
@@ -305,7 +328,8 @@ export class Stage1aBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
           {
             page_url: primary,
             page_type: "asset_mirror",
-            excerpt: "All logo candidates unreachable; degraded to avatar fallback.",
+            excerpt:
+              "All logo candidates unreachable; degraded to avatar fallback.",
           },
         ],
       },

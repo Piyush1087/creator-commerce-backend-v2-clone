@@ -44,8 +44,7 @@ function llmHexColorArray(max: number) {
     (val) =>
       asArray(val)
         .filter(
-          (c): c is string =>
-            typeof c === "string" && HEX_RE.test(c.trim()),
+          (c): c is string => typeof c === "string" && HEX_RE.test(c.trim()),
         )
         .map((c) => c.trim())
         .slice(0, max),

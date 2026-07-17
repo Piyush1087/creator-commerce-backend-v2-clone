@@ -10,7 +10,7 @@ const PlannedUrlsSchema = z.array(z.string().url()).max(7);
 /**
  * Stage 1B MCP Planner — Gemini picks up to 7 high-value crawl targets from
  * the Stage 1A homepage link inventory. Falls back to first N links on error.
- * Uses the shared GeminiJsonClient (@google/generative-ai).
+ * Planned URLs are filtered to the same apex origin as the authoritative site.
  */
 @Injectable()
 export class McpPlannerService {
@@ -25,10 +25,16 @@ export class McpPlannerService {
     industry: string;
     subIndustry: string;
     discoveredUrls: string[];
+    /** Authoritative website URL — off-origin planned URLs are dropped. */
+    websiteUrl: string;
   }): Promise<string[]> {
-    const fallback = args.discoveredUrls.slice(0, 5);
+    const sameOriginInventory = filterSameApexOrigin(
+      args.discoveredUrls,
+      args.websiteUrl,
+    );
+    const fallback = sameOriginInventory.slice(0, 5);
     const apiKey = this.config.get<string>("GEMINI_API_KEY", "")?.trim();
-    if (!apiKey || args.discoveredUrls.length === 0) {
+    if (!apiKey || sameOriginInventory.length === 0) {
       return fallback;
     }
 
@@ -43,7 +49,7 @@ export class McpPlannerService {
         .replace("{{sub_industry}}", args.subIndustry)
         .replace(
           "{{link_inventory}}",
-          JSON.stringify(args.discoveredUrls, null, 2),
+          JSON.stringify(sameOriginInventory, null, 2),
         );
 
       const raw = await this.gemini.generateJson({
@@ -61,15 +67,58 @@ export class McpPlannerService {
         );
         return fallback;
       }
+
+      const filtered = filterSameApexOrigin(parsed.data, args.websiteUrl);
+      const dropped = parsed.data.length - filtered.length;
+      if (dropped > 0) {
+        this.logger.warn(
+          `mcp-planner.off_origin_dropped count=${dropped} apex=${apexHostFromUrl(args.websiteUrl) ?? "-"}`,
+        );
+      }
+
+      const selected = filtered.length > 0 ? filtered : fallback;
       this.logger.log(
-        `mcp-planner ok ms=${Date.now() - startedAt} urls=${parsed.data.length}`,
+        `mcp-planner.ok industry=${args.industry} inventory=${sameOriginInventory.length} selected=${selected.length} model=${modelId} ms=${Date.now() - startedAt}`,
       );
-      return parsed.data;
+      return selected;
     } catch (err) {
       this.logger.warn(
         `mcp-planner failed ms=${Date.now() - startedAt} err=${String(err)} — using fallback (${fallback.length} urls)`,
       );
       return fallback;
     }
+  }
+}
+
+/** Strip www and compare hostnames; drop URLs that are not same apex. */
+export function filterSameApexOrigin(
+  urls: string[],
+  websiteUrl: string,
+): string[] {
+  const apex = apexHostFromUrl(websiteUrl);
+  if (!apex) {
+    return [];
+  }
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const url of urls) {
+    const host = apexHostFromUrl(url);
+    if (!host || host !== apex) {
+      continue;
+    }
+    if (seen.has(url)) {
+      continue;
+    }
+    seen.add(url);
+    out.push(url);
+  }
+  return out;
+}
+
+export function apexHostFromUrl(url: string): string | null {
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
   }
 }

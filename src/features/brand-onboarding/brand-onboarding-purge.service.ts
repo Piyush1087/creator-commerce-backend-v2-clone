@@ -10,7 +10,9 @@ export class BrandOnboardingPurgeService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async purgeStaleUnverifiedBrandProfiles(): Promise<{ deletedProfileCount: number }> {
+  async purgeStaleUnverifiedBrandProfiles(): Promise<{
+    deletedProfileCount: number;
+  }> {
     const cutoff = subDays(new Date(), BRAND_UNVERIFIED_PURGE_AFTER_DAYS);
 
     const stale = await this.prisma.brandProfile.findMany({

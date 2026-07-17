@@ -1,42 +1,29 @@
-# Brand Onboarding Journey (Backend)
+# Brand Onboarding (Backend)
 
-This document outlines the backend implementation and flow for the 8-step brand onboarding process.
+Engineering index for discovery → surface intelligence → verification.
 
-## Journey Overview
+## Start here
 
-1.  **Step 1: Root Identity Capture** - Capturing the website URL and initial triage.
-2.  **Step 2: Surface Scan** - AI-driven extraction of logos, names, and basic product/competitor lists (Low latency).
-3.  **Step 3: Brand DNA Review** - User reviews and refines brand identity, visual style, and audience persona.
-4.  **Step 4: Product Catalogue** - User manages products, treatments, or services identified during the scan.
-5.  **Step 5: Competitive Landscape** - User confirms top competitors and the "Why" behind the rivalry.
-6.  **Step 6: Domain Verification** - Email-based OTP verification to prove domain ownership.
-7.  **Step 7: Deep Intel Scan** - Post-verification background processing for deep strategy extraction (USPs, KSPs, Compliance).
-8.  **Step 8: Completion & Dashboard** - Finalizing the profile and unlocking full platform features.
+1. **[CURRENT_STATE.md](./CURRENT_STATE.md)** — what is implemented today (source of truth vs stale Change Docs).
+2. **[GAPS_AND_DECISIONS.md](./GAPS_AND_DECISIONS.md)** — locked product decisions and open gaps.
+3. **[MANUAL_TEST_MATRIX.md](./MANUAL_TEST_MATRIX.md)** — manual QA checklist.
 
-## Architecture
+## Operational docs
 
-- **Organization-Centric**: A `BrandProfile` is owned by an `Organization`.
-- **User Roles**: Brand users are linked to an `Organization`.
-- **Atomic Updates**: Field-level updates during review steps to prevent data loss.
-- **Scan Phases**:
-    - **Surface Scan**: Rapid, top-level discovery (Steps 2-5).
-    - **Deep Scan**: Thorough analysis triggered after Step 6 (Verification).
+- [ENTRY_RESOLVER.md](./ENTRY_RESOLVER.md) — `POST /discovery/resolve` before validate.
+- [AI_GUARDRAILS.md](./AI_GUARDRAILS.md) — Parallel + Gemini safety / hygiene.
+- [S3_ASSETS.md](./S3_ASSETS.md) — logo and asset mirroring.
+- [BRAND_AUTH.md](./BRAND_AUTH.md) — brand auth notes.
+- [VERIFICATION_OTP_TOGGLE.md](./VERIFICATION_OTP_TOGGLE.md) — stub OTP vs real email.
 
-## Database Schema
+## Product history (not engineering truth)
 
-See [SCHEMA_DESIGN.md](./SCHEMA_DESIGN.md) for detailed model definitions.
+`product-team-docs/` holds phase Change Docs and older step dumps. Use them for intent; if they conflict with CURRENT_STATE or code, prefer CURRENT_STATE + code.
 
-## Implementation tracking
+## Archived
 
-See [IMPLEMENTATION_TRACKING.md](./IMPLEMENTATION_TRACKING.md) for phased work, decisions, and checklist items (sync with product docs under `docs/product-team-docs/brand-onboarding`). Prompt + scan pipeline cheat sheet: [SURFACE_SCAN_AND_PROMPTS.md](./SURFACE_SCAN_AND_PROMPTS.md).
+Superseded engineering dumps live in [`_archive/`](./_archive/) (tracking logs, old gate/test docs, prior schema comparison, old surface-scan cheat sheet).
 
-## API entry points
+## Frontend
 
-- [ENTRY_RESOLVER.md](./ENTRY_RESOLVER.md) — read-only `POST /api/v1/discovery/resolve` before `validate`.
-- [AI_GUARDRAILS.md](./AI_GUARDRAILS.md) — Parallel + Gemini safety and hygiene (living).
-- [SURFACE_SCAN_AND_PROMPTS.md](./SURFACE_SCAN_AND_PROMPTS.md) — **where to edit prompts**, how Parallel/Gemini scan runs, cache vs `force`, and check order.
-- [VERIFICATION_OTP_TOGGLE.md](./VERIFICATION_OTP_TOGGLE.md) — Step 6 OTP: stub `123456` (default) vs real email for production.
-
-## Frontend (v2) — deferred checklist
-
-- [FRONTEND_REQUIREMENTS.md](./FRONTEND_REQUIREMENTS.md) — env usage without secrets, removal of mocks and **fallback** static data, and **Step 4 catalogue** templates (D2C / Healthcare / Offline + industry mapping).
+v2 feature module: `creator-commerce-frontend-v2/src/features/brand-onboarding`.

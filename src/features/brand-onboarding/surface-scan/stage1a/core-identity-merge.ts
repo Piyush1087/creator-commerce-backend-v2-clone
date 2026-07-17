@@ -2,6 +2,7 @@ import type {
   CoreIdentitySnapshot,
   RawScrapeResult,
 } from "./core-identity.schema";
+import { normalizeIndustryVertical } from "./core-identity.schema";
 import { isPlaceholderAsset } from "./zyte-homepage.strategy";
 
 /**
@@ -126,9 +127,7 @@ export function mergeScrapePayloads(args: {
   const { scanId, targetUrl, industry, subIndustry, zyte, playwright } = args;
 
   const nameValue =
-    zyte?.brand_name ||
-    playwright?.brand_name ||
-    fallbackBrandName(targetUrl);
+    zyte?.brand_name || playwright?.brand_name || fallbackBrandName(targetUrl);
 
   let logoValue = playwright?.logo_url || zyte?.logo_url || null;
   if (
@@ -182,12 +181,7 @@ export function mergeScrapePayloads(args: {
   const uniqueLinks = [...new Set(discovered)].slice(0, 40);
 
   const tldCountry = countryHintFromTld(targetUrl);
-  const country = (
-    zyte?.country ||
-    playwright?.country ||
-    tldCountry ||
-    "US"
-  )
+  const country = (zyte?.country || playwright?.country || tldCountry || "US")
     .slice(0, 2)
     .toUpperCase();
   const currency = currencyFromCountry(country);
@@ -252,7 +246,7 @@ export function mergeScrapePayloads(args: {
       edited: false,
     },
     industry: {
-      value: industry,
+      value: normalizeIndustryVertical(industry),
       confidence: 90,
       evidence: evidence(
         targetUrl,

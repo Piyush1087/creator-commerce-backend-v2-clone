@@ -88,7 +88,8 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
       this.scanProgress.complete(args.leadId);
       return result;
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Surface scan failed";
+      const message =
+        err instanceof Error ? err.message : "Surface scan failed";
       // Gate exceptions still surface as HTTP 403; progress should show failure too.
       this.scanProgress.fail(args.leadId, message);
       throw err;
@@ -391,17 +392,16 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
     );
 
     // Gemini sometimes returns null-ish location fields; avoid failing persistence on bad rows.
-    const normalizedLocations = payload.locations
-      .flatMap((item) => {
-        if (typeof item.address !== "string") {
-          return [];
-        }
-        const address = item.address.trim();
-        if (!address) {
-          return [];
-        }
-        return [{ ...item, address }];
-      });
+    const normalizedLocations = payload.locations.flatMap((item) => {
+      if (typeof item.address !== "string") {
+        return [];
+      }
+      const address = item.address.trim();
+      if (!address) {
+        return [];
+      }
+      return [{ ...item, address }];
+    });
 
     this.logGeminiSurfaceSummary(domain, payload, {
       identityChars: identityMd.length,

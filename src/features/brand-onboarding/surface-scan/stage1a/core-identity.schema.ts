@@ -1,13 +1,40 @@
+import { IndustryVertical } from "@prisma/client";
 import { z } from "zod";
 
-export const IndustryEnum = z.enum([
-  "D2C",
-  "SAAS_AI",
-  "HEALTHCARE",
-  "OFFLINE_SERVICES",
-  "D2C_ECOMMERCE",
-  "AI_SAAS",
-]);
+/** Map gatekeeper / doc aliases onto Prisma IndustryVertical. */
+export function normalizeIndustryVertical(raw: string): IndustryVertical {
+  const key = raw
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+  const aliases: Record<string, IndustryVertical> = {
+    D2C: IndustryVertical.D2C,
+    D2C_ECOMMERCE: IndustryVertical.D2C,
+    ECOMMERCE: IndustryVertical.D2C,
+    SAAS_AI: IndustryVertical.SAAS_AI,
+    AI_SAAS: IndustryVertical.SAAS_AI,
+    SAAS: IndustryVertical.SAAS_AI,
+    HEALTHCARE: IndustryVertical.HEALTHCARE,
+    OFFLINE_SERVICES: IndustryVertical.OFFLINE_SERVICES,
+    REAL_ESTATE: IndustryVertical.REAL_ESTATE,
+    B2B_AGENCY: IndustryVertical.B2B_AGENCY,
+    MEDIA: IndustryVertical.MEDIA,
+    EDUCATION: IndustryVertical.EDUCATION,
+    ENTERTAINMENT: IndustryVertical.ENTERTAINMENT,
+    UNKNOWN: IndustryVertical.UNKNOWN,
+    GAMBLING: IndustryVertical.GAMBLING,
+    ADULT: IndustryVertical.ADULT,
+    FRAUDULENT_HIGHRISK: IndustryVertical.FRAUDULENT_HIGH_RISK,
+    FRAUDULENT_HIGH_RISK: IndustryVertical.FRAUDULENT_HIGH_RISK,
+  };
+  return aliases[key] ?? IndustryVertical.UNKNOWN;
+}
+
+export const IndustryEnum = z
+  .string()
+  .min(1)
+  .transform((value) => normalizeIndustryVertical(value))
+  .pipe(z.nativeEnum(IndustryVertical));
 
 export const SocialHandlesSchema = z.object({
   instagram: z.string().url().nullable().default(null),
@@ -41,7 +68,7 @@ export const CoreIdentitySnapshotSchema = z.object({
   country: createUniversalWrapper(z.string().min(2).max(2)),
   reporting_currency: createUniversalWrapper(z.string().min(3).max(3)),
   brand_logo: createUniversalWrapper(z.string().url().nullable()),
-  industry: createUniversalWrapper(z.string().min(1)),
+  industry: createUniversalWrapper(IndustryEnum),
   sub_industry: createUniversalWrapper(z.string().min(1)),
   social_handles: createUniversalWrapper(SocialHandlesSchema),
   tagline: createUniversalWrapper(z.string().nullable()),

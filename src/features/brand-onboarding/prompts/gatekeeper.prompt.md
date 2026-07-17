@@ -22,7 +22,13 @@ Supported industries (set `supported: true` only for these):
 - `HEALTHCARE` — clinics, telehealth, medical devices sold to patients, pharma consumer
 - `OFFLINE_SERVICES` — local services, hospitality, fitness studios, salons, agencies with a strong local footprint
 
-For everything else (real estate, media, education-only, entertainment, gambling, adult, fraud, unclear), set `supported: false` and pick the closest industry enum below.
+For everything else (real estate, media, education-only, entertainment, unclear), set `supported: false` and pick the closest industry enum below.
+
+**Blocked industries** (set `supported: false` and use these exact industry values — never waitlist-style niches):
+
+- `GAMBLING` — betting, casinos, sportsbooks
+- `ADULT` — adult / explicit content
+- `FRAUDULENT_HIGH_RISK` — clear scam / phishing / high-risk fraud signals
 
 Allowed `industry` values exactly:
 
@@ -38,7 +44,9 @@ Also accept aliases in your reasoning but **output** only the values above:
 - No crawling. No inventing page content.
 - Prefer hostname / public brand naming cues cautiously.
 - If unsure, use `supported: false`, `industry: UNKNOWN`, lower confidence.
-- Never mark gambling / adult / high-risk fraud as supported.
+- Never mark gambling / adult / high-risk fraud as supported — always use `GAMBLING`, `ADULT`, or `FRAUDULENT_HIGH_RISK`.
+- For foreign-language-only brands (when hostname strongly suggests non-English-only markets with no English brand), use `UNKNOWN` and sub_industry `Foreign Language Storefront`.
+- For parked / for-sale domains, use `UNKNOWN` and sub_industry `Parked Domain`.
 
 ## Output
 

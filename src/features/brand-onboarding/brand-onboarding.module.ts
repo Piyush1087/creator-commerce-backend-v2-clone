@@ -9,10 +9,13 @@ import { PrismaModule } from "../../prisma/prisma.module";
 import { S3Module } from "../../shared/s3/s3.module";
 import { BrandOnboardingPurgeScheduler } from "./brand-onboarding-purge.scheduler";
 import { BrandOnboardingPurgeService } from "./brand-onboarding-purge.service";
+import { BrandIntelligenceJobService } from "./brand-intelligence-job.service";
+import { BrandIntelligenceWorkerService } from "./brand-intelligence-worker.service";
 import { BrandScanGateService } from "./brand-scan-gate.service";
 import { BrandController } from "./brand.controller";
 import { BrandOnboardingController } from "./brand-onboarding.controller";
 import { BrandOnboardingService } from "./brand-onboarding.service";
+import { DiscoveryReachabilityService } from "./discovery-reachability.service";
 import { BrandProfileService } from "./brand-profile.service";
 import { BrandOfferingsService } from "./brand-offerings.service";
 import { BrandCompetitorsService } from "./brand-competitors.service";
@@ -30,11 +33,19 @@ import { UnconfiguredBrandSurfaceScanRunner } from "./surface-scan/unconfigured-
 import { SurfaceScanProgressStore } from "./surface-scan/surface-scan-progress.store";
 import { CoreIdentityOrchestratorService } from "./surface-scan/stage1a/core-identity-orchestrator.service";
 import { CoreIdentitySnapshotService } from "./surface-scan/stage1a/core-identity-snapshot.service";
+import { CoreIdentityConfirmationService } from "./surface-scan/stage1a/core-identity-confirmation.service";
 import { PlaywrightHomepageStrategy } from "./surface-scan/stage1a/playwright-homepage.strategy";
 import { Stage1aBrandSurfaceScanRunner } from "./surface-scan/stage1a/stage1a-brand-surface-scan.runner";
 import { ZyteHomepageStrategy } from "./surface-scan/stage1a/zyte-homepage.strategy";
 import { McpPlannerService } from "./surface-scan/stage1b/mcp-planner.service";
 import { Stage1bCoordinatorService } from "./surface-scan/stage1b/stage1b-coordinator.service";
+import { TextContextBuilderService } from "./surface-scan/stage1b/text-context-builder.service";
+import { PromptBuilderService } from "./surface-scan/stage2/prompt-builder.service";
+import { BrandDnaEngineService } from "./surface-scan/stage2/brand-dna-engine.service";
+import { SnapshotValidationService } from "./surface-scan/stage2/snapshot-validation.service";
+import { BrandDnaProfileMergerService } from "./surface-scan/stage2/brand-dna-profile-merger.service";
+import { IntelligenceStatusService } from "./surface-scan/intelligence-status.service";
+import { Checkpoint2Service } from "./surface-scan/checkpoint2/checkpoint2.service";
 import { BrandVerificationService } from "./verification/brand-verification.service";
 
 @Module({
@@ -49,6 +60,7 @@ import { BrandVerificationService } from "./verification/brand-verification.serv
   controllers: [BrandOnboardingController, BrandController],
   providers: [
     BrandScanGateService,
+    DiscoveryReachabilityService,
     BrandOnboardingPurgeService,
     BrandOnboardingPurgeScheduler,
     BrandOnboardingService,
@@ -68,8 +80,18 @@ import { BrandVerificationService } from "./verification/brand-verification.serv
     PlaywrightHomepageStrategy,
     CoreIdentityOrchestratorService,
     CoreIdentitySnapshotService,
+    CoreIdentityConfirmationService,
+    TextContextBuilderService,
     McpPlannerService,
+    PromptBuilderService,
+    BrandDnaEngineService,
+    BrandDnaProfileMergerService,
+    SnapshotValidationService,
     Stage1bCoordinatorService,
+    BrandIntelligenceJobService,
+    BrandIntelligenceWorkerService,
+    IntelligenceStatusService,
+    Checkpoint2Service,
     Stage1aBrandSurfaceScanRunner,
     {
       provide: BRAND_SURFACE_SCAN_RUNNER,

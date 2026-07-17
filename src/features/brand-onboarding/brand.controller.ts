@@ -32,7 +32,10 @@ import {
   PatchBrandProfileDto,
   SurfaceScanRequestDto,
 } from "./dto/brand-profile.dto";
-import { SyncOfferingsDto, UploadOfferingImageDto } from "./dto/brand-offerings.dto";
+import {
+  SyncOfferingsDto,
+  UploadOfferingImageDto,
+} from "./dto/brand-offerings.dto";
 import { UploadBrandImageDto } from "./dto/brand-image-upload.dto";
 import { SyncCompetitorsDto } from "./dto/brand-competitors.dto";
 import { BrandVerificationService } from "./verification/brand-verification.service";
@@ -45,6 +48,11 @@ import { isSurfaceScanConnectionFailure } from "./surface-scan/surface-scan-conn
 import { isSurfaceScanAcquisitionTimeout } from "./surface-scan/surface-scan-acquisition-timeout.error";
 import { SurfaceScanProgressStore } from "./surface-scan/surface-scan-progress.store";
 import { CoreIdentitySnapshotService } from "./surface-scan/stage1a/core-identity-snapshot.service";
+import { CoreIdentityConfirmationService } from "./surface-scan/stage1a/core-identity-confirmation.service";
+import { ConfirmIdentityBodySchema } from "./surface-scan/stage1a/confirm-identity.schema";
+import { IntelligenceStatusService } from "./surface-scan/intelligence-status.service";
+import { Checkpoint2Service } from "./surface-scan/checkpoint2/checkpoint2.service";
+import { ConfirmCheckpoint2BodySchema } from "./surface-scan/checkpoint2/confirm-checkpoint2.schema";
 
 @Controller("api/v1/brand")
 @UseGuards(ThrottlerGuard)
@@ -58,6 +66,9 @@ export class BrandController {
     private readonly brandVerification: BrandVerificationService,
     private readonly scanProgress: SurfaceScanProgressStore,
     private readonly coreIdentitySnapshots: CoreIdentitySnapshotService,
+    private readonly coreIdentityConfirmation: CoreIdentityConfirmationService,
+    private readonly intelligenceStatus: IntelligenceStatusService,
+    private readonly checkpoint2: Checkpoint2Service,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -87,6 +98,67 @@ export class BrandController {
     @Param("leadId", new ParseUUIDPipe({ version: "4" })) leadId: string,
   ) {
     return this.coreIdentitySnapshots.getByLeadId(leadId);
+  }
+
+  /**
+   * Checkpoint 1 confirmation — locks authoritative identity and queues
+   * Stage 1B → Prompt A Brand DNA pipeline.
+   */
+  @Post("surface-scan/confirm-identity/:leadId")
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async confirmIdentity(
+    @Param("leadId", new ParseUUIDPipe({ version: "4" })) leadId: string,
+    @Body() body: unknown,
+  ) {
+    const parsed = ConfirmIdentityBodySchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        message: "Invalid confirm-identity payload",
+        issues: parsed.error.issues,
+      });
+    }
+    return this.coreIdentityConfirmation.confirm(leadId, parsed.data);
+  }
+
+  /**
+   * Pipeline status + archived Brand DNA for the Brand DNA page polling.
+   */
+  @Get("surface-scan/intelligence/:leadId")
+  async intelligenceStatusByLead(
+    @Param("leadId", new ParseUUIDPipe({ version: "4" })) leadId: string,
+  ) {
+    return this.intelligenceStatus.getByLeadId(leadId);
+  }
+
+  /**
+   * Checkpoint 2 payload — Surface Intelligence (Brand DNA + offerings/competitors).
+   */
+  @Get("surface-scan/checkpoint-2/:leadId")
+  async checkpoint2ByLead(
+    @Param("leadId", new ParseUUIDPipe({ version: "4" })) leadId: string,
+  ) {
+    return this.checkpoint2.getByLeadId(leadId);
+  }
+
+  /**
+   * Checkpoint 2 confirmation — locks Surface Intelligence review.
+   */
+  @Post("surface-scan/checkpoint-2/:leadId/confirm")
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async confirmCheckpoint2(
+    @Param("leadId", new ParseUUIDPipe({ version: "4" })) leadId: string,
+    @Body() body: unknown,
+  ) {
+    const parsed = ConfirmCheckpoint2BodySchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        message: "Invalid checkpoint-2 confirm payload",
+        issues: parsed.error.issues,
+      });
+    }
+    return this.checkpoint2.confirm(leadId, parsed.data);
   }
 
   @Post("surface-scan")
@@ -123,7 +195,8 @@ export class BrandController {
           message: err.message,
         });
       }
-      const message = err instanceof Error ? err.message : "Surface scan failed";
+      const message =
+        err instanceof Error ? err.message : "Surface scan failed";
       if (message.includes(SURFACE_SCAN_NOT_CONFIGURED_PREFIX)) {
         throw new ServiceUnavailableException(
           message.slice(SURFACE_SCAN_NOT_CONFIGURED_PREFIX.length),

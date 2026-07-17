@@ -1,4 +1,4 @@
-import { IndustryVertical } from "@prisma/client";
+import { IndustryVertical, WaitlistReason } from "@prisma/client";
 import { Transform } from "class-transformer";
 import {
   IsEmail,
@@ -19,6 +19,16 @@ export class DiscoverWaitlistRequestDto {
 
   @IsEnum(IndustryVertical)
   industry!: IndustryVertical;
+
+  @IsOptional()
+  @IsEnum(WaitlistReason)
+  reason?: WaitlistReason;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  domain?: string;
 
   @IsOptional()
   @IsUUID("4")

@@ -81,10 +81,20 @@ export function classifyConnectionFailure(
   return null;
 }
 
-const MULTI_PART_SECOND_LEVEL = new Set(["co", "com", "net", "org", "ac", "gov"]);
+const MULTI_PART_SECOND_LEVEL = new Set([
+  "co",
+  "com",
+  "net",
+  "org",
+  "ac",
+  "gov",
+]);
 
 function apexOf(hostname: string): string {
-  const labels = hostname.toLowerCase().replace(/^www\./, "").split(".");
+  const labels = hostname
+    .toLowerCase()
+    .replace(/^www\./, "")
+    .split(".");
   if (labels.length <= 2) {
     return labels.join(".");
   }

@@ -80,9 +80,7 @@ export class PlaywrightHomepageStrategy {
             .querySelector('link[rel="apple-touch-icon"]')
             ?.getAttribute("href") || "";
         const icon =
-          document
-            .querySelector('link[rel="icon"]')
-            ?.getAttribute("href") ||
+          document.querySelector('link[rel="icon"]')?.getAttribute("href") ||
           document
             .querySelector('link[rel="shortcut icon"]')
             ?.getAttribute("href") ||
@@ -117,7 +115,9 @@ export class PlaywrightHomepageStrategy {
             absoluteUrl(extracted.ogImage, targetUrl),
             absoluteUrl(extracted.appleTouch, targetUrl),
             absoluteUrl(extracted.icon, targetUrl),
-          ].filter((u): u is string => Boolean(u) && !isPlaceholderAsset(u as string)),
+          ].filter(
+            (u): u is string => Boolean(u) && !isPlaceholderAsset(u as string),
+          ),
         ),
       ];
 

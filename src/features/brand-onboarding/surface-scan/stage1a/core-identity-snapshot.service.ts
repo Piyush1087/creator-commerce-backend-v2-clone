@@ -14,8 +14,9 @@ export type CoreIdentitySnapshotResponse = {
 };
 
 /**
- * Reads the Stage 1A Core Identity snapshot stored on
- * DiscoveryLead.temporaryPayload.stage1a (no Prisma schema change).
+ * Reads the Stage 1A Core Identity snapshot.
+ * Prefer BrandIntelligenceScan.stage1aSnapshot; fall back to
+ * DiscoveryLead.temporaryPayload.stage1a for older rows.
  */
 @Injectable()
 export class CoreIdentitySnapshotService {
@@ -34,43 +35,61 @@ export class CoreIdentitySnapshotService {
       throw new NotFoundException("Discovery lead not found");
     }
 
-    const payload =
-      lead.temporaryPayload &&
-      typeof lead.temporaryPayload === "object" &&
-      !Array.isArray(lead.temporaryPayload)
-        ? (lead.temporaryPayload as Record<string, unknown>)
-        : null;
+    const scan = await this.prisma.brandIntelligenceScan.findUnique({
+      where: { discoveryLeadId: leadId },
+    });
 
-    const rawSnapshot = payload?.stage1a;
-    const parsed = CoreIdentitySnapshotSchema.safeParse(rawSnapshot);
-    if (!parsed.success) {
-      throw new NotFoundException(
-        "Stage 1A core identity snapshot is not available for this lead.",
-      );
+    let snapshot: CoreIdentitySnapshot | null = null;
+    let completedAt: string | null = null;
+    let brandProfileId: string | null = scan?.brandProfileId ?? null;
+
+    if (scan?.stage1aSnapshot) {
+      const parsed = CoreIdentitySnapshotSchema.safeParse(scan.stage1aSnapshot);
+      if (parsed.success) {
+        snapshot = parsed.data;
+        completedAt = scan.updatedAt.toISOString();
+      }
     }
 
-    const completedAt =
-      typeof payload?.stage1aCompletedAt === "string"
-        ? payload.stage1aCompletedAt
-        : null;
+    if (!snapshot) {
+      const payload =
+        lead.temporaryPayload &&
+        typeof lead.temporaryPayload === "object" &&
+        !Array.isArray(lead.temporaryPayload)
+          ? (lead.temporaryPayload as Record<string, unknown>)
+          : null;
 
-    let brandProfileId: string | null = null;
-    try {
-      const host = new URL(lead.normalizedUrl).hostname.replace(/^www\./, "");
-      const profile = await this.prisma.brandProfile.findUnique({
-        where: { domain: host },
-        select: { id: true },
-      });
-      brandProfileId = profile?.id ?? null;
-    } catch {
-      brandProfileId = null;
+      const parsed = CoreIdentitySnapshotSchema.safeParse(payload?.stage1a);
+      if (!parsed.success) {
+        throw new NotFoundException(
+          "Stage 1A core identity snapshot is not available for this lead.",
+        );
+      }
+      snapshot = parsed.data;
+      completedAt =
+        typeof payload?.stage1aCompletedAt === "string"
+          ? payload.stage1aCompletedAt
+          : null;
+    }
+
+    if (!brandProfileId) {
+      try {
+        const host = new URL(lead.normalizedUrl).hostname.replace(/^www\./, "");
+        const profile = await this.prisma.brandProfile.findUnique({
+          where: { domain: host },
+          select: { id: true },
+        });
+        brandProfileId = profile?.id ?? null;
+      } catch {
+        brandProfileId = null;
+      }
     }
 
     return {
       leadId: lead.id,
       brandProfileId,
       completedAt,
-      snapshot: parsed.data,
+      snapshot,
     };
   }
 }

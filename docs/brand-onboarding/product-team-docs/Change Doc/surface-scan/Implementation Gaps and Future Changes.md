@@ -1,11 +1,19 @@
 # Surface Scan — Test Scenarios, Gaps, and Future Changes
 
-**Last reviewed:** 2026-07-15  
-**Current scope:** Landing URL gate, Stage 0 Gatekeeper, and Stage 1A core
-identity acquisition (Phase 3)
+> **Superseded for engineering (2026-07-16).**  
+> Use [`docs/brand-onboarding/CURRENT_STATE.md`](../../../CURRENT_STATE.md),
+> [`GAPS_AND_DECISIONS.md`](../../../GAPS_AND_DECISIONS.md), and
+> [`MANUAL_TEST_MATRIX.md`](../../../MANUAL_TEST_MATRIX.md).  
+> This Change Doc remains product history; several “gaps” below are already
+> closed in code (reachability-before-Gatekeeper, `.ac.in` block, masked
+> `adminEmail`, durable Stage 1B jobs, Checkpoint 2 API scaffold).
 
-Use this document as the manual-test checklist and quick reference for deferred
-surface-scan work.
+**Last reviewed:** 2026-07-15  
+**Current scope:** Landing URL gate, Stage 0 Gatekeeper, Stage 1A core
+identity (Phase 3), Checkpoint 1 confirm-identity (Phase 4), Stage 1B
+targeted acquisition (Phase 5), Prompt A Brand DNA + validation (Phases 6–7)
+
+Use this document as historical product notes only.
 
 ## Manual test scenarios
 
@@ -266,9 +274,8 @@ production.
 
 ### Stage 1A / Phase 3
 
-- Universal-wrapper data is temporarily stored in
-  `DiscoveryLead.temporaryPayload`; not every wrapped field has a first-class
-  Prisma column.
+- Stage 1A now upserts `BrandIntelligenceScan` (`STAGE_1A_COMPLETE`) and still
+  mirrors into `DiscoveryLead.temporaryPayload.stage1a` for compatibility.
 - Flat core identity values are written to `BrandProfile`.
 - There is no durable job queue, retry budget, dead-letter handling, or
   cross-process progress store.
@@ -308,6 +315,20 @@ Before production traffic, apply all of the following:
 
 ### Later phases
 
+- Prompt B (Offerings) and Prompt C (Competitors) Stage 2 modules —
+  Catalogue/Competitors screens still use existing sync APIs without
+  Stage 2 entity candidates.
+- Checkpoint 2 dedicated review for offerings/competitors confirmation
+  before Deep Scan.
+- Full Stage 2 Context Contract enrichment beyond Phase 5's thin
+  `{ url, page_type, clean_text }[]` runtime context (website_summary,
+  website_assets, messaging_pages, candidate entities).
+- Doc conflict resolutions already applied in code, still open in docs:
+  - Evidence keys: code uses `page_url` / `page_type` (not camelCase).
+  - Persona count: Zod allows 1–6; prompt asks for 2–4; canonical doc
+    says 2–6.
+- Durable queue-based Stage 1B/2 dispatch (current: in-process
+  `setImmediate` fire-and-forget).
 - Production Stage 1B crawl-planning worker and durable job lifecycle.
 - Deep-page acquisition and evidence extraction.
 - Offerings, locations, audience, competitor, visual identity, and policy
@@ -322,13 +343,15 @@ Before production traffic, apply all of the following:
 
 1. Run the manual scenarios above and record actual outcome, response code, and
    UI state for each.
-2. Remove anonymous `adminEmail` exposure from the claimed-brand response if
+2. End-to-end Checkpoint 1 → Brand DNA: confirm identity on a supported brand
+   (e.g. `mamaearth.in`), poll DNA page until `STAGE_2_BRAND_DNA_ARCHIVED`.
+3. Remove anonymous `adminEmail` exposure from the claimed-brand response if
    confirmed by API testing.
-3. Add focused tests for `.gov.in`/`.nic.in`/`.mil.in`, State F variants,
+4. Add focused tests for `.gov.in`/`.nic.in`/`.mil.in`, State F variants,
    direct API enforcement, and one-driver degradation.
-4. Decide policy for `ac.in` and `edu.in`.
-5. Add an SSRF-safe reachability check before URL-only Gemini classification.
-6. Enforce a minimum confidence threshold with an `UNKNOWN` fallback.
-7. Replace heuristic registrable-domain logic with a Public Suffix List
+5. Decide policy for `ac.in` and `edu.in`.
+6. Add an SSRF-safe reachability check before URL-only Gemini classification.
+7. Enforce a minimum confidence threshold with an `UNKNOWN` fallback.
+8. Replace heuristic registrable-domain logic with a Public Suffix List
    implementation.
-8. Continue with the next approved surface-scan phase.
+9. Implement Prompt B/C and Checkpoint 2 wiring into Catalogue/Competitors.
