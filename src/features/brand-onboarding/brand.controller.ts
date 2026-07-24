@@ -51,6 +51,7 @@ import { CoreIdentitySnapshotService } from "./surface-scan/stage1a/core-identit
 import { CoreIdentityConfirmationService } from "./surface-scan/stage1a/core-identity-confirmation.service";
 import { ConfirmIdentityBodySchema } from "./surface-scan/stage1a/confirm-identity.schema";
 import { IntelligenceStatusService } from "./surface-scan/intelligence-status.service";
+import { BrandAuditExportService } from "./surface-scan/brand-audit-export.service";
 import { Checkpoint2Service } from "./surface-scan/checkpoint2/checkpoint2.service";
 import { ConfirmCheckpoint2BodySchema } from "./surface-scan/checkpoint2/confirm-checkpoint2.schema";
 
@@ -68,6 +69,7 @@ export class BrandController {
     private readonly coreIdentitySnapshots: CoreIdentitySnapshotService,
     private readonly coreIdentityConfirmation: CoreIdentityConfirmationService,
     private readonly intelligenceStatus: IntelligenceStatusService,
+    private readonly brandAuditExport: BrandAuditExportService,
     private readonly checkpoint2: Checkpoint2Service,
     private readonly jwtService: JwtService,
   ) {}
@@ -129,6 +131,16 @@ export class BrandController {
     @Param("leadId", new ParseUUIDPipe({ version: "4" })) leadId: string,
   ) {
     return this.intelligenceStatus.getByLeadId(leadId);
+  }
+
+  /**
+   * Structured audit payload for product-team PDF export on the Brand DNA page.
+   */
+  @Get("surface-scan/audit/:leadId")
+  async brandAuditByLead(
+    @Param("leadId", new ParseUUIDPipe({ version: "4" })) leadId: string,
+  ) {
+    return this.brandAuditExport.getByLeadId(leadId);
   }
 
   /**

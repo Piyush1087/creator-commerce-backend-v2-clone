@@ -45,6 +45,7 @@ import { BrandDnaEngineService } from "./surface-scan/stage2/brand-dna-engine.se
 import { SnapshotValidationService } from "./surface-scan/stage2/snapshot-validation.service";
 import { BrandDnaProfileMergerService } from "./surface-scan/stage2/brand-dna-profile-merger.service";
 import { IntelligenceStatusService } from "./surface-scan/intelligence-status.service";
+import { BrandAuditExportService } from "./surface-scan/brand-audit-export.service";
 import { Checkpoint2Service } from "./surface-scan/checkpoint2/checkpoint2.service";
 import { BrandVerificationService } from "./verification/brand-verification.service";
 
@@ -91,6 +92,7 @@ import { BrandVerificationService } from "./verification/brand-verification.serv
     BrandIntelligenceJobService,
     BrandIntelligenceWorkerService,
     IntelligenceStatusService,
+    BrandAuditExportService,
     Checkpoint2Service,
     Stage1aBrandSurfaceScanRunner,
     {
