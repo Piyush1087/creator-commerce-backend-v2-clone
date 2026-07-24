@@ -17,14 +17,25 @@ import { mergeScrapePayloads } from "./core-identity-merge";
 import { PlaywrightHomepageStrategy } from "./playwright-homepage.strategy";
 import { ZyteHomepageStrategy } from "./zyte-homepage.strategy";
 
+export type CoreIdentityAcquisitionResult = {
+  snapshot: CoreIdentitySnapshot;
+  /**
+   * True when both drivers failed (or none configured) and we built a safe
+   * domain-derived snapshot — runner should persist STAGE_1A_FAILED_FALLBACK.
+   */
+  usedFallback: boolean;
+};
+
 /**
- * Stage 1A acquisition — Zyte-only, cost-tiered:
- * 1. Cheap Zyte httpResponseBody scrape (static HTML) runs first.
- * 2. Zyte browserHtml (JS-rendered, pricier) runs only as fallback when the
- *    static scrape fails or leaves identity gaps.
+ * Stage 1A acquisition — Phase 3 parallel Zyte + Playwright.
  *
- * Playwright is disabled by code for now (pending product decision) but the
- * strategy is kept wired so it can be re-enabled — see the commented block.
+ * - Zyte: static HTTP (JSON-LD / OpenGraph / meta / anchors)
+ * - Playwright: hydrated DOM (logo finder / social anchors)
+ * - Merge: name←Zyte, logo/socials←Playwright (see core-identity-merge)
+ * - Both fail → safe fallback snapshot (usedFallback=true)
+ *
+ * No overall Promise.race timeout — drivers use their own request budgets.
+ * Parallel.ai is not used.
  */
 @Injectable()
 export class CoreIdentityOrchestratorService {
@@ -32,7 +43,6 @@ export class CoreIdentityOrchestratorService {
 
   constructor(
     private readonly zyte: ZyteHomepageStrategy,
-    // Kept injected for future reactivation; not invoked while disabled.
     private readonly playwright: PlaywrightHomepageStrategy,
   ) {}
 
@@ -41,85 +51,74 @@ export class CoreIdentityOrchestratorService {
     targetUrl: string;
     gatekeeperIndustry: string;
     gatekeeperSubIndustry: string;
-  }): Promise<CoreIdentitySnapshot> {
+  }): Promise<CoreIdentityAcquisitionResult> {
     const scanId = args.scanId ?? randomUUID();
     const startedAt = Date.now();
     this.logger.log(`stage1a.start scanId=${scanId} url=${args.targetUrl}`);
 
-    if (!this.zyte.isConfigured()) {
+    const zyteConfigured = this.zyte.isConfigured();
+    const playwrightEnabled = this.playwright.isEnabled();
+
+    if (!zyteConfigured && !playwrightEnabled) {
       this.logger.warn("stage1a.no_acquisition_drivers — using fallback");
-      return this.buildFallback(scanId, args);
+      return {
+        snapshot: this.buildFallback(scanId, args),
+        usedFallback: true,
+      };
     }
 
-    const rejections: unknown[] = [];
+    // Phase 3: concurrent drivers via Promise.allSettled (no overall race timeout).
+    const scrapePromise = Promise.allSettled([
+      zyteConfigured
+        ? this.zyte.scrapeHomepage(args.targetUrl)
+        : Promise.reject(new Error("Zyte not configured")),
+      playwrightEnabled
+        ? this.playwright.scrapeDynamicDOM(args.targetUrl)
+        : Promise.reject(new Error("Playwright disabled")),
+    ]);
 
-    // Tier 1: cheap static-HTML scrape.
-    let httpResult: RawScrapeResult | null = null;
-    {
-      const t0 = Date.now();
-      try {
-        httpResult = await this.zyte.scrapeHomepage(args.targetUrl);
-        this.logger.log(
-          `stage1a.zyte_http_ok ms=${Date.now() - t0} ${describeResult(httpResult)}`,
-        );
-      } catch (err) {
-        this.logger.warn(
-          `stage1a.zyte_http_fail ms=${Date.now() - t0} err=${errMessage(err)}`,
-        );
-        if (isSurfaceScanAcquisitionTimeout(err)) {
-          throw err;
-        }
-        rejections.push(err);
+    const [zyteSettled, playwrightSettled] = await scrapePromise;
+
+    const rawZyte =
+      zyteSettled.status === "fulfilled" ? zyteSettled.value : null;
+    const rawPlaywright =
+      playwrightSettled.status === "fulfilled" ? playwrightSettled.value : null;
+
+    if (zyteSettled.status === "rejected") {
+      this.logger.warn(
+        `stage1a.zyte_fail err=${errMessage(zyteSettled.reason)}`,
+      );
+    } else {
+      this.logger.log(
+        `stage1a.zyte_ok ${describeResult(rawZyte as RawScrapeResult)}`,
+      );
+    }
+    if (playwrightSettled.status === "rejected") {
+      this.logger.warn(
+        `stage1a.playwright_fail err=${errMessage(playwrightSettled.reason)}`,
+      );
+    } else {
+      this.logger.log(
+        `stage1a.playwright_ok ${describeResult(rawPlaywright as RawScrapeResult)}`,
+      );
+    }
+
+    if (!rawZyte && !rawPlaywright) {
+      const rejections: unknown[] = [];
+      if (zyteSettled.status === "rejected") {
+        rejections.push(zyteSettled.reason);
       }
-    }
-
-    // Tier 2: JS-rendered browserHtml fallback, only when tier 1 left gaps.
-    const renderReason = this.renderedFallbackReason(httpResult);
-    let renderedResult: RawScrapeResult | null = null;
-    if (renderReason) {
-      this.logger.log(`stage1a.zyte_rendered_fallback reason=${renderReason}`);
-      const t0 = Date.now();
-      try {
-        renderedResult = await this.zyte.scrapeHomepageRendered(args.targetUrl);
-        this.logger.log(
-          `stage1a.zyte_rendered_ok ms=${Date.now() - t0} ${describeResult(renderedResult)}`,
-        );
-      } catch (err) {
-        this.logger.warn(
-          `stage1a.zyte_rendered_fail ms=${Date.now() - t0} err=${errMessage(err)}`,
-        );
-        if (isSurfaceScanAcquisitionTimeout(err)) {
-          throw err;
-        }
-        rejections.push(err);
+      if (playwrightSettled.status === "rejected") {
+        rejections.push(playwrightSettled.reason);
       }
-    }
 
-    // Playwright DOM path — disabled pending product decision on dropping it.
-    // To re-enable, restore this block (and see PLAYWRIGHT_* env vars):
-    //
-    // let playwrightResult: RawScrapeResult | null = null;
-    // if (this.playwright.isEnabled()) {
-    //   const t0 = Date.now();
-    //   try {
-    //     playwrightResult = await this.playwright.scrapeDynamicDOM(
-    //       args.targetUrl,
-    //     );
-    //     this.logger.log(
-    //       `stage1a.playwright_ok ms=${Date.now() - t0} ${describeResult(playwrightResult)}`,
-    //     );
-    //   } catch (err) {
-    //     this.logger.warn(
-    //       `stage1a.playwright_fail ms=${Date.now() - t0} err=${errMessage(err)}`,
-    //     );
-    //     rejections.push(err);
-    //   }
-    // }
+      // Propagate acquisition timeouts so the scan UI can offer retry.
+      for (const reason of rejections) {
+        if (isSurfaceScanAcquisitionTimeout(reason)) {
+          throw reason;
+        }
+      }
 
-    if (!httpResult && !renderedResult) {
-      // Every attempted path failed. If any failure is connection-level
-      // (dead DNS, timeout, 4xx/5xx, redirect hijack), surface State F so
-      // the UI shows "Retry Connection Check" instead of a degraded profile.
       const connectionFailures = rejections
         .map((reason) => classifyConnectionFailure(reason))
         .filter((f): f is SurfaceScanConnectionFailureError => f !== null);
@@ -130,27 +129,27 @@ export class CoreIdentityOrchestratorService {
         );
         throw failure;
       }
+
       this.logger.warn(
-        `stage1a.all_drivers_failed_non_connection — using fallback totalMs=${Date.now() - startedAt}`,
+        `stage1a.both_drivers_failed — STAGE_1A_FAILED_FALLBACK totalMs=${Date.now() - startedAt}`,
       );
-      return this.buildFallback(scanId, args);
+      return {
+        snapshot: this.buildFallback(scanId, args),
+        usedFallback: true,
+      };
     }
 
-    // Rendered result goes in the "playwright" merge slot: same precedence
-    // (rendered DOM wins for logo/socials, static JSON-LD wins for name).
     const snapshot = mergeScrapePayloads({
       scanId,
       targetUrl: args.targetUrl,
       industry: args.gatekeeperIndustry,
       subIndustry: args.gatekeeperSubIndustry,
-      zyte: httpResult,
-      playwright: renderedResult,
+      zyte: rawZyte,
+      playwright: rawPlaywright,
     });
 
     let validated = CoreIdentitySnapshotSchema.safeParse(snapshot);
     if (!validated.success) {
-      // Per-field degradation: null out failing optional fields (logo,
-      // tagline, socials) instead of discarding the whole good snapshot.
       const failedPaths = validated.error.issues
         .map((issue) => issue.path.join("."))
         .join(",");
@@ -162,29 +161,17 @@ export class CoreIdentityOrchestratorService {
         this.logger.error(
           `stage1a.zod_fail ${JSON.stringify(validated.error.format()).slice(0, 800)}`,
         );
-        return this.buildFallback(scanId, args);
+        return {
+          snapshot: this.buildFallback(scanId, args),
+          usedFallback: true,
+        };
       }
     }
 
     this.logger.log(
-      `stage1a.ok scanId=${scanId} totalMs=${Date.now() - startedAt} brand=${validated.data.brand_name.value} logo=${validated.data.brand_logo.value ? "yes" : "no"} links=${validated.data.discovered_root_links.length}`,
+      `stage1a.ok scanId=${scanId} totalMs=${Date.now() - startedAt} brand=${validated.data.brand_name.value} logo=${validated.data.brand_logo.value ? "yes" : "no"} zyte=${rawZyte ? "yes" : "no"} pw=${rawPlaywright ? "yes" : "no"} links=${validated.data.discovered_root_links.length}`,
     );
-    return validated.data;
-  }
-
-  /**
-   * The pricier browserHtml render runs only when the static scrape failed
-   * or looks like a client-rendered shell (no name or no anchors at all).
-   * A missing logo alone does not justify a render — the static parser
-   * already falls back to apple-touch-icon/favicon tags.
-   */
-  private renderedFallbackReason(
-    httpResult: RawScrapeResult | null,
-  ): string | null {
-    if (!httpResult) return "http_scrape_failed";
-    if (!httpResult.brand_name) return "missing_brand_name";
-    if ((httpResult.discovered_links?.length ?? 0) === 0) return "no_links";
-    return null;
+    return { snapshot: validated.data, usedFallback: false };
   }
 
   private buildFallback(
@@ -210,8 +197,6 @@ export class CoreIdentityOrchestratorService {
 /**
  * Nulls the optional fields that failed validation (logo, tagline, socials)
  * and drops invalid discovered links, preserving everything that was valid.
- * Required fields (name, url, industry) are never repaired here — if those
- * fail, the caller falls back to the safe snapshot.
  */
 function repairSnapshotFields(
   snapshot: CoreIdentitySnapshot,

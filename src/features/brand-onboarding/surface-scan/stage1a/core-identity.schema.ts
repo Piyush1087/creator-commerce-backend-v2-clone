@@ -56,7 +56,11 @@ export function createUniversalWrapper<T extends z.ZodTypeAny>(valueSchema: T) {
         excerpt: z.string().min(1),
       }),
     ),
-    source: z.enum(["AI", "USER", "SYSTEM", "CRAWLER"]).default("CRAWLER"),
+    // ZYTE / PLAYWRIGHT = Stage 1A driver provenance (Phase 3).
+    // CRAWLER kept for legacy snapshots that predate driver-specific sources.
+    source: z
+      .enum(["AI", "USER", "SYSTEM", "CRAWLER", "ZYTE", "PLAYWRIGHT"])
+      .default("CRAWLER"),
     edited: z.boolean().default(false),
   });
 }

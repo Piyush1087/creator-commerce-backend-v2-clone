@@ -5,6 +5,8 @@ import type {
 import { normalizeIndustryVertical } from "./core-identity.schema";
 import { isPlaceholderAsset } from "./zyte-homepage.strategy";
 
+type FieldSource = CoreIdentitySnapshot["brand_name"]["source"];
+
 /**
  * Phase 3 conflict matrix: "Currency / Geo … Static Fallback (Stage 0 Domain
  * TLD context)". TLD is used only when no driver extracted a country;
@@ -116,6 +118,13 @@ function evidence(
   return [{ page_url: pageUrl, page_type: pageType, excerpt }];
 }
 
+/**
+ * Phase 3 merge engine — deterministic weights, no LLM:
+ * - Brand name: Zyte (JSON-LD / meta) over Playwright (title / OG)
+ * - Logo / socials: Playwright (hydrated DOM) over Zyte (static)
+ * - Geo: Zyte over Playwright over TLD hint
+ * - Tagline: Zyte over Playwright
+ */
 export function mergeScrapePayloads(args: {
   scanId: string;
   targetUrl: string;
@@ -126,9 +135,20 @@ export function mergeScrapePayloads(args: {
 }): CoreIdentitySnapshot {
   const { scanId, targetUrl, industry, subIndustry, zyte, playwright } = args;
 
+  const nameFromZyte = Boolean(zyte?.brand_name?.trim());
+  const nameFromPw = Boolean(playwright?.brand_name?.trim());
   const nameValue =
-    zyte?.brand_name || playwright?.brand_name || fallbackBrandName(targetUrl);
+    zyte?.brand_name?.trim() ||
+    playwright?.brand_name?.trim() ||
+    fallbackBrandName(targetUrl);
+  const nameSource: FieldSource = nameFromZyte
+    ? "ZYTE"
+    : nameFromPw
+      ? "PLAYWRIGHT"
+      : "SYSTEM";
 
+  const logoFromPw = Boolean(playwright?.logo_url?.trim());
+  const logoFromZyte = Boolean(zyte?.logo_url?.trim());
   let logoValue = playwright?.logo_url || zyte?.logo_url || null;
   if (
     !logoValue ||
@@ -138,9 +158,6 @@ export function mergeScrapePayloads(args: {
   ) {
     logoValue = null;
   }
-  // Normalize to an absolute URL against the scan target; a logo that cannot
-  // resolve must degrade to null (avatar fallback) instead of failing the
-  // whole snapshot at Zod validation.
   if (logoValue) {
     try {
       logoValue = new URL(logoValue, targetUrl).toString();
@@ -148,7 +165,14 @@ export function mergeScrapePayloads(args: {
       logoValue = null;
     }
   }
-  // Ordered alternates the mirror step can walk when the primary 404s.
+  const logoSource: FieldSource = !logoValue
+    ? "SYSTEM"
+    : logoFromPw
+      ? "PLAYWRIGHT"
+      : logoFromZyte
+        ? "ZYTE"
+        : "SYSTEM";
+
   const logoCandidates = [
     ...new Set(
       [
@@ -173,6 +197,13 @@ export function mergeScrapePayloads(args: {
     youtube: playwright?.socials?.youtube || zyte?.socials?.youtube || null,
     linkedin: playwright?.socials?.linkedin || zyte?.socials?.linkedin || null,
   };
+  const socialFromPw = Object.values(playwright?.socials ?? {}).some(Boolean);
+  const socialFromZyte = Object.values(zyte?.socials ?? {}).some(Boolean);
+  const socialSource: FieldSource = socialFromPw
+    ? "PLAYWRIGHT"
+    : socialFromZyte
+      ? "ZYTE"
+      : "SYSTEM";
 
   const discovered = [
     ...(zyte?.discovered_links ?? []),
@@ -181,22 +212,47 @@ export function mergeScrapePayloads(args: {
   const uniqueLinks = [...new Set(discovered)].slice(0, 40);
 
   const tldCountry = countryHintFromTld(targetUrl);
-  const country = (zyte?.country || playwright?.country || tldCountry || "US")
+  const countryFromZyte = Boolean(zyte?.country?.trim());
+  const countryFromPw = Boolean(playwright?.country?.trim());
+  const country = (
+    zyte?.country ||
+    playwright?.country ||
+    tldCountry ||
+    "US"
+  )
     .slice(0, 2)
     .toUpperCase();
+  const countrySource: FieldSource = countryFromZyte
+    ? "ZYTE"
+    : countryFromPw
+      ? "PLAYWRIGHT"
+      : "SYSTEM";
   const currency = currencyFromCountry(country);
+
+  const taglineFromZyte = Boolean(zyte?.tagline?.trim());
+  const taglineFromPw = Boolean(playwright?.tagline?.trim());
+  const taglineValue = zyte?.tagline || playwright?.tagline || null;
+  const taglineSource: FieldSource = taglineFromZyte
+    ? "ZYTE"
+    : taglineFromPw
+      ? "PLAYWRIGHT"
+      : "SYSTEM";
 
   return {
     scan_id: scanId,
     brand_name: {
       value: nameValue,
-      confidence: zyte?.brand_name ? 95 : 70,
+      confidence: nameFromZyte ? 95 : nameFromPw ? 70 : 40,
       evidence: evidence(
         targetUrl,
         "homepage",
-        `Detected brand identifier matching: ${nameValue}`,
+        nameFromZyte
+          ? `Zyte (JSON-LD/meta): detected brand name "${nameValue}"`
+          : nameFromPw
+            ? `Playwright (DOM title/OG): detected brand name "${nameValue}"`
+            : `System fallback: brand name derived from domain → "${nameValue}"`,
       ),
-      source: "CRAWLER",
+      source: nameSource,
       edited: false,
     },
     website_url: {
@@ -207,42 +263,48 @@ export function mergeScrapePayloads(args: {
         "homepage",
         "Root baseline URL target verified.",
       ),
-      source: "CRAWLER",
+      source: "SYSTEM",
       edited: false,
     },
     country: {
       value: country,
-      confidence: zyte?.country ? 90 : 50,
+      confidence: countryFromZyte ? 90 : countryFromPw ? 70 : 50,
       evidence: evidence(
         targetUrl,
         "metadata",
-        "Extracted country parameter code block.",
+        countryFromZyte
+          ? `Zyte metadata: country "${country}"`
+          : countryFromPw
+            ? `Playwright metadata: country "${country}"`
+            : `System TLD/geo hint: country "${country}"`,
       ),
-      source: "CRAWLER",
+      source: countrySource,
       edited: false,
     },
     reporting_currency: {
       value: currency,
-      confidence: zyte?.country || playwright?.country ? 85 : 50,
+      confidence: countryFromZyte || countryFromPw ? 85 : 50,
       evidence: evidence(
         targetUrl,
         "metadata",
-        `Reporting currency inferred from country ${country}.`,
+        `Reporting currency inferred from country ${country} (${countrySource}).`,
       ),
-      source: "CRAWLER",
+      source: countrySource,
       edited: false,
     },
     brand_logo: {
       value: logoValue,
-      confidence: logoValue ? 85 : 0,
+      confidence: logoValue ? (logoFromPw ? 90 : 80) : 0,
       evidence: evidence(
         targetUrl,
         "homepage",
         logoValue
-          ? `Logo link verified: ${logoValue}`
+          ? logoFromPw
+            ? `Playwright (rendered DOM): logo ${logoValue}`
+            : `Zyte (og:image/static): logo ${logoValue}`
           : "No usable header identity asset located.",
       ),
-      source: "CRAWLER",
+      source: logoSource,
       edited: false,
     },
     industry: {
@@ -251,7 +313,7 @@ export function mergeScrapePayloads(args: {
       evidence: evidence(
         targetUrl,
         "gatekeeper_prediction",
-        "Calculated baseline classification metrics.",
+        "Gemini Gatekeeper baseline classification.",
       ),
       source: "AI",
       edited: false,
@@ -262,31 +324,39 @@ export function mergeScrapePayloads(args: {
       evidence: evidence(
         targetUrl,
         "gatekeeper_prediction",
-        "Sub-tier segment taxonomy configured.",
+        "Gemini Gatekeeper sub-industry taxonomy.",
       ),
       source: "AI",
       edited: false,
     },
     social_handles: {
       value: mergedSocials,
-      confidence: 90,
+      confidence: socialFromPw || socialFromZyte ? 90 : 0,
       evidence: evidence(
         targetUrl,
         "homepage",
-        "Scanned anchor elements across social media pattern sets.",
+        socialFromPw
+          ? "Playwright: scanned hydrated DOM anchors for social patterns."
+          : socialFromZyte
+            ? "Zyte: static HTML regex / anchor social matches."
+            : "No social handles located by Zyte or Playwright.",
       ),
-      source: "CRAWLER",
+      source: socialSource,
       edited: false,
     },
     tagline: {
-      value: zyte?.tagline || playwright?.tagline || null,
-      confidence: zyte?.tagline ? 80 : 40,
+      value: taglineValue,
+      confidence: taglineFromZyte ? 80 : taglineFromPw ? 60 : 0,
       evidence: evidence(
         targetUrl,
         "homepage",
-        "Evaluated core descriptive meta layouts.",
+        taglineFromZyte
+          ? "Zyte: descriptive meta / OG tagline."
+          : taglineFromPw
+            ? "Playwright: OG/description tagline from rendered DOM."
+            : "No tagline located.",
       ),
-      source: "CRAWLER",
+      source: taglineSource,
       edited: false,
     },
     discovered_root_links: uniqueLinks,

@@ -9,7 +9,7 @@
  */
 import { PrismaClient, UserRole } from "@prisma/client";
 
-const CREATOR_EMAIL = "test1@creator.com";
+const CREATOR_EMAIL = "test@creator.com";
 const CREATOR_DISPLAY_NAME = "Test Creator";
 const CREATOR_HANDLE = "test_creator";
 const STUB_BANK = {

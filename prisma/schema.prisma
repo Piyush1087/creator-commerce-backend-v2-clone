@@ -59,6 +59,7 @@ enum ScanStatus {
 /// Stage lifecycle for the Brand Intelligence pipeline (Phases 4–7).
 enum BrandIntelligenceStage {
   STAGE_1A_COMPLETE
+  STAGE_1A_FAILED_FALLBACK
   CORE_IDENTITY_APPROVED
   STAGE_1B_COMPLETE
   STAGE_1B_FAILED

@@ -1,4 +1,5 @@
 import { OfferingType } from "@prisma/client";
+import { Transform, Type } from "class-transformer";
 import {
   IsArray,
   IsBoolean,
@@ -10,7 +11,33 @@ import {
   MaxLength,
   ValidateNested,
 } from "class-validator";
-import { Type } from "class-transformer";
+
+/** Strip tracking query/hash and add https:// when missing (catalogue pastes). */
+function normalizeOfferingUrlInput(value: unknown): unknown {
+  if (typeof value !== "string") {
+    return value;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return value;
+  }
+  const withoutHash = trimmed.split("#")[0] ?? trimmed;
+  const withoutQuery = withoutHash.split("?")[0] ?? withoutHash;
+  const withProtocol = /^https?:\/\//i.test(withoutQuery)
+    ? withoutQuery
+    : `https://${withoutQuery}`;
+  try {
+    const url = new URL(withProtocol);
+    const host = url.hostname.replace(/^www\./i, "").toLowerCase();
+    const path =
+      url.pathname && url.pathname !== "/"
+        ? url.pathname.replace(/\/+$/, "")
+        : "";
+    return path ? `https://${host}${path}` : `https://${host}`;
+  } catch {
+    return withProtocol;
+  }
+}
 
 export class UpsertOfferingItemDto {
   @IsOptional()
@@ -33,6 +60,7 @@ export class UpsertOfferingItemDto {
   @IsUrl({ require_tld: false })
   imageUrl?: string | null;
 
+  @Transform(({ value }) => normalizeOfferingUrlInput(value))
   @IsUrl({ require_tld: false })
   url!: string;
 

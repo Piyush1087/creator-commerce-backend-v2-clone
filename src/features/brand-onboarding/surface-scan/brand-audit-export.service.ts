@@ -32,6 +32,7 @@ export type BrandAuditExportResponse = {
   surfaceScan: {
     completedAt: string | null;
     scanId: string;
+    discoveryMode: string | null;
     discoveredLinksCount: number;
     discoveredLinksSample: string[];
     fields: AuditFieldRow[];
@@ -131,6 +132,10 @@ export class BrandAuditExportService {
       surfaceScan: {
         completedAt: scan?.updatedAt?.toISOString() ?? null,
         scanId: stage1a?.scan_id ?? "—",
+        discoveryMode: summarizeStage1aDrivers(
+          stage1a,
+          scan?.currentStage ?? null,
+        ),
         discoveredLinksCount: stage1a?.discovered_root_links.length ?? 0,
         discoveredLinksSample: (stage1a?.discovered_root_links ?? []).slice(0, 12),
         fields: stage1a ? flattenCoreIdentity(stage1a) : [],
@@ -245,6 +250,43 @@ function flattenCoreIdentity(snapshot: CoreIdentitySnapshot): AuditFieldRow[] {
   return rows;
 }
 
+/** Summarize which Stage 1A drivers contributed, from field provenance. */
+function summarizeStage1aDrivers(
+  snapshot: CoreIdentitySnapshot | null,
+  stage: BrandIntelligenceStage | null,
+): string | null {
+  if (stage === "STAGE_1A_FAILED_FALLBACK") {
+    return "Fallback only (Zyte + Playwright both failed)";
+  }
+  if (!snapshot) {
+    return null;
+  }
+  const sources = [
+    snapshot.brand_name.source,
+    snapshot.brand_logo.source,
+    snapshot.social_handles.source,
+    snapshot.tagline.source,
+    snapshot.country.source,
+  ];
+  const hasZyte = sources.includes("ZYTE");
+  const hasPw = sources.includes("PLAYWRIGHT");
+  const hasLegacyCrawler = sources.includes("CRAWLER");
+
+  if (hasZyte && hasPw) {
+    return "Parallel Zyte + Playwright (Phase 3 merge)";
+  }
+  if (hasZyte) {
+    return "Zyte only (Playwright returned nothing useful)";
+  }
+  if (hasPw) {
+    return "Playwright only (Zyte returned nothing useful)";
+  }
+  if (hasLegacyCrawler) {
+    return "Website crawl (legacy CRAWLER source)";
+  }
+  return "System / Gatekeeper only";
+}
+
 function flattenBrandDna(snapshot: BrandDnaSnapshot): {
   fields: AuditFieldRow[];
   personas: Array<{ index: number; fields: AuditFieldRow[] }>;
@@ -323,14 +365,18 @@ function formatAuditEvidence(evidence: FieldEvidence[]): string {
 
 function sourceDetailLabel(source: string): string {
   switch (source) {
+    case "ZYTE":
+      return "Zyte (static HTML / JSON-LD / meta)";
+    case "PLAYWRIGHT":
+      return "Playwright (rendered DOM)";
     case "CRAWLER":
-      return "Website crawl (Zyte / Playwright)";
+      return "Website crawl (legacy — Zyte or Playwright)";
     case "AI":
       return "Gemini";
     case "USER":
       return "User confirmed";
     case "SYSTEM":
-      return "System / derived";
+      return "System / derived (domain or TLD fallback)";
     default:
       return source;
   }

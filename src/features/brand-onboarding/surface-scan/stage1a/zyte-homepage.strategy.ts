@@ -9,10 +9,10 @@ import { SurfaceScanAcquisitionTimeoutError } from "../surface-scan-acquisition-
 import type { RawScrapeResult } from "./core-identity.schema";
 
 /**
- * Zyte homepage acquisition.
- * Primary path: cheap httpResponseBody (static HTML) → parse meta / JSON-LD / anchors.
- * Fallback path: browserHtml (Zyte-side JS rendering) for client-rendered sites,
- * priced higher per request — call only when the static scrape leaves gaps.
+ * Zyte homepage acquisition (Phase 3).
+ * Primary Stage 1A path: cheap httpResponseBody (static HTML) → parse
+ * JSON-LD / OpenGraph / meta / same-origin anchors.
+ * Optional browserHtml remains available for Stage 1B blank-page fallback.
  */
 @Injectable()
 export class ZyteHomepageStrategy {

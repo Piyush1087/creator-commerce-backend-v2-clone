@@ -13,7 +13,8 @@ import {
 } from "./zyte-homepage.strategy";
 
 /**
- * Playwright dynamic DOM homepage acquisition (logos + social anchors).
+ * Playwright dynamic DOM homepage acquisition (Phase 3).
+ * Runs in parallel with Zyte: logo finder, social anchors, hydrated title/OG.
  */
 @Injectable()
 export class PlaywrightHomepageStrategy {
@@ -34,7 +35,7 @@ export class PlaywrightHomepageStrategy {
       throw new Error("Playwright is disabled");
     }
 
-    const timeoutMs = this.config.get<number>("PLAYWRIGHT_TIMEOUT_MS", 5000);
+    const timeoutMs = this.config.get<number>("PLAYWRIGHT_TIMEOUT_MS", 25_000);
     // Dynamic import keeps cold starts lighter when Playwright is off.
     const { chromium } = await import("playwright");
     const browser = await chromium.launch({

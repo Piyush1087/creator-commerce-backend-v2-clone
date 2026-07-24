@@ -28,7 +28,7 @@ type UniversalWrapper<T> = {
   value: T;
   confidence: number;
   evidence: FieldEvidence[];
-  source: "AI" | "USER" | "SYSTEM" | "CRAWLER";
+  source: "AI" | "USER" | "SYSTEM" | "CRAWLER" | "ZYTE" | "PLAYWRIGHT";
   edited: boolean;
 };
 
@@ -108,9 +108,10 @@ export class CoreIdentityConfirmationService {
     if (
       scan &&
       scan.currentStage !== BrandIntelligenceStage.STAGE_1A_COMPLETE &&
+      scan.currentStage !== BrandIntelligenceStage.STAGE_1A_FAILED_FALLBACK &&
       scan.currentStage !== BrandIntelligenceStage.CORE_IDENTITY_APPROVED
     ) {
-      // Allow re-confirm from STAGE_1A / already approved; reject mid-pipeline.
+      // Allow re-confirm from STAGE_1A / fallback / already approved; reject mid-pipeline.
       if (
         scan.currentStage === BrandIntelligenceStage.STAGE_1B_COMPLETE ||
         scan.currentStage ===

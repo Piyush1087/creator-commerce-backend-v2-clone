@@ -136,12 +136,16 @@ export class Stage1aBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
     const industry = lead.industry ?? IndustryVertical.UNKNOWN;
     const subIndustry = lead.subIndustry ?? "General";
 
-    const snapshot = await this.orchestrator.execute({
+    const acquisition = await this.orchestrator.execute({
       scanId: lead.id,
       targetUrl: gated.normalizedUrl,
       gatekeeperIndustry: industry,
       gatekeeperSubIndustry: subIndustry,
     });
+    const snapshot = acquisition.snapshot;
+    const stage1aStage = acquisition.usedFallback
+      ? BrandIntelligenceStage.STAGE_1A_FAILED_FALLBACK
+      : BrandIntelligenceStage.STAGE_1A_COMPLETE;
 
     this.scanProgress.setPhase(args.leadId, "persisting");
 
@@ -205,19 +209,24 @@ export class Stage1aBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
           discoveryLeadId: lead.id,
           brandProfileId: upserted.id,
           websiteUrl: gated.normalizedUrl,
-          currentStage: BrandIntelligenceStage.STAGE_1A_COMPLETE,
+          currentStage: stage1aStage,
           stage1aSnapshot: mirroredSnapshot as unknown as Prisma.InputJsonValue,
+          errorLogs: acquisition.usedFallback
+            ? "Stage 1A: both Zyte and Playwright failed; safe fallback snapshot."
+            : null,
         },
         update: {
           brandProfileId: upserted.id,
           websiteUrl: gated.normalizedUrl,
-          currentStage: BrandIntelligenceStage.STAGE_1A_COMPLETE,
+          currentStage: stage1aStage,
           stage1aSnapshot: mirroredSnapshot as unknown as Prisma.InputJsonValue,
           authoritativeIdentity: Prisma.DbNull,
           runtimeContext: Prisma.DbNull,
           brandDnaRaw: Prisma.DbNull,
           brandDnaVerifiedSnapshot: Prisma.DbNull,
-          errorLogs: null,
+          errorLogs: acquisition.usedFallback
+            ? "Stage 1A: both Zyte and Playwright failed; safe fallback snapshot."
+            : null,
         },
       });
 
