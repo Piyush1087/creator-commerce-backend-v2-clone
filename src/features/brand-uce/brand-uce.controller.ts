@@ -23,10 +23,7 @@ import {
   PatchCampaignEssentialsDto,
   PatchDraftCampaignWizardDto,
 } from "./dto/brand-uce-campaign.dto";
-import {
-  CreateCampaignBriefDto,
-  UpdateCampaignBriefDto,
-} from "./dto/brand-uce-brief.dto";
+import { UpdateCampaignBriefDto } from "./dto/brand-uce-brief.dto";
 import {
   AddTrackingDto,
   ApproveApplicantDto,
@@ -39,10 +36,7 @@ import {
   ReviewContentDto,
   SubmitContentDraftDto,
 } from "./dto/brand-uce-pipeline.dto";
-import {
-  CreateCampaignProductDto,
-  UpdateCampaignProductDto,
-} from "./dto/brand-uce-product.dto";
+import { UpdateCampaignProductDto } from "./dto/brand-uce-product.dto";
 import { BrandUceBriefService } from "./services/brand-uce-brief.service";
 import { BrandUceCampaignService } from "./services/brand-uce-campaign.service";
 import { BrandUcePipelineService } from "./services/brand-uce-pipeline.service";
@@ -149,7 +143,7 @@ export class BrandUceController {
   async createProduct(
     @Req() req: RequestWithAuthUser,
     @Param("campaignId") campaignId: string,
-    @Body() body: CreateCampaignProductDto,
+    @Body() body: unknown,
   ) {
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
     return this.products.create(brandProfileId, campaignId, body);
@@ -190,7 +184,7 @@ export class BrandUceController {
   async createBrief(
     @Req() req: RequestWithAuthUser,
     @Param("campaignId") campaignId: string,
-    @Body() body: CreateCampaignBriefDto,
+    @Body() body: unknown,
   ) {
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
     return this.briefs.create(brandProfileId, campaignId, body);

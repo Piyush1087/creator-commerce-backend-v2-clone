@@ -9,30 +9,10 @@ import {
   MinLength,
 } from "class-validator";
 
-export class CreateCampaignProductDto {
-  @IsString()
-  @MinLength(2)
-  @MaxLength(150)
-  sku_code!: string;
-
-  @IsString()
-  @MinLength(1)
-  @MaxLength(255)
-  product_name!: string;
-
-  @IsInt()
-  @Min(0)
-  inventory_count!: number;
-
-  @IsNumber()
-  @Min(0.01)
-  cost_per_unit!: number;
-
-  @IsOptional()
-  @IsUrl()
-  image_url?: string | null;
-}
-
+/**
+ * Create uses MasterAddAssetDrawerSchema (Zod) on the controller.
+ * Inventory is not accepted on create — patch via UpdateCampaignProductDto.
+ */
 export class UpdateCampaignProductDto {
   @IsOptional()
   @IsString()

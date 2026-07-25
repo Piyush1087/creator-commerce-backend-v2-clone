@@ -9,27 +9,10 @@ import {
   MinLength,
 } from "class-validator";
 
-export class CreateCampaignBriefDto {
-  @IsString()
-  @MinLength(5)
-  @MaxLength(255)
-  internal_title!: string;
-
-  @IsString()
-  @MinLength(20)
-  creative_guidelines!: string;
-
-  @IsArray()
-  @ArrayMinSize(1)
-  @IsEnum(UceMediaPlatform, { each: true })
-  required_platforms!: UceMediaPlatform[];
-
-  @IsArray()
-  @ArrayMinSize(1)
-  @IsString({ each: true })
-  deliverable_format_tags!: string[];
-}
-
+/**
+ * Create uses MasterAddBriefWizardSchema (Zod) on the controller.
+ * Patch retains legacy flat fields for essentials edits.
+ */
 export class UpdateCampaignBriefDto {
   @IsOptional()
   @IsString()

@@ -5,6 +5,7 @@ import {
   UnprocessableEntityException,
 } from "@nestjs/common";
 import {
+  UceCampaignAssetType,
   UceCampaignObjective,
   UceCampaignStatus,
   UceMediaPlatform,
@@ -231,12 +232,19 @@ export class BrandCentreUceBridgeService {
           const product = await tx.uceCampaignProduct.create({
             data: {
               campaignId,
+              assetType: UceCampaignAssetType.INDIVIDUAL_PRODUCT_SKU,
               skuCode,
               productName: payload.product_name.trim(),
               inventoryCount: 0,
               costPerUnit: payload.estimated_base_price,
               imageUrl: null,
               isActive: true,
+              assetPayload: {
+                asset_type: "INDIVIDUAL_PRODUCT_SKU",
+                product_name: payload.product_name.trim(),
+                price: payload.estimated_base_price,
+                source: "BRAND_CENTRE_BRIDGE",
+              },
             },
             select: { id: true },
           });

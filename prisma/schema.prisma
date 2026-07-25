@@ -1210,41 +1210,74 @@ model UceCampaignCommercials {
   @@map("uce_campaign_commercials")
 }
 
-model UceCampaignProduct {
-  id             String      @id @default(uuid()) @map("product_id")
-  campaignId     String      @map("campaign_id")
-  campaign       UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  skuCode        String      @map("sku_code")
-  productName    String      @map("product_name")
-  isActive       Boolean     @default(true) @map("is_active")
-  inventoryCount Int         @default(0) @map("inventory_count")
-  costPerUnit    Decimal     @default(0) @map("cost_per_unit") @db.Decimal(10, 2)
-  imageUrl       String?     @map("image_url")
-  createdAt      DateTime    @default(now()) @map("created_at")
+enum UceCampaignAssetType {
+  INDIVIDUAL_PRODUCT_SKU
+  CURATED_COLLECTION_LINE
+  CORE_BRAND_IDENTITY
+  ACTIVE_SALE_PROMOTION
 
+  @@map("uce_campaign_asset_type_enum")
+}
+
+enum UceBriefStrategyMode {
+  CREATOR_LED
+  BRAND_LED
+
+  @@map("uce_brief_strategy_mode_enum")
+}
+
+model UceCampaignProduct {
+  id             String              @id @default(uuid()) @map("product_id")
+  campaignId     String              @map("campaign_id")
+  campaign       UceCampaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  assetType      UceCampaignAssetType @default(INDIVIDUAL_PRODUCT_SKU) @map("asset_type")
+  skuCode        String?             @map("sku_code")
+  productName    String              @map("product_name")
+  isActive       Boolean             @default(true) @map("is_active")
+  /// Stock is managed via essentials/inventory patch — not on Add Asset create.
+  inventoryCount Int                 @default(0) @map("inventory_count")
+  costPerUnit    Decimal             @default(0) @map("cost_per_unit") @db.Decimal(10, 2)
+  imageUrl       String?             @map("image_url")
+  /// Validated MasterAddAssetDrawer payload (minus campaign_id).
+  assetPayload   Json                @default("{}") @map("asset_payload")
+  createdAt      DateTime            @default(now()) @map("created_at")
+
+  briefs         UceCampaignBrief[]
   collaborations UceCampaignCollaboration[]
   workflowCollaborations Collaboration[]
 
   @@unique([campaignId, skuCode])
   @@index([campaignId])
+  @@index([campaignId, assetType])
   @@map("uce_campaign_products")
 }
 
 model UceCampaignBrief {
-  id                    String             @id @default(uuid()) @map("brief_id")
-  campaignId            String             @map("campaign_id")
-  campaign              UceCampaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  internalTitle         String             @map("internal_title")
-  creativeGuidelines    String             @map("creative_guidelines") @db.Text
-  isActive              Boolean            @default(true) @map("is_active")
-  requiredPlatforms     UceMediaPlatform[] @map("required_platforms")
-  deliverableFormatTags String[]           @default([]) @map("deliverable_format_tags")
-  createdAt             DateTime           @default(now()) @map("created_at")
+  id                           String               @id @default(uuid()) @map("brief_id")
+  campaignId                   String               @map("campaign_id")
+  campaign                     UceCampaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  productId                    String?              @map("product_id")
+  product                      UceCampaignProduct?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  internalTitle                String               @map("internal_title")
+  creativeGuidelines           String               @map("creative_guidelines") @db.Text
+  isActive                     Boolean              @default(true) @map("is_active")
+  requiredPlatforms            UceMediaPlatform[]   @map("required_platforms")
+  deliverableFormatTags        String[]             @default([]) @map("deliverable_format_tags")
+  briefType                    UceBriefStrategyMode? @map("brief_type")
+  purpose                      String?              @map("purpose") @db.Text
+  objective                    String?              @map("objective") @db.Text
+  targetInfluencerArchetype    String?              @map("target_influencer_archetype")
+  mandatoryCreatorRequirements String?              @map("mandatory_creator_requirements") @db.Text
+  deliverablesInventory        Json?                @map("deliverables_inventory")
+  contentGuidanceMatrix        Json?                @map("content_guidance_matrix")
+  parentPlannerLogisticsSnapshot Json?              @map("parent_planner_logistics_snapshot")
+  createdAt                    DateTime             @default(now()) @map("created_at")
 
   collaborations UceCampaignCollaboration[]
   workflowCollaborations Collaboration[]
 
   @@index([campaignId])
+  @@index([productId])
   @@map("uce_campaign_briefs")
 }
 
