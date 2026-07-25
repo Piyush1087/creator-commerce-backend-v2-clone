@@ -6,15 +6,15 @@
     "deleteOutDir": true,
     "assets": [
       {
-        "include": "**/*.prompt.md",
+        "include": "features/brand-onboarding/prompts/**/*.md",
         "watchAssets": true
       },
       {
-        "include": "features/brand-onboarding/prompts/surface/**/*.md",
+        "include": "features/brand-centre/prompts/**/*.md",
         "watchAssets": true
       },
       {
-        "include": "features/brand-centre/prompts/contracts/**/*.md",
+        "include": "features/creator-onboarding/prompts/**/*.md",
         "watchAssets": true
       }
     ]

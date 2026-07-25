@@ -13,6 +13,7 @@ RUN npm ci
 COPY . .
 
 RUN npx prisma generate
+# `npm run build` = nest build + copy-prompt-assets.mjs (prompt .md into dist/)
 RUN npm run build
 
 FROM node:20-bookworm-slim AS runner
