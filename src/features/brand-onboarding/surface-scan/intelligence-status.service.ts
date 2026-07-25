@@ -1,5 +1,8 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import type { BrandIntelligenceStage } from "@prisma/client";
+import type {
+  BrandIntelligenceJobStatus,
+  BrandIntelligenceStage,
+} from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import {
@@ -13,6 +16,9 @@ export type IntelligenceStatusResponse = {
   currentStage: BrandIntelligenceStage | null;
   brandDna: BrandDnaSnapshot | null;
   error: string | null;
+  /** Latest Stage 1B job — UI must keep waiting while QUEUED/RUNNING (retries). */
+  jobStatus: BrandIntelligenceJobStatus | null;
+  jobAttempt: number | null;
 };
 
 /**
@@ -33,9 +39,16 @@ export class IntelligenceStatusService {
       throw new NotFoundException("Discovery lead not found");
     }
 
-    const scan = await this.prisma.brandIntelligenceScan.findUnique({
-      where: { discoveryLeadId: leadId },
-    });
+    const [scan, latestJob] = await Promise.all([
+      this.prisma.brandIntelligenceScan.findUnique({
+        where: { discoveryLeadId: leadId },
+      }),
+      this.prisma.brandIntelligenceJob.findFirst({
+        where: { discoveryLeadId: leadId },
+        orderBy: { queuedAt: "desc" },
+        select: { status: true, attempt: true },
+      }),
+    ]);
 
     if (!scan) {
       return {
@@ -44,6 +57,8 @@ export class IntelligenceStatusService {
         currentStage: null,
         brandDna: null,
         error: null,
+        jobStatus: latestJob?.status ?? null,
+        jobAttempt: latestJob?.attempt ?? null,
       };
     }
 
@@ -67,6 +82,8 @@ export class IntelligenceStatusService {
       currentStage: scan.currentStage,
       brandDna,
       error: scan.errorLogs,
+      jobStatus: latestJob?.status ?? null,
+      jobAttempt: latestJob?.attempt ?? null,
     };
   }
 }
