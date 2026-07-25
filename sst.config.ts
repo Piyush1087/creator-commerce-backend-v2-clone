@@ -128,24 +128,60 @@ export default $config({
             ? (process.env.APP_FRONTEND_URL_DEV?.trim() || defaultFrontendUrl)
             : (process.env.APP_FRONTEND_URL?.trim() || defaultFrontendUrl),
       ...buildNotificationPostmarkTemplateEnv(process.env),
-      PARALLEL_API_KEY: process.env.PARALLEL_API_KEY as string,
-      GEMINI_API_KEY: process.env.GEMINI_API_KEY as string,
-      GEMINI_MODEL: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
-      GEMINI_REQUEST_TIMEOUT_MS:
-        process.env.GEMINI_REQUEST_TIMEOUT_MS ?? "120000",
+      // Brand onboarding Stage 1A — Zyte + Playwright (Parallel is legacy only)
+      BRAND_SCAN_ACQUISITION:
+        process.env.BRAND_SCAN_ACQUISITION?.trim() || "zyte",
+      ZYTE_API_KEY: process.env.ZYTE_API_KEY as string,
+      ZYTE_API_URL:
+        process.env.ZYTE_API_URL?.trim() || "https://api.zyte.com/v1/extract",
+      ZYTE_REQUEST_TIMEOUT_MS:
+        process.env.ZYTE_REQUEST_TIMEOUT_MS ?? "15000",
+      // Stage 1A: Zyte + Playwright on deployed stages. Local follows .env (default off).
+      // To disable PW on ECS intentionally, set PLAYWRIGHT_ENABLED=false and
+      // PLAYWRIGHT_FORCE_OFF=true in the deploy .env.
+      PLAYWRIGHT_ENABLED:
+        $app.stage === "local"
+          ? (process.env.PLAYWRIGHT_ENABLED?.trim() || "false")
+          : process.env.PLAYWRIGHT_FORCE_OFF === "true"
+            ? "false"
+            : "true",
+      PLAYWRIGHT_TIMEOUT_MS: process.env.PLAYWRIGHT_TIMEOUT_MS ?? "25000",
+      // Legacy Parallel surface-scan path (kept for reactivation)
+      PARALLEL_API_KEY: process.env.PARALLEL_API_KEY ?? "",
       PARALLEL_EXTRACT_TIMEOUT_MS:
         process.env.PARALLEL_EXTRACT_TIMEOUT_MS ?? "300000",
       PARALLEL_SEARCH_TIMEOUT_MS:
         process.env.PARALLEL_SEARCH_TIMEOUT_MS ?? "60000",
       PARALLEL_SEARCH_MAX_CHARS_TOTAL:
         process.env.PARALLEL_SEARCH_MAX_CHARS_TOTAL ?? "24000",
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY as string,
+      GEMINI_MODEL: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+      GATEKEEPER_GEMINI_MODEL:
+        process.env.GATEKEEPER_GEMINI_MODEL ??
+        process.env.GEMINI_MODEL ??
+        "gemini-2.5-flash",
+      MCP_PLANNER_GEMINI_MODEL:
+        process.env.MCP_PLANNER_GEMINI_MODEL ??
+        process.env.GEMINI_MODEL ??
+        "gemini-2.5-flash",
+      BRAND_DNA_GEMINI_MODEL:
+        process.env.BRAND_DNA_GEMINI_MODEL ??
+        process.env.GEMINI_MODEL ??
+        "gemini-2.5-flash",
+      GEMINI_REQUEST_TIMEOUT_MS:
+        process.env.GEMINI_REQUEST_TIMEOUT_MS ?? "120000",
       INSTAGRAM_API_ID: process.env.INSTAGRAM_API_ID as string,
       INSTAGRAM_APP_SECRET: process.env.INSTAGRAM_APP_SECRET as string,
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? "",
+      // Static/stub OTP on local + dev; prod may opt into real Postmark OTP later.
       CREATOR_VERIFICATION_USE_REAL_OTP:
-        process.env.CREATOR_VERIFICATION_USE_REAL_OTP ?? "false",
+        $app.stage === "prod"
+          ? (process.env.CREATOR_VERIFICATION_USE_REAL_OTP ?? "false")
+          : "false",
       BRAND_VERIFICATION_USE_REAL_OTP:
-        process.env.BRAND_VERIFICATION_USE_REAL_OTP ?? "false",
+        $app.stage === "prod"
+          ? (process.env.BRAND_VERIFICATION_USE_REAL_OTP ?? "false")
+          : "false",
       BRAND_SCAN_LIMITS_ENABLED:
         process.env.BRAND_SCAN_LIMITS_ENABLED ??
         ($app.stage === "local" ? "false" : "true"),

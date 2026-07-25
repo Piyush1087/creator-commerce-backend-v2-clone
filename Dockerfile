@@ -28,6 +28,11 @@ COPY --from=builder /usr/src/app/dist ./dist
 COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
+# Brand onboarding Stage 1A — Playwright Chromium for ECS (arm64 + amd64).
+# Browsers land under /ms-playwright so the slim image can find them at runtime.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN npx playwright install --with-deps chromium
+
 ENV PORT=80
 EXPOSE 80
 

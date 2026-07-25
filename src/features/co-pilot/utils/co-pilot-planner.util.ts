@@ -51,6 +51,12 @@ export function isPlannerLaunchGuidanceQuery(userText: string): boolean {
 
 export function isPlannerLaunchWriteQuery(userText: string): boolean {
   const n = userText.toLowerCase();
+
+  // "move/send/push … planner" is move-leak, not launch-card.
+  if (/\b(move|send|push|convert)\b/.test(n) && mentionsPlanner(userText)) {
+    return false;
+  }
+
   if (!mentionsPlanner(userText)) {
     return (
       n.includes("launch planner card") ||

@@ -185,6 +185,15 @@ export class CoPilotOrchestratorService {
       if (slotPayload) {
         return slotPayload;
       }
+      // Slot submit without an active session — do not re-route to a different write intent.
+      return CoPilotChatPayloadSchema.parse({
+        messageId,
+        threadId: args.threadId,
+        timestamp: new Date().toISOString(),
+        formatType: "CONVERSATIONAL_NARRATIVE",
+        narrativeText:
+          "That form expired or is no longer active. Please ask me again to move a leak to Campaign Planner (or continue the action you wanted), then pick from the list.",
+      });
     }
 
     const activeSession = await this.slotSessions.getActiveSession(args.threadId);

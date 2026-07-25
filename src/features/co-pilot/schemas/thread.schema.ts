@@ -14,11 +14,24 @@ export const PatchCoPilotThreadSchema = z.object({
   status: z.enum(["ACTIVE", "ARCHIVED"]).optional(),
 });
 
-export const PostCoPilotMessageSchema = z.object({
-  text: z.string().trim().min(1).max(8000),
-  scopeContext: CoPilotScopeContextSchema.optional(),
-  slotValues: z.record(z.string()).optional(),
-});
+export const PostCoPilotMessageSchema = z
+  .object({
+    text: z.string().max(8000).default(""),
+    scopeContext: CoPilotScopeContextSchema.optional(),
+    slotValues: z.record(z.string()).optional(),
+  })
+  .superRefine((body, ctx) => {
+    const hasText = body.text.trim().length > 0;
+    const hasSlots =
+      !!body.slotValues && Object.keys(body.slotValues).length > 0;
+    if (!hasText && !hasSlots) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Message text or slotValues is required",
+        path: ["text"],
+      });
+    }
+  });
 
 export const ConfirmHitlSchema = z.object({
   threadId: z.string().uuid(),
