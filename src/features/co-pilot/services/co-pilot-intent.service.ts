@@ -50,8 +50,9 @@ export class CoPilotIntentService {
       this.detectDnaOfferingUpdate(userText) ??
       this.detectDnaIdentityUpdate(userText) ??
       this.detectCampaignEditDraft(userText) ??
-      this.detectPlannerLaunchDraft(userText) ??
+      // Move-leak before launch-card — "move … planner" must not stage launch.
       this.detectIntelligenceMoveToPlanner(userText, history) ??
+      this.detectPlannerLaunchDraft(userText) ??
       this.detectCampaignLaunch(userText) ??
       { kind: "NONE" }
     );

@@ -86,6 +86,25 @@ For **dev RDS** seed via tunnel (optional — only if jumpbox is available):
 npm run db:seed:dev-creator
 ```
 
+## Migration: `brand_intelligence_scans` (Phase 4–7)
+
+Adds the Brand Intelligence pipeline table for Checkpoint 1 → Stage 1B →
+Prompt A Brand DNA:
+
+- Enum `BrandIntelligenceStage` (`STAGE_1A_COMPLETE` …
+  `STAGE_2_NEEDS_REVIEW`).
+- Table `brand_intelligence_scans` with:
+  - `discovery_lead_id` (unique FK → `discovery_leads`)
+  - optional `brand_profile_id` FK → `brand_profiles`
+  - JSON columns: `stage1a_snapshot`, `authoritative_identity`,
+    `runtime_context`, `brand_dna_raw`, `brand_dna_verified_snapshot`
+  - `current_stage`, `error_logs`, timestamps
+- Stage 1A continues to also write `temporaryPayload.stage1a` for
+  backward compatibility; readers prefer the new table.
+
+Apply locally with `npm run db:migrate:dev` (name suggestion:
+`brand_intelligence_scans`). Deploy with `npm run db:migrate:deploy`.
+
 ## Migration: `20260704120000_command_center_phase_alignment`
 
 - Command-center workspace phases on `uce_campaign_collaborations` (`current_phase`, `action_required_by_role`, `production_deadline_at`, `creator_profile_id`, `content_format_type`).

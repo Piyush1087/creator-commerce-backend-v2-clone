@@ -69,6 +69,8 @@ function resolveCorsOrigin(
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
+    // Replace default ~100kb parsers so 5MB image uploads (base64) fit.
+    bodyParser: false,
   });
   const config = app.get(ConfigService);
   const stage = config.get<string>("STAGE");
@@ -98,6 +100,9 @@ async function bootstrap() {
       whitelist: true,
     }),
   );
+
+  app.useBodyParser("json", { limit: "8mb" });
+  app.useBodyParser("urlencoded", { extended: true, limit: "8mb" });
 
   const port = config.get<number>("PORT", 3000);
   await app.listen(port);

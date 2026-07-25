@@ -18,6 +18,7 @@ You must provide **structured JSON** for:
 ## Rules
 
 - Never invent absolute URLs: every `products[].url` must appear in the crawl markdown **or** be the provided `CANONICAL_SITE_URL` (root) when the site only shows relative links you cannot resolve.
+- When markdown includes an image URL for the brand logo, a product, or a competitor, copy it into `brand.logoUrl`, `products[].imageUrl`, or `competitors[].logoUrl` as an absolute `https://` URL. Prefer OG/meta images, apple-touch icons, CDN product thumbnails, and visible list-grid images when present. For products, leave `imageUrl` null only when the list markdown has **no** nearby image URL — do not invent image URLs.
 - **shortDescription** ≤ 200 characters when possible (hard cap 500 in schema).
 - **toneTags**: at most **3** short labels. **aestheticTags**: at most **2** short labels.
 - **products**: at most **6** items from list/grid views only.

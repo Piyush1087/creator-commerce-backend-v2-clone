@@ -91,6 +91,11 @@ For Prisma through the tunnel, use **`localhost:5435`**, not the RDS hostname an
 ## Prerequisites
 
 1. `.env` with `DEV_DATABASE_URL` and API keys (see `sst.config.ts`).
+   For brand onboarding Stage 1A, ensure at least:
+   - `ZYTE_API_KEY` (+ optional `ZYTE_API_URL`, `ZYTE_REQUEST_TIMEOUT_MS`)
+   - `GEMINI_API_KEY`
+   - `PLAYWRIGHT_ENABLED` — leave unset (or `true`) so deployed ECS runs Zyte + Playwright; Docker image installs Chromium
+   - OTP stays stubbed on **dev** (`CREATOR/BRAND_VERIFICATION_USE_REAL_OTP` forced `false` in SST for non-prod)
 2. AWS SSO:
 
    ```bash

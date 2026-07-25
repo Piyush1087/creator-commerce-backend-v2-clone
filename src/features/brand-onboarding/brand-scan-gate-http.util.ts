@@ -1,6 +1,7 @@
 import { ForbiddenException } from "@nestjs/common";
 
 import { BrandScanGateException } from "./brand-scan-gate.service";
+import { maskAdminEmail } from "./mask-admin-email.util";
 
 /** Maps scan-gate failures to structured 403 bodies for the frontend. */
 export function throwBrandScanGateHttp(err: unknown): void {
@@ -13,7 +14,7 @@ export function throwBrandScanGateHttp(err: unknown): void {
       outcome: "org_claimed",
       message: gate.message,
       domain: gate.domain,
-      adminEmail: gate.adminEmail,
+      adminEmail: maskAdminEmail(gate.adminEmail),
     });
   }
   if (gate.kind === "brand_active") {

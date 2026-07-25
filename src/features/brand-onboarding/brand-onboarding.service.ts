@@ -10,21 +10,26 @@ import {
   MarketIntelRejectionType,
   Prisma,
 } from "@prisma/client";
+import { addDays } from "date-fns";
 
 import { PrismaService } from "../../prisma/prisma.service";
+import { BRAND_RESUME_PROFILE_MAX_AGE_DAYS } from "./brand-scan-gate.config";
 import { BrandScanGateService } from "./brand-scan-gate.service";
 import type { DiscoverWaitlistRequestDto } from "./dto/discover-waitlist-request.dto";
 import { stubClassifyIndustry } from "./discovery-industry.stub";
+import { DiscoveryReachabilityService } from "./discovery-reachability.service";
 import { redactUrlForLogs } from "./discovery-redaction";
 import {
   gateAndNormalizeBrandUrl,
   type UrlGateFailureReason,
 } from "./discovery-url.util";
+import { maskAdminEmail } from "./mask-admin-email.util";
 import {
   INDUSTRY_CLASSIFIER,
   type IndustryClassifier,
 } from "./industry/industry-classifier.token";
 import type { IndustryClassification } from "./industry/industry.types";
+import { WaitlistReason } from "@prisma/client";
 
 export type DiscoverValidateSuccess = {
   outcome: "success";
@@ -33,12 +38,21 @@ export type DiscoverValidateSuccess = {
   industry: IndustryVertical;
 };
 
+export type WaitlistReasonCode =
+  | "UNSUPPORTED_INDUSTRY"
+  | "FOREIGN_LANGUAGE"
+  | "CONTENT_UNREADABLE"
+  | "PARKED_DOMAIN";
+
 export type DiscoverValidateWaitlist = {
   outcome: "waitlist";
   logId: string;
+  leadId: string;
   normalizedUrl: string;
   domain: string;
   industry: IndustryVertical;
+  reason: WaitlistReasonCode;
+  message?: string;
 };
 
 export type DiscoverValidateBlocked = {
@@ -74,13 +88,23 @@ export type DiscoverValidateVerificationRequired = {
   reason: "DOMAIN_LIMIT" | "IP_LIMIT";
 };
 
+export type DiscoverValidateInfrastructureError = {
+  outcome: "infrastructure_error";
+  reason: "http_status" | "dns_or_timeout" | "redirect_hijack";
+  httpStatus?: number;
+  message: string;
+  domain: string;
+  normalizedUrl: string;
+};
+
 export type DiscoverValidateResult =
   | DiscoverValidateSuccess
   | DiscoverValidateWaitlist
   | DiscoverValidateBlocked
   | DiscoverValidateOrgClaimed
   | DiscoverValidateBrandActive
-  | DiscoverValidateVerificationRequired;
+  | DiscoverValidateVerificationRequired
+  | DiscoverValidateInfrastructureError;
 
 /** Read-only Step 1 entry check: no `discovery_leads` rows are created here. */
 export type DiscoveryResolveResume = {
@@ -127,6 +151,7 @@ export class BrandOnboardingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scanGate: BrandScanGateService,
+    private readonly reachability: DiscoveryReachabilityService,
     @Inject(INDUSTRY_CLASSIFIER)
     private readonly industryClassifier: IndustryClassifier,
   ) {}
@@ -154,7 +179,12 @@ export class BrandOnboardingService {
       return this.mapGateFailure(entry.reason.reason);
     }
     if (entry.kind === "org_claimed") {
-      return { outcome: "org_claimed", ...entry };
+      return {
+        outcome: "org_claimed",
+        message: entry.message,
+        domain: entry.domain,
+        adminEmail: maskAdminEmail(entry.adminEmail),
+      };
     }
     if (entry.kind === "brand_active") {
       return { outcome: "brand_active", ...entry };
@@ -212,7 +242,12 @@ export class BrandOnboardingService {
       return this.mapGateFailure(entry.reason.reason, logId);
     }
     if (entry.kind === "org_claimed") {
-      return { outcome: "org_claimed", ...entry };
+      return {
+        outcome: "org_claimed",
+        message: entry.message,
+        domain: entry.domain,
+        adminEmail: maskAdminEmail(entry.adminEmail),
+      };
     }
     if (entry.kind === "brand_active") {
       return { outcome: "brand_active", ...entry };
@@ -231,16 +266,108 @@ export class BrandOnboardingService {
       return this.mapGateFailure(gated.reason, logId);
     }
 
+    const reach = await this.reachability.probe(gated.normalizedUrl);
+    if (!reach.ok) {
+      return {
+        outcome: "infrastructure_error",
+        reason: reach.reason,
+        httpStatus: reach.httpStatus,
+        message: reach.message,
+        domain: gated.hostname,
+        normalizedUrl: gated.normalizedUrl,
+      };
+    }
+
+    if (reach.contentSignal === "parked") {
+      return this.emitContentWaitlist({
+        rawUrl,
+        gated,
+        industry: IndustryVertical.UNKNOWN,
+        subIndustry: "Parked Domain",
+        reason: "PARKED_DOMAIN",
+        message:
+          "We found a parked or coming-soon page at this address. Leave your email and we'll notify you when storefront evaluation is available for this domain.",
+      });
+    }
+    if (reach.contentSignal === "unreadable") {
+      return this.emitContentWaitlist({
+        rawUrl,
+        gated,
+        industry: IndustryVertical.UNKNOWN,
+        subIndustry: "Unreadable Content",
+        reason: "CONTENT_UNREADABLE",
+        message:
+          "We couldn't evaluate enough storefront content on this site. Leave your email for updates when content-level scanning improves.",
+      });
+    }
+    if (reach.contentSignal === "foreign_language") {
+      return this.emitContentWaitlist({
+        rawUrl,
+        gated,
+        industry: IndustryVertical.UNKNOWN,
+        subIndustry: "Foreign Language Storefront",
+        reason: "FOREIGN_LANGUAGE",
+        message:
+          "We've identified a non-English storefront. Creator's Shop currently focuses on English-language brands — leave your email for localization early access.",
+      });
+    }
+
     const classified = await this.classifyIndustryCached({
       hostname: gated.hostname,
       normalizedUrl: gated.normalizedUrl,
     });
 
+    const sub = (classified.subIndustry ?? "").toLowerCase();
+    if (
+      classified.industry === IndustryVertical.UNKNOWN &&
+      (sub.includes("foreign") || sub.includes("language"))
+    ) {
+      return this.emitContentWaitlist({
+        rawUrl,
+        gated,
+        industry: classified.industry,
+        subIndustry: classified.subIndustry ?? "Foreign Language Storefront",
+        reason: "FOREIGN_LANGUAGE",
+        message:
+          "We've identified a non-English storefront. Creator's Shop currently focuses on English-language brands — leave your email for localization early access.",
+      });
+    }
+    if (
+      classified.industry === IndustryVertical.UNKNOWN &&
+      (sub.includes("parked") ||
+        sub.includes("unreadable") ||
+        sub.includes("coming soon"))
+    ) {
+      return this.emitContentWaitlist({
+        rawUrl,
+        gated,
+        industry: classified.industry,
+        subIndustry: classified.subIndustry ?? "Unreadable Content",
+        reason: sub.includes("parked")
+          ? "PARKED_DOMAIN"
+          : "CONTENT_UNREADABLE",
+        message:
+          "We couldn't evaluate storefront components for this domain. Leave your email and we'll follow up.",
+      });
+    }
+
     if (classified.bucket === "supported") {
-      const lead = await this.ensureDiscoveryLead({
+      const lead = await this.upsertDiscoveryLeadSession({
         rawUrl: rawUrl.trim(),
         normalizedUrl: gated.normalizedUrl,
         industry: classified.industry,
+        subIndustry: classified.subIndustry ?? null,
+        isSupported: true,
+        status: DiscoveryLeadStatus.IDENTIFIED,
+        temporaryPayload: {
+          bucket: "supported",
+          industry: classified.industry,
+          subIndustry: classified.subIndustry ?? null,
+          confidence: classified.confidence ?? null,
+          classifier: "stage0_gatekeeper",
+          pipelineVersion: "stage0_gatekeeper_v1",
+        },
+        classificationEvidence: `Supported vertical: ${classified.industry}${classified.subIndustry ? ` / ${classified.subIndustry}` : ""}`,
       });
       return {
         outcome: "success",
@@ -256,12 +383,33 @@ export class BrandOnboardingService {
         industry: classified.industry,
         rejectionType: MarketIntelRejectionType.UNSUPPORTED_NICHE,
       });
+      const lead = await this.upsertDiscoveryLeadSession({
+        rawUrl: rawUrl.trim(),
+        normalizedUrl: gated.normalizedUrl,
+        industry: classified.industry,
+        subIndustry: classified.subIndustry ?? null,
+        isSupported: false,
+        status: DiscoveryLeadStatus.REJECTED,
+        temporaryPayload: {
+          bucket: "regret",
+          reason: "UNSUPPORTED_INDUSTRY",
+          industry: classified.industry,
+          subIndustry: classified.subIndustry ?? null,
+          confidence: classified.confidence ?? null,
+          marketIntelligenceLogId: log.id,
+          classifier: "stage0_gatekeeper",
+          pipelineVersion: "stage0_gatekeeper_v1",
+        },
+        classificationEvidence: `Regret vertical: ${classified.industry}`,
+      });
       return {
         outcome: "waitlist",
         logId: log.id,
+        leadId: lead.id,
         normalizedUrl: gated.normalizedUrl,
         domain: gated.hostname,
         industry: classified.industry,
+        reason: "UNSUPPORTED_INDUSTRY",
       };
     }
 
@@ -287,7 +435,7 @@ export class BrandOnboardingService {
       ? redactUrlForLogs(dto.sourceUrl)
       : undefined;
     this.logger.log(
-      `discovery.waitlist email=[redacted] industry=${dto.industry} ip=${this.redactIp(ctx.clientIp)}${safeSource ? ` source=${safeSource}` : ""}`,
+      `discovery.waitlist email=[redacted] industry=${dto.industry} reason=${dto.reason ?? "-"} domain=${dto.domain ?? "-"} ip=${this.redactIp(ctx.clientIp)}${safeSource ? ` source=${safeSource}` : ""}`,
     );
 
     if (dto.discoveryLeadId) {
@@ -313,11 +461,61 @@ export class BrandOnboardingService {
       data: {
         email: dto.email,
         industryInterest: dto.industry,
+        domain: dto.domain?.trim() || null,
+        reason: dto.reason
+          ? (dto.reason as WaitlistReason)
+          : WaitlistReason.UNSUPPORTED_INDUSTRY,
         discoveryLeadId: dto.discoveryLeadId,
         marketIntelligenceLogId: dto.marketIntelligenceLogId,
       },
     });
     return { id: row.id };
+  }
+
+  private async emitContentWaitlist(args: {
+    rawUrl: string;
+    gated: { normalizedUrl: string; hostname: string };
+    industry: IndustryVertical;
+    subIndustry: string;
+    reason: WaitlistReasonCode;
+    message: string;
+  }): Promise<DiscoverValidateWaitlist> {
+    const log = await this.upsertMarketIntel({
+      domainName: args.gated.hostname,
+      industry: args.industry,
+      rejectionType: MarketIntelRejectionType.UNSUPPORTED_NICHE,
+    });
+    const lead = await this.upsertDiscoveryLeadSession({
+      rawUrl: args.rawUrl.trim(),
+      normalizedUrl: args.gated.normalizedUrl,
+      industry: args.industry,
+      subIndustry: args.subIndustry,
+      isSupported: false,
+      status: DiscoveryLeadStatus.REJECTED,
+      temporaryPayload: {
+        bucket: "regret",
+        reason: args.reason,
+        industry: args.industry,
+        subIndustry: args.subIndustry,
+        marketIntelligenceLogId: log.id,
+        classifier: "stage0_reachability",
+        pipelineVersion: "stage0_gatekeeper_v1",
+      },
+      classificationEvidence: `${args.reason}: ${args.subIndustry}`.slice(
+        0,
+        250,
+      ),
+    });
+    return {
+      outcome: "waitlist",
+      logId: log.id,
+      leadId: lead.id,
+      normalizedUrl: args.gated.normalizedUrl,
+      domain: args.gated.hostname,
+      industry: args.industry,
+      reason: args.reason,
+      message: args.message,
+    };
   }
 
   private async classifyIndustryCached(input: {
@@ -386,6 +584,13 @@ export class BrandOnboardingService {
             code: "BLOCKED_TLD",
             message: "This domain type is not accepted for automated scans.",
           };
+        case "BLOCKED_RESTRICTED_SEGMENT":
+          return {
+            outcome: "blocked",
+            code: "BLOCKED_TLD",
+            message:
+              "Access Denied: This target website belongs to a restricted segment, or is not supported by the platform.",
+          };
         default:
           return {
             outcome: "blocked",
@@ -449,11 +654,58 @@ export class BrandOnboardingService {
         return MarketIntelRejectionType.SECURITY_RISK;
       case "BLOCKED_TLD":
         return MarketIntelRejectionType.BLOCKED_PLATFORM;
+      case "BLOCKED_RESTRICTED_SEGMENT":
+        return MarketIntelRejectionType.SECURITY_RISK;
       default:
         return MarketIntelRejectionType.GARBAGE_ENTRY;
     }
   }
 
+  private discoveryLeadExpiresAt(): Date {
+    return addDays(new Date(), BRAND_RESUME_PROFILE_MAX_AGE_DAYS);
+  }
+
+  private async upsertDiscoveryLeadSession(args: {
+    rawUrl: string;
+    normalizedUrl: string;
+    industry: IndustryVertical;
+    subIndustry?: string | null;
+    isSupported: boolean;
+    status: DiscoveryLeadStatus;
+    temporaryPayload: Prisma.InputJsonValue;
+    classificationEvidence: string;
+  }) {
+    const expiresAt = this.discoveryLeadExpiresAt();
+    const evidence = args.classificationEvidence.slice(0, 250);
+    return this.prisma.discoveryLead.upsert({
+      where: { normalizedUrl: args.normalizedUrl },
+      create: {
+        rawUrl: args.rawUrl,
+        normalizedUrl: args.normalizedUrl,
+        status: args.status,
+        isSupported: args.isSupported,
+        industry: args.industry,
+        subIndustry: args.subIndustry ?? null,
+        securityScore: 0,
+        temporaryPayload: args.temporaryPayload,
+        expiresAt,
+        signupCompleted: false,
+        classificationEvidence: evidence,
+      },
+      update: {
+        rawUrl: args.rawUrl,
+        status: args.status,
+        isSupported: args.isSupported,
+        industry: args.industry,
+        subIndustry: args.subIndustry ?? null,
+        temporaryPayload: args.temporaryPayload,
+        expiresAt,
+        classificationEvidence: evidence,
+      },
+    });
+  }
+
+  /** @deprecated Use upsertDiscoveryLeadSession — kept for internal resume paths. */
   private async ensureDiscoveryLead(args: {
     rawUrl: string;
     normalizedUrl: string;
@@ -463,7 +715,15 @@ export class BrandOnboardingService {
       where: { normalizedUrl: args.normalizedUrl },
     });
     if (existing) {
-      return existing;
+      return this.prisma.discoveryLead.update({
+        where: { id: existing.id },
+        data: {
+          industry: args.industry,
+          isSupported: true,
+          status: DiscoveryLeadStatus.IDENTIFIED,
+          expiresAt: this.discoveryLeadExpiresAt(),
+        },
+      });
     }
     try {
       return await this.prisma.discoveryLead.create({
@@ -474,6 +734,8 @@ export class BrandOnboardingService {
           isSupported: true,
           industry: args.industry,
           securityScore: 0,
+          expiresAt: this.discoveryLeadExpiresAt(),
+          signupCompleted: false,
         },
       });
     } catch (e) {

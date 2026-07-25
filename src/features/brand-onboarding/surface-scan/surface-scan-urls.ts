@@ -14,7 +14,7 @@ function uniqSameOriginUrls(
   const unique = new Set<string>();
   for (const path of paths) {
     const candidate = path === "/" ? origin : `${origin}${path}`;
-    const next = gateAndNormalizeBrandUrl(candidate);
+    const next = gateAndNormalizeBrandUrl(candidate, { keepPath: true });
     if (next.ok && next.hostname === gated.hostname) {
       unique.add(next.normalizedUrl);
     }

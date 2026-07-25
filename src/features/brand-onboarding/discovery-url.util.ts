@@ -1,13 +1,30 @@
-const BLOCKED_HOST_SUBSTRINGS = [
-  "facebook.",
+const BLOCKED_APEX_HOSTS = [
+  "facebook.com",
   "fb.com",
-  "instagram.",
-  "twitter.",
+  "instagram.com",
+  "twitter.com",
   "x.com",
-  "tiktok.",
+  "tiktok.com",
   "youtube.com",
   "youtu.be",
-];
+  "linkedin.com",
+] as const;
+
+/** Marketplace brand labels present as a hostname segment (amazon.in, flipkart.com, …). */
+const BLOCKED_MARKETPLACE_LABELS = [
+  "amazon",
+  "flipkart",
+  "myntra",
+  "meesho",
+  "ajio",
+  "snapdeal",
+  "nykaa",
+  "ebay",
+  "walmart",
+  "aliexpress",
+  "alibaba",
+  "shopee",
+] as const;
 
 const SUSPICIOUS_TLDS = new Set([
   "zip",
@@ -21,15 +38,34 @@ const SUSPICIOUS_TLDS = new Set([
   "ml",
 ]);
 
+const HARD_BLOCKED_SUFFIXES = [
+  ".gov",
+  ".gov.in",
+  ".nic.in",
+  ".mil",
+  ".mil.in",
+  ".edu",
+  ".ac.in",
+] as const;
+
 export type UrlGateFailureReason =
   | "INVALID_SYNTAX"
   | "BLOCKED_SOCIAL_HOST"
   | "BLOCKED_PRIVATE_HOST"
-  | "BLOCKED_TLD";
+  | "BLOCKED_TLD"
+  | "BLOCKED_RESTRICTED_SEGMENT";
 
 export type UrlGateResult =
   | { ok: true; normalizedUrl: string; hostname: string }
   | { ok: false; reason: UrlGateFailureReason; hostname?: string };
+
+export type UrlGateOptions = {
+  /**
+   * When true, keep a non-root pathname (offerings / enrichers).
+   * Discovery / gatekeeper always use apex-only (`keepPath: false`, default).
+   */
+  keepPath?: boolean;
+};
 
 function isPrivateOrReservedHost(hostname: string): boolean {
   const h = hostname.toLowerCase();
@@ -72,7 +108,11 @@ function isPrivateOrReservedHost(hostname: string): boolean {
 
 function hasBlockedSocialMarketplace(hostname: string): boolean {
   const h = hostname.toLowerCase();
-  return BLOCKED_HOST_SUBSTRINGS.some((frag) => h.includes(frag));
+  if (BLOCKED_APEX_HOSTS.some((apex) => h === apex || h.endsWith(`.${apex}`))) {
+    return true;
+  }
+  const labels = h.split(".");
+  return BLOCKED_MARKETPLACE_LABELS.some((label) => labels.includes(label));
 }
 
 function hasSuspiciousPublicSuffix(hostname: string): boolean {
@@ -81,18 +121,42 @@ function hasSuspiciousPublicSuffix(hostname: string): boolean {
   return SUSPICIOUS_TLDS.has(tld);
 }
 
+function hasRestrictedSegmentSuffix(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return HARD_BLOCKED_SUFFIXES.some(
+    (suffix) => h === suffix.slice(1) || h.endsWith(suffix),
+  );
+}
+
+/**
+ * Landing change-doc Truncate & Slice: drop query/hash before URL parse so
+ * long `?fbclid` / utm pastes cannot break validation.
+ */
+function preSliceTrackingNoise(raw: string): string {
+  const trimmed = raw.trim();
+  const cutHash = trimmed.split("#")[0] ?? trimmed;
+  const cutQuery = cutHash.split("?")[0] ?? cutHash;
+  return cutQuery.trim();
+}
+
 /**
  * Lightweight syntax gate aligned with Step 1 tri-layer validation. This does
  * not perform outbound HTTP fetches (SSRF-safe by construction here).
+ *
+ * Discovery identity key is always apex (`https://hostname`) unless `keepPath`.
  */
-export function gateAndNormalizeBrandUrl(raw: string): UrlGateResult {
-  const trimmed = raw.trim();
-  if (trimmed.length < 3 || trimmed.length > 2048) {
+export function gateAndNormalizeBrandUrl(
+  raw: string,
+  options?: UrlGateOptions,
+): UrlGateResult {
+  const keepPath = options?.keepPath === true;
+  const sliced = preSliceTrackingNoise(raw);
+  if (sliced.length < 3 || sliced.length > 2048) {
     return { ok: false, reason: "INVALID_SYNTAX" };
   }
-  const withProtocol = /^https?:\/\//i.test(trimmed)
-    ? trimmed
-    : `https://${trimmed}`;
+  const withProtocol = /^https?:\/\//i.test(sliced)
+    ? sliced
+    : `https://${sliced}`;
   let url: URL;
   try {
     url = new URL(withProtocol);
@@ -118,6 +182,9 @@ export function gateAndNormalizeBrandUrl(raw: string): UrlGateResult {
   if (isPrivateOrReservedHost(hostname)) {
     return { ok: false, reason: "BLOCKED_PRIVATE_HOST", hostname };
   }
+  if (hasRestrictedSegmentSuffix(hostname)) {
+    return { ok: false, reason: "BLOCKED_RESTRICTED_SEGMENT", hostname };
+  }
   if (hasSuspiciousPublicSuffix(hostname)) {
     return { ok: false, reason: "BLOCKED_TLD", hostname };
   }
@@ -129,10 +196,11 @@ export function gateAndNormalizeBrandUrl(raw: string): UrlGateResult {
   if (!labels.every((l) => apex.test(l))) {
     return { ok: false, reason: "INVALID_SYNTAX", hostname };
   }
-  url.protocol = "https:";
-  url.hostname = hostname;
-  url.hash = "";
-  url.search = "";
+
+  if (!keepPath) {
+    return { ok: true, normalizedUrl: `https://${hostname}`, hostname };
+  }
+
   const path =
     url.pathname && url.pathname !== "/"
       ? url.pathname.replace(/\/+$/, "")

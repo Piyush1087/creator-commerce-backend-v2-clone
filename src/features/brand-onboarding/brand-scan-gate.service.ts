@@ -46,7 +46,10 @@ export class BrandScanGateService {
     authenticatedUserId?: string;
   }): Promise<
     | BrandScanGateResult
-    | { kind: "url_blocked"; reason: ReturnType<typeof gateAndNormalizeBrandUrl> }
+    | {
+        kind: "url_blocked";
+        reason: ReturnType<typeof gateAndNormalizeBrandUrl>;
+      }
   > {
     const gated = gateAndNormalizeBrandUrl(args.rawUrl);
     if (!gated.ok) {
@@ -55,7 +58,10 @@ export class BrandScanGateService {
 
     const { hostname, normalizedUrl } = gated;
 
-    const orgClaimed = await this.findOrgClaimedContact(hostname, normalizedUrl);
+    const orgClaimed = await this.findOrgClaimedContact(
+      hostname,
+      normalizedUrl,
+    );
     if (orgClaimed) {
       return {
         kind: "org_claimed",
@@ -328,10 +334,7 @@ export class BrandScanGateService {
     if (!user) {
       return false;
     }
-    if (
-      organizationId &&
-      user.organizationId === organizationId
-    ) {
+    if (organizationId && user.organizationId === organizationId) {
       return true;
     }
     if (

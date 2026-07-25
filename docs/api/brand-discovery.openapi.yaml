@@ -250,12 +250,15 @@ components:
           $ref: "#/components/schemas/IndustryVertical"
     DiscoverValidateWaitlist:
       type: object
-      required: [outcome, logId, normalizedUrl, domain, industry]
+      required: [outcome, logId, leadId, normalizedUrl, domain, industry]
       properties:
         outcome:
           type: string
           enum: [waitlist]
         logId:
+          type: string
+          format: uuid
+        leadId:
           type: string
           format: uuid
         normalizedUrl:

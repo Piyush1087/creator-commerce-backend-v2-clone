@@ -9,12 +9,15 @@ export class BrandOnboardingPurgeScheduler {
 
   constructor(private readonly purge: BrandOnboardingPurgeService) {}
 
-  /** Daily purge of unverified drafts past the 7-day horizon. */
+  /** Daily purge of unverified drafts and expired discovery cache rows. */
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
   async handleDailyPurge(): Promise<void> {
     try {
-      const result = await this.purge.purgeStaleUnverifiedBrandProfiles();
-      this.logger.log(`scheduled purge complete count=${result.deletedProfileCount}`);
+      const profiles = await this.purge.purgeStaleUnverifiedBrandProfiles();
+      const leads = await this.purge.purgeExpiredDiscoveryLeads();
+      this.logger.log(
+        `scheduled purge complete profiles=${profiles.deletedProfileCount} discoveryLeads=${leads.deletedLeadCount}`,
+      );
     } catch (err) {
       this.logger.error(`scheduled purge failed err=${String(err)}`);
     }

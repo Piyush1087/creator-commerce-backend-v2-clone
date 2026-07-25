@@ -31,7 +31,10 @@ export function emailDomainMatchesBrandDomain(
   brandDomain: string,
 ): boolean {
   const emailHost = emailDomainFromAddress(email);
-  const site = brandDomain.trim().toLowerCase().replace(/^www\./, "");
+  const site = brandDomain
+    .trim()
+    .toLowerCase()
+    .replace(/^www\./, "");
   if (!emailHost || !site) {
     return false;
   }

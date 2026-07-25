@@ -13,12 +13,17 @@ export class GeminiJsonClient {
     userText: string;
     /** OpenAPI-style schema; use `zodToGeminiResponseSchema` from brand-centre prompts. */
     responseSchema?: ResponseSchema;
+    /** Overrides GEMINI_MODEL for callers with a dedicated model env (e.g. gatekeeper). */
+    modelId?: string;
+    temperature?: number;
   }): Promise<unknown> {
     const apiKey = this.config.get<string>("GEMINI_API_KEY", "");
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY is not configured");
     }
-    const modelId = this.config.get<string>("GEMINI_MODEL", "gemini-2.5-flash");
+    const modelId =
+      args.modelId?.trim() ||
+      this.config.get<string>("GEMINI_MODEL", "gemini-2.5-flash");
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
@@ -26,7 +31,7 @@ export class GeminiJsonClient {
       systemInstruction: args.systemInstruction,
       generationConfig: {
         responseMimeType: "application/json",
-        temperature: 0.2,
+        temperature: args.temperature ?? 0.2,
         ...(args.responseSchema ? { responseSchema: args.responseSchema } : {}),
       },
     });

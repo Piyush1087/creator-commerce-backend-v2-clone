@@ -28,8 +28,11 @@ HTTP **403** body uses the same `outcome` shapes for `brand_active`, `org_claime
 
 | Env | Behavior |
 |-----|----------|
-| `STAGE=local` | Counters **off** (unless `BRAND_SCAN_LIMITS_ENABLED=true`) |
-| `STAGE=dev` / `prod` | Counters **on** |
+| `STAGE=local` | Counters **off** by default (`BRAND_SCAN_LIMITS_ENABLED` unset or `false`) |
+| `STAGE=dev` / `prod` | Counters **on** (SST default `true` unless env overrides) |
+
+Set `BRAND_SCAN_LIMITS_ENABLED=true` locally to test the 6th-scan `verification_required` gate without deploying.
+Set `BRAND_SCAN_LIMITS_ENABLED=false` on dev to keep limits open during QA.
 
 Config: `BRAND_SCAN_LIMITS_ENABLED`, `BRAND_SCAN_LIMIT_WINDOW_DAYS` (7), `BRAND_SCAN_LIMIT_MAX_PER_WINDOW` (5).
 
@@ -37,9 +40,12 @@ Nest throttler (requests/min) remains separate from scan counters.
 
 ## Purge
 
-Daily cron (03:00 server time) deletes **unverified** `BrandProfile` rows with **no** `organizationId` older than **7 days** (cascade children).
+Daily cron (03:00 server time):
 
-Manual: inject `BrandOnboardingPurgeService` or call `purgeStaleUnverifiedBrandProfiles()` from a script.
+- Deletes **unverified** `BrandProfile` rows with **no** `organizationId` older than **7 days** (cascade children).
+- Deletes **unsigned** `DiscoveryLead` rows past `expires_at` (cascade `waitlist_leads`).
+
+Manual: inject `BrandOnboardingPurgeService` or call `purgeStaleUnverifiedBrandProfiles()` / `purgeExpiredDiscoveryLeads()` from a script.
 
 ## Auth continuity
 

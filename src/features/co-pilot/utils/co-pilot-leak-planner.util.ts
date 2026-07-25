@@ -50,33 +50,72 @@ export function parseLeakTitleHint(userText: string): string | undefined {
   return undefined;
 }
 
+/** Parse `uuid::Label` select values from slot lists into the bare id. */
+export function parseSelectOptionId(value: unknown): string {
+  const raw = String(value ?? "").trim();
+  const separator = raw.indexOf("::");
+  return separator >= 0 ? raw.slice(0, separator) : raw;
+}
+
+export function parseSelectOptionLabel(value: unknown): string {
+  const raw = String(value ?? "").trim();
+  const separator = raw.indexOf("::");
+  return separator >= 0 ? raw.slice(separator + 2).trim() : raw;
+}
+
 export function isMoveLeakToPlannerQuery(userText: string): boolean {
   const n = userText.toLowerCase();
 
+  // "Approve/launch planner card as draft" is PLANNER_LAUNCH_DRAFT, not move-leak.
+  const isLaunchCardPhrase =
+    (/\blaunch\b/.test(n) || /\bcreate draft\b/.test(n)) &&
+    (n.includes("card") || n.includes("blueprint") || n.includes("draft campaign"));
+  const isApproveCardPhrase =
+    /\bapprove\b/.test(n) &&
+    (n.includes("planner card") || n.includes("card as a draft")) &&
+    !/\b(leak|gap|opportunity)\b/.test(n);
+  if (
+    (isLaunchCardPhrase || isApproveCardPhrase) &&
+    !/\b(move|send|push|convert)\b/.test(n)
+  ) {
+    return false;
+  }
+
   if (
     mentionsCampaignPlanner(userText) &&
-    /\b(move|send|push|convert|pass|approve)\b/.test(n)
+    /\b(move|send|push|convert|pass)\b/.test(n)
   ) {
     return true;
   }
 
+  // e.g. "move top planner", "move to planner"
+  if (/\bmove\b/.test(n) && /\bplanner\b/.test(n)) {
+    return true;
+  }
+
+  // "approve and pass <Leak Title>" (leak title in the same utterance)
   if (/\b(approve|pass)\s+(?:and\s+pass\s+)?(?:the\s+)?/i.test(userText)) {
     const titleHint = parseLeakTitleHint(userText);
     if (titleHint) {
       return true;
     }
-    if (/\bleak\b/.test(n) || mentionsCampaignPlanner(userText)) {
+    if (/\bleak\b/.test(n) || /\bgap\b/.test(n)) {
       return true;
     }
   }
 
-  if (mentionsCampaignPlanner(userText) && /\b(it|this|that)\b/.test(n)) {
+  if (
+    mentionsCampaignPlanner(userText) &&
+    /\b(it|this|that)\b/.test(n) &&
+    /\b(move|send|push|pass)\b/.test(n)
+  ) {
     return true;
   }
 
   return (
     n.includes("send opportunity to campaign planner") ||
-    n.includes("to campaign planner")
+    (n.includes("to campaign planner") &&
+      /\b(move|send|push|pass|convert)\b/.test(n))
   );
 }
 
