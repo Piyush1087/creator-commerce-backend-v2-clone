@@ -13,7 +13,12 @@ import { randomUUID } from "crypto";
 import type { AuthUser } from "../../auth/types/auth-user";
 import { GeminiJsonClient } from "../../brand-onboarding/integrations/gemini/gemini-json.client";
 import { zodToGeminiResponseSchema } from "../../brand-centre/prompts/zod-to-gemini-response-schema.util";
-import { COPILOT_SYSTEM_PROMPT } from "../integrations/copilot-system-prompt";
+import { CoPilotModuleRegistry } from "../core/module-registry";
+import { CoPilotPromptComposer } from "../core/prompt-composer";
+import type {
+  DetectedWriteIntent,
+  WriteIntentKind,
+} from "../core/write-intent.types";
 import { GeminiStreamClient } from "../integrations/gemini-stream.client";
 import {
   CoPilotChatPayloadSchema,
@@ -22,12 +27,9 @@ import {
   type SlotFillingData,
 } from "../schemas/copilot-payload.schema";
 import { BrandCentreCoPilotToolsService } from "../tools/brand-centre.tools";
-import { CollaborationCoPilotToolsService } from "../tools/collaboration.tools";
 import { PlannerCoPilotToolsService } from "../tools/planner.tools";
-import { EscrowCoPilotToolsService } from "../tools/escrow.tools";
 import {
   buildCoPilotFallbackReply,
-  buildCoPilotWelcomeReply,
   isGibberishInput,
 } from "../utils/co-pilot-conversational.util";
 import {
@@ -39,26 +41,18 @@ import {
   refineDnaIdentityClarification,
   type DnaIdentityUpdateAxis,
 } from "../utils/co-pilot-dna-identity.util";
+import { buildNoMovableLeaksNarrative } from "../utils/co-pilot-leak-planner.util";
 import {
-  buildNoMovableLeaksNarrative,
-  matchLeakByTitleHint,
-  resolveLeakFromThreadContext,
-} from "../utils/co-pilot-leak-planner.util";
-import {
-  buildPlannerLaunchGuidanceFooter,
-  isPlannerLaunchGuidanceQuery,
-  plannerCardLabel,
-  resolvePlannerCardFromContext,
-} from "../utils/co-pilot-planner.util";
-import {
-  CoPilotIntentService,
-  type DetectedWriteIntent,
-  type WriteIntentKind,
-} from "./co-pilot-intent.service";
+  looksLikeCampaignFollowUp,
+  looksLikeCampaignUtterance,
+  normalizeCoPilotUserText,
+} from "../utils/co-pilot-text-normalize.util";
+import { CoPilotCampaignSmartRouterService } from "./co-pilot-campaign-smart-router.service";
+import { CoPilotConversationMemoryService } from "./co-pilot-conversation-memory.service";
+import { CoPilotIntentService } from "./co-pilot-intent.service";
 import { CoPilotInteractionLogService } from "./co-pilot-thread.service";
 import { CoPilotModerationService } from "./co-pilot-moderation.service";
 import { CoPilotResponseGroundingService } from "./co-pilot-response-grounding.service";
-import { CoPilotScopeRouterService } from "./co-pilot-scope-router.service";
 import { CoPilotSlotSessionService } from "./co-pilot-slot-session.service";
 
 export type RunMessageArgs = {
@@ -82,14 +76,15 @@ export class CoPilotOrchestratorService {
     private readonly geminiStream: GeminiStreamClient,
     private readonly brandCentreTools: BrandCentreCoPilotToolsService,
     private readonly plannerTools: PlannerCoPilotToolsService,
-    private readonly escrowTools: EscrowCoPilotToolsService,
-    private readonly collabTools: CollaborationCoPilotToolsService,
     private readonly interactionLog: CoPilotInteractionLogService,
     private readonly slotSessions: CoPilotSlotSessionService,
     private readonly intents: CoPilotIntentService,
     private readonly moderation: CoPilotModerationService,
-    private readonly scopeRouter: CoPilotScopeRouterService,
     private readonly grounding: CoPilotResponseGroundingService,
+    private readonly registry: CoPilotModuleRegistry,
+    private readonly promptComposer: CoPilotPromptComposer,
+    private readonly campaignSmartRouter: CoPilotCampaignSmartRouterService,
+    private readonly conversationMemory: CoPilotConversationMemoryService,
   ) {}
 
   shouldStreamPayload(payload: CoPilotChatPayload): boolean {
@@ -264,12 +259,89 @@ export class CoPilotOrchestratorService {
       });
     }
 
-    const readKind = this.scopeRouter.resolveReadQuery(
-      args.userText,
+    const normalizedText = normalizeCoPilotUserText(args.userText);
+    const routingArgs: RunMessageArgs = {
+      ...args,
+      userText: normalizedText,
+    };
+    const campaignMemory = this.conversationMemory.getCampaignMemory(
+      args.threadId,
+    );
+    const shouldTryCampaignSmart =
+      looksLikeCampaignUtterance(normalizedText) ||
+      (Boolean(campaignMemory?.listedCampaigns.length) &&
+        looksLikeCampaignFollowUp(normalizedText));
+
+    if (shouldTryCampaignSmart) {
+      const smart = await this.campaignSmartRouter.tryRoute({
+        brandProfileId: routingArgs.brandProfileId,
+        userId: routingArgs.userId,
+        threadId: routingArgs.threadId,
+        messageId,
+        userText: routingArgs.userText,
+        scopeContext: routingArgs.scopeContext,
+        history: routingArgs.history,
+        authUser: routingArgs.authUser,
+      });
+
+      if (smart.handled && smart.kind === "read") {
+        await this.slotSessions.clearSession(args.threadId);
+        return smart.payload;
+      }
+
+      if (smart.handled && smart.kind === "write") {
+        await this.slotSessions.clearSession(args.threadId);
+        const enriched = await this.enrichWriteIntent(
+          args.brandProfileId,
+          smart.intent,
+          { history: args.history, userText: normalizedText },
+        );
+        await this.slotSessions.upsertSession({
+          threadId: args.threadId,
+          intentWorkspaceContext: enriched.kind,
+          stagedPayload: enriched.stagedPayload,
+          missingSlots: enriched.missingSlots,
+        });
+
+        if (enriched.missingSlots.length === 0) {
+          return await this.buildStagedExecutionPayload({
+            messageId,
+            threadId: args.threadId,
+            intentKind: enriched.kind,
+            stagedPayload: enriched.stagedPayload,
+          });
+        }
+
+        const partial = this.intents.buildSlotFillingPayload({
+          narrativeText: this.writeIntentNarrative(
+            enriched.kind,
+            enriched.stagedPayload,
+          ),
+          intentWorkspaceContext: enriched.kind,
+          stagedPayload: enriched.stagedPayload,
+          missingSlots: enriched.missingSlots,
+        });
+        return CoPilotChatPayloadSchema.parse({
+          messageId,
+          threadId: args.threadId,
+          timestamp: new Date().toISOString(),
+          ...partial,
+        });
+      }
+    }
+
+    const registryRead = this.registry.resolveRead(
+      normalizedText,
       args.scopeContext,
     );
-    const isExplicitRead = readKind !== "BRAND_CENTRE_DEFAULT";
-    const writeIntent = this.intents.detectWriteIntent(args.userText, args.history);
+    const isExplicitRead = registryRead !== null;
+    const writeIntentResolved = this.registry.resolveWrite(
+      normalizedText,
+      args.history,
+    );
+    const writeIntent: DetectedWriteIntent = writeIntentResolved ?? {
+      kind: "NONE",
+    };
 
     if (isExplicitRead || writeIntent.kind !== "NONE") {
       await this.slotSessions.clearSession(args.threadId);
@@ -297,7 +369,7 @@ export class CoPilotOrchestratorService {
       const enriched = await this.enrichWriteIntent(
         args.brandProfileId,
         writeIntent,
-        { history: args.history, userText: args.userText },
+        { history: args.history, userText: normalizedText },
       );
       await this.slotSessions.upsertSession({
         threadId: args.threadId,
@@ -329,8 +401,12 @@ export class CoPilotOrchestratorService {
       });
     }
 
-    if (isExplicitRead) {
-      const readPayload = await this.tryReadPayload(args, messageId, readKind);
+    if (isExplicitRead && registryRead) {
+      const readPayload = await this.tryRegistryReadPayload(
+        routingArgs,
+        messageId,
+        registryRead.kind,
+      );
       if (readPayload) {
         return readPayload;
       }
@@ -387,210 +463,35 @@ export class CoPilotOrchestratorService {
     }
   }
 
-  private async tryReadPayload(
+  private async tryRegistryReadPayload(
     args: RunMessageArgs,
     messageId: string,
-    readKind: ReturnType<CoPilotScopeRouterService["resolveReadQuery"]>,
+    readKind: NonNullable<
+      ReturnType<CoPilotModuleRegistry["resolveRead"]>
+    >["kind"],
   ): Promise<CoPilotChatPayload | null> {
-    const base = {
+    const result = await this.registry.executeRead(readKind, {
+      brandProfileId: args.brandProfileId,
+      userId: args.userId,
+      userText: args.userText,
+      scopeContext: args.scopeContext,
+      messageId,
+      threadId: args.threadId,
+      history: args.history,
+      authUser: args.authUser,
+    });
+    if (!result) {
+      return null;
+    }
+    return CoPilotChatPayloadSchema.parse({
       messageId,
       threadId: args.threadId,
       timestamp: new Date().toISOString(),
-    };
-
-    if (readKind === "ESCROW_SETUP") {
-      return CoPilotChatPayloadSchema.parse({
-        ...base,
-        formatType: "CONVERSATIONAL_NARRATIVE",
-        narrativeText:
-          "Your escrow vault isn’t active yet, so I can’t show balances or ledger entries here. To get started, open Settings → Billing (/brand/settings/billing) to confirm your plan and billing setup, then go to Settings → Escrow (/brand/settings/escrow) to enable the vault and add funds. After that, ask me for an escrow audit or ledger report and I’ll pull read-only data. I can’t enable the vault from chat.",
-      });
-    }
-
-    if (readKind === "ESCROW_AUDIT" || readKind === "ESCROW_TDS") {
-      const ctx = await this.escrowTools.getEscrowReadContext(args.brandProfileId);
-      const metrics = this.escrowTools.buildVaultMetrics(ctx);
-      const table = this.escrowTools.buildLedgerTable(ctx);
-      const tds =
-        ctx.available && ctx.vault
-          ? `${ctx.vault.currency} ${Number(ctx.vault.tds_buffer_balance).toLocaleString()}`
-          : "Vault not initialized";
-
-      return CoPilotChatPayloadSchema.parse({
-        ...base,
-        formatType: "TABULAR_AUDIT_DATA",
-        narrativeText:
-          readKind === "ESCROW_TDS"
-            ? `TDS tax buffer balance: ${tds}. Ledger excerpt below (read-only).`
-            : "Read-only escrow vault summary and recent ledger entries.",
-        metricGridData: metrics,
-        tableData: table,
-      });
-    }
-
-    if (readKind === "COLLAB_PIPELINE" || readKind === "COLLAB_ISSUES") {
-      const ctx = await this.collabTools.getCollabReadContext(args.authUser);
-      const table = this.collabTools.buildCollabTable(ctx);
-      return CoPilotChatPayloadSchema.parse({
-        ...base,
-        formatType: "TABULAR_AUDIT_DATA",
-        narrativeText:
-          readKind === "COLLAB_ISSUES"
-            ? `${ctx.withFulfillmentIssues} collaboration(s) with fulfillment issues; ${ctx.stuckLogistics} in Logistics, ${ctx.stuckProduction} in Production.`
-            : `${ctx.totalActive} active collaboration(s). Pipeline snapshot below (read-only).`,
-        tableData: table,
-      });
-    }
-
-    if (readKind === "DNA_COMPLIANCE") {
-      const context = await this.brandCentreTools.getBrandCentreReadContext(
-        args.brandProfileId,
-      );
-      const words = context.dna.doNotSayList;
-      return CoPilotChatPayloadSchema.parse({
-        ...base,
-        formatType: "CONVERSATIONAL_NARRATIVE",
-        narrativeText:
-          words.length > 0
-            ? `Compliance do-not-say phrases for ${context.dna.brandName}: ${words.join("; ")}.`
-            : `No do-not-say list on file yet for ${context.dna.brandName}. Complete Brand DNA scan to populate guardrails.`,
-      });
-    }
-
-    if (readKind === "BRAND_CENTRE_GREETING") {
-      const context = await this.brandCentreTools.getBrandCentreReadContext(
-        args.brandProfileId,
-      );
-      return CoPilotChatPayloadSchema.parse({
-        ...base,
-        formatType: "CONVERSATIONAL_NARRATIVE",
-        narrativeText: buildCoPilotWelcomeReply(context.dna.brandName),
-      });
-    }
-
-    if (
-      readKind === "BRAND_CENTRE_OVERVIEW" ||
-      readKind === "BRAND_CENTRE_COMPLETENESS"
-    ) {
-      const context = await this.brandCentreTools.getBrandCentreReadContext(
-        args.brandProfileId,
-      );
-      const metricGrid =
-        this.brandCentreTools.buildMetricGridFromContext(context);
-      const narrativeText =
-        readKind === "BRAND_CENTRE_COMPLETENESS"
-          ? this.brandCentreTools.buildCompletenessNarrative(context)
-          : this.brandCentreTools.buildOverviewNarrative(context);
-
-      return CoPilotChatPayloadSchema.parse({
-        ...base,
-        formatType: "METRIC_HIGHLIGHT_GRID",
-        narrativeText,
-        metricGridData: metricGrid,
-      });
-    }
-
-    if (readKind === "BRAND_CENTRE_READINESS") {
-      const context = await this.brandCentreTools.getBrandCentreReadContext(
-        args.brandProfileId,
-      );
-      return CoPilotChatPayloadSchema.parse({
-        ...base,
-        formatType: "METRIC_HIGHLIGHT_GRID",
-        narrativeText: this.brandCentreTools.buildReadinessNarrative(context),
-        metricGridData:
-          this.brandCentreTools.buildMetricGridFromContext(context),
-      });
-    }
-
-    if (readKind === "BRAND_CENTRE_DNA_BLOCKS") {
-      const context = await this.brandCentreTools.getBrandCentreReadContext(
-        args.brandProfileId,
-      );
-      return CoPilotChatPayloadSchema.parse({
-        ...base,
-        formatType: "CONVERSATIONAL_NARRATIVE",
-        narrativeText: this.brandCentreTools.buildDnaBlocksNarrative(context),
-      });
-    }
-
-    if (readKind === "BRAND_CENTRE_LEAKS") {
-      const context = await this.brandCentreTools.getBrandCentreReadContext(
-        args.brandProfileId,
-      );
-      return CoPilotChatPayloadSchema.parse({
-        ...base,
-        formatType: "TABULAR_AUDIT_DATA",
-        narrativeText: this.brandCentreTools.buildLeaksNarrative(context),
-        tableData: this.brandCentreTools.buildLeaksTable(context),
-      });
-    }
-
-    if (readKind === "BRAND_CENTRE_PERSONAS") {
-      const context = await this.brandCentreTools.getBrandCentreReadContext(
-        args.brandProfileId,
-      );
-      return CoPilotChatPayloadSchema.parse({
-        ...base,
-        formatType: "TABULAR_AUDIT_DATA",
-        narrativeText: this.brandCentreTools.buildPersonasNarrative(context),
-        tableData: this.brandCentreTools.buildPersonasTable(context),
-      });
-    }
-
-    if (readKind === "BRAND_CENTRE_COMPETITOR_INSIGHTS") {
-      const context = await this.brandCentreTools.getBrandCentreReadContext(
-        args.brandProfileId,
-      );
-      return CoPilotChatPayloadSchema.parse({
-        ...base,
-        formatType: "CONVERSATIONAL_NARRATIVE",
-        narrativeText:
-          this.brandCentreTools.buildCompetitorInsightsNarrative(context),
-      });
-    }
-
-    if (readKind === "BRAND_CENTRE_VISUAL_IDENTITY") {
-      const context = await this.brandCentreTools.getBrandCentreReadContext(
-        args.brandProfileId,
-      );
-      return CoPilotChatPayloadSchema.parse({
-        ...base,
-        formatType: "CONVERSATIONAL_NARRATIVE",
-        narrativeText: this.brandCentreTools.buildVisualIdentityNarrative(context),
-      });
-    }
-
-    if (readKind === "PLANNER_PIPELINE") {
-      const dashboard = await this.plannerTools.getPlannerReadContext(
-        args.brandProfileId,
-      );
-      const launchable = await this.plannerTools.listLaunchablePlannerCards(
-        args.brandProfileId,
-      );
-      let narrative = this.plannerTools.buildPlannerPipelineNarrative(dashboard);
-      if (isPlannerLaunchGuidanceQuery(args.userText) || launchable.length > 0) {
-        narrative = `${narrative}\n\n${buildPlannerLaunchGuidanceFooter(launchable.length)}`;
-      }
-      return CoPilotChatPayloadSchema.parse({
-        ...base,
-        formatType: "TABULAR_AUDIT_DATA",
-        narrativeText: narrative,
-        tableData: this.plannerTools.buildPlannerTable(dashboard),
-      });
-    }
-
-    if (readKind === "CAMPAIGN_DRAFT_LIST") {
-      const drafts = await this.plannerTools.listDraftCampaigns(args.brandProfileId);
-      return CoPilotChatPayloadSchema.parse({
-        ...base,
-        formatType: "TABULAR_AUDIT_DATA",
-        narrativeText: this.plannerTools.buildDraftCampaignsNarrative(drafts),
-        tableData: this.plannerTools.buildDraftCampaignsTable(drafts),
-      });
-    }
-
-    return null;
+      formatType: result.formatType,
+      narrativeText: result.narrativeText,
+      metricGridData: result.metricGridData,
+      tableData: result.tableData,
+    });
   }
 
   private async trySlotFlow(
@@ -663,11 +564,19 @@ export class CoPilotOrchestratorService {
       idempotencyKey,
     });
 
-    const widget = this.intents.buildExecutionWidget({
-      intentKind,
-      stagedPayload: stagedRecord,
-      idempotencyKey,
-    });
+    const widget =
+      this.registry
+        .findModuleForWriteIntent(intentKind)
+        ?.buildExecutionWidget?.({
+          intentKind,
+          stagedPayload: stagedRecord,
+          idempotencyKey,
+        }) ??
+      this.intents.buildExecutionWidget({
+        intentKind,
+        stagedPayload: stagedRecord,
+        idempotencyKey,
+      });
 
     return CoPilotChatPayloadSchema.parse({
       messageId,
@@ -704,11 +613,19 @@ export class CoPilotOrchestratorService {
       idempotencyKey,
     });
 
-    const widget = this.intents.buildExecutionWidget({
-      intentKind: args.intentKind,
-      stagedPayload: args.stagedPayload,
-      idempotencyKey,
-    });
+    const widget =
+      this.registry
+        .findModuleForWriteIntent(args.intentKind)
+        ?.buildExecutionWidget?.({
+          intentKind: args.intentKind,
+          stagedPayload: args.stagedPayload,
+          idempotencyKey,
+        }) ??
+      this.intents.buildExecutionWidget({
+        intentKind: args.intentKind,
+        stagedPayload: args.stagedPayload,
+        idempotencyKey,
+      });
 
     return CoPilotChatPayloadSchema.parse({
       messageId: args.messageId,
@@ -780,6 +697,12 @@ export class CoPilotOrchestratorService {
     kind: WriteIntentKind,
     stagedPayload?: Record<string, unknown>,
   ): string {
+    const fromModule = this.registry
+      .findModuleForWriteIntent(kind)
+      ?.writeSlotNarrative?.(kind, stagedPayload);
+    if (fromModule) {
+      return fromModule;
+    }
     switch (kind) {
       case "DNA_IDENTITY_UPDATE": {
         const axes = (stagedPayload?.update_axes ?? []) as DnaIdentityUpdateAxis[];
@@ -808,6 +731,12 @@ export class CoPilotOrchestratorService {
     kind: WriteIntentKind,
     stagedPayload?: Record<string, unknown>,
   ): string {
+    const fromModule = this.registry
+      .findModuleForWriteIntent(kind)
+      ?.hitlReviewNarrative?.(kind, stagedPayload);
+    if (fromModule) {
+      return fromModule;
+    }
     switch (kind) {
       case "DNA_IDENTITY_UPDATE": {
         const axes = (stagedPayload?.update_axes ?? []) as DnaIdentityUpdateAxis[];
@@ -870,137 +799,21 @@ export class CoPilotOrchestratorService {
       userText: string;
     },
   ): Promise<Extract<DetectedWriteIntent, { kind: WriteIntentKind }>> {
-    const stagedPayload = { ...intent.stagedPayload };
-    const missingSlots = intent.missingSlots.map((slot) => ({ ...slot }));
-
-    if (intent.kind === "INTELLIGENCE_MOVE_TO_PLANNER") {
-      const leaks = await this.plannerTools.listMovableLeaks(brandProfileId);
-      if (leaks.length === 0) {
-        throw new BadRequestException(buildNoMovableLeaksNarrative());
-      }
-
-      const titleHint = String(
-        stagedPayload.leak_title_hint ?? stagedPayload.leak_title ?? "",
-      ).trim();
-
-      let matched = titleHint
-        ? matchLeakByTitleHint(titleHint, leaks)
-        : undefined;
-
-      if (!matched && context) {
-        matched = resolveLeakFromThreadContext(
-          context.history,
-          leaks,
-          context.userText,
-        );
-      }
-
-      if (!matched && leaks.length === 1) {
-        matched = leaks[0];
-      }
-
-      const leakSlot =
-        missingSlots.find((slot) => slot.fieldName === "leak_id") ??
-        ({
-          fieldName: "leak_id",
-          uiLabel: "Intelligence leak to move",
-          inputType: "SINGLE_SELECT",
-          selectOptions: [],
-          placeholderText: "Choose a leak from Intelligence & Gaps",
-        } as SlotFillingData["missingSlots"][number]);
-
-      leakSlot.selectOptions = leaks.map(
-        (leak) => `${leak.id}::${leak.insightTitle}`,
-      );
-
-      if (!missingSlots.some((slot) => slot.fieldName === "leak_id")) {
-        missingSlots.push(leakSlot);
-      }
-
-      if (matched) {
-        stagedPayload.leak_id = matched.id;
-        stagedPayload.leak_title = matched.insightTitle;
-        delete stagedPayload.leak_title_hint;
-      }
-    }
-
-    if (intent.kind === "PLANNER_LAUNCH_DRAFT") {
-      const cards = await this.plannerTools.listLaunchablePlannerCards(
+    try {
+      return await this.registry.enrichWriteIntent(
+        intent,
         brandProfileId,
+        context,
       );
-      if (cards.length === 0) {
-        throw new BadRequestException(
-          "No green planner cards are pending review. Move a leak to the planner first.",
-        );
+    } catch (err) {
+      if (err instanceof BadRequestException) {
+        throw err;
       }
-
-      let matched = context
-        ? resolvePlannerCardFromContext(context.history, cards, context.userText)
-        : undefined;
-
-      if (!matched && cards.length === 1) {
-        matched = cards[0];
+      if (err instanceof Error) {
+        throw new BadRequestException(err.message);
       }
-
-      const cardSlot = missingSlots.find(
-        (slot) => slot.fieldName === "planner_card_id",
-      );
-      if (cardSlot) {
-        cardSlot.selectOptions = cards.map(
-          (card) =>
-            `${card.id}::${card.aiContextHook ?? card.strategy.objective ?? "Planner card"}`,
-        );
-      }
-
-      if (matched) {
-        stagedPayload.planner_card_id = matched.id;
-        stagedPayload.planner_card_label = plannerCardLabel(matched);
-      }
+      throw err;
     }
-
-    if (intent.kind === "CAMPAIGN_EDIT_DRAFT") {
-      const drafts = await this.plannerTools.listDraftCampaigns(brandProfileId);
-      if (drafts.length === 0) {
-        throw new BadRequestException("No DRAFT campaigns found to edit.");
-      }
-      const campaignSlot = missingSlots.find(
-        (slot) => slot.fieldName === "campaign_id",
-      );
-      if (campaignSlot) {
-        campaignSlot.selectOptions = drafts.map(
-          (draft) => `${draft.campaign_id}::${draft.campaign_name}`,
-        );
-      }
-      if (drafts.length === 1) {
-        stagedPayload.campaign_id = drafts[0].campaign_id;
-        stagedPayload.campaign_name = drafts[0].campaign_name;
-      }
-    }
-
-    if (intent.kind === "DNA_IDENTITY_UPDATE") {
-      const enriched = await this.enrichDnaIdentityStagedPayload(
-        brandProfileId,
-        stagedPayload,
-      );
-      Object.assign(stagedPayload, enriched);
-    }
-
-    return {
-      kind: intent.kind,
-      stagedPayload,
-      missingSlots: missingSlots.filter((slot) => {
-        if (slot.fieldName === "leak_id" && stagedPayload.leak_id) {
-          return false;
-        }
-        if (slot.fieldName === "planner_card_id" && stagedPayload.planner_card_id) {
-          return false;
-        }
-        if (slot.fieldName === "campaign_id" && stagedPayload.campaign_id) {
-          return false;
-        }
-        return true;
-      }),
-    };
   }
 
   private buildGeminiUserPrompt(
@@ -1036,7 +849,7 @@ export class CoPilotOrchestratorService {
     >,
   ) {
     const raw = await this.gemini.generateJson({
-      systemInstruction: COPILOT_SYSTEM_PROMPT,
+      systemInstruction: this.promptComposer.composeSystemPrompt(),
       userText: this.buildGeminiUserPrompt(args, context),
       responseSchema: zodToGeminiResponseSchema(GeminiCoPilotOutputSchema),
     });

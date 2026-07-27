@@ -98,34 +98,32 @@ Example: *“How many campaign blueprints are pending in my planner?”*
 
 ## Universal Campaign Engine (UCE)
 
-**Scope in chat:** Brand Centre (campaign launch intent)  
-**Status:** Draft list read live · create + edit DRAFT via confirm · activate manually in app
+**Scope in chat:** Campaign List module (`uce-campaign-list`) + draft launch paths  
+**Status:** Campaign List reads live · lifecycle HITL live · create/edit DRAFT live
 
 ### What you can read
 
-- **DRAFT campaigns only** — table in chat (`List my draft campaigns`)
-
-### What you can write (confirm required)
-
-- **Launch a campaign** (shortcut) — slot fill → HITL → UCE wizard **DRAFT**
-- **Launch planner card** — Tab 3 approve + bridge **DRAFT**
-- **Edit draft campaign** — budget, objective, name on **DRAFT** rows only
-
-You cannot pause, extend, or edit **ACTIVE** / **PAUSED** campaigns from chat.
+- **All campaigns** — list / search / filter / sort as a table
+- **Campaign summary, performance, financials** — metric grids
+- **Compare campaigns** — side-by-side table
+- **DRAFT campaigns only** — still available via “list my drafts”
 
 ### What you can write (confirm required)
 
 | Action | What happens after confirm |
 | --- | --- |
-| **Launch a campaign (slot fill flow)** | User provides product focus, budget, and objective → reviews staged brief → confirm creates a **DRAFT** campaign via the UCE wizard |
-
-Nothing goes live automatically. Confirm only creates a draft the brand can finish in Campaigns.
+| **Launch a campaign** (slot fill) | Creates a **DRAFT** via UCE wizard |
+| **Launch planner card** | Approve planner + bridge → UCE **DRAFT** |
+| **Edit draft campaign** | Name/budget/objective on **DRAFT** only |
+| **Pause / Resume** | Status ACTIVE↔PAUSED (resume re-checks activation checklist) |
+| **Archive** | Sets status to **ARCHIVED** |
+| **Duplicate** | Clones strategy/targeting/commercials/products/briefs into a new **DRAFT** |
+| **Bulk pause/resume/archive** | Runs the action across selected campaign ids |
 
 ### What you cannot write via co-pilot
 
-- Pause, extend, or reconfigure a **live** campaign
 - Promote campaign phase (Cold Start → Self-Healing)
-- Edit targeting or commercials on existing campaigns from chat
+- Escrow lock/refund from Campaign List chat (separate module, deferred)
 
 ---
 

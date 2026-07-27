@@ -262,6 +262,7 @@ enum UceCampaignStatus {
   ACTIVE
   PAUSED
   COMPLETED
+  ARCHIVED
 }
 
 enum UceTimelineStructure {

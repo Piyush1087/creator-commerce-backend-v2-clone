@@ -177,9 +177,18 @@ export const CO_PILOT_DATA_ACCESS_CONTRACT = {
 
         UceCampaignCommercials: "WRITE_VIA_HITL",
 
+        UceCampaignProduct: "WRITE_VIA_HITL",
+
+        UceCampaignBrief: "WRITE_VIA_HITL",
+
+        UceCampaignPerformanceAggregate: "READ",
+
       },
 
-      apiRoutesRead: ["GET /api/v1/brand-uce/campaigns?status=DRAFT"],
+      apiRoutesRead: [
+        "GET /api/v1/brand-uce/campaigns",
+        "GET /api/v1/brand-uce/campaigns/:id (summary/performance/financials via service)",
+      ],
 
       apiRoutesWriteHitl: [
 
@@ -187,10 +196,14 @@ export const CO_PILOT_DATA_ACCESS_CONTRACT = {
 
         "POST /api/v1/co-pilot/hitl/confirm → PATCH /api/v1/brand-uce/campaigns/:id/wizard (DRAFT only)",
 
+        "POST /api/v1/co-pilot/hitl/confirm → pause/resume/archive via BrandUceCampaignService",
+
+        "POST /api/v1/co-pilot/hitl/confirm → duplicateCampaign / bulkLifecycleAction",
+
       ],
 
       notes:
-        "CAMPAIGN_LAUNCH shortcut, PLANNER_LAUNCH_DRAFT via bridge, CAMPAIGN_EDIT_DRAFT. No ACTIVE/PAUSED edits from chat.",
+        "UCE Campaign List module (uce-campaign-list): list/search/filter/sort/summary/performance/compare/financials reads. Lifecycle HITL: pause, resume, archive→ARCHIVED, duplicate→DRAFT, bulk. Also CAMPAIGN_LAUNCH shortcut, PLANNER_LAUNCH_DRAFT via bridge, CAMPAIGN_EDIT_DRAFT.",
 
     },
 

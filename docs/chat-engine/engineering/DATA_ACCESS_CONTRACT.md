@@ -81,9 +81,11 @@ This file is the **technical** mirror of the TypeScript contract. For plain-lang
 | `UceCampaignStrategy` | WRITE_VIA_HITL |
 | `UceCampaignTargeting` | WRITE_VIA_HITL |
 | `UceCampaignCommercials` | WRITE_VIA_HITL |
+| `UceCampaignProduct` / `UceCampaignBrief` | WRITE_VIA_HITL (duplicate clone) |
+| `UceCampaignPerformanceAggregate` | READ |
 
-**Read routes:** `GET /api/v1/brand-uce/campaigns` (not exposed as co-pilot tool yet)  
-**Write route:** `POST /api/v1/co-pilot/hitl/confirm` → delegates `POST /api/v1/brand-uce/campaigns/wizard`  
+**Read routes:** `GET /api/v1/brand-uce/campaigns` (+ summary/performance/financials/compare via `BrandUceCampaignService`, Campaign List AI module)  
+**Write route:** `POST /api/v1/co-pilot/hitl/confirm` → wizard create/edit DRAFT, pause/resume, archive→ARCHIVED, duplicate, bulk lifecycle
 **Flow:** `CAMPAIGN_LAUNCH` intent → slot fill → execution widget → confirm creates **DRAFT** campaign.
 
 ---

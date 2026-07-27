@@ -76,6 +76,9 @@ export class BrandUceCampaignService {
       status?: UceCampaignStatus;
       search?: string;
       objective?: UceCampaignObjective;
+      product?: string;
+      sortBy?: "updatedAt" | "name" | "budget" | "spend";
+      sortDir?: "asc" | "desc";
     },
   ) {
     const where: Prisma.UceCampaignWhereInput = { brandProfileId };
@@ -88,10 +91,29 @@ export class BrandUceCampaignService {
     if (filters.objective) {
       where.strategy = { coreObjective: filters.objective };
     }
+    if (filters.product?.trim()) {
+      where.products = {
+        some: {
+          productName: {
+            contains: filters.product.trim(),
+            mode: "insensitive",
+          },
+        },
+      };
+    }
+
+    const sortBy = filters.sortBy ?? "updatedAt";
+    const sortDir = filters.sortDir ?? "desc";
+    let orderBy: Prisma.UceCampaignOrderByWithRelationInput = {
+      updatedAt: sortDir,
+    };
+    if (sortBy === "name") {
+      orderBy = { name: sortDir };
+    }
 
     const campaigns = await this.prisma.uceCampaign.findMany({
       where,
-      orderBy: { updatedAt: "desc" },
+      orderBy,
       include: {
         performanceAggregate: true,
         strategy: true,
@@ -109,7 +131,7 @@ export class BrandUceCampaignService {
       },
     });
 
-    return campaigns.map((c) => {
+    const mapped = campaigns.map((c) => {
       const agg = c.performanceAggregate;
       const prospects = c.collaborations.filter((x) =>
         (PROSPECT_STATUSES as readonly string[]).includes(x.collabStatus),
@@ -124,6 +146,7 @@ export class BrandUceCampaignService {
       const budgetPool = c.commercials
         ? decimalToNumber(c.commercials.totalCampaignBudgetPool)
         : 0;
+      const spend = agg ? decimalToNumber(agg.totalSpendToDate) : 0;
 
       return {
         campaign_id: c.id,
@@ -135,9 +158,7 @@ export class BrandUceCampaignService {
         prospects_count: prospects,
         applicants_count: applicants,
         active_collabs_count: activeCollabs,
-        total_spend_to_date: agg
-          ? decimalToNumber(agg.totalSpendToDate)
-          : 0,
+        total_spend_to_date: spend,
         total_impressions: agg
           ? agg.totalImpressionsCount.toString()
           : "0",
@@ -146,6 +167,22 @@ export class BrandUceCampaignService {
         updated_at: c.updatedAt.toISOString(),
       };
     });
+
+    if (sortBy === "budget") {
+      mapped.sort((a, b) =>
+        sortDir === "asc"
+          ? a.budget_pool - b.budget_pool
+          : b.budget_pool - a.budget_pool,
+      );
+    } else if (sortBy === "spend") {
+      mapped.sort((a, b) =>
+        sortDir === "asc"
+          ? a.total_spend_to_date - b.total_spend_to_date
+          : b.total_spend_to_date - a.total_spend_to_date,
+      );
+    }
+
+    return mapped;
   }
 
   async createFromWizard(
@@ -422,8 +459,8 @@ export class BrandUceCampaignService {
     if (!campaign) {
       throw new BadRequestException("Campaign not found");
     }
-    if (campaign.status === UceCampaignStatus.COMPLETED) {
-      throw new BadRequestException("Completed campaigns cannot be edited.");
+    if (campaign.status === UceCampaignStatus.COMPLETED || campaign.status === UceCampaignStatus.ARCHIVED) {
+      throw new BadRequestException("Completed or archived campaigns cannot be edited.");
     }
 
     const canEdit = await this.canEditCampaignEssentials(campaignId);
@@ -480,7 +517,30 @@ export class BrandUceCampaignService {
   ) {
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
 
+    const existing = await this.prisma.uceCampaign.findFirst({
+      where: { id: campaignId, brandProfileId },
+    });
+    if (!existing) {
+      throw new BadRequestException("Campaign not found");
+    }
+
+    if (status === UceCampaignStatus.PAUSED) {
+      if (existing.status !== UceCampaignStatus.ACTIVE) {
+        throw new BadRequestException(
+          "Only ACTIVE campaigns can be paused.",
+        );
+      }
+    }
+
     if (status === UceCampaignStatus.ACTIVE) {
+      if (
+        existing.status !== UceCampaignStatus.PAUSED &&
+        existing.status !== UceCampaignStatus.DRAFT
+      ) {
+        throw new BadRequestException(
+          "Only PAUSED or DRAFT campaigns can be activated/resumed.",
+        );
+      }
       const checklist = await this.buildActivationChecklist(campaignId);
       const blockers = checklist.filter((c) => !c.satisfied);
       if (blockers.length > 0) {
@@ -491,6 +551,18 @@ export class BrandUceCampaignService {
       }
     }
 
+    if (status === UceCampaignStatus.ARCHIVED) {
+      if (
+        existing.status !== UceCampaignStatus.ACTIVE &&
+        existing.status !== UceCampaignStatus.PAUSED &&
+        existing.status !== UceCampaignStatus.COMPLETED
+      ) {
+        throw new BadRequestException(
+          "Only ACTIVE, PAUSED, or COMPLETED campaigns can be archived.",
+        );
+      }
+    }
+
     const updated = await this.prisma.uceCampaign.update({
       where: { id: campaignId },
       data: { status },
@@ -498,11 +570,316 @@ export class BrandUceCampaignService {
 
     return {
       campaign_id: updated.id,
+      campaign_name: updated.name,
       current_status: updated.status,
       pause_warning:
         updated.status === UceCampaignStatus.PAUSED
           ? "Campaign Paused. Inbound application links are offline. Active collaboration workflows remain accessible for processing."
           : null,
+    };
+  }
+
+  async pauseCampaign(brandProfileId: string, campaignId: string) {
+    return this.patchStatus(
+      brandProfileId,
+      campaignId,
+      UceCampaignStatus.PAUSED,
+    );
+  }
+
+  async resumeCampaign(brandProfileId: string, campaignId: string) {
+    return this.patchStatus(
+      brandProfileId,
+      campaignId,
+      UceCampaignStatus.ACTIVE,
+    );
+  }
+
+  async archiveCampaign(brandProfileId: string, campaignId: string) {
+    return this.patchStatus(
+      brandProfileId,
+      campaignId,
+      UceCampaignStatus.ARCHIVED,
+    );
+  }
+
+  async getCampaignSummary(brandProfileId: string, campaignId: string) {
+    const shell = await this.getCampaignShell(brandProfileId, campaignId);
+    const budget = shell.zone_1_commercials?.total_campaign_budget_pool ?? 0;
+    const spend = shell.performance_aggregate?.total_spend_to_date ?? 0;
+    const remaining = Math.max(0, budget - spend);
+    return {
+      campaign_id: shell.campaign_id,
+      campaign_name: shell.campaign_name,
+      current_status: shell.current_status,
+      core_objective: shell.zone_1_master?.core_objective ?? null,
+      budget_pool: budget,
+      total_spend_to_date: spend,
+      remaining_budget: remaining,
+      utilization_pct:
+        budget > 0 ? Math.round((spend / budget) * 1000) / 10 : 0,
+      product_count: shell.zone_2_tactics.products.length,
+      brief_count: shell.zone_2_tactics.briefs.length,
+      total_prospects_count:
+        shell.performance_aggregate?.total_prospects_count ?? 0,
+      total_applicants_count:
+        shell.performance_aggregate?.total_applicants_count ?? 0,
+      total_active_collabs_count:
+        shell.performance_aggregate?.total_active_collabs_count ?? 0,
+    };
+  }
+
+  async getCampaignFinancials(brandProfileId: string, campaignId: string) {
+    const summary = await this.getCampaignSummary(brandProfileId, campaignId);
+    return {
+      campaign_id: summary.campaign_id,
+      campaign_name: summary.campaign_name,
+      current_status: summary.current_status,
+      budget_pool: summary.budget_pool,
+      total_spend_to_date: summary.total_spend_to_date,
+      remaining_budget: summary.remaining_budget,
+      utilization_pct: summary.utilization_pct,
+    };
+  }
+
+  async getCampaignPerformance(brandProfileId: string, campaignId: string) {
+    const shell = await this.getCampaignShell(brandProfileId, campaignId);
+    const listRow = (
+      await this.listCampaigns(brandProfileId, {})
+    ).find((c) => c.campaign_id === campaignId);
+
+    return {
+      campaign_id: shell.campaign_id,
+      campaign_name: shell.campaign_name,
+      current_status: shell.current_status,
+      core_objective: shell.zone_1_master?.core_objective ?? null,
+      total_impressions: listRow?.total_impressions ?? "0",
+      total_spend_to_date:
+        shell.performance_aggregate?.total_spend_to_date ?? 0,
+      total_prospects_count:
+        shell.performance_aggregate?.total_prospects_count ?? 0,
+      total_applicants_count:
+        shell.performance_aggregate?.total_applicants_count ?? 0,
+      total_active_collabs_count:
+        shell.performance_aggregate?.total_active_collabs_count ?? 0,
+      budget_pool: shell.zone_1_commercials?.total_campaign_budget_pool ?? 0,
+    };
+  }
+
+  async compareCampaigns(brandProfileId: string, campaignIds: string[]) {
+    const uniqueIds = [...new Set(campaignIds.filter(Boolean))];
+    if (uniqueIds.length < 2) {
+      throw new BadRequestException(
+        "At least two campaign ids are required to compare.",
+      );
+    }
+
+    const rows = [];
+    for (const id of uniqueIds) {
+      rows.push(await this.getCampaignSummary(brandProfileId, id));
+    }
+    return rows;
+  }
+
+  async findCampaignByNameHint(
+    brandProfileId: string,
+    nameHint: string,
+  ) {
+    const hint = nameHint.trim();
+    if (!hint) {
+      return null;
+    }
+    const campaigns = await this.listCampaigns(brandProfileId, {
+      search: hint,
+    });
+    if (campaigns.length === 0) {
+      return null;
+    }
+    const exact = campaigns.find(
+      (c) => c.campaign_name.toLowerCase() === hint.toLowerCase(),
+    );
+    return exact ?? (campaigns.length === 1 ? campaigns[0] : null);
+  }
+
+  async duplicateCampaign(
+    brandProfileId: string,
+    sourceCampaignId: string,
+    newCampaignName: string,
+  ) {
+    await this.access.assertCampaignOwned(brandProfileId, sourceCampaignId);
+
+    const source = await this.prisma.uceCampaign.findFirst({
+      where: { id: sourceCampaignId, brandProfileId },
+      include: {
+        strategy: true,
+        targeting: true,
+        commercials: true,
+        products: { orderBy: { createdAt: "asc" } },
+        briefs: { orderBy: { createdAt: "asc" } },
+      },
+    });
+    if (!source) {
+      throw new BadRequestException("Source campaign not found");
+    }
+    if (!source.strategy || !source.targeting || !source.commercials) {
+      throw new BadRequestException(
+        "Source campaign is missing strategy, targeting, or commercials and cannot be duplicated.",
+      );
+    }
+
+    const name = newCampaignName.trim();
+    if (!name) {
+      throw new BadRequestException("New campaign name is required.");
+    }
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const campaign = await tx.uceCampaign.create({
+        data: {
+          brandProfileId,
+          name,
+          status: UceCampaignStatus.DRAFT,
+          performanceAggregate: { create: {} },
+          strategy: {
+            create: {
+              timelineType: source.strategy!.timelineType,
+              fixedStartDate: source.strategy!.fixedStartDate,
+              fixedEndDate: source.strategy!.fixedEndDate,
+              dynamicDaysLimit: source.strategy!.dynamicDaysLimit,
+              coreObjective: source.strategy!.coreObjective,
+              platformDeliverables:
+                source.strategy!.platformDeliverables as Prisma.InputJsonValue,
+            },
+          },
+          targeting: {
+            create: {
+              industryVertical: source.targeting!.industryVertical,
+              creatorArchetypes: source.targeting!.creatorArchetypes,
+              followerTiers: source.targeting!.followerTiers,
+              audienceAgeMin: source.targeting!.audienceAgeMin,
+              audienceAgeMax: source.targeting!.audienceAgeMax,
+              audienceGender: source.targeting!.audienceGender,
+              targetLocations: source.targeting!.targetLocations,
+              disqualifyingKeywords: source.targeting!.disqualifyingKeywords,
+              visibilityScopes: source.targeting!.visibilityScopes,
+              applicationScope: source.targeting!.applicationScope,
+            },
+          },
+          commercials: {
+            create: {
+              compensationType: source.commercials!.compensationType,
+              fixedFeeAmount: source.commercials!.fixedFeeAmount,
+              negotiableMinFee: source.commercials!.negotiableMinFee,
+              negotiableMaxFee: source.commercials!.negotiableMaxFee,
+              totalCampaignBudgetPool:
+                source.commercials!.totalCampaignBudgetPool,
+              advancePaymentPercentage:
+                source.commercials!.advancePaymentPercentage,
+              finalBalanceTerms: source.commercials!.finalBalanceTerms,
+            },
+          },
+        },
+      });
+
+      await tx.uceCampaignReportingSnapshot.create({
+        data: {
+          campaignId: campaign.id,
+          primaryObjective: source.strategy!.coreObjective,
+          lastApiSyncTimestamp: new Date(),
+        },
+      });
+
+      const productIdMap = new Map<string, string>();
+      for (const product of source.products) {
+        const cloned = await tx.uceCampaignProduct.create({
+          data: {
+            campaignId: campaign.id,
+            assetType: product.assetType,
+            skuCode: product.skuCode
+              ? `${product.skuCode}-COPY-${campaign.id.slice(0, 6)}`
+              : null,
+            productName: product.productName,
+            isActive: product.isActive,
+            inventoryCount: product.inventoryCount,
+            costPerUnit: product.costPerUnit,
+            imageUrl: product.imageUrl,
+            assetPayload: product.assetPayload as Prisma.InputJsonValue,
+          },
+        });
+        productIdMap.set(product.id, cloned.id);
+      }
+
+      for (const brief of source.briefs) {
+        await tx.uceCampaignBrief.create({
+          data: {
+            campaignId: campaign.id,
+            productId: brief.productId
+              ? (productIdMap.get(brief.productId) ?? null)
+              : null,
+            internalTitle: brief.internalTitle,
+            creativeGuidelines: brief.creativeGuidelines,
+            isActive: brief.isActive,
+            requiredPlatforms: brief.requiredPlatforms,
+            deliverableFormatTags: brief.deliverableFormatTags,
+            briefType: brief.briefType,
+            purpose: brief.purpose,
+            objective: brief.objective,
+            targetInfluencerArchetype: brief.targetInfluencerArchetype,
+            mandatoryCreatorRequirements: brief.mandatoryCreatorRequirements,
+            deliverablesInventory:
+              brief.deliverablesInventory as Prisma.InputJsonValue,
+            contentGuidanceMatrix:
+              brief.contentGuidanceMatrix as Prisma.InputJsonValue,
+            parentPlannerLogisticsSnapshot:
+              brief.parentPlannerLogisticsSnapshot as Prisma.InputJsonValue,
+          },
+        });
+      }
+
+      return campaign;
+    });
+
+    return this.getCampaignShell(brandProfileId, created.id);
+  }
+
+  async bulkLifecycleAction(
+    brandProfileId: string,
+    action: "PAUSE" | "RESUME" | "ARCHIVE",
+    campaignIds: string[],
+  ) {
+    const results: Array<{
+      campaign_id: string;
+      ok: boolean;
+      current_status?: UceCampaignStatus;
+      error?: string;
+    }> = [];
+
+    for (const id of [...new Set(campaignIds.filter(Boolean))]) {
+      try {
+        const result =
+          action === "PAUSE"
+            ? await this.pauseCampaign(brandProfileId, id)
+            : action === "RESUME"
+              ? await this.resumeCampaign(brandProfileId, id)
+              : await this.archiveCampaign(brandProfileId, id);
+        results.push({
+          campaign_id: result.campaign_id,
+          ok: true,
+          current_status: result.current_status,
+        });
+      } catch (err) {
+        results.push({
+          campaign_id: id,
+          ok: false,
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+      }
+    }
+
+    return {
+      action,
+      results,
+      success_count: results.filter((r) => r.ok).length,
+      failure_count: results.filter((r) => !r.ok).length,
     };
   }
 

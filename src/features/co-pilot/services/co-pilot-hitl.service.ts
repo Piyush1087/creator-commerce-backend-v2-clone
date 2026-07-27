@@ -21,7 +21,7 @@ import {
   parsePaletteColorsInput,
   type DnaIdentityUpdateAxis,
 } from "../utils/co-pilot-dna-identity.util";
-import type { WriteIntentKind } from "./co-pilot-intent.service";
+import type { WriteIntentKind } from "../core/write-intent.types";
 import { CoPilotSlotSessionService } from "./co-pilot-slot-session.service";
 import { CoPilotThreadService } from "./co-pilot-thread.service";
 
@@ -102,6 +102,16 @@ export class CoPilotHitlService {
         return this.confirmDnaOffering(args, staged);
       case "DNA_PERSONA_CREATE":
         return this.confirmDnaPersonaCreate(args, staged);
+      case "PAUSE_CAMPAIGN":
+        return this.confirmPauseCampaign(args, staged);
+      case "RESUME_CAMPAIGN":
+        return this.confirmResumeCampaign(args, staged);
+      case "ARCHIVE_CAMPAIGN":
+        return this.confirmArchiveCampaign(args, staged);
+      case "DUPLICATE_CAMPAIGN":
+        return this.confirmDuplicateCampaign(args, staged);
+      case "BULK_CAMPAIGN_ACTION":
+        return this.confirmBulkCampaignAction(args, staged);
       default:
         throw new BadRequestException(`Unsupported HITL intent: ${intent}`);
     }
@@ -606,6 +616,239 @@ export class CoPilotHitlService {
 
     return {
       intent: "DNA_PERSONA_CREATE",
+      message: summary,
+      hitlResolution: { status: "CONFIRMED", resolvedAt, summary },
+    };
+  }
+
+  private parseSelectLabel(raw: unknown): string | undefined {
+    const value = String(raw ?? "").trim();
+    if (!value.includes("::")) {
+      return undefined;
+    }
+    return value.split("::").slice(1).join("::").trim() || undefined;
+  }
+
+  private parseCampaignIdList(raw: unknown): string[] {
+    if (Array.isArray(raw)) {
+      return raw.map((v) => this.parseSelectId(v)).filter(Boolean);
+    }
+    const text = String(raw ?? "").trim();
+    if (!text) {
+      return [];
+    }
+    return text
+      .split(/[,;\s]+/)
+      .map((part) => this.parseSelectId(part))
+      .filter(Boolean);
+  }
+
+  private async confirmPauseCampaign(
+    args: { brandProfileId: string; threadId: string },
+    staged: Record<string, unknown>,
+  ): Promise<HitlConfirmResult> {
+    const campaignId = this.parseSelectId(staged.campaign_id);
+    if (!campaignId) {
+      throw new BadRequestException("Campaign id is required.");
+    }
+    const result = await this.uceCampaigns.pauseCampaign(
+      args.brandProfileId,
+      campaignId,
+    );
+    await this.slotSessions.clearSession(args.threadId);
+    const resolvedAt = new Date().toISOString();
+    const summary = `Campaign paused (${result.current_status}).`;
+    await this.threads.persistHitlResolution(
+      args.threadId,
+      String(staged.idempotencyKey),
+      {
+        status: "CONFIRMED",
+        resolvedAt,
+        summary,
+        campaignId: result.campaign_id,
+        campaignName: result.campaign_name,
+      },
+    );
+    return {
+      intent: "PAUSE_CAMPAIGN",
+      campaignId: result.campaign_id,
+      campaignName: result.campaign_name,
+      message: summary,
+      hitlResolution: {
+        status: "CONFIRMED",
+        resolvedAt,
+        summary,
+        campaignId: result.campaign_id,
+        campaignName: result.campaign_name,
+      },
+    };
+  }
+
+  private async confirmResumeCampaign(
+    args: { brandProfileId: string; threadId: string },
+    staged: Record<string, unknown>,
+  ): Promise<HitlConfirmResult> {
+    const campaignId = this.parseSelectId(staged.campaign_id);
+    if (!campaignId) {
+      throw new BadRequestException("Campaign id is required.");
+    }
+    const result = await this.uceCampaigns.resumeCampaign(
+      args.brandProfileId,
+      campaignId,
+    );
+    await this.slotSessions.clearSession(args.threadId);
+    const resolvedAt = new Date().toISOString();
+    const summary = `Campaign resumed (${result.current_status}).`;
+    await this.threads.persistHitlResolution(
+      args.threadId,
+      String(staged.idempotencyKey),
+      {
+        status: "CONFIRMED",
+        resolvedAt,
+        summary,
+        campaignId: result.campaign_id,
+        campaignName: result.campaign_name,
+      },
+    );
+    return {
+      intent: "RESUME_CAMPAIGN",
+      campaignId: result.campaign_id,
+      campaignName: result.campaign_name,
+      message: summary,
+      hitlResolution: {
+        status: "CONFIRMED",
+        resolvedAt,
+        summary,
+        campaignId: result.campaign_id,
+        campaignName: result.campaign_name,
+      },
+    };
+  }
+
+  private async confirmArchiveCampaign(
+    args: { brandProfileId: string; threadId: string },
+    staged: Record<string, unknown>,
+  ): Promise<HitlConfirmResult> {
+    const campaignId = this.parseSelectId(staged.campaign_id);
+    if (!campaignId) {
+      throw new BadRequestException("Campaign id is required.");
+    }
+    const result = await this.uceCampaigns.archiveCampaign(
+      args.brandProfileId,
+      campaignId,
+    );
+    await this.slotSessions.clearSession(args.threadId);
+    const resolvedAt = new Date().toISOString();
+    const summary = `Campaign archived (status ${result.current_status}).`;
+    await this.threads.persistHitlResolution(
+      args.threadId,
+      String(staged.idempotencyKey),
+      {
+        status: "CONFIRMED",
+        resolvedAt,
+        summary,
+        campaignId: result.campaign_id,
+        campaignName: result.campaign_name,
+      },
+    );
+    return {
+      intent: "ARCHIVE_CAMPAIGN",
+      campaignId: result.campaign_id,
+      campaignName: result.campaign_name,
+      message: summary,
+      hitlResolution: {
+        status: "CONFIRMED",
+        resolvedAt,
+        summary,
+        campaignId: result.campaign_id,
+        campaignName: result.campaign_name,
+      },
+    };
+  }
+
+  private async confirmDuplicateCampaign(
+    args: { brandProfileId: string; threadId: string },
+    staged: Record<string, unknown>,
+  ): Promise<HitlConfirmResult> {
+    const campaignId = this.parseSelectId(staged.campaign_id);
+    const newName = String(staged.new_campaign_name ?? "").trim();
+    if (!campaignId || !newName) {
+      throw new BadRequestException(
+        "Source campaign and new campaign name are required.",
+      );
+    }
+    const shell = await this.uceCampaigns.duplicateCampaign(
+      args.brandProfileId,
+      campaignId,
+      newName,
+    );
+    await this.slotSessions.clearSession(args.threadId);
+    const resolvedAt = new Date().toISOString();
+    const summary = `Draft campaign "${shell.campaign_name}" created by duplicating ${this.parseSelectLabel(staged.campaign_id) ?? "source"}.`;
+    await this.threads.persistHitlResolution(
+      args.threadId,
+      String(staged.idempotencyKey),
+      {
+        status: "CONFIRMED",
+        resolvedAt,
+        summary,
+        campaignId: shell.campaign_id,
+        campaignName: shell.campaign_name,
+      },
+    );
+    return {
+      intent: "DUPLICATE_CAMPAIGN",
+      campaignId: shell.campaign_id,
+      campaignName: shell.campaign_name,
+      message: summary,
+      hitlResolution: {
+        status: "CONFIRMED",
+        resolvedAt,
+        summary,
+        campaignId: shell.campaign_id,
+        campaignName: shell.campaign_name,
+      },
+    };
+  }
+
+  private async confirmBulkCampaignAction(
+    args: { brandProfileId: string; threadId: string },
+    staged: Record<string, unknown>,
+  ): Promise<HitlConfirmResult> {
+    const action = String(staged.bulk_action ?? "")
+      .toUpperCase()
+      .trim() as "PAUSE" | "RESUME" | "ARCHIVE";
+    if (action !== "PAUSE" && action !== "RESUME" && action !== "ARCHIVE") {
+      throw new BadRequestException("bulk_action must be PAUSE, RESUME, or ARCHIVE.");
+    }
+
+    let campaignIds = this.parseCampaignIdList(staged.campaign_ids);
+    if (campaignIds.length === 0 && staged.campaign_id) {
+      campaignIds = [this.parseSelectId(staged.campaign_id)];
+    }
+    if (campaignIds.length === 0) {
+      throw new BadRequestException("At least one campaign id is required.");
+    }
+
+    const result = await this.uceCampaigns.bulkLifecycleAction(
+      args.brandProfileId,
+      action,
+      campaignIds,
+    );
+    await this.slotSessions.clearSession(args.threadId);
+    const resolvedAt = new Date().toISOString();
+    const summary = `Bulk ${action}: ${result.success_count} succeeded, ${result.failure_count} failed.`;
+    await this.threads.persistHitlResolution(
+      args.threadId,
+      String(staged.idempotencyKey),
+      {
+        status: "CONFIRMED",
+        resolvedAt,
+        summary,
+      },
+    );
+    return {
+      intent: "BULK_CAMPAIGN_ACTION",
       message: summary,
       hitlResolution: { status: "CONFIRMED", resolvedAt, summary },
     };

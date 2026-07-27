@@ -2,6 +2,10 @@ import { Injectable } from "@nestjs/common";
 import { randomUUID } from "crypto";
 
 import type {
+  DetectedWriteIntent,
+  WriteIntentKind,
+} from "../core/write-intent.types";
+import type {
   ExecutionWidgetData,
   SlotFillingData,
 } from "../schemas/copilot-payload.schema";
@@ -16,22 +20,7 @@ import {
 } from "../utils/co-pilot-leak-planner.util";
 import { isPlannerLaunchWriteQuery } from "../utils/co-pilot-planner.util";
 
-export type WriteIntentKind =
-  | "CAMPAIGN_LAUNCH"
-  | "CAMPAIGN_EDIT_DRAFT"
-  | "INTELLIGENCE_MOVE_TO_PLANNER"
-  | "PLANNER_LAUNCH_DRAFT"
-  | "DNA_IDENTITY_UPDATE"
-  | "DNA_OFFERING_UPDATE"
-  | "DNA_PERSONA_CREATE";
-
-export type DetectedWriteIntent =
-  | { kind: "NONE" }
-  | {
-      kind: WriteIntentKind;
-      stagedPayload: Record<string, unknown>;
-      missingSlots: SlotFillingData["missingSlots"];
-    };
+export type { DetectedWriteIntent, WriteIntentKind };
 
 const CAMPAIGN_OBJECTIVES = [
   "BRAND_AWARENESS",
