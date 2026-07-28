@@ -228,15 +228,32 @@ export class CoPilotThreadService {
     formatType: string;
     narrativeText: string;
   }) {
-    const message = await this.prisma.coPilotMessage.create({
-      data: {
-        threadId: args.threadId,
-        role: "ASSISTANT",
-        textContent: args.narrativeText,
-        payloadJson: args.payload as Prisma.InputJsonValue,
-        formatType: args.formatType as CoPilotFormatType,
-      },
-    });
+    const tryCreate = (formatType: string) =>
+      this.prisma.coPilotMessage.create({
+        data: {
+          threadId: args.threadId,
+          role: "ASSISTANT",
+          textContent: args.narrativeText,
+          payloadJson: args.payload as Prisma.InputJsonValue,
+          formatType: formatType as CoPilotFormatType,
+        },
+      });
+
+    let message;
+    try {
+      message = await tryCreate(args.formatType);
+    } catch (err) {
+      // Local/dev DBs may not have newer enum values yet (e.g. VALIDATION_CHECKLIST).
+      // Persist with a safe format so chat still works; payload JSON keeps the full shape.
+      if (
+        args.formatType !== "CONVERSATIONAL_NARRATIVE" &&
+        this.isUnknownFormatTypeError(err)
+      ) {
+        message = await tryCreate("CONVERSATIONAL_NARRATIVE");
+      } else {
+        throw err;
+      }
+    }
 
     await this.prisma.coPilotThread.update({
       where: { id: args.threadId },
@@ -244,6 +261,15 @@ export class CoPilotThreadService {
     });
 
     return message;
+  }
+
+  private isUnknownFormatTypeError(err: unknown): boolean {
+    const text = err instanceof Error ? err.message : String(err ?? "");
+    return (
+      /invalid input value for enum/i.test(text) ||
+      /CoPilotFormatType/i.test(text) ||
+      /VALIDATION_CHECKLIST/i.test(text)
+    );
   }
 
   async findHitlResolution(

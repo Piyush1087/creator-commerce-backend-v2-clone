@@ -18,6 +18,7 @@ const CampaignListIntentSchema = z.enum([
   "CAMPAIGN_FINANCIALS",
   "PAUSE_CAMPAIGN",
   "RESUME_CAMPAIGN",
+  "GO_LIVE_CAMPAIGN",
   "ARCHIVE_CAMPAIGN",
   "DUPLICATE_CAMPAIGN",
   "BULK_CAMPAIGN_ACTION",
@@ -55,6 +56,7 @@ export type CampaignWriteIntentKind = Extract<
   CampaignClassifierOutput["intent"],
   | "PAUSE_CAMPAIGN"
   | "RESUME_CAMPAIGN"
+  | "GO_LIVE_CAMPAIGN"
   | "ARCHIVE_CAMPAIGN"
   | "DUPLICATE_CAMPAIGN"
   | "BULK_CAMPAIGN_ACTION"
@@ -79,6 +81,7 @@ const READ_INTENTS = new Set<string>([
 const WRITE_INTENTS = new Set<string>([
   "PAUSE_CAMPAIGN",
   "RESUME_CAMPAIGN",
+  "GO_LIVE_CAMPAIGN",
   "ARCHIVE_CAMPAIGN",
   "DUPLICATE_CAMPAIGN",
   "BULK_CAMPAIGN_ACTION",
@@ -87,13 +90,16 @@ const WRITE_INTENTS = new Set<string>([
 const SYSTEM = `You are the intent classifier for The Creator Shop Brand Co-Pilot, Campaign List module only.
 
 Return JSON only. Decide:
-- domain=CAMPAIGN_LIST when the user is asking about listing/searching/filtering/sorting campaigns, campaign summary/performance/financials/compare, or lifecycle actions (pause/resume/archive/duplicate/bulk), including typos and paraphrases.
+- domain=CAMPAIGN_LIST when the user is asking about listing/searching/filtering/sorting campaigns, campaign summary/performance/financials/compare, or lifecycle actions (pause/resume/go-live/publish/archive/duplicate/bulk), including typos and paraphrases.
 - domain=OTHER for Brand DNA, planner blueprints, escrow, collaborations, greetings, or unrelated chat.
 
 Intent rules:
 - "sort … by budget/name/spend" → SORT_CAMPAIGNS (never CAMPAIGN_FINANCIALS just because budget appears).
 - "budget / spending / remaining / utilization for a campaign" → CAMPAIGN_FINANCIALS.
-- "set/make … active" or "unpause/restart" → RESUME_CAMPAIGN.
+- "go live / publish / make live / activate draft" → GO_LIVE_CAMPAIGN (DRAFT → ACTIVE). Never confuse with creating a new campaign (CAMPAIGN_LAUNCH).
+- "publish X" / "go live X" with a campaign name (even typos) → GO_LIVE_CAMPAIGN with campaignNameHint.
+- "resume / unpause / restart" a paused campaign → RESUME_CAMPAIGN.
+- "set/make … active" → GO_LIVE_CAMPAIGN if draft-like, else RESUME_CAMPAIGN when clearly paused.
 - "campaigns with X product" → SEARCH_CAMPAIGNS or FILTER_CAMPAIGNS with productHint.
 - "draft / active / paused / archived campaigns", "what about drafts" → FILTER_CAMPAIGNS with matching statusFilter (never invent empty results).
 - "summarize my campaigns" (plural / no single name) → LIST_CAMPAIGNS (or FILTER if status given), not CAMPAIGN_SUMMARY.

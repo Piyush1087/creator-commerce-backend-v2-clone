@@ -134,15 +134,28 @@ export class CoPilotCampaignSmartRouterService {
       stagedPayload.campaign_name = campaign.name;
     }
 
+    let kind: CampaignWriteIntentKind = classified.intent;
+    if (campaign) {
+      const status = catalog.find((c) => c.id === campaign.id)?.status;
+      if (
+        status === "DRAFT" &&
+        (kind === "RESUME_CAMPAIGN" || kind === "GO_LIVE_CAMPAIGN")
+      ) {
+        kind = "GO_LIVE_CAMPAIGN";
+      } else if (
+        status === "PAUSED" &&
+        (kind === "GO_LIVE_CAMPAIGN" || kind === "RESUME_CAMPAIGN")
+      ) {
+        kind = "RESUME_CAMPAIGN";
+      }
+    }
+
     const missingSlots: Exclude<
       DetectedWriteIntent,
       { kind: "NONE" }
     >["missingSlots"] = [];
 
-    if (
-      classified.intent !== "BULK_CAMPAIGN_ACTION" &&
-      !stagedPayload.campaign_id
-    ) {
+    if (kind !== "BULK_CAMPAIGN_ACTION" && !stagedPayload.campaign_id) {
       missingSlots.push({
         fieldName: "campaign_id",
         uiLabel: "Campaign",
@@ -152,10 +165,7 @@ export class CoPilotCampaignSmartRouterService {
       });
     }
 
-    if (
-      classified.intent === "DUPLICATE_CAMPAIGN" &&
-      !stagedPayload.new_campaign_name
-    ) {
+    if (kind === "DUPLICATE_CAMPAIGN" && !stagedPayload.new_campaign_name) {
       missingSlots.push({
         fieldName: "new_campaign_name",
         uiLabel: "New campaign name",
@@ -164,7 +174,7 @@ export class CoPilotCampaignSmartRouterService {
       });
     }
 
-    if (classified.intent === "BULK_CAMPAIGN_ACTION") {
+    if (kind === "BULK_CAMPAIGN_ACTION") {
       if (!stagedPayload.bulk_action) {
         missingSlots.push({
           fieldName: "bulk_action",
@@ -184,7 +194,7 @@ export class CoPilotCampaignSmartRouterService {
     }
 
     return {
-      kind: classified.intent,
+      kind,
       stagedPayload,
       missingSlots,
     };

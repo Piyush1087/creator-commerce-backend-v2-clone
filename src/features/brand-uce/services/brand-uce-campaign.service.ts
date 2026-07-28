@@ -587,7 +587,41 @@ export class BrandUceCampaignService {
     );
   }
 
+  /** Publish a DRAFT campaign (go live). */
+  async goLiveCampaign(brandProfileId: string, campaignId: string) {
+    await this.access.assertCampaignOwned(brandProfileId, campaignId);
+    const existing = await this.prisma.uceCampaign.findFirst({
+      where: { id: campaignId, brandProfileId },
+    });
+    if (!existing) {
+      throw new BadRequestException("Campaign not found");
+    }
+    if (existing.status !== UceCampaignStatus.DRAFT) {
+      throw new BadRequestException(
+        "Only DRAFT campaigns can go live. Use resume for PAUSED campaigns.",
+      );
+    }
+    return this.patchStatus(
+      brandProfileId,
+      campaignId,
+      UceCampaignStatus.ACTIVE,
+    );
+  }
+
+  /** Resume a PAUSED campaign back to ACTIVE. */
   async resumeCampaign(brandProfileId: string, campaignId: string) {
+    await this.access.assertCampaignOwned(brandProfileId, campaignId);
+    const existing = await this.prisma.uceCampaign.findFirst({
+      where: { id: campaignId, brandProfileId },
+    });
+    if (!existing) {
+      throw new BadRequestException("Campaign not found");
+    }
+    if (existing.status !== UceCampaignStatus.PAUSED) {
+      throw new BadRequestException(
+        "Only PAUSED campaigns can be resumed. Use go live for DRAFT campaigns.",
+      );
+    }
     return this.patchStatus(
       brandProfileId,
       campaignId,
@@ -601,6 +635,11 @@ export class BrandUceCampaignService {
       campaignId,
       UceCampaignStatus.ARCHIVED,
     );
+  }
+
+  async getActivationChecklist(brandProfileId: string, campaignId: string) {
+    await this.access.assertCampaignOwned(brandProfileId, campaignId);
+    return this.buildActivationChecklist(campaignId);
   }
 
   async getCampaignSummary(brandProfileId: string, campaignId: string) {

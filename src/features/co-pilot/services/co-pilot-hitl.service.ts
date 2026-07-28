@@ -22,6 +22,13 @@ import {
   type DnaIdentityUpdateAxis,
 } from "../utils/co-pilot-dna-identity.util";
 import type { WriteIntentKind } from "../core/write-intent.types";
+import type { ValidationChecklistData } from "../schemas/copilot-payload.schema";
+import {
+  mapBulkLifecyclePartialFailures,
+  mapCampaignListValidationError,
+  validationChecklistToPayloadFields,
+  type CampaignListValidationAction,
+} from "../modules/uce-campaign-list/campaign-list-validation";
 import { CoPilotSlotSessionService } from "./co-pilot-slot-session.service";
 import { CoPilotThreadService } from "./co-pilot-thread.service";
 
@@ -32,7 +39,8 @@ export type HitlConfirmResult = {
   campaignName?: string;
   plannerCardId?: string;
   pendingBrandCentreJobId?: string;
-  hitlResolution: {
+  /** Present on success. Absent when validationBlocked. */
+  hitlResolution?: {
     status: "CONFIRMED";
     resolvedAt: string;
     summary: string;
@@ -41,6 +49,11 @@ export type HitlConfirmResult = {
     plannerCardId?: string;
     brandCentreJobId?: string;
   };
+  /** Part 5 — action paused; session kept for retry. */
+  validationBlocked?: true;
+  validationChecklist?: ValidationChecklistData;
+  /** Optional follow-up checklist after a successful confirm (e.g. bulk partial failures). */
+  followUpChecklist?: ValidationChecklistData;
 };
 
 @Injectable()
@@ -106,6 +119,8 @@ export class CoPilotHitlService {
         return this.confirmPauseCampaign(args, staged);
       case "RESUME_CAMPAIGN":
         return this.confirmResumeCampaign(args, staged);
+      case "GO_LIVE_CAMPAIGN":
+        return this.confirmGoLiveCampaign(args, staged);
       case "ARCHIVE_CAMPAIGN":
         return this.confirmArchiveCampaign(args, staged);
       case "DUPLICATE_CAMPAIGN":
@@ -643,6 +658,90 @@ export class CoPilotHitlService {
       .filter(Boolean);
   }
 
+  private async confirmLifecycleWithValidation(args: {
+    brandProfileId: string;
+    threadId: string;
+    intent: Extract<
+      WriteIntentKind,
+      | "PAUSE_CAMPAIGN"
+      | "RESUME_CAMPAIGN"
+      | "GO_LIVE_CAMPAIGN"
+      | "ARCHIVE_CAMPAIGN"
+      | "DUPLICATE_CAMPAIGN"
+    >;
+    action: CampaignListValidationAction;
+    staged: Record<string, unknown>;
+    run: () => Promise<{
+      campaign_id: string;
+      campaign_name: string;
+      current_status?: string;
+    }>;
+    successSummary: (result: {
+      campaign_id: string;
+      campaign_name: string;
+      current_status?: string;
+    }) => string;
+  }): Promise<HitlConfirmResult> {
+    const campaignId = this.parseSelectId(args.staged.campaign_id);
+    const campaignName =
+      typeof args.staged.campaign_name === "string"
+        ? args.staged.campaign_name
+        : undefined;
+
+    try {
+      const result = await args.run();
+      await this.slotSessions.clearSession(args.threadId);
+      const resolvedAt = new Date().toISOString();
+      const summary = args.successSummary(result);
+      await this.threads.persistHitlResolution(
+        args.threadId,
+        String(args.staged.idempotencyKey),
+        {
+          status: "CONFIRMED",
+          resolvedAt,
+          summary,
+          campaignId: result.campaign_id,
+          campaignName: result.campaign_name,
+        },
+      );
+      return {
+        intent: args.intent,
+        campaignId: result.campaign_id,
+        campaignName: result.campaign_name,
+        message: summary,
+        hitlResolution: {
+          status: "CONFIRMED",
+          resolvedAt,
+          summary,
+          campaignId: result.campaign_id,
+          campaignName: result.campaign_name,
+        },
+      };
+    } catch (err) {
+      const mapped = mapCampaignListValidationError({
+        err,
+        action: args.action,
+        campaignId: campaignId ?? undefined,
+        campaignName,
+      });
+      const fields = validationChecklistToPayloadFields(mapped);
+      return {
+        intent: args.intent,
+        message: fields.narrativeText,
+        campaignId: mapped.campaignId,
+        campaignName: mapped.campaignName,
+        validationBlocked: true,
+        validationChecklist: {
+          ...fields.validationChecklistData,
+          idempotencyKey:
+            typeof args.staged.idempotencyKey === "string"
+              ? args.staged.idempotencyKey
+              : undefined,
+        },
+      };
+    }
+  }
+
   private async confirmPauseCampaign(
     args: { brandProfileId: string; threadId: string },
     staged: Record<string, unknown>,
@@ -651,37 +750,16 @@ export class CoPilotHitlService {
     if (!campaignId) {
       throw new BadRequestException("Campaign id is required.");
     }
-    const result = await this.uceCampaigns.pauseCampaign(
-      args.brandProfileId,
-      campaignId,
-    );
-    await this.slotSessions.clearSession(args.threadId);
-    const resolvedAt = new Date().toISOString();
-    const summary = `Campaign paused (${result.current_status}).`;
-    await this.threads.persistHitlResolution(
-      args.threadId,
-      String(staged.idempotencyKey),
-      {
-        status: "CONFIRMED",
-        resolvedAt,
-        summary,
-        campaignId: result.campaign_id,
-        campaignName: result.campaign_name,
-      },
-    );
-    return {
+    return this.confirmLifecycleWithValidation({
+      brandProfileId: args.brandProfileId,
+      threadId: args.threadId,
       intent: "PAUSE_CAMPAIGN",
-      campaignId: result.campaign_id,
-      campaignName: result.campaign_name,
-      message: summary,
-      hitlResolution: {
-        status: "CONFIRMED",
-        resolvedAt,
-        summary,
-        campaignId: result.campaign_id,
-        campaignName: result.campaign_name,
-      },
-    };
+      action: "PAUSE",
+      staged,
+      run: () => this.uceCampaigns.pauseCampaign(args.brandProfileId, campaignId),
+      successSummary: (result) =>
+        `Campaign paused (${result.current_status}).`,
+    });
   }
 
   private async confirmResumeCampaign(
@@ -692,37 +770,36 @@ export class CoPilotHitlService {
     if (!campaignId) {
       throw new BadRequestException("Campaign id is required.");
     }
-    const result = await this.uceCampaigns.resumeCampaign(
-      args.brandProfileId,
-      campaignId,
-    );
-    await this.slotSessions.clearSession(args.threadId);
-    const resolvedAt = new Date().toISOString();
-    const summary = `Campaign resumed (${result.current_status}).`;
-    await this.threads.persistHitlResolution(
-      args.threadId,
-      String(staged.idempotencyKey),
-      {
-        status: "CONFIRMED",
-        resolvedAt,
-        summary,
-        campaignId: result.campaign_id,
-        campaignName: result.campaign_name,
-      },
-    );
-    return {
+    return this.confirmLifecycleWithValidation({
+      brandProfileId: args.brandProfileId,
+      threadId: args.threadId,
       intent: "RESUME_CAMPAIGN",
-      campaignId: result.campaign_id,
-      campaignName: result.campaign_name,
-      message: summary,
-      hitlResolution: {
-        status: "CONFIRMED",
-        resolvedAt,
-        summary,
-        campaignId: result.campaign_id,
-        campaignName: result.campaign_name,
-      },
-    };
+      action: "RESUME",
+      staged,
+      run: () => this.uceCampaigns.resumeCampaign(args.brandProfileId, campaignId),
+      successSummary: (result) =>
+        `Campaign resumed (${result.current_status}).`,
+    });
+  }
+
+  private async confirmGoLiveCampaign(
+    args: { brandProfileId: string; threadId: string },
+    staged: Record<string, unknown>,
+  ): Promise<HitlConfirmResult> {
+    const campaignId = this.parseSelectId(staged.campaign_id);
+    if (!campaignId) {
+      throw new BadRequestException("Campaign id is required.");
+    }
+    return this.confirmLifecycleWithValidation({
+      brandProfileId: args.brandProfileId,
+      threadId: args.threadId,
+      intent: "GO_LIVE_CAMPAIGN",
+      action: "GO_LIVE",
+      staged,
+      run: () => this.uceCampaigns.goLiveCampaign(args.brandProfileId, campaignId),
+      successSummary: (result) =>
+        `Campaign is live (${result.current_status}).`,
+    });
   }
 
   private async confirmArchiveCampaign(
@@ -733,37 +810,17 @@ export class CoPilotHitlService {
     if (!campaignId) {
       throw new BadRequestException("Campaign id is required.");
     }
-    const result = await this.uceCampaigns.archiveCampaign(
-      args.brandProfileId,
-      campaignId,
-    );
-    await this.slotSessions.clearSession(args.threadId);
-    const resolvedAt = new Date().toISOString();
-    const summary = `Campaign archived (status ${result.current_status}).`;
-    await this.threads.persistHitlResolution(
-      args.threadId,
-      String(staged.idempotencyKey),
-      {
-        status: "CONFIRMED",
-        resolvedAt,
-        summary,
-        campaignId: result.campaign_id,
-        campaignName: result.campaign_name,
-      },
-    );
-    return {
+    return this.confirmLifecycleWithValidation({
+      brandProfileId: args.brandProfileId,
+      threadId: args.threadId,
       intent: "ARCHIVE_CAMPAIGN",
-      campaignId: result.campaign_id,
-      campaignName: result.campaign_name,
-      message: summary,
-      hitlResolution: {
-        status: "CONFIRMED",
-        resolvedAt,
-        summary,
-        campaignId: result.campaign_id,
-        campaignName: result.campaign_name,
-      },
-    };
+      action: "ARCHIVE",
+      staged,
+      run: () =>
+        this.uceCampaigns.archiveCampaign(args.brandProfileId, campaignId),
+      successSummary: (result) =>
+        `Campaign archived (status ${result.current_status}).`,
+    });
   }
 
   private async confirmDuplicateCampaign(
@@ -772,43 +829,33 @@ export class CoPilotHitlService {
   ): Promise<HitlConfirmResult> {
     const campaignId = this.parseSelectId(staged.campaign_id);
     const newName = String(staged.new_campaign_name ?? "").trim();
-    if (!campaignId || !newName) {
-      throw new BadRequestException(
-        "Source campaign and new campaign name are required.",
-      );
+    if (!campaignId) {
+      throw new BadRequestException("Campaign id is required.");
     }
-    const shell = await this.uceCampaigns.duplicateCampaign(
-      args.brandProfileId,
-      campaignId,
-      newName,
-    );
-    await this.slotSessions.clearSession(args.threadId);
-    const resolvedAt = new Date().toISOString();
-    const summary = `Draft campaign "${shell.campaign_name}" created by duplicating ${this.parseSelectLabel(staged.campaign_id) ?? "source"}.`;
-    await this.threads.persistHitlResolution(
-      args.threadId,
-      String(staged.idempotencyKey),
-      {
-        status: "CONFIRMED",
-        resolvedAt,
-        summary,
-        campaignId: shell.campaign_id,
-        campaignName: shell.campaign_name,
-      },
-    );
-    return {
+    if (!newName) {
+      throw new BadRequestException("New campaign name is required.");
+    }
+    return this.confirmLifecycleWithValidation({
+      brandProfileId: args.brandProfileId,
+      threadId: args.threadId,
       intent: "DUPLICATE_CAMPAIGN",
-      campaignId: shell.campaign_id,
-      campaignName: shell.campaign_name,
-      message: summary,
-      hitlResolution: {
-        status: "CONFIRMED",
-        resolvedAt,
-        summary,
-        campaignId: shell.campaign_id,
-        campaignName: shell.campaign_name,
+      action: "DUPLICATE",
+      staged,
+      run: async () => {
+        const shell = await this.uceCampaigns.duplicateCampaign(
+          args.brandProfileId,
+          campaignId,
+          newName,
+        );
+        return {
+          campaign_id: shell.campaign_id,
+          campaign_name: shell.campaign_name,
+          current_status: shell.current_status,
+        };
       },
-    };
+      successSummary: (result) =>
+        `Draft campaign "${result.campaign_name}" created by duplicating source.`,
+    });
   }
 
   private async confirmBulkCampaignAction(
@@ -819,7 +866,25 @@ export class CoPilotHitlService {
       .toUpperCase()
       .trim() as "PAUSE" | "RESUME" | "ARCHIVE";
     if (action !== "PAUSE" && action !== "RESUME" && action !== "ARCHIVE") {
-      throw new BadRequestException("bulk_action must be PAUSE, RESUME, or ARCHIVE.");
+      const mapped = mapCampaignListValidationError({
+        err: new BadRequestException(
+          "bulk_action must be PAUSE, RESUME, or ARCHIVE.",
+        ),
+        action: "BULK",
+      });
+      const fields = validationChecklistToPayloadFields(mapped);
+      return {
+        intent: "BULK_CAMPAIGN_ACTION",
+        message: fields.narrativeText,
+        validationBlocked: true,
+        validationChecklist: {
+          ...fields.validationChecklistData,
+          idempotencyKey:
+            typeof staged.idempotencyKey === "string"
+              ? staged.idempotencyKey
+              : undefined,
+        },
+      };
     }
 
     let campaignIds = this.parseCampaignIdList(staged.campaign_ids);
@@ -827,30 +892,111 @@ export class CoPilotHitlService {
       campaignIds = [this.parseSelectId(staged.campaign_id)];
     }
     if (campaignIds.length === 0) {
-      throw new BadRequestException("At least one campaign id is required.");
+      const mapped = mapCampaignListValidationError({
+        err: new BadRequestException("At least one campaign id is required."),
+        action: "BULK",
+      });
+      const fields = validationChecklistToPayloadFields(mapped);
+      return {
+        intent: "BULK_CAMPAIGN_ACTION",
+        message: fields.narrativeText,
+        validationBlocked: true,
+        validationChecklist: {
+          ...fields.validationChecklistData,
+          idempotencyKey:
+            typeof staged.idempotencyKey === "string"
+              ? staged.idempotencyKey
+              : undefined,
+        },
+      };
     }
 
-    const result = await this.uceCampaigns.bulkLifecycleAction(
-      args.brandProfileId,
-      action,
-      campaignIds,
-    );
-    await this.slotSessions.clearSession(args.threadId);
-    const resolvedAt = new Date().toISOString();
-    const summary = `Bulk ${action}: ${result.success_count} succeeded, ${result.failure_count} failed.`;
-    await this.threads.persistHitlResolution(
-      args.threadId,
-      String(staged.idempotencyKey),
-      {
-        status: "CONFIRMED",
-        resolvedAt,
-        summary,
-      },
-    );
-    return {
-      intent: "BULK_CAMPAIGN_ACTION",
-      message: summary,
-      hitlResolution: { status: "CONFIRMED", resolvedAt, summary },
-    };
+    try {
+      const result = await this.uceCampaigns.bulkLifecycleAction(
+        args.brandProfileId,
+        action,
+        campaignIds,
+      );
+
+      const nameMap: Record<string, string> = {};
+      if (typeof staged.campaign_name === "string" && campaignIds.length === 1) {
+        nameMap[campaignIds[0]] = staged.campaign_name;
+      }
+
+      const partial = mapBulkLifecyclePartialFailures({
+        action,
+        results: result.results,
+        campaignNames: nameMap,
+      });
+
+      if (partial && result.success_count === 0) {
+        const fields = validationChecklistToPayloadFields(partial);
+        return {
+          intent: "BULK_CAMPAIGN_ACTION",
+          message: fields.narrativeText,
+          validationBlocked: true,
+          validationChecklist: {
+            ...fields.validationChecklistData,
+            idempotencyKey:
+              typeof staged.idempotencyKey === "string"
+                ? staged.idempotencyKey
+                : undefined,
+          },
+        };
+      }
+
+      await this.slotSessions.clearSession(args.threadId);
+      const resolvedAt = new Date().toISOString();
+      let summary = `Bulk ${action}: ${result.success_count} succeeded, ${result.failure_count} failed.`;
+      if (partial) {
+        summary = `${summary} Some campaigns need attention — see the checklist.`;
+      }
+      await this.threads.persistHitlResolution(
+        args.threadId,
+        String(staged.idempotencyKey),
+        {
+          status: "CONFIRMED",
+          resolvedAt,
+          summary,
+        },
+      );
+
+      if (partial) {
+        const fields = validationChecklistToPayloadFields(partial);
+        return {
+          intent: "BULK_CAMPAIGN_ACTION",
+          message: summary,
+          hitlResolution: { status: "CONFIRMED", resolvedAt, summary },
+          followUpChecklist: {
+            ...fields.validationChecklistData,
+            primaryActionLabel: "Dismiss",
+          },
+        };
+      }
+
+      return {
+        intent: "BULK_CAMPAIGN_ACTION",
+        message: summary,
+        hitlResolution: { status: "CONFIRMED", resolvedAt, summary },
+      };
+    } catch (err) {
+      const mapped = mapCampaignListValidationError({
+        err,
+        action: "BULK",
+      });
+      const fields = validationChecklistToPayloadFields(mapped);
+      return {
+        intent: "BULK_CAMPAIGN_ACTION",
+        message: fields.narrativeText,
+        validationBlocked: true,
+        validationChecklist: {
+          ...fields.validationChecklistData,
+          idempotencyKey:
+            typeof staged.idempotencyKey === "string"
+              ? staged.idempotencyKey
+              : undefined,
+        },
+      };
+    }
   }
 }

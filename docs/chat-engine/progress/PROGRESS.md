@@ -20,6 +20,8 @@
 | Campaign launch HITL (UCE draft) | Done |
 | UCE Campaign List module (reads + lifecycle HITL) | Done |
 | Campaign List smart routing (normalize → Gemini classify → fuzzy resolve → tools/HITL) | Done |
+| Campaign Go Live (publish DRAFT→ACTIVE) HITL | Done |
+| Part 5 validation recovery checklists (go live / resume / pause / archive / duplicate) | Done |
 | Co-Pilot AI module registry (`core/` + `modules/`) | Done |
 | `UceCampaignStatus.ARCHIVED` enum + migration | Done (apply with `npm run db:migrate:deploy` — no shadow DB) |
 | HITL resolution persisted on message (reopen thread shows saved/discard) | Done |

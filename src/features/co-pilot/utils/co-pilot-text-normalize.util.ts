@@ -27,6 +27,10 @@ const WORD_CORRECTIONS: Array<{ pattern: RegExp; replace: string }> = [
   { pattern: /\bpaues\b/gi, replace: "pause" },
   { pattern: /\bfinacials?\b/gi, replace: "financials" },
   { pattern: /\bobjectvie\b/gi, replace: "objective" },
+  { pattern: /\bpublis[hj]\b/gi, replace: "publish" },
+  { pattern: /\bpublsih\b/gi, replace: "publish" },
+  { pattern: /\bpubish\b/gi, replace: "publish" },
+  { pattern: /\bpubls?ih\b/gi, replace: "publish" },
 ];
 
 /** Soft gate: message may belong to Campaign List (broad, not exact intents). */
@@ -46,6 +50,9 @@ export function looksLikeCampaignUtterance(normalizedText: string): boolean {
     n.includes("performance") ||
     n.includes("financial") ||
     n.includes("spending") ||
+    n.includes("publish") ||
+    n.includes("go live") ||
+    n.includes("go-live") ||
     /\b(draft|active|paused|completed|archived)\b/.test(n) ||
     /\bsort\b.*\b(by|budget|name|spend)/.test(n) ||
     /\bfilter\b/.test(n) ||
@@ -63,7 +70,9 @@ export function looksLikeCampaignFollowUp(normalizedText: string): boolean {
       n,
     ) ||
     /\b(its|their)\s+(budget|spend|performance|summary)\b/.test(n) ||
-    /\bwhat about\b/.test(n)
+    /\bwhat about\b/.test(n) ||
+    // "publish teat 222" / "go live era" after a list — no "campaign" word needed
+    /\b(publish|go live|go-live|pause|resume|archive|duplicate)\b/.test(n)
   );
 }
 
@@ -80,6 +89,9 @@ function fuzzyCorrectToken(token: string): string {
   }
   if (/^com+pare?$/.test(lower) && lower !== "compare") {
     return "compare";
+  }
+  if (/^pub+l[a-z]{0,4}$/.test(lower) && lower !== "publish") {
+    return "publish";
   }
   return token;
 }

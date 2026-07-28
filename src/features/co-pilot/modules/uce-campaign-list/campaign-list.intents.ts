@@ -27,14 +27,14 @@ export function extractCampaignNameHint(userText: string): string | undefined {
   }
 
   const patterns = [
-    /(?:pause|resume|archive|duplicate|clone|summarize|summary of|overview of|performance of|budget for|financials for|spending for)\s+(?:campaign\s+)?(.+)$/i,
+    /(?:pause|resume|archive|duplicate|clone|summarize|summary of|overview of|performance of|budget for|financials for|spending for|publish|go live|go-live|activate)\s+(?:campaign\s+)?(.+)$/i,
     /(?:campaign)\s+["']?([^"']+?)["']?(?:\s+campaign)?$/i,
   ];
   for (const pattern of patterns) {
     const match = userText.match(pattern)?.[1]?.trim();
     if (match && match.length >= 2 && match.length <= 80) {
       const cleaned = match
-        .replace(/\b(please|now|campaign)\b/gi, "")
+        .replace(/\b(please|now|campaign|can you|could you)\b/gi, "")
         .replace(/[?.!]+$/, "")
         .trim();
       if (
@@ -328,11 +328,41 @@ export function detectCampaignListWrite(
   }
 
   if (
+    (n.includes("go live") ||
+      n.includes("go-live") ||
+      n.includes("publish") ||
+      (n.includes("make") && n.includes("live")) ||
+      (n.includes("activate") && (n.includes("campaign") || n.includes("draft")))) &&
+    !n.includes("resume") &&
+    !n.includes("launch a campaign") &&
+    !n.includes("create a campaign") &&
+    !n.includes("create campaign")
+  ) {
+    return {
+      kind: "GO_LIVE_CAMPAIGN",
+      stagedPayload: { campaign_name_hint: nameHint },
+      missingSlots: [campaignSelectSlot()],
+    };
+  }
+
+  if (
     (n.includes("resume") || n.includes("restart") || n.includes("unpause")) &&
     n.includes("campaign")
   ) {
     return {
       kind: "RESUME_CAMPAIGN",
+      stagedPayload: { campaign_name_hint: nameHint },
+      missingSlots: [campaignSelectSlot()],
+    };
+  }
+
+  if (
+    (/\b(set|make)\b/.test(n) && /\b(active|live)\b/.test(n) && n.includes("campaign")) ||
+    (n.includes("set") && n.includes("active"))
+  ) {
+    // Ambiguous activate — prefer go-live wording handled above; default resume/go-live via enrich by status.
+    return {
+      kind: "GO_LIVE_CAMPAIGN",
       stagedPayload: { campaign_name_hint: nameHint },
       missingSlots: [campaignSelectSlot()],
     };

@@ -40,6 +40,7 @@ const READ_KINDS: ReadQueryKind[] = [
 const WRITE_INTENTS: WriteIntentKind[] = [
   "PAUSE_CAMPAIGN",
   "RESUME_CAMPAIGN",
+  "GO_LIVE_CAMPAIGN",
   "ARCHIVE_CAMPAIGN",
   "DUPLICATE_CAMPAIGN",
   "BULK_CAMPAIGN_ACTION",
@@ -294,7 +295,9 @@ export class UceCampaignListAiModule implements CoPilotAiModule {
         ? ("ACTIVE" as const)
         : intent.kind === "RESUME_CAMPAIGN"
           ? ("PAUSED" as const)
-          : undefined;
+          : intent.kind === "GO_LIVE_CAMPAIGN"
+            ? ("DRAFT" as const)
+            : undefined;
 
     const campaigns = await this.tools.listCampaigns(brandProfileId, {
       status: listStatus,
@@ -321,8 +324,27 @@ export class UceCampaignListAiModule implements CoPilotAiModule {
       stagedPayload.campaign_name = campaigns[0].campaign_name;
     }
 
+    let kind = intent.kind;
+    if (stagedPayload.campaign_id) {
+      const matched = campaigns.find(
+        (c) => c.campaign_id === stagedPayload.campaign_id,
+      );
+      const status = matched?.current_status;
+      if (
+        status === "DRAFT" &&
+        (kind === "RESUME_CAMPAIGN" || kind === "GO_LIVE_CAMPAIGN")
+      ) {
+        kind = "GO_LIVE_CAMPAIGN";
+      } else if (
+        status === "PAUSED" &&
+        (kind === "GO_LIVE_CAMPAIGN" || kind === "RESUME_CAMPAIGN")
+      ) {
+        kind = "RESUME_CAMPAIGN";
+      }
+    }
+
     return {
-      kind: intent.kind,
+      kind,
       stagedPayload,
       missingSlots: missingSlots.filter((slot) => {
         if (slot.fieldName === "campaign_id" && stagedPayload.campaign_id) {
@@ -370,6 +392,19 @@ export class UceCampaignListAiModule implements CoPilotAiModule {
           },
           requiredZodValidationSchemaName: "ResumeCampaignDto",
           primaryActionLabel: "Confirm resume campaign",
+          cancelActionLabel: "Discard",
+        };
+      case "GO_LIVE_CAMPAIGN":
+        return {
+          formTargetRoute: "/api/v1/brand-uce/campaigns/lifecycle/go-live",
+          idempotencyKey: key,
+          prefilledFields: {
+            campaign_id: args.stagedPayload.campaign_id,
+            campaign_name: args.stagedPayload.campaign_name,
+            action: "GO_LIVE",
+          },
+          requiredZodValidationSchemaName: "GoLiveCampaignDto",
+          primaryActionLabel: "Confirm go live",
           cancelActionLabel: "Discard",
         };
       case "ARCHIVE_CAMPAIGN":
@@ -425,6 +460,8 @@ export class UceCampaignListAiModule implements CoPilotAiModule {
         return "I can pause an ACTIVE campaign after you confirm. Choose the campaign below.";
       case "RESUME_CAMPAIGN":
         return "I can resume a PAUSED campaign after you confirm (activation checklist still applies).";
+      case "GO_LIVE_CAMPAIGN":
+        return "I can publish a DRAFT campaign (go live) after you confirm. Activation checklist must pass.";
       case "ARCHIVE_CAMPAIGN":
         return "I can archive a campaign (sets status to ARCHIVED) after you confirm.";
       case "DUPLICATE_CAMPAIGN":
@@ -448,6 +485,8 @@ export class UceCampaignListAiModule implements CoPilotAiModule {
         return `Review pause for "${name}". Inbound applications go offline; active collabs stay accessible.`;
       case "RESUME_CAMPAIGN":
         return `Review resume for "${name}". Activation checklist must pass.`;
+      case "GO_LIVE_CAMPAIGN":
+        return `Review go live (publish) for "${name}". Draft → ACTIVE if checklist passes.`;
       case "ARCHIVE_CAMPAIGN":
         return `Review archive for "${name}". Status will become ARCHIVED.`;
       case "DUPLICATE_CAMPAIGN":
