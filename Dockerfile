@@ -15,6 +15,16 @@ COPY . .
 RUN npx prisma generate
 # `npm run build` = nest build + copy-prompt-assets.mjs (prompt .md into dist/)
 RUN npm run build
+# TEMPORARY: compile QA seed for ECS start (remove after test@creator.com verified on dev).
+# Do not run ts-node in the runner — no tsconfig there → TS5109 NodeNext clash.
+RUN npx tsc scripts/seed-dev-creator.ts \
+  --outDir dist/scripts \
+  --rootDir scripts \
+  --esModuleInterop \
+  --module commonjs \
+  --moduleResolution node \
+  --target ES2021 \
+  --skipLibCheck
 
 FROM node:20-bookworm-slim AS runner
 WORKDIR /usr/src/app
@@ -26,8 +36,6 @@ COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/package*.json ./
 COPY --from=builder /usr/src/app/prisma ./prisma
 COPY --from=builder /usr/src/app/dist ./dist
-# TEMPORARY: QA creator seed on ECS start (remove after test@creator.com verified on dev)
-COPY --from=builder /usr/src/app/scripts/seed-dev-creator.ts ./scripts/seed-dev-creator.ts
 COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

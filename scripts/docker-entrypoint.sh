@@ -19,7 +19,7 @@ fi
 
 if [ "${RUN_SEED_DEV_CREATOR_ON_START}" = "true" ]; then
   echo "[entrypoint] RUN_SEED_DEV_CREATOR_ON_START=true — seed test@creator.com (TEMPORARY)"
-  npx ts-node --transpile-only scripts/seed-dev-creator.ts
+  node dist/scripts/seed-dev-creator.js
   echo "[entrypoint] seed-dev-creator complete"
 fi
 

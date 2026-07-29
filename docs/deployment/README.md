@@ -81,7 +81,7 @@ While jumpbox is unavailable, **dev** sets `RUN_SEED_DEV_CREATOR_ON_START=true` 
 
 1. `RUN_SEED_DEV_CREATOR_ON_START` from `sst.config.ts`
 2. The seed block in `scripts/docker-entrypoint.sh`
-3. The `COPY ... seed-dev-creator.ts` line in `Dockerfile`
+3. The temporary `tsc scripts/seed-dev-creator.ts` step in `Dockerfile`
 
 Local seed (Docker DB only) remains: `npm run db:seed:dev-creator`.
 
