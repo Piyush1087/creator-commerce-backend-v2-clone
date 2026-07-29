@@ -1,11 +1,17 @@
 /**
- * Local / dev seed: test creator account for collaboration UI.
+ * Seed / upsert QA creator: test@creator.com
  *
- * Usage (from backend-v2 root):
+ * Usage (from backend-v2 root, with DATABASE_URL set):
  *   npm run db:seed:dev-creator
  *
- * Requires DATABASE_URL in .env (same as Prisma).
- * Idempotent — safe to re-run.
+ * TEMPORARY on ECS: when RUN_SEED_DEV_CREATOR_ON_START=true (dev deploy),
+ * docker-entrypoint runs this after migrate. Remove that flag after QA verify.
+ *
+ * Idempotent create-or-update for user + creator profile (+ stub bank/shipping).
+ * Pair with CREATOR_APPLY_BYPASS_EMAILS=test@creator.com so this account can
+ * see ELIGIBLE_ONLY campaigns and apply without real Instagram Graph data.
+ *
+ * Login: test@creator.com — OTP stub 123456 when CREATOR_VERIFICATION_USE_REAL_OTP=false
  */
 import { PrismaClient, UserRole } from "@prisma/client";
 
@@ -35,6 +41,14 @@ const STUB_AUDIENCE_MATRIX = {
   gender_skew: { female: 0.58, male: 0.42 },
 };
 
+const PROFILE_FIELDS = {
+  displayName: CREATOR_DISPLAY_NAME,
+  instagramHandle: CREATOR_HANDLE,
+  primaryRegion: "IN",
+  followerCount: 45_000,
+  audienceDemographicsMatrix: STUB_AUDIENCE_MATRIX,
+};
+
 async function main() {
   const prisma = new PrismaClient();
 
@@ -51,13 +65,7 @@ async function main() {
           name: CREATOR_DISPLAY_NAME,
           role: UserRole.CREATOR,
           creatorProfile: {
-            create: {
-              displayName: CREATOR_DISPLAY_NAME,
-              instagramHandle: CREATOR_HANDLE,
-              primaryRegion: "IN",
-              followerCount: 45_000,
-              audienceDemographicsMatrix: STUB_AUDIENCE_MATRIX,
-            },
+            create: { ...PROFILE_FIELDS },
           },
         },
         include: { creatorProfile: true },
@@ -77,24 +85,16 @@ async function main() {
         await prisma.creatorProfile.create({
           data: {
             userId: user.id,
-            displayName: CREATOR_DISPLAY_NAME,
-            instagramHandle: CREATOR_HANDLE,
-            primaryRegion: "IN",
-            followerCount: 45_000,
-            audienceDemographicsMatrix: STUB_AUDIENCE_MATRIX,
+            ...PROFILE_FIELDS,
           },
         });
+        console.log("Created missing creator profile");
       } else {
         await prisma.creatorProfile.update({
           where: { id: user.creatorProfile.id },
-          data: {
-            displayName: CREATOR_DISPLAY_NAME,
-            instagramHandle: CREATOR_HANDLE,
-            primaryRegion: "IN",
-            followerCount: 45_000,
-            audienceDemographicsMatrix: STUB_AUDIENCE_MATRIX,
-          },
+          data: { ...PROFILE_FIELDS },
         });
+        console.log("Updated creator profile (handle, followers, region, audience)");
       }
       console.log(`Updated existing user ${CREATOR_EMAIL}`);
       user = await prisma.user.findUniqueOrThrow({
@@ -128,6 +128,16 @@ async function main() {
         },
       });
       console.log("Created user profile (media kit layer)");
+    } else {
+      await prisma.userProfile.update({
+        where: { userId: user.id },
+        data: {
+          displayName: CREATOR_DISPLAY_NAME,
+          totalReachCache: profile.followerCount,
+          topLocationCache: "Mumbai, IN",
+        },
+      });
+      console.log("Updated user profile (media kit layer)");
     }
 
     const existingBank = await prisma.creatorBankDetails.findFirst({
@@ -155,11 +165,15 @@ async function main() {
     });
 
     console.log("");
-    console.log("Creator seed complete.");
+    console.log("Creator seed complete (create-or-update).");
     console.log(`  Email:    ${CREATOR_EMAIL}`);
-    console.log(`  OTP:      123456 (login stub)`);
+    console.log(`  OTP:      123456 (when CREATOR_VERIFICATION_USE_REAL_OTP=false)`);
     console.log(`  Handle:   @${CREATOR_HANDLE}`);
-    console.log(`  Threads:  ${threadCount} (approve a UCE applicant as brand to create one)`);
+    console.log(`  Followers:${PROFILE_FIELDS.followerCount} (MICRO tier stub)`);
+    console.log(
+      `  Bypass:   set CREATOR_APPLY_BYPASS_EMAILS=${CREATOR_EMAIL} for targeting override`,
+    );
+    console.log(`  Threads:  ${threadCount}`);
   } finally {
     await prisma.$disconnect();
   }

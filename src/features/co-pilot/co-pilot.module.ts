@@ -40,7 +40,7 @@ import {
 import { BrandCentreCoPilotToolsService } from "./tools/brand-centre.tools";
 import { PlannerCoPilotToolsService } from "./tools/planner.tools";
 import { CoPilotBrandCentreJobService } from "./services/co-pilot-brand-centre-job.service";
-import { CollaborationCoPilotToolsService } from "./tools/collaboration.tools";
+import { CollaborationCoPilotToolsService } from "./modules/collaboration/collaboration.tools";
 import { EscrowCoPilotToolsService } from "./tools/escrow.tools";
 
 @Module({

@@ -46,11 +46,38 @@ Real Instagram Graph API OAuth and sync are **deferred**. Until then:
 
 **Replace later:** background worker post-OAuth to hydrate `follower_count` and `audience_demographics_matrix` from Meta Graph API. Eligibility service (`CreatorEligibilityService`) is the single swap point.
 
-Dev seed (`npm run db:seed:dev-creator`) sets:
+Dev seed (`npm run db:seed:dev-creator`) **create-or-updates**:
 
-- `follower_count: 45000` (MICRO tier)
-- `primary_region: IN`
-- Sample `age_distribution` / `top_countries` / `gender_skew`
+- User `test@creator.com` (role `CREATOR`) — OTP stub `123456` when real OTP is off
+- `instagram_handle: test_creator`, `follower_count: 45000` (MICRO), `primary_region: IN`
+- Sample `audience_demographics_matrix` + stub bank / shipping when missing
+
+Safe to re-run on local or after deploy (against that env’s `DATABASE_URL`).
+
+---
+
+## QA apply bypass (`CREATOR_APPLY_BYPASS_EMAILS`)
+
+Some deployed campaigns use tight targeting / `ELIGIBLE_ONLY` visibility. Without real Instagram Graph data, a stub creator can fail eligibility.
+
+| Env | Purpose |
+| --- | --- |
+| `CREATOR_APPLY_BYPASS_EMAILS` | Comma-separated emails (exact match, case-insensitive) |
+
+**Behaviour when email is allowlisted:**
+
+- Targeting eligibility is forced **eligible** (marketplace list/detail + `POST .../creator-uce/.../apply`)
+- Creator-tier marketplace filters also pass
+- Does **not** bypass `INVITED_ONLY` (still need an invite/prospect row)
+- Does **not** skip JWT / `CREATOR` role / collaboration stage rules
+
+**Defaults (SST):**
+
+- `local` / `dev`: defaults to `test@creator.com` if env unset  
+- `prod`: empty unless explicitly set  
+
+Helper: `src/shared/config/creator-apply-bypass.ts`  
+Wired through `CreatorEligibilityService.evaluateTargeting(..., { creatorEmail })`.
 
 ---
 
@@ -117,8 +144,10 @@ Apply locally: `npm run db:migrate:dev`
 
 ## Manual test checklist
 
-1. Run migration + `npm run db:seed:dev-creator`
-2. Brand: create/activate UCE campaign with targeting tiers including `MICRO`, locations including `IN`
-3. Creator login (`test@creator.com`, OTP `123456`)
-4. `GET /api/v1/creator/marketplace/campaigns` — expect row with `match_score_percent`, `is_eligible: true`
-5. Set campaign `visibility_scopes` to `['INVITED_ONLY']` only — creator should not see row until brand adds prospect/invite pipeline row
+1. Run migration + `npm run db:seed:dev-creator` (create-or-update `test@creator.com`)
+2. Ensure `CREATOR_APPLY_BYPASS_EMAILS=test@creator.com` (local `.env` or SST non-prod default)
+3. Brand: create/activate UCE campaign (any targeting; even `ELIGIBLE_ONLY`)
+4. Creator login (`test@creator.com`, OTP `123456` when stub OTP is on)
+5. Marketplace / apply — expect campaign visible and apply allowed without real IG OAuth
+6. Brand: approve applicant → collaboration thread for Brand Co-Pilot QA
+7. Optional: set campaign `visibility_scopes` to `['INVITED_ONLY']` only — bypass does **not** show the row until invited

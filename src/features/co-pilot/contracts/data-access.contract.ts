@@ -247,27 +247,45 @@ export const CO_PILOT_DATA_ACCESS_CONTRACT = {
 
       prismaModels: {
 
-        Collaboration: "READ",
+        Collaboration: "WRITE_VIA_HITL",
+
+        CollaborationCommercial: "WRITE_VIA_HITL",
+
+        CollaborationLogistics: "WRITE_VIA_HITL",
+
+        CollaborationMedia: "WRITE_VIA_HITL",
+
+        CollaborationFinalization: "WRITE_VIA_HITL",
 
       },
 
       apiRoutesRead: [
 
-        "GET /api/v1/collaboration/threads (via co-pilot getCollabReadContext)",
+        "GET /api/v1/collaboration/threads (via collab.listThreads)",
+
+        "GET /api/v1/collaboration/threads/:id (via collab.getThread)",
 
       ],
 
       apiRoutesWriteHitl: [
 
-        "POST /api/v1/collaboration/.../review-media (future HITL — product §6)",
+        "POST /api/v1/collaboration/threads/:id/negotiation/counter-offer",
 
-        "POST /api/v1/collaboration/.../counter-offer (future HITL)",
+        "POST /api/v1/collaboration/threads/:id/negotiation/accept",
+
+        "POST /api/v1/collaboration/threads/:id/securement/fund-escrow",
+
+        "POST /api/v1/collaboration/threads/:id/logistics/dispatch",
+
+        "POST /api/v1/collaboration/threads/:id/production/review",
+
+        "POST /api/v1/collaboration/threads/:id/posting/verify-compliance",
 
       ],
 
       notes:
 
-        "Read: pipeline + fulfillment issues via TABULAR_AUDIT_DATA. Write handshakes (counter-offer, shipment, content review) not wired yet.",
+        "Collaboration AI module: pipeline/issues/status reads. Brand HITL writes: counter-offer, accept terms, fund escrow, dispatch, approve/request revision, verify compliance. Stage+persona gated. Part 5 validation checklists with deep-link resume.",
 
     },
 

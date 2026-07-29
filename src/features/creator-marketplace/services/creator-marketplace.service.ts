@@ -187,6 +187,7 @@ export class CreatorMarketplaceService {
         const eligibility = this.eligibility.evaluateTargeting(
           creatorContext,
           targeting,
+          { creatorEmail: user.email },
         );
 
         const visible = isCampaignVisibleToCreator(
@@ -214,6 +215,7 @@ export class CreatorMarketplaceService {
           !this.eligibility.matchesCreatorTierFilter(
             creatorContext.followerCount,
             filters.creator_tier,
+            { creatorEmail: user.email },
           )
         ) {
           return null;
@@ -351,6 +353,7 @@ export class CreatorMarketplaceService {
     const eligibility = this.eligibility.evaluateTargeting(
       creatorContext,
       campaign.targeting,
+      { creatorEmail: user.email },
     );
 
     const isInvitedFromPipeline =

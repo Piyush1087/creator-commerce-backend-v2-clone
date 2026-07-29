@@ -358,3 +358,34 @@ CampaignListCapabilities \= {
 
 This keeps the implementation tightly scoped to Campaign List and makes it easy to extend. When you later implement **Campaign Details**, **Create Campaign**, or **Add Product**, each sub-module can have its own validation capability without introducing platform-wide complexity or modifying the existing architecture.
 
+---
+
+# **14\. Implementation note — `autoResume` + silent return-to-chat (v2 Nest co-pilot)**
+
+## Contract
+
+When a Campaign List HITL confirm is blocked by validation:
+
+* Keep the staged slot session and the same `idempotencyKey`.
+* Return a `VALIDATION_CHECKLIST` with:
+  * `autoResume: true` when the user can fix prerequisites and retry the **same** confirm (e.g. missing brief / products / budget for go-live).
+  * `autoResume: false` for terminal / non-retryable cases (permission, not found, already completed where retry is useless).
+  * `idempotencyKey` on the checklist payload.
+  * Optional `deepLinkPath` to the exact campaign screen.
+
+## Frontend behavior (no extra backend APIs)
+
+* Manual **Try again** still calls the existing HITL confirm endpoint.
+* Additionally, when the brand returns to co-pilot (thread load / tab visible again), the FE may **silently** call that same confirm **once** per `idempotencyKey` if `autoResume` is true.
+* No toast. No change to HITL decision rules — only UI progression if validators now pass.
+* If still blocked, a fresh checklist may appear; user can use **Try again** manually.
+
+## Rule for future Campaign / UCE workflows
+
+Any new Part 5-style recovery flow **must** set `autoResume` explicitly:
+
+* Fixable after deep-link or in-chat repair → `autoResume: true`
+* Terminal / do-not-retry → `autoResume: false`
+
+If a future change doc describes validation recovery but **does not** call out `autoResume`, add it before implementation (or remind the owner to update the doc).
+

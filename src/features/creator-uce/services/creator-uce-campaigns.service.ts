@@ -140,6 +140,7 @@ export class CreatorUceCampaignsService {
     const eligibility = this.eligibility.evaluateTargeting(
       creatorContext,
       campaign.targeting,
+      { creatorEmail: user.email },
     );
     const inviteBypass =
       campaign.targeting.applicationScope === UceApplicationScope.DIRECT_BYPASS;

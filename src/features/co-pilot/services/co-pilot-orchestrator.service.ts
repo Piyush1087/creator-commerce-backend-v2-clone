@@ -45,6 +45,7 @@ import { buildNoMovableLeaksNarrative } from "../utils/co-pilot-leak-planner.uti
 import {
   looksLikeCampaignFollowUp,
   looksLikeCampaignUtterance,
+  looksLikeCollaborationUtterance,
   normalizeCoPilotUserText,
 } from "../utils/co-pilot-text-normalize.util";
 import { CoPilotCampaignSmartRouterService } from "./co-pilot-campaign-smart-router.service";
@@ -267,10 +268,12 @@ export class CoPilotOrchestratorService {
     const campaignMemory = this.conversationMemory.getCampaignMemory(
       args.threadId,
     );
+    const looksCollab = looksLikeCollaborationUtterance(normalizedText);
     const shouldTryCampaignSmart =
-      looksLikeCampaignUtterance(normalizedText) ||
-      (Boolean(campaignMemory?.listedCampaigns.length) &&
-        looksLikeCampaignFollowUp(normalizedText));
+      !looksCollab &&
+      (looksLikeCampaignUtterance(normalizedText) ||
+        (Boolean(campaignMemory?.listedCampaigns.length) &&
+          looksLikeCampaignFollowUp(normalizedText)));
 
     if (shouldTryCampaignSmart) {
       const smart = await this.campaignSmartRouter.tryRoute({
@@ -294,7 +297,12 @@ export class CoPilotOrchestratorService {
         const enriched = await this.enrichWriteIntent(
           args.brandProfileId,
           smart.intent,
-          { history: args.history, userText: normalizedText },
+          {
+            history: args.history,
+            userText: normalizedText,
+            authUser: args.authUser,
+            threadId: args.threadId,
+          },
         );
         await this.slotSessions.upsertSession({
           threadId: args.threadId,
@@ -369,7 +377,12 @@ export class CoPilotOrchestratorService {
       const enriched = await this.enrichWriteIntent(
         args.brandProfileId,
         writeIntent,
-        { history: args.history, userText: normalizedText },
+        {
+          history: args.history,
+          userText: normalizedText,
+          authUser: args.authUser,
+          threadId: args.threadId,
+        },
       );
       await this.slotSessions.upsertSession({
         threadId: args.threadId,
@@ -797,6 +810,8 @@ export class CoPilotOrchestratorService {
     context?: {
       history: RunMessageArgs["history"];
       userText: string;
+      authUser?: AuthUser;
+      threadId?: string;
     },
   ): Promise<Extract<DetectedWriteIntent, { kind: WriteIntentKind }>> {
     try {

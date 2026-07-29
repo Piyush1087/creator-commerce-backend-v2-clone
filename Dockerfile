@@ -26,6 +26,8 @@ COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/package*.json ./
 COPY --from=builder /usr/src/app/prisma ./prisma
 COPY --from=builder /usr/src/app/dist ./dist
+# TEMPORARY: QA creator seed on ECS start (remove after test@creator.com verified on dev)
+COPY --from=builder /usr/src/app/scripts/seed-dev-creator.ts ./scripts/seed-dev-creator.ts
 COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

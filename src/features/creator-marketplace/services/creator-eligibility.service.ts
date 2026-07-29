@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { UceCampaignTargeting } from "@prisma/client";
 
+import { isCreatorApplyBypassEmail } from "../../../shared/config/creator-apply-bypass";
 import type { CreatorAudienceDemographicsMatrix } from "../types/creator-audience.types";
 import {
   creatorMatchesFollowerTiers,
@@ -20,12 +21,24 @@ export type EligibilityBreakdown = {
   tier_match: boolean;
   region_match: boolean;
   audience_geo_match: boolean;
+  /** True when CREATOR_APPLY_BYPASS_EMAILS matched (QA only). */
+  apply_bypass?: boolean;
+};
+
+const BYPASS_ELIGIBLE: EligibilityBreakdown = {
+  is_eligible: true,
+  tier_match: true,
+  region_match: true,
+  audience_geo_match: true,
+  apply_bypass: true,
 };
 
 @Injectable()
 export class CreatorEligibilityService {
   /**
    * Server-side targeting check (mock metrics today; replace with Instagram Graph API).
+   * When `creatorEmail` is on CREATOR_APPLY_BYPASS_EMAILS, returns eligible without
+   * evaluating tiers/geo (QA seed creators such as test@creator.com).
    */
   evaluateTargeting(
     creator: CreatorEligibilityInput,
@@ -38,7 +51,12 @@ export class CreatorEligibilityService {
       | "audienceGender"
       | "disqualifyingKeywords"
     >,
+    options?: { creatorEmail?: string | null },
   ): EligibilityBreakdown {
+    if (isCreatorApplyBypassEmail(options?.creatorEmail)) {
+      return { ...BYPASS_ELIGIBLE };
+    }
+
     const tierMatch = creatorMatchesFollowerTiers(
       creator.followerCount,
       targeting.followerTiers,
@@ -66,7 +84,11 @@ export class CreatorEligibilityService {
   matchesCreatorTierFilter(
     followerCount: number,
     filterTiers: string[],
+    options?: { creatorEmail?: string | null },
   ): boolean {
+    if (isCreatorApplyBypassEmail(options?.creatorEmail)) {
+      return true;
+    }
     if (filterTiers.length === 0) {
       return true;
     }

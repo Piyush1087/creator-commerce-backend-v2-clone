@@ -92,6 +92,8 @@ export class CoPilotModuleRegistry {
     context?: {
       history: Array<{ role: "USER" | "ASSISTANT"; text: string }>;
       userText: string;
+      authUser?: unknown;
+      threadId?: string;
     },
   ): Promise<Exclude<DetectedWriteIntent, { kind: "NONE" }>> {
     const owner = this.findModuleForWriteIntent(intent.kind);

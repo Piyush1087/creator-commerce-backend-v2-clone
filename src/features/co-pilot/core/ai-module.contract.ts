@@ -68,6 +68,8 @@ export interface CoPilotAiModule {
     context?: {
       history: Array<{ role: "USER" | "ASSISTANT"; text: string }>;
       userText: string;
+      authUser?: unknown;
+      threadId?: string;
     },
   ): Promise<Exclude<DetectedWriteIntent, { kind: "NONE" }>>;
   buildExecutionWidget?(args: {

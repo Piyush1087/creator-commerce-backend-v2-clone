@@ -10,7 +10,10 @@ import { BrandCentreIntelligenceService } from "../../brand-centre/services/bran
 import { BrandCentrePlannerService } from "../../brand-centre/services/brand-centre-planner.service";
 import { BrandCentreUceBridgeService } from "../../brand-centre-uce-bridge/services/brand-centre-uce-bridge.service";
 import { BrandUceCampaignService } from "../../brand-uce/services/brand-uce-campaign.service";
+import { CollaborationService } from "../../collaboration/services/collaboration.service";
 import { PrismaService } from "../../../prisma/prisma.service";
+import type { AuthUser } from "../../auth/types/auth-user";
+import { UserRole } from "@prisma/client";
 import {
   buildBridgeInjectSignals,
   buildBridgeLaunchSignal,
@@ -29,8 +32,14 @@ import {
   validationChecklistToPayloadFields,
   type CampaignListValidationAction,
 } from "../modules/uce-campaign-list/campaign-list-validation";
+import {
+  mapCollaborationValidationError,
+  validationChecklistToPayloadFields as collabValidationChecklistToPayloadFields,
+  type CollaborationValidationAction,
+} from "../modules/collaboration/collaboration-validation";
 import { CoPilotSlotSessionService } from "./co-pilot-slot-session.service";
 import { CoPilotThreadService } from "./co-pilot-thread.service";
+import { CoPilotConversationMemoryService } from "./co-pilot-conversation-memory.service";
 
 export type HitlConfirmResult = {
   intent: WriteIntentKind;
@@ -67,6 +76,8 @@ export class CoPilotHitlService {
     private readonly intelligence: BrandCentreIntelligenceService,
     private readonly planner: BrandCentrePlannerService,
     private readonly bridge: BrandCentreUceBridgeService,
+    private readonly collaboration: CollaborationService,
+    private readonly conversationMemory: CoPilotConversationMemoryService,
   ) {}
 
   async confirmStaged(args: {
@@ -127,6 +138,20 @@ export class CoPilotHitlService {
         return this.confirmDuplicateCampaign(args, staged);
       case "BULK_CAMPAIGN_ACTION":
         return this.confirmBulkCampaignAction(args, staged);
+      case "COLLAB_COUNTER_OFFER":
+        return this.confirmCollabCounterOffer(args, staged);
+      case "COLLAB_ACCEPT_TERMS":
+        return this.confirmCollabAcceptTerms(args, staged);
+      case "COLLAB_FUND_ESCROW":
+        return this.confirmCollabFundEscrow(args, staged);
+      case "COLLAB_DISPATCH":
+        return this.confirmCollabDispatch(args, staged);
+      case "COLLAB_APPROVE_CONTENT":
+        return this.confirmCollabApproveContent(args, staged);
+      case "COLLAB_REQUEST_REVISION":
+        return this.confirmCollabRequestRevision(args, staged);
+      case "COLLAB_VERIFY_COMPLIANCE":
+        return this.confirmCollabVerifyCompliance(args, staged);
       default:
         throw new BadRequestException(`Unsupported HITL intent: ${intent}`);
     }
@@ -998,5 +1023,354 @@ export class CoPilotHitlService {
         },
       };
     }
+  }
+
+  private async resolveAuthUser(userId: string): Promise<AuthUser> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException("User not found.");
+    }
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      organizationId: user.organizationId,
+    };
+  }
+
+  private async confirmCollabAction(args: {
+    userId: string;
+    threadId: string;
+    intent: Extract<
+      WriteIntentKind,
+      | "COLLAB_COUNTER_OFFER"
+      | "COLLAB_ACCEPT_TERMS"
+      | "COLLAB_FUND_ESCROW"
+      | "COLLAB_DISPATCH"
+      | "COLLAB_APPROVE_CONTENT"
+      | "COLLAB_REQUEST_REVISION"
+      | "COLLAB_VERIFY_COMPLIANCE"
+    >;
+    action: CollaborationValidationAction;
+    staged: Record<string, unknown>;
+    run: (authUser: AuthUser, collaborationId: string) => Promise<{
+      stage?: string;
+      campaignName?: string;
+      creatorLabel?: string;
+    }>;
+    successSummary: (meta: {
+      stage?: string;
+      campaignName?: string;
+      creatorLabel?: string;
+    }) => string;
+  }): Promise<HitlConfirmResult> {
+    const collaborationId = this.parseSelectId(args.staged.collaboration_id);
+    const creatorLabel =
+      typeof args.staged.creator_label === "string"
+        ? args.staged.creator_label
+        : undefined;
+    const campaignName =
+      typeof args.staged.campaign_name === "string"
+        ? args.staged.campaign_name
+        : undefined;
+
+    if (!collaborationId) {
+      throw new BadRequestException("Collaboration id is required.");
+    }
+
+    try {
+      const authUser = await this.resolveAuthUser(args.userId);
+      if (authUser.role !== UserRole.BRAND) {
+        throw new BadRequestException("Brand access required.");
+      }
+      const meta = await args.run(authUser, collaborationId);
+      await this.slotSessions.clearSession(args.threadId);
+      const resolvedAt = new Date().toISOString();
+      const summary = args.successSummary({
+        stage: meta.stage,
+        campaignName: meta.campaignName ?? campaignName,
+        creatorLabel: meta.creatorLabel ?? creatorLabel,
+      });
+      this.conversationMemory.rememberSelectedCollaboration(args.threadId, {
+        id: collaborationId,
+        name: `${meta.creatorLabel ?? creatorLabel ?? "Creator"} · ${meta.campaignName ?? campaignName ?? ""}`,
+        stage: meta.stage,
+        campaignName: meta.campaignName ?? campaignName,
+      });
+      await this.threads.persistHitlResolution(
+        args.threadId,
+        String(args.staged.idempotencyKey),
+        {
+          status: "CONFIRMED",
+          resolvedAt,
+          summary,
+        },
+      );
+      return {
+        intent: args.intent,
+        message: summary,
+        hitlResolution: {
+          status: "CONFIRMED",
+          resolvedAt,
+          summary,
+        },
+      };
+    } catch (err) {
+      if (
+        err instanceof BadRequestException &&
+        String(err.message).includes("Collaboration id is required")
+      ) {
+        throw err;
+      }
+      const mapped = mapCollaborationValidationError({
+        err,
+        action: args.action,
+        collaborationId,
+        creatorLabel,
+        campaignName,
+      });
+      const fields = collabValidationChecklistToPayloadFields(mapped);
+      return {
+        intent: args.intent,
+        message: fields.narrativeText,
+        validationBlocked: true,
+        validationChecklist: {
+          ...fields.validationChecklistData,
+          idempotencyKey:
+            typeof args.staged.idempotencyKey === "string"
+              ? args.staged.idempotencyKey
+              : undefined,
+        },
+      };
+    }
+  }
+
+  private stageFromDetail(detail: Awaited<
+    ReturnType<CollaborationService["getThread"]>
+  >): string {
+    return detail.thread.currentStage;
+  }
+
+  private async confirmCollabCounterOffer(
+    args: { userId: string; threadId: string },
+    staged: Record<string, unknown>,
+  ): Promise<HitlConfirmResult> {
+    const amount = Number(staged.counter_offer);
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw new BadRequestException("Counter-offer amount is required.");
+    }
+    return this.confirmCollabAction({
+      ...args,
+      intent: "COLLAB_COUNTER_OFFER",
+      action: "COUNTER_OFFER",
+      staged,
+      run: async (authUser, collaborationId) => {
+        const detail = await this.collaboration.brandCounterOffer(
+          authUser,
+          collaborationId,
+          { counter_offer: amount },
+        );
+        return {
+          stage: this.stageFromDetail(detail),
+          campaignName: detail.thread.campaign.name,
+          creatorLabel:
+            detail.thread.creatorUser.creatorProfile?.displayName ??
+            detail.thread.creatorUser.name ??
+            detail.thread.creatorHandle,
+        };
+      },
+      successSummary: (meta) =>
+        `Counter-offer ₹${amount} sent for ${meta.creatorLabel ?? "creator"} (${meta.stage ?? "negotiation"}).`,
+    });
+  }
+
+  private async confirmCollabAcceptTerms(
+    args: { userId: string; threadId: string },
+    staged: Record<string, unknown>,
+  ): Promise<HitlConfirmResult> {
+    return this.confirmCollabAction({
+      ...args,
+      intent: "COLLAB_ACCEPT_TERMS",
+      action: "ACCEPT_TERMS",
+      staged,
+      run: async (authUser, collaborationId) => {
+        const detail = await this.collaboration.acceptCommercials(
+          authUser,
+          collaborationId,
+          {},
+        );
+        return {
+          stage: this.stageFromDetail(detail),
+          campaignName: detail.thread.campaign.name,
+          creatorLabel:
+            detail.thread.creatorUser.creatorProfile?.displayName ??
+            detail.thread.creatorUser.name ??
+            detail.thread.creatorHandle,
+        };
+      },
+      successSummary: (meta) =>
+        `Terms accepted. Workflow advanced to ${meta.stage ?? "next stage"}.`,
+    });
+  }
+
+  private async confirmCollabFundEscrow(
+    args: { userId: string; threadId: string },
+    staged: Record<string, unknown>,
+  ): Promise<HitlConfirmResult> {
+    return this.confirmCollabAction({
+      ...args,
+      intent: "COLLAB_FUND_ESCROW",
+      action: "FUND_ESCROW",
+      staged,
+      run: async (authUser, collaborationId) => {
+        const detail = await this.collaboration.fundEscrow(
+          authUser,
+          collaborationId,
+          {},
+        );
+        return {
+          stage: this.stageFromDetail(detail),
+          campaignName: detail.thread.campaign.name,
+          creatorLabel:
+            detail.thread.creatorUser.creatorProfile?.displayName ??
+            detail.thread.creatorUser.name ??
+            detail.thread.creatorHandle,
+        };
+      },
+      successSummary: (meta) =>
+        `Escrow funded. Now in ${meta.stage ?? "logistics"}.`,
+    });
+  }
+
+  private async confirmCollabDispatch(
+    args: { userId: string; threadId: string },
+    staged: Record<string, unknown>,
+  ): Promise<HitlConfirmResult> {
+    const trackingId =
+      typeof staged.tracking_id === "string" ? staged.tracking_id.trim() : "";
+    const courierName =
+      typeof staged.courier_name === "string"
+        ? staged.courier_name.trim()
+        : undefined;
+    return this.confirmCollabAction({
+      ...args,
+      intent: "COLLAB_DISPATCH",
+      action: "DISPATCH",
+      staged,
+      run: async (authUser, collaborationId) => {
+        const detail = await this.collaboration.dispatchLogistics(
+          authUser,
+          collaborationId,
+          {
+            tracking_id: trackingId || undefined,
+            courier_name: courierName,
+          },
+        );
+        return {
+          stage: this.stageFromDetail(detail),
+          campaignName: detail.thread.campaign.name,
+          creatorLabel:
+            detail.thread.creatorUser.creatorProfile?.displayName ??
+            detail.thread.creatorUser.name ??
+            detail.thread.creatorHandle,
+        };
+      },
+      successSummary: (meta) =>
+        `Dispatch recorded${trackingId ? ` (${trackingId})` : ""}. Stage: ${meta.stage ?? "logistics"}.`,
+    });
+  }
+
+  private async confirmCollabApproveContent(
+    args: { userId: string; threadId: string },
+    staged: Record<string, unknown>,
+  ): Promise<HitlConfirmResult> {
+    return this.confirmCollabAction({
+      ...args,
+      intent: "COLLAB_APPROVE_CONTENT",
+      action: "APPROVE_CONTENT",
+      staged,
+      run: async (authUser, collaborationId) => {
+        const detail = await this.collaboration.reviewMedia(
+          authUser,
+          collaborationId,
+          { decision: "APPROVED" },
+        );
+        return {
+          stage: this.stageFromDetail(detail),
+          campaignName: detail.thread.campaign.name,
+          creatorLabel:
+            detail.thread.creatorUser.creatorProfile?.displayName ??
+            detail.thread.creatorUser.name ??
+            detail.thread.creatorHandle,
+        };
+      },
+      successSummary: (meta) =>
+        `Content approved. Advanced to ${meta.stage ?? "publishing"}.`,
+    });
+  }
+
+  private async confirmCollabRequestRevision(
+    args: { userId: string; threadId: string },
+    staged: Record<string, unknown>,
+  ): Promise<HitlConfirmResult> {
+    const feedback =
+      typeof staged.brand_feedback === "string"
+        ? staged.brand_feedback.trim()
+        : "";
+    return this.confirmCollabAction({
+      ...args,
+      intent: "COLLAB_REQUEST_REVISION",
+      action: "REQUEST_REVISION",
+      staged,
+      run: async (authUser, collaborationId) => {
+        const detail = await this.collaboration.reviewMedia(
+          authUser,
+          collaborationId,
+          {
+            decision: "REJECTED",
+            brand_feedback: feedback || undefined,
+          },
+        );
+        return {
+          stage: this.stageFromDetail(detail),
+          campaignName: detail.thread.campaign.name,
+          creatorLabel:
+            detail.thread.creatorUser.creatorProfile?.displayName ??
+            detail.thread.creatorUser.name ??
+            detail.thread.creatorHandle,
+        };
+      },
+      successSummary: () =>
+        `Revision requested${feedback ? `: ${feedback}` : "."}`,
+    });
+  }
+
+  private async confirmCollabVerifyCompliance(
+    args: { userId: string; threadId: string },
+    staged: Record<string, unknown>,
+  ): Promise<HitlConfirmResult> {
+    return this.confirmCollabAction({
+      ...args,
+      intent: "COLLAB_VERIFY_COMPLIANCE",
+      action: "VERIFY_COMPLIANCE",
+      staged,
+      run: async (authUser, collaborationId) => {
+        const detail = await this.collaboration.verifyCompliance(
+          authUser,
+          collaborationId,
+        );
+        return {
+          stage: this.stageFromDetail(detail),
+          campaignName: detail.thread.campaign.name,
+          creatorLabel:
+            detail.thread.creatorUser.creatorProfile?.displayName ??
+            detail.thread.creatorUser.name ??
+            detail.thread.creatorHandle,
+        };
+      },
+      successSummary: (meta) =>
+        `Compliance verified. Advanced to ${meta.stage ?? "feedback"}.`,
+    });
   }
 }

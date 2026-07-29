@@ -41,14 +41,17 @@ curl -s https://api.dev.thecreatorshop.in/health/live
 1. SST builds the Docker image (includes `prisma/migrations`).
 2. ECS rolls out new API task(s) in the VPC with `DATABASE_URL` = `DEV_DATABASE_URL` from `.env`.
 3. Container entrypoint (`scripts/docker-entrypoint.sh`) runs **`npx prisma migrate deploy`** when `RUN_MIGRATIONS_ON_START=true` (dev stage only).
-4. App starts (`node dist/main.js`).
-5. ALB health check passes (`healthCheckGracePeriodSeconds` = 120s to allow migrate time).
+4. **TEMPORARY:** same entrypoint runs **`seed-dev-creator`** when `RUN_SEED_DEV_CREATOR_ON_START=true` (dev only — remove after QA verify).
+5. App starts (`node dist/main.js`).
+6. ALB health check passes (`healthCheckGracePeriodSeconds` = 120s to allow migrate time).
 
 Watch ECS logs for:
 
 ```text
 [entrypoint] RUN_MIGRATIONS_ON_START=true — prisma migrate deploy
 [entrypoint] prisma migrate deploy complete
+[entrypoint] RUN_SEED_DEV_CREATOR_ON_START=true — seed test@creator.com (TEMPORARY)
+[entrypoint] seed-dev-creator complete
 ```
 
 | Step | Jumpbox / tunnel? |
@@ -58,6 +61,29 @@ Watch ECS logs for:
 | `prisma migrate deploy` on dev RDS | **Automatic** inside ECS on task start |
 
 **Prod** does not auto-migrate (`RUN_MIGRATIONS_ON_START=false`). Prod still uses manual migrate after review (tunnel or approved process).
+
+---
+
+## QA creator seed + apply bypass (dev/staging)
+
+### Apply bypass (keep)
+
+Env `CREATOR_APPLY_BYPASS_EMAILS` (SST: defaults to `test@creator.com` on non-prod; empty on prod unless set) forces targeting eligibility for those emails so they can see `ELIGIBLE_ONLY` campaigns and apply.
+
+Login: `test@creator.com` · OTP `123456` when stub OTP is on.  
+Details: `docs/campaigns-creator-view/engineering/MARKETPLACE_BACKEND.md`.
+
+### TEMPORARY — seed on ECS start (dev only)
+
+While jumpbox is unavailable, **dev** sets `RUN_SEED_DEV_CREATOR_ON_START=true` so `scripts/docker-entrypoint.sh` runs `scripts/seed-dev-creator.ts` after migrate (create-or-update `test@creator.com`). Idempotent.
+
+**After you confirm the user exists on dev**, remove:
+
+1. `RUN_SEED_DEV_CREATOR_ON_START` from `sst.config.ts`
+2. The seed block in `scripts/docker-entrypoint.sh`
+3. The `COPY ... seed-dev-creator.ts` line in `Dockerfile`
+
+Local seed (Docker DB only) remains: `npm run db:seed:dev-creator`.
 
 ---
 

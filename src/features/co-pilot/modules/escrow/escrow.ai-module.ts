@@ -28,6 +28,15 @@ export class EscrowAiModule implements CoPilotAiModule {
   detectRead(userText: string, scopeContext: CoPilotScopeContext): ReadQueryKind | null {
     const n = userText.toLowerCase();
     if (
+      n.includes("collaboration") ||
+      n.includes("collab") ||
+      n.includes("counter") ||
+      n.includes("dispatch") ||
+      n.includes("content review")
+    ) {
+      return null;
+    }
+    if (
       n.includes("enable escrow") ||
       n.includes("set up escrow") ||
       n.includes("setup escrow") ||

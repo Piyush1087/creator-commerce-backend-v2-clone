@@ -100,6 +100,8 @@ export default $config({
       PORT: "80",
       DATABASE_URL,
       RUN_MIGRATIONS_ON_START: $app.stage === "dev" ? "true" : "false",
+      // TEMPORARY: remove after test@creator.com verified on dev RDS
+      RUN_SEED_DEV_CREATOR_ON_START: $app.stage === "dev" ? "true" : "false",
       APP_BACKEND_URL:
         $app.stage === "prod"
           ? "https://api.thecreatorshop.in"
@@ -182,6 +184,11 @@ export default $config({
         $app.stage === "prod"
           ? (process.env.BRAND_VERIFICATION_USE_REAL_OTP ?? "false")
           : "false",
+      // QA apply/eligibility bypass — default test@creator.com on non-prod; empty on prod unless set.
+      CREATOR_APPLY_BYPASS_EMAILS:
+        $app.stage === "prod"
+          ? (process.env.CREATOR_APPLY_BYPASS_EMAILS ?? "")
+          : (process.env.CREATOR_APPLY_BYPASS_EMAILS ?? "test@creator.com"),
       BRAND_SCAN_LIMITS_ENABLED:
         process.env.BRAND_SCAN_LIMITS_ENABLED ??
         ($app.stage === "local" ? "false" : "true"),
