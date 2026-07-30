@@ -174,6 +174,21 @@ export class CoPilotCampaignSmartRouterService {
       });
     }
 
+    if (kind === "CAMPAIGN_EDIT_DRAFT") {
+      stagedPayload.rename_only = true;
+      if (classified.newCampaignName) {
+        stagedPayload.campaign_name = classified.newCampaignName;
+      }
+      if (!stagedPayload.campaign_name) {
+        missingSlots.push({
+          fieldName: "campaign_name",
+          uiLabel: "New campaign name",
+          inputType: "TEXT",
+          placeholderText: "e.g. Summer Sale 2026",
+        });
+      }
+    }
+
     if (kind === "BULK_CAMPAIGN_ACTION") {
       if (!stagedPayload.bulk_action) {
         missingSlots.push({
@@ -305,6 +320,7 @@ export class CoPilotCampaignSmartRouterService {
       narrativeText: result.narrativeText,
       metricGridData: result.metricGridData,
       tableData: result.tableData,
+      validationChecklistData: result.validationChecklistData,
     });
   }
 

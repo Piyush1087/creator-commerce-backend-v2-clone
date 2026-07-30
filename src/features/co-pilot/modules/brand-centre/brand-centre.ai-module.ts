@@ -25,6 +25,11 @@ import {
   resolveLeakFromThreadContext,
 } from "../../utils/co-pilot-leak-planner.util";
 import { buildCoPilotWelcomeReply } from "../../utils/co-pilot-conversational.util";
+import {
+  presentDetailRead,
+  presentInventoryRead,
+  wantsFullDetailWidget,
+} from "../../utils/co-pilot-presentation.util";
 import { PlannerCoPilotToolsService } from "../../tools/planner.tools";
 
 const READ_KINDS: ReadQueryKind[] = [
@@ -173,25 +178,34 @@ export class BrandCentreAiModule implements CoPilotAiModule {
       kind === "BRAND_CENTRE_OVERVIEW" ||
       kind === "BRAND_CENTRE_COMPLETENESS"
     ) {
+      const narrative =
+        kind === "BRAND_CENTRE_COMPLETENESS"
+          ? this.brandCentreTools.buildCompletenessNarrative(context)
+          : this.brandCentreTools.buildOverviewNarrative(context);
       return {
-        formatType: "METRIC_HIGHLIGHT_GRID",
-        narrativeText:
-          kind === "BRAND_CENTRE_COMPLETENESS"
-            ? this.brandCentreTools.buildCompletenessNarrative(context)
-            : this.brandCentreTools.buildOverviewNarrative(context),
-        metricGridData:
-          this.brandCentreTools.buildMetricGridFromContext(context),
-        toolsInvoked: ["getBrandCentreReadContext"],
+        ...presentDetailRead({
+          userText: ctx.userText,
+          narrativeText: narrative,
+          metricGridData:
+            this.brandCentreTools.buildMetricGridFromContext(context),
+          preferMetrics:
+            kind === "BRAND_CENTRE_OVERVIEW" ||
+            wantsFullDetailWidget(ctx.userText),
+          toolsInvoked: ["getBrandCentreReadContext"],
+        }),
       };
     }
 
     if (kind === "BRAND_CENTRE_READINESS") {
       return {
-        formatType: "METRIC_HIGHLIGHT_GRID",
-        narrativeText: this.brandCentreTools.buildReadinessNarrative(context),
-        metricGridData:
-          this.brandCentreTools.buildMetricGridFromContext(context),
-        toolsInvoked: ["getBrandCentreReadContext"],
+        ...presentDetailRead({
+          userText: ctx.userText,
+          narrativeText: this.brandCentreTools.buildReadinessNarrative(context),
+          metricGridData:
+            this.brandCentreTools.buildMetricGridFromContext(context),
+          preferMetrics: wantsFullDetailWidget(ctx.userText),
+          toolsInvoked: ["getBrandCentreReadContext"],
+        }),
       };
     }
 
@@ -204,20 +218,29 @@ export class BrandCentreAiModule implements CoPilotAiModule {
     }
 
     if (kind === "BRAND_CENTRE_LEAKS") {
+      const leakCount = context.intelligence.available
+        ? context.intelligence.leaks.length
+        : 0;
       return {
-        formatType: "TABULAR_AUDIT_DATA",
-        narrativeText: this.brandCentreTools.buildLeaksNarrative(context),
-        tableData: this.brandCentreTools.buildLeaksTable(context),
-        toolsInvoked: ["getBrandCentreReadContext"],
+        ...presentInventoryRead({
+          userText: ctx.userText,
+          narrativeText: this.brandCentreTools.buildLeaksNarrative(context),
+          tableData: this.brandCentreTools.buildLeaksTable(context),
+          rowCount: leakCount,
+          toolsInvoked: ["getBrandCentreReadContext"],
+        }),
       };
     }
 
     if (kind === "BRAND_CENTRE_PERSONAS") {
       return {
-        formatType: "TABULAR_AUDIT_DATA",
-        narrativeText: this.brandCentreTools.buildPersonasNarrative(context),
-        tableData: this.brandCentreTools.buildPersonasTable(context),
-        toolsInvoked: ["getBrandCentreReadContext"],
+        ...presentInventoryRead({
+          userText: ctx.userText,
+          narrativeText: this.brandCentreTools.buildPersonasNarrative(context),
+          tableData: this.brandCentreTools.buildPersonasTable(context),
+          rowCount: context.personas.length,
+          toolsInvoked: ["getBrandCentreReadContext"],
+        }),
       };
     }
 

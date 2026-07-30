@@ -9,6 +9,7 @@ import type {
 import type { ReadQueryKind } from "../../core/read-kind.types";
 import type { DetectedWriteIntent, WriteIntentKind } from "../../core/write-intent.types";
 import { EscrowCoPilotToolsService } from "../../tools/escrow.tools";
+import { presentDetailRead } from "../../utils/co-pilot-presentation.util";
 
 const READ_KINDS: ReadQueryKind[] = [
   "ESCROW_AUDIT",
@@ -94,12 +95,21 @@ export class EscrowAiModule implements CoPilotAiModule {
           ? `${escrowCtx.vault.currency} ${Number(escrowCtx.vault.tds_buffer_balance).toLocaleString()}`
           : "Vault not initialized";
 
+      if (kind === "ESCROW_TDS") {
+        return {
+          ...presentDetailRead({
+            userText: ctx.userText,
+            narrativeText: `Your TDS tax buffer balance is ${tds}.`,
+            metricGridData: metrics,
+            toolsInvoked: ["escrow.getEscrowReadContext"],
+          }),
+        };
+      }
+
       return {
         formatType: "TABULAR_AUDIT_DATA",
         narrativeText:
-          kind === "ESCROW_TDS"
-            ? `TDS tax buffer balance: ${tds}. Ledger excerpt below (read-only).`
-            : "Read-only escrow vault summary and recent ledger entries.",
+          "Here’s a read-only escrow vault summary and recent ledger entries.",
         metricGridData: metrics,
         tableData: table,
         toolsInvoked: ["escrow.getEscrowReadContext"],

@@ -34,7 +34,11 @@ export type CoPilotModuleReadContext = {
 
 export type CoPilotModuleReadResult = Pick<
   CoPilotChatPayload,
-  "formatType" | "narrativeText" | "metricGridData" | "tableData"
+  | "formatType"
+  | "narrativeText"
+  | "metricGridData"
+  | "tableData"
+  | "validationChecklistData"
 > & {
   toolsInvoked?: string[];
 };

@@ -43,6 +43,7 @@ import {
 } from "../utils/co-pilot-dna-identity.util";
 import { buildNoMovableLeaksNarrative } from "../utils/co-pilot-leak-planner.util";
 import {
+  looksLikeBrandSettingsUtterance,
   looksLikeCampaignFollowUp,
   looksLikeCampaignUtterance,
   looksLikeCollaborationUtterance,
@@ -269,8 +270,10 @@ export class CoPilotOrchestratorService {
       args.threadId,
     );
     const looksCollab = looksLikeCollaborationUtterance(normalizedText);
+    const looksSettings = looksLikeBrandSettingsUtterance(normalizedText);
     const shouldTryCampaignSmart =
       !looksCollab &&
+      !looksSettings &&
       (looksLikeCampaignUtterance(normalizedText) ||
         (Boolean(campaignMemory?.listedCampaigns.length) &&
           looksLikeCampaignFollowUp(normalizedText)));
@@ -311,7 +314,10 @@ export class CoPilotOrchestratorService {
           missingSlots: enriched.missingSlots,
         });
 
-        if (enriched.missingSlots.length === 0) {
+        if (
+          enriched.stagedPayload.hitl_blocked === true ||
+          enriched.missingSlots.length === 0
+        ) {
           return await this.buildStagedExecutionPayload({
             messageId,
             threadId: args.threadId,
@@ -391,7 +397,10 @@ export class CoPilotOrchestratorService {
         missingSlots: enriched.missingSlots,
       });
 
-      if (enriched.missingSlots.length === 0) {
+      if (
+        enriched.stagedPayload.hitl_blocked === true ||
+        enriched.missingSlots.length === 0
+      ) {
         return await this.buildStagedExecutionPayload({
           messageId,
           threadId: args.threadId,
@@ -504,6 +513,7 @@ export class CoPilotOrchestratorService {
       narrativeText: result.narrativeText,
       metricGridData: result.metricGridData,
       tableData: result.tableData,
+      validationChecklistData: result.validationChecklistData,
     });
   }
 
@@ -560,7 +570,6 @@ export class CoPilotOrchestratorService {
       return null;
     }
 
-    const idempotencyKey = existingKey ?? randomUUID();
     const intentKind = merged.intentWorkspaceContext as WriteIntentKind;
     if (intentKind === "DNA_IDENTITY_UPDATE") {
       stagedRecord = await this.enrichDnaIdentityStagedPayload(
@@ -568,36 +577,14 @@ export class CoPilotOrchestratorService {
         stagedRecord,
       );
     }
-    const stagedWithKey = { ...stagedRecord, idempotencyKey };
-    await this.slotSessions.upsertSession({
-      threadId: args.threadId,
-      intentWorkspaceContext: merged.intentWorkspaceContext,
-      stagedPayload: stagedWithKey,
-      missingSlots: [],
-      idempotencyKey,
-    });
 
-    const widget =
-      this.registry
-        .findModuleForWriteIntent(intentKind)
-        ?.buildExecutionWidget?.({
-          intentKind,
-          stagedPayload: stagedRecord,
-          idempotencyKey,
-        }) ??
-      this.intents.buildExecutionWidget({
-        intentKind,
-        stagedPayload: stagedRecord,
-        idempotencyKey,
-      });
-
-    return CoPilotChatPayloadSchema.parse({
+    // Always go through staged builder so hitl_blocked / activation gates
+    // never produce a confirm widget after slot fill.
+    return await this.buildStagedExecutionPayload({
       messageId,
       threadId: args.threadId,
-      timestamp: new Date().toISOString(),
-      formatType: "INTERACTIVE_EXECUTION_WIDGET",
-      narrativeText: this.hitlReviewNarrative(intentKind, stagedRecord),
-      executionWidget: widget,
+      intentKind,
+      stagedPayload: stagedRecord,
     });
   }
 
@@ -613,6 +600,135 @@ export class CoPilotOrchestratorService {
         threadId: args.threadId,
         stagedPayload: args.stagedPayload,
       });
+    }
+
+    // Strict HITL: never stage a confirm widget when module preflight blocked it.
+    if (args.stagedPayload.hitl_blocked === true) {
+      await this.slotSessions.clearSession(args.threadId);
+      const items = Array.isArray(args.stagedPayload.hitl_block_items)
+        ? (args.stagedPayload.hitl_block_items as Array<{
+            id: string;
+            title: string;
+            satisfied: boolean;
+            helpText?: string;
+            repairHint?: string;
+          }>)
+        : [];
+      const campaignId = String(args.stagedPayload.campaign_id ?? "");
+      const collaborationId = String(
+        args.stagedPayload.collaboration_id ?? "",
+      );
+      const deepLink =
+        typeof args.stagedPayload.hitl_block_deep_link === "string"
+          ? args.stagedPayload.hitl_block_deep_link
+          : collaborationId
+            ? `/brand/collaborations?thread=${collaborationId}`
+            : campaignId
+              ? `/brand/campaigns/${campaignId}`
+              : undefined;
+      return CoPilotChatPayloadSchema.parse({
+        messageId: args.messageId,
+        threadId: args.threadId,
+        timestamp: new Date().toISOString(),
+        formatType: "VALIDATION_CHECKLIST",
+        narrativeText: String(
+          args.stagedPayload.hitl_block_narrative ??
+            "This action isn’t available yet. Fix the blockers, then ask again.",
+        ),
+        validationChecklistData: {
+          title: String(
+            args.stagedPayload.hitl_block_title ?? "Action blocked",
+          ),
+          action: String(args.stagedPayload.hitl_block_action ?? "UNKNOWN"),
+          code: String(
+            args.stagedPayload.hitl_block_code ?? "HITL_PREFLIGHT_BLOCKED",
+          ),
+          campaignId: campaignId || undefined,
+          campaignName:
+            typeof args.stagedPayload.campaign_name === "string"
+              ? args.stagedPayload.campaign_name
+              : undefined,
+          autoResume: false,
+          deepLinkPath: deepLink,
+          items:
+            items.length > 0
+              ? items
+              : [
+                  {
+                    id: "blocked",
+                    title: "Prerequisites not met",
+                    satisfied: false,
+                    helpText: "Resolve the blockers, then retry the action.",
+                  },
+                ],
+          primaryActionLabel: "Open to fix",
+          cancelActionLabel: "Dismiss",
+        },
+      });
+    }
+
+    // Legacy collab stage flag → unified blocker shape
+    if (
+      args.stagedPayload.stage_mismatch === true &&
+      args.stagedPayload.hitl_blocked !== true
+    ) {
+      const stage = String(args.stagedPayload.current_stage ?? "unknown");
+      args.stagedPayload.hitl_blocked = true;
+      args.stagedPayload.hitl_block_title = "Action blocked";
+      args.stagedPayload.hitl_block_action = args.intentKind;
+      args.stagedPayload.hitl_block_code = "COLLAB_STAGE_MISMATCH";
+      args.stagedPayload.hitl_block_narrative = `That action isn’t valid for the current stage (${stage}). Choose a matching collaboration or a different action.`;
+      args.stagedPayload.hitl_block_deep_link = args.stagedPayload
+        .collaboration_id
+        ? `/brand/collaborations?thread=${String(args.stagedPayload.collaboration_id)}`
+        : "/brand/collaborations";
+      args.stagedPayload.hitl_block_items = [
+        {
+          id: "stage",
+          title: "Matching workflow stage",
+          satisfied: false,
+          helpText: `Current stage: ${stage}`,
+          repairHint:
+            "Select a collaboration in the right stage, then ask again.",
+        },
+      ];
+      return this.buildStagedExecutionPayload(args);
+    }
+
+    // Legacy go-live flag → unified blocker shape
+    if (
+      args.stagedPayload.activation_blocked === true &&
+      args.stagedPayload.hitl_blocked !== true
+    ) {
+      const checklist = Array.isArray(args.stagedPayload.activation_checklist)
+        ? (args.stagedPayload.activation_checklist as Array<{
+            key: string;
+            label: string;
+            satisfied: boolean;
+          }>)
+        : [];
+      args.stagedPayload.hitl_blocked = true;
+      args.stagedPayload.hitl_block_title =
+        args.intentKind === "GO_LIVE_CAMPAIGN"
+          ? "Publish blocked"
+          : "Resume blocked";
+      args.stagedPayload.hitl_block_action =
+        args.intentKind === "GO_LIVE_CAMPAIGN" ? "GO_LIVE" : "RESUME";
+      args.stagedPayload.hitl_block_code = "CAMPAIGN_NOT_READY";
+      args.stagedPayload.hitl_block_items = checklist.map((c) => ({
+        id: c.key,
+        title: c.label,
+        satisfied: c.satisfied,
+        helpText: c.satisfied ? "Complete" : "Required before this action",
+        repairHint: c.satisfied
+          ? undefined
+          : "Open the campaign wizard to fix this, then ask again.",
+      }));
+      args.stagedPayload.hitl_block_narrative = `"${String(args.stagedPayload.campaign_name ?? "Campaign")}" isn’t ready yet. Complete the checklist, then ask again.`;
+      args.stagedPayload.hitl_block_deep_link = args.stagedPayload.campaign_id
+        ? `/brand/campaigns/${String(args.stagedPayload.campaign_id)}`
+        : "/brand/campaigns";
+      return this.buildStagedExecutionPayload(args);
     }
 
     const idempotencyKey = randomUUID();
@@ -639,6 +755,18 @@ export class CoPilotOrchestratorService {
         stagedPayload: args.stagedPayload,
         idempotencyKey,
       });
+
+    if (!widget) {
+      await this.slotSessions.clearSession(args.threadId);
+      return CoPilotChatPayloadSchema.parse({
+        messageId: args.messageId,
+        threadId: args.threadId,
+        timestamp: new Date().toISOString(),
+        formatType: "CONVERSATIONAL_NARRATIVE",
+        narrativeText:
+          "I couldn’t build a confirmation card for that action. Please try again or open the relevant screen in the app.",
+      });
+    }
 
     return CoPilotChatPayloadSchema.parse({
       messageId: args.messageId,

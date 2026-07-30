@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { AuthModule } from "../auth/auth.module";
 import { BrandCentreModule } from "../brand-centre/brand-centre.module";
+import { BrandSettingsModule } from "../brand-settings/brand-settings.module";
 import { BrandUceModule } from "../brand-uce/brand-uce.module";
 import { BrandCentreUceBridgeModule } from "../brand-centre-uce-bridge/brand-centre-uce-bridge.module";
 import { BrandEscrowModule } from "../brand-escrow/brand-escrow.module";
@@ -17,6 +18,8 @@ import { CoPilotController } from "./co-pilot.controller";
 import { GeminiStreamClient } from "./integrations/gemini-stream.client";
 import { BrandCentreAiModule } from "./modules/brand-centre/brand-centre.ai-module";
 import { BrandCentrePlannerAiModule } from "./modules/brand-centre-planner/brand-centre-planner.ai-module";
+import { BrandSettingsAiModule } from "./modules/brand-settings/brand-settings.ai-module";
+import { BrandSettingsCoPilotToolsService } from "./modules/brand-settings/brand-settings.tools";
 import { CollaborationAiModule } from "./modules/collaboration/collaboration.ai-module";
 import { EscrowAiModule } from "./modules/escrow/escrow.ai-module";
 import { CampaignListToolsService } from "./modules/uce-campaign-list/campaign-list.tools";
@@ -48,6 +51,7 @@ import { EscrowCoPilotToolsService } from "./tools/escrow.tools";
     PrismaModule,
     AuthModule,
     BrandCentreModule,
+    BrandSettingsModule,
     BrandUceModule,
     BrandCentreUceBridgeModule,
     BrandEscrowModule,
@@ -75,6 +79,7 @@ import { EscrowCoPilotToolsService } from "./tools/escrow.tools";
     CoPilotBrandCentreJobService,
     EscrowCoPilotToolsService,
     CollaborationCoPilotToolsService,
+    BrandSettingsCoPilotToolsService,
     GeminiJsonClient,
     GeminiStreamClient,
     CampaignListToolsService,
@@ -83,18 +88,28 @@ import { EscrowCoPilotToolsService } from "./tools/escrow.tools";
     BrandCentrePlannerAiModule,
     EscrowAiModule,
     CollaborationAiModule,
+    BrandSettingsAiModule,
     {
       provide: CO_PILOT_AI_MODULES,
       useFactory: (
         escrow: EscrowAiModule,
         collab: CollaborationAiModule,
+        brandSettings: BrandSettingsAiModule,
         campaignList: UceCampaignListAiModule,
         brandCentre: BrandCentreAiModule,
         planner: BrandCentrePlannerAiModule,
-      ) => [escrow, collab, campaignList, brandCentre, planner],
+      ) => [
+        escrow,
+        collab,
+        brandSettings,
+        campaignList,
+        brandCentre,
+        planner,
+      ],
       inject: [
         EscrowAiModule,
         CollaborationAiModule,
+        BrandSettingsAiModule,
         UceCampaignListAiModule,
         BrandCentreAiModule,
         BrandCentrePlannerAiModule,

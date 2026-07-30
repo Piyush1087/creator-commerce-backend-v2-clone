@@ -61,12 +61,14 @@ export function extractStageFilter(
     /\bship/.test(normalized) ||
     /\bdispatch\b/.test(normalized) ||
     /\btracking\b/.test(normalized) ||
+    /\bwaiting for shipment\b/.test(normalized) ||
     /\bfulfilil?ment\b/.test(normalized)
   ) {
     return UceMilestoneStage.STAGE_3_LOGISTICS;
   }
   if (
     /\bcontent review\b/.test(normalized) ||
+    /\bwaiting for content\b/.test(normalized) ||
     /\bmedia\b/.test(normalized) ||
     /\brevision\b/.test(normalized) ||
     /\bdeliverable\b/.test(normalized)

@@ -22,6 +22,10 @@ import {
   resolvePlannerCardFromContext,
 } from "../../utils/co-pilot-planner.util";
 import { mentionsPlanner } from "../../utils/co-pilot-planner.util";
+import {
+  presentInventoryRead,
+  wantsInventoryWidget,
+} from "../../utils/co-pilot-presentation.util";
 
 const READ_KINDS: ReadQueryKind[] = ["PLANNER_PIPELINE", "CAMPAIGN_DRAFT_LIST"];
 const WRITE_INTENTS: WriteIntentKind[] = [
@@ -89,11 +93,25 @@ export class BrandCentrePlannerAiModule implements CoPilotAiModule {
       if (isPlannerLaunchGuidanceQuery(ctx.userText) || launchable.length > 0) {
         narrative = `${narrative}\n\n${buildPlannerLaunchGuidanceFooter(launchable.length)}`;
       }
+      const cardCount = dashboard.cards.length;
+      const forceTable =
+        wantsInventoryWidget(ctx.userText) ||
+        isPlannerPipelineReadQuery(ctx.userText) ||
+        cardCount >= 2;
       return {
-        formatType: "TABULAR_AUDIT_DATA",
-        narrativeText: narrative,
-        tableData: this.plannerTools.buildPlannerTable(dashboard),
-        toolsInvoked: ["planner.getPlannerReadContext"],
+        ...presentInventoryRead({
+          userText: forceTable ? "list pipeline" : ctx.userText,
+          narrativeText: narrative,
+          tableData: this.plannerTools.buildPlannerTable(dashboard),
+          rowCount: forceTable ? Math.max(cardCount, 2) : cardCount,
+          singleItemNarrative:
+            cardCount === 1
+              ? narrative
+              : cardCount === 0
+                ? narrative
+                : undefined,
+          toolsInvoked: ["planner.getPlannerReadContext"],
+        }),
       };
     }
 
@@ -102,10 +120,19 @@ export class BrandCentrePlannerAiModule implements CoPilotAiModule {
         ctx.brandProfileId,
       );
       return {
-        formatType: "TABULAR_AUDIT_DATA",
-        narrativeText: this.plannerTools.buildDraftCampaignsNarrative(drafts),
-        tableData: this.plannerTools.buildDraftCampaignsTable(drafts),
-        toolsInvoked: ["uce.listDraftCampaigns"],
+        ...presentInventoryRead({
+          userText: ctx.userText,
+          narrativeText: this.plannerTools.buildDraftCampaignsNarrative(drafts),
+          tableData: this.plannerTools.buildDraftCampaignsTable(drafts),
+          rowCount: drafts.length,
+          singleItemNarrative:
+            drafts.length === 1
+              ? `You have 1 draft campaign: "${drafts[0].campaign_name}" (budget ${drafts[0].budget_pool}).`
+              : drafts.length === 0
+                ? "You don’t have any draft campaigns yet."
+                : undefined,
+          toolsInvoked: ["uce.listDraftCampaigns"],
+        }),
       };
     }
 

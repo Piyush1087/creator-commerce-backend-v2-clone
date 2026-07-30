@@ -23,6 +23,10 @@ import { BrandUceReportingService } from "./services/brand-uce-reporting.service
     BrandUcePipelineService,
     BrandUceReportingService,
   ],
-  exports: [BrandUceCampaignService, BrandUceReportingService],
+  exports: [
+    BrandUceCampaignService,
+    BrandUceReportingService,
+    BrandUcePipelineService,
+  ],
 })
 export class BrandUceModule {}

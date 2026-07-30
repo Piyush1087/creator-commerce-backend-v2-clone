@@ -3,17 +3,17 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { BrandCentreJobStatus, IndustryVertical, PlannerWorkflowStatus } from "@prisma/client";
+import { BrandCentreJobStatus, IndustryVertical, PlannerWorkflowStatus, UserRole, type UceMilestoneStage } from "@prisma/client";
 
 import { BrandCentreDnaService } from "../../brand-centre/services/brand-centre-dna.service";
 import { BrandCentreIntelligenceService } from "../../brand-centre/services/brand-centre-intelligence.service";
 import { BrandCentrePlannerService } from "../../brand-centre/services/brand-centre-planner.service";
 import { BrandCentreUceBridgeService } from "../../brand-centre-uce-bridge/services/brand-centre-uce-bridge.service";
+import { BrandSettingsService } from "../../brand-settings/services/brand-settings.service";
 import { BrandUceCampaignService } from "../../brand-uce/services/brand-uce-campaign.service";
 import { CollaborationService } from "../../collaboration/services/collaboration.service";
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
-import { UserRole } from "@prisma/client";
 import {
   buildBridgeInjectSignals,
   buildBridgeLaunchSignal,
@@ -37,6 +37,19 @@ import {
   validationChecklistToPayloadFields as collabValidationChecklistToPayloadFields,
   type CollaborationValidationAction,
 } from "../modules/collaboration/collaboration-validation";
+import {
+  isBrandWriteAllowedAtStage,
+} from "../modules/collaboration/collaboration.stages";
+import {
+  mapBrandSettingsValidationError,
+  validationChecklistToPayloadFields as settingsValidationChecklistToPayloadFields,
+  type BrandSettingsValidationAction,
+} from "../modules/brand-settings/brand-settings-validation";
+import {
+  BrandBillingProfileSchema,
+  BrandWithdrawalAccountSchema,
+  UpdateBrandGeneralProfileSchema,
+} from "../../brand-settings/schemas/brand-settings.schema";
 import { CoPilotSlotSessionService } from "./co-pilot-slot-session.service";
 import { CoPilotThreadService } from "./co-pilot-thread.service";
 import { CoPilotConversationMemoryService } from "./co-pilot-conversation-memory.service";
@@ -77,6 +90,7 @@ export class CoPilotHitlService {
     private readonly planner: BrandCentrePlannerService,
     private readonly bridge: BrandCentreUceBridgeService,
     private readonly collaboration: CollaborationService,
+    private readonly brandSettings: BrandSettingsService,
     private readonly conversationMemory: CoPilotConversationMemoryService,
   ) {}
 
@@ -152,6 +166,12 @@ export class CoPilotHitlService {
         return this.confirmCollabRequestRevision(args, staged);
       case "COLLAB_VERIFY_COMPLIANCE":
         return this.confirmCollabVerifyCompliance(args, staged);
+      case "SETTINGS_UPDATE_GENERAL":
+        return this.confirmSettingsUpdateGeneral(args, staged);
+      case "SETTINGS_UPDATE_BILLING":
+        return this.confirmSettingsUpdateBilling(args, staged);
+      case "SETTINGS_LINK_WITHDRAWAL":
+        return this.confirmSettingsLinkWithdrawal(args, staged);
       default:
         throw new BadRequestException(`Unsupported HITL intent: ${intent}`);
     }
@@ -340,9 +360,51 @@ export class CoPilotHitlService {
     args: { brandProfileId: string; threadId: string },
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
-    const campaignId = String(staged.campaign_id ?? "").trim();
+    const campaignId = this.parseSelectId(staged.campaign_id);
     if (!campaignId) {
       throw new BadRequestException("Draft campaign id is required.");
+    }
+
+    const campaignName =
+      typeof staged.campaign_name === "string"
+        ? staged.campaign_name
+        : typeof staged.source_campaign_name === "string"
+          ? staged.source_campaign_name
+          : undefined;
+
+    // Defense in depth: only DRAFT campaigns may be edited from co-pilot.
+    try {
+      const shell = await this.uceCampaigns.getCampaignShell(
+        args.brandProfileId,
+        campaignId,
+      );
+      if (shell.current_status !== "DRAFT") {
+        throw new BadRequestException(
+          "Only DRAFT campaigns can be edited from co-pilot.",
+        );
+      }
+    } catch (err) {
+      const mapped = mapCampaignListValidationError({
+        err,
+        action: "UNKNOWN",
+        campaignId,
+        campaignName,
+      });
+      const fields = validationChecklistToPayloadFields(mapped);
+      return {
+        intent: "CAMPAIGN_EDIT_DRAFT",
+        message: fields.narrativeText,
+        campaignId: mapped.campaignId,
+        campaignName: mapped.campaignName,
+        validationBlocked: true,
+        validationChecklist: {
+          ...fields.validationChecklistData,
+          idempotencyKey:
+            typeof staged.idempotencyKey === "string"
+              ? staged.idempotencyKey
+              : undefined,
+        },
+      };
     }
 
     const budgetRaw = staged.budget_allocation;
@@ -356,43 +418,73 @@ export class CoPilotHitlService {
       | "SALES_CONVERSIONS"
       | undefined;
 
-    const campaign = await this.uceCampaigns.updateDraftWizard(
-      args.brandProfileId,
-      campaignId,
-      {
-        campaign_name: staged.campaign_name
-          ? String(staged.campaign_name)
-          : undefined,
-        budget_allocation:
-          budget !== undefined && Number.isFinite(budget) ? budget : undefined,
-        marketing_objective: objective,
-      },
-    );
+    try {
+      const campaign = await this.uceCampaigns.updateDraftWizard(
+        args.brandProfileId,
+        campaignId,
+        {
+          campaign_name: staged.campaign_name
+            ? String(staged.campaign_name)
+            : undefined,
+          budget_allocation:
+            budget !== undefined && Number.isFinite(budget)
+              ? budget
+              : undefined,
+          marketing_objective: objective,
+        },
+      );
 
-    await this.slotSessions.clearSession(args.threadId);
-    const resolvedAt = new Date().toISOString();
-    const summary = `Draft campaign "${campaign.campaign_name}" updated.`;
-    await this.threads.persistHitlResolution(args.threadId, String(staged.idempotencyKey), {
-      status: "CONFIRMED",
-      resolvedAt,
-      summary,
-      campaignId: campaign.campaign_id,
-      campaignName: campaign.campaign_name,
-    });
+      await this.slotSessions.clearSession(args.threadId);
+      const resolvedAt = new Date().toISOString();
+      const summary = `Draft campaign "${campaign.campaign_name}" updated.`;
+      await this.threads.persistHitlResolution(
+        args.threadId,
+        String(staged.idempotencyKey),
+        {
+          status: "CONFIRMED",
+          resolvedAt,
+          summary,
+          campaignId: campaign.campaign_id,
+          campaignName: campaign.campaign_name,
+        },
+      );
 
-    return {
-      intent: "CAMPAIGN_EDIT_DRAFT",
-      campaignId: campaign.campaign_id,
-      campaignName: campaign.campaign_name,
-      message: summary,
-      hitlResolution: {
-        status: "CONFIRMED",
-        resolvedAt,
-        summary,
+      return {
+        intent: "CAMPAIGN_EDIT_DRAFT",
         campaignId: campaign.campaign_id,
         campaignName: campaign.campaign_name,
-      },
-    };
+        message: summary,
+        hitlResolution: {
+          status: "CONFIRMED",
+          resolvedAt,
+          summary,
+          campaignId: campaign.campaign_id,
+          campaignName: campaign.campaign_name,
+        },
+      };
+    } catch (err) {
+      const mapped = mapCampaignListValidationError({
+        err,
+        action: "UNKNOWN",
+        campaignId,
+        campaignName,
+      });
+      const fields = validationChecklistToPayloadFields(mapped);
+      return {
+        intent: "CAMPAIGN_EDIT_DRAFT",
+        message: fields.narrativeText,
+        campaignId: mapped.campaignId,
+        campaignName: mapped.campaignName,
+        validationBlocked: true,
+        validationChecklist: {
+          ...fields.validationChecklistData,
+          idempotencyKey:
+            typeof staged.idempotencyKey === "string"
+              ? staged.idempotencyKey
+              : undefined,
+        },
+      };
+    }
   }
 
   private async confirmIntelligenceMoveToPlanner(
@@ -775,6 +867,38 @@ export class CoPilotHitlService {
     if (!campaignId) {
       throw new BadRequestException("Campaign id is required.");
     }
+
+    const shell = await this.uceCampaigns.getCampaignShell(
+      args.brandProfileId,
+      campaignId,
+    );
+    if (shell.current_status !== "ACTIVE") {
+      const mapped = mapCampaignListValidationError({
+        err: new BadRequestException("Only ACTIVE campaigns can be paused."),
+        action: "PAUSE",
+        campaignId,
+        campaignName:
+          typeof staged.campaign_name === "string"
+            ? staged.campaign_name
+            : shell.campaign_name,
+      });
+      const fields = validationChecklistToPayloadFields(mapped);
+      return {
+        intent: "PAUSE_CAMPAIGN",
+        message: fields.narrativeText,
+        campaignId: mapped.campaignId,
+        campaignName: mapped.campaignName,
+        validationBlocked: true,
+        validationChecklist: {
+          ...fields.validationChecklistData,
+          idempotencyKey:
+            typeof staged.idempotencyKey === "string"
+              ? staged.idempotencyKey
+              : undefined,
+        },
+      };
+    }
+
     return this.confirmLifecycleWithValidation({
       brandProfileId: args.brandProfileId,
       threadId: args.threadId,
@@ -795,6 +919,78 @@ export class CoPilotHitlService {
     if (!campaignId) {
       throw new BadRequestException("Campaign id is required.");
     }
+
+    const campaignName =
+      typeof staged.campaign_name === "string"
+        ? staged.campaign_name
+        : undefined;
+
+    // Defense in depth: re-check status + activation checklist before mutating.
+    const shell = await this.uceCampaigns.getCampaignShell(
+      args.brandProfileId,
+      campaignId,
+    );
+    if (shell.current_status !== "PAUSED") {
+      const mapped = mapCampaignListValidationError({
+        err: new BadRequestException(
+          "Only PAUSED campaigns can be resumed. Use go live for DRAFT campaigns.",
+        ),
+        action: "RESUME",
+        campaignId,
+        campaignName: campaignName ?? shell.campaign_name,
+      });
+      const fields = validationChecklistToPayloadFields(mapped);
+      return {
+        intent: "RESUME_CAMPAIGN",
+        message: fields.narrativeText,
+        campaignId: mapped.campaignId,
+        campaignName: mapped.campaignName,
+        validationBlocked: true,
+        validationChecklist: {
+          ...fields.validationChecklistData,
+          idempotencyKey:
+            typeof staged.idempotencyKey === "string"
+              ? staged.idempotencyKey
+              : undefined,
+        },
+      };
+    }
+
+    const checklist = await this.uceCampaigns.getActivationChecklist(
+      args.brandProfileId,
+      campaignId,
+    );
+    const blockers = checklist.filter((c) => !c.satisfied);
+    if (blockers.length > 0) {
+      const mapped = mapCampaignListValidationError({
+        err: {
+          response: {
+            message: "Campaign cannot be activated until checklist criteria are met",
+            checklist,
+          },
+          status: 400,
+        },
+        action: "RESUME",
+        campaignId,
+        campaignName: campaignName ?? shell.campaign_name,
+      });
+      const fields = validationChecklistToPayloadFields(mapped);
+      return {
+        intent: "RESUME_CAMPAIGN",
+        message: fields.narrativeText,
+        campaignId: mapped.campaignId,
+        campaignName: mapped.campaignName,
+        validationBlocked: true,
+        validationChecklist: {
+          ...fields.validationChecklistData,
+          idempotencyKey:
+            typeof staged.idempotencyKey === "string"
+              ? staged.idempotencyKey
+              : undefined,
+        },
+      };
+    }
+
     return this.confirmLifecycleWithValidation({
       brandProfileId: args.brandProfileId,
       threadId: args.threadId,
@@ -815,6 +1011,78 @@ export class CoPilotHitlService {
     if (!campaignId) {
       throw new BadRequestException("Campaign id is required.");
     }
+
+    const campaignName =
+      typeof staged.campaign_name === "string"
+        ? staged.campaign_name
+        : undefined;
+
+    // Defense in depth: re-check status + activation checklist before mutating.
+    const shell = await this.uceCampaigns.getCampaignShell(
+      args.brandProfileId,
+      campaignId,
+    );
+    if (shell.current_status !== "DRAFT") {
+      const mapped = mapCampaignListValidationError({
+        err: new BadRequestException(
+          "Only DRAFT campaigns can go live. Use resume for PAUSED campaigns.",
+        ),
+        action: "GO_LIVE",
+        campaignId,
+        campaignName: campaignName ?? shell.campaign_name,
+      });
+      const fields = validationChecklistToPayloadFields(mapped);
+      return {
+        intent: "GO_LIVE_CAMPAIGN",
+        message: fields.narrativeText,
+        campaignId: mapped.campaignId,
+        campaignName: mapped.campaignName,
+        validationBlocked: true,
+        validationChecklist: {
+          ...fields.validationChecklistData,
+          idempotencyKey:
+            typeof staged.idempotencyKey === "string"
+              ? staged.idempotencyKey
+              : undefined,
+        },
+      };
+    }
+
+    const checklist = await this.uceCampaigns.getActivationChecklist(
+      args.brandProfileId,
+      campaignId,
+    );
+    const blockers = checklist.filter((c) => !c.satisfied);
+    if (blockers.length > 0) {
+      const mapped = mapCampaignListValidationError({
+        err: {
+          response: {
+            message: "Campaign cannot be activated until checklist criteria are met",
+            checklist,
+          },
+          status: 400,
+        },
+        action: "GO_LIVE",
+        campaignId,
+        campaignName: campaignName ?? shell.campaign_name,
+      });
+      const fields = validationChecklistToPayloadFields(mapped);
+      return {
+        intent: "GO_LIVE_CAMPAIGN",
+        message: fields.narrativeText,
+        campaignId: mapped.campaignId,
+        campaignName: mapped.campaignName,
+        validationBlocked: true,
+        validationChecklist: {
+          ...fields.validationChecklistData,
+          idempotencyKey:
+            typeof staged.idempotencyKey === "string"
+              ? staged.idempotencyKey
+              : undefined,
+        },
+      };
+    }
+
     return this.confirmLifecycleWithValidation({
       brandProfileId: args.brandProfileId,
       threadId: args.threadId,
@@ -835,6 +1103,43 @@ export class CoPilotHitlService {
     if (!campaignId) {
       throw new BadRequestException("Campaign id is required.");
     }
+
+    const shell = await this.uceCampaigns.getCampaignShell(
+      args.brandProfileId,
+      campaignId,
+    );
+    const status = shell.current_status;
+    const archivable =
+      status === "ACTIVE" || status === "PAUSED" || status === "COMPLETED";
+    if (!archivable) {
+      const mapped = mapCampaignListValidationError({
+        err: new BadRequestException(
+          "Only ACTIVE, PAUSED, or COMPLETED campaigns can be archived.",
+        ),
+        action: "ARCHIVE",
+        campaignId,
+        campaignName:
+          typeof staged.campaign_name === "string"
+            ? staged.campaign_name
+            : shell.campaign_name,
+      });
+      const fields = validationChecklistToPayloadFields(mapped);
+      return {
+        intent: "ARCHIVE_CAMPAIGN",
+        message: fields.narrativeText,
+        campaignId: mapped.campaignId,
+        campaignName: mapped.campaignName,
+        validationBlocked: true,
+        validationChecklist: {
+          ...fields.validationChecklistData,
+          idempotencyKey:
+            typeof staged.idempotencyKey === "string"
+              ? staged.idempotencyKey
+              : undefined,
+        },
+      };
+    }
+
     return this.confirmLifecycleWithValidation({
       brandProfileId: args.brandProfileId,
       threadId: args.threadId,
@@ -1084,6 +1389,20 @@ export class CoPilotHitlService {
       if (authUser.role !== UserRole.BRAND) {
         throw new BadRequestException("Brand access required.");
       }
+
+      // Defense in depth: re-check stage before mutating (stage can change
+      // between HITL staging and confirm).
+      const detail = await this.collaboration.getThread(
+        authUser,
+        collaborationId,
+      );
+      const currentStage = detail.thread.currentStage as UceMilestoneStage;
+      if (!isBrandWriteAllowedAtStage(args.intent, currentStage)) {
+        throw new BadRequestException(
+          `Cannot complete this action at the current stage ${currentStage}.`,
+        );
+      }
+
       const meta = await args.run(authUser, collaborationId);
       await this.slotSessions.clearSession(args.threadId);
       const resolvedAt = new Date().toISOString();
@@ -1372,5 +1691,154 @@ export class CoPilotHitlService {
       successSummary: (meta) =>
         `Compliance verified. Advanced to ${meta.stage ?? "feedback"}.`,
     });
+  }
+
+  private async confirmSettingsUpdateGeneral(
+    args: { userId: string; threadId: string },
+    staged: Record<string, unknown>,
+  ): Promise<HitlConfirmResult> {
+    return this.confirmSettingsAction({
+      ...args,
+      intent: "SETTINGS_UPDATE_GENERAL",
+      action: "UPDATE_GENERAL",
+      staged,
+      run: async (authUser) => {
+        const input = UpdateBrandGeneralProfileSchema.parse({
+          organizationLegalName: this.optionalString(
+            staged.organizationLegalName,
+          ),
+          countryCode: this.optionalString(staged.countryCode),
+          currencyCode: this.optionalString(staged.currencyCode),
+          firstName: this.optionalString(staged.firstName),
+          lastName: this.optionalString(staged.lastName),
+          organizationAddress: this.optionalString(staged.organizationAddress),
+          taxId: this.optionalString(staged.taxId) ?? null,
+        });
+        await this.brandSettings.updateGeneral(authUser, input);
+        return "General settings updated.";
+      },
+    });
+  }
+
+  private async confirmSettingsUpdateBilling(
+    args: { userId: string; threadId: string },
+    staged: Record<string, unknown>,
+  ): Promise<HitlConfirmResult> {
+    return this.confirmSettingsAction({
+      ...args,
+      intent: "SETTINGS_UPDATE_BILLING",
+      action: "UPDATE_BILLING",
+      staged,
+      run: async (authUser) => {
+        const input = BrandBillingProfileSchema.parse({
+          registeredCompanyName: staged.registeredCompanyName,
+          corporateBillingAddress: staged.corporateBillingAddress,
+          gstin: this.optionalString(staged.gstin),
+          pan: this.optionalString(staged.pan),
+          defaultTdsPercentage:
+            typeof staged.defaultTdsPercentage === "number"
+              ? staged.defaultTdsPercentage
+              : Number(staged.defaultTdsPercentage ?? 2),
+          currencyPreference:
+            this.optionalString(staged.currencyPreference) ?? "INR",
+        });
+        await this.brandSettings.upsertBillingProfile(authUser, input);
+        return "Billing profile saved.";
+      },
+    });
+  }
+
+  private async confirmSettingsLinkWithdrawal(
+    args: { userId: string; threadId: string },
+    staged: Record<string, unknown>,
+  ): Promise<HitlConfirmResult> {
+    return this.confirmSettingsAction({
+      ...args,
+      intent: "SETTINGS_LINK_WITHDRAWAL",
+      action: "LINK_WITHDRAWAL",
+      staged,
+      run: async (authUser) => {
+        const input = BrandWithdrawalAccountSchema.parse({
+          beneficiaryName: staged.beneficiaryName,
+          bankName: staged.bankName,
+          accountNumber: staged.accountNumber,
+          confirmAccountNumber: staged.confirmAccountNumber,
+          ifscCode: staged.ifscCode,
+        });
+        await this.brandSettings.linkWithdrawalAccount(authUser, input);
+        return "Withdrawal bank account linked.";
+      },
+    });
+  }
+
+  private async confirmSettingsAction(args: {
+    userId: string;
+    threadId: string;
+    intent: Extract<
+      WriteIntentKind,
+      | "SETTINGS_UPDATE_GENERAL"
+      | "SETTINGS_UPDATE_BILLING"
+      | "SETTINGS_LINK_WITHDRAWAL"
+    >;
+    action: BrandSettingsValidationAction;
+    staged: Record<string, unknown>;
+    run: (authUser: AuthUser) => Promise<string>;
+  }): Promise<HitlConfirmResult> {
+    try {
+      const authUser = await this.resolveAuthUser(args.userId);
+      if (authUser.role !== UserRole.BRAND) {
+        throw new BadRequestException("Brand access required.");
+      }
+      const summary = await args.run(authUser);
+      await this.slotSessions.clearSession(args.threadId);
+      const resolvedAt = new Date().toISOString();
+      await this.threads.persistHitlResolution(
+        args.threadId,
+        String(args.staged.idempotencyKey),
+        {
+          status: "CONFIRMED",
+          resolvedAt,
+          summary,
+        },
+      );
+      return {
+        intent: args.intent,
+        message: summary,
+        hitlResolution: {
+          status: "CONFIRMED",
+          resolvedAt,
+          summary,
+        },
+      };
+    } catch (err) {
+      if (err instanceof BadRequestException || err instanceof NotFoundException) {
+        throw err;
+      }
+      const mapped = mapBrandSettingsValidationError({
+        err,
+        action: args.action,
+      });
+      const fields = settingsValidationChecklistToPayloadFields(mapped);
+      return {
+        intent: args.intent,
+        message: fields.narrativeText,
+        validationBlocked: true,
+        validationChecklist: {
+          ...fields.validationChecklistData,
+          idempotencyKey:
+            typeof args.staged.idempotencyKey === "string"
+              ? args.staged.idempotencyKey
+              : undefined,
+        },
+      };
+    }
+  }
+
+  private optionalString(value: unknown): string | undefined {
+    if (typeof value !== "string") {
+      return undefined;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
   }
 }

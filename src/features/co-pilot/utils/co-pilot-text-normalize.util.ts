@@ -120,6 +120,8 @@ const PLURAL_BASES = new Set([
   "deliverable",
 ]);
 
+export { looksLikeBrandSettingsUtterance } from "../modules/brand-settings/brand-settings.intents";
+
 /** Soft gate: message may belong to Campaign List (broad, not exact intents). */
 export function looksLikeCampaignUtterance(normalizedText: string): boolean {
   const n = normalizedText.toLowerCase();
@@ -145,7 +147,10 @@ export function looksLikeCampaignUtterance(normalizedText: string): boolean {
     /\bsort\b.*\b(by|budget|name|spend)/.test(n) ||
     /\bfilter\b/.test(n) ||
     /\b(set|make)\b.*\b(active|paused|live)\b/.test(n) ||
-    /\bproduct\b/.test(n)
+    /\bproduct\b/.test(n) ||
+    /\b(checklist|what'?s missing|campaign brief|creator guidelines|invited creators?|can i publish|rename campaign|delete campaign)\b/.test(
+      n,
+    )
   );
 }
 
@@ -182,7 +187,25 @@ export function looksLikeCollaborationUtterance(
     (n.includes("escrow") &&
       (n.includes("fund") || n.includes("collab") || n.includes("secure"))) ||
     (n.includes("pipeline") &&
-      (n.includes("creator") || n.includes("collab") || n.includes("applicant")))
+      (n.includes("creator") || n.includes("collab") || n.includes("applicant"))) ||
+    // Layer 2 detail inspect (quote/offer/tracking/submission) — not chat transcript
+    /\bquot(?:e|ed|ing)\b/.test(n) ||
+    (/\bhow much\b/.test(n) &&
+      /\b(quot(?:e|ed)|offer|creator|they|collab|negotiation|amount)\b/.test(
+        n,
+      )) ||
+    (/\b(offer|amount|price|commercials?)\b/.test(n) &&
+      /\b(creator|they|them|sent|collab|negotiation|show|what|current)\b/.test(
+        n,
+      )) ||
+    (/\b(tracking|courier|awb)\b/.test(n) &&
+      /\b(show|what|collab|shipment|dispatch|logistics)\b/.test(n)) ||
+    /\b(what did they submit|show (?:the )?submission|draft url|live post url)\b/.test(
+      n,
+    ) ||
+    /\b(pending action|what should i do next|what'?s pending|timeline|activity history|deliverable|creator profile|who is the creator|conversation with|latest messages|collaboration (?:stats|statistics|summary)|summarize (?:this )?collab|can i (?:accept|approve|ship))\b/.test(
+      n,
+    )
   );
 }
 

@@ -15,16 +15,6 @@ COPY . .
 RUN npx prisma generate
 # `npm run build` = nest build + copy-prompt-assets.mjs (prompt .md into dist/)
 RUN npm run build
-# TEMPORARY: compile QA seed for ECS start (remove after test@creator.com verified on dev).
-# Do not run ts-node in the runner — no tsconfig there → TS5109 NodeNext clash.
-RUN npx tsc scripts/seed-dev-creator.ts \
-  --outDir dist/scripts \
-  --rootDir scripts \
-  --esModuleInterop \
-  --module commonjs \
-  --moduleResolution node \
-  --target ES2021 \
-  --skipLibCheck
 
 FROM node:20-bookworm-slim AS runner
 WORKDIR /usr/src/app

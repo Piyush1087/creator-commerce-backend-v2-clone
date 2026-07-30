@@ -13,6 +13,12 @@ const CampaignListIntentSchema = z.enum([
   "FILTER_CAMPAIGNS",
   "SORT_CAMPAIGNS",
   "CAMPAIGN_SUMMARY",
+  "CAMPAIGN_STATUS",
+  "CAMPAIGN_CHECKLIST",
+  "CAMPAIGN_PRODUCTS",
+  "CAMPAIGN_BRIEF",
+  "CAMPAIGN_INVITES",
+  "CAMPAIGN_VALIDATE",
   "CAMPAIGN_PERFORMANCE",
   "COMPARE_CAMPAIGNS",
   "CAMPAIGN_FINANCIALS",
@@ -22,6 +28,7 @@ const CampaignListIntentSchema = z.enum([
   "ARCHIVE_CAMPAIGN",
   "DUPLICATE_CAMPAIGN",
   "BULK_CAMPAIGN_ACTION",
+  "CAMPAIGN_EDIT_DRAFT",
 ]);
 
 const CampaignClassifierOutputSchema = z.object({
@@ -60,6 +67,7 @@ export type CampaignWriteIntentKind = Extract<
   | "ARCHIVE_CAMPAIGN"
   | "DUPLICATE_CAMPAIGN"
   | "BULK_CAMPAIGN_ACTION"
+  | "CAMPAIGN_EDIT_DRAFT"
 >;
 
 export type CampaignReadIntentKind = Extract<
@@ -73,6 +81,12 @@ const READ_INTENTS = new Set<string>([
   "FILTER_CAMPAIGNS",
   "SORT_CAMPAIGNS",
   "CAMPAIGN_SUMMARY",
+  "CAMPAIGN_STATUS",
+  "CAMPAIGN_CHECKLIST",
+  "CAMPAIGN_PRODUCTS",
+  "CAMPAIGN_BRIEF",
+  "CAMPAIGN_INVITES",
+  "CAMPAIGN_VALIDATE",
   "CAMPAIGN_PERFORMANCE",
   "COMPARE_CAMPAIGNS",
   "CAMPAIGN_FINANCIALS",
@@ -85,23 +99,32 @@ const WRITE_INTENTS = new Set<string>([
   "ARCHIVE_CAMPAIGN",
   "DUPLICATE_CAMPAIGN",
   "BULK_CAMPAIGN_ACTION",
+  "CAMPAIGN_EDIT_DRAFT",
 ]);
 
 const SYSTEM = `You are the intent classifier for The Creator Shop Brand Co-Pilot, Campaign List module only.
 
 Return JSON only. Decide:
-- domain=CAMPAIGN_LIST when the user is asking about listing/searching/filtering/sorting campaigns, campaign summary/performance/financials/compare, or lifecycle actions (pause/resume/go-live/publish/archive/duplicate/bulk), including typos and paraphrases.
+- domain=CAMPAIGN_LIST when the user is asking about listing/searching/filtering/sorting campaigns, campaign summary/status/checklist/products/brief/invites/performance/financials/compare/validate, or lifecycle actions (pause/resume/go-live/publish/archive/duplicate/rename/bulk), including typos and paraphrases.
 - domain=OTHER for Brand DNA, planner blueprints, escrow, collaborations, greetings, or unrelated chat.
 
 Intent rules:
 - "sort … by budget/name/spend" → SORT_CAMPAIGNS (never CAMPAIGN_FINANCIALS just because budget appears).
 - "budget / spending / remaining / utilization for a campaign" → CAMPAIGN_FINANCIALS.
+- "is it live / draft / current status / which stage" → CAMPAIGN_STATUS.
+- "what's missing / checklist / why can't I publish / what should I do next" (campaign) → CAMPAIGN_CHECKLIST.
+- "can I publish / is it ready / why is publishing blocked" → CAMPAIGN_VALIDATE.
+- "can I delete / delete campaign" → CAMPAIGN_VALIDATE (delete unsupported; guide to archive).
+- "show products / which products" → CAMPAIGN_PRODUCTS.
+- "show brief / creator guidelines / instructions" → CAMPAIGN_BRIEF.
+- "invited / accepted / joined creators" → CAMPAIGN_INVITES.
 - "go live / publish / make live / activate draft" → GO_LIVE_CAMPAIGN (DRAFT → ACTIVE). Never confuse with creating a new campaign (CAMPAIGN_LAUNCH).
 - "publish X" / "go live X" with a campaign name (even typos) → GO_LIVE_CAMPAIGN with campaignNameHint.
+- "rename campaign … to …" → CAMPAIGN_EDIT_DRAFT with newCampaignName.
 - "resume / unpause / restart" a paused campaign → RESUME_CAMPAIGN.
 - "set/make … active" → GO_LIVE_CAMPAIGN if draft-like, else RESUME_CAMPAIGN when clearly paused.
 - "campaigns with X product" → SEARCH_CAMPAIGNS or FILTER_CAMPAIGNS with productHint.
-- "draft / active / paused / archived campaigns", "what about drafts" → FILTER_CAMPAIGNS with matching statusFilter (never invent empty results).
+- "draft / active / live / paused / archived campaigns", "what about drafts" → FILTER_CAMPAIGNS with matching statusFilter (never invent empty results). LIVE maps to ACTIVE.
 - "summarize my campaigns" (plural / no single name) → LIST_CAMPAIGNS (or FILTER if status given), not CAMPAIGN_SUMMARY.
 - compare without two names still → COMPARE_CAMPAIGNS.
 - If unsure between list variants, prefer LIST_CAMPAIGNS.

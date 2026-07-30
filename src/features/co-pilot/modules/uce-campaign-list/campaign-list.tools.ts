@@ -2,9 +2,11 @@ import { Injectable } from "@nestjs/common";
 import type { UceCampaignObjective, UceCampaignStatus } from "@prisma/client";
 
 import { BrandUceCampaignService } from "../../../brand-uce/services/brand-uce-campaign.service";
+import { BrandUcePipelineService } from "../../../brand-uce/services/brand-uce-pipeline.service";
 import type {
   DataTableData,
   MetricItem,
+  ValidationChecklistData,
 } from "../../schemas/copilot-payload.schema";
 import { fuzzyMatchNamedEntity } from "../../utils/co-pilot-fuzzy-match.util";
 
@@ -12,9 +14,16 @@ export type CampaignListRow = Awaited<
   ReturnType<BrandUceCampaignService["listCampaigns"]>
 >[number];
 
+export type CampaignShell = Awaited<
+  ReturnType<BrandUceCampaignService["getCampaignShell"]>
+>;
+
 @Injectable()
 export class CampaignListToolsService {
-  constructor(private readonly uceCampaigns: BrandUceCampaignService) {}
+  constructor(
+    private readonly uceCampaigns: BrandUceCampaignService,
+    private readonly pipeline: BrandUcePipelineService,
+  ) {}
 
   listCampaigns(
     brandProfileId: string,
@@ -34,6 +43,14 @@ export class CampaignListToolsService {
     return this.uceCampaigns.getCampaignSummary(brandProfileId, campaignId);
   }
 
+  getShell(brandProfileId: string, campaignId: string) {
+    return this.uceCampaigns.getCampaignShell(brandProfileId, campaignId);
+  }
+
+  getChecklist(brandProfileId: string, campaignId: string) {
+    return this.uceCampaigns.getActivationChecklist(brandProfileId, campaignId);
+  }
+
   getFinancials(brandProfileId: string, campaignId: string) {
     return this.uceCampaigns.getCampaignFinancials(brandProfileId, campaignId);
   }
@@ -44,6 +61,19 @@ export class CampaignListToolsService {
 
   compare(brandProfileId: string, campaignIds: string[]) {
     return this.uceCampaigns.compareCampaigns(brandProfileId, campaignIds);
+  }
+
+  async listInvites(brandProfileId: string, campaignId: string) {
+    const [prospects, applicants, active] = await Promise.all([
+      this.pipeline.listProspects(brandProfileId, campaignId, {}),
+      this.pipeline.listApplicants(brandProfileId, campaignId, {}),
+      this.pipeline.listActiveCollabs(brandProfileId, campaignId, {}),
+    ]);
+    return {
+      prospects: prospects.rows as unknown as Array<Record<string, unknown>>,
+      applicants: applicants.rows as unknown as Array<Record<string, unknown>>,
+      active: active.rows as unknown as Array<Record<string, unknown>>,
+    };
   }
 
   async findByNameHint(brandProfileId: string, hint: string) {
@@ -130,11 +160,314 @@ export class CampaignListToolsService {
         statusColor: summary.utilization_pct > 80 ? "YELLOW" : "GREEN",
       },
       {
+        label: "Products",
+        value: String(summary.product_count),
+        statusColor: summary.product_count > 0 ? "GREEN" : "YELLOW",
+      },
+      {
+        label: "Briefs",
+        value: String(summary.brief_count),
+        statusColor: summary.brief_count > 0 ? "GREEN" : "YELLOW",
+      },
+      {
         label: "Active collabs",
         value: String(summary.total_active_collabs_count),
         statusColor: "NEUTRAL",
       },
     ];
+  }
+
+  buildStatusMetrics(shell: CampaignShell): MetricItem[] {
+    return [
+      {
+        label: "Status",
+        value: shell.current_status,
+        statusColor:
+          shell.current_status === "ACTIVE"
+            ? "GREEN"
+            : shell.current_status === "DRAFT"
+              ? "YELLOW"
+              : "NEUTRAL",
+      },
+      {
+        label: "Live?",
+        value: shell.current_status === "ACTIVE" ? "Yes" : "No",
+        statusColor: shell.current_status === "ACTIVE" ? "GREEN" : "YELLOW",
+      },
+      {
+        label: "Draft?",
+        value: shell.current_status === "DRAFT" ? "Yes" : "No",
+        statusColor: "NEUTRAL",
+      },
+      {
+        label: "Objective",
+        value: shell.zone_1_master?.core_objective ?? "—",
+        statusColor: "NEUTRAL",
+      },
+      {
+        label: "Can edit essentials",
+        value: shell.can_edit_essentials ? "Yes" : "No",
+        statusColor: "NEUTRAL",
+      },
+    ];
+  }
+
+  statusNarrative(shell: CampaignShell): string {
+    const live = shell.current_status === "ACTIVE";
+    const draft = shell.current_status === "DRAFT";
+    return `"${shell.campaign_name}" is ${shell.current_status}${
+      live ? " (live)" : draft ? " (still a draft)" : ""
+    }.${shell.pause_warning ? ` ${shell.pause_warning}` : ""}`;
+  }
+
+  checklistNarrative(
+    shell: CampaignShell,
+    checklist: Awaited<
+      ReturnType<BrandUceCampaignService["getActivationChecklist"]>
+    >,
+  ): string {
+    const blockers = checklist.filter((c) => !c.satisfied);
+    if (shell.current_status === "ACTIVE") {
+      return `"${shell.campaign_name}" is already live. Checklist is for publish readiness on drafts.`;
+    }
+    if (blockers.length === 0) {
+      return `"${shell.campaign_name}" checklist is complete — you can publish / go live after confirm.`;
+    }
+    return `"${shell.campaign_name}" can’t publish yet. Missing: ${blockers
+      .map((b) => b.label)
+      .join("; ")}.`;
+  }
+
+  checklistToValidation(
+    shell: CampaignShell,
+    checklist: Awaited<
+      ReturnType<BrandUceCampaignService["getActivationChecklist"]>
+    >,
+    opts?: { action?: string; title?: string },
+  ): ValidationChecklistData {
+    const blockers = checklist.filter((c) => !c.satisfied);
+    return {
+      title: opts?.title ?? "Campaign activation checklist",
+      action: opts?.action ?? "PUBLISH",
+      code: blockers.length
+        ? "CAMPAIGN_CHECKLIST_BLOCKED"
+        : "CAMPAIGN_CHECKLIST_OK",
+      campaignId: shell.campaign_id,
+      campaignName: shell.campaign_name,
+      autoResume: blockers.length > 0,
+      deepLinkPath: `/brand/campaigns/${shell.campaign_id}`,
+      items: checklist.map((c) => ({
+        id: c.key,
+        title: c.label,
+        satisfied: c.satisfied,
+        helpText: c.satisfied
+          ? "Complete"
+          : "Required before publish / go live",
+        repairHint: c.satisfied
+          ? undefined
+          : "Open the campaign wizard to fix this item.",
+      })),
+      primaryActionLabel: blockers.length
+        ? "Open campaign"
+        : "Ready to publish",
+      cancelActionLabel: "Dismiss",
+    };
+  }
+
+  validatePublish(
+    shell: CampaignShell,
+    checklist: Awaited<
+      ReturnType<BrandUceCampaignService["getActivationChecklist"]>
+    >,
+  ): { narrativeText: string; validationChecklistData: ValidationChecklistData } {
+    const isDraft = shell.current_status === "DRAFT";
+    const items = [
+      {
+        id: "draft_status",
+        title: "Campaign is DRAFT",
+        satisfied: isDraft,
+        helpText: isDraft
+          ? "Status allows go-live."
+          : `Current status is ${shell.current_status}.`,
+        repairHint: isDraft
+          ? undefined
+          : "Only DRAFT campaigns can be published from chat.",
+      },
+      ...checklist.map((c) => ({
+        id: c.key,
+        title: c.label,
+        satisfied: c.satisfied,
+        helpText: c.satisfied ? "Complete" : "Required before publish",
+        repairHint: c.satisfied
+          ? undefined
+          : "Fix this in the campaign wizard.",
+      })),
+    ];
+    const blocked = items.some((i) => !i.satisfied);
+    return {
+      narrativeText: blocked
+        ? `"${shell.campaign_name}" is not ready to publish yet.`
+        : `"${shell.campaign_name}" is ready to publish. Say “publish ${shell.campaign_name}” to confirm.`,
+      validationChecklistData: {
+        title: "Validate publish",
+        action: "GO_LIVE",
+        code: blocked ? "PUBLISH_BLOCKED" : "PUBLISH_READY",
+        campaignId: shell.campaign_id,
+        campaignName: shell.campaign_name,
+        autoResume: blocked,
+        deepLinkPath: `/brand/campaigns/${shell.campaign_id}`,
+        items,
+        primaryActionLabel: blocked ? "Open campaign" : "Ready",
+        cancelActionLabel: "Dismiss",
+      },
+    };
+  }
+
+  validateDelete(shell: CampaignShell): {
+    narrativeText: string;
+    validationChecklistData: ValidationChecklistData;
+  } {
+    return {
+      narrativeText: `Delete isn’t available in chat for "${shell.campaign_name}". Archive it instead if you want it off the active list.`,
+      validationChecklistData: {
+        title: "Delete campaign",
+        action: "DELETE",
+        code: "DELETE_UNSUPPORTED",
+        campaignId: shell.campaign_id,
+        campaignName: shell.campaign_name,
+        autoResume: false,
+        deepLinkPath: `/brand/campaigns/${shell.campaign_id}`,
+        items: [
+          {
+            id: "delete_api",
+            title: "Delete in chat",
+            satisfied: false,
+            helpText: "Hard delete is not supported from Brand Co-Pilot.",
+            repairHint:
+              'Say “archive campaign …” or open Campaigns in the app.',
+          },
+        ],
+        primaryActionLabel: "Open campaign",
+        cancelActionLabel: "Dismiss",
+      },
+    };
+  }
+
+  productsTable(shell: CampaignShell): DataTableData {
+    const products = shell.zone_2_tactics.products;
+    if (products.length === 0) {
+      return {
+        headers: ["Product", "SKU", "Inventory"],
+        rows: [{ Product: "—", SKU: "—", Inventory: "No products added" }],
+      };
+    }
+    return {
+      headers: ["Product", "SKU", "Type", "Inventory", "Cost/unit"],
+      rows: products.map((p) => ({
+        Product: p.product_name,
+        SKU: p.sku_code ?? "—",
+        Type: p.asset_type,
+        Inventory: p.inventory_count,
+        "Cost/unit": p.cost_per_unit,
+      })),
+    };
+  }
+
+  productsNarrative(shell: CampaignShell): string {
+    const count = shell.zone_2_tactics.products.length;
+    return count === 0
+      ? `"${shell.campaign_name}" has no products yet.`
+      : `"${shell.campaign_name}" has ${count} product(s) (${shell.total_inventory_allocated} inventory allocated).`;
+  }
+
+  briefsTable(shell: CampaignShell): DataTableData {
+    const briefs = shell.zone_2_tactics.briefs;
+    if (briefs.length === 0) {
+      return {
+        headers: ["Brief", "Type", "Guidelines"],
+        rows: [{ Brief: "—", Type: "—", Guidelines: "No briefs yet" }],
+      };
+    }
+    return {
+      headers: ["Brief", "Type", "Platforms", "Guidelines"],
+      rows: briefs.map((b) => ({
+        Brief: b.internal_title,
+        Type: b.brief_type ?? "—",
+        Platforms: (b.required_platforms ?? []).join(", ") || "—",
+        Guidelines: (b.creative_guidelines ?? "").slice(0, 120) || "—",
+      })),
+    };
+  }
+
+  briefsNarrative(shell: CampaignShell): string {
+    const briefs = shell.zone_2_tactics.briefs;
+    if (briefs.length === 0) {
+      return `"${shell.campaign_name}" has no briefs yet.`;
+    }
+    const first = briefs[0];
+    return `"${shell.campaign_name}" has ${briefs.length} brief(s). First: “${first.internal_title}”${
+      first.creative_guidelines
+        ? ` — ${(first.creative_guidelines ?? "").slice(0, 160)}`
+        : ""
+    }.`;
+  }
+
+  invitesTable(args: {
+    prospects: Array<Record<string, unknown>>;
+    applicants: Array<Record<string, unknown>>;
+    active: Array<Record<string, unknown>>;
+  }): DataTableData {
+    const rows: Array<Record<string, string | number | boolean>> = [];
+    const push = (
+      list: Array<Record<string, unknown>>,
+      bucket: string,
+    ) => {
+      for (const row of list) {
+        rows.push({
+          Creator: String(
+            row.instagram_handle ??
+              row.creator_display_name ??
+              row.creator_email ??
+              "—",
+          ),
+          Bucket: bucket,
+          Status: String(row.collab_status ?? row.status ?? bucket),
+        });
+      }
+    };
+    push(args.prospects, "Invited/Prospect");
+    push(args.applicants, "Applicant");
+    push(args.active, "Joined/Active");
+    if (rows.length === 0) {
+      return {
+        headers: ["Creator", "Bucket", "Status"],
+        rows: [{ Creator: "—", Bucket: "—", Status: "No creators yet" }],
+      };
+    }
+    return {
+      headers: ["Creator", "Bucket", "Status"],
+      rows,
+    };
+  }
+
+  invitesNarrative(args: {
+    campaignName: string;
+    prospects: unknown[];
+    applicants: unknown[];
+    active: unknown[];
+    userText: string;
+  }): string {
+    const n = args.userText.toLowerCase();
+    if (/\baccepted|joined\b/.test(n)) {
+      return `"${args.campaignName}" has ${args.active.length} joined/active creator(s).`;
+    }
+    if (/\brejected\b/.test(n)) {
+      return `Rejected creators aren’t a separate pipeline list in chat yet for "${args.campaignName}". Showing invited / applicants / active instead.`;
+    }
+    if (/\binvited\b/.test(n)) {
+      return `"${args.campaignName}" has ${args.prospects.length} invited/prospect creator(s).`;
+    }
+    return `"${args.campaignName}" pipeline: ${args.prospects.length} invited, ${args.applicants.length} applicants, ${args.active.length} active.`;
   }
 
   buildPerformanceMetrics(

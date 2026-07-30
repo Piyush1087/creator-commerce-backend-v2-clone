@@ -27,7 +27,7 @@ export function extractCampaignNameHint(userText: string): string | undefined {
   }
 
   const patterns = [
-    /(?:pause|resume|archive|duplicate|clone|summarize|summary of|overview of|performance of|budget for|financials for|spending for|publish|go live|go-live|activate)\s+(?:campaign\s+)?(.+)$/i,
+    /(?:pause|resume|archive|duplicate|clone|summarize|summary of|overview of|performance of|budget for|financials for|spending for|publish|go live|go-live|activate|rename|delete|status of|products? (?:in|for)|brief for|invites? for|checklist for)\s+(?:campaign\s+)?(.+)$/i,
     /(?:campaign)\s+["']?([^"']+?)["']?(?:\s+campaign)?$/i,
   ];
   for (const pattern of patterns) {
@@ -53,7 +53,7 @@ export function extractCampaignNameHint(userText: string): string | undefined {
 export function extractStatusFilter(
   normalized: string,
 ): UceCampaignStatus | undefined {
-  if (/\bactive\b/.test(normalized) || /\brunning\b/.test(normalized)) {
+  if (/\bactive\b/.test(normalized) || /\brunning\b/.test(normalized) || /\blive\b/.test(normalized)) {
     return "ACTIVE";
   }
   if (/\bpaused\b/.test(normalized)) {
@@ -130,6 +130,53 @@ export function extractSearchTerm(userText: string, normalized: string): string 
 
 export function detectCampaignListRead(userText: string): ReadQueryKind | null {
   const n = userText.toLowerCase().trim();
+  const mentionsCampaign =
+    n.includes("campaign") ||
+    /\b(publish|go live|go-live|checklist|draft)\b/.test(n);
+
+  // Validation / blockers first
+  if (
+    (/\b(can i|why can'?t i|why cannot i|is (?:this|it) ready|why is publishing blocked)\b/.test(
+      n,
+    ) &&
+      (mentionsCampaign ||
+        /\b(publish|delete|go live|activate)\b/.test(n))) ||
+    (/\b(why can'?t i publish|what'?s missing|pending checklist|what do i need to complete|what'?s blocking this campaign|why can'?t i continue|show pending work)\b/.test(
+      n,
+    ) &&
+      (mentionsCampaign ||
+        /\b(publish|checklist|missing|blocking|pending)\b/.test(n)))
+  ) {
+    if (
+      /\b(checklist|missing|complete|blocking|pending|ready|publish)\b/.test(n) ||
+      /\bcan i (?:publish|go live|activate)\b/.test(n) ||
+      /\bis this campaign ready\b/.test(n)
+    ) {
+      if (/\bcan i delete\b/.test(n) || /\bdelete this campaign\b/.test(n)) {
+        return "CAMPAIGN_VALIDATE";
+      }
+      if (
+        /\b(can i publish|can i go live|is (?:this|the)?\s*campaign ready|why is publishing blocked|why can'?t i publish)\b/.test(
+          n,
+        )
+      ) {
+        return "CAMPAIGN_VALIDATE";
+      }
+      return "CAMPAIGN_CHECKLIST";
+    }
+    if (/\bdelete\b/.test(n)) {
+      return "CAMPAIGN_VALIDATE";
+    }
+  }
+
+  if (
+    /\b(what should i do next|what'?s pending|show pending checklist|pending checklist items)\b/.test(
+      n,
+    ) &&
+    (mentionsCampaign || /\bchecklist\b/.test(n))
+  ) {
+    return "CAMPAIGN_CHECKLIST";
+  }
 
   if (
     n.includes("compare") &&
@@ -149,10 +196,25 @@ export function detectCampaignListRead(userText: string): ReadQueryKind | null {
     return "CAMPAIGN_FINANCIALS";
   }
 
+  // Invites before generic analytics ("how many creators accepted")
+  if (
+    /\b(invited creators?|creator invites?|accepted creators?|rejected creators?|who joined this campaign|how many creators (?:are )?invited|show (?:accepted|rejected|invited) creators)\b/.test(
+      n,
+    ) ||
+    (/\bcreators?\b/.test(n) &&
+      /\b(invited|invite|accepted|rejected|joined)\b/.test(n) &&
+      mentionsCampaign)
+  ) {
+    return "CAMPAIGN_INVITES";
+  }
+
   if (
     (n.includes("performance") ||
       n.includes("roi") ||
       n.includes("kpi") ||
+      n.includes("campaign progress") ||
+      n.includes("campaign statistics") ||
+      n.includes("campaign stats") ||
       n.includes("which campaign performed")) &&
     (n.includes("campaign") || n.includes("performed best"))
   ) {
@@ -160,18 +222,55 @@ export function detectCampaignListRead(userText: string): ReadQueryKind | null {
   }
 
   if (
+    /\b(campaign products?|products? (?:in|for|added to) (?:this )?campaign|which products|how many products|show products)\b/.test(
+      n,
+    ) &&
+    (mentionsCampaign || /\bproducts?\b/.test(n))
+  ) {
+    return "CAMPAIGN_PRODUCTS";
+  }
+
+  if (
+    /\b(campaign brief|show brief|explain (?:the )?brief|creator guidelines|what instructions|brief for)\b/.test(
+      n,
+    ) &&
+    (mentionsCampaign || /\bbrief\b/.test(n) || /\bguidelines\b/.test(n))
+  ) {
+    return "CAMPAIGN_BRIEF";
+  }
+
+  if (
+    /\b(is (?:my|this|the)?\s*campaign (?:live|still a draft|active|paused)|current status|which stage is my campaign|campaign status|is .+ live)\b/.test(
+      n,
+    ) ||
+    (/\bstatus\b/.test(n) && mentionsCampaign && !/\bsummary\b/.test(n))
+  ) {
+    return "CAMPAIGN_STATUS";
+  }
+
+  if (
     (n.includes("summarize") ||
       n.includes("summary") ||
-      n.includes("overview of")) &&
+      n.includes("overview") ||
+      n.includes("tell me about") ||
+      n.includes("explain this campaign") ||
+      n.includes("what's happening in this campaign") ||
+      n.includes("campaign details") ||
+      n.includes("campaign information") ||
+      n.includes("show campaign details")) &&
     n.includes("campaign")
   ) {
-    // Fleet overview ("summarize my campaigns") → list, not a single-campaign summary.
     const nameHint = extractCampaignNameHint(userText);
     const fleetAsk =
       /\bcampaigns\b/.test(n) ||
       !nameHint ||
       /^(my|all|the)?\s*campaigns?$/i.test(nameHint);
-    if (fleetAsk) {
+    // Single-campaign overview phrases should not fall back to fleet list
+    const singleOverview =
+      /\b(tell me about|campaign details|campaign information|explain this|what'?s happening in this|give me campaign summary|campaign overview)\b/.test(
+        n,
+      ) || Boolean(nameHint && !fleetAsk);
+    if (fleetAsk && !singleOverview) {
       if (extractStatusFilter(n) || extractObjectiveFilter(n)) {
         return "FILTER_CAMPAIGNS";
       }
@@ -188,7 +287,6 @@ export function detectCampaignListRead(userText: string): ReadQueryKind | null {
     (n.includes("filter") || extractStatusFilter(n) || extractObjectiveFilter(n)) &&
     n.includes("campaign")
   ) {
-    // "show active campaigns" / "what about draft campaigns" → filtered list
     if (extractStatusFilter(n) || extractObjectiveFilter(n) || n.includes("filter")) {
       return "FILTER_CAMPAIGNS";
     }
@@ -210,6 +308,7 @@ export function detectCampaignListRead(userText: string): ReadQueryKind | null {
     n.includes("what campaigns are running") ||
     n.includes("show running campaigns") ||
     n.includes("show active campaigns") ||
+    n.includes("campaigns created this month") ||
     (n.includes("what about") && n.includes("campaign")) ||
     (n.includes("campaigns") &&
       (n.includes("show") ||
@@ -221,6 +320,10 @@ export function detectCampaignListRead(userText: string): ReadQueryKind | null {
       return "FILTER_CAMPAIGNS";
     }
     return "LIST_CAMPAIGNS";
+  }
+
+  if (/\bdelete\b/.test(n) && n.includes("campaign")) {
+    return "CAMPAIGN_VALIDATE";
   }
 
   return null;
@@ -377,6 +480,39 @@ export function detectCampaignListWrite(
       stagedPayload: { campaign_name_hint: nameHint },
       missingSlots: [campaignSelectSlot()],
     };
+  }
+
+  // Rename draft campaign name via CAMPAIGN_EDIT_DRAFT HITL
+  if (/\brename\b/.test(n) && n.includes("campaign")) {
+    const newName =
+      userText.match(
+        /(?:to|as|named|name(?:d)?)\s+["']?([^"']+)["']?/i,
+      )?.[1]?.trim() ?? undefined;
+    const missingSlots: SlotFillingData["missingSlots"] = [
+      campaignSelectSlot(),
+    ];
+    if (!newName) {
+      missingSlots.push({
+        fieldName: "campaign_name",
+        uiLabel: "New campaign name",
+        inputType: "TEXT",
+        placeholderText: "e.g. Summer Sale 2026",
+      });
+    }
+    return {
+      kind: "CAMPAIGN_EDIT_DRAFT",
+      stagedPayload: {
+        campaign_name_hint: nameHint,
+        campaign_name: newName,
+        rename_only: true,
+      },
+      missingSlots,
+    };
+  }
+
+  // Delete is not supported — leave for CAMPAIGN_VALIDATE read path
+  if (/\bdelete\b/.test(n) && n.includes("campaign")) {
+    return null;
   }
 
   return null;

@@ -243,6 +243,47 @@ export const CO_PILOT_DATA_ACCESS_CONTRACT = {
 
     {
 
+      module: "brand-settings",
+
+      prismaModels: {
+
+        BrandProfile: "WRITE_VIA_HITL",
+
+        BrandBillingProfile: "WRITE_VIA_HITL",
+
+        BrandWithdrawalAccount: "WRITE_VIA_HITL",
+
+      },
+
+      apiRoutesRead: [
+
+        "GET /api/v1/brand/settings (via settings.getOverview)",
+
+        "GET /api/v1/brand/settings/general",
+
+        "GET /api/v1/brand/settings/billing-profile",
+
+        "GET /api/v1/brand/settings/withdrawal-account",
+
+      ],
+
+      apiRoutesWriteHitl: [
+
+        "POST /api/v1/co-pilot/hitl/confirm → PATCH /api/v1/brand/settings/general",
+
+        "POST /api/v1/co-pilot/hitl/confirm → PATCH /api/v1/brand/settings/billing-profile",
+
+        "POST /api/v1/co-pilot/hitl/confirm → POST /api/v1/brand/settings/withdrawal-account",
+
+      ],
+
+      notes:
+        "Brand Settings module: overview/general/finance reads + integrations deep-link narrative. HITL writes: update general, upsert billing, link withdrawal. OAuth connect/reconnect stays UI-only.",
+
+    },
+
+    {
+
       module: "collaboration",
 
       prismaModels: {

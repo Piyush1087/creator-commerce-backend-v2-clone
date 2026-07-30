@@ -30,11 +30,27 @@ import {
   CollaborationCoPilotToolsService,
   type CollabThreadRow,
 } from "./collaboration.tools";
+import {
+  presentDetailRead,
+  presentInventoryRead,
+} from "../../utils/co-pilot-presentation.util";
 
 const READ_KINDS: ReadQueryKind[] = [
   "COLLAB_PIPELINE",
   "COLLAB_ISSUES",
   "COLLAB_STATUS",
+  "COLLAB_DETAIL",
+  "COLLAB_PENDING",
+  "COLLAB_QUOTE",
+  "COLLAB_SHIPMENT",
+  "COLLAB_CONTENT",
+  "COLLAB_DELIVERABLES",
+  "COLLAB_TIMELINE",
+  "COLLAB_CREATOR",
+  "COLLAB_CONVERSATION",
+  "COLLAB_SUMMARY",
+  "COLLAB_ANALYTICS",
+  "COLLAB_VALIDATE",
 ];
 
 const WRITE_INTENTS: WriteIntentKind[] = [
@@ -113,16 +129,7 @@ export class CollaborationAiModule implements CoPilotAiModule {
         stage,
         search: kind === "COLLAB_PIPELINE" ? search : undefined,
       });
-      this.memory.rememberListedCollaborations(
-        ctx.threadId,
-        collabCtx.threads.map((t) => ({
-          id: t.collaboration_id,
-          name: `${t.creator_display_name ?? t.creator_handle ?? "Creator"} · ${t.campaign_name}`,
-          stage: t.current_stage,
-          campaignName: t.campaign_name,
-        })),
-      );
-      const tableThreads =
+      let tableThreads =
         kind === "COLLAB_ISSUES"
           ? collabCtx.threads.filter(
               (t) =>
@@ -131,21 +138,84 @@ export class CollaborationAiModule implements CoPilotAiModule {
                 t.current_stage === "STAGE_4_CONTENT_REVIEW",
             )
           : collabCtx.threads;
+
+      if (kind === "COLLAB_PIPELINE" && /\brejected\b/.test(n)) {
+        tableThreads = collabCtx.threads.filter((t) => t.is_terminated);
+      }
+
+      this.memory.rememberListedCollaborations(
+        ctx.threadId,
+        tableThreads.map((t) => ({
+          id: t.collaboration_id,
+          name: `${t.creator_display_name ?? t.creator_handle ?? "Creator"} · ${t.campaign_name}`,
+          stage: t.current_stage,
+          campaignName: t.campaign_name,
+        })),
+      );
+      const baseNarrative =
+        kind === "COLLAB_ISSUES"
+          ? this.tools.issuesNarrative(collabCtx)
+          : this.tools.pipelineNarrative({
+              ...collabCtx,
+              threads: tableThreads,
+              totalActive: tableThreads.length,
+            }) +
+            (stage ? ` Filtered to ${STAGE_LABELS[stage] ?? stage}.` : "") +
+            (/\brejected\b/.test(n) ? " Showing terminated/rejected threads." : "");
       return {
-        formatType: "TABULAR_AUDIT_DATA",
-        narrativeText:
-          kind === "COLLAB_ISSUES"
-            ? this.tools.issuesNarrative(collabCtx)
-            : this.tools.pipelineNarrative(collabCtx) +
-              (stage
-                ? ` Filtered to ${STAGE_LABELS[stage] ?? stage}.`
-                : ""),
-        tableData: this.tools.buildCollabTable(tableThreads),
-        toolsInvoked: ["collab.listThreads"],
+        ...presentInventoryRead({
+          userText: ctx.userText,
+          narrativeText: baseNarrative,
+          tableData: this.tools.buildCollabTable(tableThreads),
+          rowCount: tableThreads.length,
+          singleItemNarrative:
+            tableThreads.length === 1
+              ? this.tools.singleCollabListNarrative(tableThreads[0])
+              : tableThreads.length === 0
+                ? kind === "COLLAB_ISSUES"
+                  ? "No collaborations with fulfillment issues right now."
+                  : "No collaborations matched that filter."
+                : undefined,
+          toolsInvoked: ["collab.listThreads"],
+        }),
       };
     }
 
-    if (kind === "COLLAB_STATUS") {
+    if (kind === "COLLAB_ANALYTICS") {
+      const threads = await this.tools.listThreads(authUser, {});
+      this.memory.rememberListedCollaborations(
+        ctx.threadId,
+        threads.map((t) => ({
+          id: t.collaboration_id,
+          name: `${t.creator_display_name ?? t.creator_handle ?? "Creator"} · ${t.campaign_name}`,
+          stage: t.current_stage,
+          campaignName: t.campaign_name,
+        })),
+      );
+      return {
+        formatType: "METRIC_HIGHLIGHT_GRID",
+        narrativeText: this.tools.analyticsNarrative(threads),
+        metricGridData: this.tools.analyticsMetrics(threads),
+        toolsInvoked: ["collab.getCollaborationAnalytics"],
+      };
+    }
+
+    const threadScopedKinds: ReadQueryKind[] = [
+      "COLLAB_STATUS",
+      "COLLAB_DETAIL",
+      "COLLAB_PENDING",
+      "COLLAB_QUOTE",
+      "COLLAB_SHIPMENT",
+      "COLLAB_CONTENT",
+      "COLLAB_DELIVERABLES",
+      "COLLAB_TIMELINE",
+      "COLLAB_CREATOR",
+      "COLLAB_CONVERSATION",
+      "COLLAB_SUMMARY",
+      "COLLAB_VALIDATE",
+    ];
+
+    if (threadScopedKinds.includes(kind)) {
       const resolved = await this.resolveThreadForRead(authUser, ctx);
       if (!resolved) {
         const all = await this.tools.listThreads(authUser, {});
@@ -159,11 +229,20 @@ export class CollaborationAiModule implements CoPilotAiModule {
           })),
         );
         return {
-          formatType: "TABULAR_AUDIT_DATA",
-          narrativeText:
-            "Which collaboration should I open? Pick one from the list or name the creator/campaign.",
-          tableData: this.tools.buildCollabTable(all),
-          toolsInvoked: ["collab.listThreads"],
+          ...presentInventoryRead({
+            userText: ctx.userText,
+            narrativeText:
+              "Which collaboration should I open? Name the creator or campaign.",
+            tableData: this.tools.buildCollabTable(all),
+            rowCount: all.length,
+            singleItemNarrative:
+              all.length === 1
+                ? this.tools.singleCollabListNarrative(all[0])
+                : all.length === 0
+                  ? "You don’t have any active collaborations yet."
+                  : undefined,
+            toolsInvoked: ["collab.listThreads"],
+          }),
         };
       }
 
@@ -171,17 +250,213 @@ export class CollaborationAiModule implements CoPilotAiModule {
         authUser,
         resolved.collaboration_id,
       );
+      const creatorLabel =
+        resolved.creator_display_name ??
+        resolved.creator_handle ??
+        "creator";
       this.memory.rememberSelectedCollaboration(ctx.threadId, {
         id: resolved.collaboration_id,
-        name: `${resolved.creator_display_name ?? resolved.creator_handle ?? "Creator"} · ${resolved.campaign_name}`,
+        name: `${creatorLabel} · ${resolved.campaign_name}`,
         stage: resolved.current_stage,
         campaignName: resolved.campaign_name,
       });
+
+      if (kind === "COLLAB_PENDING") {
+        return {
+          formatType: "VALIDATION_CHECKLIST",
+          narrativeText: this.tools.pendingNarrative(
+            detail,
+            creatorLabel,
+            resolved.campaign_name,
+          ),
+          validationChecklistData: this.tools.pendingChecklistData(detail),
+          toolsInvoked: ["collab.getPendingActions"],
+        };
+      }
+
+      if (kind === "COLLAB_VALIDATE") {
+        // Reject-quote with no selected thread still uses validate helper
+        if (/\breject (?:the )?quote|decline (?:the )?(?:quote|offer)\b/.test(n)) {
+          const validated = this.tools.validateActionChecklist(
+            detail,
+            ctx.userText,
+          );
+          return {
+            formatType: "VALIDATION_CHECKLIST",
+            ...validated,
+            toolsInvoked: ["collab.validateQuoteAction"],
+          };
+        }
+        const validated = this.tools.validateActionChecklist(
+          detail,
+          ctx.userText,
+        );
+        return {
+          formatType: "VALIDATION_CHECKLIST",
+          ...validated,
+          toolsInvoked: ["collab.validateAction"],
+        };
+      }
+
+      if (kind === "COLLAB_QUOTE") {
+        return {
+          ...presentDetailRead({
+            userText: ctx.userText,
+            narrativeText: this.tools.detailNarrative(
+              detail,
+              creatorLabel,
+              resolved.campaign_name,
+              ctx.userText.includes("quote")
+                ? ctx.userText
+                : `${ctx.userText} quote`,
+            ),
+            metricGridData: this.tools.quoteMetrics(detail),
+            preferMetrics: true,
+            toolsInvoked: ["collab.getQuoteDetails"],
+          }),
+        };
+      }
+
+      if (kind === "COLLAB_SHIPMENT") {
+        return {
+          ...presentDetailRead({
+            userText: ctx.userText,
+            narrativeText: this.tools.detailNarrative(
+              detail,
+              creatorLabel,
+              resolved.campaign_name,
+              "tracking shipment",
+            ),
+            metricGridData: this.tools.shipmentMetrics(detail),
+            preferMetrics: true,
+            toolsInvoked: ["collab.getShipmentDetails"],
+          }),
+        };
+      }
+
+      if (kind === "COLLAB_CONTENT") {
+        return {
+          ...presentDetailRead({
+            userText: ctx.userText,
+            narrativeText: this.tools.detailNarrative(
+              detail,
+              creatorLabel,
+              resolved.campaign_name,
+              "submission media",
+            ),
+            metricGridData: this.tools.contentMetrics(detail),
+            preferMetrics: true,
+            toolsInvoked: ["collab.getContentSubmission"],
+          }),
+        };
+      }
+
+      if (kind === "COLLAB_DELIVERABLES") {
+        return {
+          formatType: "TABULAR_AUDIT_DATA",
+          narrativeText: this.tools.deliverablesNarrative(
+            detail,
+            creatorLabel,
+            resolved.campaign_name,
+          ),
+          tableData: this.tools.deliverablesTable(detail),
+          toolsInvoked: ["collab.getDeliverables"],
+        };
+      }
+
+      if (kind === "COLLAB_TIMELINE") {
+        return {
+          formatType: "TABULAR_AUDIT_DATA",
+          narrativeText: this.tools.timelineNarrative(
+            detail,
+            creatorLabel,
+            resolved.campaign_name,
+          ),
+          tableData: this.tools.timelineTable(detail),
+          toolsInvoked: ["collab.getTimeline"],
+        };
+      }
+
+      if (kind === "COLLAB_CREATOR") {
+        return {
+          ...presentDetailRead({
+            userText: ctx.userText,
+            narrativeText: this.tools.creatorNarrative(detail, creatorLabel),
+            metricGridData: this.tools.creatorMetrics(detail),
+            preferMetrics: true,
+            toolsInvoked: ["collab.getCreatorProfile"],
+          }),
+        };
+      }
+
+      if (kind === "COLLAB_CONVERSATION") {
+        const { messages } = await this.tools.listMessages(
+          authUser,
+          resolved.collaboration_id,
+        );
+        return {
+          formatType: "TABULAR_AUDIT_DATA",
+          narrativeText: this.tools.conversationNarrative(
+            messages,
+            creatorLabel,
+          ),
+          tableData: this.tools.conversationTable(messages),
+          toolsInvoked: ["collab.getConversationHistory"],
+        };
+      }
+
+      if (kind === "COLLAB_SUMMARY") {
+        return {
+          ...presentDetailRead({
+            userText: ctx.userText,
+            narrativeText: this.tools.summaryNarrative(
+              detail,
+              creatorLabel,
+              resolved.campaign_name,
+            ),
+            metricGridData: [
+              ...this.tools.buildStatusMetrics(detail).slice(0, 4),
+              ...this.tools.buildStageDetailMetrics(detail).slice(0, 4),
+            ],
+            preferMetrics: true,
+            toolsInvoked: [
+              "collab.getCollaborationOverview",
+              "collab.getPendingActions",
+            ],
+          }),
+        };
+      }
+
+      if (kind === "COLLAB_DETAIL") {
+        return {
+          ...presentDetailRead({
+            userText: ctx.userText,
+            narrativeText: this.tools.detailNarrative(
+              detail,
+              creatorLabel,
+              resolved.campaign_name,
+              ctx.userText,
+            ),
+            metricGridData: [
+              ...this.tools.buildStatusMetrics(detail).slice(0, 3),
+              ...this.tools.buildStageDetailMetrics(detail),
+            ],
+            toolsInvoked: ["collab.getThread", "collab.viewStageDetail"],
+          }),
+        };
+      }
+
       return {
-        formatType: "METRIC_HIGHLIGHT_GRID",
-        narrativeText: `Collaboration with ${resolved.creator_display_name ?? resolved.creator_handle ?? "creator"} on "${resolved.campaign_name}" is in ${STAGE_LABELS[resolved.current_stage] ?? resolved.current_stage}.`,
-        metricGridData: this.tools.buildStatusMetrics(detail),
-        toolsInvoked: ["collab.getThread"],
+        ...presentDetailRead({
+          userText: ctx.userText,
+          narrativeText: this.tools.statusNarrative(
+            detail,
+            creatorLabel,
+            resolved.campaign_name,
+          ),
+          metricGridData: this.tools.buildStatusAndDetailMetrics(detail),
+          toolsInvoked: ["collab.getCollaborationOverview"],
+        }),
       };
     }
 
@@ -293,7 +568,25 @@ export class CollaborationAiModule implements CoPilotAiModule {
         stagedPayload.current_stage as UceMilestoneStage,
       )
     ) {
+      const stage = stagedPayload.current_stage as UceMilestoneStage;
+      const stageLabel = STAGE_LABELS[stage] ?? String(stage);
       stagedPayload.stage_mismatch = true;
+      stagedPayload.hitl_blocked = true;
+      stagedPayload.hitl_block_title = "Action blocked";
+      stagedPayload.hitl_block_action = intent.kind;
+      stagedPayload.hitl_block_code = "COLLAB_STAGE_MISMATCH";
+      stagedPayload.hitl_block_narrative = `That action isn’t valid for ${stageLabel}. Pick a collaboration in the right stage, or choose a different action — confirmation is only staged when the stage allows it.`;
+      stagedPayload.hitl_block_deep_link = `/brand/collaborations?thread=${String(stagedPayload.collaboration_id)}`;
+      stagedPayload.hitl_block_items = [
+        {
+          id: "stage",
+          title: "Matching workflow stage",
+          satisfied: false,
+          helpText: `Current stage: ${stageLabel}`,
+          repairHint:
+            "Open Collaborations and select a thread whose stage allows this action, then ask again.",
+        },
+      ];
     }
 
     return {
@@ -442,8 +735,16 @@ export class CollaborationAiModule implements CoPilotAiModule {
     kind: WriteIntentKind,
     stagedPayload?: Record<string, unknown>,
   ): string | null {
-    if (stagedPayload?.stage_mismatch) {
-      return `That action isn’t valid for the current stage (${String(stagedPayload.current_stage ?? "unknown")}). Choose a matching collaboration or a different action.`;
+    if (
+      stagedPayload?.hitl_blocked ||
+      stagedPayload?.stage_mismatch
+    ) {
+      return (
+        (typeof stagedPayload?.hitl_block_narrative === "string"
+          ? stagedPayload.hitl_block_narrative
+          : null) ??
+        `That action isn’t valid for the current stage (${String(stagedPayload?.current_stage ?? "unknown")}). Choose a matching collaboration or a different action.`
+      );
     }
     switch (kind) {
       case "COLLAB_COUNTER_OFFER":
@@ -535,6 +836,16 @@ export class CollaborationAiModule implements CoPilotAiModule {
     const hint = extractCreatorOrCampaignHint(ctx.userText);
     if (hint) {
       return this.tools.findByHint(authUser, hint);
+    }
+
+    // After a pipeline list with exactly one row, detail/status follow-ups resolve to it
+    if (mem?.listedCollaborations?.length === 1) {
+      const onlyId = mem.listedCollaborations[0].id;
+      const all = await this.tools.listThreads(authUser, {});
+      const match = all.find((t) => t.collaboration_id === onlyId);
+      if (match) {
+        return match;
+      }
     }
 
     const all = await this.tools.listThreads(authUser, {});

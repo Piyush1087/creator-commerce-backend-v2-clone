@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
 
+import { isCoPilotQuotaEnforced } from "../../../shared/config/co-pilot-quota";
 import { EntitlementService } from "../../pricing/services/entitlement.service";
 
 export type CoPilotUsageSnapshot = {
@@ -19,6 +20,20 @@ export class CoPilotUsageService {
   constructor(private readonly entitlements: EntitlementService) {}
 
   async getUsageSnapshot(brandProfileId: string): Promise<CoPilotUsageSnapshot | null> {
+    if (!isCoPilotQuotaEnforced()) {
+      return {
+        featureKey: "MAX_AI_CHATS",
+        current: 0,
+        limit: 999_999,
+        resetAt: null,
+        percentUsed: 0,
+        warningLevel: "ok",
+        warningMessage: null,
+        canSend: true,
+        tier: "DEV_UNLIMITED",
+      };
+    }
+
     const snapshot = await this.entitlements.getUsageSnapshot(brandProfileId);
     if (!snapshot) {
       return null;
@@ -45,6 +60,9 @@ export class CoPilotUsageService {
   }
 
   async assertCanRun(brandProfileId: string): Promise<void> {
+    if (!isCoPilotQuotaEnforced()) {
+      return;
+    }
     const usage = await this.getUsageSnapshot(brandProfileId);
     if (!usage) {
       return;
@@ -57,6 +75,9 @@ export class CoPilotUsageService {
   }
 
   async incrementRun(brandProfileId: string): Promise<void> {
+    if (!isCoPilotQuotaEnforced()) {
+      return;
+    }
     await this.entitlements.checkAndIncrementUsage(
       brandProfileId,
       "MAX_AI_CHATS",

@@ -4,9 +4,6 @@
  * Usage (from backend-v2 root, with DATABASE_URL set):
  *   npm run db:seed:dev-creator
  *
- * TEMPORARY on ECS: when RUN_SEED_DEV_CREATOR_ON_START=true (dev deploy),
- * docker-entrypoint runs this after migrate. Remove that flag after QA verify.
- *
  * Idempotent create-or-update for user + creator profile (+ stub bank/shipping).
  * Pair with CREATOR_APPLY_BYPASS_EMAILS=test@creator.com so this account can
  * see ELIGIBLE_ONLY campaigns and apply without real Instagram Graph data.
