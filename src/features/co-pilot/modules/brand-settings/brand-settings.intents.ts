@@ -16,6 +16,51 @@ function textSlot(
   };
 }
 
+function titleCaseToken(raw: string): string {
+  const cleaned = raw.replace(/[.,!?;:]+$/g, "").trim();
+  if (!cleaned) {
+    return cleaned;
+  }
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+/** Personal profile (first/last name, account email read) — not org/company. */
+export function isPersonalProfileAsk(normalizedText: string): boolean {
+  const n = normalizedText.toLowerCase();
+  return (
+    n.includes("first name") ||
+    n.includes("last name") ||
+    n.includes("personal profile") ||
+    n.includes("personal name") ||
+    n.includes("account email") ||
+    n.includes("user name") ||
+    n.includes("my name") ||
+    n.includes("brand owner name") ||
+    n.includes("who is the brand owner") ||
+    n.includes("who is brand owner") ||
+    n.includes("who is brand_owner") ||
+    (n.includes("owner") &&
+      (n.includes("name") || n.includes("who is")) &&
+      !n.includes("company"))
+  );
+}
+
+/** Explicitly blocked identity mutations (email / password). */
+export function isDeniedIdentityMutationAsk(normalizedText: string): boolean {
+  const n = normalizedText.toLowerCase();
+  const mutates = /\b(update|change|set|rename|reset|modify)\b/.test(n);
+  if (!mutates) {
+    return false;
+  }
+  return (
+    n.includes("password") ||
+    n.includes("email address") ||
+    (n.includes("email") &&
+      !n.includes("billing email") &&
+      !n.includes("contact email"))
+  );
+}
+
 /** Soft gate: message may belong to Brand Settings. */
 export function looksLikeBrandSettingsUtterance(normalizedText: string): boolean {
   const n = normalizedText.toLowerCase();
@@ -34,6 +79,8 @@ export function looksLikeBrandSettingsUtterance(normalizedText: string): boolean
     n.includes("company name") ||
     n.includes("organization name") ||
     n.includes("legal name") ||
+    isPersonalProfileAsk(n) ||
+    isDeniedIdentityMutationAsk(n) ||
     /\bgst(in)?\b/.test(n) ||
     /\bpan\b/.test(n) ||
     n.includes("withdrawal account") ||
@@ -71,6 +118,11 @@ export function detectBrandSettingsRead(
     return null;
   }
 
+  // Email/password change attempts → general read with refusal narrative
+  if (isDeniedIdentityMutationAsk(n)) {
+    return "SETTINGS_GENERAL";
+  }
+
   if (
     n.includes("integration") ||
     n.includes("instagram connect") ||
@@ -94,12 +146,15 @@ export function detectBrandSettingsRead(
   }
 
   if (
+    isPersonalProfileAsk(n) ||
     n.includes("general setting") ||
     n.includes("company name") ||
     n.includes("organization name") ||
     n.includes("legal name") ||
     n.includes("company profile") ||
-    (n.includes("organization") && n.includes("setting"))
+    (n.includes("organization") && n.includes("setting")) ||
+    (n.includes("general") &&
+      (n.includes("within") || n.includes("in ") || n.includes("setting")))
   ) {
     return "SETTINGS_GENERAL";
   }
@@ -119,6 +174,11 @@ export function detectBrandSettingsWrite(
   userText: string,
 ): DetectedWriteIntent | null {
   const n = userText.toLowerCase().trim();
+
+  // Never stage HITL for email / password changes
+  if (isDeniedIdentityMutationAsk(n)) {
+    return null;
+  }
 
   if (
     /\b(link|add|update|set)\b/.test(n) &&
@@ -181,6 +241,80 @@ export function detectBrandSettingsWrite(
         defaultTdsPercentage: 2,
         currencyPreference: "INR",
       },
+      missingSlots,
+    };
+  }
+
+  // Personal profile: first name / last name only (not email or password)
+  const wantsPersonalName =
+    /\b(update|set|change|rename)\b/.test(n) &&
+    (n.includes("first name") ||
+      n.includes("last name") ||
+      n.includes("my name") ||
+      n.includes("personal name") ||
+      n.includes("personal profile") ||
+      (n.includes("user name") && !n.includes("company")));
+
+  if (wantsPersonalName) {
+    const stagedPayload: Record<string, unknown> = {
+      personal_profile_only: true,
+    };
+    const missingSlots: SlotFillingData["missingSlots"] = [];
+    const wantsFirst =
+      n.includes("first name") ||
+      n.includes("my name") ||
+      n.includes("personal name") ||
+      n.includes("personal profile") ||
+      n.includes("user name") ||
+      (!n.includes("last name") && n.includes("name"));
+    const wantsLast = n.includes("last name");
+
+    const fromTo = n.match(/\bfrom\s+(\S+)\s+to\s+(\S+)/i);
+    const toOnly = n.match(
+      /\b(?:to|as)\s+([a-z][a-z'-]{0,40})(?:\s|$)/i,
+    );
+
+    if (wantsFirst) {
+      const nextFirst = fromTo
+        ? titleCaseToken(fromTo[2])
+        : toOnly && !n.includes("last name")
+          ? titleCaseToken(toOnly[1])
+          : undefined;
+      if (nextFirst) {
+        stagedPayload.firstName = nextFirst;
+      } else {
+        missingSlots.push(
+          textSlot("firstName", "First name", "e.g. Brian"),
+        );
+      }
+    }
+
+    if (wantsLast) {
+      const nextLast = fromTo
+        ? titleCaseToken(fromTo[2])
+        : toOnly
+          ? titleCaseToken(toOnly[1])
+          : undefined;
+      if (nextLast && n.includes("last name")) {
+        stagedPayload.lastName = nextLast;
+      } else if (!stagedPayload.lastName) {
+        missingSlots.push(textSlot("lastName", "Last name", "e.g. Silva"));
+      }
+    }
+
+    // "update my name from Amar to Brian" → first name only
+    if (
+      !wantsLast &&
+      wantsFirst &&
+      !stagedPayload.firstName &&
+      missingSlots.every((s) => s.fieldName !== "firstName")
+    ) {
+      missingSlots.push(textSlot("firstName", "First name", "e.g. Brian"));
+    }
+
+    return {
+      kind: "SETTINGS_UPDATE_GENERAL",
+      stagedPayload,
       missingSlots,
     };
   }

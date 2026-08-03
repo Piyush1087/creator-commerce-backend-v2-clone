@@ -93,8 +93,8 @@ export class BrandSettingsAiModule implements CoPilotAiModule {
       return {
         ...presentDetailRead({
           userText: ctx.userText,
-          narrativeText: this.tools.generalNarrative(general),
-          metricGridData: this.tools.generalMetrics(general),
+          narrativeText: this.tools.generalNarrative(general, ctx.userText),
+          metricGridData: this.tools.generalMetrics(general, ctx.userText),
           preferMetrics: wantsFullDetailWidget(ctx.userText),
           toolsInvoked: ["settings.getGeneral"],
         }),
@@ -184,7 +184,9 @@ export class BrandSettingsAiModule implements CoPilotAiModule {
           idempotencyKey: key,
           prefilledFields: fields,
           requiredZodValidationSchemaName: "UpdateBrandGeneralProfileSchema",
-          primaryActionLabel: "Confirm general settings update",
+          primaryActionLabel: args.stagedPayload.personal_profile_only
+            ? "Confirm name update"
+            : "Confirm general settings update",
           cancelActionLabel: "Discard",
         };
       case "SETTINGS_UPDATE_BILLING":
@@ -212,11 +214,13 @@ export class BrandSettingsAiModule implements CoPilotAiModule {
 
   writeSlotNarrative(
     kind: WriteIntentKind,
-    _stagedPayload?: Record<string, unknown>,
+    stagedPayload?: Record<string, unknown>,
   ): string | null {
     switch (kind) {
       case "SETTINGS_UPDATE_GENERAL":
-        return "I can update organization settings after you confirm. Fill any missing fields below.";
+        return stagedPayload?.personal_profile_only
+          ? "I can update your first and/or last name after you confirm. Email and password can’t be changed from co-pilot."
+          : "I can update organization settings after you confirm. Fill any missing fields below.";
       case "SETTINGS_UPDATE_BILLING":
         return "I can update the billing profile (company, address, GST/PAN) after you confirm.";
       case "SETTINGS_LINK_WITHDRAWAL":
@@ -228,10 +232,27 @@ export class BrandSettingsAiModule implements CoPilotAiModule {
 
   hitlReviewNarrative(
     kind: WriteIntentKind,
-    _stagedPayload?: Record<string, unknown>,
+    stagedPayload?: Record<string, unknown>,
   ): string | null {
     switch (kind) {
       case "SETTINGS_UPDATE_GENERAL":
+        if (stagedPayload?.personal_profile_only) {
+          const first =
+            typeof stagedPayload.firstName === "string"
+              ? stagedPayload.firstName
+              : undefined;
+          const last =
+            typeof stagedPayload.lastName === "string"
+              ? stagedPayload.lastName
+              : undefined;
+          const bits = [
+            first ? `first name → ${first}` : null,
+            last ? `last name → ${last}` : null,
+          ].filter(Boolean);
+          return bits.length > 0
+            ? `Review personal name update (${bits.join(", ")}). Nothing is saved until you confirm.`
+            : "Review the personal name update below. Nothing is saved until you confirm.";
+        }
         return "Review the general settings update below. Nothing is saved until you confirm.";
       case "SETTINGS_UPDATE_BILLING":
         return "Review the billing profile update below. Nothing is saved until you confirm.";

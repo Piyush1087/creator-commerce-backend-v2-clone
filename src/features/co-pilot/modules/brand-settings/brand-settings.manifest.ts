@@ -35,7 +35,7 @@ export const BRAND_SETTINGS_FUNCTION_MANIFEST: BrandSettingsManifestEntry[] = [
   },
   {
     tool: "settings.getGeneral",
-    description: "Read general / organization settings",
+    description: "Read general settings (personal profile + organization)",
     submodule: "GENERAL",
     backendRoute: "GET /api/v1/brand/settings/general",
     serviceMethod: "getGeneral",
@@ -46,7 +46,8 @@ export const BRAND_SETTINGS_FUNCTION_MANIFEST: BrandSettingsManifestEntry[] = [
   {
     tool: "settings.updateGeneral",
     intent: "SETTINGS_UPDATE_GENERAL",
-    description: "Update organization legal name / country / currency",
+    description:
+      "Update organization legal name / country / currency, or personal first/last name (not email/password)",
     submodule: "GENERAL",
     backendRoute: "PATCH /api/v1/brand/settings/general",
     serviceMethod: "updateGeneral",
@@ -112,9 +113,12 @@ export const BRAND_SETTINGS_FUNCTION_MANIFEST: BrandSettingsManifestEntry[] = [
 export const BRAND_SETTINGS_INTENTS = [
   "VIEW_SETTINGS_OVERVIEW",
   "VIEW_GENERAL_SETTINGS",
+  "VIEW_PERSONAL_PROFILE",
   "VIEW_FINANCE_SETTINGS",
   "VIEW_INTEGRATION_STATUS",
   "UPDATE_COMPANY_NAME",
+  "UPDATE_FIRST_NAME",
+  "UPDATE_LAST_NAME",
   "UPDATE_GST",
   "UPDATE_PAN",
   "UPDATE_BANK_DETAILS",

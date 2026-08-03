@@ -2,6 +2,9 @@
  * Brand Settings entities for prompt understanding (not Prisma models).
  */
 export const BRAND_SETTINGS_ENTITIES = [
+  "FirstName",
+  "LastName",
+  "AccountEmail",
   "CompanyName",
   "Website",
   "Logo",

@@ -34,9 +34,61 @@ export class BrandSettingsCoPilotToolsService {
 
   generalNarrative(
     general: Awaited<ReturnType<BrandSettingsService["getGeneral"]>>,
+    userText = "",
   ): string {
+    const n = userText.toLowerCase();
+    const personal = general.personal_profile;
+    const first = personal.first_name?.trim() || "—";
+    const last = personal.last_name?.trim() || "—";
+    const email = personal.email?.trim() || "—";
+    const displayPersonal =
+      [personal.first_name, personal.last_name].filter(Boolean).join(" ") ||
+      "—";
+
+    if (
+      n.includes("password") &&
+      /\b(update|change|set|rename|reset|modify)\b/.test(n)
+    ) {
+      return "I can’t change passwords from co-pilot. Use your account security flow or contact support.";
+    }
+    if (
+      (n.includes("email") || n.includes("email address")) &&
+      /\b(update|change|set|rename|modify)\b/.test(n) &&
+      !n.includes("billing email")
+    ) {
+      return `Account email is ${email}. Email changes aren’t allowed from Settings or co-pilot — contact system support for identity routing changes.`;
+    }
+
+    if (
+      n.includes("first name") ||
+      n.includes("last name") ||
+      n.includes("personal profile") ||
+      n.includes("personal name") ||
+      n.includes("user name") ||
+      n.includes("my name") ||
+      n.includes("account email") ||
+      n.includes("brand owner") ||
+      (n.includes("owner") && n.includes("name"))
+    ) {
+      const owner = general.team.members.find((m) => m.role === "BRAND_OWNER");
+      const ownerLabel = owner?.name?.trim() || displayPersonal;
+      if (n.includes("first name") && !n.includes("last name")) {
+        return `Your first name on personal profile is “${first}”.`;
+      }
+      if (n.includes("last name") && !n.includes("first name")) {
+        return `Your last name on personal profile is “${last}”.`;
+      }
+      if (n.includes("account email") || (n.includes("email") && !n.includes("billing"))) {
+        return `Account email on personal profile is ${email}. Email can’t be changed from co-pilot.`;
+      }
+      if (n.includes("brand owner") || (n.includes("owner") && n.includes("name"))) {
+        return `Brand owner on this workspace is “${ownerLabel}” (${owner?.email ?? email}). Your personal profile name is “${displayPersonal}”.`;
+      }
+      return `Personal profile: first name “${first}”, last name “${last}”, account email ${email}. I can update first/last name after you confirm — email and password can’t be changed here.`;
+    }
+
     const org = general.organization;
-    return `General settings: company “${org.company_legal_name}”, country ${org.country_code ?? "—"}, currency ${org.currency_code ?? "—"}. Brand display name “${general.brand_identity.display_name}”${general.brand_identity.website_url ? ` · ${general.brand_identity.website_url}` : ""}.`;
+    return `General settings: personal profile “${displayPersonal}” (${email}). Company “${org.company_legal_name}”, country ${org.country_code ?? "—"}, currency ${org.currency_code ?? "—"}. Brand display name “${general.brand_identity.display_name}”${general.brand_identity.website_url ? ` · ${general.brand_identity.website_url}` : ""}.`;
   }
 
   financeNarrative(
@@ -84,8 +136,43 @@ export class BrandSettingsCoPilotToolsService {
 
   generalMetrics(
     general: Awaited<ReturnType<BrandSettingsService["getGeneral"]>>,
+    userText = "",
   ): MetricItem[] {
+    const n = userText.toLowerCase();
+    const personalFocused =
+      n.includes("first name") ||
+      n.includes("last name") ||
+      n.includes("personal profile") ||
+      n.includes("personal name") ||
+      n.includes("user name") ||
+      n.includes("my name") ||
+      n.includes("account email") ||
+      n.includes("brand owner");
+
+    const personalMetrics: MetricItem[] = [
+      {
+        label: "First name",
+        value: general.personal_profile.first_name ?? "—",
+        statusColor: "NEUTRAL",
+      },
+      {
+        label: "Last name",
+        value: general.personal_profile.last_name ?? "—",
+        statusColor: "NEUTRAL",
+      },
+      {
+        label: "Account email",
+        value: general.personal_profile.email ?? "—",
+        statusColor: "NEUTRAL",
+      },
+    ];
+
+    if (personalFocused) {
+      return personalMetrics;
+    }
+
     return [
+      ...personalMetrics,
       {
         label: "Company",
         value: general.organization.company_legal_name,
