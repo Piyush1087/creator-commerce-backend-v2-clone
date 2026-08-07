@@ -125,3 +125,89 @@ export type BulkNotificationSettingsInput = z.infer<
 export type UpdateBrandGeneralProfileInput = z.infer<
   typeof UpdateBrandGeneralProfileSchema
 >;
+
+export const IntegrationProviderEnum = z.enum([
+  "META_BUSINESS_SUITE",
+  "INSTAGRAM",
+]);
+
+export const IntegrationStatusEnum = z.enum([
+  "CONNECTED",
+  "PARTIALLY_CONNECTED",
+  "TOKEN_EXPIRED",
+  "DISCONNECTED",
+]);
+
+export const IntegrationScopeEnum = z.enum([
+  "BASIC_PROFILE",
+  "ENGAGEMENT_INSIGHTS",
+  "TARGETED_OUTREACH",
+]);
+
+export const ManageConnectionActionEnum = z.enum([
+  "RECONNECT",
+  "DISCONNECT_INTEGRATION",
+  "DELETE_INGESTED_DATA",
+]);
+
+export const IntegrationConnectionSchema = z.object({
+  id: z.string().uuid(),
+  provider: IntegrationProviderEnum,
+  status: IntegrationStatusEnum,
+  currentPlatformHandle: z
+    .string()
+    .min(1)
+    .startsWith("@", { message: 'Handle must start with "@".' }),
+  inboundOauthHandle: z
+    .string()
+    .startsWith("@", { message: 'Inbound handle must start with "@".' })
+    .nullable()
+    .optional(),
+  scopes: z.array(IntegrationScopeEnum).default([]),
+  tokenExpiresAt: z.string().datetime().nullable().optional(),
+});
+
+export const ManageConnectionActionSchema = z
+  .object({
+    integrationId: z.string().uuid(),
+    action: ManageConnectionActionEnum,
+    confirmDeleteData: z.boolean().optional().default(false),
+  })
+  .refine(
+    (data) => {
+      if (data.action === "DELETE_INGESTED_DATA" && !data.confirmDeleteData) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message:
+        'Explicit confirmation required to execute "Delete Ingested Social Data".',
+      path: ["confirmDeleteData"],
+    },
+  );
+
+export const IdentityConflictResolutionSchema = z.object({
+  integrationId: z.string().uuid(),
+  currentPlatformHandle: z.string().startsWith("@"),
+  inboundOauthHandle: z.string().startsWith("@"),
+  resolution: z.enum(["OVERWRITE_HANDLE", "CANCEL_CONNECT"]),
+});
+
+export const ConnectInstagramSettingsSchema = z.object({
+  code: z.string().min(1),
+  redirectUri: z.string().url(),
+});
+
+export type IntegrationConnectionDto = z.infer<
+  typeof IntegrationConnectionSchema
+>;
+export type ManageConnectionActionInput = z.infer<
+  typeof ManageConnectionActionSchema
+>;
+export type IdentityConflictResolutionDto = z.infer<
+  typeof IdentityConflictResolutionSchema
+>;
+export type ConnectInstagramSettingsInput = z.infer<
+  typeof ConnectInstagramSettingsSchema
+>;

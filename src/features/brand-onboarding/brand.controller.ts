@@ -28,6 +28,8 @@ import { BrandOfferingsService } from "./brand-offerings.service";
 import { BrandCompetitorsService } from "./brand-competitors.service";
 import { SendBrandVerificationDto } from "./dto/send-brand-verification.dto";
 import { VerifyBrandVerificationDto } from "./dto/verify-brand-verification.dto";
+import { GoogleBrandVerificationDto } from "./dto/google-brand-verification.dto";
+import { SetBrandPasswordDto } from "./dto/set-brand-password.dto";
 import {
   PatchBrandProfileDto,
   SurfaceScanRequestDto,
@@ -331,6 +333,35 @@ export class BrandController {
       brandProfileId,
       body.email,
       body.otp,
+    );
+  }
+
+  @Post("profiles/:brandProfileId/verification/google")
+  @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async confirmGoogleVerification(
+    @Param("brandProfileId", new ParseUUIDPipe({ version: "4" }))
+    brandProfileId: string,
+    @Body() body: GoogleBrandVerificationDto,
+  ) {
+    return this.brandVerification.confirmGoogleIdentity(
+      brandProfileId,
+      body.idToken,
+    );
+  }
+
+  @Post("profiles/:brandProfileId/verification/password")
+  @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async setVerificationPassword(
+    @Param("brandProfileId", new ParseUUIDPipe({ version: "4" }))
+    brandProfileId: string,
+    @Body() body: SetBrandPasswordDto,
+  ) {
+    return this.brandVerification.setPasswordAndActivate(
+      brandProfileId,
+      body.email,
+      body.password,
     );
   }
 

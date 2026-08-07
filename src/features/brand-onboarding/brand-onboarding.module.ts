@@ -4,9 +4,12 @@ import { ScheduleModule } from "@nestjs/schedule";
 
 import { AuthModule } from "../auth/auth.module";
 import { BrandCentreModule } from "../brand-centre/brand-centre.module";
+import { InstagramModule } from "../instagram/instagram.module";
 import { MailModule } from "../../mail/mail.module";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { S3Module } from "../../shared/s3/s3.module";
+import { BrandSocialSyncController } from "./social-sync/brand-social-sync.controller";
+import { BrandSocialSyncService } from "./social-sync/brand-social-sync.service";
 import { BrandOnboardingPurgeScheduler } from "./brand-onboarding-purge.scheduler";
 import { BrandOnboardingPurgeService } from "./brand-onboarding-purge.service";
 import { BrandIntelligenceJobService } from "./brand-intelligence-job.service";
@@ -57,9 +60,15 @@ import { BrandVerificationService } from "./verification/brand-verification.serv
     AuthModule,
     S3Module,
     BrandCentreModule,
+    InstagramModule,
   ],
-  controllers: [BrandOnboardingController, BrandController],
+  controllers: [
+    BrandOnboardingController,
+    BrandController,
+    BrandSocialSyncController,
+  ],
   providers: [
+    BrandSocialSyncService,
     BrandScanGateService,
     DiscoveryReachabilityService,
     BrandOnboardingPurgeService,

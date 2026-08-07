@@ -483,6 +483,31 @@ enum OAuthTokenStatus {
   REVOKED
 }
 
+enum BrandIntegrationProvider {
+  INSTAGRAM
+  META_BUSINESS_SUITE
+}
+
+enum BrandIntegrationStatus {
+  CONNECTED
+  PARTIALLY_CONNECTED
+  TOKEN_EXPIRED
+  DISCONNECTED
+}
+
+enum BrandIntegrationScope {
+  BASIC_PROFILE
+  ENGAGEMENT_INSIGHTS
+  TARGETED_OUTREACH
+}
+
+enum InstagramSyncInvitationStatus {
+  PENDING
+  VERIFIED
+  COMPLETED
+  EXPIRED
+}
+
 enum CreatorTeamRole {
   OWNER
   MANAGER
@@ -805,14 +830,19 @@ model BrandProfile {
   policyFlags             String[]         @map("policy_flags")
   targetAudience          Json?            @map("target_audience")
 
-  // Step 6: Verification
+  // Step 6: Verification (isVerified flips only after password gate)
   isVerified        Boolean   @default(false) @map("is_verified")
   verifiedAt        DateTime? @map("verified_at")
   verificationEmail String?   @map("verification_email")
+  /// Set when OTP/Google identity succeeds; password step still required for isVerified.
+  identityConfirmedAt DateTime? @map("identity_confirmed_at")
 
   // Step 7: Deep Intel
   scanStatus      ScanStatus  @default(PENDING) @map("scan_status")
   deepIntelStatus IntelStatus @default(PENDING) @map("deep_intel_status")
+
+  /// Step 8: brand skipped Instagram Login during onboarding.
+  socialSyncSkipped Boolean @default(false) @map("social_sync_skipped")
 
   // Regional Context (Captured in Step 2)
   countryCode  String? @map("country_code")
@@ -878,8 +908,51 @@ model BrandProfile {
   withdrawalAccounts   BrandWithdrawalAccount[]
   notificationSettings BrandNotificationSetting[]
   notifications        Notification[]
+  integrations         BrandIntegration[]
+  instagramSyncInvitations InstagramSyncInvitation[]
 
   @@map("brand_profiles")
+}
+
+/// Brand OAuth connections (Instagram Login + optional Meta Business Suite in Settings).
+model BrandIntegration {
+  id                     String                  @id @default(uuid()) @map("integration_id")
+  brandProfileId         String                  @map("brand_id")
+  brandProfile           BrandProfile            @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  provider               BrandIntegrationProvider
+  status                 BrandIntegrationStatus  @default(DISCONNECTED)
+  currentPlatformHandle  String                  @map("current_platform_handle") @db.VarChar(255)
+  inboundOauthHandle     String?                 @map("inbound_oauth_handle") @db.VarChar(255)
+  accessTokenEncrypted   String?                 @map("access_token_encrypted") @db.Text
+  refreshTokenEncrypted  String?                 @map("refresh_token_encrypted") @db.Text
+  grantedScopes          BrandIntegrationScope[] @default([]) @map("granted_scopes")
+  tokenExpiresAt         DateTime?               @map("token_expires_at")
+  isActive               Boolean                 @default(true) @map("is_active")
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime                @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, provider], map: "uq_brand_provider_pair")
+  @@index([brandProfileId, provider, status], map: "idx_brand_integrations_lookup")
+  @@index([status, tokenExpiresAt], map: "idx_integrations_token_expiration")
+  @@map("brand_integrations")
+}
+
+/// Temporary agent invites for onboarding Instagram sync (no permanent User).
+model InstagramSyncInvitation {
+  id            String                       @id @default(uuid())
+  email         String
+  status        InstagramSyncInvitationStatus @default(PENDING)
+  token         String                       @unique
+  otpCode       String?                      @map("otp_code")
+  otpExpiresAt  DateTime?                    @map("otp_expires_at")
+  brandProfileId String                      @map("brand_id")
+  brandProfile  BrandProfile                 @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  createdAt     DateTime                     @default(now()) @map("created_at")
+  expiresAt     DateTime                     @map("expires_at")
+
+  @@index([token])
+  @@index([brandProfileId])
+  @@map("instagram_sync_invitations")
 }
 
 model Offering {

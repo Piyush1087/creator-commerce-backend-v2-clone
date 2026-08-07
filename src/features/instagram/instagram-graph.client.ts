@@ -16,6 +16,37 @@ export type InstagramMeProfile = {
 export class InstagramGraphClient {
   private readonly logger = new Logger(InstagramGraphClient.name);
 
+  /**
+   * Returns granted Instagram Login permission names (e.g. instagram_business_basic).
+   * Failures degrade to [] so callers can apply conservative partial-scope handling.
+   */
+  async fetchGrantedPermissions(accessToken: string): Promise<string[]> {
+    const url = new URL("https://graph.instagram.com/v21.0/me/permissions");
+    url.searchParams.set("access_token", accessToken);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        const errText = await res.text();
+        this.logger.warn(
+          `Instagram /me/permissions failed: ${errText.slice(0, 200)}`,
+        );
+        return [];
+      }
+      const data = (await res.json()) as {
+        data?: Array<{ permission?: string; status?: string }>;
+      };
+      return (data.data ?? [])
+        .filter((row) => (row.status ?? "granted").toLowerCase() === "granted")
+        .map((row) => (row.permission ?? "").trim().toLowerCase())
+        .filter((name) => name.length > 0);
+    } catch (err) {
+      this.logger.warn(
+        `Instagram /me/permissions error: ${String(err).slice(0, 200)}`,
+      );
+      return [];
+    }
+  }
+
   async fetchMe(accessToken: string): Promise<InstagramMeProfile> {
     const url = new URL("https://graph.instagram.com/v21.0/me");
     url.searchParams.set(

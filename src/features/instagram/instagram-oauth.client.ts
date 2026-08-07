@@ -3,6 +3,8 @@ import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 export type InstagramTokenExchangeResult = {
   accessToken: string;
   expiresInSeconds: number;
+  /** Permission names when present on the short-lived token response. */
+  permissions: string[];
 };
 
 const DEFAULT_INSTAGRAM_SCOPES = [
@@ -52,10 +54,14 @@ export class InstagramOAuthClient {
       clientId,
       clientSecret,
     );
-    const longToken = await this.fetchLongLivedToken(shortToken, clientSecret);
+    const longToken = await this.fetchLongLivedToken(
+      shortToken.accessToken,
+      clientSecret,
+    );
     return {
       accessToken: longToken.access_token,
       expiresInSeconds: longToken.expires_in,
+      permissions: shortToken.permissions,
     };
   }
 
@@ -64,7 +70,7 @@ export class InstagramOAuthClient {
     redirectUri: string,
     clientId: string,
     clientSecret: string,
-  ): Promise<string> {
+  ): Promise<{ accessToken: string; permissions: string[] }> {
     const body = new URLSearchParams({
       client_id: clientId,
       client_secret: clientSecret,
@@ -86,13 +92,17 @@ export class InstagramOAuthClient {
         "Failed to exchange Instagram authorization code.",
       );
     }
-    const data = (await res.json()) as { access_token?: string };
+    const data = (await res.json()) as {
+      access_token?: string;
+      permissions?: string | string[];
+    };
     if (!data.access_token) {
       throw new BadRequestException(
         "Instagram authorization response missing access token.",
       );
     }
-    return data.access_token;
+    const permissions = normalizePermissionList(data.permissions);
+    return { accessToken: data.access_token, permissions };
   }
 
   private async fetchLongLivedToken(
@@ -123,4 +133,16 @@ export class InstagramOAuthClient {
     }
     return { access_token: data.access_token, expires_in: data.expires_in };
   }
+}
+
+function normalizePermissionList(
+  raw: string | string[] | undefined,
+): string[] {
+  if (!raw) {
+    return [];
+  }
+  const parts = Array.isArray(raw) ? raw : raw.split(",");
+  return parts
+    .map((p) => p.trim().toLowerCase())
+    .filter((p) => p.length > 0);
 }

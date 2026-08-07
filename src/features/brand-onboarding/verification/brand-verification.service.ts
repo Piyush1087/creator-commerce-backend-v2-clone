@@ -1,19 +1,24 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
+import { UserRole } from "@prisma/client";
 import { addMinutes } from "date-fns";
 
 import { MailService } from "../../../mail/mail.service";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { AuthService } from "../../auth/auth.service";
+import { GoogleAuthService } from "../../auth/google-auth.service";
 import { BrandCentreScanService } from "../../brand-centre/services/brand-centre-scan.service";
 import {
   emailDomainFromAddress,
   emailDomainMatchesBrandDomain,
   emailLocalPart,
+  isBannedPublicEmailProvider,
   isValidVerificationEmail,
   normalizeVerificationEmail,
   verificationCodeIdentifier,
@@ -47,6 +52,8 @@ export class BrandVerificationService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly brandCentreScan: BrandCentreScanService,
+    private readonly auth: AuthService,
+    private readonly googleAuth: GoogleAuthService,
   ) {}
 
   async sendOtp(brandProfileId: string, rawEmail: string) {
@@ -61,6 +68,201 @@ export class BrandVerificationService {
       return this.verifyOtpStub(brandProfileId, rawEmail, rawOtp);
     }
     return this.verifyOtpReal(brandProfileId, rawEmail, rawOtp);
+  }
+
+  /**
+   * Path B: Google Workspace identity confirmation (does not create User / set isVerified).
+   */
+  async confirmGoogleIdentity(brandProfileId: string, idToken: string) {
+    const profile = await this.prisma.brandProfile.findUnique({
+      where: { id: brandProfileId },
+      select: { id: true, domain: true, isVerified: true },
+    });
+    if (!profile) {
+      throw new NotFoundException("Brand profile not found");
+    }
+    if (profile.isVerified) {
+      throw new BadRequestException(
+        "This brand is already verified. Please sign in.",
+      );
+    }
+
+    const payload = await this.googleAuth.verifyIdTokenPayload(idToken);
+    if (!payload.email) {
+      throw new BadRequestException("Google account must include an email.");
+    }
+    const email = normalizeVerificationEmail(payload.email);
+    const emailVerified =
+      payload.email_verified === true || payload.email_verified === "true";
+    if (!emailVerified) {
+      throw new BadRequestException("Google email is not verified.");
+    }
+
+    if (isBannedPublicEmailProvider(email)) {
+      throw new BadRequestException(
+        "Public consumer accounts cannot be used for brand verification. Please sign in with your official corporate Google Workspace account.",
+      );
+    }
+
+    if (!emailDomainMatchesBrandDomain(email, profile.domain)) {
+      const emailDomain = emailDomainFromAddress(email);
+      throw new BadRequestException(
+        `The authenticated Google account (@${emailDomain}) does not match your registered brand website domain (${profile.domain}). Please sign in with the correct workspace account.`,
+      );
+    }
+
+    await this.markIdentityConfirmed(brandProfileId, email);
+
+    return {
+      identityConfirmed: true,
+      brandProfileId: profile.id,
+      domain: profile.domain,
+      email,
+      nextStep: "password" as const,
+    };
+  }
+
+  /**
+   * Unified password gate for OTP + Google paths.
+   * Creates Brand User with hashedPassword, sets isVerified, enqueues deep scan.
+   */
+  async setPasswordAndActivate(
+    brandProfileId: string,
+    rawEmail: string,
+    rawPassword: string,
+  ) {
+    const email = normalizeVerificationEmail(rawEmail);
+    const password = rawPassword;
+    if (password.trim().length === 0) {
+      throw new BadRequestException(
+        "Passwords cannot consist entirely of blank spaces. Please enter at least 8 visible characters.",
+      );
+    }
+    if (password.length < 8) {
+      throw new BadRequestException(
+        "Password must be at least 8 characters long.",
+      );
+    }
+
+    const profile = await this.prisma.brandProfile.findUnique({
+      where: { id: brandProfileId },
+      select: {
+        id: true,
+        name: true,
+        domain: true,
+        isVerified: true,
+        verificationEmail: true,
+        identityConfirmedAt: true,
+        organizationId: true,
+        planStartedAt: true,
+      },
+    });
+    if (!profile) {
+      throw new NotFoundException("Brand profile not found");
+    }
+    if (!profile.identityConfirmedAt || !profile.verificationEmail) {
+      throw new BadRequestException(
+        "Confirm your work email (OTP or Google) before setting a password.",
+      );
+    }
+    if (normalizeVerificationEmail(profile.verificationEmail) !== email) {
+      throw new BadRequestException(
+        "Password email must match the verified identity email.",
+      );
+    }
+    if (profile.isVerified && profile.organizationId) {
+      throw new BadRequestException(
+        "This brand is already activated. Please sign in.",
+      );
+    }
+
+    const hashedPassword = this.auth.hashPassword(password);
+    const displayName = emailLocalPart(email);
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+    });
+    if (existingUser && existingUser.role !== UserRole.BRAND) {
+      throw new ConflictException(
+        "This email is registered for a different account type.",
+      );
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      let organizationId = profile.organizationId;
+      let userId = existingUser?.id;
+
+      if (!organizationId) {
+        const organization = await tx.organization.create({
+          data: { name: profile.name },
+        });
+        organizationId = organization.id;
+      }
+
+      if (userId) {
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            hashedPassword,
+            emailVerifiedAt: new Date(),
+            name: existingUser?.name ?? displayName,
+            organizationId,
+          },
+        });
+      } else {
+        const user = await tx.user.create({
+          data: {
+            email,
+            name: displayName,
+            role: UserRole.BRAND,
+            organizationId,
+            hashedPassword,
+            emailVerifiedAt: new Date(),
+          },
+        });
+        userId = user.id;
+      }
+
+      await tx.brandProfile.update({
+        where: { id: profile.id },
+        data: {
+          organizationId,
+          isVerified: true,
+          verifiedAt: new Date(),
+          verificationEmail: email,
+        },
+      });
+
+      return { userId: userId!, organizationId };
+    });
+
+    await this.enqueueDeepScanAfterVerify(brandProfileId);
+
+    const token = await this.auth.issueTokenForUserId(result.userId);
+
+    return {
+      activated: true,
+      brandProfileId: profile.id,
+      domain: profile.domain,
+      organizationId: result.organizationId,
+      ...token,
+    };
+  }
+
+  private async markIdentityConfirmed(
+    brandProfileId: string,
+    email: string,
+  ): Promise<void> {
+    await this.prisma.brandProfile.update({
+      where: { id: brandProfileId },
+      data: {
+        verificationEmail: email,
+        identityConfirmedAt: new Date(),
+        // Password gate owns isVerified.
+        isVerified: false,
+        verifiedAt: null,
+      },
+    });
   }
 
   /** PRE-PROD: no Postmark / no VerificationCode rows. Logged stub code 123456. */
@@ -99,7 +301,7 @@ export class BrandVerificationService {
     };
   }
 
-  /** PRE-PROD: accepts only STUB_OTP_CODE; still sets isVerified on BrandProfile. */
+  /** PRE-PROD: accepts only STUB_OTP_CODE; confirms identity only (password gate sets isVerified). */
   private async verifyOtpStub(
     brandProfileId: string,
     rawEmail: string,
@@ -135,25 +337,18 @@ export class BrandVerificationService {
       );
     }
 
-    await this.prisma.brandProfile.update({
-      where: { id: brandProfileId },
-      data: {
-        isVerified: true,
-        verifiedAt: new Date(),
-        verificationEmail: email,
-      },
-    });
-
-    await this.enqueueDeepScanAfterVerify(brandProfileId);
+    await this.markIdentityConfirmed(brandProfileId, email);
 
     this.logger.warn(
-      `[STUB OTP] verified brandProfileId=${brandProfileId} email=${email}`,
+      `[STUB OTP] identity confirmed brandProfileId=${brandProfileId} email=${email} — password still required`,
     );
 
     return {
-      verified: true,
+      identityConfirmed: true,
       brandProfileId: profile.id,
       domain: profile.domain,
+      email,
+      nextStep: "password" as const,
     };
   }
 
@@ -311,21 +506,14 @@ export class BrandVerificationService {
       data: { isUsed: true },
     });
 
-    await this.prisma.brandProfile.update({
-      where: { id: brandProfileId },
-      data: {
-        isVerified: true,
-        verifiedAt: new Date(),
-        verificationEmail: email,
-      },
-    });
-
-    await this.enqueueDeepScanAfterVerify(brandProfileId);
+    await this.markIdentityConfirmed(brandProfileId, email);
 
     return {
-      verified: true,
+      identityConfirmed: true,
       brandProfileId: profile.id,
       domain: profile.domain,
+      email,
+      nextStep: "password" as const,
     };
   }
 
