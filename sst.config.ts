@@ -182,6 +182,11 @@ export default $config({
         $app.stage === "prod"
           ? (process.env.BRAND_VERIFICATION_USE_REAL_OTP ?? "false")
           : "false",
+      // QA apply/eligibility bypass — default test@creator.com on non-prod; empty on prod unless set.
+      CREATOR_APPLY_BYPASS_EMAILS:
+        $app.stage === "prod"
+          ? (process.env.CREATOR_APPLY_BYPASS_EMAILS ?? "")
+          : (process.env.CREATOR_APPLY_BYPASS_EMAILS ?? "test@creator.com"),
       BRAND_SCAN_LIMITS_ENABLED:
         process.env.BRAND_SCAN_LIMITS_ENABLED ??
         ($app.stage === "local" ? "false" : "true"),

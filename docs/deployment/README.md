@@ -61,6 +61,16 @@ Watch ECS logs for:
 
 ---
 
+## QA creator seed + apply bypass (dev/staging)
+
+Env `CREATOR_APPLY_BYPASS_EMAILS` (SST: defaults to `test@creator.com` on non-prod; empty on prod unless set) forces targeting eligibility for those emails so they can see `ELIGIBLE_ONLY` campaigns and apply.
+
+Login: `test@creator.com` · OTP `123456` when stub OTP is on.  
+Local re-seed (Docker DB / tunnel): `npm run db:seed:dev-creator`.  
+Details: `docs/campaigns-creator-view/engineering/MARKETPLACE_BACKEND.md`.
+
+---
+
 ## Quick reference (when to use what)
 
 | Goal | Command |

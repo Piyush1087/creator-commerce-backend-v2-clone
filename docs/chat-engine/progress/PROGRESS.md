@@ -18,6 +18,12 @@
 | DNA compliance read (do-not-say list) | Done |
 | DNA HITL writes (identity, offering description, persona create) | Done |
 | Campaign launch HITL (UCE draft) | Done |
+| UCE Campaign List module (reads + lifecycle HITL) | Done |
+| Campaign List smart routing (normalize → Gemini classify → fuzzy resolve → tools/HITL) | Done |
+| Campaign Go Live (publish DRAFT→ACTIVE) HITL | Done |
+| Part 5 validation recovery checklists (go live / resume / pause / archive / duplicate) | Done |
+| Co-Pilot AI module registry (`core/` + `modules/`) | Done |
+| `UceCampaignStatus.ARCHIVED` enum + migration | Done (apply with `npm run db:migrate:deploy` — no shadow DB) |
 | HITL resolution persisted on message (reopen thread shows saved/discard) | Done |
 | Thread soft-delete (archive) in sidebar | Done |
 | SSE streaming | Done |
@@ -48,8 +54,9 @@
 | --- | --- | --- | --- |
 | Brand Centre Tab 2 move-to-planner HITL | Done | — | Async SSE follow-up on confirm/stream |
 | Brand Centre Tab 3 planner read + launch HITL | Done | Done | Table read; bridge → UCE DRAFT |
-| UCE draft list + edit (DRAFT only) | Done | — | CAMPAIGN_EDIT_DRAFT HITL |
-| UCE read | Not started | — | Live campaigns grid / carousel |
+| UCE draft list + edit (DRAFT only) | Done | Done | CAMPAIGN_EDIT_DRAFT HITL |
+| UCE Campaign List (live list + lifecycle) | Done | Done | Smart path: typo normalize + Gemini intent classify + fuzzy name match + thread memory; keyword detectors remain fallback |
+| UCE read (legacy row) | Superseded | — | Covered by Campaign List module |
 | Escrow writes | Read done | Not started | Lock, release, refund widgets |
 | Collaboration writes | Read done | Not started | Counter-offer, shipment, media review |
 | Analytics scope | Not started | — | Funnel charts |

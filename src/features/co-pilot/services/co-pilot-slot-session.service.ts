@@ -89,6 +89,20 @@ export class CoPilotSlotSessionService {
       }
     }
 
+    if (staged.campaign_ids != null && String(staged.campaign_ids).trim() !== "") {
+      const raw = String(staged.campaign_ids);
+      const parts = raw.includes("::")
+        ? [parseSelectOptionId(raw)]
+        : raw.split(/[,;]+/).map((p) => parseSelectOptionId(p.trim())).filter(Boolean);
+      staged.campaign_ids = parts.join(",");
+      if (raw.includes("::")) {
+        const label = parseSelectOptionLabel(raw);
+        if (label) {
+          staged.campaign_name = label;
+        }
+      }
+    }
+
     const missing = (
       session.missingSlots as SlotFillingData["missingSlots"]
     ).filter((slot) => !String(staged[slot.fieldName] ?? "").trim());

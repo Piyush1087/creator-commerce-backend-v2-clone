@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,6 +9,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
   UsePipes,
@@ -21,16 +23,23 @@ import {
   BrandBillingProfileSchema,
   BrandWithdrawalAccountSchema,
   BulkNotificationSettingsSchema,
+  ConnectInstagramSettingsSchema,
+  IdentityConflictResolutionSchema,
   InviteTeamMemberSchema,
+  ManageConnectionActionSchema,
   UpdateBrandGeneralProfileSchema,
   UpdateTeamRoleSchema,
 } from "./schemas/brand-settings.schema";
+import { BrandSettingsIntegrationsService } from "./services/brand-settings-integrations.service";
 import { BrandSettingsService } from "./services/brand-settings.service";
 
 @Controller("api/v1/brand/settings")
 @UseGuards(ThrottlerGuard, JwtAuthGuard)
 export class BrandSettingsController {
-  constructor(private readonly settings: BrandSettingsService) {}
+  constructor(
+    private readonly settings: BrandSettingsService,
+    private readonly integrations: BrandSettingsIntegrationsService,
+  ) {}
 
   @Get()
   getOverview(@Req() req: RequestWithAuthUser) {
@@ -127,5 +136,51 @@ export class BrandSettingsController {
     @Param("invitationId") invitationId: string,
   ) {
     return this.settings.cancelTeamInvitation(req.user, invitationId);
+  }
+
+  @Get("integrations")
+  getIntegrations(@Req() req: RequestWithAuthUser) {
+    return this.integrations.getIntegrations(req.user);
+  }
+
+  @Get("integrations/instagram/oauth-url")
+  getInstagramOauthUrl(
+    @Req() req: RequestWithAuthUser,
+    @Query("redirectUri") redirectUri: string,
+  ) {
+    if (!redirectUri?.trim()) {
+      throw new BadRequestException("redirectUri is required");
+    }
+    return this.integrations.getInstagramOauthUrl(req.user, redirectUri);
+  }
+
+  @Post("integrations/instagram/connect")
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ZodValidationPipe(ConnectInstagramSettingsSchema))
+  connectInstagram(
+    @Req() req: RequestWithAuthUser,
+    @Body() body: ReturnType<typeof ConnectInstagramSettingsSchema.parse>,
+  ) {
+    return this.integrations.connectInstagram(req.user, body);
+  }
+
+  @Post("integrations/resolve-identity-conflict")
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ZodValidationPipe(IdentityConflictResolutionSchema))
+  resolveIdentityConflict(
+    @Req() req: RequestWithAuthUser,
+    @Body() body: ReturnType<typeof IdentityConflictResolutionSchema.parse>,
+  ) {
+    return this.integrations.resolveIdentityConflict(req.user, body);
+  }
+
+  @Post("integrations/manage")
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ZodValidationPipe(ManageConnectionActionSchema))
+  manageIntegration(
+    @Req() req: RequestWithAuthUser,
+    @Body() body: ReturnType<typeof ManageConnectionActionSchema.parse>,
+  ) {
+    return this.integrations.manageAction(req.user, body);
   }
 }

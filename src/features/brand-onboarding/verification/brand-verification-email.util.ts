@@ -1,5 +1,21 @@
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+export const BANNED_PUBLIC_EMAIL_PROVIDERS = [
+  "gmail.com",
+  "yahoo.com",
+  "outlook.com",
+  "hotmail.com",
+  "icloud.com",
+  "mail.com",
+  "proton.me",
+  "protonmail.com",
+] as const;
+
+export function isBannedPublicEmailProvider(email: string): boolean {
+  const domain = emailDomainFromAddress(email);
+  return (BANNED_PUBLIC_EMAIL_PROVIDERS as readonly string[]).includes(domain);
+}
+
 export function normalizeVerificationEmail(email: string): string {
   return email.trim().toLowerCase();
 }

@@ -178,6 +178,11 @@ export class GoogleAuthService {
     });
   }
 
+  /** Public helper for brand onboarding identity confirmation (no user creation). */
+  async verifyIdTokenPayload(idToken: string): Promise<GoogleTokenPayload> {
+    return this.verifyIdToken(idToken);
+  }
+
   private async verifyIdToken(idToken: string): Promise<GoogleTokenPayload> {
     const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
     if (!clientId) {

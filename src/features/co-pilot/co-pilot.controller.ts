@@ -63,9 +63,11 @@ import {
 } from "./schemas/thread.schema";
 
 import type { CoPilotChatPayload } from "./schemas/copilot-payload.schema";
-
+import {
+  mapCampaignListValidationError,
+  validationChecklistToPayloadFields,
+} from "./modules/uce-campaign-list/campaign-list-validation";
 import { CoPilotFeedbackService } from "./services/co-pilot-feedback.service";
-
 import { CoPilotHitlService } from "./services/co-pilot-hitl.service";
 import { CoPilotBrandCentreJobService } from "./services/co-pilot-brand-centre-job.service";
 
@@ -458,11 +460,59 @@ export class CoPilotController {
 
 
 
+    if (result.validationBlocked && result.validationChecklist) {
+
+      const followUpPayload: CoPilotChatPayload = {
+
+        messageId: randomUUID(),
+
+        threadId: body.threadId,
+
+        timestamp: new Date().toISOString(),
+
+        formatType: "VALIDATION_CHECKLIST",
+
+        narrativeText: result.message ?? result.validationChecklist.title,
+
+        validationChecklistData: result.validationChecklist,
+
+      };
+
+      await this.threads.appendAssistantMessage({
+
+        threadId: body.threadId,
+
+        payload: followUpPayload,
+
+        formatType: followUpPayload.formatType,
+
+        narrativeText: followUpPayload.narrativeText,
+
+      });
+
+      return {
+
+        ok: true,
+
+        validationBlocked: true,
+
+        message: followUpPayload.narrativeText,
+
+        result,
+
+        followUpPayload,
+
+      };
+
+    }
+
+
+
     const message =
 
       result.message ??
 
-      result.hitlResolution.summary ??
+      result.hitlResolution?.summary ??
 
       "Action confirmed.";
 
@@ -519,6 +569,64 @@ export class CoPilotController {
         idempotencyKey: body.idempotencyKey,
 
       });
+
+
+
+      if (result.validationBlocked && result.validationChecklist) {
+
+        const followUpPayload: CoPilotChatPayload = {
+
+          messageId: randomUUID(),
+
+          threadId: body.threadId,
+
+          timestamp: new Date().toISOString(),
+
+          formatType: "VALIDATION_CHECKLIST",
+
+          narrativeText: result.message ?? result.validationChecklist.title,
+
+          validationChecklistData: result.validationChecklist,
+
+        };
+
+        try {
+
+          await this.threads.appendAssistantMessage({
+
+            threadId: body.threadId,
+
+            payload: followUpPayload,
+
+            formatType: followUpPayload.formatType,
+
+            narrativeText: followUpPayload.narrativeText,
+
+          });
+
+        } catch {
+
+          // Still stream the checklist — don't remap persist failures as INTERNAL_ERROR.
+
+        }
+
+        res.write(
+
+          `event: follow_up\ndata: ${JSON.stringify({ payload: followUpPayload })}\n\n`,
+
+        );
+
+        res.write(
+
+          `event: done\ndata: ${JSON.stringify({ ok: true, validationBlocked: true, result })}\n\n`,
+
+        );
+
+        res.end();
+
+        return;
+
+      }
 
 
 
@@ -598,6 +706,42 @@ export class CoPilotController {
 
         );
 
+      } else if (result.followUpChecklist) {
+
+        const followUpPayload: CoPilotChatPayload = {
+
+          messageId: randomUUID(),
+
+          threadId: body.threadId,
+
+          timestamp: new Date().toISOString(),
+
+          formatType: "VALIDATION_CHECKLIST",
+
+          narrativeText: result.message ?? result.followUpChecklist.title,
+
+          validationChecklistData: result.followUpChecklist,
+
+        };
+
+        await this.threads.appendAssistantMessage({
+
+          threadId: body.threadId,
+
+          payload: followUpPayload,
+
+          formatType: followUpPayload.formatType,
+
+          narrativeText: followUpPayload.narrativeText,
+
+        });
+
+        res.write(
+
+          `event: follow_up\ndata: ${JSON.stringify({ payload: followUpPayload })}\n\n`,
+
+        );
+
       }
 
 
@@ -608,10 +752,41 @@ export class CoPilotController {
 
     } catch (err) {
 
-      const message = err instanceof Error ? err.message : "HITL confirm failed";
+      // Prefer a checklist follow-up over a raw SSE error toast (incl. 500s).
+      const mapped = mapCampaignListValidationError({
+        err,
+        action: "UNKNOWN",
+      });
+      const fields = validationChecklistToPayloadFields(mapped);
+      const followUpPayload: CoPilotChatPayload = {
+        messageId: randomUUID(),
+        threadId: body.threadId,
+        timestamp: new Date().toISOString(),
+        formatType: "VALIDATION_CHECKLIST",
+        narrativeText: fields.narrativeText,
+        validationChecklistData: {
+          ...fields.validationChecklistData,
+          idempotencyKey: body.idempotencyKey,
+        },
+      };
 
-      res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
+      try {
+        await this.threads.appendAssistantMessage({
+          threadId: body.threadId,
+          payload: followUpPayload,
+          formatType: followUpPayload.formatType,
+          narrativeText: followUpPayload.narrativeText,
+        });
+      } catch {
+        /* best-effort */
+      }
 
+      res.write(
+        `event: follow_up\ndata: ${JSON.stringify({ payload: followUpPayload })}\n\n`,
+      );
+      res.write(
+        `event: done\ndata: ${JSON.stringify({ ok: true, validationBlocked: true })}\n\n`,
+      );
       res.end();
 
     }

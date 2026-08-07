@@ -74,9 +74,9 @@ export class AuthService {
     }
 
     if (dto.password) {
-      if (user.role !== UserRole.CREATOR) {
+      if (user.role !== UserRole.CREATOR && user.role !== UserRole.BRAND) {
         throw new BadRequestException(
-          "Password sign-in is only available for creator accounts.",
+          "Password sign-in is not available for this account type.",
         );
       }
       if (!user.hashedPassword) {

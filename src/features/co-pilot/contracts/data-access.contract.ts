@@ -177,9 +177,18 @@ export const CO_PILOT_DATA_ACCESS_CONTRACT = {
 
         UceCampaignCommercials: "WRITE_VIA_HITL",
 
+        UceCampaignProduct: "WRITE_VIA_HITL",
+
+        UceCampaignBrief: "WRITE_VIA_HITL",
+
+        UceCampaignPerformanceAggregate: "READ",
+
       },
 
-      apiRoutesRead: ["GET /api/v1/brand-uce/campaigns?status=DRAFT"],
+      apiRoutesRead: [
+        "GET /api/v1/brand-uce/campaigns",
+        "GET /api/v1/brand-uce/campaigns/:id (summary/performance/financials via service)",
+      ],
 
       apiRoutesWriteHitl: [
 
@@ -187,10 +196,14 @@ export const CO_PILOT_DATA_ACCESS_CONTRACT = {
 
         "POST /api/v1/co-pilot/hitl/confirm → PATCH /api/v1/brand-uce/campaigns/:id/wizard (DRAFT only)",
 
+        "POST /api/v1/co-pilot/hitl/confirm → pause/resume/archive via BrandUceCampaignService",
+
+        "POST /api/v1/co-pilot/hitl/confirm → duplicateCampaign / bulkLifecycleAction",
+
       ],
 
       notes:
-        "CAMPAIGN_LAUNCH shortcut, PLANNER_LAUNCH_DRAFT via bridge, CAMPAIGN_EDIT_DRAFT. No ACTIVE/PAUSED edits from chat.",
+        "UCE Campaign List module (uce-campaign-list): list/search/filter/sort/summary/performance/compare/financials reads. Lifecycle HITL: pause, resume, archive→ARCHIVED, duplicate→DRAFT, bulk. Also CAMPAIGN_LAUNCH shortcut, PLANNER_LAUNCH_DRAFT via bridge, CAMPAIGN_EDIT_DRAFT.",
 
     },
 
@@ -230,31 +243,90 @@ export const CO_PILOT_DATA_ACCESS_CONTRACT = {
 
     {
 
-      module: "collaboration",
+      module: "brand-settings",
 
       prismaModels: {
 
-        Collaboration: "READ",
+        BrandProfile: "WRITE_VIA_HITL",
+
+        BrandBillingProfile: "WRITE_VIA_HITL",
+
+        BrandWithdrawalAccount: "WRITE_VIA_HITL",
 
       },
 
       apiRoutesRead: [
 
-        "GET /api/v1/collaboration/threads (via co-pilot getCollabReadContext)",
+        "GET /api/v1/brand/settings (via settings.getOverview)",
+
+        "GET /api/v1/brand/settings/general",
+
+        "GET /api/v1/brand/settings/billing-profile",
+
+        "GET /api/v1/brand/settings/withdrawal-account",
 
       ],
 
       apiRoutesWriteHitl: [
 
-        "POST /api/v1/collaboration/.../review-media (future HITL — product §6)",
+        "POST /api/v1/co-pilot/hitl/confirm → PATCH /api/v1/brand/settings/general",
 
-        "POST /api/v1/collaboration/.../counter-offer (future HITL)",
+        "POST /api/v1/co-pilot/hitl/confirm → PATCH /api/v1/brand/settings/billing-profile",
+
+        "POST /api/v1/co-pilot/hitl/confirm → POST /api/v1/brand/settings/withdrawal-account",
+
+      ],
+
+      notes:
+        "Brand Settings module: overview/general/finance reads + integrations deep-link narrative. HITL writes: update general, upsert billing, link withdrawal. OAuth connect/reconnect stays UI-only.",
+
+    },
+
+    {
+
+      module: "collaboration",
+
+      prismaModels: {
+
+        Collaboration: "WRITE_VIA_HITL",
+
+        CollaborationCommercial: "WRITE_VIA_HITL",
+
+        CollaborationLogistics: "WRITE_VIA_HITL",
+
+        CollaborationMedia: "WRITE_VIA_HITL",
+
+        CollaborationFinalization: "WRITE_VIA_HITL",
+
+      },
+
+      apiRoutesRead: [
+
+        "GET /api/v1/collaboration/threads (via collab.listThreads)",
+
+        "GET /api/v1/collaboration/threads/:id (via collab.getThread)",
+
+      ],
+
+      apiRoutesWriteHitl: [
+
+        "POST /api/v1/collaboration/threads/:id/negotiation/counter-offer",
+
+        "POST /api/v1/collaboration/threads/:id/negotiation/accept",
+
+        "POST /api/v1/collaboration/threads/:id/securement/fund-escrow",
+
+        "POST /api/v1/collaboration/threads/:id/logistics/dispatch",
+
+        "POST /api/v1/collaboration/threads/:id/production/review",
+
+        "POST /api/v1/collaboration/threads/:id/posting/verify-compliance",
 
       ],
 
       notes:
 
-        "Read: pipeline + fulfillment issues via TABULAR_AUDIT_DATA. Write handshakes (counter-offer, shipment, content review) not wired yet.",
+        "Collaboration AI module: pipeline/issues/status reads. Brand HITL writes: counter-offer, accept terms, fund escrow, dispatch, approve/request revision, verify compliance. Stage+persona gated. Part 5 validation checklists with deep-link resume.",
 
     },
 

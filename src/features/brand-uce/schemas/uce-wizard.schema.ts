@@ -5,6 +5,7 @@ export const UceCampaignStatusSchema = z.enum([
   "ACTIVE",
   "PAUSED",
   "COMPLETED",
+  "ARCHIVED",
 ]);
 export const UceTimelineStructureSchema = z.enum([
   "FIXED_DATES",
