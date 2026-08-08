@@ -1,0 +1,94 @@
+version: "1.0"
+status: FROZEN
+module: add_product
+artifact: runtime_contract
+
+operations:
+  ADD:
+    allowed_campaign_status: [PUBLISHED, LIVE]
+    creates_status: ACTIVE
+    sequence: [validate_campaign, validate_brand_centre_reference, validate_domain_invariants, create_campaign_asset, recalculate_campaign_readiness, return_updated_projection]
+  PAUSE:
+    allowed_campaign_status: [PUBLISHED, LIVE]
+    required_asset_status: ACTIVE
+    mutation: CAMPAIGN_ASSET_STATUS_ONLY
+    resulting_status: PAUSED
+  RESUME:
+    allowed_campaign_status: [PUBLISHED, LIVE]
+    required_asset_status: PAUSED
+    revalidate_live_brand_centre_reference: true
+    mutation: CAMPAIGN_ASSET_STATUS_ONLY
+    resulting_status: ACTIVE
+
+normal_manual_draft_behavior:
+  add_product_allowed: false
+  note: Manual campaign is published before normal Add Product flow. AI recommendation acceptance uses separate orchestration.
+
+effective_availability:
+  campaign_asset: CAMPAIGN_LIVE_AND_CAMPAIGN_ASSET_ACTIVE
+  brief: CAMPAIGN_LIVE_AND_CAMPAIGN_ASSET_ACTIVE_AND_BRIEF_ACTIVE
+  asset_execution_ready: CAMPAIGN_ASSET_ACTIVE_AND_EXISTS_ACTIVE_BRIEF
+  campaign_execution_ready: EXISTS_EXECUTION_READY_CAMPAIGN_ASSET
+  persisted: false
+
+pause_effects:
+  new_sourcing: STOP
+  new_matching: STOP
+  new_applications: STOP
+  existing_discovery_records: PRESERVE
+  existing_applications: PRESERVE_AND_REVIEWABLE
+  existing_collaborations: PRESERVE_AND_OPERATIONAL
+  mutate_brief_status: false
+  mutate_application_status: false
+  mutate_collaboration_status: false
+
+campaign_pause_interaction:
+  mutate_campaign_asset_status: false
+  campaign_resume_mutates_campaign_asset_status: false
+  asset_resume_while_campaign_paused: DISALLOWED
+
+loss_of_execution_readiness_after_live:
+  campaign_status_demoted_to_published: false
+  valid_condition: LIVE_WITH_EXECUTION_READY_FALSE
+  block_new_creator_acquisition: true
+  block_new_applications: true
+  block_share_campaign: true
+  preserve_existing_applicants: true
+  preserve_existing_collaborations: true
+  page_behavior: BLOCKING_READINESS_PRESENTATION
+
+creator_apply_path:
+  required: [CAMPAIGN_LIVE, CAMPAIGN_ASSET_ACTIVE, BRIEF_ACTIVE, BRIEF_BELONGS_TO_CAMPAIGN_ASSET]
+  note: Campaign-wide execution readiness alone is insufficient for a specific Asset x Brief application.
+
+brand_centre_mutation:
+  campaign_asset_mutation: NONE
+  behavior: RESOLVE_CURRENT_VALUES_AT_READ_TIME
+  sync_job_required: false
+
+broken_reference:
+  silent_delete: false
+  new_creator_activity: BLOCK
+  surface_operational_error: true
+
+runtime_invariants:
+  - RT-01 ADD creates CampaignAsset as ACTIVE.
+  - RT-02 ADD never copies Brand Centre business data.
+  - RT-03 PAUSE changes only CampaignAsset status.
+  - RT-04 RESUME changes only CampaignAsset status.
+  - RT-05 Campaign pause does not mutate CampaignAsset status.
+  - RT-06 Campaign resume does not mutate CampaignAsset status.
+  - RT-07 Asset pause does not mutate Brief status.
+  - RT-08 Asset pause prevents new acquisition/application through descendant Briefs.
+  - RT-09 Existing Applications survive Asset pause.
+  - RT-10 Existing Collaborations survive Asset pause.
+  - RT-11 Asset execution readiness requires Asset ACTIVE plus at least one ACTIVE Brief.
+  - RT-12 Campaign execution readiness requires at least one execution-ready CampaignAsset.
+  - RT-13 Losing execution readiness after LIVE does not demote Campaign to PUBLISHED.
+  - RT-14 LIVE plus execution_ready false blocks new creator acquisition and Campaign sharing.
+  - RT-15 Asset identity never changes after creation.
+  - RT-16 Duplicate identity includes PAUSED CampaignAssets.
+  - RT-17 Brand Centre mutations are resolved at read time.
+  - RT-18 Runtime never silently deletes CampaignAsset on reference-resolution failure.
+  - RT-19 Apply eligibility is validated against Campaign x CampaignAsset x Brief at action time.
+  - RT-20 Every successful CampaignAsset mutation triggers Campaign Page projection recalculation.

@@ -1,0 +1,102 @@
+version: "1.0"
+status: FROZEN
+module: create_campaign
+contract: field_object_contract
+
+campaign:
+  aggregate_root: true
+  creation_source: [MANUAL, AI_RECOMMENDED]
+  lifecycle_states: [DRAFT, PUBLISHED, LIVE]
+  provenance_rule: "creation_source is behavioural and participates in field editability"
+
+objects:
+  campaign_strategy: {cardinality: "1:1"}
+  creator_strategy: {cardinality: "1:1"}
+  commercial_policy: {cardinality: "1:1"}
+
+downstream_ownership:
+  campaign_products: campaign_page
+  briefs: add_brief
+  deliverables: brief
+  prospects: discovery
+  applications: applicants
+  collaborations: collaborations
+
+ai_allowed_edit_fields:
+  - campaign_name
+  - publishing_window
+  - creator_following
+  - commercial_offer
+  - total_campaign_budget
+
+fields:
+  CF-001: {field: campaign_name, owner: campaign_strategy, required: true, validation: {min_length: 3, max_length: 60, duplicate_allowed: true}, edit_policy: AI_ALLOWED_EDIT}
+  CF-002: {field: publishing_schedule, owner: campaign_strategy, allowed: [EVERGREEN, SCHEDULED], required: true, manual_after_publish: locked, ai_recommended: locked}
+  CF-003: {field: publishing_window, owner: campaign_strategy, required_when: "publishing_schedule == SCHEDULED", validation: {publish_from_lte_publish_until: true, creation_publish_from_gte_today: true}, edit_policy: AI_ALLOWED_EDIT}
+  CF-004: {field: campaign_objective, owner: campaign_strategy, allowed: [PULSE, PROOF, PRODUCTION, PUSH], manual_after_publish: locked, ai_recommended: locked, derives: [primary_kpi, supporting_kpis]}
+  CF-005: {field: primary_kpi, owner: campaign_strategy, source: SYSTEM_DERIVED, framework: canonical_kpi_framework, user_editable: false, freeze_on_publish: true}
+  CF-006: {field: supporting_kpis, owner: campaign_strategy, source: SYSTEM_DERIVED, cardinality: {min: 2, max: 4}, user_editable: false, freeze_on_publish: true}
+  CF-007: {field: platforms, owner: campaign_strategy, mvp_supported: [INSTAGRAM], future_add_platform_after_publish_manual: true, ai_recommended_after_launch: locked, commercial_dependency: none}
+  CF-008: {field: deliverables, status: RETIRED_FROM_CREATE_CAMPAIGN, new_owner: brief}
+  CF-009: {field: campaign_visibility, owner: campaign_strategy, allowed: [PUBLIC, ELIGIBLE_CREATORS_ONLY, INVITE_ONLY], default: PUBLIC, manual_after_publish: editable, ai_recommended: locked}
+  CF-010:
+    field: creator_archetypes
+    owner: creator_strategy
+    source: CANONICAL_ARCHETYPE_LIBRARY
+    cardinality: {min: 1, max: 5}
+    recommendation_owner: CREATOR_SHOP_INTELLIGENCE
+    recommendation_must_use_canonical_ids: true
+    manual_after_publish: editable_with_dependency_check
+    on_remove_active_brief: PAUSE_DEPENDENT_BRIEF
+    ai_recommended: locked
+  CF-011: {field: creator_following, owner: creator_strategy, validation: {minimum_gte: 0, maximum_gt_minimum: true}, edit_policy: AI_ALLOWED_EDIT, prospective_only: true}
+  CF-012: {field: audience_gender, owner: creator_strategy, semantics: CREATOR_AUDIENCE, allowed: [FEMALE, MALE, ALL], default: ALL, manual_after_publish: locked, ai_recommended: locked}
+  CF-013: {field: audience_age, owner: creator_strategy, semantics: CREATOR_AUDIENCE, validation: {minimum: 13, maximum: 65, minimum_lte_maximum: true}, manual_after_publish: locked, ai_recommended: locked}
+  CF-014:
+    field: audience_affinities
+    owner: creator_strategy
+    source: CANONICAL_AFFINITY_LIBRARY
+    cardinality: {min: 0, max: 5}
+    canonical_ids_only: true
+    aliases_for_search_only: true
+    target_library: {canonical_affinities: "180-220", aliases: "600-1000"}
+    mvp_seed_affinities: "20-50"
+    manual_after_publish: editable
+    ai_recommended: locked
+  CF-015:
+    field: audience_geography
+    owner: creator_strategy
+    semantics: CREATOR_AUDIENCE_GEOGRAPHY
+    input_provider: GOOGLE_MAPS_PLACES
+    supported_scopes: [CITY, REGION, COUNTRY, MULTI_LOCATION, GLOBAL]
+    storage: STRUCTURED_NORMALIZED_GEOGRAPHY
+    align_with: BRAND_INTELLIGENCE_GEOGRAPHY_CONTRACT
+    manual_after_publish: editable
+    ai_recommended: locked
+  CF-016: {field: brand_support, owner: commercial_policy, support_types: [PRODUCT, SERVICE, EXPERIENCE, ACCESS_SUBSCRIPTION, OTHER], estimated_value_optional: true, non_cash_consideration: true, manual_after_publish: editable, ai_recommended: locked}
+  CF-017: {field: compensation_model, owner: commercial_policy, allowed: [FIXED, NEGOTIABLE], negotiable_commercial_offer_semantics: minimum_advertised_payout, maximum_creator_payout_field: none, final_negotiated_payout_owner: collaboration_commercial_agreement, manual_after_publish: editable, ai_recommended: locked}
+  CF-018: {field: commercial_offer, owner: commercial_policy, scope: CAMPAIGN_WIDE, per_platform: false, per_product: false, per_brief: false, per_deliverable: false, minimum: 0, edit_policy: AI_ALLOWED_EDIT}
+  CF-019: {field: total_campaign_budget, owner: commercial_policy, scope: CAMPAIGN_WIDE, validation: {minimum: 0, must_gte_commercial_offer: true}, edit_policy: AI_ALLOWED_EDIT}
+  CF-020: {field: advance_payment_percent, owner: commercial_policy, allowed: [0, 25, 50, 75, 100], continuous_slider: false, minimum_platform_threshold: none, manual_after_publish: editable, ai_recommended: locked}
+  CF-021: {field: net_payment_terms, owner: commercial_policy, allowed_days: [7, 15, 30, 45, 60], manual_after_publish: editable, ai_recommended: locked}
+
+validation_lifecycle:
+  field_entry: immediate
+  autosave: {allow_incomplete_draft: true, enforce_type_safety: true}
+  next: {validate_current_step: true}
+  publish: {validate_complete_aggregate: true}
+
+manual_draft: {persisted: true, autosaved: true, incomplete_state_allowed: true, resume_supported: true}
+
+ai_recommendation:
+  campaign_created_before_final_acceptance: false
+  contains: [campaign_configuration, recommended_product, recommended_brief]
+  acceptance_flow: [REVIEW_CAMPAIGN_ECONOMICS, REVIEW_PRODUCT, REVIEW_BRIEF]
+  economics_editable: [commercial_offer, total_campaign_budget]
+  final_action: LAUNCH_CAMPAIGN
+  transaction: {atomic: true, creation_source: AI_RECOMMENDED, resulting_state: LIVE}
+  abandonment: {campaign_created: false, original_recommendation_retained: true}
+
+backend_mapping:
+  status: TO_AUDIT
+  reconciliation_order: [CURRENT_SCHEMA_0208, INTELLIGENCE_SCHEMA_PRISMA, CAMPAIGN_SCHEMA_ACTION]

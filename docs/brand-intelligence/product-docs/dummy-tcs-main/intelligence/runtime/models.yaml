@@ -1,0 +1,113 @@
+version: 0.2-working
+status: WORKING
+
+purpose: Central registry for AI model selection and runtime defaults used by the Intelligence Compiler. Processors reference stable model profiles; provider model IDs and tunable runtime settings are resolved here so model changes do not require rewriting processor definitions or reasoning artifacts.
+
+principles:
+  - Processor definitions must not hardcode provider model IDs.
+  - A processor/scope requests a stable model_profile based on the job it performs.
+  - model_profile resolves to a provider model alias and runtime settings.
+  - Provider credentials and secrets live only in environment/secret configuration and never in this file.
+  - Model Registry controls execution configuration; it does not contain reasoning, taxonomy, evidence, or output-contract instructions.
+  - Processor-specific runtime overrides should be rare and explicit.
+  - Exact provider model IDs may change without changing processor identity, artifacts, Intelligence Objects, or Execution Profiles.
+
+providers:
+  google_gemini:
+    adapter: gemini
+    credential_ref: env.GEMINI_API_KEY
+    enabled_environments: [development, test, production]
+
+model_aliases:
+  gemini_fast_current:
+    provider: google_gemini
+    model_id: gemini-3.5-flash
+    lifecycle: CURRENT
+    intended_use: low-latency classification and straightforward structured extraction
+
+  gemini_reasoning_current:
+    provider: google_gemini
+    model_id: gemini-3.5-flash
+    lifecycle: CURRENT
+    intended_use: evidence-grounded tasks requiring comparison, conflict resolution, or multi-signal reasoning
+
+model_profiles:
+  fast_classification:
+    description: Low-latency constrained classification against controlled taxonomies.
+    model_alias: gemini_fast_current
+    runtime: {temperature: 0, structured_output: true, timeout_ms: 15000, max_attempts: 2}
+    intended_processors: [industry_classification.gatekeeper]
+
+  grounded_extraction:
+    description: Evidence-grounded structured extraction where multiple website signals may need to be reconciled.
+    model_alias: gemini_reasoning_current
+    runtime: {temperature: 0, structured_output: true, timeout_ms: 30000, max_attempts: 2}
+    intended_processors: [identity_core, industry_classification.industry_niche]
+
+  grounded_geography:
+    description: Evidence-grounded geographic reasoning across website and optional external geography evidence.
+    model_alias: gemini_reasoning_current
+    runtime: {temperature: 0, structured_output: true, timeout_ms: 30000, max_attempts: 2}
+    intended_processors: [market_geography]
+
+processor_model_bindings:
+  industry_classification:
+    gatekeeper: {model_profile: fast_classification, access_mode: website_direct}
+    industry_niche: {model_profile: grounded_extraction, access_mode: normalized_evidence}
+  identity_core:
+    default: {model_profile: grounded_extraction, access_mode: normalized_evidence}
+  market_geography:
+    default: {model_profile: grounded_geography, access_mode: normalized_evidence}
+
+runtime_defaults:
+  default_model_alias: gemini_reasoning_current
+  structured_output: true
+  temperature: 0
+  timeout_ms: 30000
+  max_attempts: 2
+  retry_on: [provider_timeout, provider_rate_limit, transient_provider_error]
+  do_not_retry_on: [invalid_required_input, unsupported_business_outcome, deterministic_output_contract_violation_after_successful_provider_response]
+  retry_backoff: {strategy: exponential, initial_delay_ms: 500, max_delay_ms: 4000}
+  output_behavior:
+    parse_structured_response: true
+    validate_before_persistence: true
+    persist_raw_provider_response: false
+    retain_response_for_runtime_debugging: implementation_policy_to_define
+
+resolution_order: [processor_scope_binding, processor_default_binding, explicit_authorized_execution_override, runtime_default]
+
+execution_override_policy:
+  allowed_for: [development, test, admin_debug]
+  production_default: false
+  allowed_fields: [model_profile, timeout_ms]
+  forbidden_without_runtime_code_change: [disable_output_validation, disable_evidence_grounding, inject_provider_credentials]
+
+compiler_resolution_contract:
+  input: [processor_id, processor_scope_when_applicable, environment]
+  steps:
+    - Resolve processor/scope to model_profile through processor_model_bindings.
+    - Resolve model_profile to model_alias and runtime settings.
+    - Resolve model_alias to provider and concrete model_id.
+    - Resolve provider credential/configuration from environment secrets.
+    - Merge permitted runtime defaults and authorized overrides.
+    - Return an immutable resolved_model_runtime snapshot for the Processor Execution.
+
+telemetry_requirements:
+  record_per_processor_execution: [model_profile, model_alias, provider, model_id, runtime_settings_effective, attempt_count, input_tokens_when_available, output_tokens_when_available, provider_cost_when_available, provider_latency_when_available]
+
+failure_policy:
+  missing_processor_binding: {action: FAIL_PRECHECK, code: MODEL_PROFILE_NOT_CONFIGURED}
+  missing_model_alias: {action: FAIL_PRECHECK, code: MODEL_ALIAS_NOT_FOUND}
+  model_id_not_configured: {action: FAIL_PRECHECK, code: MODEL_ID_NOT_CONFIGURED}
+  provider_credentials_missing: {action: FAIL_PRECHECK, code: PROVIDER_CREDENTIALS_MISSING}
+  provider_unavailable: {action: RETRY_ACCORDING_TO_RUNTIME_POLICY_THEN_FAIL, code: PROVIDER_UNAVAILABLE}
+  provider_timeout: {action: RETRY_ACCORDING_TO_RUNTIME_POLICY_THEN_FAIL, code: PROVIDER_TIMEOUT}
+
+identity_test_readiness:
+  default_model_decision: Gemini 3.5 Flash for all Identity AI processor profiles for MVP; optimize/split later based on observed latency, quality and cost.
+  blocked_until:
+    - GEMINI_API_KEY is available in the execution environment
+    - Gemini runtime adapter supports website_direct for the Gatekeeper path
+    - Gemini runtime adapter supports structured normalized-evidence requests for other Identity processors
+
+non_goals: [Prompt construction, Global or processor-specific reasoning instructions, Evidence acquisition or normalization, Processor output schemas, Intelligence persistence mapping, Trigger policy, Provider secret storage]

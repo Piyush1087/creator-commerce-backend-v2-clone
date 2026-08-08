@@ -1,0 +1,67 @@
+id: identity_test
+version: 0.1-working
+status: WORKING
+engine: brand_intelligence
+branch: identity
+purpose: Exercise the complete Identity runtime in dry-run mode before connecting it to the production onboarding trigger.
+
+defaults:
+  persist_results: false
+  allow_parallelism: true
+
+inputs:
+  required: [entity_type, entity_id, website_url]
+
+tasks:
+  - id: gatekeeper
+    processor_id: industry_classification
+    processor_scope: gatekeeper
+    kind: AI
+    active_outputs: [industry, sub_industry]
+    required: true
+    dependencies: []
+    access_mode: website_direct
+
+  - id: identity_core
+    processor_id: identity_core
+    kind: AI
+    active_outputs: [brand_name, brand_logo, tagline, country, business_geography, primary_language, website_currency, instagram_handle, youtube_handle, tiktok_handle, facebook_handle, linkedin_handle]
+    required: true
+    dependencies: [gatekeeper]
+    evidence_requirement: identity_core_website_evidence
+
+  - id: industry_niche
+    processor_id: industry_classification
+    processor_scope: industry_niche
+    kind: AI
+    active_outputs: [industry_niche]
+    required: true
+    dependencies: [gatekeeper, identity_core]
+    canonical_dependencies: [industry, sub_industry]
+    evidence_requirement: industry_niche_website_evidence
+
+  - id: reporting_currency
+    processor_id: reporting_currency
+    kind: DETERMINISTIC
+    active_outputs: [reporting_currency]
+    required: true
+    dependencies: [identity_core]
+    canonical_dependencies: [country]
+    rule: "country == IN ? INR : USD"
+
+  - id: market_geography
+    processor_id: market_geography
+    kind: AI
+    active_outputs: [markets_served]
+    required: true
+    dependencies: [identity_core]
+    canonical_dependencies: [country, business_geography]
+    evidence_requirement: market_geography_website_plus_optional_similarweb_instagram
+
+execution_notes:
+  - Gatekeeper remains Gemini direct website access for MVP.
+  - Website evidence acquisition for downstream processors may begin concurrently while Gatekeeper is running; processor execution waits for required dependencies/evidence.
+  - After Gatekeeper succeeds, identity_core executes.
+  - After identity_core succeeds, industry_niche, reporting_currency and market_geography can execute concurrently because their dependencies are satisfied.
+  - The test profile defaults to dry-run persistence. Validated outputs are returned even when persist_results=false.
+  - Production onboarding lifecycle/checkpoint/domain-verification policy is deliberately outside this test profile.

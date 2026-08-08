@@ -1,0 +1,104 @@
+version: "1.0"
+status: FROZEN
+module: add_product
+artifact: backend_schema_reconciliation
+
+canonical_object: CampaignAsset
+working_prisma_model: UceCampaignAsset
+
+current_backend_mapping:
+  BRAND:
+    target_model: BrandProfile
+  OFFERING:
+    target_model: Offering
+    authoritative_subtype_field: Offering.type
+    current_known_types: [PRODUCT, MODULE, TREATMENT, EXPERIENCE, SERVICE, COLLECTION]
+  OFFER:
+    target_model: BrandOffer
+
+architecture_decisions:
+  - Do not persist PRODUCT/TREATMENT/COLLECTION/etc as Campaign-owned taxonomy; Offering.type is authoritative.
+  - Use typed nullable reference columns instead of one polymorphic soft-reference id.
+  - CampaignAsset stores no Brand Centre business-data snapshots.
+  - Campaign owns CampaignAsset linking records.
+  - Brand Centre reference deletion must be restrictive, never cascading or SetNull.
+
+prisma_additions:
+  enums:
+    UceCampaignAssetKind: [BRAND, OFFERING, OFFER]
+    UceCampaignAssetStatus: [ACTIVE, PAUSED]
+  model: UceCampaignAsset
+  campaign_relation: "UceCampaign.assets UceCampaignAsset[]"
+
+model_shape:
+  fields:
+    id: String
+    campaignId: String
+    kind: UceCampaignAssetKind
+    status: UceCampaignAssetStatus
+    brandProfileId: String?
+    offeringId: String?
+    brandOfferId: String?
+    createdAt: DateTime
+    updatedAt: DateTime
+  unique_constraints:
+    - [campaignId, brandProfileId]
+    - [campaignId, offeringId]
+    - [campaignId, brandOfferId]
+  indexes:
+    - [campaignId, status]
+
+production_merge_requirements:
+  - Add real UceCampaignAsset -> BrandProfile optional FK/reverse relation with onDelete Restrict.
+  - Add real UceCampaignAsset -> Offering optional FK/reverse relation with onDelete Restrict.
+  - Add real UceCampaignAsset -> BrandOffer optional FK/reverse relation with onDelete Restrict.
+  - Keep UceCampaign -> UceCampaignAsset ownership relation onDelete Cascade.
+  - Add a PostgreSQL CHECK constraint guaranteeing exactly one reference column is populated and matches kind.
+
+postgres_check_semantics:
+  BRAND: brand_profile_id_not_null_and_other_refs_null
+  OFFERING: offering_id_not_null_and_other_refs_null
+  OFFER: brand_offer_id_not_null_and_other_refs_null
+
+brand_ownership_validation:
+  BRAND: campaign.brandProfileId_equals_campaignAsset.brandProfileId
+  OFFERING: campaign.brandProfileId_equals_offering.brandProfileId
+  OFFER: campaign.brandProfileId_equals_brandOffer.brandProfileId
+
+selectability:
+  contract: BRAND_CENTRE_CAMPAIGN_SELECTABLE
+  current_mvp_signal_examples: [Offering.isActive, BrandOffer.isActive]
+  note: Campaign contract must not permanently couple itself to Brand Centre lifecycle implementation.
+
+prohibited_campaign_asset_columns:
+  - assetName
+  - assetDescription
+  - assetImage
+  - price
+  - currency
+  - sellingPoints
+  - doNotSay
+  - promoCode
+  - offerValidity
+  - metadataSnapshot
+  - executionReady
+  - hasActiveBrief
+  - effectiveAvailable
+
+brief_relation:
+  domain_relationship_frozen: true
+  prisma_relation_added_now: false
+  reason: Add Brief backend schema has not yet been reconciled.
+
+unresolved:
+  PLAN_vs_MODULE:
+    current_backend: MODULE
+    product_discussion_term: PLAN
+    owner: BRAND_CENTRE
+    blocks_campaign_asset: false
+
+result:
+  new_campaign_owned_model: UceCampaignAsset
+  new_campaign_relation: UceCampaign.assets
+  snapshots_added: false
+  readiness_fields_added: false

@@ -1,0 +1,290 @@
+id: identity_test
+version: 0.1-working
+status: WORKING
+
+purpose: Execute the frozen Brand Intelligence > Identity branch end-to-end in development/testing without onboarding-specific checkpoints, domain verification, scan-admission safeguards, 7-day reuse, or onboarding locks. This profile is the first executable reference profile for validating the Intelligence Compiler, model/runtime configuration, Prompt Builder, Evidence Acquisition, output validation, persistence mapping, parallel execution, and runtime telemetry.
+
+profile_type: TEST
+environment_policy:
+  intended_for: [development, test]
+  production_public_trigger: false
+  callable_by: [developer, admin, automated_test]
+
+architecture_boundary:
+  - This profile proves that the Identity branch can execute as an Intelligence workflow.
+  - It does not reproduce the user onboarding journey defined by identity_onboarding.
+  - Trigger/request handling remains outside the Compiler; any authorized test caller may request this profile.
+  - Scan-admission rules, domain verification, provisional edits, user checkpoints, and onboarding locks are intentionally excluded.
+  - Evidence Acquisition is invoked as an execution dependency but remains a separate runtime capability from AI reasoning.
+  - Processor reasoning, taxonomy and output contracts remain in the frozen Identity branch artifacts and are loaded by the Compiler/Prompt Builder rather than copied here.
+
+entity:
+  entity_type: brand
+  entity_id: runtime_required
+
+execution_mode:
+  supported: [FULL, PARTIAL]
+  default: FULL
+  semantics:
+    FULL: Execute the complete Identity test flow and produce all applicable Identity outputs.
+    PARTIAL: Execute only explicitly requested processor scopes/outputs plus required dependencies according to processor contracts.
+
+runtime_inputs:
+  required:
+    - entity_type
+    - entity_id
+    - website_url
+  optional:
+    - requested_processors
+    - requested_outputs
+    - connected_source_availability
+    - execution_reason
+    - persist_results
+
+input_ownership:
+  website_url:
+    origin: application_input
+    producer: null
+    intelligence_derived: false
+
+preflight:
+  required_checks:
+    - entity_type == brand
+    - entity_id exists
+    - website_url is valid
+    - execution profile can be loaded
+    - frozen Identity object definitions can be loaded
+    - required processor definitions can be loaded
+    - required processor artifacts can be loaded
+    - required runtime/model configuration can be resolved
+    - required provider credentials/configuration are available
+    - persistence mapping is available when persist_results != false
+  on_failure:
+    action: DO_NOT_START_PROCESSOR_EXECUTION
+    return_structured_error: true
+    persist_execution_record_when_possible: true
+
+stages:
+  - id: stage_0_gatekeeper_and_website_evidence
+    execution: PARALLEL
+    tasks:
+      - id: gatekeeper
+        owner: intelligence_compiler
+        processor: industry_classification
+        scope: gatekeeper
+        input_source: website_direct
+        active_outputs: [industry, sub_industry]
+        fresh_execution_required: true
+        model_runtime: RESOLVE_FROM_PROCESSOR_AND_RUNTIME_CONFIG
+        artifacts: LOAD_PROCESSOR_ARTIFACTS
+
+      - id: website_evidence_acquisition
+        owner: evidence_acquisition
+        operation: build_website_evidence
+        input: website_url
+        contract: brand_intelligence.identity.evidence
+        start_scope: homepage_then_discovered_pages
+        fresh_execution_required: true
+
+    synchronization:
+      gatekeeper_result_required_for_continuation: true
+      website_evidence_required_before_identity_core: true
+
+    gatekeeper_routes:
+      RESOLVED_SUPPORTED:
+        action: CONTINUE
+      RESOLVED_UNSUPPORTED:
+        action: STOP_PROFILE
+        result: TEST_UNSUPPORTED_BUSINESS
+        technical_failure: false
+      UNRESOLVED_UNKNOWN:
+        action: STOP_PROFILE
+        result: TEST_INDUSTRY_UNRESOLVED
+        technical_failure: false
+
+  - id: stage_1_identity_core
+    starts_when:
+      - gatekeeper route == RESOLVED_SUPPORTED
+      - required Website Evidence for identity_core is available
+    tasks:
+      - id: identity_core
+        owner: intelligence_compiler
+        processor: identity_core
+        input_source: website_evidence
+        active_outputs:
+          full: [brand_name, brand_logo, tagline, country, business_geography, primary_language, website_currency, instagram_handle, youtube_handle, tiktok_handle, facebook_handle, linkedin_handle]
+        model_runtime: RESOLVE_FROM_PROCESSOR_AND_RUNTIME_CONFIG
+        artifacts: LOAD_PROCESSOR_ARTIFACTS
+        output_validation: REQUIRED_BEFORE_PERSISTENCE
+        fresh_execution_required: true
+
+      - id: reporting_currency
+        owner: deterministic_runtime
+        operation: derive_reporting_currency
+        depends_on:
+          processor: identity_core
+          output: country
+        mapping: {IN: INR, US: USD, DEFAULT: USD}
+        null_dependency_behavior: DO_NOT_DERIVE_UNTIL_COUNTRY_RESOLVED
+
+    test_specific_null_policy:
+      - Unlike identity_onboarding, this profile has no user checkpoint to resolve AI-null country or website_currency.
+      - A nullable AI output permitted by its processor contract is not itself a processor failure.
+      - reporting_currency remains unresolved if country is unresolved.
+      - Downstream tasks requiring country cannot execute successfully without a resolved country and must return a dependency error rather than invent a value.
+
+  - id: stage_2_dependent_identity
+    starts_when:
+      - stage_1_identity_core processor execution completed
+    execution: PARALLEL_WHERE_DEPENDENCIES_ALLOW
+    tasks:
+      - id: industry_niche
+        owner: intelligence_compiler
+        processor: industry_classification
+        scope: industry_niche
+        active_outputs: [industry_niche]
+        canonical_dependencies: [industry, sub_industry]
+        input_source: website_evidence
+        model_runtime: RESOLVE_FROM_PROCESSOR_AND_RUNTIME_CONFIG
+        artifacts: LOAD_PROCESSOR_ARTIFACTS
+        output_validation: REQUIRED_BEFORE_PERSISTENCE
+        fresh_execution_required: true
+
+      - id: market_geography
+        owner: intelligence_compiler
+        processor: market_geography
+        active_outputs: [markets_served]
+        canonical_dependencies: [country]
+        optional_canonical_context: [business_geography]
+        evidence:
+          required: [website_evidence]
+          optional: [similarweb_geography, instagram_audience_geography]
+        optional_evidence_wait_policy: DO_NOT_BLOCK
+        model_runtime: RESOLVE_FROM_PROCESSOR_AND_RUNTIME_CONFIG
+        artifacts: LOAD_PROCESSOR_ARTIFACTS
+        output_validation: REQUIRED_BEFORE_PERSISTENCE
+        fresh_execution_required: true
+
+    parallel_rule:
+      - industry_niche and market_geography may dispatch concurrently once their own dependencies are satisfied.
+      - Failure or missing dependency of one task does not create a false dependency on the other.
+
+persistence:
+  default: true
+  behavior:
+    - Persist only outputs that pass their owning output contract.
+    - Resolve each Intelligence Object to its canonical backend storage mapping; do not create duplicate value storage merely because the value is Intelligence-derived.
+    - This test profile does not apply onboarding locks.
+    - Test executions must remain distinguishable from production/onboarding executions in runtime records.
+  when_persist_results_false:
+    - Validate and return outputs without writing canonical Brand values.
+    - Runtime execution records may still be persisted for debugging/telemetry.
+
+completion:
+  full_success_when:
+    - gatekeeper == RESOLVED_SUPPORTED
+    - required Website Evidence acquisition succeeded
+    - identity_core completed with a valid output
+    - deterministic derivations whose dependencies resolved were evaluated
+    - industry_niche completed according to its contract
+    - market_geography completed according to its contract
+    - selected outputs passed validation
+    - persistence succeeded when enabled
+  result: IDENTITY_TEST_COMPLETE
+
+partial_execution_policy:
+  - requested_processors/requested_outputs are resolved by the Compiler to processor scopes and dependencies.
+  - Callers address processor/object IDs, not repository file paths.
+  - A partial request must not execute unrelated outputs solely because they share a processor.
+  - Required evidence acquisition may still run when needed by the requested processor.
+  - Existing values do not automatically satisfy a dependency marked fresh_execution_required.
+
+compiler_and_prompt_builder_contract:
+  for_each_ai_task:
+    - load processor definition
+    - resolve active output scope
+    - resolve required and optional inputs/evidence
+    - load applicable global LLM artifacts when defined
+    - load processor-specific artifacts
+    - resolve model/runtime profile
+    - call Prompt Builder
+    - execute configured model/provider
+    - parse structured response
+    - validate against active output contract
+    - persist valid outputs when enabled
+    - write Processor Execution telemetry
+  note: Exact global artifacts, model profiles and Prompt Builder implementation will be defined next; this profile establishes where they are consumed.
+
+parallel_execution_policy:
+  - PARALLEL is declarative intent and must be translated by the Compiler/orchestrator into concurrent dispatch.
+  - Parallel tasks retain independent Processor Execution records.
+  - Output validation and persistence occur per task and cannot be bypassed by parallel execution.
+
+retry_policy:
+  - Retry the failed task rather than restarting the complete profile when prerequisite evidence/state remains valid.
+  - Provider retry count/backoff belongs to runtime configuration, not this profile.
+
+failure_policy:
+  preflight_failure: {profile_status: FAILED_PRECHECK, processor_started: false}
+  unsupported_business: {profile_status: STOPPED_EXPECTED, technical_failure: false}
+  unresolved_industry: {profile_status: STOPPED_EXPECTED, technical_failure: false}
+  required_evidence_failure: {profile_status: FAILED, return_structured_error: true}
+  processor_failure: {task_status: FAILED, return_structured_error: true}
+  dependency_unresolved: {task_status: BLOCKED_OR_FAILED_DEPENDENCY, do_not_invent_value: true}
+  output_contract_failure: {task_status: FAILED_VALIDATION, do_not_persist_invalid_output: true}
+  persistence_failure: {task_status: FAILED_PERSISTENCE, profile_success: false}
+
+runtime_record_requirements:
+  execution:
+    - execution_id
+    - execution_profile_id
+    - execution_profile_version
+    - environment
+    - entity_type
+    - entity_id
+    - website_url
+    - execution_mode
+    - requested_processors_or_outputs_when_partial
+    - status
+    - started_at
+    - completed_at
+    - total_latency
+    - structured_errors
+  processor_execution:
+    - processor_execution_id
+    - execution_id
+    - processor_id
+    - processor_scope_when_applicable
+    - processor_version
+    - active_outputs
+    - model_runtime_profile
+    - provider_and_model_resolved_at_runtime
+    - prompt_or_artifact_versions
+    - evidence_run_ids_or_refs
+    - status
+    - input_tokens_when_available
+    - output_tokens_when_available
+    - provider_cost_when_available
+    - latency
+    - validation_status
+    - structured_error
+
+success_criteria_for_first_runtime_validation:
+  - A developer/admin can invoke identity_test with entity_id and website_url.
+  - Gatekeeper and Website Evidence acquisition start concurrently.
+  - The Compiler loads processor definitions/artifacts rather than embedding their reasoning in code.
+  - The Prompt Builder receives all required components for each AI task.
+  - At least identity_core produces contract-valid structured output.
+  - industry_niche and market_geography can dispatch concurrently after dependencies resolve.
+  - Valid outputs can be persisted through canonical backend mappings or returned without persistence in dry-run mode.
+  - Runtime records expose enough information to diagnose model, evidence, validation, latency and cost failures.
+
+non_goals:
+  - onboarding scan-admission safeguards
+  - seven-day result reuse
+  - user review/checkpoint UI
+  - provisional manual edits
+  - domain verification
+  - onboarding locks
+  - final Surface Intelligence review
+  - Deep Intelligence execution

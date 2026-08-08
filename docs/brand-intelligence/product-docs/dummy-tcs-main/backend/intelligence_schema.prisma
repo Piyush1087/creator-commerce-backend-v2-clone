@@ -1,0 +1,58 @@
+// Creator Shop Intelligence — focused backend schema working view
+//
+// PURPOSE
+// This is NOT a copy of the complete application schema.
+// Add only existing fields/models encountered by Intelligence and new fields/models
+// required by the Intelligence architecture.
+//
+// IMPORTANT
+// The current production Prisma schema remains authoritative until a developer
+// reconciles these definitions and creates reviewed migrations.
+
+// ============================================================================
+// EXISTING APPLICATION SCHEMA — IDENTITY FIELDS
+// ============================================================================
+//
+// The final Identity mapping will be written here after the Identity Object
+// Registry is frozen. We intentionally do not reconstruct or guess the existing
+// BrandProfile model from partial documentation.
+//
+// Known Identity concerns to map against the current backend include:
+// - website / domain
+// - brand name
+// - logo
+// - social handles
+// - industry
+// - sub-industry
+// - country / business geography
+// - website currency
+// - reporting / transaction currency
+// - primary language
+// - markets
+// - object-level user confirmation / permanent-lock state
+//
+// Existing fields will be copied here only when encountered and verified against
+// the current backend schema.
+
+
+// ============================================================================
+// NEW INTELLIGENCE RUNTIME MODELS — TO BE FROZEN WITH IDENTITY
+// ============================================================================
+//
+// We have established the need for two global runtime concerns:
+//
+// 1. Processor Execution
+//    Immutable execution telemetry: processor/version, entity, executor/model,
+//    resolved artifacts, timing, tokens/cost where applicable, retries, status,
+//    errors and timestamps.
+//
+// 2. Intelligence State / History
+//    Object-level provenance and lifecycle metadata that should not duplicate the
+//    canonical application value: evidence lineage, execution lineage, confidence
+//    where applicable, confirmation/manual override, protection/lock state and
+//    historical values.
+//
+// Concrete Prisma models/relations are intentionally deferred until Identity
+// objects are mapped to the verified current backend schema. This prevents the
+// architecture document from inventing foreign keys or duplicating existing
+// application models.

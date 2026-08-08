@@ -1,0 +1,266 @@
+id: identity_onboarding
+version: 1.0-frozen
+status: FROZEN
+
+purpose: Execute Brand Intelligence > Identity for onboarding after the application/scan-admission layer permits a fresh scan, including fast eligibility classification, parallel website evidence acquisition, core Identity extraction, early Identity checkpoint, provisional user edits, domain verification, canonical commit, and dependent Identity intelligence.
+
+architecture_boundary:
+  - This profile defines execution order, concurrency, gates, prerequisites and active processor scopes after fresh execution has been admitted.
+  - Trigger rules remain separate.
+  - Existing-brand checks, 7-day scan reuse and abuse/rate safeguards belong to the application/scan-admission layer before this profile is invoked.
+  - Evidence Acquisition may run concurrently with Intelligence execution but remains a separate responsibility.
+  - A user/application pause is persisted and resumed later; no compiler worker remains alive while waiting for user action or domain verification.
+
+entity:
+  entity_type: brand
+  entity_id: runtime_required
+
+execution_mode:
+  supported: [FULL, PARTIAL]
+  default_for_onboarding: FULL
+  semantics:
+    FULL: Execute all stages applicable to this profile, subject to eligibility and verification gates.
+    PARTIAL: Execute only explicitly requested processors/output scopes plus required fresh dependencies; an existing Intelligence Object does not satisfy a dependency when fresh_execution_required=true.
+
+runtime_inputs:
+  required: [entity_type, entity_id, website_url, fresh_scan_admitted]
+  optional: [requested_processors, requested_outputs, existing_intelligence, connected_source_availability, execution_reason]
+
+input_ownership:
+  website_url:
+    origin: application_input
+    producer: null
+    intelligence_derived: false
+    role: processor_and_acquisition_input
+
+precondition_from_application_layer:
+  requirement: fresh_scan_admitted
+  checks_completed_before_invocation:
+    verified_brand:
+      rule: If the normalized domain already belongs to a verified brand, do not invoke this profile; return the existing-brand/contact-admin journey.
+    recent_scan_reuse:
+      rule: Reuse only an eligible reusable result for the same normalized domain within the last 7 days; the mere existence of any execution is not sufficient.
+      reusable_examples: [SUPPORTED_COMPLETED_SCAN, RESOLVED_UNSUPPORTED_BUSINESS_OUTCOME]
+      not_reusable_examples: [TECHNICAL_FAILURE, INCOMPLETE_FAILED_SCAN, PENDING_PROVISIONAL_EDITS]
+      note: UNRESOLVED classification outcomes may use a separate application retry/cache policy; they must not be confused with technical failures.
+    abuse_safeguard:
+      rule: When the configured submission threshold is reached, required pre-scan domain verification must succeed before a fresh execution is admitted.
+  note: These checks are invocation assumptions, not Intelligence processor logic.
+
+preflight:
+  fail_before_execution_if:
+    - entity_type != brand
+    - entity_id is missing
+    - website_url is missing_or_invalid
+    - fresh_scan_admitted is not true
+    - industry_classification processor definition cannot be loaded
+    - required gatekeeper artifacts cannot be loaded
+    - configured gatekeeper model/provider is unavailable_at_dispatch
+
+stages:
+  - id: stage_0_gatekeeper_and_acquisition
+    execution: PARALLEL
+    tasks:
+      - id: gatekeeper
+        owner: intelligence_compiler
+        processor: industry_classification
+        scope: gatekeeper
+        input_source: website_direct
+        active_outputs: [industry, sub_industry]
+        fresh_execution_required: true
+        blocking_for_stage_completion: true
+      - id: website_evidence_acquisition
+        owner: evidence_acquisition
+        operation: build_website_evidence
+        start_scope: homepage_then_discovered_pages
+        blocking_for_stage_completion: false
+        cancellable: true
+    gatekeeper_routes:
+      RESOLVED_SUPPORTED: {action: CONTINUE}
+      RESOLVED_UNSUPPORTED:
+        action: STOP_PROFILE
+        onboarding_result: UNSUPPORTED_BUSINESS
+        acquisition_action: CANCEL_OR_DISCARD_WHERE_PRACTICAL
+      UNRESOLVED_UNKNOWN:
+        action: STOP_PROFILE
+        onboarding_result: INDUSTRY_UNRESOLVED
+        acquisition_action: CANCEL_OR_DISCARD_WHERE_PRACTICAL
+        diagnostic_policy: retain_runtime_failure_and_evidence_diagnostics_for_pattern_analysis
+
+  - id: stage_1_core_identity
+    starts_when:
+      - gatekeeper route == RESOLVED_SUPPORTED
+      - required Website Evidence for identity_core is available
+    tasks:
+      - id: identity_core
+        owner: intelligence_compiler
+        processor: identity_core
+        scope: requested_or_full
+        input_source: website_evidence
+        active_outputs:
+          full: [brand_name, brand_logo, tagline, country, business_geography, primary_language, website_currency, instagram_handle, youtube_handle, tiktok_handle, facebook_handle, linkedin_handle]
+        fresh_execution_required: true
+      - id: reporting_currency
+        owner: deterministic_runtime
+        operation: derive_reporting_currency
+        depends_on: {processor: identity_core, output: country, fresh_execution_required: true}
+        mapping: {IN: INR, US: USD, DEFAULT: USD}
+        provisional_behavior: May be derived from the AI country for display/runtime use, but must be recalculated if verified canonical country changes.
+    completion_requirement:
+      - AI-null values are permitted where the owning output contract permits null; checkpoint-required completion is handled by stage_2 rather than by forcing AI inference.
+
+  - id: stage_2_identity_checkpoint
+    type: USER_CHECKPOINT
+    checkpoint_id: identity_checkpoint
+    starts_when:
+      - stage_1_core_identity completed successfully
+    purpose: Early Identity checkpoint used to correct critical Identity anchors before remaining Surface Intelligence depends on them; this is not the final Surface Intelligence review.
+    display_objects: [brand_name, brand_logo, tagline, instagram_handle, youtube_handle, tiktok_handle, facebook_handle, linkedin_handle, industry, sub_industry, country, business_geography, primary_language, website_currency]
+    editable_objects: [brand_name, instagram_handle, youtube_handle, tiktok_handle, facebook_handle, linkedin_handle, industry, sub_industry, country, website_currency]
+    required_before_submit: [brand_name, industry, sub_industry, country, website_currency]
+    null_resolution_policy:
+      country: AI may return null; user must supply a valid value before checkpoint submission.
+      website_currency: AI may return null; user must supply a valid value before checkpoint submission.
+    ui_grouping_note: Social handles may be presented as one UI group while remaining separate Intelligence Objects.
+    behavior:
+      - Present AI-generated Identity values to the user.
+      - Displayed objects and editable checkpoint objects are distinct sets.
+      - Store manual corrections as provisional edits only; do not overwrite canonical Intelligence Objects yet.
+      - Preserve original AI-generated values while domain verification is pending.
+      - Submission moves the journey to domain verification; it does not itself make provisional edits canonical.
+    provisional_edit_record:
+      required_fields: [entity_id, execution_id, object_id, original_value, proposed_value, edited_at]
+      status: PENDING_DOMAIN_VERIFICATION
+    on_submit:
+      action: PERSIST_AND_WAIT_FOR_DOMAIN_VERIFICATION
+      runtime_behavior: Persist profile/checkpoint state, end the active worker, and resume later when the application supplies a verification outcome.
+    on_abandon: PROFILE_NOT_COMPLETE
+
+  - id: stage_3_domain_verification
+    type: APPLICATION_GATE
+    gate_id: domain_verification
+    resume_condition: persisted identity_checkpoint has been submitted
+    owner: application_identity_verification
+    verification_target: submitted_brand_domain
+    behavior:
+      - Domain verification is performed outside the Intelligence Compiler.
+      - The profile resumes from persisted state when a verification outcome is supplied.
+    routes:
+      VERIFIED: {action: COMMIT_PROVISIONAL_EDITS_AND_CONTINUE}
+      FAILED: {action: DISCARD_PROVISIONAL_EDITS_AND_STOP, onboarding_result: DOMAIN_VERIFICATION_FAILED}
+      ABANDONED_OR_EXPIRED: {action: DISCARD_PROVISIONAL_EDITS_AND_STOP, onboarding_result: DOMAIN_VERIFICATION_INCOMPLETE}
+    preservation_policy:
+      - AI-generated scan results may remain persisted/reusable according to application retention and eligible 7-day reuse policy.
+      - Only uncommitted manual edits are discarded on failed/abandoned verification.
+
+  - id: stage_4_canonical_commit
+    type: DETERMINISTIC_STATE_TRANSITION
+    starts_when:
+      - domain_verification == VERIFIED
+    behavior:
+      - Apply each provisional edit to its corresponding canonical application-backed Intelligence value.
+      - For review objects without a manual edit, retain the AI-generated value.
+      - Recalculate deterministic Intelligence Objects affected by changed canonical inputs.
+      - Apply onboarding locks according to Identity Object lifecycle policy.
+      - Mark provisional edit records as COMMITTED.
+    lock_semantics:
+      meaning: Locked fields cannot be changed through normal user editing or automated Intelligence refresh after verification.
+      not_database_immutable: true
+      authorized_override: Controlled admin/system correction may update them when explicitly permitted.
+    deterministic_recalculation:
+      reporting_currency:
+        when: country changed
+        mapping: {IN: INR, US: USD, DEFAULT: USD}
+    completion_marker: identity_checkpoint_confirmed
+
+  - id: stage_5_dependent_identity
+    starts_when:
+      - identity_checkpoint_confirmed == true
+    execution: PARALLEL_WHERE_DEPENDENCIES_ALLOW
+    tasks:
+      - id: industry_niche
+        owner: intelligence_compiler
+        processor: industry_classification
+        scope: industry_niche
+        active_outputs: [industry_niche]
+        canonical_dependencies: [industry, sub_industry]
+        dependency_semantics: use_post_verification_canonical_values
+        fresh_execution_required: true
+      - id: market_geography
+        owner: intelligence_compiler
+        processor: market_geography
+        active_outputs: [markets_served]
+        canonical_dependencies: [country]
+        optional_canonical_context: [business_geography]
+        evidence:
+          required: [website_evidence]
+          optional: [similarweb_geography, instagram_audience_geography]
+        external_evidence_wait_policy: DO_NOT_BLOCK_FOR_OPTIONAL_SOURCES
+        dependency_semantics: use_post_verification_canonical_values
+        fresh_execution_required: true
+    note: industry_niche and market_geography execute only after verified canonical commit and may run concurrently because neither depends on the other's output.
+
+completion:
+  success_when:
+    - gatekeeper was RESOLVED_SUPPORTED
+    - domain was VERIFIED
+    - provisional edits were committed or no edits existed
+    - onboarding locks were applied as required
+    - all required selected dependent tasks completed
+    - outputs passed their processor output contracts
+    - resulting canonical application values were persisted successfully
+  result: IDENTITY_ONBOARDING_COMPLETE
+
+partial_execution_policy:
+  - Compiler receives explicit requested_processors and/or requested_outputs.
+  - Compiler resolves the owning processor from processor/object definitions; callers do not address processors by file path.
+  - Execute only the required scope of a multi-scope processor when its contract permits partial execution.
+  - Do not rerun unrelated outputs merely because they share a processor.
+  - Evaluate dependency freshness rather than merely checking whether an old object exists.
+  - Checkpoint-locked canonical values are excluded from normal automated refresh unless an explicitly authorized lifecycle path permits replacement.
+
+parallel_execution_policy:
+  - PARALLEL is declarative profile intent; the compiler/orchestrator translates it into concurrent task dispatch.
+  - Independent AI tasks may be dispatched concurrently.
+  - A task becomes runnable only when declared fresh dependencies and gates are satisfied.
+  - Parallel execution must not bypass output validation, persistence or failure handling.
+
+retry_policy:
+  - Retry the failed task rather than restarting the full profile when valid prerequisite state/evidence can be reused.
+  - Reuse prerequisite evidence/state only when still valid for the retry.
+
+failure_policy:
+  preflight_failure: {action: DO_NOT_START, persist_execution_record: true}
+  gatekeeper_business_outcome: {action: STOP_AS_EXPECTED_ONBOARDING_OUTCOME, technical_failure: false}
+  processor_or_provider_failure: {action: FAIL_TASK, persist_execution_record: true, return_structured_error: true}
+  output_contract_failure: {action: FAIL_TASK, persist_validation_error: true, do_not_persist_invalid_intelligence: true}
+  evidence_unavailable:
+    required_evidence: FAIL_OR_WAIT_ACCORDING_TO_TASK_REQUIREMENT
+    optional_external_evidence: CONTINUE_WITH_AVAILABLE_EVIDENCE
+  persistence_failure: {action: FAIL_TASK, do_not_report_profile_success: true}
+  domain_verification_failure: {action: DISCARD_PROVISIONAL_EDITS_AND_STOP, technical_failure: false}
+
+runtime_record_requirements:
+  - execution_profile_id
+  - execution_id
+  - entity_type
+  - entity_id
+  - execution_mode
+  - execution_reason_when_supplied
+  - stage_and_task_status
+  - processor_execution_ids
+  - evidence_acquisition_run_ids_when_applicable
+  - identity_checkpoint_status
+  - domain_verification_status
+  - provisional_edit_status
+  - canonical_commit_status
+  - started_at
+  - completed_at
+  - structured_errors
+
+non_goals:
+  - This profile does not define trigger schedules/events.
+  - This profile does not implement scan-admission safeguards or 7-day reuse storage/query logic.
+  - This profile does not contain processor reasoning or taxonomy.
+  - This profile does not define model selection; model/runtime configuration is supplied through the compiler/prompt package/runtime configuration.
+  - This profile does not define Evidence semantics; those live in the branch Evidence contract.

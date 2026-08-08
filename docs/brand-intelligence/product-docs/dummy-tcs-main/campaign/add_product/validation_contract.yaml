@@ -1,0 +1,102 @@
+version: "1.0"
+status: FROZEN
+module: add_product
+artifact: validation_contract
+
+principles:
+  - Validate early in UI but always revalidate authoritatively on backend.
+  - Validate current persisted state at action time; stale UI state is never authoritative.
+  - Keep validation ownership distributed across Campaign, Brand Centre, CampaignAsset, Brief, Applicants and Roles/Permissions.
+
+add_validation_order:
+  - CAMPAIGN_EXISTS
+  - CAMPAIGN_STATE_ALLOWS_ADD
+  - ASSET_TYPE_AVAILABLE_FROM_BRAND_CENTRE
+  - ASSET_REFERENCE_EXISTS
+  - ASSET_REFERENCE_MATCHES_TYPE
+  - ASSET_BELONGS_TO_CAMPAIGN_BRAND
+  - ASSET_IS_CAMPAIGN_SELECTABLE
+  - CAMPAIGN_ASSET_DUPLICATE_DOES_NOT_EXIST
+  - BRAND_ASSET_UNIQUENESS_SATISFIED
+
+campaign_operation_matrix:
+  DRAFT: {add: false, pause_asset: false, resume_asset: false}
+  PUBLISHED: {add: true, pause_asset: true, resume_asset: true}
+  LIVE: {add: true, pause_asset: true, resume_asset: true}
+  PAUSED: {add: false, pause_asset: false, resume_asset: false}
+  COMPLETED: {add: false, pause_asset: false, resume_asset: false}
+  ARCHIVED: {add: false, pause_asset: false, resume_asset: false}
+
+pause_validation:
+  requires_asset_status: ACTIVE
+  last_execution_ready_asset_may_be_paused: true
+  existing_applications_block: false
+  existing_collaborations_block: false
+
+resume_validation:
+  requires_asset_status: PAUSED
+  revalidate_reference_exists: true
+  revalidate_campaign_selectable: true
+  active_brief_required: false
+
+apply_time_boundary:
+  owner: DOWNSTREAM_APPLY_RUNTIME
+  required_path_state: [CAMPAIGN_LIVE, CAMPAIGN_ASSET_ACTIVE, BRIEF_ACTIVE, BRIEF_BELONGS_TO_CAMPAIGN_ASSET]
+  duplicate_application_owner: APPLICANTS
+
+brand_centre_archive_delete:
+  block_when_referenced_by_campaign_status: [PUBLISHED, LIVE, PAUSED]
+  completed_archived_behavior: DEFERRED
+
+semantic_errors:
+  - CAMPAIGN_NOT_FOUND
+  - CAMPAIGN_ASSET_NOT_FOUND
+  - CAMPAIGN_STATE_DISALLOWS_ASSET_ADD
+  - CAMPAIGN_STATE_DISALLOWS_ASSET_PAUSE
+  - CAMPAIGN_STATE_DISALLOWS_ASSET_RESUME
+  - ASSET_TYPE_NOT_SUPPORTED
+  - ASSET_REFERENCE_NOT_FOUND
+  - ASSET_TYPE_REFERENCE_MISMATCH
+  - ASSET_NOT_OWNED_BY_CAMPAIGN_BRAND
+  - ASSET_NOT_CAMPAIGN_SELECTABLE
+  - CAMPAIGN_ASSET_ALREADY_EXISTS
+  - CAMPAIGN_BRAND_ASSET_ALREADY_EXISTS
+  - CAMPAIGN_ASSET_ALREADY_PAUSED
+  - CAMPAIGN_ASSET_ALREADY_ACTIVE
+  - CAMPAIGN_ASSET_REFERENCE_UNAVAILABLE
+
+not_validated_here:
+  - follower_eligibility
+  - audience_match
+  - archetype_match
+  - ai_match_score
+  - commercial_sufficiency
+  - total_campaign_budget_sufficiency
+  - creator_availability
+  - meta_connection
+  - discovery_availability
+  - existing_application_presence
+  - existing_collaboration_presence
+  - same_asset_in_other_campaigns
+
+invariants:
+  - VAL-01 Every operation validates current persisted state.
+  - VAL-02 Frontend validation never replaces backend validation.
+  - VAL-03 ADD is permitted only for normal Campaigns in PUBLISHED or LIVE.
+  - VAL-04 PAUSE and RESUME are permitted only in PUBLISHED or LIVE.
+  - VAL-05 Asset Type must be currently available from Brand Centre.
+  - VAL-06 Asset reference must exist.
+  - VAL-07 Asset reference must match submitted Asset Type.
+  - VAL-08 Asset reference must belong to Campaign Brand.
+  - VAL-09 Asset must be campaign-selectable according to Brand Centre.
+  - VAL-10 Campaign plus canonical Asset reference must remain unique across ACTIVE and PAUSED records.
+  - VAL-11 At most one BRAND CampaignAsset may exist per Campaign.
+  - VAL-12 Pausing the last execution-ready CampaignAsset is valid.
+  - VAL-13 Existing Applications never block Asset Pause.
+  - VAL-14 Existing Collaborations never block Asset Pause.
+  - VAL-15 Asset Resume revalidates the live Brand Centre reference.
+  - VAL-16 Asset Resume does not require an active Brief.
+  - VAL-17 Campaign Resume never automatically resumes CampaignAssets.
+  - VAL-18 Apply-time validation is CampaignAsset x Brief specific.
+  - VAL-19 Brand Centre reference destruction is blocked for PUBLISHED, LIVE and PAUSED Campaigns.
+  - VAL-20 Concurrent persisted state is authoritative over stale UI state.

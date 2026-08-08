@@ -48,7 +48,10 @@ export class BrandSocialSyncService {
 
   async getOauthUrl(user: AuthUser, redirectUri: string) {
     const brand = await this.brandAuth.resolveBrandProfile(user);
-    const finalized = this.requireFinalizedHandle(brand.igHandle);
+    // Handle match gate temporarily disabled for onboarding social-sync.
+    const finalized = brand.igHandle
+      ? normalizeHandle(brand.igHandle)
+      : null;
     const state = Buffer.from(
       JSON.stringify({
         brandProfileId: brand.id,
@@ -210,7 +213,6 @@ export class BrandSocialSyncService {
     if (!brand) {
       throw new NotFoundException("Brand profile not found");
     }
-    const finalized = this.requireFinalizedHandle(brand.igHandle);
 
     const tokenResult = await this.oauth.exchangeAuthorizationCode(
       args.code,
@@ -226,12 +228,8 @@ export class BrandSocialSyncService {
       });
     }
 
-    if (normalizeHandle(me.username) !== finalized) {
-      throw new BadRequestException({
-        code: "HANDLE_MISMATCH",
-        message: `Connection Failed: The authenticated Instagram account (@${me.username}) does not match the finalized brand handle (@${finalized}).`,
-      });
-    }
+    // Upstream handle match temporarily disabled — accept the authenticated
+    // professional account and persist its handle onto the brand profile.
 
     const permissionNames = [
       ...tokenResult.permissions,
@@ -296,15 +294,6 @@ export class BrandSocialSyncService {
       scopes,
       brandProfileId: brand.id,
     };
-  }
-
-  private requireFinalizedHandle(igHandle: string | null): string {
-    if (!igHandle?.trim()) {
-      throw new BadRequestException(
-        "Upstream finalized Instagram handle is missing. Confirm core identity first.",
-      );
-    }
-    return normalizeHandle(igHandle);
   }
 
   private async findValidInvite(token: string) {

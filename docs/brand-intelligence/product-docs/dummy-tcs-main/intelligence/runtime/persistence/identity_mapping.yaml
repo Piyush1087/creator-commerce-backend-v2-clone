@@ -1,0 +1,172 @@
+id: identity_persistence_mapping
+version: 0.2-working
+status: WORKING
+engine: brand_intelligence
+branch: identity
+schema_reference: Current Schema 0208 (2026-08-02)
+
+purpose: Map validated Identity outputs into the existing canonical BrandProfile/DiscoveryLead storage and identify only the minimal schema additions required. No duplicate Intelligence value store is introduced.
+
+principles:
+  - Existing canonical backend fields remain canonical storage targets.
+  - Preserve existing field names and frontend/backend connections.
+  - IndustryVertical remains the current backend source-of-truth enum for industry persistence in MVP; BrandRoutingType remains a separate legacy/routing field and is not renamed or silently replaced.
+  - DiscoveryLead is the canonical pre-BrandProfile store for Gatekeeper/onboarding scan state; BrandProfile is the canonical verified Brand store.
+  - Existing Location rows are physical/service locations and must not be overloaded for business_geography or markets_served.
+
+objects:
+  website_url:
+    pre_brand_target: DiscoveryLead.normalizedUrl
+    brand_target: BrandProfile.domain
+    status: EXISTING
+    persistence_mode: APPLICATION_INPUT_ONLY
+
+  brand_name:
+    target: BrandProfile.name
+    db_column: brand_name
+    status: EXISTING
+
+  brand_logo:
+    target: BrandProfile.logoUrl
+    db_column: logo_url
+    status: EXISTING
+
+  tagline:
+    target: BrandProfile.tagline
+    status: EXISTING
+
+  industry:
+    pre_brand_target: DiscoveryLead.industry
+    brand_target: BrandProfile.industry
+    type: IndustryVertical
+    status: EXISTING_WITH_CANONICAL_MAPPING
+    note: Intelligence canonical industry labels must map to the existing IndustryVertical values. Do not change enum names or BrandRoutingType connections in this migration.
+
+  sub_industry:
+    pre_brand_target: DiscoveryLead.subIndustry
+    brand_target: BrandProfile.subIndustry
+    status: EXISTING
+
+  industry_niche:
+    pre_brand_target: DiscoveryLead.industryNiche
+    brand_target: BrandProfile.industryNiche
+    status: EXISTING
+
+  country:
+    target: BrandProfile.countryCode
+    status: EXISTING
+    format: ISO_3166_1_ALPHA_2
+
+  business_geography:
+    target: BrandProfile.businessGeography
+    status: ADD
+    prisma_type: Json?
+    db_column: business_geography
+    note: Do not overload Location.
+
+  markets_served:
+    target: BrandProfile.marketsServed
+    status: ADD
+    prisma_type: Json?
+    db_column: markets_served
+    note: JSONB/Prisma Json is sufficient for MVP and supports locality/radius, region, country and global scopes.
+
+  primary_language:
+    target: BrandProfile.primaryLanguage
+    status: ADD
+    prisma_type: String?
+    db_column: primary_language
+    format: ISO_639_1_lowercase
+
+  website_currency:
+    target: BrandProfile.websiteCurrency
+    status: ADD
+    prisma_type: String?
+    db_column: website_currency
+    format: ISO_4217_uppercase
+
+  reporting_currency:
+    target: BrandProfile.currencyCode
+    status: EXISTING
+    allowed_values: [INR, USD]
+    note: Existing field is retained as platform reporting/transaction currency; default USD remains untouched by this patch.
+
+  instagram_handle:
+    target: BrandProfile.igHandle
+    status: EXISTING
+
+  youtube_handle:
+    target: BrandProfile.ytHandle
+    status: EXISTING
+
+  tiktok_handle:
+    target: BrandProfile.tiktokHandle
+    status: EXISTING
+
+  facebook_handle:
+    target: BrandProfile.facebookHandle
+    status: ADD
+    prisma_type: String?
+    db_column: facebook_handle
+
+  linkedin_handle:
+    target: BrandProfile.linkedinHandle
+    status: ADD
+    prisma_type: String?
+    db_column: linkedin_handle
+
+schema_patch_required:
+  BrandProfile:
+    add:
+      - businessGeography Json? @map("business_geography")
+      - marketsServed Json? @map("markets_served")
+      - primaryLanguage String? @map("primary_language")
+      - websiteCurrency String? @map("website_currency")
+      - facebookHandle String? @map("facebook_handle")
+      - linkedinHandle String? @map("linkedin_handle")
+  no_change_required:
+    - domain
+    - name
+    - industry
+    - subIndustry
+    - industryNiche
+    - logoUrl
+    - tagline
+    - countryCode
+    - currencyCode
+    - igHandle
+    - ytHandle
+    - tiktokHandle
+    - brandRoutingType
+
+industry_compatibility:
+  backend_enum: IndustryVertical
+  existing_values_include: [D2C, SAAS_AI, HEALTHCARE, OFFLINE_SERVICES]
+  intelligence_to_backend:
+    D2C: D2C
+    AI_SAAS: SAAS_AI
+    HEALTHCARE: HEALTHCARE
+    OFFLINE_EXPERIENCES_SERVICES: OFFLINE_SERVICES
+  rule: This adapter mapping protects existing database/frontend enum contracts. Intelligence nomenclature does not require renaming the deployed enum.
+
+write_contract:
+  - Only authoritative validated output may persist.
+  - One processor execution writes atomically to its target entity.
+  - Refresh respects manual-value protection.
+  - Null cannot overwrite a protected manual value.
+  - Gatekeeper values may persist to DiscoveryLead before BrandProfile exists.
+  - Canonical BrandProfile values are committed according to onboarding verification/checkpoint lifecycle, not merely because an AI processor returned them.
+
+identity_test_policy:
+  recommended_first_runs: persist_results=false
+  persist_results_true_allowed_after:
+    - six new BrandProfile fields are deployed
+    - Industry canonical mapping is implemented in persistence adapter
+    - integration tests confirm existing field semantics
+
+non_goals:
+  - rename IndustryVertical
+  - rename/remove BrandRoutingType
+  - change existing frontend contracts
+  - alter Location model
+  - redesign unrelated BrandProfile fields

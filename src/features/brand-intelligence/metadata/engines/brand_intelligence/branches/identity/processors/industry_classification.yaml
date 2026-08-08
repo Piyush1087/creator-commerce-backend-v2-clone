@@ -1,0 +1,49 @@
+id: industry_classification
+version: 1.1-frozen
+status: FROZEN
+engine: brand_intelligence
+branch: identity
+executor: ai
+
+purpose: Classify the brand within Creator Shop's industry hierarchy for eligibility routing and downstream intelligence.
+
+outputs: [industry, sub_industry, industry_niche]
+
+output_execution:
+  industry:
+    scope: gatekeeper
+    requires: [website_url]
+  sub_industry:
+    scope: gatekeeper
+    requires: [website_url]
+  industry_niche:
+    scope: industry_niche
+    requires: [industry, sub_industry, website_evidence.homepage]
+    requirement_note: industry and sub_industry must use current canonical post-checkpoint values, including verified user corrections.
+
+inputs:
+  required: [website_url]
+  optional: [website_evidence.homepage, website_evidence.about, website_evidence.product, website_evidence.collection, website_evidence.service, website_evidence.offering]
+
+acquisition_mode:
+  gatekeeper_current_mvp: gemini_direct_website_homepage
+  industry_niche: normalized_website_evidence
+  replaceable: true
+  note: Acquisition is not processor identity. A future evidence-first Gatekeeper path may replace direct website access without changing processor/output ownership.
+
+execution:
+  can_run_independently: true
+  partial_output_supported: true
+  scopes:
+    gatekeeper: [industry, sub_industry]
+    industry_niche: [industry_niche]
+
+artifacts:
+  location: artifacts/industry_classification/
+  status: FROZEN
+  note: Use the frozen reasoning, taxonomy and output-contract artifacts in this folder.
+
+failure_policy:
+  fail_if_required_input_for_requested_output_missing: true
+  fail_if_output_contract_invalid: true
+  no_silent_default: true

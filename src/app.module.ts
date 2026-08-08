@@ -6,6 +6,7 @@ import { AppController } from "./app.controller";
 import { AuthModule } from "./features/auth/auth.module";
 import { BrandCentreModule } from "./features/brand-centre/brand-centre.module";
 import { BrandCentreUceBridgeModule } from "./features/brand-centre-uce-bridge/brand-centre-uce-bridge.module";
+import { BrandIntelligenceModule } from "./features/brand-intelligence/brand-intelligence.module";
 import { BrandOnboardingModule } from "./features/brand-onboarding/brand-onboarding.module";
 import { BrandEscrowModule } from "./features/brand-escrow/brand-escrow.module";
 import { PricingModule } from "./features/pricing/pricing.module";
@@ -46,6 +47,7 @@ import { S3Module } from "./shared/s3/s3.module";
     HealthModule,
     AuthModule,
     BrandOnboardingModule,
+    BrandIntelligenceModule,
     BrandCentreModule,
     BrandCentreUceBridgeModule,
     BrandUceModule,

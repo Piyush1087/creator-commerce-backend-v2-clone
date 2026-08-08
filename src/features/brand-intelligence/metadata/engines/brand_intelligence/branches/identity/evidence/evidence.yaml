@@ -1,0 +1,296 @@
+version: 1.0-frozen
+status: FROZEN
+engine: brand_intelligence
+branch: identity
+
+# Evidence is factual processor input, not an Intelligence Object.
+# Acquisition/discovery decides what to collect. Intelligence processors decide what it means.
+
+principles:
+  - Evidence preserves source and acquisition provenance.
+  - Normalization removes technical/page noise but must not convert evidence into business conclusions.
+  - Website pages use one reusable page contract rather than branch-specific homepage/about/contact evidence types.
+  - Page discovery is an Evidence Acquisition capability, not an Intelligence processor.
+  - The Gemini used for page discovery is an acquisition-layer Gemini connection used with Zyte/Cheerio; it is separate from Intelligence Compiler LLM execution.
+  - Missing optional pages/evidence never cause fabricated values.
+  - Processors can filter Website Evidence by page type and combine multiple evidence sources.
+  - Traffic/audience geography is supporting evidence and does not independently prove that a market is commercially served.
+  - Asset extraction preserves candidate assets and their structural context; the normalizer does not decide which candidate is canonical.
+
+sources:
+  website_direct:
+    description: Direct website access by the configured AI provider for a processor scope that explicitly permits it.
+    current_use: [industry_classification.gatekeeper_scope]
+    current_provider: Gemini
+    replaceable: true
+    note: Current Gatekeeper reads only the homepage for speed.
+  website_acquisition:
+    description: Website acquisition and normalization pipeline that builds reusable Website Evidence.
+    current_fetcher: Zyte
+    current_normalizer: Cheerio_and_deterministic_cleaning
+    page_discovery:
+      current_selector: Gemini
+      role: Select useful URLs/pages from normalized discovered links/content for subsequent Zyte acquisition.
+      architectural_layer: evidence_acquisition
+      intelligence_processor: false
+      separate_from_intelligence_llm: true
+    replaceable_components: true
+  similarweb:
+    description: Normalized website traffic/geography evidence from the configured Similarweb acquisition path.
+    availability: optional
+  instagram:
+    description: Normalized Instagram evidence obtained through approved Meta/API integrations.
+    availability: optional_and_connection_dependent
+
+website_evidence:
+  description: Reusable normalized representation of the brand website available across intelligence engines and branches.
+
+  asset_contracts:
+    logo_candidate:
+      description: Factual candidate brand-mark asset extracted from owned website structure or metadata. Candidate creation is deterministic acquisition/normalization; canonical logo selection belongs to identity_core.
+      fields:
+        candidate_type:
+          required: true
+          enum: [IMAGE_URL, INLINE_SVG]
+        source_location:
+          required: true
+          enum: [HEADER, NAVIGATION, FOOTER, STRUCTURED_DATA, METADATA, MAIN_CONTENT, OTHER]
+        source_page_url: required
+        asset_url:
+          optional: true
+          description: Absolute normalized asset URL for externally referenced images/SVGs. Required for IMAGE_URL; null for INLINE_SVG unless acquisition persists the SVG and supplies an internal asset URL.
+        inline_svg_ref:
+          optional: true
+          description: Reference to preserved inline SVG content/payload; used instead of injecting full SVG markup into Intelligence prompts.
+        alt_text: optional
+        title_text: optional
+        width: optional
+        height: optional
+        mime_type: optional
+        structured_property:
+          optional: true
+          examples: [Organization.logo, WebSite.logo, og:image]
+        linked_home: optional_boolean
+        extraction_method:
+          required: true
+          examples: [img_src, img_srcset, inline_svg, json_ld, meta_tag, css_background]
+      invariants:
+        - IMAGE_URL requires asset_url.
+        - INLINE_SVG requires inline_svg_ref or an acquisition-generated persisted asset_url.
+        - Relative asset URLs must be normalized to absolute URLs before becoming evidence.
+        - Inline SVG markup must not be invented, rewritten or summarized by the Intelligence processor.
+        - Favicon and generic og:image may be retained as weak candidates but must not be promoted to canonical logo during evidence normalization.
+
+    image_candidate:
+      description: Generic factual image asset preserved for downstream processors; not assumed to be a logo.
+      fields:
+        asset_url: required
+        source_page_url: required
+        source_location: optional
+        alt_text: optional
+        title_text: optional
+        width: optional
+        height: optional
+        mime_type: optional
+
+  page_contract:
+    id: website_page
+    fields:
+      url: required
+      page_type: required
+      fetched_at: required
+      acquisition_status: required
+      seo:
+        title: optional
+        meta_description: optional
+        canonical_url: optional
+        robots: optional
+        hreflang: optional_array
+        open_graph: optional
+        twitter_card: optional
+      structure:
+        header: optional
+        navigation: optional_array
+        main_content: optional
+        footer: optional
+      content:
+        headings: optional_array
+        visible_text: optional
+        structured_data: optional
+      links:
+        internal: optional_array
+        external: optional_array
+        social: optional_array
+      media:
+        images:
+          type: array
+          optional: true
+          items: image_candidate
+        logo_candidates:
+          type: array
+          optional: true
+          items: logo_candidate
+      extracted_signals:
+        organization_name_candidates: optional_array
+        currency_signals: optional_array
+        geography_signals: optional_array
+        language_signals: optional_array
+        address_candidates: optional_array
+        phone_country_signals: optional_array
+        shipping_or_service_area_statements: optional_array
+        offering_labels: optional_array
+    normalization_rule: Extracted signals and asset candidates remain factual candidates/statements and must not become canonical intelligence during normalization.
+
+  page_types: [homepage, about, contact, product, collection, service, offering, pricing, locations, shipping, faq, policy, blog, other]
+
+  site_structure:
+    fields:
+      root_domain: required
+      homepage_url: required
+      discovered_urls: optional_array
+      navigation_links: optional_array
+      header_links: optional_array
+      footer_links: optional_array
+      page_relationships: optional_array
+      discovery_runs: optional_array
+
+  acquisition_metadata:
+    fields:
+      acquisition_run_id: required
+      started_at: required
+      completed_at: optional
+      fetcher: required
+      normalizer: required
+      discovery_selector: optional
+      pages_attempted: optional
+      pages_succeeded: optional
+      pages_failed: optional
+
+acquisition_flow:
+  on_website_submission:
+    parallel:
+      gatekeeper:
+        input: website_url
+        page_scope: homepage_only
+        method: Gemini_direct_website
+        output_destination: industry_classification_processor
+      website_indexing:
+        steps:
+          - Zyte_fetch_homepage
+          - Cheerio_normalize_homepage
+          - preserve_header_footer_navigation_SEO_metadata_links_main_content_and_asset_candidates
+          - normalize_relative_asset_urls_to_absolute
+          - preserve_inline_svg_by_reference_when_present
+          - Gemini_page_discovery_over_normalized_acquisition_output
+          - Zyte_fetch_selected_pages
+          - normalize_selected_pages_into_website_page_contract
+        note: Website indexing starts while Gatekeeper is running to hide acquisition latency. If the brand is rejected, downstream acquisition work may be cancelled/discarded where practical.
+
+  logo_candidate_extraction:
+    responsibility: Cheerio_and_deterministic_normalization
+    candidate_sources:
+      - header_or_navigation_img_src_or_srcset
+      - header_or_navigation_inline_svg
+      - structured_data_Organization_logo
+      - structured_data_WebSite_logo_when_present
+      - persistent_footer_brand_asset
+      - relevant_metadata_image_signals_as_weak_candidates
+      - css_background_image_when_structurally_associated_with_brand_header_or_navigation
+    priority_is_evidence_context_not_canonical_selection: true
+    note: Acquisition extracts candidates and context only. identity_core applies reasoning to select the canonical brand_logo.
+
+  page_discovery:
+    input: [normalized_homepage, discovered_internal_links, header_navigation, footer_links]
+    output: [selected_urls, predicted_page_types, acquisition_priority]
+    examples_of_targets: [about, contact, product, collection, service, pricing, locations, shipping, faq]
+    note: Page Discovery only decides what evidence to acquire. It does not create Brand/Product/Commercial Intelligence.
+
+  product_candidate_discovery_support:
+    principle: Product Intelligence should begin from homepage/site-structure signals before deep PDP acquisition.
+    acquisition_signals_to_preserve: [homepage_featured_product_links, bestseller_labels, new_launch_labels, featured_collection_links, navigation_prominence, hero_or_promotion_links]
+    note: These are evidence signals. Product Intelligence later determines product importance and canonical product objects.
+
+external_evidence:
+  similarweb_geography:
+    source: similarweb
+    availability: optional
+    fields:
+      observed_at: required
+      domain: required
+      source_method: required
+      country_traffic_share:
+        type: array
+        optional: true
+        items:
+          country_code: {type: string, normalization: ISO_3166_1_alpha_2}
+          traffic_share: {type: number, range: [0, 1]}
+        rule: Each country appears at most once; shares represent normalized source values and are not invented to sum to 1 when source coverage is partial.
+      top_countries:
+        type: array
+        optional: true
+        items:
+          country_code: {type: string, normalization: ISO_3166_1_alpha_2}
+          rank: {type: integer, minimum: 1}
+          traffic_share: {type: [number, 'null'], range_when_non_null: [0, 1]}
+    interpretation: Observed website traffic/demand geography; not independent proof of service availability.
+
+  instagram_audience_geography:
+    source: instagram
+    availability: optional_and_connection_dependent
+    fields:
+      observed_at: required
+      instagram_account_id: required
+      source_method: required
+      audience_country_distribution:
+        type: array
+        optional: true
+        items:
+          country_code: {type: string, normalization: ISO_3166_1_alpha_2}
+          share: {type: number, range: [0, 1]}
+      audience_city_distribution:
+        type: array
+        optional: true
+        items:
+          city: {type: string}
+          country_code: {type: [string, 'null'], normalization_when_non_null: ISO_3166_1_alpha_2}
+          share: {type: number, range: [0, 1]}
+    availability_policy: Unavailable when required Meta permissions or connected account data are absent.
+    interpretation: Audience geography; supporting evidence only and not independent proof of markets served.
+
+processor_input_map:
+  industry_classification:
+    gatekeeper_scope:
+      source: website_direct
+      page_filter: {required: [homepage]}
+      required_context: [website_url]
+      note: Current implementation does not wait for Website Evidence acquisition.
+    industry_niche_scope:
+      source: website_evidence
+      page_filter:
+        required: [homepage]
+        optional: [about, product, collection, service, offering]
+      intelligence_dependencies: [industry, sub_industry]
+
+  identity_core:
+    source: website_evidence
+    page_filter:
+      required: [homepage]
+      optional: [about, contact, locations]
+    required_context: [website_url]
+    evidence_sections_of_interest: [seo, structure.header, structure.navigation, structure.main_content, structure.footer, content, links.social, media.logo_candidates, extracted_signals]
+
+  market_geography:
+    source: multi_source
+    website_page_filter:
+      required: [homepage]
+      optional: [about, contact, locations, shipping, service, offering, product, collection]
+    intelligence_dependencies: [country]
+    optional_intelligence_context: [business_geography]
+    optional_external_evidence: [similarweb_geography, instagram_audience_geography]
+
+implementation_notes:
+  - Raw acquisition payload retention and exact persistence duration are implementation concerns and do not change this Evidence contract.
+  - page_type assignment may be deterministic, discovery-assisted, or hybrid as long as the normalized contract is preserved.
+  - Crawl budgets are execution-profile/acquisition configuration, not Evidence semantics.
+  - Similarweb acquisition method may change without changing normalized similarweb_geography.
+  - Exact Meta fields may vary by approved API capability; adapters must normalize available geography into this contract when present.

@@ -1,0 +1,145 @@
+version: "1.1"
+status: FROZEN
+module: campaign_page
+artifact: lifecycle_readiness_contract
+
+scope:
+  includes: [campaign_lifecycle, readiness_primitives, execution_readiness, workspace_dependency_order, share_readiness, reporting_surface_readiness]
+  excludes: [campaign_asset_internal_logic, brief_internal_logic, discovery_internal_logic, applicants_internal_logic, collaborations_internal_logic, intelligence_calculation]
+
+lifecycle:
+  DRAFT:
+    operational_page: false
+    creator_facing_live: false
+    primary_action: CONTINUE_CAMPAIGN_CREATION
+  PUBLISHED:
+    definition: campaign_definition_published_but_first_execution_readiness_not_yet_met
+    operational_page: true
+    creator_facing_live: false
+  LIVE:
+    first_entry_requires: ACTIVE_CAMPAIGN_ASSET_WITH_ACTIVE_BRIEF
+    may_later_have_execution_ready_false: true
+    loss_of_readiness_demotes_to_published: false
+    meta_required: false
+  PAUSED:
+    new_creator_acquisition: false
+    new_applications: false
+    existing_applications_reviewable: true
+    existing_collaborations_operational: true
+    primary_action: RESUME_CAMPAIGN
+  COMPLETED:
+    creator_acquisition: false
+    new_applications: false
+    new_collaborations: false
+    reporting_available: true
+    intelligence_available: true
+    completion_trigger: DEFERRED
+  ARCHIVED:
+    execution: false
+    read_only: true
+    purpose: [REVIEW, HISTORY, REPORTING]
+    operational_ctas: hidden
+
+transitions:
+  - {from: DRAFT, to: PUBLISHED, trigger: PUBLISH_MANUAL_CAMPAIGN}
+  - {from: PUBLISHED, to: LIVE, trigger: FIRST_EXECUTION_READINESS_MET}
+  - {from: LIVE, to: PAUSED, trigger: PAUSE}
+  - {from: PAUSED, to: LIVE, trigger: RESUME}
+  - {from: LIVE_OR_PAUSED, to: COMPLETED, trigger: DEFERRED}
+  - {from: COMPLETED, to: ARCHIVED, trigger: ARCHIVE}
+
+ai_recommended_entry:
+  behavior: CAMPAIGN_ASSET_BRIEF_ACCEPTED_AS_ONE_REVIEW_FLOW
+  resulting_state: LIVE
+
+readiness_primitives:
+  has_active_campaign_asset:
+    type: boolean
+    derived: true
+    persisted_on_campaign: false
+    rule: EXISTS_ACTIVE_CAMPAIGN_ASSET
+  has_active_brief:
+    type: boolean
+    derived: true
+    persisted_on_campaign: false
+    rule: EXISTS_ACTIVE_CAMPAIGN_ASSET_WITH_ACTIVE_BRIEF
+  execution_ready:
+    type: boolean
+    derived: true
+    persisted_on_campaign: false
+    rule: EXISTS_ACTIVE_CAMPAIGN_ASSET_WITH_ACTIVE_BRIEF
+  meta_connection_state:
+    type: enum
+    values: [CONNECTED, NOT_CONNECTED, CONNECTION_UNAVAILABLE]
+    owner: INTEGRATION_DOMAIN
+    persisted_on_campaign: false
+  share_campaign_ready:
+    type: boolean
+    derived: true
+    rule: CAMPAIGN_STATUS_LIVE_AND_EXECUTION_READY
+  reporting_state:
+    type: enum
+    values: [INSUFFICIENT_DATA, AVAILABLE]
+    owner: REPORTING_PROVIDER
+  campaign_intelligence_state:
+    type: enum
+    values: [NOT_AVAILABLE, AVAILABLE, STALE]
+    owner: INTELLIGENCE_PROVIDER
+
+post_live_readiness_loss:
+  condition: CAMPAIGN_LIVE_AND_EXECUTION_READY_FALSE
+  lifecycle_status_change: NONE
+  new_creator_acquisition: BLOCKED
+  new_applications: BLOCKED
+  share_campaign: BLOCKED
+  existing_applications: PRESERVED_AND_REVIEWABLE
+  existing_collaborations: PRESERVED_AND_OPERATIONAL
+  presentation: BLOCKING_READINESS_MODE
+
+workspace_dependency_order:
+  - DISCOVERY
+  - APPLICANTS
+  - COLLABORATIONS
+  rules:
+    discovery_unlocked_when: CAMPAIGN_LIVE_AND_EXECUTION_READY
+    applicants_cannot_precede: DISCOVERY_UNLOCK
+    applicants_activity_does_not_require_discovery_prospect_activity: true
+    collaborations_cannot_precede: APPLICANTS
+    collaboration_creation_requires: APPROVED_APPLICATION
+
+marketplace_capability:
+  rule: CAMPAIGN_LIVE_AND_EXECUTION_READY_AND_META_CONNECTED
+  meta_not_connected_effect:
+    discovery_workspace: AVAILABLE_WHEN_EXECUTION_READY
+    marketplace_sourcing: UNAVAILABLE
+    manual_sourcing: AVAILABLE_WHEN_EXECUTION_READY
+    share_campaign: AVAILABLE_WHEN_EXECUTION_READY
+
+runtime_counts:
+  persisted_on_campaign: false
+  fields:
+    - active_campaign_asset_count
+    - active_brief_count
+    - active_prospect_count
+    - total_application_count
+    - pending_application_count
+    - rejected_application_count
+    - total_collaboration_count
+    - active_collaboration_count
+    - completed_collaboration_count
+
+prohibited_campaign_persistence:
+  - hasCampaignAsset
+  - hasBrief
+  - executionReady
+  - hasApplicants
+  - hasCollaborations
+  - discoveryReady
+  - applicantsReady
+  - collaborationsReady
+  - campaignPageState
+  - hydrationState
+  - currentPriorityModule
+  - metaConnected
+
+invariant: "Lifecycle records what the Campaign has become; readiness is a current runtime projection and may later become false without reversing LIVE to PUBLISHED."

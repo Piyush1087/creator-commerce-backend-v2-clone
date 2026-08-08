@@ -1,0 +1,46 @@
+id: identity_core
+version: 1.1-frozen
+status: FROZEN
+engine: brand_intelligence
+branch: identity
+executor: ai
+
+purpose: Resolve the brand's core owned identity from normalized Website Evidence after eligibility classification.
+
+outputs: [brand_name, brand_logo, tagline, country, business_geography, primary_language, website_currency, instagram_handle, youtube_handle, tiktok_handle, facebook_handle, linkedin_handle]
+
+inputs:
+  required: [website_url, website_evidence.homepage]
+  optional: [website_evidence.about, website_evidence.contact, website_evidence.locations]
+
+input_policy:
+  required_means: Processor cannot execute the relevant scope without this input.
+  optional_means: Absence does not block execution and must not cause fabricated output.
+
+execution:
+  can_run_independently: true
+  partial_output_supported: true
+  protected_output_policy: Compiler removes checkpoint-locked or manual-protected objects from normal automated refresh scope according to current object lifecycle; authorized admin/system correction is a separate lifecycle path.
+
+checkpoint_resolution:
+  - country may be AI-null; the early Identity checkpoint must resolve it before submission.
+  - website_currency may be AI-null; the early Identity checkpoint must resolve it before submission.
+  - Nullable AI output must not be replaced by unsupported inference merely because checkpoint completion later requires a value.
+
+post_processing:
+  reporting_currency:
+    source: country
+    type: deterministic_derivation
+    rule: India=INR; United_States=USD; Rest_of_World=USD
+    note: reporting_currency is an Identity object but does not require its own processor or AI output and must be recalculated if verified canonical country changes.
+
+artifacts:
+  location: artifacts/identity_core/
+  status: FROZEN
+  note: Use the frozen processor-specific reasoning/output artifacts in this folder; taxonomy/examples are present only where required by the processor.
+
+failure_policy:
+  fail_if_required_input_missing: true
+  fail_if_output_contract_invalid: true
+  nullable_outputs_allowed_when_contract_permits: true
+  no_silent_default: true

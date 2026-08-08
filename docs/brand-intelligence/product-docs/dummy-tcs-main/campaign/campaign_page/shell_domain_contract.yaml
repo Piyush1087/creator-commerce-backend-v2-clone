@@ -1,0 +1,92 @@
+version: "1.0"
+status: FROZEN
+module: campaign_page
+artifact: shell_domain_contract
+
+role: ORCHESTRATION_DOMAIN
+principle: "Campaign Page touches many domains but owns minimal business data. No CampaignPage persistence aggregate is introduced."
+
+owns:
+  - campaign_lifecycle_interaction_contract
+  - readiness_resolution
+  - priority_resolution
+  - visibility_and_prominence_resolution
+  - hydration_state
+  - primary_focus
+  - progressive_workspace_navigation
+  - campaign_level_action_availability_and_routing
+  - campaign_priority_intelligence_presentation_surface
+  - reporting_highlight_and_reporting_entry_point
+  - responsive_shell_presentation_contract
+
+campaign_level_actions:
+  - EDIT_CAMPAIGN
+  - PAUSE_CAMPAIGN
+  - RESUME_CAMPAIGN
+  - SHARE_CAMPAIGN
+  - ARCHIVE_CAMPAIGN
+  - VIEW_REPORTING
+  - ADD_PRODUCT
+  - ADD_BRIEF
+  - CONNECT_META
+
+reads:
+  campaign_projection:
+    fields: [id, name, status, creation_source, publishing_schedule, publish_from, publish_until, objective, platforms, currency, commercial_offer, total_campaign_budget]
+  product_projection:
+    fields: [total_count, active_count, items.id, items.display_name, items.operational_status]
+  brief_projection:
+    fields: [total_count, active_count, items.id, items.product_id, items.display_name, items.operational_status]
+  integration_projection:
+    meta_state: [CONNECTED, NOT_CONNECTED, CONNECTION_UNAVAILABLE]
+
+consumes:
+  discovery_projection:
+    fields: [instantiated, active_prospect_count, priority_signal]
+  applicants_projection:
+    fields: [instantiated, total_application_count, pending_application_count, priority_signal]
+  collaborations_projection:
+    fields: [instantiated, active_count, completed_count, priority_signal]
+  campaign_priority_insight: provider_output
+  reporting_highlight: provider_output
+
+workspace_instantiation:
+  applicants: EXISTS_ANY_APPLICATION_FOR_CAMPAIGN
+  collaborations: EXISTS_ANY_COLLABORATION_FOR_CAMPAIGN
+  persisted_shell_flags_required: false
+
+product_brief_boundary:
+  shell_owns: [hierarchy_presentation, setup_vs_execution_prominence, navigation, add_action_launch]
+  product_domain_owns: [product_definition, validation, edit, operational_status_logic]
+  brief_domain_owns: [brief_definition, deliverables, platform_formats, validation, edit, operational_status_logic]
+
+campaign_details_boundary:
+  rule: "Campaign definition/details have a separate details surface and are not repeatedly rendered throughout Campaign Page or Reporting."
+
+action_destination_contract:
+  types: [CAMPAIGN_EDIT, PRODUCT, BRIEF, DISCOVERY, APPLICANTS, COLLABORATIONS, REPORTING, META_CONNECTION]
+  fields:
+    type: required_enum
+    entity_id: optional_string
+    context: optional_object
+
+action_types:
+  mvp: [NAVIGATE, INFORMATION_ONLY]
+  future: [ONE_CLICK_ACTION]
+  rule: "Recommendation/action routing never bypasses Campaign/domain editability, permissions or validation."
+
+explicitly_does_not_own:
+  - product_business_logic
+  - brief_business_logic
+  - discovery_business_logic
+  - applicant_business_logic
+  - collaboration_business_logic
+  - ai_match_calculation
+  - campaign_intelligence_calculation
+  - reporting_calculation
+  - meta_integration_implementation
+
+persistence:
+  new_campaign_page_table: false
+  new_campaign_page_state_columns: false
+  rationale: "Shell state is derived from persisted domains or consumed provider output."

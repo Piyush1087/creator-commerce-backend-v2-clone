@@ -1,0 +1,139 @@
+version: "1.1"
+status: FROZEN
+module: campaign_page
+artifact: hydration_state_machine
+
+principle: "Nine deterministic hydration outcomes of one Campaign Page; never nine persisted backend Campaign states. Post-live readiness loss is an orchestration condition, not a tenth state."
+
+states:
+  STATE_1_PRODUCT_SETUP:
+    lifecycle: PUBLISHED
+    entry: active_campaign_asset_count == 0
+    primary_focus: PRODUCT
+    primary_action: ADD_PRODUCT
+    products_briefs: PROMINENT
+    discovery: HIDDEN
+    applicants: HIDDEN
+    collaborations: HIDDEN
+    reporting: HIDDEN
+    share_campaign: DISABLED
+    exit: active_campaign_asset_count >= 1
+
+  STATE_2_BRIEF_SETUP:
+    lifecycle: PUBLISHED
+    entry: active_campaign_asset_count >= 1 AND execution_ready == false
+    primary_focus: BRIEF
+    primary_action: ADD_BRIEF
+    products_briefs: PROMINENT
+    discovery: HIDDEN
+    applicants: HIDDEN
+    collaborations: HIDDEN
+    reporting: HIDDEN
+    share_campaign: DISABLED
+    exit: execution_ready == true
+    lifecycle_transition_on_exit: LIVE
+
+  STATE_3_CREATOR_ACQUISITION_SETUP:
+    lifecycle: LIVE
+    requires: execution_ready == true
+    entry: active_prospect_count == 0 AND total_application_count == 0 AND total_collaboration_count == 0
+    primary_focus: DISCOVERY
+    products_briefs: BACKGROUND
+    discovery: PROMINENT
+    applicants: HIDDEN
+    collaborations: HIDDEN
+    reporting: AVAILABLE
+    share_campaign: ENABLED
+
+  STATE_4_DISCOVERY_ACTIVE:
+    lifecycle: LIVE
+    requires: execution_ready == true
+    candidate_when: active_prospect_count > 0
+    primary_focus_candidate: DISCOVERY
+    discovery: PROMINENT_IF_PRIORITY_WINNER
+    applicants: VISIBLE_IF_INSTANTIATED
+    collaborations: VISIBLE_IF_INSTANTIATED
+    reporting: AVAILABLE
+
+  STATE_5_APPLICATIONS_ACTIVE:
+    lifecycle: LIVE
+    candidate_when: pending_application_count > 0
+    primary_focus_candidate: APPLICANTS
+    discovery: NORMAL_IF_EXECUTION_READY
+    applicants: PROMINENT_IF_PRIORITY_WINNER
+    collaborations: VISIBLE_IF_INSTANTIATED
+    reporting: AVAILABLE
+
+  STATE_6_COLLABORATIONS_ACTIVE:
+    lifecycle: LIVE
+    candidate_when: active_collaboration_count > 0
+    primary_focus_candidate: COLLABORATIONS
+    discovery: NORMAL_IF_EXECUTION_READY
+    applicants: NORMAL_IF_INSTANTIATED
+    collaborations: PROMINENT_IF_PRIORITY_WINNER
+    reporting: AVAILABLE
+
+  STATE_7_MATURE_CAMPAIGN:
+    lifecycle: LIVE
+    candidate_when: meaningful_optimization_intelligence_available == true
+    primary_focus_candidate: REPORTING_OR_INTELLIGENCE
+    reporting: PROMINENT_IF_PRIORITY_WINNER
+
+  STATE_8_PAUSED_CAMPAIGN:
+    lifecycle: PAUSED
+    override: true
+    primary_focus: RESUME_OR_EXISTING_EXECUTION
+    new_discovery: DISABLED
+    share_campaign: DISABLED
+    new_applications: DISABLED
+    applicants: VISIBLE_IF_INSTANTIATED
+    collaborations: VISIBLE_IF_INSTANTIATED
+    reporting: AVAILABLE
+    intelligence: AVAILABLE_IF_PROVIDER_OUTPUT_EXISTS
+
+  STATE_9_HISTORICAL_CAMPAIGN:
+    lifecycle: [COMPLETED, ARCHIVED]
+    override: true
+    primary_focus: REVIEW_AND_REPORTING
+    operational_ctas: HIDDEN
+    products_briefs: HISTORICAL_COMPACT
+    discovery: HISTORICAL_IF_INSTANTIATED
+    applicants: HISTORICAL_IF_INSTANTIATED
+    collaborations: HISTORICAL_IF_INSTANTIATED
+    reporting: PROMINENT
+
+post_live_readiness_block:
+  is_hydration_state: false
+  entry: lifecycle == LIVE AND execution_ready == false
+  primary_focus: RESTORE_CAMPAIGN_READINESS
+  if_no_active_campaign_asset: ADD_OR_RESUME_PRODUCT
+  if_active_asset_but_no_active_brief_path: ADD_OR_RESUME_BRIEF
+  new_discovery: DISABLED
+  new_applications: DISABLED
+  share_campaign: DISABLED
+  applicants: VISIBLE_IF_INSTANTIATED
+  collaborations: VISIBLE_IF_INSTANTIATED
+  reporting: AVAILABLE
+  lifecycle_transition: NONE
+
+resolver_order:
+  - "ARCHIVED or COMPLETED -> STATE_9"
+  - "PAUSED -> STATE_8"
+  - "PUBLISHED and no active CampaignAsset -> STATE_1"
+  - "PUBLISHED and no valid active CampaignAsset->Brief chain -> STATE_2"
+  - "LIVE and execution_ready == false -> apply post_live_readiness_block over preserved instantiated workspaces"
+  - "LIVE and execution_ready == true -> evaluate STATE_3 through STATE_7 candidates using Priority Engine"
+
+non_linear_rule: "States 1-3 establish setup progression; States 4-7 are competing operational focus states; State 8 is pause override; State 9 is historical override; post-live readiness loss is a runtime blocking condition rather than State 10."
+
+meta_rule: "Meta connection modifies Discovery marketplace capability; it never creates a hydration state."
+
+workspace_instantiation:
+  discovery:
+    visible_when: CAMPAIGN_LIVE_AND_EXECUTION_READY_OR_HISTORICALLY_INSTANTIATED
+  applicants:
+    instantiated_when: EXISTS_ANY_APPLICATION_FOR_CAMPAIGN
+    persists_when_pending_count_zero: true
+  collaborations:
+    instantiated_when: EXISTS_ANY_COLLABORATION_FOR_CAMPAIGN
+    persists_when_active_count_zero: true

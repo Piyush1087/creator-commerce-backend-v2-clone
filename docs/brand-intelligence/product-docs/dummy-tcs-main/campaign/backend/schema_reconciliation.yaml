@@ -1,0 +1,217 @@
+version: "1.0"
+status: FROZEN
+module: create_campaign
+artifact: backend_schema_reconciliation
+
+sources:
+  - current_backend_schema: "Current Schema 0208"
+  - intelligence_working_schema: "backend/intelligence_schema.prisma"
+  - campaign_contract: "campaign/create_campaign/field_object_contract.yaml"
+  - runtime_contract: "campaign/create_campaign/runtime_contract.yaml"
+  - geography_contract: "intelligence/engines/brand_intelligence/branches/identity/artifacts/market_geography/output_contract.yaml"
+
+principles:
+  - "Evolve the existing UceCampaign aggregate; do not create a parallel Campaign aggregate."
+  - "Campaign persistence remains separate from intelligence_schema.prisma."
+  - "creation_source is behavioural and must be persisted."
+  - "Deliverables belong to Brief, not Campaign."
+  - "Brand industry is inherited Brand context, not Campaign-owned input."
+  - "Campaign commercial currency is derived from Brand Centre country and persisted as campaign commercial context."
+
+commercial_currency_policy:
+  source: BRAND_CENTRE_COUNTRY
+  derived: true
+  persisted_on_campaign_commercials: true
+  mapping:
+    IN: INR
+    US: USD
+    DEFAULT: USD
+  allowed: [INR, USD]
+  user_editable: false
+  note: "India -> INR; United States -> USD; rest of world -> USD. This is distinct from website/product price currency."
+
+geography_policy:
+  decision: REUSE_STRUCTURED_GEOGRAPHY_SHAPE
+  semantic_owner: CAMPAIGN_AUDIENCE_TARGETING
+  source_shape: market_geography_output_contract
+  cardinality: array
+  fields:
+    scope: {enum: [LOCALITY, REGION, COUNTRY, GLOBAL]}
+    label: string
+    country_code: nullable_iso_3166_1_alpha_2
+    locality: nullable_string
+    region: nullable_string
+    radius_km: nullable_number
+    is_primary: boolean
+  invariants:
+    - "At least one resolved geography when audience geography is required."
+    - "GLOBAL requires country_code/locality/region/radius_km null."
+    - "COUNTRY requires country_code and locality null."
+    - "LOCALITY should include country_code when known and locality."
+    - "REGION should include country_code when known and region."
+  persistence_decision: JSON_FOR_WORKING_SCHEMA
+  note: "Working Prisma uses Json for compatibility with the frozen structured object; service/Zod layer must validate exact shape. A normalized relational geography table may replace this only during production integration if the main backend already has a canonical shared geography model."
+
+reconciliation:
+  UceCampaign:
+    action: MODIFY
+    keep: [id, brandProfileId, name, createdAt, updatedAt, strategy, targeting, commercials]
+    add: [creationSource, aiRecommendationId, aiRecommendationVersion]
+    note: "Do not create AiCampaign."
+
+  UceCampaignStatus:
+    action: MODIFY
+    target: [DRAFT, PUBLISHED, LIVE, PAUSED, COMPLETED, ARCHIVED]
+    deprecate_semantic: ACTIVE
+    migration_note: "Existing ACTIVE rows require production migration mapping to LIVE."
+
+  UceCampaignCreationSource:
+    action: NEW
+    values: [MANUAL, AI_RECOMMENDED]
+    default: MANUAL
+
+  campaign_name:
+    action: KEEP
+    existing: UceCampaign.name
+
+  publishing_schedule:
+    action: MODIFY
+    replace_old_semantics: [timelineType, fixedStartDate, fixedEndDate, dynamicDaysLimit]
+    target_fields: [publishingSchedule, publishFrom, publishUntil]
+    target_enum: [EVERGREEN, SCHEDULED]
+    dynamicDaysLimit: DEPRECATE_FROM_CREATE_CAMPAIGN
+
+  campaign_objective:
+    action: NORMALIZE
+    reuse_enum: CampaignObjective
+    values: [PULSE, PROOF, PRODUCTION, PUSH]
+    deprecate_enum: UceCampaignObjective
+
+  primary_kpi:
+    action: NEW
+    field: primaryKpiId
+    semantics: "Resolved canonical KPI ID; frozen on publish."
+
+  supporting_kpis:
+    action: NEW
+    field: supportingKpiIds
+    semantics: "Resolved canonical KPI IDs; frozen on publish."
+
+  platform_enum:
+    action: KEEP
+    existing: UceMediaPlatform
+  campaign_platforms:
+    action: NEW
+    field: platforms
+    type: UceMediaPlatform[]
+    mvp_validation: [INSTAGRAM]
+
+  platformDeliverables:
+    action: DEPRECATE_FROM_CREATE_CAMPAIGN
+    new_owner: BRIEF
+
+  campaign_visibility:
+    action: MODIFY_CARDINALITY
+    existing_enum: UceVisibilityScope
+    existing_to_ui_mapping:
+      EVERYONE: PUBLIC
+      ELIGIBLE_ONLY: ELIGIBLE_CREATORS_ONLY
+      INVITED_ONLY: INVITE_ONLY
+    target_field: visibilityScope
+    target_cardinality: one
+
+  creator_archetypes:
+    action: KEEP
+    field: creatorArchetypes
+    storage: canonical_string_ids
+
+  creator_following:
+    action: MODIFY
+    deprecate_field: followerTiers
+    target_fields: [minimumFollowers, maximumFollowers]
+
+  audience_age:
+    action: KEEP
+    fields: [audienceAgeMin, audienceAgeMax]
+
+  audience_gender:
+    action: MODIFY_TYPE
+    target_enum: UceAudienceGender
+    values: [ALL, FEMALE, MALE]
+
+  audience_affinities:
+    action: NEW
+    field: audienceAffinityIds
+    storage: canonical_string_ids
+
+  audience_geography:
+    action: MODIFY
+    deprecate_field: targetLocations
+    target_field: audienceGeographies
+    target_working_type: Json
+    validation_contract: geography_policy
+
+  industryVertical:
+    action: DEPRECATE_AS_CREATE_CAMPAIGN_INPUT
+    replacement: inherited_brand_industry_context
+
+  disqualifyingKeywords:
+    action: OUT_OF_CREATE_CAMPAIGN
+    note: "Do not delete until complete Campaign module reconciliation."
+
+  applicationScope:
+    action: OUT_OF_CREATE_CAMPAIGN
+    note: "Revisit with Discovery/Applicants sourcing rules."
+
+  compensation_type:
+    action: KEEP
+    enum: UceCompensationType
+    mapping: {FIXED: FIXED_FEE, NEGOTIABLE: NEGOTIABLE}
+
+  commercial_offer:
+    action: MODIFY
+    target_field: commercialOffer
+    target_type: Decimal_12_2
+    deprecate_fields: [fixedFeeAmount, negotiableMinFee, negotiableMaxFee]
+    semantics:
+      FIXED_FEE: final_creator_payout
+      NEGOTIABLE: minimum_advertised_payout
+    maximum_negotiated_payout_field: none
+
+  total_campaign_budget:
+    action: KEEP_SEMANTICS
+    existing_field: totalCampaignBudgetPool
+    canonical_domain_name: totalCampaignBudget
+
+  advance_payment:
+    action: KEEP_FIELD_MODIFY_VALIDATION
+    allowed: [0, 25, 50, 75, 100]
+    old_default_30: REMOVE
+    target_default: 0
+
+  net_payment_terms:
+    action: EXTEND_ENUM
+    existing_enum: UcePayoutTerms
+    create_campaign_allowed: [NET_7, NET_15, NET_30, NET_45, NET_60]
+    add: [NET_45, NET_60]
+    immediate: "May remain for other backend consumers but is not selectable in Create Campaign."
+
+  brand_support:
+    action: NEW
+    fields: [receivesBrandSupport, brandSupportType, brandSupportEstimatedValue]
+    enum: [PRODUCT, SERVICE, EXPERIENCE, ACCESS_SUBSCRIPTION, OTHER]
+
+  commercial_currency:
+    action: NEW
+    field: currency
+    type: String_3
+    allowed: [INR, USD]
+    derived_from: Brand_Centre_country
+
+intelligence_boundary:
+  campaign_persistence_in_intelligence_schema: false
+  campaign_lineage_fields: [aiRecommendationId, aiRecommendationVersion]
+  intelligence_owned: [AI_CAMPAIGN_RECOMMENDATION, ARCHETYPE_RECOMMENDATION]
+  campaign_owned: [campaign_fields, lifecycle, canonical_references, resolved_kpis, human_acceptance, persistence]
+
+next_artifact: backend/campaign_schema.prisma

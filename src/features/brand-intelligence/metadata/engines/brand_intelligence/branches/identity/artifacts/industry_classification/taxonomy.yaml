@@ -1,0 +1,124 @@
+id: industry_classification_taxonomy
+version: 1.0-frozen
+status: FROZEN
+processor: industry_classification
+
+purpose: Canonical Industry and MVP Sub-industry taxonomy used by industry_classification. The Sub-industry list is intentionally small for MVP and is designed to be expanded without processor or object-model changes.
+
+canonical_industry_contract:
+  status: FROZEN
+  values:
+    - D2C
+    - AI_SAAS
+    - HEALTHCARE
+    - OFFLINE_EXPERIENCES
+  rule: All new Intelligence Engine outputs and artifacts use only these canonical IDs. Legacy application enum names must not leak into new intelligence outputs.
+
+legacy_compatibility:
+  migration_status: DO_NOT_RENAME_EXISTING_ENUMS_YET
+  BrandRoutingType:
+    D2C_SKINCARE: D2C
+    SAAS_PRODUCT: AI_SAAS
+    HEALTHCARE_TREATMENT: HEALTHCARE
+    OFFLINE_EXPERIENCE: OFFLINE_EXPERIENCES
+  CollaborationIndustryType:
+    D2C_ECOMMERCE: D2C
+    AI_SAAS: AI_SAAS
+    HEALTHCARE_CLINICAL: HEALTHCARE
+    OFFLINE_EXPERIENCES: OFFLINE_EXPERIENCES
+  adapter_rule: Translate canonical values to/from legacy enums only at existing application boundaries until a controlled migration is completed.
+
+hierarchy:
+  D2C:
+    label: D2C
+    sub_industries:
+      - id: BEAUTY_PERSONAL_CARE
+        label: Beauty & Personal Care
+      - id: FASHION_APPAREL
+        label: Fashion & Apparel
+      - id: FOOD_BEVERAGE
+        label: Food & Beverage
+      - id: HOME_LIVING
+        label: Home & Living
+      - id: OTHER_D2C
+        label: Other D2C
+
+  AI_SAAS:
+    label: AI / SaaS
+    sub_industries:
+      - id: MARKETING_SALES
+        label: Marketing & Sales
+      - id: PRODUCTIVITY_COLLABORATION
+        label: Productivity & Collaboration
+      - id: FINANCE_FINTECH
+        label: Finance & FinTech
+      - id: HR_RECRUITMENT
+        label: HR & Recruitment
+      - id: OTHER_AI_SAAS
+        label: Other AI / SaaS
+
+  HEALTHCARE:
+    label: Healthcare
+    sub_industries:
+      - id: REPRODUCTIVE_MEDICINE
+        label: Reproductive Medicine
+      - id: DERMATOLOGY
+        label: Dermatology
+      - id: DENTAL_CARE
+        label: Dental Care
+      - id: DIAGNOSTICS
+        label: Diagnostics
+      - id: OTHER_HEALTHCARE
+        label: Other Healthcare
+
+  OFFLINE_EXPERIENCES:
+    label: Offline Experiences / Services
+    sub_industries:
+      - id: FITNESS_WELLNESS
+        label: Fitness & Wellness
+      - id: HOSPITALITY
+        label: Hospitality
+      - id: EDUCATION_TRAINING
+        label: Education & Training
+      - id: EVENTS_ENTERTAINMENT
+        label: Events & Entertainment
+      - id: OTHER_OFFLINE_EXPERIENCES
+        label: Other Offline Experiences / Services
+
+sub_industry_policy:
+  status: MVP_FROZEN
+  controlled_taxonomy: true
+  user_edit_control: dependent_searchable_dropdown
+  ai_output_control: must_select_from_taxonomy
+  expansion_rule: New sub-industries may be added as taxonomy data without changing the processor contract or Intelligence Object definition.
+  fallback_rule: Use the parent-specific OTHER value when the brand belongs to the canonical Industry but no current MVP sub-industry is a defensible fit. Do not force an incorrect specific category.
+
+industry_niche_policy:
+  status: FROZEN
+  controlled_taxonomy: false
+  type: evidence_grounded_nullable_string
+  rule: Industry niche is a specific evidence-supported specialization within the confirmed Industry and Sub-industry. It is not restricted to a fixed list and may be null when no useful niche is supported.
+
+classification_principles:
+  - Industry is the stable top-level platform business category.
+  - Sub-industry is a controlled functional/business sector constrained by Industry.
+  - Industry niche is a more specific evidence-supported specialization and may be null.
+  - Taxonomy classifies the business, not merely website content topics.
+  - Pharma must not be silently classified as HEALTHCARE; its placement requires a deliberate future taxonomy decision.
+
+precedence_rules:
+  status: FROZEN_FOR_MVP
+  order:
+    - D2C
+    - AI_SAAS
+    - HEALTHCARE
+    - OFFLINE_EXPERIENCES
+  note: Apply precedence only when a business genuinely spans multiple canonical industries; processor reasoning must still classify the primary business represented by the submitted brand/domain.
+
+validation:
+  industry_must_be_one_of_canonical_values: true
+  legacy_values_rejected_from_new_intelligence_output: true
+  sub_industry_must_belong_to_industry: true
+  other_sub_industry_must_match_parent_industry: true
+  niche_must_be_compatible_with_confirmed_industry_and_sub_industry: true
+  allow_null_niche: true

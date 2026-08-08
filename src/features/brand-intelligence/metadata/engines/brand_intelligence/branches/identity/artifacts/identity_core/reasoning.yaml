@@ -1,0 +1,125 @@
+id: identity_core_reasoning
+version: 1.0-frozen
+status: FROZEN
+processor: identity_core
+
+purpose: Resolve core owned-brand Identity Objects from normalized Website Evidence while preserving the distinction between explicit evidence, candidate signals and canonical intelligence.
+
+principles:
+  - Apply global evidence_grounding rules.
+  - Resolve only outputs in the compiler's active output scope.
+  - Prefer stable owned-site identity signals over incidental page mentions.
+  - Use repeated/persistent site-wide signals such as header, footer, navigation and structured metadata to corroborate identity.
+  - Never fabricate an optional object because the output exists.
+  - A missing optional page must not block the processor when homepage evidence is available.
+
+object_reasoning:
+  brand_name:
+    objective: Resolve the canonical consumer-facing brand display name.
+    strong_signals:
+      - persistent header/wordmark text
+      - organization name consistently used across homepage and owned pages
+      - title/meta/structured organization name when consistent with visible branding
+      - footer copyright/business branding when consistent
+    rules:
+      - Prefer the customer-facing brand over legal suffixes or parent-company names unless the submitted website itself represents that entity.
+      - Do not use a product/collection name as the brand name merely because it is prominent.
+      - Normalize obvious presentation formatting without creatively rewriting the name.
+
+  brand_logo:
+    objective: Resolve the primary logo asset representing the brand.
+    strong_signals:
+      - persistent header logo
+      - structured metadata logo consistent with visible header branding
+      - site-wide logo asset
+    rules:
+      - Prefer the primary site/header brand mark over campaign banners, product images, partner logos or footer certification marks.
+      - Return the evidence-backed asset reference/URL expected by the output contract; do not generate a logo.
+
+  tagline:
+    objective: Capture the primary explicit tagline or short positioning line used by the brand.
+    strong_signals:
+      - explicit hero tagline
+      - repeated short positioning line attached to brand identity
+      - metadata description only when clearly functioning as a tagline and corroborated by owned content
+    rules:
+      - Do not summarize the company and present the summary as its tagline.
+      - Return null if no explicit defensible tagline exists.
+
+  country:
+    objective: Resolve the primary country in which the brand/business is based for Creator Shop identity and routing.
+    output_normalization: ISO_3166_1_alpha_2
+    strong_signals:
+      - explicit owned-site address/business location
+      - contact/about/legal business information
+      - consistent country-specific business identity signals
+    supporting_signals:
+      - phone country code
+      - currency
+      - country domain
+      - footer/legal references
+    rules:
+      - Do not infer country from website currency alone.
+      - Distinguish business base from countries served or audience geography.
+      - Prefer explicit business/organization location evidence over market-facing claims.
+
+  business_geography:
+    objective: Resolve the primary business-base geography when evidence supports it.
+    strong_signals:
+      - explicit headquarters/business address
+      - explicit clinic/store/studio/company base when representing the primary business base
+    rules:
+      - Do not convert every physical branch/location into the canonical business geography.
+      - Do not use markets served as business geography.
+      - AI-derived geography may contain normalized label/locality/region/country while provider place_id and coordinates remain null.
+      - A later user correction through the configured Maps/Places search may resolve the same object to a provider-backed place without changing the object shape.
+      - Return null when no stable primary business-base geography can be established.
+
+  primary_language:
+    objective: Identify the primary language actually used in owned brand communication.
+    output_normalization: ISO_639_1_lowercase
+    strong_signals:
+      - dominant language of homepage main content
+      - dominant language across available core owned pages
+    rules:
+      - Infer from observed communication, not country defaults.
+      - Ignore isolated translated fragments, legal boilerplate or language-selector options unless they represent dominant content.
+
+  website_currency:
+    objective: Resolve the primary currency displayed/transacted on the website for catalogue/context purposes.
+    output_normalization: ISO_4217_uppercase
+    strong_signals:
+      - explicit product/service prices with currency
+      - checkout/catalogue currency signals available in Website Evidence
+      - structured priceCurrency when consistent with visible prices
+    supporting_signals:
+      - persistent currency selector/default
+    rules:
+      - Website currency is not reporting_currency.
+      - Do not derive website currency solely from country.
+      - When multiple currencies are supported, select the site's observed primary/default currency; do not list every supported currency unless the Intelligence Object contract later changes.
+
+  social_handles:
+    outputs: [instagram_handle, youtube_handle, tiktok_handle, facebook_handle, linkedin_handle]
+    objective: Resolve official brand-owned social profiles linked or strongly evidenced by the owned website.
+    strong_signals:
+      - social links in persistent header/footer/navigation
+      - explicit official social links on contact/about pages
+      - structured sameAs metadata corroborated by owned-site signals
+    rules:
+      - Prefer profiles directly linked from the owned website.
+      - Do not infer a handle from the brand name alone.
+      - Do not treat share buttons, creator/employee profiles or unrelated partner accounts as official brand handles.
+      - Normalize platform URLs to the identifier format defined by the output contract.
+      - Return null independently for any platform without defensible evidence.
+
+cross_object_consistency:
+  - brand_name, brand_logo and social handles should describe the same represented brand/entity.
+  - country and business_geography must not be inferred from markets served.
+  - business_geography.country_code should agree with country when both are resolved; conflicting evidence must not be silently normalized away.
+  - website_currency must not determine reporting_currency; reporting_currency is deterministic post-processing from canonical country.
+  - Null on one optional object must not invalidate unrelated resolved objects.
+
+manual_protection:
+  - Compiler must exclude permanently locked or manual-protected objects from active output scope according to the Identity Object lifecycle registry.
+  - This processor must not attempt to override protected values supplied as canonical runtime context.

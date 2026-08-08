@@ -1,0 +1,66 @@
+version: "1.0"
+status: FROZEN
+library: campaign_kpi_framework
+
+# Primary success metric is objective-driven and universal.
+# Supporting metrics are industry-tuned.
+objectives:
+  PULSE:
+    label: "Awareness & Reach"
+    primary_metric:
+      id: REACH
+      label: "Reach"
+      success_statement: "Success is measured by how many unique people your campaign reaches."
+    supporting_metrics:
+      D2C_ECOMMERCE: [DISCOVER_REACH, IMPRESSIONS, PROFILE_VISITS, NEW_FOLLOWERS]
+      SAAS_TECH: [IMPRESSIONS, PROFILE_VISITS, WEBSITE_CLICKS, NEW_FOLLOWERS]
+      HEALTHCARE: [LOCAL_REACH, PROFILE_VISITS, NEW_FOLLOWERS, LOCAL_AUDIENCE_PERCENT]
+
+  PROOF:
+    label: "Trust & Validation"
+    primary_metric:
+      id: MEANINGFUL_ENGAGEMENT
+      label: "Meaningful Engagement"
+      success_statement: "Success is measured by how many people actively engage with your content."
+    supporting_metrics:
+      D2C_ECOMMERCE: [SAVES, SHARES, COMMENT_SENTIMENT, UGC_MENTIONS]
+      SAAS_TECH: [STORY_COMPLETION_RATE, SAVES, PROFILE_VISITS, DM_INQUIRIES]
+      HEALTHCARE: [DM_INQUIRIES, SAVES, SHARES, COMMENT_SENTIMENT]
+
+  PRODUCTION:
+    label: "High-Quality Assets"
+    primary_metric:
+      id: ASSET_QUALITY_SCORE
+      label: "Asset Quality Score"
+      success_statement: "Success is measured by the quality and reusability of creator-delivered content."
+    supporting_metrics:
+      D2C_ECOMMERCE: [BRAND_COMPLIANCE, CREATIVE_VARIETY, VISUAL_QUALITY, ASSET_REUSABILITY]
+      SAAS_TECH: [FEATURE_CLARITY, SCREEN_RECORDING_QUALITY, TECHNICAL_ACCURACY, ASSET_REUSABILITY]
+      HEALTHCARE: [MEDICAL_COMPLIANCE, BRAND_COMPLIANCE, EDUCATIONAL_ACCURACY, ASSET_REUSABILITY]
+
+  PUSH:
+    label: "Direct Action"
+    primary_metric:
+      id: UNIQUE_CTA_CLICKS
+      label: "Unique CTA Clicks"
+      success_statement: "Success is measured by how many unique users take the desired action by clicking your campaign link."
+    supporting_metrics:
+      D2C_ECOMMERCE: [CTR, TOTAL_CTA_CLICKS, REPEAT_CLICKS, PROMO_LINK_CLICKS]
+      SAAS_TECH: [CTR, LANDING_PAGE_VISITS, DOCUMENTATION_CLICKS, TRIAL_PAGE_VISITS]
+      HEALTHCARE: [WHATSAPP_CLICKS, BOOKING_PAGE_CLICKS, MAPS_CLICKS, TOTAL_CTA_CLICKS]
+
+asset_quality_score:
+  status: PROPRIETARY_METRIC_DEFINITION
+  score_range: [0, 100]
+  components:
+    - {id: TECHNICAL_QUALITY, weight_percent: 30}
+    - {id: BRAND_COMPLIANCE, weight_percent: 25}
+    - {id: CREATIVE_QUALITY, weight_percent: 20}
+    - {id: PLATFORM_OPTIMIZATION, weight_percent: 15}
+    - {id: REUSABILITY, weight_percent: 10}
+
+rules:
+  primary_metric_depends_on: CAMPAIGN_OBJECTIVE
+  supporting_metrics_depend_on: [CAMPAIGN_OBJECTIVE, BRAND_INDUSTRY]
+  primary_must_not_repeat_in_supporting_metrics: true
+  user_editable: false

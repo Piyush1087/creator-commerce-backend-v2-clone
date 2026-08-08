@@ -1,0 +1,125 @@
+version: "1.1"
+status: FROZEN
+module: campaign_page
+artifact: backend_schema_reconciliation
+
+principles:
+  - Campaign Page is an orchestration domain, not a persistence aggregate.
+  - Persist genuine lifecycle facts; derive current readiness, hydration, visibility and priority.
+  - CampaignAsset is now reconciled; Brief, Discovery, Applicants and Collaborations remain independently reconciled modules.
+
+reconciliation:
+  campaign_status:
+    decision: KEEP
+    field: UceCampaign.status
+    values: [DRAFT, PUBLISHED, LIVE, PAUSED, COMPLETED, ARCHIVED]
+  lifecycle_timestamps:
+    decision: KEEP
+    fields: [publishedAt, liveAt, completedAt, archivedAt]
+  active_campaign_asset_readiness:
+    decision: DERIVE
+    owner: CAMPAIGN_ASSET_DOMAIN
+    rule: EXISTS_ACTIVE_CAMPAIGN_ASSET
+    campaign_boolean_column: false
+  active_brief_readiness:
+    decision: DEFER
+    future_owner: BRIEF_DOMAIN
+    shell_behavior: DERIVE
+    rule: EXISTS_ACTIVE_CAMPAIGN_ASSET_WITH_ACTIVE_BRIEF
+    campaign_boolean_column: false
+  execution_ready:
+    decision: DERIVE
+    persisted: false
+    rule: EXISTS_ACTIVE_CAMPAIGN_ASSET_WITH_ACTIVE_BRIEF
+    may_be_false_after_campaign_live: true
+  post_live_readiness_block:
+    decision: DERIVE
+    persisted: false
+    condition: CAMPAIGN_LIVE_AND_EXECUTION_READY_FALSE
+    lifecycle_demote: false
+  discovery_readiness:
+    decision: DERIVE
+    persisted: false
+    rule: CAMPAIGN_STATUS_LIVE_AND_EXECUTION_READY
+  applicants_instantiated:
+    decision: DEFER
+    future_owner: APPLICANTS_DOMAIN
+    rule: EXISTS_ANY_APPLICATION_FOR_CAMPAIGN
+  collaborations_instantiated:
+    decision: DEFER
+    future_owner: COLLABORATIONS_DOMAIN
+    rule: EXISTS_ANY_COLLABORATION_FOR_CAMPAIGN
+  meta_connection_state:
+    decision: EXTERNAL_OWNER
+    owner: INTEGRATION_SETTINGS_DOMAIN
+    persisted_on_campaign: false
+  marketplace_enabled:
+    decision: DERIVE
+    persisted: false
+    rule: CAMPAIGN_LIVE_AND_EXECUTION_READY_AND_META_CONNECTED
+  share_campaign_enabled:
+    decision: DERIVE
+    persisted: false
+    rule: CAMPAIGN_STATUS_LIVE_AND_EXECUTION_READY
+  reporting_highlight:
+    decision: EXTERNAL_OWNER
+    owner: REPORTING_INTELLIGENCE_PROVIDER
+    persisted_on_campaign: false
+  campaign_priority_insight:
+    decision: EXTERNAL_OWNER
+    owner: MODULE_SIGNALS_AND_FUTURE_CAMPAIGN_INTELLIGENCE_ENGINE
+    persisted_on_campaign: false
+  hydration_state:
+    decision: DERIVE
+    persisted: false
+  primary_focus:
+    decision: DERIVE
+    persisted: false
+  workspace_navigation:
+    decision: DERIVE
+    persisted: false
+  workspace_visibility:
+    decision: DERIVE
+    persisted: false
+
+prohibited_campaign_columns:
+  - hasCampaignAsset
+  - hasBrief
+  - executionReady
+  - hasApplicants
+  - hasCollaborations
+  - discoveryReady
+  - applicantsReady
+  - collaborationsReady
+  - metaConnected
+  - shareEnabled
+  - campaignPageState
+  - hydrationState
+  - primaryFocus
+  - currentPriorityModule
+  - workspaceNavigation
+  - currentInsight
+  - insightSeverity
+  - recommendedAction
+  - reportingMetric
+  - reportingValue
+  - reportingInsight
+  - reportingSeverity
+  - reportingRecommendation
+
+prisma_delta_from_campaign_page:
+  lifecycle_fields: [publishedAt, liveAt, completedAt, archivedAt]
+  campaign_asset_relation_now_owned_by: ADD_PRODUCT_RECONCILIATION
+  add_campaign_page_model: false
+
+service_layer_follow_up:
+  - Enforce legal lifecycle transitions; frontend must not assign arbitrary status.
+  - Set lifecycle timestamps atomically with successful transitions.
+  - PUBLISHED to LIVE must verify CampaignAsset/Brief execution readiness.
+  - Losing execution readiness after LIVE must not demote lifecycle status.
+  - Resolve Campaign Page projections without duplicating readiness on UceCampaign.
+
+result:
+  campaign_page_specific_new_models: 0
+  campaign_page_specific_readiness_columns: 0
+  conclusion: Campaign Page remains projection-driven while CampaignAsset becomes the canonical product-side readiness parent.

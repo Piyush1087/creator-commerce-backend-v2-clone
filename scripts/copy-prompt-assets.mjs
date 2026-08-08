@@ -12,6 +12,10 @@ const pairs = [
   ["src/features/brand-onboarding/prompts", "dist/features/brand-onboarding/prompts"],
   ["src/features/brand-centre/prompts", "dist/features/brand-centre/prompts"],
   ["src/features/creator-onboarding/prompts", "dist/features/creator-onboarding/prompts"],
+  [
+    "src/features/brand-intelligence/metadata",
+    "dist/features/brand-intelligence/metadata",
+  ],
 ];
 
 const required = [
@@ -28,6 +32,10 @@ const required = [
   // Creator onboarding AI
   "dist/features/creator-onboarding/prompts/welcome-insight.prompt.md",
   "dist/features/creator-onboarding/prompts/handle-eligibility.prompt.md",
+  // Brand Intelligence identity_test metadata
+  "dist/features/brand-intelligence/metadata/execution_profiles/identity_test.yaml",
+  "dist/features/brand-intelligence/metadata/models.yaml",
+  "dist/features/brand-intelligence/metadata/engines/brand_intelligence/branches/identity/objects.yaml",
 ];
 
 for (const [fromRel, toRel] of pairs) {

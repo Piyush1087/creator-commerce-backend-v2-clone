@@ -1,0 +1,74 @@
+id: intelligence_compiler
+version: 0.1-working
+status: WORKING
+
+purpose: Execute an Intelligence Execution Profile by resolving processor tasks, dependencies, evidence, model runtime, Prompt Builder requests, provider calls, authoritative validation and optional canonical persistence. The Compiler owns orchestration; processors own business reasoning.
+
+responsibility_boundary:
+  compiler_does:
+    - load and validate execution profile
+    - create execution and processor-execution runtime records
+    - resolve processor dependencies and runnable tasks
+    - permit parallel execution when dependency graph allows it
+    - request/await required evidence through evidence runtime interfaces
+    - resolve model profile through Model Registry
+    - call Prompt Builder for AI tasks
+    - call configured provider adapter
+    - call authoritative output validator
+    - expose validated outputs as canonical dependencies to downstream processors
+    - optionally persist validated outputs through canonical persistence adapter
+    - aggregate execution status/result
+  compiler_does_not:
+    - contain processor business reasoning
+    - invent taxonomy or evidence precedence
+    - crawl websites directly
+    - construct provider prompts itself
+    - bypass validation
+    - write unresolved persistence mappings
+
+execution_input:
+  required: [execution_profile_id, entity_type, entity_id, website_url]
+  optional: [persist_results, trigger, authorized_runtime_overrides]
+
+execution_states: [PENDING, RUNNING, WAITING_FOR_DEPENDENCY, SUCCEEDED, PARTIAL, FAILED]
+processor_execution_states: [PENDING, READY, RUNNING, SUCCEEDED, FAILED_PRECHECK, FAILED_PROVIDER, FAILED_VALIDATION, FAILED_PERSISTENCE, SKIPPED_DEPENDENCY]
+
+scheduler:
+  algorithm: dependency_dag
+  rules:
+    - A task becomes READY when all required dependencies are satisfied.
+    - READY tasks without mutual dependencies may execute concurrently.
+    - A failed required dependency causes dependent tasks to SKIP_DEPENDENCY unless profile policy defines another outcome.
+    - Canonical dependency values are taken only from validated upstream output or explicitly supplied confirmed application state.
+    - Parallelism must never change processor reasoning or output ownership.
+
+ai_task_pipeline:
+  - preflight task inputs/artifacts/evidence requirements
+  - resolve model runtime
+  - build PromptPackage
+  - call provider adapter
+  - authoritative validate response
+  - publish validated outputs to execution context
+  - optionally persist canonical outputs
+  - mark processor execution SUCCEEDED
+
+deterministic_task_pipeline:
+  - preflight inputs
+  - execute deterministic resolver
+  - validate result when contract exists
+  - publish canonical output
+  - optionally persist
+
+failure_policy:
+  fail_closed_on: [missing_required_artifact, missing_required_dependency, missing_required_evidence, model_configuration_error, provider_failure_after_retry, output_validation_failure, persistence_failure_when_persistence_enabled]
+  no_unvalidated_dependency_publish: true
+  no_unvalidated_persistence: true
+
+execution_result:
+  include: [execution_id, profile_id, status, processor_results, validated_outputs, failures, timing]
+  debug_metadata_when_enabled: [model_runtime, prompt_build_id, artifact_versions, evidence_refs, provider_usage]
+
+identity_test_defaults:
+  persist_results: false
+  allow_parallelism: true
+  objective: prove end-to-end Identity runtime before enabling onboarding canonical writes

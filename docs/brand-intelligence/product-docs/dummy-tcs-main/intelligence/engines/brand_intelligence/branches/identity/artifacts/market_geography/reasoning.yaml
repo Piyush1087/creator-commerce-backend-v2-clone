@@ -1,0 +1,97 @@
+id: market_geography_reasoning
+version: 1.1-frozen
+status: FROZEN
+processor: market_geography
+
+purpose: Determine the markets the brand actually serves by combining owned Website Evidence with optional Similarweb and Instagram geography evidence, while keeping business geography, demand geography and audience geography conceptually separate.
+
+principles:
+  - Apply global evidence_grounding rules.
+  - markets_served means where the brand can meaningfully sell/deliver its products, services or experience; it is not simply where traffic or followers come from.
+  - Website Evidence is the primary commercial-availability source and is sufficient when Similarweb and Instagram are unavailable.
+  - Similarweb and Instagram are supporting/corroborating sources, not mandatory dependencies.
+  - Fallback must respect the business delivery model; headquarters/local business geography must not incorrectly narrow a nationally or digitally deliverable business.
+
+inputs:
+  canonical_intelligence:
+    required: [country]
+    optional: [business_geography]
+  evidence:
+    required: [website_evidence.homepage]
+    optional: [website_evidence.about, website_evidence.contact, website_evidence.locations, website_evidence.shipping, website_evidence.service, website_evidence.offering, website_evidence.product, website_evidence.collection, similarweb_geography, instagram_audience_geography]
+
+source_meaning:
+  website:
+    role: primary_commercial_availability_evidence
+    high_value_signals: [explicit_shipping_destinations, explicit_service_areas, location_or_service_radius_statements, explicit_countries_cities_regions_served, location_network_for_location_bound_business, explicit_national_or_global_availability, product_or_service_availability_restrictions]
+    supporting_signals: [country_specific_offerings_or_landing_pages, currency_or_language_variants_tied_to_availability, repeated_geographic_targeting]
+    caution:
+      - A business address alone proves business geography, not necessarily the full market.
+      - A location list may indicate operating locations but should be interpreted according to the business model.
+  similarweb:
+    role: demand_geography_support
+    meaning: Indicates where website traffic/demand is observed.
+    rules:
+      - Use to corroborate, prioritize or challenge website-derived market hypotheses.
+      - Do not convert high traffic share into a served market when the website explicitly excludes that geography.
+      - Strong concentration may support primary-market ranking when commercial availability is otherwise plausible.
+  instagram:
+    role: audience_geography_support
+    meaning: Indicates where the connected Instagram audience is observed.
+    rules:
+      - Use as supporting evidence for market relevance, especially where website availability is broad.
+      - Do not treat follower geography alone as proof that the brand serves that geography.
+      - Do not override explicit website shipping/service restrictions with audience geography.
+
+reasoning_order:
+  - Establish whether the business is location-bound, nationally deliverable, digitally deliverable or multi-market.
+  - Extract explicit commercial/service geography from Website Evidence first.
+  - Build defensible candidate markets from explicit website availability and service-area evidence.
+  - If Similarweb exists, use it to corroborate/rank candidate markets or identify plausible markets that still require commercial-availability support.
+  - If Instagram audience geography exists, use it as additional corroboration/relevance evidence.
+  - Resolve granularity appropriate to the business: locality/region, country, multiple countries or GLOBAL.
+  - If external evidence is absent, complete reasoning using Website Evidence only.
+  - If Website Evidence cannot establish a defensible market, apply the business-model-aware fallback policy below.
+
+business_model_guidance:
+  location_bound:
+    examples: [clinic, studio, local_service, venue]
+    rule: Prefer explicit locality/service-area evidence. A local clinic should not become national merely because its website is nationally accessible.
+  nationally_deliverable:
+    examples: [domestic_ecommerce, nationwide_service]
+    rule: Resolve the country when owned evidence supports nationwide shipping/service; external geography may prioritize but should not shrink an explicitly nationwide market.
+  digitally_deliverable:
+    examples: [saas, digital_service]
+    rule: Global technical accessibility is not automatically GLOBAL commercial market. Prefer explicit customer/availability/geographic positioning and use Similarweb/Instagram as supporting market-relevance signals.
+  multi_market:
+    examples: [international_ecommerce, global_saas, multi_country_service]
+    rule: Return multiple markets when commercial availability is supported. External evidence may identify which are primary but must not invent availability.
+
+conflict_resolution:
+  - Explicit owned-site commercial restrictions outrank Similarweb traffic and Instagram audience geography.
+  - Explicit owned-site service/shipping statements outrank proxy geography signals.
+  - Similarweb and Instagram agreement strengthens market relevance but does not independently establish commercial availability.
+  - When website claims broad/global availability but observed demand is concentrated, retain the broad served market while using concentration for primary-market ranking where applicable.
+  - When evidence remains ambiguous, prefer the narrower defensible market rather than an unsupported broad market.
+
+fallback_policy:
+  when_website_market_not_resolvable:
+    location_bound:
+      order: [business_geography, country]
+      rationale: The operating locality/region is the minimum defensible served market for a location-bound business when explicit service-area evidence is absent.
+    nationally_deliverable:
+      order: [country]
+      rationale: Headquarters locality must not narrow a business whose delivery model is national.
+    digitally_deliverable:
+      order: [country]
+      rationale: Headquarters locality is not a defensible digital market, while GLOBAL must not be assumed without evidence.
+    multi_market:
+      order: [country]
+      rationale: Do not invent additional countries/global availability when explicit multi-market evidence is absent.
+  rule: A fallback value is a valid resolved MVP market, not a processor failure, but the fallback must never imply broader availability than evidence supports or incorrectly reduce a non-location-bound business to its headquarters locality.
+
+non_goals:
+  - Do not redefine country or business_geography.
+  - Do not infer audience demographics beyond geography.
+  - Do not determine reporting_currency.
+  - Do not treat traffic geography as commercial availability.

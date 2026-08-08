@@ -1,0 +1,53 @@
+id: market_geography_output_contract
+version: 1.1-frozen
+status: FROZEN
+processor: market_geography
+
+purpose: Define structured market geography output while supporting local, national, multi-country and global businesses.
+
+response:
+  type: object
+  additional_properties: false
+  required: [markets_served]
+  properties:
+    markets_served:
+      type: array
+      min_items: 1
+      items:
+        type: object
+        additional_properties: false
+        required: [scope, label, country_code, locality, region, radius_km, is_primary]
+        properties:
+          scope: {type: string, enum: [LOCALITY, REGION, COUNTRY, GLOBAL]}
+          label: {type: string}
+          country_code: {type: [string, 'null'], normalization: ISO_3166_1_alpha_2}
+          locality: {type: [string, 'null']}
+          region: {type: [string, 'null']}
+          radius_km: {type: [number, 'null']}
+          is_primary: {type: boolean}
+
+invariants:
+  - markets_served must contain at least one resolved market.
+  - At least one market must have is_primary=true.
+  - GLOBAL requires country_code=null, locality=null, region=null and radius_km=null.
+  - COUNTRY requires non-null country_code and locality=null.
+  - LOCALITY should include country_code when known and a non-null locality.
+  - REGION should include country_code when known and a non-null region.
+  - Multiple markets may be marked primary when evidence supports multiple meaningful primary markets.
+  - Similarweb or Instagram geography alone must not create a served market that contradicts owned-site commercial availability.
+  - When market evidence is insufficient, fallback must follow market_geography_reasoning business-model-aware policy: location-bound may use business_geography then country; nationally deliverable, digitally deliverable and multi-market businesses fall back to country rather than headquarters locality.
+  - GLOBAL must never be created merely because a digital product is technically accessible worldwide.
+
+examples:
+  local_clinic:
+    markets_served:
+      - {scope: LOCALITY, label: 'Kanpur, Uttar Pradesh, India', country_code: IN, locality: Kanpur, region: Uttar Pradesh, radius_km: 25, is_primary: true}
+  domestic_ecommerce:
+    markets_served:
+      - {scope: COUNTRY, label: India, country_code: IN, locality: null, region: null, radius_km: null, is_primary: true}
+  global_saas_when_supported_by_evidence:
+    markets_served:
+      - {scope: GLOBAL, label: Global, country_code: null, locality: null, region: null, radius_km: null, is_primary: true}
+
+runtime_metadata_policy:
+  note: Source availability, evidence references, confidence, model, token usage, latency, failure and fallback diagnostics belong to execution/runtime records rather than the markets_served Intelligence Object unless a later global contract explicitly adds them.

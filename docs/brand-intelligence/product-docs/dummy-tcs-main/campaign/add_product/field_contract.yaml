@@ -1,0 +1,66 @@
+version: "1.0"
+status: FROZEN
+module: add_product
+artifact: field_contract
+
+ui:
+  title: Add a Product
+  principle: Reference selection, not asset creation or editing.
+
+fields:
+  campaign_id:
+    required: true
+    user_input: false
+    source: PAGE_CONTEXT
+    persisted: true
+  asset_type:
+    label: Product Type
+    required: true
+    control: SELECT
+    source: BRAND_CENTRE_AVAILABLE_TYPES
+    editable_until_submit: true
+    persisted_semantics: resolved_to_canonical_reference_kind_and_brand_centre_entity_type
+  asset_reference:
+    required: true
+    control: SINGLE_ENTITY_SEARCH
+    source: BRAND_CENTRE
+    multi_select: false
+    editable_until_submit: true
+    brand_behavior: AUTO_RESOLVE_CURRENT_BRAND
+    persisted: true
+
+selection_behavior:
+  asset_type_change:
+    clear_asset_reference: true
+    clear_preview: true
+    reload_eligible_entities: true
+  already_attached_entity:
+    selectable: false
+    paused_counts_as_attached: true
+  brand_already_attached:
+    add_enabled: false
+
+preview:
+  read_only: true
+  source: BRAND_CENTRE
+  normalized_projection_examples: [display_name, image, primary_metadata, secondary_metadata, description]
+  persisted_on_campaign_asset: false
+
+write_boundary:
+  conceptual_inputs: [campaign_id, canonical_reference_kind, canonical_reference_id]
+  prohibited_copies: [name, image, price, currency, description, selling_points, compliance, offer_details, metadata]
+
+submit_state:
+  no_asset_type: DISABLED
+  asset_type_without_reference: DISABLED
+  valid_reference_selected: ENABLED
+  duplicate_or_ineligible_reference: CANNOT_REACH_VALID_SELECTED_STATE
+
+post_success:
+  close_surface: true
+  recalculate_campaign_page_projection: true
+  first_asset_without_brief_next_focus: ADD_BRIEF
+
+ai_recommended_campaign:
+  normal_add_product_flow: false
+  behavior: SAME_DOMAIN_OBJECT_AND_VALIDATION_DIFFERENT_REVIEW_ORCHESTRATION

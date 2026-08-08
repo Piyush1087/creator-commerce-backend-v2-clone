@@ -1,0 +1,73 @@
+version: "1.0"
+status: FROZEN
+module: add_product
+canonical_domain_object: CampaignAsset
+ui_name: Add a Product
+
+principles:
+  - CampaignAsset is a reference to a Brand Centre entity, not a copied product record.
+  - Brand Centre remains authoritative for asset business data.
+  - CampaignAsset identity is immutable after creation.
+  - One CampaignAsset may own zero or many Briefs; every Brief belongs to exactly one CampaignAsset.
+  - Readiness is derived, not persisted.
+
+identity:
+  belongs_to: exactly_one_campaign
+  references: exactly_one_brand_centre_entity
+  canonical_reference_kinds: [BRAND, OFFERING, OFFER]
+  immutable_fields: [reference_kind, reference_id]
+
+lifecycle:
+  states: [ACTIVE, PAUSED]
+  transitions:
+    - ACTIVE_TO_PAUSED
+    - PAUSED_TO_ACTIVE
+  excluded_mvp_states: [DRAFT, ARCHIVED, DELETED, COMPLETED]
+
+brand_centre_ownership:
+  copied_fields: []
+  resolved_at_read_time: true
+  examples_not_persisted: [name, description, images, price, currency, selling_points, compliance, offer_metadata]
+  accepted_mvp_consequence: Existing Applications and Collaborations may display current Brand Centre information rather than the values visible when they were originally created.
+
+brief_relationship:
+  campaign_asset_to_brief: ONE_TO_MANY
+  brief_to_campaign_asset: EXACTLY_ONE
+  execution_unit: CAMPAIGN_X_CAMPAIGN_ASSET_X_BRIEF
+
+readiness:
+  asset_execution_ready: CAMPAIGN_ASSET_ACTIVE_AND_EXISTS_ACTIVE_BRIEF
+  campaign_execution_ready: EXISTS_EXECUTION_READY_CAMPAIGN_ASSET
+  persisted: false
+
+invariants:
+  - CA-01 CampaignAsset belongs to exactly one Campaign.
+  - CA-02 CampaignAsset references exactly one Brand Centre entity.
+  - CA-03 Brand Centre remains authoritative for referenced entity data.
+  - CA-04 Campaign never duplicates Brand Centre entity business data.
+  - CA-05 CampaignAsset reference kind is immutable after creation.
+  - CA-06 CampaignAsset reference identity is immutable after creation.
+  - CA-07 One Add operation creates exactly one CampaignAsset.
+  - CA-08 Duplicate CampaignAssets within a Campaign are prohibited.
+  - CA-09 PAUSED CampaignAssets remain part of duplicate detection.
+  - CA-10 At most one BRAND CampaignAsset may exist per Campaign.
+  - CA-11 BRAND may coexist with other permitted asset kinds.
+  - CA-12 CampaignAsset supports ACTIVE and PAUSED only for MVP.
+  - CA-13 Pausing prevents new matching and applications through the Asset.
+  - CA-14 Pausing does not invalidate existing Applications.
+  - CA-15 Pausing does not interrupt existing Collaborations.
+  - CA-16 Every Brief belongs to exactly one CampaignAsset.
+  - CA-17 One CampaignAsset may have multiple Briefs.
+  - CA-18 An ACTIVE Brief under a PAUSED CampaignAsset is not effectively available for new acquisition.
+  - CA-19 Campaign execution readiness requires at least one ACTIVE CampaignAsset with at least one ACTIVE Brief.
+  - CA-20 Asset details are resolved from Brand Centre at read time.
+  - CA-21 CampaignAsset business information cannot be edited from Campaign.
+
+brand_centre_reference_protection:
+  block_archive_delete_for_campaign_status: [PUBLISHED, LIVE, PAUSED]
+  completed_archived_behavior: DEFERRED
+
+unresolved:
+  PLAN_vs_MODULE:
+    owner: BRAND_CENTRE
+    campaign_action: NONE

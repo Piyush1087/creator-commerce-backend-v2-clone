@@ -1,0 +1,51 @@
+version: "1.0"
+status: FROZEN
+contract: archetype_recommendation
+
+ownership:
+  canonical_taxonomy: CAMPAIGN
+  recommendation_score_and_ranking: CREATOR_SHOP_INTELLIGENCE
+
+inputs:
+  required:
+    - campaign_objective
+    - brand_industry
+  future_context_allowed: true
+
+candidate_set:
+  source: "campaign/canonical/creator_archetypes.yaml"
+  allow_noncanonical_candidates: false
+
+output:
+  type: ranked_list
+  item:
+    archetype_id:
+      required: true
+      canonical_reference: true
+    recommendation_score:
+      required: true
+      range: [0, 100]
+    recommended:
+      required: true
+      type: boolean
+
+presentation:
+  recommended_count: 4
+  remaining_candidates_label: "Other Archetypes"
+
+constraints:
+  intelligence_can_create_new_archetype: false
+  campaign_validates_returned_ids: true
+  invalid_ids: IGNORE
+  recommendation_failure_blocks_campaign_creation: false
+
+user_behavior:
+  recommendation_is_binding: false
+  user_can_select_nonrecommended_canonical_archetype: true
+  selected_archetypes: {min: 1, max: 5}
+
+# Historical note:
+# Earlier product work defined deterministic Objective (70%) + Industry (30%) affinity matrices.
+# Those matrices are preserved in source documentation, but are NOT frozen here as Campaign runtime
+# calculation logic because the latest product decision assigns recommendation scoring to the
+# Creator Shop Intelligence Framework. Intelligence may use these or richer signals internally.

@@ -1,0 +1,222 @@
+id: intelligence_prompt_builder
+version: 0.1-working
+status: WORKING
+
+purpose: Build the exact model request for one AI Processor Execution by composing runtime context, global LLM artifacts, processor-specific artifacts, active Intelligence Object definitions, canonical dependencies, evidence, and the active output contract. The Prompt Builder does not decide what should execute; it only builds the request for the task selected by the Intelligence Compiler.
+
+ownership:
+  caller: intelligence_compiler
+  called_for: each_ai_processor_execution
+  not_called_for:
+    - deterministic_runtime_tasks
+    - evidence_acquisition_tasks
+    - application_or_trigger_logic
+
+responsibility_boundary:
+  prompt_builder_does:
+    - validate that required prompt components are present
+    - load/receive only artifacts applicable to the active processor/scope
+    - filter Intelligence Object definitions to active outputs
+    - serialize canonical dependencies and evidence into stable prompt sections
+    - compose global and processor-specific instructions in deterministic order
+    - attach the active structured output schema/contract
+    - return a provider-neutral prompt package plus prompt metadata/version refs
+  prompt_builder_does_not:
+    - choose which processor runs
+    - resolve execution dependencies
+    - acquire or crawl evidence
+    - decide evidence freshness
+    - choose the concrete provider/model
+    - call the model provider
+    - validate the model response
+    - persist Intelligence
+    - retry failed provider calls
+    - mutate execution state
+
+input_contract:
+  required:
+    execution_context:
+      - execution_id
+      - processor_execution_id
+      - entity_type
+      - entity_id
+      - processor_id
+      - active_outputs
+    processor_definition:
+      - processor_id
+      - purpose_or_responsibility
+      - input_contract
+      - output_ownership
+    global_artifacts:
+      - runtime_context
+      - evidence_grounding
+      - output_discipline
+    processor_artifacts:
+      - reasoning
+      - output_contract
+    intelligence_objects:
+      - definitions_for_every_active_output
+    evidence:
+      - evidence_required_by_active_processor_scope
+    resolved_model_runtime:
+      - model_profile
+      - access_mode
+  optional:
+    - processor_scope
+    - taxonomy
+    - processor_specific_rules
+    - canonical_dependencies
+    - optional_evidence
+    - execution_reason
+
+prebuild_validation:
+  fail_if:
+    - active_outputs is empty
+    - any active output is not owned by the processor/scope
+    - an active Intelligence Object definition cannot be loaded
+    - processor reasoning artifact is missing
+    - active output contract cannot be resolved
+    - a required canonical dependency is missing
+    - required normalized evidence is missing for normalized_evidence access mode
+    - required global artifact is missing
+  failure:
+    code: PROMPT_BUILD_PRECHECK_FAILED
+    model_call_allowed: false
+
+composition_order:
+  - section: execution_boundary
+    source: global.runtime_context
+  - section: evidence_grounding
+    source: global.evidence_grounding
+  - section: output_discipline
+    source: global.output_discipline
+  - section: task
+    source: processor_definition
+  - section: processor_reasoning
+    source: processor_artifacts.reasoning
+  - section: taxonomy_and_processor_rules
+    source: processor_artifacts.taxonomy_or_rules
+    include_when_present: true
+  - section: active_output_definitions
+    source: intelligence_objects.active_only
+  - section: canonical_dependencies
+    source: runtime.canonical_dependencies
+    include_when_present: true
+  - section: evidence
+    source: runtime.evidence
+  - section: output_contract
+    source: processor_artifacts.output_contract.active_scope
+
+composition_rules:
+  - Global artifacts establish common behavior but must not override processor-specific business reasoning.
+  - Processor-specific reasoning has authority over processor-specific evidence precedence, inference rules, fallbacks, and conflict handling.
+  - Only active Intelligence Object definitions are included; do not send the complete branch object registry when unnecessary.
+  - Only evidence relevant/allowed for the active processor scope is included.
+  - Canonical dependencies must be clearly separated from observed evidence so the model does not treat them as competing claims.
+  - Output contract is filtered to active outputs/scopes where the processor supports partial execution.
+  - Repository paths, internal implementation comments, and unrelated artifacts must not be inserted into the model prompt.
+  - Secrets, credentials, user authorization state, database connection details, and provider keys must never enter the prompt.
+  - No hidden reasoning/chain-of-thought output is requested. The model returns only the structured processor result required by the output contract.
+
+access_modes:
+  normalized_evidence:
+    behavior:
+      - Prompt contains normalized evidence supplied by runtime.
+      - Prompt Builder does not fetch external URLs.
+  website_direct:
+    behavior:
+      - Prompt contains the target website URL and processor instructions/artifacts required for direct website analysis.
+      - Provider adapter is responsible for enabling the configured direct-access capability.
+      - Prompt Builder does not perform Zyte/Cheerio acquisition for this mode.
+
+provider_neutral_output:
+  prompt_package:
+    - system_instructions
+    - task_payload
+    - structured_output_schema
+    - metadata
+  metadata:
+    - prompt_builder_version
+    - global_artifact_ids_and_versions
+    - processor_id
+    - processor_scope_when_applicable
+    - processor_artifact_ids_and_versions
+    - active_output_ids
+    - intelligence_object_definition_versions
+    - evidence_refs_or_run_ids
+    - output_contract_id_and_version
+
+serialization:
+  system_instructions:
+    contains:
+      - execution_boundary
+      - evidence_grounding
+      - output_discipline
+  task_payload:
+    format: structured_sections
+    section_order:
+      - task
+      - processor_reasoning
+      - taxonomy_and_processor_rules
+      - active_output_definitions
+      - canonical_dependencies
+      - evidence
+  structured_output_schema:
+    source: active_output_contract
+    provider_adapter_may_translate_schema: true
+
+partial_execution:
+  supported: true
+  behavior:
+    - Filter processor output contract to requested active outputs.
+    - Filter Intelligence Object definitions to requested active outputs.
+    - Include shared reasoning/taxonomy required to correctly resolve those outputs.
+    - Include required dependencies/evidence even when they are not themselves outputs.
+    - Do not ask the model to regenerate unrelated outputs owned by the same processor.
+
+prompt_size_policy:
+  mvp:
+    - Prefer relevant normalized evidence over raw HTML.
+    - Do not duplicate the same evidence in multiple sections.
+    - Do not include inactive object definitions or unrelated branch artifacts.
+    - Evidence truncation/summarization must never silently remove required evidence; if runtime cannot supply contract-compliant evidence, fail before model execution.
+  future:
+    - token-budget-aware evidence selection may be added without changing processor definitions.
+
+versioning_and_traceability:
+  - Every built prompt package must have a prompt_build_id.
+  - Processor Execution records the Prompt Builder version and all artifact/object/output-contract versions used.
+  - Runtime should record a hash of the final provider-neutral prompt package for reproducibility without requiring permanent storage of every full prompt.
+  - Full prompt retention is an implementation/privacy policy and is not required by this contract.
+
+failure_codes:
+  - PROMPT_ACTIVE_OUTPUT_INVALID
+  - PROMPT_REQUIRED_ARTIFACT_MISSING
+  - PROMPT_OBJECT_DEFINITION_MISSING
+  - PROMPT_REQUIRED_DEPENDENCY_MISSING
+  - PROMPT_REQUIRED_EVIDENCE_MISSING
+  - PROMPT_OUTPUT_CONTRACT_MISSING
+  - PROMPT_SERIALIZATION_FAILED
+
+identity_test_expected_builds:
+  - processor: industry_classification
+    scope: gatekeeper
+    access_mode: website_direct
+    active_outputs: [industry, sub_industry]
+  - processor: identity_core
+    access_mode: normalized_evidence
+    active_outputs: runtime_selected_or_full_identity_core_scope
+  - processor: industry_classification
+    scope: industry_niche
+    access_mode: normalized_evidence
+    active_outputs: [industry_niche]
+  - processor: market_geography
+    access_mode: normalized_evidence
+    active_outputs: [markets_served]
+
+non_goals:
+  - model registry
+  - provider SDK implementation
+  - evidence acquisition implementation
+  - response validation implementation
+  - Intelligence persistence implementation

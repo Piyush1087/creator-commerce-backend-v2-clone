@@ -1,0 +1,121 @@
+version: "1.1"
+status: FROZEN
+module: campaign_page
+artifact: orchestration_contract
+
+goal: "Resolve what can be used, what deserves attention, and how prominently each Campaign Page surface should appear."
+
+pipeline: [LIFECYCLE_OVERRIDE, READINESS, PRIORITY, VISIBILITY, HYDRATION_OUTPUT]
+
+lifecycle_override:
+  ARCHIVED: STATE_9_HISTORICAL_CAMPAIGN
+  COMPLETED: STATE_9_HISTORICAL_CAMPAIGN
+  PAUSED: STATE_8_PAUSED_CAMPAIGN
+  DRAFT: OUTSIDE_OPERATIONAL_CAMPAIGN_PAGE
+  PUBLISHED: CONTINUE_READINESS
+  LIVE: CONTINUE_CURRENT_READINESS_AND_OPERATIONAL_ORCHESTRATION
+
+readiness:
+  campaign_asset_gate:
+    if: PUBLISHED AND active_campaign_asset_count == 0
+    result: STATE_1_PRODUCT_SETUP
+    short_circuit: true
+  brief_gate:
+    if: PUBLISHED AND execution_ready == false
+    result: STATE_2_BRIEF_SETUP
+    short_circuit: true
+  first_execution_gate:
+    if: PUBLISHED AND execution_ready == true
+    result: TRANSITION_CAMPAIGN_TO_LIVE
+    enables: [DISCOVERY, SHARE_CAMPAIGN, REPORTING_SURFACE]
+  post_live_execution_gate:
+    if: LIVE AND execution_ready == false
+    result: BLOCKING_READINESS_MODE
+    lifecycle_change: NONE
+    blocks: [NEW_DISCOVERY, NEW_APPLICATIONS, SHARE_CAMPAIGN]
+    preserves: [INSTANTIATED_APPLICANTS, INSTANTIATED_COLLABORATIONS, REPORTING]
+    primary_action:
+      no_active_campaign_asset: ADD_OR_RESUME_PRODUCT
+      no_active_brief_path: ADD_OR_RESUME_BRIEF
+
+  applicants:
+    structurally_possible_after: DISCOVERY_UNLOCK
+    instantiated_when: EXISTS_ANY_APPLICATION_FOR_CAMPAIGN
+  collaborations:
+    instantiated_when: EXISTS_ANY_COLLABORATION_FOR_CAMPAIGN
+    provenance_requires: APPROVED_APPLICATION
+  marketplace:
+    enabled_when: CAMPAIGN_LIVE_AND_EXECUTION_READY_AND_META_CONNECTED
+
+priority_classes:
+  P0_BLOCKING:
+    examples: [NO_ACTIVE_CAMPAIGN_ASSET, NO_ACTIVE_BRIEF_PATH]
+  P1_CRITICAL_ACTION:
+    examples: [MODULE_REPORTED_CRITICAL_BLOCKER]
+  P2_ACTION_REQUIRED:
+    examples: [APPLICATIONS_WAITING_REVIEW, MODULE_REPORTED_ACTION]
+  P3_OPTIMIZATION_OPPORTUNITY:
+    examples: [REPORTING_OR_INTELLIGENCE_RECOMMENDATION]
+  P4_BACKGROUND:
+    examples: [HEALTHY_ONGOING_MODULE]
+
+priority_order: [P0_BLOCKING, P1_CRITICAL_ACTION, P2_ACTION_REQUIRED, P3_OPTIMIZATION_OPPORTUNITY, P4_BACKGROUND]
+
+tie_breaking:
+  same_severity_operational_modules: [COLLABORATIONS, APPLICANTS, DISCOVERY]
+  rationale: "Increasing commitment/cost downstream receives precedence when severity is equal."
+  reporting_rule: "Reporting/Intelligence must express its true severity; it does not win via module tie-break order."
+
+normalized_module_signal:
+  fields:
+    module: [DISCOVERY, APPLICANTS, COLLABORATIONS, REPORTING, CAMPAIGN]
+    severity: [P1, P2, P3, P4]
+    count: optional_number
+    summary: string
+    action: optional_action_destination
+
+visibility_states:
+  HIDDEN: "Not structurally available or not yet instantiated."
+  BACKGROUND: "Available but currently trivial/contextual."
+  NORMAL: "Useful and accessible, not primary focus."
+  PROMINENT: "Current operational/analytical focus."
+
+progressive_workspace_navigation:
+  rule: "Do not render empty operational workspace destinations."
+  only_discovery_available:
+    navigation_chrome: NONE
+    render_directly: DISCOVERY
+  after_first_application:
+    destinations: [DISCOVERY, APPLICANTS]
+  after_first_collaboration:
+    destinations: [DISCOVERY, APPLICANTS, COLLABORATIONS]
+  persistence:
+    applicants: "Remain navigable while any historical Application exists, even if pending count is zero."
+    collaborations: "Remain navigable while any historical Collaboration exists, even if active count is zero."
+
+primary_focus_vs_intelligence:
+  rule: "Primary workspace and top Campaign Intelligence insight may differ. Workspace answers where the user is working; Intelligence answers what the user should know."
+
+hydration_output:
+  persisted: false
+  fields:
+    lifecycle_status: enum
+    execution_ready: boolean
+    readiness_block: optional_runtime_condition
+    hydration_state: runtime_enum
+    primary_focus: runtime_surface
+    surfaces:
+      products_briefs: visibility_state
+      discovery: visibility_state
+      applicants: visibility_state
+      collaborations: visibility_state
+      reporting: visibility_state
+    workspace_destinations: array
+    capabilities:
+      share_campaign: boolean
+      marketplace: boolean
+    primary_signal: optional_normalized_signal
+    reporting_highlight: optional_provider_output
+    generated_at: timestamp
+
+invariant: "Lifecycle records what the Campaign has become; Readiness says what can happen now; Priority says what deserves focus; Visibility says how it is presented."

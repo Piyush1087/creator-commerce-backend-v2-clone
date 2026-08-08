@@ -1,0 +1,59 @@
+// Identity Intelligence — minimal BrandProfile schema patch
+// Reference schema: Current Schema 0208 (2026-08-02)
+//
+// Apply these fields inside the EXISTING `model BrandProfile`.
+// Do not create a second BrandProfile model from this file.
+// Existing Identity-compatible fields are intentionally not repeated here.
+
+// ---------------------------------------------------------------------------
+// ADD TO model BrandProfile
+// ---------------------------------------------------------------------------
+
+businessGeography Json?   @map("business_geography")
+marketsServed     Json?   @map("markets_served")
+primaryLanguage   String? @map("primary_language")
+websiteCurrency   String? @map("website_currency")
+facebookHandle    String? @map("facebook_handle")
+linkedinHandle    String? @map("linkedin_handle")
+
+// ---------------------------------------------------------------------------
+// EXISTING FIELDS TO RETAIN AS-IS
+// ---------------------------------------------------------------------------
+// domain            String @unique                    // website_url
+// name              String @map("brand_name")         // brand_name
+// industry          IndustryVertical                  // industry
+// subIndustry       String? @map("sub_industry")      // sub_industry
+// industryNiche     String? @map("industry_niche")    // industry_niche
+// logoUrl           String? @map("logo_url")          // brand_logo
+// tagline           String?                           // tagline
+// countryCode       String? @map("country_code")      // country
+// currencyCode      String @default("USD") ...        // reporting_currency
+// igHandle          String? @map("ig_handle")         // instagram_handle
+// ytHandle          String? @map("yt_handle")         // youtube_handle
+// tiktokHandle      String? @map("tiktok_handle")     // tiktok_handle
+// brandRoutingType  BrandRoutingType ...               // RETAIN; separate routing compatibility field
+
+// ---------------------------------------------------------------------------
+// EXISTING PRE-BRAND / GATEKEEPER STORAGE TO RETAIN
+// ---------------------------------------------------------------------------
+// DiscoveryLead.normalizedUrl  -> website_url before BrandProfile exists
+// DiscoveryLead.industry       -> gatekeeper industry
+// DiscoveryLead.subIndustry    -> gatekeeper sub_industry
+// DiscoveryLead.industryNiche  -> industry_niche when applicable
+
+// ---------------------------------------------------------------------------
+// INDUSTRY COMPATIBILITY — NO ENUM RENAME IN THIS PATCH
+// ---------------------------------------------------------------------------
+// Existing backend enum values used by the four supported platform industries:
+// IndustryVertical.D2C
+// IndustryVertical.SAAS_AI
+// IndustryVertical.HEALTHCARE
+// IndustryVertical.OFFLINE_SERVICES
+//
+// Intelligence canonical mapping is handled at the persistence boundary:
+// D2C                          -> D2C
+// AI_SAAS                      -> SAAS_AI
+// HEALTHCARE                   -> HEALTHCARE
+// OFFLINE_EXPERIENCES_SERVICES -> OFFLINE_SERVICES
+//
+// BrandRoutingType remains untouched to avoid disrupting existing frontend/code paths.

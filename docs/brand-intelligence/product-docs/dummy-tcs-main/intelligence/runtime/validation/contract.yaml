@@ -1,0 +1,114 @@
+id: intelligence_output_validation
+version: 0.1-working
+status: WORKING
+
+purpose: Convert frozen processor output contracts into executable runtime schemas, validate model responses before persistence, and enforce semantic invariants that cannot be represented safely by basic provider structured-output schemas.
+
+architecture:
+  source_of_truth: frozen_processor_output_contract_yaml
+  runtime_schema_library: zod
+  provider_schema: derived_from_same_runtime_schema_or_intermediate_contract
+  rule: Do not independently hand-author a second business output contract in Zod.
+
+pipeline:
+  - load frozen processor output contract
+  - select active processor scope when applicable
+  - select/filter active outputs according to execution request
+  - compile structural schema
+  - compile normalization/semantic validators
+  - derive provider-compatible structured-output schema
+  - model executes
+  - parse response
+  - validate structural schema
+  - validate processor invariants/taxonomy/parent-child rules
+  - normalize only explicitly permitted canonical formats
+  - return validated output or structured validation failure
+  - persistence is allowed only for validated output
+
+validation_layers:
+  provider_structured_output:
+    purpose: Reduce malformed model responses before they reach backend validation.
+    authoritative: false
+  runtime_structural_validation:
+    purpose: Enforce object shape, types, required fields, enums, nullability, additional-properties policy, arrays and nested structures.
+    authoritative: true
+  runtime_semantic_validation:
+    purpose: Enforce cross-field invariants, taxonomy relationships, processor-specific constraints and normalization requirements.
+    authoritative: true
+
+partial_execution:
+  - For processors whose contract is active-scope-only, compile a schema containing only requested Intelligence outputs plus required diagnostic/control fields defined by that processor scope.
+  - Gatekeeper is scope-based rather than arbitrary field-partial: its diagnostic fields status, eligibility and detected_business_type remain required because its invariants depend on them.
+  - identity_core may be field-partial; schema must reject inactive outputs.
+  - market_geography currently has one owned output and therefore no meaningful field-partial reduction.
+
+normalization_policy:
+  allowed:
+    - Canonical normalization explicitly declared in the frozen output contract, when deterministic and lossless.
+  examples:
+    - ISO country/language/currency casing normalization where contract explicitly permits it
+    - social identifier cleanup when explicitly specified by contract
+  forbidden:
+    - guessing missing values
+    - converting unsupported taxonomy labels to nearest canonical labels without an explicit mapping rule
+    - repairing semantic contradictions by inventing values
+    - silently dropping extra fields to make an invalid response pass
+  rule: Prefer validation failure over hidden semantic repair.
+
+failure_contract:
+  code: OUTPUT_VALIDATION_FAILED
+  task_status: FAILED_VALIDATION
+  persist_intelligence: false
+  include:
+    - processor_id
+    - processor_scope_when_applicable
+    - active_outputs
+    - validation_stage
+    - issues
+  issue_shape:
+    - path
+    - code
+    - message
+    - expected_when_available
+    - received_when_safe
+
+identity_semantic_validators:
+  industry_classification.gatekeeper:
+    - RESOLVED + SUPPORTED => industry and sub_industry non-null; detected_business_type null.
+    - RESOLVED + UNSUPPORTED => industry/sub_industry null; detected_business_type non-null.
+    - UNRESOLVED => eligibility UNKNOWN; industry/sub_industry/detected_business_type null.
+    - SUPPORTED industry must match canonical Industry taxonomy.
+    - SUPPORTED sub_industry must belong to selected Industry.
+    - Legacy Industry enum values are invalid.
+  industry_classification.industry_niche:
+    - null is valid.
+    - non-null niche must not contradict canonical Industry/Sub-industry; evidence compatibility remains processor semantic validation.
+  identity_core:
+    - Reject extra/inactive fields.
+    - Validate ISO-shaped country/language/currency outputs according to contract.
+    - Validate business_geography nested shape when non-null.
+    - Apply declared social-handle normalization rules only; do not synthesize handles.
+  market_geography:
+    - markets_served length >= 1.
+    - at least one market is_primary=true.
+    - GLOBAL => country_code/locality/region/radius_km null.
+    - COUNTRY => country_code non-null and locality null.
+    - LOCALITY => locality non-null; country_code required when known cannot be mechanically validated if knowledge is absent.
+    - REGION => region non-null.
+
+provider_schema_policy:
+  - Provider schema may be less expressive than runtime validation.
+  - Cross-field invariants remain backend validators even when provider schema cannot express them.
+  - Provider schema generation must never weaken authoritative post-response validation.
+
+versioning:
+  - Compiled schema metadata records source output-contract id/version and validator compiler version.
+  - Processor Execution records both.
+  - Any semantic validator that adds business rules not present in the frozen output contract is prohibited; update/freeze the source contract first.
+
+non_goals:
+  - processor reasoning
+  - evidence validation
+  - model retries
+  - persistence mapping
+  - orchestration

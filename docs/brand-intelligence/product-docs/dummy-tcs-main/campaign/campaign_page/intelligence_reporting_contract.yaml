@@ -1,0 +1,90 @@
+version: "1.0"
+status: FROZEN
+module: campaign_page
+artifact: intelligence_reporting_consumption_contract
+
+principle: "Campaign Page consumes intelligence; it does not calculate it. Priority Intelligence and Reporting Intelligence are separate presentation responsibilities even if one future engine supplies both."
+
+priority_insight:
+  purpose: WHAT_NEEDS_ATTENTION_NOW
+  state: [AVAILABLE, NONE]
+  fields:
+    insight_id: string
+    severity: [CRITICAL, HIGH, MEDIUM, LOW]
+    headline: string
+    summary: string
+    source: [CAMPAIGN, DISCOVERY, APPLICANTS, COLLABORATIONS, REPORTING]
+    action:
+      type: [NAVIGATE, INFORMATION_ONLY]
+      label: string
+      destination: action_destination
+    generated_at: timestamp
+
+reporting_highlight:
+  purpose: CAMPAIGN_VALUE_EFFICIENCY_AND_RECOMMENDED_CHANGE
+  state: [INSUFFICIENT_DATA, AVAILABLE]
+  fields:
+    metric:
+      metric_id: string
+      label: string
+      value: scalar
+      unit: string
+      comparison:
+        direction: [UP, DOWN, FLAT, NONE]
+        value: optional_scalar
+        basis: optional_string
+    intelligence:
+      headline: string
+      summary: string
+    severity: [CRITICAL, HIGH, MEDIUM, LOW, INFORMATIONAL]
+    recommended_action:
+      type: [NAVIGATE, INFORMATION_ONLY]
+      label: string
+      destination: action_destination
+    generated_at: timestamp
+
+comparison_rule: "If a comparison is displayed, the provider must supply its comparison basis. Exhaustive comparison taxonomy belongs to the Intelligence/Reporting engine, not Campaign Page."
+
+dynamic_metric_rule: "Frontend must consume a generic metric object; it must not hard-code a fixed reporting metric schema."
+
+kpi_rule: "Reporting headline metric is not required to equal Campaign primary KPI. KPI is an evaluation input; Reporting selects the most useful current data slice."
+
+lifecycle_progression:
+  newly_live: sourcing_or_application_efficiency
+  collaborations_starting: creator_selection_or_commercial_efficiency
+  content_running: primary_secondary_kpi_and_bang_for_buck
+  completed: final_campaign_performance
+  archived: historical_intelligence
+  note: "These are provider concerns, not separate reporting page states."
+
+action_destination:
+  type: [CAMPAIGN_EDIT, PRODUCT, BRIEF, DISCOVERY, APPLICANTS, COLLABORATIONS, REPORTING, META_CONNECTION]
+  entity_id: optional_string
+  context: optional_object
+
+provider_boundary:
+  initial_priority_source: DETERMINISTIC_MODULE_SIGNALS
+  reporting_interface: CampaignReportingProvider
+  mvp_reporting_implementation: CampaignReportingDummyProvider
+  target_reporting_implementation: CampaignIntelligenceReportingProvider
+  target_intelligence_owner: CREATOR_SHOP_CAMPAIGN_INTELLIGENCE_ENGINE
+
+failure_behavior:
+  campaign_page_load_must_not_fail: true
+  priority_fallback: NONE
+  reporting_fallback: INSUFFICIENT_DATA
+
+freshness:
+  provider_supplies: generated_at
+  refresh_cadence_owner: CAMPAIGN_INTELLIGENCE_ENGINE
+  cadence_frozen_here: false
+
+reporting_detail:
+  permanent_workspace: false
+  destination_type: REPORTING
+  presentation_frontend_owned: [MODAL, FULL_SCREEN_MODAL, OVERLAY, RESPONSIVE_VIEW]
+
+persistence:
+  campaign_columns_for_current_insight: false
+  campaign_columns_for_reporting_highlight: false
+  owner_of_future_result_history: INTELLIGENCE_FRAMEWORK

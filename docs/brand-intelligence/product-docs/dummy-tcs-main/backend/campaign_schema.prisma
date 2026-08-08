@@ -1,0 +1,551 @@
+// Creator Shop Campaign Prisma Working View
+// Version: 1.9
+// Status: CREATE CAMPAIGN + CAMPAIGN PAGE + ADD PRODUCT + ADD BRIEF + DISCOVERY + APPLICANTS + OUTREACH + REPORTING + SHARE FROZEN WORKING SCHEMA
+// This is a working view, not a standalone replacement for the production Prisma schema.
+
+enum UceCampaignStatus { DRAFT PUBLISHED LIVE PAUSED COMPLETED ARCHIVED }
+enum UceCampaignCreationSource { MANUAL AI_RECOMMENDED }
+enum UcePublishingSchedule { EVERGREEN SCHEDULED }
+enum CampaignObjective { PULSE PROOF PRODUCTION PUSH }
+enum UceMediaPlatform { INSTAGRAM TIKTOK YOUTUBE }
+enum UceVisibilityScope { EVERYONE ELIGIBLE_ONLY INVITED_ONLY }
+enum UceAudienceGender { ALL FEMALE MALE }
+enum UceCompensationType { FIXED_FEE NEGOTIABLE }
+enum UcePayoutTerms { IMMEDIATE NET_7 NET_15 NET_30 NET_45 NET_60 }
+enum UceBrandSupportType { PRODUCT SERVICE EXPERIENCE ACCESS_SUBSCRIPTION OTHER }
+enum UceCampaignAssetKind { BRAND OFFERING OFFER }
+enum UceCampaignAssetStatus { ACTIVE PAUSED }
+enum UceBriefStatus { DRAFT PUBLISHED PAUSED }
+enum UceBriefCreationSource { MANUAL AI_RECOMMENDED }
+enum UceBriefType { CREATOR_LED BRAND_LED }
+enum UceDeliverableFormat { REEL_VIDEO STORY PHOTOSHOOT BANNER_CAROUSEL }
+enum UceCampaignCreatorSource { META_MARKETPLACE MANUAL }
+enum UceCampaignCreatorIngestionMethod { MARKETPLACE_RECOMMENDATION MANUAL_SINGLE MANUAL_CSV }
+enum UceCampaignCreatorReviewState { PENDING_REVIEW REVIEWED REJECTED }
+enum UceRecommendationScoreBand { HIGH MEDIUM LOW }
+enum UceCreatorRecommendationRunType { INITIAL REPLENISHMENT }
+enum UceCreatorRecommendationRunStatus { RUNNING SUCCEEDED FAILED }
+enum UceCampaignCreatorImportStatus { PENDING VALIDATED IMPORTING COMPLETED FAILED }
+enum UceApplicationStatus { PENDING APPROVED REJECTED WITHDRAWN EXPIRED SUPERSEDED }
+enum UceApplicantIntelligenceStatus { PROCESSING READY UNAVAILABLE }
+enum UceOutreachChannel { PRIORITY_DM EMAIL }
+enum UceOutreachAttemptStatus { COMPOSE_INITIATED ACCEPTED SCHEDULED EXECUTED FAILED CANCELLED }
+enum UceOutreachTrackingEventType { LINK_CLICKED }
+enum UceApplicationSource { DIRECT OUTREACH SHARE }
+enum UceReportAvailability { AVAILABLE PARTIAL }
+enum UceCampaignShareChannel { COPY_LINK WHATSAPP INSTAGRAM NATIVE_SHARE }
+enum UceCampaignShareTrackingEventType { LINK_CLICKED }
+
+model UceCampaign {
+  id String @id @default(cuid())
+  brandProfileId String @map("brand_profile_id")
+  name String @map("campaign_name")
+  status UceCampaignStatus @default(DRAFT)
+  creationSource UceCampaignCreationSource @default(MANUAL) @map("creation_source")
+  aiRecommendationId String? @map("ai_recommendation_id")
+  aiRecommendationVersion String? @map("ai_recommendation_version")
+  strategy UceCampaignStrategy?
+  targeting UceCampaignTargeting?
+  commercials UceCampaignCommercials?
+  assets UceCampaignAsset[]
+  creators UceCampaignCreator[]
+  applications UceApplication[]
+  recommendationContexts UceCampaignRecommendationContext[]
+  recommendationRuns UceCreatorRecommendationRun[]
+  creatorImports UceCampaignCreatorImport[]
+  report UceCampaignReport?
+  shares UceCampaignShare[]
+  publishedAt DateTime? @map("published_at")
+  liveAt DateTime? @map("live_at")
+  completedAt DateTime? @map("completed_at")
+  archivedAt DateTime? @map("archived_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@index([brandProfileId])
+  @@index([status])
+  @@index([creationSource])
+  @@map("uce_campaigns")
+}
+
+model UceCampaignStrategy {
+  id String @id @default(cuid())
+  campaignId String @unique @map("campaign_id")
+  publishingSchedule UcePublishingSchedule @map("publishing_schedule")
+  publishFrom DateTime? @map("publish_from")
+  publishUntil DateTime? @map("publish_until")
+  coreObjective CampaignObjective @map("core_objective")
+  primaryKpiId String @map("primary_kpi_id")
+  supportingKpiIds String[] @default([]) @map("supporting_kpi_ids")
+  platforms UceMediaPlatform[] @default([INSTAGRAM])
+  visibilityScope UceVisibilityScope @default(EVERYONE) @map("visibility_scope")
+  campaign UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("uce_campaign_strategies")
+}
+
+model UceCampaignTargeting {
+  id String @id @default(cuid())
+  campaignId String @unique @map("campaign_id")
+  creatorArchetypes String[] @default([]) @map("creator_archetypes")
+  minimumFollowers Int @default(0) @map("minimum_followers")
+  maximumFollowers Int? @map("maximum_followers")
+  audienceAgeMin Int @map("audience_age_min")
+  audienceAgeMax Int @map("audience_age_max")
+  audienceGender UceAudienceGender @default(ALL) @map("audience_gender")
+  audienceAffinityIds String[] @default([]) @map("audience_affinity_ids")
+  audienceGeographies Json @map("audience_geographies")
+  campaign UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("uce_campaign_targeting")
+}
+
+model UceCampaignCommercials {
+  id String @id @default(cuid())
+  campaignId String @unique @map("campaign_id")
+  receivesBrandSupport Boolean @default(false) @map("receives_brand_support")
+  brandSupportType UceBrandSupportType? @map("brand_support_type")
+  brandSupportEstimatedValue Decimal? @map("brand_support_estimated_value") @db.Decimal(12, 2)
+  compensationType UceCompensationType @map("compensation_type")
+  commercialOffer Decimal @map("commercial_offer") @db.Decimal(12, 2)
+  totalCampaignBudget Decimal @map("total_campaign_budget") @db.Decimal(14, 2)
+  advancePaymentPercentage Int @default(0) @map("advance_payment_percentage")
+  payoutTerms UcePayoutTerms @map("payout_terms")
+  currency String @db.VarChar(3)
+  campaign UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("uce_campaign_commercials")
+}
+
+model UceCampaignAsset {
+  id String @id @default(cuid())
+  campaignId String @map("campaign_id")
+  kind UceCampaignAssetKind
+  status UceCampaignAssetStatus @default(ACTIVE)
+  brandProfileId String? @map("brand_profile_id")
+  offeringId String? @map("offering_id")
+  brandOfferId String? @map("brand_offer_id")
+  campaign UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  briefs UceBrief[]
+  applications UceApplication[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@unique([campaignId, brandProfileId])
+  @@unique([campaignId, offeringId])
+  @@unique([campaignId, brandOfferId])
+  @@index([campaignId, status])
+  @@map("uce_campaign_assets")
+}
+
+model UceBrief {
+  id String @id @default(cuid())
+  campaignAssetId String @map("campaign_asset_id")
+  status UceBriefStatus @default(DRAFT)
+  creationSource UceBriefCreationSource @default(MANUAL) @map("creation_source")
+  briefName String? @map("brief_name")
+  creativeIntent String? @map("creative_intent")
+  creatorBrief String? @map("creator_brief")
+  briefType UceBriefType? @map("brief_type")
+  platform UceMediaPlatform?
+  briefLevelGuidance Json? @map("brief_level_guidance")
+  referenceContent Json? @map("reference_content")
+  usageRights Json? @map("usage_rights")
+  creatorRequirements String? @map("creator_requirements")
+  campaignAsset UceCampaignAsset @relation(fields: [campaignAssetId], references: [id], onDelete: Cascade)
+  deliverables UceBriefDeliverable[]
+  applications UceApplication[]
+  publishedAt DateTime? @map("published_at")
+  pausedAt DateTime? @map("paused_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@index([campaignAssetId, status])
+  @@index([creationSource])
+  @@map("uce_briefs")
+}
+
+model UceBriefDeliverable {
+  id String @id @default(cuid())
+  briefId String @map("brief_id")
+  format UceDeliverableFormat
+  displayOrder Int @map("display_order")
+  configuration Json? @map("configuration")
+  creativeGuidance Json? @map("creative_guidance")
+  amplifyTargetDeliverableId String? @map("amplify_target_deliverable_id")
+  brief UceBrief @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  amplifyTargetDeliverable UceBriefDeliverable? @relation("BriefDeliverableAmplifyTarget", fields: [amplifyTargetDeliverableId], references: [id], onDelete: Restrict)
+  amplifiedBy UceBriefDeliverable[] @relation("BriefDeliverableAmplifyTarget")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@index([briefId, displayOrder])
+  @@index([amplifyTargetDeliverableId])
+  @@map("uce_brief_deliverables")
+}
+
+// Durable Campaign↔creator bridge. creatorId stays unresolved until production Creator is reconciled.
+model UceCampaignCreator {
+  id String @id @default(cuid())
+  campaignId String @map("campaign_id")
+  creatorId String? @map("creator_id")
+  platform UceMediaPlatform
+  socialHandle String @map("social_handle")
+  normalizedSocialHandle String @map("normalized_social_handle")
+  email String?
+  source UceCampaignCreatorSource
+  ingestionMethod UceCampaignCreatorIngestionMethod @map("ingestion_method")
+  reviewState UceCampaignCreatorReviewState @default(PENDING_REVIEW) @map("review_state")
+  campaign UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  recommendations UceCampaignCreatorRecommendation[]
+  outreach UceOutreach?
+  applications UceApplication[]
+  archivedAt DateTime? @map("archived_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@unique([campaignId, platform, normalizedSocialHandle])
+  @@index([campaignId, reviewState])
+  @@index([campaignId, source])
+  @@index([campaignId, archivedAt])
+  @@index([creatorId])
+  @@map("uce_campaign_creators")
+}
+
+model UceCampaignRecommendationContext {
+  id String @id @default(cuid())
+  campaignId String @map("campaign_id")
+  version Int
+  contextHash String? @map("context_hash")
+  campaign UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  runs UceCreatorRecommendationRun[]
+  recommendations UceCampaignCreatorRecommendation[]
+  createdAt DateTime @default(now()) @map("created_at")
+  @@unique([campaignId, version])
+  @@index([campaignId])
+  @@map("uce_campaign_recommendation_contexts")
+}
+
+// Thin Campaign-facing run; detailed L1/L2/L3 execution belongs to Intelligence persistence.
+model UceCreatorRecommendationRun {
+  id String @id @default(cuid())
+  campaignId String @map("campaign_id")
+  recommendationContextId String @map("recommendation_context_id")
+  type UceCreatorRecommendationRunType
+  status UceCreatorRecommendationRunStatus
+  campaign UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  recommendationContext UceCampaignRecommendationContext @relation(fields: [recommendationContextId], references: [id], onDelete: Restrict)
+  recommendations UceCampaignCreatorRecommendation[]
+  startedAt DateTime @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@index([campaignId, status])
+  @@index([recommendationContextId])
+  @@map("uce_creator_recommendation_runs")
+}
+
+// Append-oriented recommendation history. Provenance parents are protected with Restrict.
+model UceCampaignCreatorRecommendation {
+  id String @id @default(cuid())
+  campaignCreatorId String @map("campaign_creator_id")
+  recommendationRunId String @map("recommendation_run_id")
+  recommendationContextId String @map("recommendation_context_id")
+  score Decimal @db.Decimal(5, 2)
+  scoreBand UceRecommendationScoreBand @map("score_band")
+  rank Int
+  explanation String?
+  evaluatedAt DateTime @default(now()) @map("evaluated_at")
+  campaignCreator UceCampaignCreator @relation(fields: [campaignCreatorId], references: [id], onDelete: Cascade)
+  recommendationRun UceCreatorRecommendationRun @relation(fields: [recommendationRunId], references: [id], onDelete: Restrict)
+  recommendationContext UceCampaignRecommendationContext @relation(fields: [recommendationContextId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @map("created_at")
+  @@unique([campaignCreatorId, recommendationRunId])
+  @@index([recommendationRunId, rank])
+  @@index([recommendationContextId])
+  @@index([campaignCreatorId, evaluatedAt])
+  @@map("uce_campaign_creator_recommendations")
+}
+
+model UceCampaignCreatorImport {
+  id String @id @default(cuid())
+  campaignId String @map("campaign_id")
+  status UceCampaignCreatorImportStatus @default(PENDING)
+  totalRows Int @default(0) @map("total_rows")
+  validRows Int @default(0) @map("valid_rows")
+  importedRows Int @default(0) @map("imported_rows")
+  invalidRows Int @default(0) @map("invalid_rows")
+  duplicateRows Int @default(0) @map("duplicate_rows")
+  campaign UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  completedAt DateTime? @map("completed_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@index([campaignId, status])
+  @@map("uce_campaign_creator_imports")
+}
+
+// One Campaign-level Outreach lifecycle per CampaignCreator. Workspace completion is derived, not persisted.
+model UceOutreach {
+  id String @id @default(cuid())
+  campaignCreatorId String @unique @map("campaign_creator_id")
+  channel UceOutreachChannel
+  composerVersion String? @map("composer_version")
+  composedSubject String? @map("composed_subject")
+  finalSubject String? @map("final_subject")
+  composedBody String @map("composed_body")
+  finalBody String @map("final_body")
+  trackingToken String @unique @map("tracking_token")
+  campaignCreator UceCampaignCreator @relation(fields: [campaignCreatorId], references: [id], onDelete: Cascade)
+  attempts UceOutreachAttempt[]
+  trackingEvents UceOutreachTrackingEvent[]
+  initiatedAt DateTime @default(now()) @map("initiated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@index([channel, initiatedAt])
+  @@index([initiatedAt])
+  @@map("uce_outreach")
+}
+
+// Channel-aware execution evidence. Email MVP only records COMPOSE_INITIATED; Priority DM uses scheduler states.
+model UceOutreachAttempt {
+  id String @id @default(cuid())
+  requestId String @unique @map("request_id")
+  outreachId String @map("outreach_id")
+  sequence Int
+  status UceOutreachAttemptStatus
+  destinationRef String? @map("destination_ref")
+  scheduledFor DateTime? @map("scheduled_for")
+  executedAt DateTime? @map("executed_at")
+  failedAt DateTime? @map("failed_at")
+  cancelledAt DateTime? @map("cancelled_at")
+  failureCode String? @map("failure_code")
+  cancellationCode String? @map("cancellation_code")
+  outreach UceOutreach @relation(fields: [outreachId], references: [id], onDelete: Cascade)
+  initiatedAt DateTime @default(now()) @map("initiated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@unique([outreachId, sequence])
+  @@index([status, scheduledFor])
+  @@index([outreachId, initiatedAt])
+  @@map("uce_outreach_attempts")
+}
+
+// Append-only tracking evidence; click aggregates remain derived projections.
+model UceOutreachTrackingEvent {
+  id String @id @default(cuid())
+  outreachId String @map("outreach_id")
+  type UceOutreachTrackingEventType
+  outreach UceOutreach @relation(fields: [outreachId], references: [id], onDelete: Cascade)
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([outreachId, occurredAt])
+  @@index([type, occurredAt])
+  @@map("uce_outreach_tracking_events")
+}
+
+// One executed Campaign-scoped Share action. Recipient identity and composer drafts are intentionally not persisted.
+model UceCampaignShare {
+  id String @id @default(cuid())
+  requestId String @unique @map("request_id")
+  campaignId String @map("campaign_id")
+  channel UceCampaignShareChannel
+  trackingToken String @unique @map("tracking_token")
+  campaign UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  trackingEvents UceCampaignShareTrackingEvent[]
+  initiatedAt DateTime @default(now()) @map("initiated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([campaignId, initiatedAt])
+  @@index([channel, initiatedAt])
+  @@map("uce_campaign_shares")
+}
+
+// Append-only Share click evidence; delivery/read/recipient state is not inferred.
+model UceCampaignShareTrackingEvent {
+  id String @id @default(cuid())
+  shareId String @map("share_id")
+  type UceCampaignShareTrackingEventType
+  share UceCampaignShare @relation(fields: [shareId], references: [id], onDelete: Cascade)
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([shareId, occurredAt])
+  @@index([type, occurredAt])
+  @@map("uce_campaign_share_tracking_events")
+}
+
+// Individual creator submission. CampaignCreator remains the Campaign-level grouping identity.
+model UceApplication {
+  id String @id @default(cuid())
+  requestId String @unique @map("request_id")
+  campaignId String @map("campaign_id")
+  campaignCreatorId String @map("campaign_creator_id")
+  campaignAssetId String @map("campaign_asset_id")
+  briefId String @map("brief_id")
+  status UceApplicationStatus @default(PENDING)
+  source UceApplicationSource @default(DIRECT)
+  supersededByApplicationId String? @map("superseded_by_application_id")
+  campaign UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  campaignCreator UceCampaignCreator @relation(fields: [campaignCreatorId], references: [id], onDelete: Restrict)
+  campaignAsset UceCampaignAsset @relation(fields: [campaignAssetId], references: [id], onDelete: Restrict)
+  brief UceBrief @relation(fields: [briefId], references: [id], onDelete: Restrict)
+  snapshot UceApplicationSnapshot?
+  applicantIntelligence UceApplicantIntelligence?
+  supersededByApplication UceApplication? @relation("ApplicationSupersession", fields: [supersededByApplicationId], references: [id], onDelete: Restrict)
+  supersededApplications UceApplication[] @relation("ApplicationSupersession")
+  appliedAt DateTime @default(now()) @map("applied_at")
+  approvedAt DateTime? @map("approved_at")
+  rejectedAt DateTime? @map("rejected_at")
+  withdrawnAt DateTime? @map("withdrawn_at")
+  expiredAt DateTime? @map("expired_at")
+  supersededAt DateTime? @map("superseded_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@index([campaignId, status])
+  @@index([campaignCreatorId, status])
+  @@index([campaignAssetId, status])
+  @@index([briefId, status])
+  @@index([campaignCreatorId, briefId, status])
+  @@index([source])
+  @@index([appliedAt])
+  @@index([supersededByApplicationId])
+  @@map("uce_applications")
+}
+
+// Immutable submission-time decision context; live Campaign/Asset/Brief models remain canonical operational state.
+model UceApplicationSnapshot {
+  id String @id @default(cuid())
+  applicationId String @unique @map("application_id")
+  campaignContext Json @map("campaign_context")
+  campaignAssetContext Json @map("campaign_asset_context")
+  briefContext Json @map("brief_context")
+  commercialContext Json @map("commercial_context")
+  creatorIdentity Json @map("creator_identity")
+  application UceApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  @@map("uce_application_snapshots")
+}
+
+// Thin Campaign-facing projection of the authoritative Application-level Intelligence result.
+model UceApplicantIntelligence {
+  id String @id @default(cuid())
+  applicationId String @unique @map("application_id")
+  status UceApplicantIntelligenceStatus @default(PROCESSING)
+  score Decimal? @db.Decimal(5, 2)
+  strengths Json?
+  weaknesses Json?
+  breakdown Json?
+  intelligenceArtifactId String? @map("intelligence_artifact_id")
+  intelligenceVersion String? @map("intelligence_version")
+  evaluatedAt DateTime? @map("evaluated_at")
+  application UceApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@index([status])
+  @@index([score])
+  @@map("uce_applicant_intelligence")
+}
+
+// Stable Campaign-level Reporting identity. Calculations are append-oriented; latestCalculation is the publication pointer.
+model UceCampaignReport {
+  id String @id @default(cuid())
+  campaignId String @unique @map("campaign_id")
+  latestCalculationId String? @unique @map("latest_calculation_id")
+  campaign UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  calculations UceCampaignReportCalculation[] @relation("CampaignReportCalculations")
+  latestCalculation UceCampaignReportCalculation? @relation("LatestCampaignReportCalculation", fields: [latestCalculationId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("uce_campaign_reports")
+}
+
+// Successful Intelligence-owned Campaign reporting snapshot. Failed/running jobs remain outside Campaign persistence.
+model UceCampaignReportCalculation {
+  id String @id @default(cuid())
+  reportId String @map("report_id")
+  version Int
+  objective CampaignObjective
+  primaryKpiId String @map("primary_kpi_id")
+  supportingKpiIds String[] @default([]) @map("supporting_kpi_ids")
+  reportingVersion String @map("reporting_version")
+  reportContextHash String? @map("report_context_hash")
+  availability UceReportAvailability
+  dataFrom DateTime @map("data_from")
+  dataThrough DateTime @map("data_through")
+  metrics Json
+  insights Json?
+  provenance Json?
+  isFinal Boolean @default(false) @map("is_final")
+  calculatedAt DateTime @map("calculated_at")
+  publishedAt DateTime? @map("published_at")
+  report UceCampaignReport @relation("CampaignReportCalculations", fields: [reportId], references: [id], onDelete: Cascade)
+  latestForReport UceCampaignReport? @relation("LatestCampaignReportCalculation")
+  createdAt DateTime @default(now()) @map("created_at")
+  @@unique([reportId, version])
+  @@index([reportId, calculatedAt])
+  @@index([availability])
+  @@index([isFinal])
+  @@map("uce_campaign_report_calculations")
+}
+
+// FROZEN PERSISTENCE BOUNDARY
+// - Readiness/workspace visibility/Meta capability/activeDiscovery remain derived.
+// - Discovery persists only CampaignCreator and published recommendation projection/provenance.
+// - Raw/reusable L1/L2/L3 pools, scans, caches and detailed processor execution remain Intelligence-owned.
+// - Manual single-add and CSV require email + social handle at runtime; social handle must pass lightweight crawl validation.
+// - Email remains nullable because Marketplace recommendations may not expose it.
+// - Campaign + platform + normalized social handle is the Campaign-level uniqueness key; duplicate ingestion resolves/skips the existing CampaignCreator.
+// - Source records first successful entry; CSV is an ingestion method, not a source.
+// - Recommendation history is context-aware and non-destructive.
+// - NOT_STARTED is derived from absence of an applicable RecommendationRun.
+// - Runs are INITIAL or REPLENISHMENT; retry is execution behavior.
+// - Exact L1/L2/L3 reuse/invalidation and replenishment thresholds remain Intelligence/runtime concerns.
+// - Outreach is Campaign-level only; Product/CampaignAsset and Brief do not participate in Outreach matching or targeting.
+// - CampaignCreator owns at most one Outreach lifecycle; resolved channel is frozen at first successful Outreach initiation.
+// - Marketplace-capable creators use Priority DM; manual/CSV creators use Email when Marketplace capability is unavailable at initiation.
+// - Outreach message persistence retains both composer draft and Brand-approved final content; Brand editing is free-form in MVP.
+// - Email MVP records only Gmail compose initiation, max three attempts; it does not infer send/delivery/follow-up state.
+// - Priority DM MVP permits one attempt and internally records ACCEPTED/SCHEDULED/EXECUTED/FAILED/CANCELLED execution evidence.
+// - Outreach workspace completion is derived; no top-level Outreach status is persisted.
+// - CampaignCreator archive is orthogonal to reviewState and is persisted through archivedAt.
+// - Outreach daily business cap is max 50 first Outreach initiations per Campaign/day; Email compose attempts 2/3 do not consume additional quota.
+// - Priority DM execution pacing is max 12/Brand Meta account/hour; scheduler queues/buckets remain infrastructure-owned.
+// - Priority DM quota is consumed at scheduler acceptance; scheduler spillover does not consume the next day's Campaign quota again.
+// - Failed/cancelled Priority DM does not refund historical Campaign daily Outreach quota.
+// - Tracking token is opaque and unique; raw click events are persisted while click aggregates remain derived.
+// - A valid Application permanently suppresses future Campaign Outreach; Application remains structurally independent from Outreach.
+// - Application source is DIRECT unless entry evidence attributes the Application to an Outreach or Share tracking path.
+// - Applicants persists Application identity/lifecycle, immutable submission snapshot, supersession provenance and published Applicant Intelligence projection.
+// - Applicant card, queues, counts, representative Application, Campaign/Brand history and Alerts remain derived projections.
+// - Applicant Match computation, weights, dimensions, raw scans and execution remain Intelligence-owned.
+// - Applicant Intelligence readiness never gates a valid Brand Approve/Reject decision.
+// - Creator x Campaign limit is max 2 non-WITHDRAWN Applications; Creator x Brand limit is max 5 non-WITHDRAWN Applications.
+// - PENDING, APPROVED, REJECTED, EXPIRED and SUPERSEDED consume submission allowance; WITHDRAWN does not.
+// - Same-Brief reapplication is blocked after PENDING/APPROVED/REJECTED/SUPERSEDED and permitted after WITHDRAWN/EXPIRED, subject to other validation.
+// - Application snapshot is immutable after successful submission and remains authoritative for submission-time Campaign/Asset/Brief/commercial context.
+// - Approval must atomically APPROVE the selected Application, SUPERSEDE sibling PENDING Applications, and create at most one Campaign Collaboration for the CampaignCreator.
+// - Collaboration schema/relation remains deferred until the canonical Collaboration aggregate is reconciled; no placeholder Collaboration model/FK is introduced here.
+// - Reporting is Campaign-level and read-only; Intelligence Engine is the sole calculation authority.
+// - One logical CampaignReport may own append-oriented successful CampaignReportCalculations; failed/running jobs remain Intelligence-owned.
+// - latestCalculationId is the explicit Brand-facing publication pointer; Reporting Card and Full Report must read the same published calculation.
+// - Report calculations snapshot objective/KPI context and preserve reporting version, context hash, reporting window, freshness and structured metrics/insights/provenance.
+// - AVAILABLE/PARTIAL describe successful published-calculation evidence; absence of a published calculation represents not-yet-available Reporting.
+// - Zero, unavailable and not-yet-calculated metric semantics must remain distinct inside the validated metrics contract.
+// - Report publication is atomic; failed refreshes preserve the last-known-good latestCalculation pointer.
+// - Campaign Page load and View full report are read actions and never synchronously trigger Intelligence calculation.
+// - Reporting refresh scheduling, dirty detection, failed-job observability, settlement duration and source synchronization remain Intelligence/runtime concerns.
+// - Final Report semantics are calculation-level through isFinal; Campaign completion/archive does not delete historical Reporting.
+// - Reporting may consume Collaboration evidence but does not duplicate Collaboration entities or infer actual spend from planned Campaign commercials.
+// - Share is Campaign-scoped distribution, not CampaignCreator-scoped Outreach; each executed Share action creates its own immutable CampaignShare evidence row.
+// - Share channels are COPY_LINK, WHATSAPP, INSTAGRAM and capability-dependent NATIVE_SHARE; external handoff does not imply delivery/read/recipient identity.
+// - Share composer drafts/content remain ephemeral in MVP; no composed/final body or composer-version audit fields are persisted.
+// - Every executed Share action receives a unique opaque tracking token; Share click evidence is append-only and click aggregates remain derived.
+// - Share does not consume Outreach quota, has no recipient dedupe, creates no CampaignCreator and has no Share attempt table or delivery status.
+// - Shareability derives from existing Campaign public-access/lifecycle rules; existing tracked URLs do not bypass current Campaign access rules.
+// - Campaign link preview metadata is Campaign-level and resolved from Campaign hero → primary Product image → Brand logo → Creator Shop fallback; it is not persisted per Share.
+// - Application source may be SHARE, but exact Share-to-Application FK attribution is deferred until Outreach and Share acquisition attribution are generalized together.
+// - requestId on Application, OutreachAttempt and CampaignShare is command replay protection, not business-domain deduplication; deliberate repeat actions use a new requestId.
+// - Production merge must reconcile creatorId before reliable cross-Campaign Creator x Brand limit enforcement.
+// - Production merge must reconcile Brand/team actor identity before approvedBy/rejectedBy relations are added.
+// - Production migration must enforce cross-record CampaignCreator/CampaignAsset/Brief ancestry consistency, score range, snapshot existence, lifecycle transitions, predicate-aware application limits and same-Brief rules transactionally.
+// - Production migration must enforce Outreach channel×attempt-state rules, one Priority DM/max three Email compose attempts, daily quota, request replay safety, scheduled-execution eligibility and application suppression transactionally/runtime-side.
+// - Production migration must validate Reporting metrics/insights/provenance payload contracts and atomic latest-publication consistency transactionally/runtime-side.
+// - Production migration must validate Share execution timing, Campaign shareability, request replay safety, opaque tracking-token generation and Application SHARE attribution runtime-side.
+// - Production migration must validate score range, Campaign/context/run consistency and source-specific runtime rules.
+// - CampaignAsset production merge still requires the previously frozen exactly-one-reference CHECK constraint.

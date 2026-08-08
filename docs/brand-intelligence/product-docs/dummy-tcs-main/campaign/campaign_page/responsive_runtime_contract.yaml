@@ -1,0 +1,123 @@
+version: "1.0"
+status: FROZEN
+module: campaign_page
+artifact: responsive_runtime_contract
+
+principle: "One Campaign Page domain/orchestration model across devices. Viewport changes presentation, never lifecycle, readiness, priority, capability, permissions or business behavior."
+
+viewport_classes: [DESKTOP, TABLET, MOBILE]
+breakpoints_owner: FRONTEND_DESIGN_SYSTEM
+
+presentation_behavior:
+  DESKTOP:
+    mode: ORCHESTRATION_RICH
+    allows: [context_coexistence, workspace_navigation, compact_secondary_information, drawer_or_modal_details]
+    rule: "More width is not permission for more clutter."
+  TABLET:
+    mode: PROGRESSIVE_DISCLOSURE
+    rule: "NORMAL surfaces must remain accessible but need not be simultaneously visible."
+  MOBILE:
+    mode: FOCUS_FIRST_EXECUTION
+    rule: "Primary orchestration focus receives visual priority; secondary context is progressively disclosed."
+
+campaign_header:
+  mobile_direct: [campaign_name, campaign_status, primary_campaign_action]
+  mobile_secondary: [EDIT_CAMPAIGN, SHARE_CAMPAIGN, PAUSE_OR_RESUME, CAMPAIGN_DETAILS, ARCHIVE_WHEN_APPLICABLE]
+
+priority_intelligence:
+  survives_all_viewports: true
+  mobile_priority: [headline, action]
+  supporting_summary_may_be_progressively_disclosed: true
+  frontend_may_rewrite_provider_output: false
+
+products_briefs:
+  setup_states:
+    rule: "When Product/Brief is the primary setup task, it dominates every viewport and operational workspaces remain absent."
+  after_execution_ready:
+    DESKTOP: COMPACT_CONTEXT
+    TABLET: COLLAPSIBLE_CONTEXT
+    MOBILE: SUMMARY_ENTRY
+
+workspace_navigation:
+  only_discovery:
+    navigation_chrome: NONE
+  multiple_destinations:
+    contract_returns_destinations_not_visual_tabs: true
+    desktop_possible: TABS_OR_EQUIVALENT
+    mobile_possible: [SEGMENTED_NAV, SWITCHER, DROPDOWN, BOTTOM_SHEET_SELECTOR, OTHER_DESIGN_SYSTEM_PATTERN]
+    invariant: "User can switch among all instantiated workspaces without leaving Campaign Page."
+
+workspace_internal_responsiveness:
+  owned_by_shell: false
+  module_contracts_required_later: [DISCOVERY, APPLICANTS, COLLABORATIONS, ADD_PRODUCT, ADD_BRIEF]
+
+detail_surfaces:
+  DESKTOP: [DRAWER, MODAL]
+  TABLET: [WIDE_DRAWER, MODAL]
+  MOBILE: [FULL_SCREEN_MODAL, FULL_SCREEN_VIEW]
+  invariant: "Opening detail does not change underlying Campaign/workspace state."
+
+reporting:
+  permanent_workspace: false
+  highlight_core_must_survive_mobile: [metric, intelligence_headline, recommended_action]
+  detailed_reporting:
+    DESKTOP: LARGE_MODAL_OR_OVERLAY
+    MOBILE: FULL_SCREEN_REPORTING_VIEW
+  route_semantics_constant: true
+
+campaign_details:
+  DESKTOP: DRAWER_OR_DETAIL_SURFACE
+  TABLET: WIDE_OVERLAY_OR_MODAL
+  MOBILE: FULL_SCREEN_DETAILS
+
+editability:
+  source: DOMAIN_RUNTIME_CONTRACT
+  viewport_specific_edit_rules: false
+  note: "Creation-source-dependent immutability is identical across devices."
+
+capability_invariants:
+  share_campaign: SAME_ACROSS_VIEWPORTS
+  meta_marketplace: SAME_ACROSS_VIEWPORTS
+  pause_resume: SAME_ACROSS_VIEWPORTS
+  permissions: SAME_ACROSS_VIEWPORTS
+  validation: SAME_ACROSS_VIEWPORTS
+
+selection_mode:
+  rule: "When workspace selection is active, responsive UI may prioritize contextual selection actions over normal navigation."
+  persistence: false
+
+deep_links:
+  invariant: "Action destinations and context hydrate the same operational target on all viewports."
+  examples: [APPLICANTS_WITH_FILTER, BRIEF_ENTITY, CAMPAIGN_EDIT_FIELD, REPORTING]
+
+server_contract_excludes:
+  - desktop_layout
+  - mobile_layout
+  - mobile_tabs
+  - mobile_drawer
+  - pixel_breakpoints
+
+responsive_may_change:
+  - layout
+  - density
+  - simultaneous_visibility
+  - navigation_presentation
+  - detail_surface_presentation
+  - progressive_disclosure
+  - control_placement
+
+responsive_must_not_change:
+  - campaign_lifecycle
+  - readiness
+  - primary_priority
+  - workspace_instantiation
+  - permissions
+  - editability
+  - share_availability
+  - meta_capability
+  - campaign_action_availability
+  - intelligence_meaning
+  - reporting_meaning
+  - business_validation
+
+focus_preservation_invariant: "Domain priority must map to visual priority regardless of viewport."

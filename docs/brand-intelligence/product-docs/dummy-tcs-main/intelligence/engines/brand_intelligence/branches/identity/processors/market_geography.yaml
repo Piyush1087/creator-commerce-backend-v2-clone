@@ -1,0 +1,50 @@
+id: market_geography
+version: 1.1-frozen
+status: FROZEN
+engine: brand_intelligence
+branch: identity
+executor: ai
+
+purpose: Determine the geographic markets the brand actively serves or targets, distinct from the brand's own business-base geography.
+
+outputs:
+  - markets_served
+
+inputs:
+  required:
+    - country
+    - website_evidence.homepage
+  optional:
+    - business_geography
+    - website_evidence.about
+    - website_evidence.contact
+    - website_evidence.locations
+    - website_evidence.shipping
+    - website_evidence.service
+    - website_evidence.offering
+    - website_evidence.product
+    - website_evidence.collection
+    - similarweb_geography
+    - instagram_audience_geography
+
+input_policy:
+  commercial_service_evidence_priority: Website/service/shipping evidence describes where the brand can actually serve customers and carries stronger market-availability meaning.
+  observed_demand_evidence: Similarweb geography may help identify where demand/traffic is concentrated but does not alone prove service availability.
+  audience_evidence: Instagram audience geography may support market inference but does not alone prove the brand serves that geography.
+  fallback: Apply the business-model-aware fallback defined in the frozen reasoning artifact when Website Evidence cannot resolve a defensible market.
+
+execution:
+  can_run_independently: true
+  partial_output_supported: false
+  multi_source_evidence_supported: true
+
+artifacts:
+  reasoning: artifacts/market_geography/reasoning.yaml
+  output_contract: artifacts/market_geography/output_contract.yaml
+  status: FROZEN
+
+failure_policy:
+  fail_if_required_input_missing: true
+  nullable_output_allowed: false
+  no_silent_default: true
+  note: A valid business-model-aware fallback is a resolved output, not a silent default.

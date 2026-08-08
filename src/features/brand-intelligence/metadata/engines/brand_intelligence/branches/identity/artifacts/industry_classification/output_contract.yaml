@@ -1,0 +1,74 @@
+id: industry_classification_output_contract
+version: 1.1-frozen
+status: FROZEN
+processor: industry_classification
+
+purpose: Define the machine-valid structured output returned by the AI executor for each active processor scope.
+
+contracts:
+  gatekeeper:
+    active_outputs: [industry, sub_industry]
+    response:
+      type: object
+      additional_properties: false
+      required:
+        - status
+        - eligibility
+        - industry
+        - sub_industry
+        - detected_business_type
+      properties:
+        status:
+          type: string
+          enum: [RESOLVED, UNRESOLVED]
+        eligibility:
+          type: string
+          enum: [SUPPORTED, UNSUPPORTED, UNKNOWN]
+        industry:
+          type: [string, 'null']
+          constraint: when_eligibility_SUPPORTED_must_match_canonical_industry_taxonomy
+        sub_industry:
+          type: [string, 'null']
+          constraint: when_eligibility_SUPPORTED_must_belong_to_industry
+        detected_business_type:
+          type: [string, 'null']
+          description: Diagnostic description used when the business can be understood but does not map to a currently supported canonical Industry. It is not an Identity Object or taxonomy value.
+
+    invariants:
+      - RESOLVED + SUPPORTED requires non-null valid industry and sub_industry and detected_business_type=null.
+      - RESOLVED + UNSUPPORTED requires industry=null and sub_industry=null and a non-null detected_business_type.
+      - UNRESOLVED requires eligibility=UNKNOWN, industry=null, sub_industry=null and detected_business_type=null.
+      - Parent-specific OTHER is a valid resolved Sub-industry when Industry is supported but the MVP taxonomy lacks a defensible specific match.
+      - Legacy Industry enum values are invalid outputs.
+
+    onboarding_policy:
+      RESOLVED_SUPPORTED: continue_onboarding
+      RESOLVED_UNSUPPORTED: stop_onboarding_as_unsupported
+      UNRESOLVED_UNKNOWN: stop_onboarding_for_mvp
+      note: MVP does not ask the user to manually classify an UNRESOLVED website. Runtime diagnostics should be retained so recurring failure patterns can be analyzed and acquisition/reasoning improved.
+
+  industry_niche:
+    active_outputs: [industry_niche]
+    response:
+      type: object
+      additional_properties: false
+      required:
+        - industry_niche
+      properties:
+        industry_niche:
+          type: [string, 'null']
+          constraint: must_be_evidence_supported_and_compatible_with_canonical_industry_and_sub_industry
+    invariants:
+      - null is valid when no meaningful evidence-supported niche can be established.
+      - niche must not alter or contradict canonical Industry or Sub-industry.
+
+validation:
+  reject_extra_fields: true
+  reject_taxonomy_mismatch: true
+  reject_invalid_parent_child_combination: true
+  reject_legacy_industry_values: true
+  reject_invalid_status_eligibility_combination: true
+  niche_null_allowed: true
+
+runtime_metadata_policy:
+  note: Model, token usage, latency, technical failure details, evidence/provenance references and other execution telemetry are not business intelligence fields in this output contract. They belong to execution/runtime records unless a later global contract explicitly requires otherwise.

@@ -1,0 +1,24 @@
+id: evidence_grounding
+version: 1.0-working
+status: WORKING
+scope: global
+
+purpose: Provide common evidence-grounding behaviour for AI intelligence processors without embedding domain-specific reasoning.
+
+rules:
+  - Use only supplied runtime evidence/context and explicitly permitted processor inputs.
+  - Do not invent a value because an output field exists.
+  - Distinguish explicit evidence from inference.
+  - Prefer direct, brand-owned evidence for claims about the brand when available.
+  - Structured metadata is evidence but is not automatically authoritative when it conflicts with stronger owned-page evidence.
+  - When evidence is insufficient for an optional output, return null/unknown according to the output contract.
+  - Do not convert audience, traffic, popularity or other proxy signals into a stronger business claim unless processor-specific reasoning explicitly permits it.
+  - When sources conflict, preserve the conflict for processor-specific resolution rather than silently combining incompatible facts.
+  - Manual/confirmed intelligence supplied as runtime context is authoritative where the object lifecycle says it is protected.
+  - Produce only the active output scope requested by the compiler.
+
+non_goals:
+  - Industry classification logic
+  - Taxonomy definitions
+  - Market inference weighting
+  - Brand-specific business reasoning
