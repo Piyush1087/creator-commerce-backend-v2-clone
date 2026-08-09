@@ -1,10 +1,13 @@
 openapi: 3.0.3
 info:
-  title: TheCreatorShop API — Brand discovery
-  version: 0.1.0
+  title: TheCreatorShop API — Brand onboarding (Step 1 discovery)
+  version: 0.2.0
   description: >
     Step 1 public URL validation. Responses are discriminated by `outcome`.
+    Nest module: `src/features/brand-onboarding` (HTTP paths remain under
+    `/api/v1/discovery/*` for contract stability).
     Throttling may return HTTP 429 (not modeled per-operation here).
+    Step 2+ brand APIs live under `/api/v1/brand/*` (surface scan + profile reads/patches).
 servers:
   - url: http://localhost:3000
     description: Local API
@@ -29,14 +32,151 @@ paths:
                   - $ref: "#/components/schemas/DiscoverValidateSuccess"
                   - $ref: "#/components/schemas/DiscoverValidateWaitlist"
                   - $ref: "#/components/schemas/DiscoverValidateBlocked"
+                  - $ref: "#/components/schemas/DiscoverValidateOrgClaimed"
                 discriminator:
                   propertyName: outcome
                   mapping:
                     success: "#/components/schemas/DiscoverValidateSuccess"
                     waitlist: "#/components/schemas/DiscoverValidateWaitlist"
                     blocked: "#/components/schemas/DiscoverValidateBlocked"
+                    org_claimed: "#/components/schemas/DiscoverValidateOrgClaimed"
         "400":
           description: Request body validation failed (Nest validation pipe)
+        "429":
+          description: Too many requests (throttler)
+  /api/v1/discovery/resolve:
+    post:
+      summary: Resolve Step 1 entry (read-only shell routing)
+      operationId: discoveryResolve
+      description: >
+        Does not create `discovery_leads` rows and does not persist gate-failure
+        intel. Use before `validate` to resume an existing lead or detect
+        `org_claimed` without writing triage rows.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscoverValidateRequest"
+      responses:
+        "200":
+          description: Resolve result (check `outcome`)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/DiscoveryResolveResume"
+                  - $ref: "#/components/schemas/DiscoveryResolveProceed"
+                  - $ref: "#/components/schemas/DiscoverValidateBlocked"
+                  - $ref: "#/components/schemas/DiscoverValidateOrgClaimed"
+                discriminator:
+                  propertyName: outcome
+                  mapping:
+                    resume: "#/components/schemas/DiscoveryResolveResume"
+                    proceed: "#/components/schemas/DiscoveryResolveProceed"
+                    blocked: "#/components/schemas/DiscoverValidateBlocked"
+                    org_claimed: "#/components/schemas/DiscoverValidateOrgClaimed"
+        "400":
+          description: Request body validation failed (Nest validation pipe)
+        "429":
+          description: Too many requests (throttler)
+  /api/v1/discovery/waitlist:
+    post:
+      summary: Join waitlist (unsupported vertical / marketing capture)
+      operationId: discoveryWaitlist
+      description: >
+        Creates a `WaitlistLead` row. Optional `discoveryLeadId` and
+        `marketIntelligenceLogId` must reference existing rows or the API
+        returns HTTP 400. `sourceUrl` is accepted for client context only
+        (not persisted).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscoverWaitlistRequest"
+      responses:
+        "201":
+          description: Waitlist row created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WaitlistJoinResponse"
+        "400":
+          description: >
+            Validation failed, or optional FK (`discoveryLeadId` /
+            `marketIntelligenceLogId`) does not exist
+        "429":
+          description: Too many requests (throttler)
+  /api/v1/brand/surface-scan:
+    post:
+      summary: Run Step 2 surface scan (Parallel extract + Gemini JSON synthesis)
+      operationId: brandSurfaceScan
+      description: >
+        Persists `BrandProfile` plus related `Offering`, `Competitor`, and `Location`
+        rows when no complete surface scan exists yet for the apex domain. Uses live
+        vendors when `PARALLEL_API_KEY` and `GEMINI_API_KEY` are set. If either key is
+        missing, a **new** scan returns **503** (existing `SURFACE_COMPLETE` profiles
+        still return **201** with `mode: "cached"`). If a `SURFACE_COMPLETE` profile
+        already exists, returns `mode: "cached"` unless `force: true` or
+        `BRAND_SCAN_FORCE_REFRESH=true`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [leadId]
+              properties:
+                leadId:
+                  type: string
+                  format: uuid
+                force:
+                  type: boolean
+                  default: false
+                  description: >
+                    When true, bypass the cached `SURFACE_COMPLETE` short-circuit and
+                    re-run vendors (subject to throttles and quotas).
+      responses:
+        "201":
+          description: Scan persisted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [brandProfileId, domain, mode, counts]
+                properties:
+                  brandProfileId:
+                    type: string
+                    format: uuid
+                  domain:
+                    type: string
+                  mode:
+                    type: string
+                    enum: [http, cached]
+                  counts:
+                    type: object
+                    required: [offerings, competitors, locations]
+                    properties:
+                      offerings:
+                        type: integer
+                      competitors:
+                        type: integer
+                      locations:
+                        type: integer
+        "400":
+          description: Bad request (validation / unsupported lead)
+        "404":
+          description: Discovery lead not found
+        "422":
+          description: Vendor output failed schema validation
+        "502":
+          description: Upstream vendor failure / insufficient extracted content
+        "503":
+          description: >
+            Surface scan not configured for a **new** run (missing `PARALLEL_API_KEY`
+            and/or `GEMINI_API_KEY`). An existing `SURFACE_COMPLETE` profile for the
+            domain still returns **201** with `mode: "cached"`.
         "429":
           description: Too many requests (throttler)
 components:
@@ -50,6 +190,34 @@ components:
           minLength: 1
           maxLength: 2048
           example: brandname.com
+    DiscoverWaitlistRequest:
+      type: object
+      required: [email, industry]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        industry:
+          $ref: "#/components/schemas/IndustryVertical"
+        discoveryLeadId:
+          type: string
+          format: uuid
+        marketIntelligenceLogId:
+          type: string
+          format: uuid
+        sourceUrl:
+          type: string
+          maxLength: 2048
+          description: Optional; logged redacted server-side only
+    WaitlistJoinResponse:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: New `WaitlistLead` primary key
     IndustryVertical:
       type: string
       enum:
@@ -82,12 +250,15 @@ components:
           $ref: "#/components/schemas/IndustryVertical"
     DiscoverValidateWaitlist:
       type: object
-      required: [outcome, logId, normalizedUrl, domain, industry]
+      required: [outcome, logId, leadId, normalizedUrl, domain, industry]
       properties:
         outcome:
           type: string
           enum: [waitlist]
         logId:
+          type: string
+          format: uuid
+        leadId:
           type: string
           format: uuid
         normalizedUrl:
@@ -116,3 +287,79 @@ components:
         logId:
           type: string
           format: uuid
+    DiscoverValidateOrgClaimed:
+      type: object
+      required: [outcome, message, domain, adminEmail]
+      properties:
+        outcome:
+          type: string
+          enum: [org_claimed]
+        message:
+          type: string
+        domain:
+          type: string
+          description: Apex hostname used for the lookup (e.g. example.com)
+        adminEmail:
+          type: string
+          format: email
+          description: >
+            First organization user by createdAt (interim contact until
+            invitations ship).
+    DiscoveryResolveResume:
+      type: object
+      required: [outcome, leadId, normalizedUrl, industry]
+      properties:
+        outcome:
+          type: string
+          enum: [resume]
+        leadId:
+          type: string
+          format: uuid
+        normalizedUrl:
+          type: string
+        industry:
+          $ref: "#/components/schemas/IndustryVertical"
+        existingBrandProfile:
+          $ref: "#/components/schemas/ExistingBrandProfileSummary"
+    ExistingBrandProfileSummary:
+      type: object
+      required:
+        - brandProfileId
+        - name
+        - scanStatus
+        - offerings
+        - competitors
+        - locations
+      properties:
+        brandProfileId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        scanStatus:
+          type: string
+        tagline:
+          type: string
+          nullable: true
+        descriptionPreview:
+          type: string
+          nullable: true
+        offerings:
+          type: integer
+        competitors:
+          type: integer
+        locations:
+          type: integer
+    DiscoveryResolveProceed:
+      type: object
+      required: [outcome, normalizedUrl, domain, industry]
+      properties:
+        outcome:
+          type: string
+          enum: [proceed]
+        normalizedUrl:
+          type: string
+        domain:
+          type: string
+        industry:
+          $ref: "#/components/schemas/IndustryVertical"

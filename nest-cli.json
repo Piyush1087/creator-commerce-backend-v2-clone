@@ -3,6 +3,20 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
-    "deleteOutDir": true
+    "deleteOutDir": true,
+    "assets": [
+      {
+        "include": "features/brand-onboarding/prompts/**/*.md",
+        "watchAssets": true
+      },
+      {
+        "include": "features/brand-centre/prompts/**/*.md",
+        "watchAssets": true
+      },
+      {
+        "include": "features/creator-onboarding/prompts/**/*.md",
+        "watchAssets": true
+      }
+    ]
   }
 }

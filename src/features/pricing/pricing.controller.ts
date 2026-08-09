@@ -1,0 +1,185 @@
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from "@nestjs/common";
+import type { Response } from "express";
+import { ThrottlerGuard } from "@nestjs/throttler";
+
+import type { RequestWithAuthUser } from "../auth/auth.controller";
+import { Public } from "../auth/decorators/public.decorator";
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { BrandCentreAuthService } from "../brand-centre/brand-centre-auth.service";
+import {
+  BootstrapTrialDto,
+  CancelSubscriptionDto,
+  ChangeTierDto,
+  InitializeRazorpayTrialDto,
+} from "./dto/pricing.dto";
+import { EntitlementService } from "./services/entitlement.service";
+import { GeoRoutingService } from "./services/geo-routing.service";
+import { PlanCatalogService } from "./services/plan-catalog.service";
+import { PricingInvoiceService } from "./services/pricing-invoice.service";
+import { SubscriptionLifecycleService } from "./services/subscription-lifecycle.service";
+
+@Controller("api/v1/pricing")
+@UseGuards(ThrottlerGuard, JwtAuthGuard)
+export class PricingController {
+  constructor(
+    private readonly brandAuth: BrandCentreAuthService,
+    private readonly planCatalog: PlanCatalogService,
+    private readonly lifecycle: SubscriptionLifecycleService,
+    private readonly entitlement: EntitlementService,
+    private readonly geoRouting: GeoRoutingService,
+    private readonly invoices: PricingInvoiceService,
+  ) {}
+
+  @Get("plans")
+  async getVisiblePlans(@Req() req: RequestWithAuthUser) {
+    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const plans = await this.planCatalog.getVisiblePlans(brandProfileId);
+    return { plans };
+  }
+
+  @Public()
+  @Get("plans/public")
+  async getPublicPlans() {
+    const plans = await this.planCatalog.getVisiblePlans(null);
+    return { plans };
+  }
+
+  @Get("subscription")
+  async getSubscription(@Req() req: RequestWithAuthUser) {
+    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const subscription = await this.lifecycle.getSubscription(brandProfileId);
+    return { subscription };
+  }
+
+  @Get("usage")
+  async getUsage(@Req() req: RequestWithAuthUser) {
+    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const usage = await this.entitlement.getUsageSnapshot(brandProfileId);
+    return { usage };
+  }
+
+  @Get("invoices")
+  async listInvoices(@Req() req: RequestWithAuthUser) {
+    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const invoices = await this.invoices.listInvoicesForBrand(brandProfileId);
+    return { invoices };
+  }
+
+  @Get("invoices/:razorpayInvoiceId")
+  async getInvoice(
+    @Req() req: RequestWithAuthUser,
+    @Param("razorpayInvoiceId") razorpayInvoiceId: string,
+  ) {
+    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const invoice = await this.invoices.getInvoiceForBrand(
+      brandProfileId,
+      razorpayInvoiceId,
+    );
+    return { invoice };
+  }
+
+  @Get("invoices/:razorpayInvoiceId/view")
+  async viewInvoice(
+    @Req() req: RequestWithAuthUser,
+    @Param("razorpayInvoiceId") razorpayInvoiceId: string,
+    @Res() res: Response,
+  ) {
+    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const viewUrl = await this.invoices.resolveInvoiceViewUrl(
+      brandProfileId,
+      razorpayInvoiceId,
+    );
+    return res.redirect(HttpStatus.FOUND, viewUrl);
+  }
+
+  @Get("geo-context")
+  async getGeoContext(@Req() req: RequestWithAuthUser) {
+    const profile = await this.brandAuth.resolveBrandProfile(req.user);
+    const geoContext = this.geoRouting.resolveGeoContext(profile.countryCode);
+    return { geoContext };
+  }
+
+  @Post("trial/bootstrap")
+  @HttpCode(HttpStatus.CREATED)
+  async bootstrapLocalTrial(
+    @Req() req: RequestWithAuthUser,
+    @Body() body: BootstrapTrialDto,
+  ) {
+    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const subscription = await this.lifecycle.bootstrapLocalTrial(
+      brandProfileId,
+      body.currency,
+    );
+    return { subscription };
+  }
+
+  @Post("trial/restore")
+  @HttpCode(HttpStatus.OK)
+  async restoreFoundersTrial(@Req() req: RequestWithAuthUser) {
+    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const subscription =
+      await this.lifecycle.restoreFoundersTrialAfterAbandonedCheckout(
+        brandProfileId,
+      );
+    return { subscription };
+  }
+
+  @Post("trial/razorpay")
+  @HttpCode(HttpStatus.CREATED)
+  async initializeRazorpayTrial(
+    @Req() req: RequestWithAuthUser,
+    @Body() body: InitializeRazorpayTrialDto,
+  ) {
+    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const subscription = await this.lifecycle.initializeRazorpayTrial(
+      brandProfileId,
+      body.currency,
+    );
+    return { subscription };
+  }
+
+  @Post("tier/change")
+  @HttpCode(HttpStatus.OK)
+  async changeTier(
+    @Req() req: RequestWithAuthUser,
+    @Body() body: ChangeTierDto,
+  ) {
+    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    return this.lifecycle.upgradeOrDowngradeTier(
+      brandProfileId,
+      body.target_tier,
+    );
+  }
+
+  @Post("cancel")
+  @HttpCode(HttpStatus.OK)
+  async cancelSubscription(
+    @Req() req: RequestWithAuthUser,
+    @Body() body: CancelSubscriptionDto,
+  ) {
+    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const subscription = await this.lifecycle.cancelSubscription(
+      brandProfileId,
+      body.cancel_at_cycle_end ?? false,
+    );
+    return { subscription };
+  }
+
+  @Post("reactivate")
+  @HttpCode(HttpStatus.OK)
+  async reactivateSubscription(@Req() req: RequestWithAuthUser) {
+    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    return this.lifecycle.reactivateSubscription(brandProfileId);
+  }
+}

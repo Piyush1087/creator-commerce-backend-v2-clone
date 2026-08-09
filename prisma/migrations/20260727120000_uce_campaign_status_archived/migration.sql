@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "UceCampaignStatus" ADD VALUE IF NOT EXISTS 'ARCHIVED';
