@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Campaign Discovery Workspace Review</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#042D30",
+                        "on-primary": "#FFFFFF",
+                        "primary-container": "#90F2F9",
+                        "on-primary-container": "#002022",
+                        "secondary": "#4A6365",
+                        "on-secondary": "#FFFFFF",
+                        "secondary-container": "#CCE8EA",
+                        "on-secondary-container": "#051F21",
+                        "tertiary": "#505E7D",
+                        "on-tertiary": "#FFFFFF",
+                        "tertiary-container": "#D8E2FF",
+                        "on-tertiary-container": "#0B1B36",
+                        "error": "#BA1A1A",
+                        "on-error": "#FFFFFF",
+                        "error-container": "#FFDAD6",
+                        "on-error-container": "#410002",
+                        "background": "#F8F8F8",
+                        "on-background": "#191C1C",
+                        "surface": "#F8F8F8",
+                        "on-surface": "#191C1C",
+                        "surface-variant": "#DAE4E5",
+                        "on-surface-variant": "#3F4849",
+                        "outline": "#6F7979",
+                        "outline-variant": "#BFC8C9",
+                        "shadow": "#000000",
+                        "scrim": "#000000",
+                        "inverse-surface": "#2D3131",
+                        "inverse-on-surface": "#EFF1F1",
+                        "inverse-primary": "#74D6DD",
+                        "surface-dim": "#D8DADA",
+                        "surface-bright": "#F8FAFA",
+                        "surface-container-lowest": "#FFFFFF",
+                        "surface-container-low": "#F2F4F4",
+                        "surface-container": "#ECEEEE",
+                        "surface-container-high": "#E6E8E8",
+                        "surface-container-highest": "#E0E2E2",
+                        "aurora-green": "#74D6DD"
+                    },
+                    borderRadius: {
+                        "none": "0",
+                        "sm": "0.125rem",
+                        "DEFAULT": "0.25rem",
+                        "md": "0.375rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "1rem",
+                        "3xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    fontFamily: {
+                        "headline": ["Satoshi", "Public Sans", "sans-serif"],
+                        "display": ["Satoshi", "Public Sans", "sans-serif"],
+                        "body": ["Source Sans 3", "Public Sans", "sans-serif"],
+                        "label": ["Source Sans 3", "Public Sans", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #F8F8F8; }
+        .satoshi { font-family: 'Satoshi', 'Public Sans', sans-serif; }
+        .source-sans { font-family: 'Source Sans 3', 'Public Sans', sans-serif; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body text-on-surface min-h-screen flex flex-col items-center py-12 space-y-12">
+<!-- Frame A: Collapsed State -->
+<div class="w-full max-w-sm px-4">
+<h2 class="text-sm font-label text-outline mb-4 ml-2">Frame A: Collapsed State</h2>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex items-center justify-between shadow-sm cursor-pointer hover:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-3">
+<span class="font-headline font-semibold text-on-surface">Discovery</span>
+<span class="text-xs font-label bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded-full">8 New</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">expand_more</span>
+</div>
+</div>
+<!-- Frame B: Expanded State -->
+<div class="w-full max-w-sm px-4">
+<h2 class="text-sm font-label text-outline mb-4 ml-2">Frame B: Expanded State</h2>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-md overflow-hidden flex flex-col" style="height: 60vh; min-height: 500px;">
+<!-- Header -->
+<div class="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-container-lowest z-10">
+<div class="flex items-center gap-3">
+<span class="font-headline font-semibold text-on-surface">Discovery</span>
+<span class="text-xs font-label bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded-full">8 New</span>
+</div>
+<button class="p-1 rounded-full hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant">expand_less</span>
+</button>
+</div>
+<!-- Filter Bar -->
+<div class="px-4 py-3 border-b border-outline-variant bg-surface-bright flex gap-2 overflow-x-auto scrollbar-hide z-10">
+<button class="flex items-center gap-1 px-3 py-1.5 border border-outline-variant rounded-lg text-sm font-label text-on-surface hover:bg-surface-container-low transition-colors whitespace-nowrap">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+                    Filter
+                </button>
+<button class="flex items-center gap-1 px-3 py-1.5 bg-primary-container text-on-primary-container rounded-lg text-sm font-label font-medium whitespace-nowrap">
+                    TikTok
+                    <span class="ml-1 bg-on-primary-container text-primary-container text-[10px] px-1.5 py-0.5 rounded-full">+1</span>
+</button>
+<button class="flex items-center gap-1 px-3 py-1.5 border border-outline-variant rounded-lg text-sm font-label text-on-surface hover:bg-surface-container-low transition-colors whitespace-nowrap">
+                    Lifestyle
+                </button>
+</div>
+<!-- Creator List -->
+<div class="flex-1 overflow-y-auto p-4 space-y-4 bg-surface">
+<!-- Creator Card 1 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col gap-3">
+<div class="flex items-start gap-3">
+<img class="w-12 h-12 rounded-full object-cover bg-surface-variant" data-alt="A close-up portrait of a young lifestyle creator with a bright, energetic expression, wearing trendy streetwear. The background is a slightly blurred, modern, well-lit apartment interior with subtle hints of aurora green accents, reflecting a fresh, contemporary light-mode aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYlc_QO0CQEZRYhvijbYbxv7OmBHGRqYOb5stulgCqc7ie5aqCbbtjaHwx2oWvLWp6foxsJMNbvpYPy7AJFiRn6c2NhMnyKtWYdqIoZJpuNY9WzLQ0ToBn7SIRDhkY7u1qH1XY64kBNQJmd2OtRexM1lTjrlTOOCC_eSMPg3gCyb3JKq3fTW0gtn9fqu42yFs4v44U0tpsft37tzH3AmY13Ez3RXqkFUwisKudjQEC9XPzU3KobktPw8LGUOv-iAXs0APJJfUK0Zg"/>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="font-headline font-semibold text-sm text-on-surface">@clara_vibe</h3>
+<p class="text-xs text-on-surface-variant font-label">Lifestyle Â· Fashion</p>
+</div>
+<span class="text-xs font-semibold text-aurora-green bg-primary-container/20 px-2 py-1 rounded-md">94% Match</span>
+</div>
+<div class="flex gap-4 mt-2">
+<div class="text-xs text-on-surface-variant font-label"><span class="font-semibold text-on-surface">125k</span> Reach</div>
+<div class="text-xs text-on-surface-variant font-label"><span class="font-semibold text-on-surface">4.2%</span> Eng</div>
+</div>
+</div>
+</div>
+<div class="flex gap-2 mt-1">
+<button class="flex-1 bg-aurora-green text-on-primary-container font-label font-medium text-sm py-2 rounded-lg hover:bg-inverse-primary transition-colors">
+                            Outreach
+                        </button>
+<button class="flex-1 border border-outline-variant text-on-surface font-label font-medium text-sm py-2 rounded-lg hover:bg-surface-container-low transition-colors">
+                            Profile
+                        </button>
+</div>
+</div>
+<!-- Creator Card 2 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col gap-3">
+<div class="flex items-start gap-3">
+<img class="w-12 h-12 rounded-full object-cover bg-surface-variant" data-alt="A portrait of a male tech reviewer looking thoughtful, holding a sleek modern gadget. Soft, diffused lighting highlights his features against a clean, minimalist studio background in light mode styling. Subtle teal and aurora green lighting accents provide a high-end, professional look." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCfmFh5mBjutFem2ijhv2ZuS-WeLLXj0RvkUnMF3ddDVyQWSN3uxgNjm-6PHGsJsDi1qjgeBMiEiC4fcesJSz5IgZR4msvW7c2L1FjD0CT4uzqmKj2_Sz73Kr2PVU6d96cUuXFf7hfmp2_sqmwuGrJmk1SaPlVjH8Q9O5iKXCe24E20ni0if8PU27YzQLnjFx9aUKSTUtYHA_1a9--KEK0btsx_MBqPas-zeZfCj8MT5D5ag6kxudRJikkSlCZ30Y5kzRBDOFRc8Wc"/>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="font-headline font-semibold text-sm text-on-surface">@tech_marc</h3>
+<p class="text-xs text-on-surface-variant font-label">Tech Â· Reviews</p>
+</div>
+<span class="text-xs font-semibold text-aurora-green bg-primary-container/20 px-2 py-1 rounded-md">88% Match</span>
+</div>
+<div class="flex gap-4 mt-2">
+<div class="text-xs text-on-surface-variant font-label"><span class="font-semibold text-on-surface">340k</span> Reach</div>
+<div class="text-xs text-on-surface-variant font-label"><span class="font-semibold text-on-surface">3.8%</span> Eng</div>
+</div>
+</div>
+</div>
+<div class="flex gap-2 mt-1">
+<button class="flex-1 bg-aurora-green text-on-primary-container font-label font-medium text-sm py-2 rounded-lg hover:bg-inverse-primary transition-colors">
+                            Outreach
+                        </button>
+<button class="flex-1 border border-outline-variant text-on-surface font-label font-medium text-sm py-2 rounded-lg hover:bg-surface-container-low transition-colors">
+                            Profile
+                        </button>
+</div>
+</div>
+<!-- Creator Card 3 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col gap-3">
+<div class="flex items-start gap-3">
+<img class="w-12 h-12 rounded-full object-cover bg-surface-variant" data-alt="A vibrant shot of a fitness influencer mid-workout, set in a bright, modern gym with large windows. The lighting is crisp and natural, emphasizing a clean, light-mode design language. The color palette features whites, light grays, and energetic pops of bright aurora green in the workout gear." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCqMCEnZaAG5iMSrZtFVenO2n17p28b0FLO5INYesfa-RmOPXKfJ6VZehZZ3G40qM-PRxOK1fyDSn4VXZcF6q8r-COr4u12dwg45iA3ux6nz2gR_glMt_2auQf3ZSPI07aDqrj47Mu7kMmqLgFLvAlKrbtorddkc3s6zzoJwFQWxnYhFos-EV_0B3oiyZF5WelmwRywKvlK3LCwh8dhSC6NKxc4T0GY0us4rgBjb-j0i9xu8TFm22p6ZzxZQIfF7VaJAJPjk8BKWnY"/>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="font-headline font-semibold text-sm text-on-surface">@fit_jess</h3>
+<p class="text-xs text-on-surface-variant font-label">Fitness Â· Health</p>
+</div>
+<span class="text-xs font-semibold text-aurora-green bg-primary-container/20 px-2 py-1 rounded-md">82% Match</span>
+</div>
+<div class="flex gap-4 mt-2">
+<div class="text-xs text-on-surface-variant font-label"><span class="font-semibold text-on-surface">89k</span> Reach</div>
+<div class="text-xs text-on-surface-variant font-label"><span class="font-semibold text-on-surface">6.1%</span> Eng</div>
+</div>
+</div>
+</div>
+<div class="flex gap-2 mt-1">
+<button class="flex-1 bg-aurora-green text-on-primary-container font-label font-medium text-sm py-2 rounded-lg hover:bg-inverse-primary transition-colors">
+                            Outreach
+                        </button>
+<button class="flex-1 border border-outline-variant text-on-surface font-label font-medium text-sm py-2 rounded-lg hover:bg-surface-container-low transition-colors">
+                            Profile
+                        </button>
+</div>
+</div>
+<!-- Spacer for scroll padding -->
+<div class="h-2 w-full"></div>
+</div>
+</div>
+</div>
+</body></html>

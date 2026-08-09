@@ -1,74 +1,313 @@
-version: "1.0"
+version: "1.1"
 status: FROZEN
-module: create_campaign
-contract: runtime_contract
+module: campaign_definition
+contract: create_edit_view_runtime_contract
+phase: PHASE_1B_RECONCILED
 
-depends_on: field_object_contract.yaml
+depends_on:
+  - field_object_contract.yaml
+  - field_validation_reconciliation.md
 
 principles:
-  validation: {field_level: immediate, step_level: before_navigation, aggregate_level: before_publish}
-  manual_campaign: {persist_draft: true, autosave: true}
-  ai_recommended_campaign: {persist_campaign_before_final_acceptance: false, launch_atomically_with_product_and_brief: true}
-  publishing: {human_confirmation_required: true, ai_may_publish_autonomously: false}
-  lifecycle: {published_is_not_live: true}
-  provenance: {creation_source_controls_runtime_edit_policy: true}
+  one_campaign_definition: true
+  create_edit_view_share_field_object: true
+  validation:
+    field_exit: validate_interacted_field_and_direct_conditionals
+    step_completion: validate_current_step
+    publish: validate_complete_aggregate
+    backend_authoritative: true
+  manual_campaign:
+    persist_draft: true
+    autosave_valid_values: true
+    invalid_local_value_does_not_replace_last_valid_persisted_value: true
+  ai_recommended_campaign:
+    persist_campaign_before_final_acceptance: false
+    launch_atomically_with_product_and_brief: true
+  publishing:
+    human_confirmation_required: true
+    ai_may_publish_autonomously: false
+  lifecycle:
+    published_is_not_live: true
+  provenance:
+    creation_source_controls_post_publish_editability: true
+
+campaign_definition_surfaces:
+  create:
+    purpose: author_campaign_definition
+    mode: editable_form
+  edit:
+    purpose: mutate_permitted_campaign_definition_fields
+    mode: editable_form
+    field_set: SAME_AS_CREATE_CAMPAIGN_FIELD_OBJECT
+    exact_editability: SERVICE_OWNED_FROM_THIS_CONTRACT
+  view:
+    purpose: inspect_accepted_campaign_definition
+    mode: read_only_detail_surface
+    field_set: SAME_AS_CREATE_CAMPAIGN_FIELD_OBJECT
+    edit_entry: supplied_edit_capability
+    inline_business_editing: false
 
 manual_campaign:
   entry:
     event: CREATE_CAMPAIGN_OPENED
     action: create_or_resume_draft
-    new_draft: {creation_source: MANUAL, lifecycle_state: DRAFT}
-  autosave:
-    mode: incremental
-    incomplete_campaign_allowed: true
-    incomplete_step_allowed: true
-    rejects: [invalid_types, structurally_unpersistable_values]
-    does_not_require: [step_validity, aggregate_validity]
-  validation:
-    field_entry: immediate
-    backend_authoritative: true
-    objective: "Next should not reveal normal field errors for the first time"
-  navigation:
-    back_navigation: true
-    preserve_entered_state: true
-    step_1_requires: [campaign_name, publishing_schedule, conditional_publishing_window, campaign_objective, primary_kpi, supporting_kpis, platform, campaign_visibility]
-    step_2_requires: [creator_archetypes, creator_following, audience_gender, audience_age, audience_geography]
-    step_2_optional: [audience_affinities]
-    step_3_requires: [brand_support_decision, conditional_support_type, compensation_model, commercial_offer, total_campaign_budget, advance_payment_percent, net_payment_terms]
-    step_3_optional: [estimated_support_value]
-  derived_state:
-    kpi_resolution:
-      owner: CAMPAIGN
-      source: canonical_kpi_framework
-      trigger: campaign_objective_selected_or_changed
-      required_to_complete_step_1: true
-      failure_blocks_step_1: true
+    new_draft:
+      creation_source: MANUAL
+      lifecycle_state: DRAFT
+
+  form_runtime:
+    untouched_required_fields:
+      show_error_before_interaction: false
+    field_exit:
+      validate_entered_field: true
+      validate_direct_conditionals: true
+      valid_value: accept_and_autosave
+      invalid_value:
+        accept_as_canonical_domain_value: false
+        preserve_last_valid_persisted_value_if_present: true
+        preserve_other_valid_draft_values: true
+        surface_local_error: true
+    step_next:
+      validate_current_step: true
+      on_failure: REMAIN_ON_CURRENT_STEP
+      on_success: NAVIGATE_NEXT_STEP
+    back_navigation:
+      allowed: true
+      preserve_entered_valid_state: true
+
+  step_1:
+    requires:
+      - campaign_name
+      - publishing_schedule
+      - conditional_publishing_window
+      - campaign_objective
+      - derived_primary_kpi
+      - derived_supporting_kpis
+      - platform
+      - campaign_visibility
+    derived_state:
+      kpi_resolution:
+        owner: CAMPAIGN
+        source: canonical_kpi_framework
+        trigger: campaign_objective_selected_or_changed
+        frontend_authored_kpi_ids: false
+        required_to_complete_step: true
+        failure_blocks_step_completion: true
+
+  step_2:
+    requires:
+      - creator_archetypes
+      - creator_following
+      - audience_gender
+      - audience_age
+      - audience_geography
+    optional:
+      - audience_affinities
     archetype_recommendation:
       owner: CREATOR_SHOP_INTELLIGENCE
       inputs: [brand_industry, campaign_objective]
       outputs: [canonical_archetype_id, recommendation_score, recommended]
-      unknown_archetype_ids: reject_or_ignore
       failure_blocks_campaign_creation: false
       user_selection_never_auto_overwritten: true
-  exit_resume:
-    on_exit: retain_last_successfully_autosaved_draft
+
+  step_3:
+    requires:
+      - brand_support_decision
+      - conditional_support_type
+      - compensation_model
+      - commercial_offer
+      - total_campaign_budget
+      - advance_payment_percent
+      - net_payment_terms
+      - derived_campaign_currency
+    optional:
+      - estimated_support_value
+    currency_resolution:
+      owner: CAMPAIGN_FROM_BRAND_CONTEXT
+      frontend_authored_currency: false
+      mapping:
+        INDIA: INR
+        UNITED_STATES: USD
+        REST_OF_WORLD: USD
+
+  draft:
+    persisted: true
+    incomplete_allowed: true
+    invalid_entered_value_accepted_as_canonical: false
     resume_supported: true
+    on_exit: retain_last_successfully_autosaved_valid_state
+
   publish:
     event: PUBLISH_CAMPAIGN
     aggregate_validation_required: true
-    validates: [campaign_strategy, creator_strategy, commercial_policy, canonical_references, primary_kpi_resolved, supporting_kpis_resolved, cross_field_invariants, total_budget_gte_commercial_offer]
+    validates:
+      - campaign_strategy
+      - creator_strategy
+      - commercial_policy
+      - canonical_references
+      - primary_kpi_resolved
+      - supporting_kpis_resolved
+      - campaign_currency_resolved
+      - cross_field_invariants
+      - total_budget_gte_commercial_offer
     does_not_require: [product, brief, deliverables]
-    success: {transition: "DRAFT -> PUBLISHED", navigate_to: CAMPAIGN_PAGE, trigger_ui: ADD_PRODUCT, live_immediately: false}
+    success:
+      transition: "DRAFT -> PUBLISHED"
+      navigate_to: CAMPAIGN_PAGE
+      campaign_page_primary_setup_focus: ADD_PRODUCT
+      live_immediately: false
     validation_failure: return_structured_domain_error
-    system_failure: {state_remains: DRAFT, partial_publish_forbidden: true}
+    system_failure:
+      state_remains: DRAFT
+      partial_publish_forbidden: true
+
+post_publish_editability:
+  terminal_states:
+    COMPLETED:
+      campaign_definition_editable: false
+      view_only: true
+    ARCHIVED:
+      campaign_definition_editable: false
+      view_only: true
+
+  manual_campaign:
+    applies_to: [PUBLISHED, LIVE, PAUSED]
+    editable:
+      - campaign_name
+      - publishing_window
+      - campaign_visibility
+      - creator_archetypes
+      - creator_following
+      - audience_affinities
+      - audience_geography
+      - brand_support
+      - compensation_model
+      - commercial_offer
+      - total_campaign_budget
+      - advance_payment_percent
+      - net_payment_terms
+    conditionally_editable:
+      creator_archetypes:
+        dependency_check_required: true
+        on_remove_active_brief: PAUSE_DEPENDENT_BRIEF
+      platforms:
+        rule: FUTURE_MANUAL_PLATFORM_EXPANSION_ALLOWED_BY_FIELD_CONTRACT
+        mvp_effect: NO_ADDITIONAL_WRITABLE_PLATFORM_BEYOND_INSTAGRAM
+    locked:
+      - publishing_schedule
+      - campaign_objective
+      - primary_kpi
+      - supporting_kpis
+      - audience_gender
+      - audience_age
+      - campaign_currency
+
+  ai_recommended_campaign:
+    applies_to: [LIVE, PAUSED]
+    editable:
+      - campaign_name
+      - publishing_window
+      - creator_following
+      - commercial_offer
+      - total_campaign_budget
+    locked:
+      - publishing_schedule
+      - campaign_objective
+      - primary_kpi
+      - supporting_kpis
+      - platforms
+      - campaign_visibility
+      - creator_archetypes
+      - audience_gender
+      - audience_age
+      - audience_affinities
+      - audience_geography
+      - brand_support
+      - compensation_model
+      - advance_payment_percent
+      - net_payment_terms
+      - campaign_currency
+
+  enforcement:
+    frontend: consume_supplied_edit_capabilities_and_field_presentation
+    zod: validate_structural_candidate_shape
+    campaign_service: enforce_creation_source_lifecycle_and_field_editability
+    stale_or_disallowed_edit: return_structured_domain_error
+
+campaign_details_view:
+  trigger: VIEW_CAMPAIGN
+  surface: CAMPAIGN_DETAILS
+  mutation_side_effect: false
+  presentation: READ_ONLY
+  includes:
+    - campaign_identity
+    - lifecycle_status
+    - creation_source_and_displayable_provenance
+    - campaign_strategy
+    - creator_strategy
+    - commercial_policy
+    - derived_kpis
+    - derived_campaign_currency
+    - published_live_completed_archived_timestamps_when_present
+    - supplied_edit_and_lifecycle_capabilities
+  product_and_brief_details:
+    inline_full_detail: false
+    use_owned_product_brief_detail_surfaces: true
+  edit_action:
+    visible_only_when_supplied_capability_allows: true
+    opens: EDIT_CAMPAIGN_FLOW
+    prefill_source: AUTHORITATIVE_CAMPAIGN_DETAILS_READ
+
+edit_campaign_runtime:
+  entry:
+    trigger: EDIT_CAMPAIGN
+    requires_supplied_capability: true
+    load_authoritative_current_definition: true
+  form:
+    uses_create_campaign_field_structure: true
+    duplicate_edit_schema_forbidden: true
+    locked_fields:
+      presentation: visible_or_read_only_according_to_design_system_and_product_flow
+      submission: omit_or_reject_as_service_policy_requires
+    validation_timing: SAME_PROGRESSIVE_MODEL_AS_CREATE
+  save:
+    command: UPDATE_CAMPAIGN
+    partial_changes_allowed: true
+    backend_reloads_authoritative_current_state: true
+    service_enforces_editability: true
+    success:
+      refresh: [CAMPAIGN_DETAILS, CAMPAIGN_PAGE_HEADER, HYDRATION_AND_CAPABILITIES_IF_AFFECTED]
+    failure:
+      preserve_unsaved_local_input_where_safe: true
+      surface_structured_domain_error: true
+  effects:
+    changed_campaign_inputs_may_change_execution_readiness: true
+    changed_creator_archetypes_may_require_dependent_brief_action: true
+    frontend_must_not_infer_dependency_consequences: true
+
+campaign_page_transition:
+  manual_publish:
+    resulting_lifecycle: PUBLISHED
+    initial_focus: PRODUCT_SETUP
+    add_product_available: true
+    add_brief_requires_product_context: true
+    transition_to_live: OWNED_BY_CAMPAIGN_RUNTIME_WHEN_EXECUTION_READINESS_BECOMES_TRUE
+  ai_recommended_launch:
+    resulting_lifecycle: LIVE
+    campaign_product_and_brief_created_atomically: true
+    lands_in_operational_campaign_page: true
 
 ai_recommended_campaign:
   source:
     owner: CREATOR_SHOP_INTELLIGENCE
     recommendation_contains: [campaign_configuration, recommended_product, recommended_brief]
     campaign_exists_before_acceptance: false
-  view_details: {event: AI_CAMPAIGN_RECOMMENDATION_VIEWED, persistence_side_effect: false}
-  accept: {event: AI_CAMPAIGN_RECOMMENDATION_ACCEPTED, creates_campaign: false}
+  view_details:
+    event: AI_CAMPAIGN_RECOMMENDATION_VIEWED
+    persistence_side_effect: false
+  accept:
+    event: AI_CAMPAIGN_RECOMMENDATION_ACCEPTED
+    creates_campaign: false
   review_flow:
     stage_1:
       type: REVIEW_CAMPAIGN_ECONOMICS
@@ -89,23 +328,37 @@ ai_recommended_campaign:
       final_cta: LAUNCH_CAMPAIGN
   launch:
     event: AI_CAMPAIGN_LAUNCH_REQUESTED
-    validate: [ai_campaign_recommendation, reviewed_commercial_values, confirmed_product, confirmed_brief]
+    validate:
+      - ai_campaign_recommendation
+      - reviewed_commercial_values
+      - confirmed_product
+      - confirmed_brief
     atomic_create: [campaign, campaign_product, brief]
-    campaign_values: {creation_source: AI_RECOMMENDED, lifecycle_state: LIVE, preserve: [ai_recommendation_id, ai_recommendation_version]}
+    campaign_values:
+      creation_source: AI_RECOMMENDED
+      lifecycle_state: LIVE
+      preserve: [ai_recommendation_id, ai_recommendation_version]
     partial_creation_forbidden: true
   abandonment:
-    before_launch: {campaign_created: false, campaign_product_created: false, brief_created: false, original_recommendation_retained: true}
-  post_launch_edit:
-    backend_enforced: true
-    mutable_campaign_fields: [campaign_name, publishing_window, creator_following, commercial_offer, total_campaign_budget]
-    all_other_create_campaign_fields: locked
-  expansion: {add_products: true, add_briefs: true}
+    before_launch:
+      campaign_created: false
+      campaign_product_created: false
+      brief_created: false
+      original_recommendation_retained: true
+  expansion:
+    add_products: true
+    add_briefs: true
 
 lifecycle_responsibility:
-  states_recognized: [DRAFT, PUBLISHED, LIVE]
-  create_campaign_owns: {manual: "DRAFT -> PUBLISHED", ai_recommended: "RECOMMENDATION -> LIVE"}
-  downstream_campaign_runtime_owns: {manual: "PUBLISHED -> LIVE"}
-  deferred: [PAUSED, SWITCHED_OFF, COMPLETED]
+  states_recognized: [DRAFT, PUBLISHED, LIVE, PAUSED, COMPLETED, ARCHIVED]
+  create_campaign_owns:
+    manual: "DRAFT -> PUBLISHED"
+    ai_recommended: "RECOMMENDATION -> LIVE"
+  downstream_campaign_runtime_owns:
+    - "PUBLISHED -> LIVE"
+    - "LIVE <-> PAUSED"
+    - "LIVE/PAUSED -> COMPLETED"
+    - "COMPLETED -> ARCHIVED"
 
 intelligence_boundary:
   create_campaign_interactions: [ARCHETYPE_RECOMMENDATION, AI_CAMPAIGN_RECOMMENDATION]
@@ -114,7 +367,7 @@ intelligence_boundary:
 idempotency_requirements:
   PUBLISH_CAMPAIGN: duplicate_campaign_creation_forbidden
   LAUNCH_CAMPAIGN: duplicate_creation_from_same_recommendation_transaction_forbidden
-  implementation: DEFER_TO_API_SERVICE_LAYER
+  implementation: API_SERVICE_LAYER
 
 runtime_events:
   - CAMPAIGN_DRAFT_CREATED
@@ -126,6 +379,9 @@ runtime_events:
   - ARCHETYPE_RECOMMENDATION_RECEIVED
   - CAMPAIGN_PUBLISH_REQUESTED
   - CAMPAIGN_PUBLISHED
+  - CAMPAIGN_DETAILS_VIEWED
+  - CAMPAIGN_EDIT_OPENED
+  - CAMPAIGN_FIELD_UPDATED
   - AI_CAMPAIGN_RECOMMENDATION_VIEWED
   - AI_CAMPAIGN_RECOMMENDATION_ACCEPTED
   - AI_CAMPAIGN_ECONOMICS_CONFIRMED
@@ -133,8 +389,9 @@ runtime_events:
   - AI_CAMPAIGN_BRIEF_CONFIRMED
   - AI_CAMPAIGN_LAUNCH_REQUESTED
   - CAMPAIGN_LAUNCHED
-  - CAMPAIGN_FIELD_UPDATED
 
 notes:
   - "Runtime events are semantic events, not a requirement that each becomes a persisted event or separate API endpoint."
-  - "Exact autosave debounce/retry, endpoints, Zod implementation, and service-layer implementation are deferred."
+  - "Create/Edit/View are three runtime surfaces over one Campaign definition field object."
+  - "Exact API routes, autosave debounce/retry, query cache implementation and production component paths remain production-integration decisions."
+  - "Phase 1C will update the full Campaign module bridge/frontend maps; Phase 1D will reconcile executable Zod/service/tests."

@@ -1,0 +1,4 @@
+import type { PerformanceSummaryView } from "../types";
+import { SurfaceStateNotice } from "./SurfaceState";
+
+export function PerformanceSummary({ performance, onReport }: { performance: PerformanceSummaryView; onReport: () => void }) { return <section className="performanceCard" aria-labelledby="performance-title"><div className="sectionHeading"><h2 id="performance-title">Performance</h2>{performance.state === "READY" && <button className="textAction" onClick={onReport} type="button">View report</button>}</div>{performance.state === "READY" ? <div className="metricGrid">{performance.metrics.map((metric) => <div className={`metricChip ${metric.tone}`} key={metric.metricId}><span>{metric.label}</span><strong>{metric.value}</strong></div>)}</div> : <SurfaceStateNotice state={performance.state} subject="reporting"/>}</section>; }

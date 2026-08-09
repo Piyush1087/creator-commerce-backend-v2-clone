@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Campaign Applicants</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Satoshi:wght@400;500;700&amp;family=Source+Sans+3:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+            "aurora-green": {
+                50: "#f0fdf4",
+                100: "#dcfce7",
+                500: "#22c55e",
+                600: "#16a34a"
+            },
+            "aurora-red": {
+                50: "#fef2f2",
+                500: "#ef4444"
+            },
+            "aurora-gray": {
+                50: "#f8f8f8",
+                100: "#f3f4f6",
+                200: "#e5e7eb",
+                500: "#6b7280",
+                900: "#111827"
+            }
+        },
+        fontFamily: {
+            headline: ["Satoshi", "sans-serif"],
+            body: ["Source Sans 3", "sans-serif"],
+            label: ["Source Sans 3", "sans-serif"],
+        },
+        borderRadius: {
+            "card": "12px",
+        }
+      },
+    },
+  }
+</script>
+<style>
+    body {
+        font-family: 'Source Sans 3', sans-serif;
+        background-color: #f3f4f6;
+    }
+    h1, h2, h3, h4, h5, h6, .satoshi {
+        font-family: 'Satoshi', sans-serif;
+    }
+    
+    /* Custom Scrollbar for Expanded State */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: #d1d5db;
+        border-radius: 20px;
+    }
+</style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="min-h-screen p-4 flex flex-col gap-6 items-center justify-center bg-aurora-gray-100">
+<!-- Frame A: Collapsed State -->
+<div class="w-full max-w-md bg-white border border-aurora-gray-200 rounded-card p-4 flex items-center justify-between cursor-pointer hover:bg-aurora-gray-50 transition-colors shadow-sm">
+<div class="flex items-center gap-3">
+<span class="font-headline font-bold text-aurora-gray-900 text-lg">Applicants</span>
+<span class="bg-aurora-gray-100 text-aurora-gray-500 px-2.5 py-0.5 rounded-full text-sm font-semibold">12 Pending</span>
+</div>
+<span class="material-symbols-outlined text-aurora-gray-500">expand_more</span>
+</div>
+<!-- Frame B: Expanded State -->
+<div class="w-full max-w-md bg-white border border-aurora-gray-200 rounded-card shadow-md flex flex-col h-[530px]">
+<!-- Header -->
+<div class="p-4 border-b border-aurora-gray-200 flex items-center justify-between sticky top-0 bg-white rounded-t-card z-10">
+<div class="flex items-center gap-3">
+<span class="font-headline font-bold text-aurora-gray-900 text-lg">Applicants</span>
+<span class="bg-aurora-gray-100 text-aurora-gray-500 px-2.5 py-0.5 rounded-full text-sm font-semibold">12 Pending</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="flex items-center gap-1 px-3 py-1.5 bg-aurora-gray-50 hover:bg-aurora-gray-100 border border-aurora-gray-200 rounded-lg text-sm font-semibold text-aurora-gray-900 transition-colors">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+                    Filter
+                </button>
+<button class="p-1 hover:bg-aurora-gray-100 rounded-full transition-colors">
+<span class="material-symbols-outlined text-aurora-gray-500">expand_less</span>
+</button>
+</div>
+</div>
+<!-- List Container -->
+<div class="overflow-y-auto custom-scrollbar flex-1 p-4 flex flex-col gap-4">
+<!-- Applicant Card 1 -->
+<div class="border border-aurora-gray-200 rounded-card p-4 flex flex-col gap-3">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<img class="w-10 h-10 rounded-full object-cover border border-aurora-gray-200" data-alt="A close up portrait photo of a young fitness creator smiling outdoors in bright sunlight, wearing athletic gear, modern light aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBx8JtrdPgh2DI4JM7MgJBVKnS51HIh18LBYzRT5NZ7x1U9-MFjIxM1ARXBSbMW836jAmoOewfQcyn1NV40Kt9dtdnPL-urdogQK6Wnd7F0Ic73K89Dk51doWCT2HeidIVZXz45ulDFN6LA487I5trpfxPHJ8ChaqZAFTvgLN7wCAUIuWb0MZ5ktouaPVXmAywHBJ99MM1UdDbosXHNJmaDoZN0VaNySeYwUjKIHgJZyKDfOZsWBUSaboLOfTGlxd8M3vn8Q6Wy--U"/>
+<div>
+<div class="font-headline font-bold text-aurora-gray-900">@elena_fit</div>
+<div class="text-sm text-aurora-gray-500">Fitness</div>
+</div>
+</div>
+<span class="bg-aurora-green-50 text-aurora-green-600 px-2 py-1 rounded-md text-xs font-bold border border-aurora-green-100">92% Match</span>
+</div>
+<div class="flex gap-4 text-sm text-aurora-gray-900">
+<div><span class="font-semibold">142k</span> Reach</div>
+<div class="w-px h-4 bg-aurora-gray-200 self-center"></div>
+<div><span class="font-semibold">4.8%</span> Eng.</div>
+</div>
+<div class="flex items-center gap-2 mt-1">
+<button class="flex-1 bg-aurora-green-500 hover:bg-aurora-green-600 text-white py-2 rounded-lg text-sm font-bold transition-colors">Approve</button>
+<button class="flex-1 border border-aurora-red-500 text-aurora-red-500 hover:bg-aurora-red-50 py-2 rounded-lg text-sm font-bold transition-colors">Reject</button>
+<button class="px-3 py-2 text-aurora-gray-500 hover:text-aurora-gray-900 hover:bg-aurora-gray-50 rounded-lg text-sm font-semibold transition-colors">Profile</button>
+</div>
+</div>
+<!-- Applicant Card 2 -->
+<div class="border border-aurora-gray-200 rounded-card p-4 flex flex-col gap-3">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<img class="w-10 h-10 rounded-full object-cover border border-aurora-gray-200" data-alt="A portrait of a male lifestyle creator in a modern coffee shop, soft natural lighting, casual aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCgueziV6L7zIcy6LUHrI8DA23xAsHea9G0Hq5oEz9IQflObzSKNnbtohcXJGqCwOIGGRWtTzVmqoHY4Wtw4eJBKz6GWxlUde594MeRXpzhYvLEVthWitp8GFuZ_4emE9ekGgGKPHQeNiBzM5Us2m4YbRfBARKZLq52wktS0j3bP9_kw4-8XQG7a16zXcLlSFsrMCFWLUOguoNR4SpuaTjHYnyLswnISs9E5ZwpJGqu5M3wTwmOeur_elTMwEcce6KJ4BeUzsaV0C8"/>
+<div>
+<div class="font-headline font-bold text-aurora-gray-900">@mark_travels</div>
+<div class="text-sm text-aurora-gray-500">Travel &amp; Lifestyle</div>
+</div>
+</div>
+<span class="bg-aurora-green-50 text-aurora-green-600 px-2 py-1 rounded-md text-xs font-bold border border-aurora-green-100">88% Match</span>
+</div>
+<div class="flex gap-4 text-sm text-aurora-gray-900">
+<div><span class="font-semibold">310k</span> Reach</div>
+<div class="w-px h-4 bg-aurora-gray-200 self-center"></div>
+<div><span class="font-semibold">3.2%</span> Eng.</div>
+</div>
+<div class="flex items-center gap-2 mt-1">
+<button class="flex-1 bg-aurora-green-500 hover:bg-aurora-green-600 text-white py-2 rounded-lg text-sm font-bold transition-colors">Approve</button>
+<button class="flex-1 border border-aurora-red-500 text-aurora-red-500 hover:bg-aurora-red-50 py-2 rounded-lg text-sm font-bold transition-colors">Reject</button>
+<button class="px-3 py-2 text-aurora-gray-500 hover:text-aurora-gray-900 hover:bg-aurora-gray-50 rounded-lg text-sm font-semibold transition-colors">Profile</button>
+</div>
+</div>
+<!-- Applicant Card 3 -->
+<div class="border border-aurora-gray-200 rounded-card p-4 flex flex-col gap-3">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<img class="w-10 h-10 rounded-full object-cover border border-aurora-gray-200" data-alt="A portrait photo of a stylish female tech reviewer in a studio setting with soft purple and blue rim lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDpPJB5hsa4xHr64lIHhZcfmt0boz-Zv7TyCXKyJXo_hepTNxIRuH0N0J7FWaMtUT7VVMoE_0l-jXrReJtK_xXz2yuyB5q9BOSCoxn9Bb0aXkysigjxzVQnTOipK1FiTqWV9jlh-i7GSleOI6-1Fm2u9_rpHO22rMjAO9GTlEJuXidjgDe9E0ccOAZhPEFixu6lStaFR5H_4noRDNGUGKOKSWPMo8ql5WyEl08pIrP2TYu4jiu7aSbNRcOv_VQV31yaVxhsn9S70Ck"/>
+<div>
+<div class="font-headline font-bold text-aurora-gray-900">@sarah.tech</div>
+<div class="text-sm text-aurora-gray-500">Technology</div>
+</div>
+</div>
+<span class="bg-aurora-green-50 text-aurora-green-600 px-2 py-1 rounded-md text-xs font-bold border border-aurora-green-100">75% Match</span>
+</div>
+<div class="flex gap-4 text-sm text-aurora-gray-900">
+<div><span class="font-semibold">89k</span> Reach</div>
+<div class="w-px h-4 bg-aurora-gray-200 self-center"></div>
+<div><span class="font-semibold">6.1%</span> Eng.</div>
+</div>
+<div class="flex items-center gap-2 mt-1">
+<button class="flex-1 bg-aurora-green-500 hover:bg-aurora-green-600 text-white py-2 rounded-lg text-sm font-bold transition-colors">Approve</button>
+<button class="flex-1 border border-aurora-red-500 text-aurora-red-500 hover:bg-aurora-red-50 py-2 rounded-lg text-sm font-bold transition-colors">Reject</button>
+<button class="px-3 py-2 text-aurora-gray-500 hover:text-aurora-gray-900 hover:bg-aurora-gray-50 rounded-lg text-sm font-semibold transition-colors">Profile</button>
+</div>
+</div>
+<!-- Applicant Card 4 -->
+<div class="border border-aurora-gray-200 rounded-card p-4 flex flex-col gap-3">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<img class="w-10 h-10 rounded-full object-cover border border-aurora-gray-200" data-alt="A headshot of a male food blogger in a well-lit kitchen, bright and airy lighting, wearing a chef apron." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCpXy2-ZgIvG6UMSHSU95ICA8vNvdGXrK5CZTZk9TEC673kt94HBWZ_cDW1Ft464kXphlftwGMGmb6xk4d_HobI9atw0uQq3qdu4I2MxI5xxByZ3otn0-qcgASQs202zL6lQiS7iQoFYyDNCauUNVtvX3X9CYj_0VyGlR7lK51mlC0reCun6tMPFEGMMozKc1p9P4B3e40ZjEYuiie1f8o3LAgwi9XGQef4w9DFGhpUNJFLkVhjFws3Apuf4oIqLh_876x3Qse3-dM"/>
+<div>
+<div class="font-headline font-bold text-aurora-gray-900">@chef_dan</div>
+<div class="text-sm text-aurora-gray-500">Food &amp; Drink</div>
+</div>
+</div>
+<span class="bg-aurora-green-50 text-aurora-green-600 px-2 py-1 rounded-md text-xs font-bold border border-aurora-green-100">70% Match</span>
+</div>
+<div class="flex gap-4 text-sm text-aurora-gray-900">
+<div><span class="font-semibold">500k</span> Reach</div>
+<div class="w-px h-4 bg-aurora-gray-200 self-center"></div>
+<div><span class="font-semibold">2.1%</span> Eng.</div>
+</div>
+<div class="flex items-center gap-2 mt-1">
+<button class="flex-1 bg-aurora-green-500 hover:bg-aurora-green-600 text-white py-2 rounded-lg text-sm font-bold transition-colors">Approve</button>
+<button class="flex-1 border border-aurora-red-500 text-aurora-red-500 hover:bg-aurora-red-50 py-2 rounded-lg text-sm font-bold transition-colors">Reject</button>
+<button class="px-3 py-2 text-aurora-gray-500 hover:text-aurora-gray-900 hover:bg-aurora-gray-50 rounded-lg text-sm font-semibold transition-colors">Profile</button>
+</div>
+</div>
+<!-- Applicant Card 5 -->
+<div class="border border-aurora-gray-200 rounded-card p-4 flex flex-col gap-3">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<img class="w-10 h-10 rounded-full object-cover border border-aurora-gray-200" data-alt="A portrait of a young female fashion influencer posing on a city street, bright daylight, modern high fashion aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDOoW2ezMqEazBh6akzgucRUP8VusdIASuImD32U_jEBZzgZOuhoZoRcdNDwCYU8qUY5h2tjQpJHygQaBRQq3p6xiUsT6rkgZT4gjrqIVANcUJjOawio9OJibsnDwMm0bJPr6C0WKg13eGoNWoQJhWO2H7l_004JzZpTc33FjUikxmc4v0O_PlSDU5Vbr-k7vm1AclZ1AcAXZ-3C74JPv0k9QoIgA469qI4paBTW4A2TM3noTzlwkZi9i_P5-_SLdEtQF_TwOLlTXg"/>
+<div>
+<div class="font-headline font-bold text-aurora-gray-900">@style.by.zoe</div>
+<div class="text-sm text-aurora-gray-500">Fashion</div>
+</div>
+</div>
+<span class="bg-aurora-green-50 text-aurora-green-600 px-2 py-1 rounded-md text-xs font-bold border border-aurora-green-100">65% Match</span>
+</div>
+<div class="flex gap-4 text-sm text-aurora-gray-900">
+<div><span class="font-semibold">22k</span> Reach</div>
+<div class="w-px h-4 bg-aurora-gray-200 self-center"></div>
+<div><span class="font-semibold">8.5%</span> Eng.</div>
+</div>
+<div class="flex items-center gap-2 mt-1">
+<button class="flex-1 bg-aurora-green-500 hover:bg-aurora-green-600 text-white py-2 rounded-lg text-sm font-bold transition-colors">Approve</button>
+<button class="flex-1 border border-aurora-red-500 text-aurora-red-500 hover:bg-aurora-red-50 py-2 rounded-lg text-sm font-bold transition-colors">Reject</button>
+<button class="px-3 py-2 text-aurora-gray-500 hover:text-aurora-gray-900 hover:bg-aurora-gray-50 rounded-lg text-sm font-semibold transition-colors">Profile</button>
+</div>
+</div>
+</div>
+</div>
+</body></html>

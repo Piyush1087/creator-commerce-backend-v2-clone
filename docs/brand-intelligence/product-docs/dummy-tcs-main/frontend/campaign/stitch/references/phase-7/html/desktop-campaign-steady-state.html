@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Summer Glow Launch Campaign</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            DEFAULT: "#000000",
+                            container: "#f3f4f6",
+                        },
+                        surface: {
+                            DEFAULT: "#ffffff",
+                            container: {
+                                lowest: "#ffffff",
+                                low: "#f8fafc",
+                                DEFAULT: "#f1f5f9",
+                                high: "#e2e8f0",
+                                highest: "#cbd5e1",
+                            },
+                            variant: "#f8fafc",
+                        },
+                        on: {
+                            surface: {
+                                DEFAULT: "#0f172a",
+                                variant: "#475569",
+                            },
+                            primary: {
+                                DEFAULT: "#ffffff",
+                                container: "#0f172a",
+                            }
+                        },
+                        outline: {
+                            DEFAULT: "#cbd5e1",
+                            variant: "#e2e8f0",
+                        },
+                        border: {
+                            default: "#e2e8f0"
+                        },
+                        semantic: {
+                            success: "#10b981",
+                            successBg: "#d1fae5",
+                            warning: "#f59e0b",
+                            warningBg: "#fef3c7",
+                            error: "#ef4444",
+                            errorBg: "#fee2e2",
+                            info: "#3b82f6",
+                            infoBg: "#dbeafe"
+                        }
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.375rem",
+                        "md": "0.5rem",
+                        "lg": "0.75rem",
+                        "xl": "1rem",
+                        "2xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    fontFamily: {
+                        headline: ["Satoshi", "sans-serif"],
+                        display: ["Satoshi", "sans-serif"],
+                        body: ["Source Sans Pro", "sans-serif"],
+                        label: ["Source Sans Pro", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        /* Fallback fonts if custom ones fail to load for preview */
+        body { font-family: 'Source Sans Pro', system-ui, -apple-system, sans-serif; }
+        h1, h2, h3, h4, h5, h6, .font-headline, .font-display { font-family: 'Satoshi', system-ui, -apple-system, sans-serif; }
+    </style>
+</head>
+<body class="bg-surface-container-low text-on-surface min-h-screen">
+<main class="max-w-[1440px] mx-auto p-6 md:p-8 lg:p-10 space-y-8">
+<!-- 1. CampaignHeader -->
+<header class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border-default">
+<div class="flex items-center gap-4">
+<h1 class="text-3xl font-headline font-bold text-on-surface tracking-tight">Summer Glow Launch</h1>
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-semantic-successBg text-semantic-success">
+<span class="w-1.5 h-1.5 rounded-full bg-semantic-success mr-1.5 animate-pulse"></span>
+                    LIVE
+                </span>
+</div>
+<div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+<button class="flex items-center gap-1 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors">
+<span>2 Products Â· 5 Briefs</span>
+<span class="material-symbols-outlined text-lg">expand_more</span>
+</button>
+<div class="hidden sm:block w-px h-6 bg-border-default"></div>
+<div class="flex items-center gap-2">
+<button class="px-4 py-2 text-sm font-medium border border-border-default rounded-md hover:bg-surface-container transition-colors bg-surface">View</button>
+<button class="px-4 py-2 text-sm font-medium border border-border-default rounded-md hover:bg-surface-container transition-colors bg-surface">Edit</button>
+<button class="px-4 py-2 text-sm font-medium border border-border-default rounded-md hover:bg-surface-container transition-colors flex items-center gap-2 bg-surface">
+<span class="material-symbols-outlined text-[18px]">share</span>
+                        Share
+                    </button>
+</div>
+</div>
+</header>
+<!-- 2. Upper Row (Split Layout) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+<!-- Left Column: Campaign Copilot -->
+<section class="lg:col-span-8 bg-surface border border-border-default rounded-xl p-6 shadow-sm">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-semantic-info">temp_preferences_custom</span>
+<h2 class="text-lg font-headline font-semibold">Campaign Copilot</h2>
+</div>
+<p class="text-on-surface-variant mb-6 text-sm">
+                    The campaign is gaining traction. We've identified new creators matching your criteria. Follow up on pending briefs to maintain momentum.
+                </p>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<!-- Priority Action Card 1 -->
+<div class="p-4 rounded-lg border border-border-default bg-surface-container-lowest hover:border-outline transition-colors flex flex-col justify-between group cursor-pointer">
+<p class="text-sm font-medium text-on-surface mb-4">8 new creators found for the campaign</p>
+<div class="flex items-center justify-between mt-auto">
+<span class="text-sm font-semibold text-primary">Review</span>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors text-[18px]">arrow_forward</span>
+</div>
+</div>
+<!-- Priority Action Card 2 -->
+<div class="p-4 rounded-lg border border-border-default bg-surface-container-lowest hover:border-outline transition-colors flex flex-col justify-between group cursor-pointer">
+<p class="text-sm font-medium text-on-surface mb-4">2 briefs need creator outreach</p>
+<div class="flex items-center justify-between mt-auto">
+<span class="text-sm font-semibold text-primary">Continue Outreach</span>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors text-[18px]">arrow_forward</span>
+</div>
+</div>
+<!-- Priority Action Card 3 -->
+<div class="p-4 rounded-lg border border-border-default bg-surface-container-lowest hover:border-outline transition-colors flex flex-col justify-between group cursor-pointer">
+<p class="text-sm font-medium text-on-surface mb-4">Budget has room for 3 more collaborations</p>
+<div class="flex items-center justify-between mt-auto">
+<span class="text-sm font-semibold text-primary">Review Budget</span>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors text-[18px]">arrow_forward</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Column: Performance Summary -->
+<section class="lg:col-span-4 bg-surface border border-border-default rounded-xl p-6 shadow-sm flex flex-col">
+<h2 class="text-lg font-headline font-semibold mb-6">Performance Summary</h2>
+<div class="flex flex-col gap-4 flex-grow justify-center">
+<div class="flex items-center justify-between p-3 rounded-lg bg-surface-container-low border border-border-default">
+<span class="text-sm text-on-surface-variant font-medium">Budget Available</span>
+<span class="font-headline font-bold text-on-surface">$24,000</span>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="p-3 rounded-lg bg-surface-container-low border border-border-default flex flex-col">
+<span class="text-xs text-on-surface-variant mb-1 font-medium">Primary KPI</span>
+<span class="font-headline font-semibold text-on-surface">Reach</span>
+</div>
+<div class="p-3 rounded-lg bg-semantic-successBg border border-semantic-success/20 flex flex-col">
+<span class="text-xs text-semantic-success mb-1 font-medium">Collaborations</span>
+<span class="font-headline font-semibold text-semantic-success">6 completed</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="p-3 rounded-lg bg-surface-container-low border border-border-default flex flex-col">
+<span class="text-xs text-on-surface-variant mb-1 font-medium">Est. Reach</span>
+<span class="font-headline font-semibold text-on-surface">1.2M</span>
+</div>
+<div class="p-3 rounded-lg bg-surface-container-low border border-border-default flex flex-col">
+<span class="text-xs text-on-surface-variant mb-1 font-medium">Engagement</span>
+<span class="font-headline font-semibold text-on-surface">4.8%</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- 3. Middle Row: Products & Briefs -->
+<section class="bg-surface border border-border-default rounded-xl p-6 shadow-sm">
+<div class="flex items-center justify-between mb-6">
+<h2 class="text-xl font-headline font-semibold">Products &amp; Briefs</h2>
+<button class="text-sm font-semibold text-primary flex items-center gap-1 hover:underline">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                    Add Product
+                </button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Product Card 1 -->
+<div class="border border-border-default rounded-lg p-5 flex flex-col bg-surface-container-lowest">
+<div class="flex items-start gap-4 mb-5">
+<div class="w-16 h-16 rounded-md bg-cover bg-center border border-border-default flex-shrink-0" data-alt="A sleek, modern frosted glass bottle of facial serum with a metallic silver dropper top, placed on a clean white marble surface. Bright, diffused natural lighting creates a fresh, premium light-mode aesthetic, emphasizing skincare purity." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuADEeC8LEoJ7sZafT0WvXMG1gO_Fyparg72GaXDEYr1aeSNrPbhfId2cbT7EdNF1abg0N_t88j4Vx_qvxwPxMEPZERC1Urj08738KWMPdoiKm5Bh9q8bTJPpoTjuBfiSeQQ-xMoRp2hV19kTgDO8WDbqDsMLNx7YH5_UrelV5NW1i0HTrl3-VitHTVftXTKnxkGDun7P1WwkmNAhfkj13aeFvhm4GhFDSEWg9UML7hg35_znP5qkqTmCVZrXt2n0JEGRLwQy947LoQ')"></div>
+<div>
+<h3 class="font-headline font-semibold text-lg">Glow Face Serum</h3>
+<p class="text-sm text-on-surface-variant">3 Active Briefs</p>
+</div>
+</div>
+<div class="space-y-3 flex-grow">
+<div class="flex items-center justify-between p-3 rounded bg-surface-container-low text-sm border border-border-default">
+<span class="font-medium">Instagram Reel</span>
+<span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-surface border border-border-default">Video</span>
+</div>
+<div class="flex items-center justify-between p-3 rounded bg-surface-container-low text-sm border border-border-default">
+<span class="font-medium">Instagram Story</span>
+<span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-surface border border-border-default">Image/Video</span>
+</div>
+<div class="flex items-center justify-between p-3 rounded bg-surface-container-low text-sm border border-border-default">
+<span class="font-medium">UGC Video</span>
+<span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-surface border border-border-default">Video</span>
+</div>
+</div>
+<button class="mt-4 w-full py-2.5 border border-dashed border-outline-variant text-on-surface-variant rounded-md hover:bg-surface-container-low hover:text-on-surface transition-colors flex items-center justify-center gap-2 text-sm font-medium">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                        Add Brief
+                    </button>
+</div>
+<!-- Product Card 2 -->
+<div class="border border-border-default rounded-lg p-5 flex flex-col bg-surface-container-lowest">
+<div class="flex items-start gap-4 mb-5">
+<div class="w-16 h-16 rounded-md bg-cover bg-center border border-border-default flex-shrink-0" data-alt="A luxurious, minimalist jar of night repair face cream with a matte white finish and elegant black typography. It sits elegantly on a soft grey stone pedestal under crisp, cool studio lighting, projecting a high-end cosmetic light-mode aesthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBMsCt1ZhCT1th0wXrG0jNOE02-YmZVp06lcRo3lFl-WkMZlajzlq78h1maCUrJxSunZm3r74HJvoYWNMZsHqdLllavLmfbAOUcWwO1FYM9YO7lcv4skCAx7nGDvd0b9lqjYhF4PPjvwTHGN-wQjBKDDG1h8LwZaCINTHmfxLZXwnmyaNOoG_eJLoNsFcJTSS8qPFxcb8BJLYZFOjyjRufgsq4ywXabjdI_an3oYKL9J1MDq6jlT85njDFi4lfv_JGKZyZFYx422es')"></div>
+<div>
+<h3 class="font-headline font-semibold text-lg">Night Repair Cream</h3>
+<p class="text-sm text-on-surface-variant">2 Active Briefs</p>
+</div>
+</div>
+<div class="space-y-3 flex-grow">
+<div class="flex items-center justify-between p-3 rounded bg-surface-container-low text-sm border border-border-default">
+<span class="font-medium">Product Review Reel</span>
+<span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-surface border border-border-default">Video</span>
+</div>
+<div class="flex items-center justify-between p-3 rounded bg-surface-container-low text-sm border border-border-default">
+<span class="font-medium">Story + Link</span>
+<span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-surface border border-border-default">Image/Video</span>
+</div>
+</div>
+<button class="mt-auto pt-4 w-full py-2.5 border border-dashed border-outline-variant text-on-surface-variant rounded-md hover:bg-surface-container-low hover:text-on-surface transition-colors flex items-center justify-center gap-2 text-sm font-medium">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                        Add Brief
+                    </button>
+</div>
+</div>
+</section>
+<!-- 4. Lower Row (Workspace) -->
+<section class="space-y-4">
+<!-- Active Expandable Section: Discovery -->
+<div class="bg-surface border border-border-default rounded-xl shadow-sm overflow-hidden">
+<div class="px-6 py-4 flex items-center justify-between bg-surface-container-lowest border-b border-border-default cursor-pointer hover:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-xl transition-transform duration-200 rotate-180">expand_more</span>
+<h2 class="text-lg font-headline font-semibold">Discovery Â· <span class="text-primary">8 New</span></h2>
+</div>
+<button class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-border-default rounded-md bg-surface hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[16px]">tune</span>
+                        Filter
+                    </button>
+</div>
+<div class="p-6 overflow-x-auto">
+<div class="flex gap-4 min-w-max pb-4">
+<!-- Creator Card 1 -->
+<div class="w-[280px] border border-border-default rounded-lg p-4 flex flex-col bg-surface hover:shadow-md transition-shadow">
+<div class="flex items-center gap-3 mb-4">
+<img class="w-12 h-12 rounded-full object-cover border border-border-default" data-alt="A bright, cheerful portrait photograph of a young female beauty and lifestyle creator with glowing clear skin, smiling gently at the camera. She is set against a clean, out-of-focus white studio background, fitting perfectly within a light-mode UI profile picture context." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCMVHcLV1Gz6xMX-bz9E37p_t8U-LhrkoIcv5Bm0FGmU8n523t2qUOeIpjKmv7yeY4wyEqFIkEG3H9Vy4nSxzSehywGvLqNz5wpWXPnjmWrkRqOXRVhmGOi7t8JTKylxydnfJUIGFoDvQEBpGVhp6QZKoP0Ua4QqM9L_yff68ol_-vTBYQLQc7Z5jCS3s0eXg8CHF3XCiggfTqdsZ8SwlF4P-mV1CM1XiViQ5vVEgl3iYueBdCy5MwA_lDgW6BBLwxRWuTqY-DhaFQ"/>
+<div>
+<h4 class="font-headline font-semibold text-sm truncate w-40">Elena Rodriguez</h4>
+<p class="text-xs text-on-surface-variant truncate w-40">Skincare &amp; Lifestyle</p>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-y-3 mb-5 border-y border-border-default py-3">
+<div>
+<p class="text-[10px] text-on-surface-variant uppercase font-semibold">Reach</p>
+<p class="text-sm font-medium">145k</p>
+</div>
+<div>
+<p class="text-[10px] text-on-surface-variant uppercase font-semibold">Engagement</p>
+<p class="text-sm font-medium">5.2%</p>
+</div>
+<div class="col-span-2">
+<div class="flex justify-between items-center mb-1">
+<p class="text-[10px] text-on-surface-variant uppercase font-semibold">Match Score</p>
+<p class="text-[10px] font-bold text-semantic-success">94%</p>
+</div>
+<div class="w-full bg-surface-container-high rounded-full h-1.5">
+<div class="bg-semantic-success h-1.5 rounded-full" style="width: 94%"></div>
+</div>
+</div>
+</div>
+<div class="flex gap-2 mt-auto">
+<button class="flex-1 bg-primary text-on-primary py-2 text-sm font-semibold rounded hover:bg-primary/90 transition-colors">Outreach</button>
+<button class="flex-1 bg-surface border border-border-default py-2 text-sm font-semibold rounded hover:bg-surface-container transition-colors">Profile</button>
+</div>
+</div>
+<!-- Creator Card 2 -->
+<div class="w-[280px] border border-border-default rounded-lg p-4 flex flex-col bg-surface hover:shadow-md transition-shadow">
+<div class="flex items-center gap-3 mb-4">
+<img class="w-12 h-12 rounded-full object-cover border border-border-default" data-alt="A professional headshot of a male grooming and lifestyle influencer with styled hair and a neat beard, looking confident. Photographed against a very light, almost white background with high-key lighting to match a bright, modern software interface aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCVmexaxf6bJnji-qndLBQDKV-JLDHlrE8m0Lk07y8sTSaxVeWMq788O-Ol16aEe5QdhcM4ZRbVkL_CpBCzqFOyuz4KtQSSzOPU-PpO7zvsxx9oQCxGnCno_lDgscuXaGgAPOkYDz2MNk_kb_wpPrCvja90ZgyKHQFFEzhEL0JjKG8czuLYJiT3NfHZFmUPxoHaqHcP_8EbscyivP45o1QKm9rBKCa6D5BGMyCHpYIUglZEtwbD0bAjQyjtZ4snfHVMXB_7TRR5wJw"/>
+<div>
+<h4 class="font-headline font-semibold text-sm truncate w-40">Marcus Chen</h4>
+<p class="text-xs text-on-surface-variant truncate w-40">Grooming &amp; Wellness</p>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-y-3 mb-5 border-y border-border-default py-3">
+<div>
+<p class="text-[10px] text-on-surface-variant uppercase font-semibold">Reach</p>
+<p class="text-sm font-medium">89k</p>
+</div>
+<div>
+<p class="text-[10px] text-on-surface-variant uppercase font-semibold">Engagement</p>
+<p class="text-sm font-medium">7.1%</p>
+</div>
+<div class="col-span-2">
+<div class="flex justify-between items-center mb-1">
+<p class="text-[10px] text-on-surface-variant uppercase font-semibold">Match Score</p>
+<p class="text-[10px] font-bold text-semantic-success">88%</p>
+</div>
+<div class="w-full bg-surface-container-high rounded-full h-1.5">
+<div class="bg-semantic-success h-1.5 rounded-full" style="width: 88%"></div>
+</div>
+</div>
+</div>
+<div class="flex gap-2 mt-auto">
+<button class="flex-1 bg-primary text-on-primary py-2 text-sm font-semibold rounded hover:bg-primary/90 transition-colors">Outreach</button>
+<button class="flex-1 bg-surface border border-border-default py-2 text-sm font-semibold rounded hover:bg-surface-container transition-colors">Profile</button>
+</div>
+</div>
+<!-- Creator Card 3 -->
+<div class="w-[280px] border border-border-default rounded-lg p-4 flex flex-col bg-surface hover:shadow-md transition-shadow">
+<div class="flex items-center gap-3 mb-4">
+<img class="w-12 h-12 rounded-full object-cover border border-border-default" data-alt="An energetic profile photo of a young female content creator applying skincare product to her cheek. She wears minimal makeup to highlight natural beauty. The shot is bright, airy, and features soft, diffused lighting typical of high-end beauty content in a light UI setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuATy0TqU8qBiaprL2-OziPBlQxLQ-o8TC4g-VEZZaG8L0bcGACH6Kg1lPGndDaw2cAPK9xUam-16aZEoonJ5tTPsSRG0DQj_QfRuNPIyzn9cSX0BueJ9ci0rVubyTBzPNK0kHX9MSMwdGgN5wmP7fW5PBCJi94i6luLHxqV5-kRoTkpk6Vk4VzgSY_ztqLXIsUeivZxtqWwtS9LDhIGPiw3DUnVAgqUesp_-7HW3B5YdLe3VByJ6yR5GKUJblnsfpxqK4QWjVXh_1o"/>
+<div>
+<h4 class="font-headline font-semibold text-sm truncate w-40">Sarah Jenkins</h4>
+<p class="text-xs text-on-surface-variant truncate w-40">Beauty Tips</p>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-y-3 mb-5 border-y border-border-default py-3">
+<div>
+<p class="text-[10px] text-on-surface-variant uppercase font-semibold">Reach</p>
+<p class="text-sm font-medium">320k</p>
+</div>
+<div>
+<p class="text-[10px] text-on-surface-variant uppercase font-semibold">Engagement</p>
+<p class="text-sm font-medium">3.4%</p>
+</div>
+<div class="col-span-2">
+<div class="flex justify-between items-center mb-1">
+<p class="text-[10px] text-on-surface-variant uppercase font-semibold">Match Score</p>
+<p class="text-[10px] font-bold text-semantic-warning">76%</p>
+</div>
+<div class="w-full bg-surface-container-high rounded-full h-1.5">
+<div class="bg-semantic-warning h-1.5 rounded-full" style="width: 76%"></div>
+</div>
+</div>
+</div>
+<div class="flex gap-2 mt-auto">
+<button class="flex-1 bg-primary text-on-primary py-2 text-sm font-semibold rounded hover:bg-primary/90 transition-colors">Outreach</button>
+<button class="flex-1 bg-surface border border-border-default py-2 text-sm font-semibold rounded hover:bg-surface-container transition-colors">Profile</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Collapsed Expandable Section: Applicants -->
+<div class="bg-surface border border-border-default rounded-xl shadow-sm overflow-hidden opacity-80 hover:opacity-100 transition-opacity">
+<div class="px-6 py-4 flex items-center justify-between bg-surface-container-lowest cursor-pointer hover:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant text-xl transition-transform duration-200">expand_more</span>
+<h2 class="text-lg font-headline font-semibold text-on-surface-variant">Applicants Â· 12 Pending</h2>
+</div>
+</div>
+</div>
+</section>
+</main>
+</body></html>

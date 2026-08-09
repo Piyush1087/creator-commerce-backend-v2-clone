@@ -1,0 +1,30 @@
+{
+  "name": "creator-shop-campaign-staging",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:campaign-schema": "vitest run ../../../backend/validation/campaign/campaign.schema.test.ts"
+  },
+  "dependencies": {
+    "react": "latest",
+    "react-dom": "latest",
+    "vite": "latest",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@eslint/js": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "eslint": "latest",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.66.0",
+    "vitest": "latest"
+  }
+}

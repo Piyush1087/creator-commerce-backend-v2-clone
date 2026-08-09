@@ -1,0 +1,2 @@
+import type { SurfaceState } from "../types";
+export function SurfaceStateNotice({ state, subject }: { state: SurfaceState; subject: string }) { const text = state === "EMPTY" ? `No ${subject} yet.` : state === "ERROR" ? `Unable to load ${subject}.` : `${subject} is unavailable.`; return <p className="surfaceState" role={state === "ERROR" ? "alert" : "status"}>{text}{state === "ERROR" && <button className="textAction" type="button">Retry</button>}</p>; }

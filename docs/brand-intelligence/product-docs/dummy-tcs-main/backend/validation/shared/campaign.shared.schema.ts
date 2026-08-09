@@ -17,10 +17,33 @@ export const campaignObjectiveSchema = z.enum(["PULSE", "PROOF", "PRODUCTION", "
 export const mediaPlatformSchema = z.enum(["INSTAGRAM", "TIKTOK", "YOUTUBE"]);
 // Persistence remains future-ready, while Brand-writable MVP Campaign publication is Instagram-only.
 export const mvpCampaignPlatformSchema = z.literal("INSTAGRAM");
+
+// Product/UI vocabulary is canonical. Persistence enum names remain separately exported for explicit adapters.
+export const campaignVisibilitySchema = z.enum(["PUBLIC", "ELIGIBLE_CREATORS_ONLY", "INVITE_ONLY"]);
 export const visibilityScopeSchema = z.enum(["EVERYONE", "ELIGIBLE_ONLY", "INVITED_ONLY"]);
+export const campaignVisibilityToPersistence = {
+  PUBLIC: "EVERYONE",
+  ELIGIBLE_CREATORS_ONLY: "ELIGIBLE_ONLY",
+  INVITE_ONLY: "INVITED_ONLY",
+} as const;
+
 export const audienceGenderSchema = z.enum(["ALL", "FEMALE", "MALE"]);
+// Product vocabulary is FIXED / NEGOTIABLE; persistence currently stores FIXED_FEE / NEGOTIABLE.
+export const compensationModelSchema = z.enum(["FIXED", "NEGOTIABLE"]);
 export const compensationTypeSchema = z.enum(["FIXED_FEE", "NEGOTIABLE"]);
+export const compensationModelToPersistence = { FIXED: "FIXED_FEE", NEGOTIABLE: "NEGOTIABLE" } as const;
+
+// Canonical Create/Edit Campaign payment terms. Historical persistence may still contain IMMEDIATE.
+export const campaignNetPaymentTermsSchema = z.enum(["NET_7", "NET_15", "NET_30", "NET_45", "NET_60"]);
 export const payoutTermsSchema = z.enum(["IMMEDIATE", "NET_7", "NET_15", "NET_30", "NET_45", "NET_60"]);
+export const advancePaymentPercentageSchema = z.union([
+  z.literal(0),
+  z.literal(25),
+  z.literal(50),
+  z.literal(75),
+  z.literal(100),
+]);
+
 export const brandSupportTypeSchema = z.enum(["PRODUCT", "SERVICE", "EXPERIENCE", "ACCESS_SUBSCRIPTION", "OTHER"]);
 export const campaignAssetKindSchema = z.enum(["BRAND", "OFFERING", "OFFER"]);
 export const briefTypeSchema = z.enum(["CREATOR_LED", "BRAND_LED"]);
@@ -33,8 +56,10 @@ export const applicationSourceSchema = z.enum(["DIRECT", "OUTREACH", "SHARE"]);
 export const reportAvailabilitySchema = z.enum(["AVAILABLE", "PARTIAL"]);
 export const campaignShareChannelSchema = z.enum(["COPY_LINK", "WHATSAPP", "INSTAGRAM", "NATIVE_SHARE"]);
 
-// Campaign collaboration currency is frozen to INR/USD for MVP.
+// Campaign commercial currency is derived from Brand country and is not a Brand-authored Campaign field.
 export const campaignCurrencySchema = z.enum(["INR", "USD"]);
+export const campaignCurrencyForBrandCountry = (countryCode: string): z.infer<typeof campaignCurrencySchema> =>
+  countryCode.trim().toUpperCase() === "IN" ? "INR" : "USD";
 
 // Taxonomy membership is service/reference-data owned; Zod validates only identifiers/cardinality.
 export const taxonomyIdSchema = z.string().trim().min(1);
@@ -54,6 +79,7 @@ export const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
 );
 
 // Current Campaign artifacts require object/array containers at these structured JSON boundaries.
+// Campaign geography remains additionally constrained by the shared normalized geography contract at the service/adapter boundary.
 export const structuredJsonSchema = z.union([
   z.record(jsonValueSchema),
   z.array(jsonValueSchema),

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Component State Review Board</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Satoshi:wght@400;500;700;900&amp;family=Source+Sans+3:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+    </style>
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        aurora: {
+                            primary: '#34D399',
+                            'primary-hover': '#10B981',
+                            error: '#CA0F1C',
+                            'error-bg': '#FFF6F6',
+                            'error-border': '#FECACA',
+                            surface: '#FFFFFF',
+                            'surface-hover': '#F9FAFB',
+                            border: '#E5E7EB',
+                            'text-main': '#111827',
+                            'text-muted': '#6B7280',
+                            skeleton: '#E5E7EB',
+                            'skeleton-highlight': '#F3F4F6'
+                        }
+                    },
+                    borderRadius: {
+                        DEFAULT: '0.25rem',
+                        md: '0.375rem',
+                        lg: '0.5rem',
+                        xl: '0.75rem', /* 12px for cards as requested */
+                        full: '9999px'
+                    },
+                    spacing: {
+                        '2': '0.5rem', /* 8px grid */
+                        '4': '1rem', /* 16px */
+                        '6': '1.5rem', /* 24px padding */
+                        '8': '2rem', /* 32px */
+                    },
+                    fontFamily: {
+                        satoshi: ['Satoshi', 'sans-serif'],
+                        source: ['Source Sans 3', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        /* Skeleton Animation */
+        @keyframes shimmer {
+            0% {
+                background-position: -1000px 0;
+            }
+            100% {
+                background-position: 1000px 0;
+            }
+        }
+        .animate-shimmer {
+            animation: shimmer 2s infinite linear;
+            background: linear-gradient(to right, #E5E7EB 4%, #F3F4F6 25%, #E5E7EB 36%);
+            background-size: 1000px 100%;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen text-aurora-text-main font-source p-8">
+<div class="max-w-7xl mx-auto space-y-12">
+<header class="mb-12">
+<h1 class="font-satoshi text-3xl font-bold text-gray-900 mb-2">Component State Review Board</h1>
+<p class="text-aurora-text-muted">Local-state reference document. Aurora Design System v4.1.</p>
+</header>
+<!-- 1. DiscoveryWorkspace States -->
+<section class="space-y-6">
+<h2 class="font-satoshi text-xl font-bold text-gray-800 border-b border-aurora-border pb-2">1. DiscoveryWorkspace States</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- (a) Initial/Empty -->
+<div class="bg-aurora-surface rounded-xl border border-aurora-border p-6 shadow-sm flex flex-col">
+<span class="inline-block bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-1 rounded mb-4 self-start font-satoshi">Initial State</span>
+<div class="flex-grow flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-gray-200 rounded-lg">
+<span class="material-symbols-outlined text-4xl text-gray-300 mb-3" style="font-variation-settings: 'FILL' 0;">group_off</span>
+<h3 class="font-satoshi font-semibold text-gray-700 mb-1">No creators found</h3>
+<p class="text-sm text-aurora-text-muted max-w-xs">Try adjusting your filters or search terms to discover relevant profiles.</p>
+</div>
+</div>
+<!-- (b) Loading -->
+<div class="bg-aurora-surface rounded-xl border border-aurora-border p-6 shadow-sm flex flex-col">
+<span class="inline-block bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-1 rounded mb-4 self-start font-satoshi">Loading State</span>
+<div class="grid grid-cols-2 gap-4">
+<!-- Skeleton Card 1 -->
+<div class="border border-aurora-border rounded-lg p-4">
+<div class="flex items-center gap-3 mb-4">
+<div class="w-12 h-12 rounded-full animate-shimmer"></div>
+<div class="space-y-2 flex-grow">
+<div class="h-4 w-3/4 rounded animate-shimmer"></div>
+<div class="h-3 w-1/2 rounded animate-shimmer"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="h-3 w-full rounded animate-shimmer"></div>
+<div class="h-3 w-5/6 rounded animate-shimmer"></div>
+</div>
+</div>
+<!-- Skeleton Card 2 -->
+<div class="border border-aurora-border rounded-lg p-4">
+<div class="flex items-center gap-3 mb-4">
+<div class="w-12 h-12 rounded-full animate-shimmer"></div>
+<div class="space-y-2 flex-grow">
+<div class="h-4 w-2/3 rounded animate-shimmer"></div>
+<div class="h-3 w-1/3 rounded animate-shimmer"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="h-3 w-full rounded animate-shimmer"></div>
+<div class="h-3 w-4/5 rounded animate-shimmer"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- (c) Recoverable Error -->
+<div class="bg-aurora-surface rounded-xl border border-aurora-border p-6 shadow-sm flex flex-col">
+<span class="inline-block bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-1 rounded mb-4 self-start font-satoshi">Error State</span>
+<div class="flex-grow flex flex-col items-center justify-center py-10 text-center bg-aurora-error-bg rounded-lg border border-aurora-error-border">
+<span class="material-symbols-outlined text-4xl text-aurora-error mb-3" style="font-variation-settings: 'FILL' 1;">error</span>
+<h3 class="font-satoshi font-semibold text-aurora-error mb-1">Unable to load creators</h3>
+<p class="text-sm text-gray-600 mb-4 max-w-xs">We encountered a temporary issue while fetching the creator list.</p>
+<button class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-md font-medium text-sm transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">refresh</span>
+                            Retry
+                        </button>
+</div>
+</div>
+<!-- (d) No Results -->
+<div class="bg-aurora-surface rounded-xl border border-aurora-border p-6 shadow-sm flex flex-col">
+<span class="inline-block bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-1 rounded mb-4 self-start font-satoshi">No Results</span>
+<!-- Preserved Filter Control Header -->
+<div class="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
+<div class="flex items-center gap-2">
+<button class="bg-gray-100 text-gray-700 px-3 py-1.5 rounded text-sm flex items-center gap-1 font-medium">
+                                Beauty <span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+<button class="bg-gray-100 text-gray-700 px-3 py-1.5 rounded text-sm flex items-center gap-1 font-medium">
+                                &gt; 50k Followers <span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+<button class="text-sm text-aurora-primary font-medium hover:text-aurora-primary-hover">Clear all</button>
+</div>
+<div class="flex-grow flex flex-col items-center justify-center py-8 text-center">
+<span class="material-symbols-outlined text-3xl text-gray-400 mb-2" style="font-variation-settings: 'FILL' 0;">search_off</span>
+<h3 class="font-satoshi font-semibold text-gray-700 mb-1">No matching creators</h3>
+<p class="text-sm text-aurora-text-muted">None of the creators match your current filter criteria.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- 2. ApplicantsWorkspace States -->
+<section class="space-y-6">
+<h2 class="font-satoshi text-xl font-bold text-gray-800 border-b border-aurora-border pb-2">2. ApplicantsWorkspace States</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- (a) No Pending -->
+<div class="bg-aurora-surface rounded-xl border border-aurora-border p-6 shadow-sm flex flex-col">
+<span class="inline-block bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-1 rounded mb-4 self-start font-satoshi">No Pending</span>
+<div class="flex-grow flex flex-col items-center justify-center py-10 text-center">
+<div class="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-green-500" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<h3 class="font-satoshi font-semibold text-gray-700 mb-1">No pending applicants</h3>
+<p class="text-sm text-aurora-text-muted">You're all caught up on reviews.</p>
+</div>
+</div>
+<!-- (b) Loading -->
+<div class="bg-aurora-surface rounded-xl border border-aurora-border p-6 shadow-sm flex flex-col">
+<span class="inline-block bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-1 rounded mb-4 self-start font-satoshi">Loading State</span>
+<div class="space-y-4 w-full">
+<!-- Row 1 -->
+<div class="flex items-center gap-4 py-2 border-b border-gray-50">
+<div class="w-10 h-10 rounded-full animate-shimmer shrink-0"></div>
+<div class="space-y-2 flex-grow">
+<div class="h-4 w-32 rounded animate-shimmer"></div>
+<div class="h-3 w-24 rounded animate-shimmer"></div>
+</div>
+<div class="h-8 w-20 rounded animate-shimmer shrink-0"></div>
+</div>
+<!-- Row 2 -->
+<div class="flex items-center gap-4 py-2 border-b border-gray-50">
+<div class="w-10 h-10 rounded-full animate-shimmer shrink-0"></div>
+<div class="space-y-2 flex-grow">
+<div class="h-4 w-40 rounded animate-shimmer"></div>
+<div class="h-3 w-20 rounded animate-shimmer"></div>
+</div>
+<div class="h-8 w-20 rounded animate-shimmer shrink-0"></div>
+</div>
+</div>
+</div>
+<!-- (c) Recoverable Error -->
+<div class="bg-aurora-surface rounded-xl border border-aurora-border p-6 shadow-sm flex flex-col">
+<span class="inline-block bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-1 rounded mb-4 self-start font-satoshi">Error State</span>
+<div class="flex-grow flex flex-col items-center justify-center py-8 text-center bg-aurora-error-bg rounded-lg border border-aurora-error-border">
+<span class="material-symbols-outlined text-3xl text-aurora-error mb-2" style="font-variation-settings: 'FILL' 1;">warning</span>
+<h3 class="font-satoshi font-semibold text-aurora-error mb-1">Something went wrong</h3>
+<button class="mt-3 bg-white border border-aurora-error-border text-aurora-error hover:bg-red-50 px-3 py-1.5 rounded-md font-medium text-sm transition-colors flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">refresh</span>
+                            Retry
+                        </button>
+</div>
+</div>
+</div>
+</section>
+<!-- 3. ProductsBriefsSection States -->
+<section class="space-y-6">
+<h2 class="font-satoshi text-xl font-bold text-gray-800 border-b border-aurora-border pb-2">3. ProductsBriefsSection States</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- (a) No Products -->
+<div class="bg-aurora-surface rounded-xl border border-aurora-border p-6 shadow-sm flex flex-col">
+<span class="inline-block bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-1 rounded mb-4 self-start font-satoshi">No Products</span>
+<div class="flex-grow flex flex-col items-center justify-center py-10 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/50">
+<span class="material-symbols-outlined text-4xl text-gray-400 mb-3" style="font-variation-settings: 'FILL' 0;">inventory_2</span>
+<h3 class="font-satoshi font-semibold text-gray-700 mb-1">No products added</h3>
+<p class="text-sm text-aurora-text-muted mb-4">Start by adding a product to this campaign.</p>
+<button class="bg-aurora-primary hover:bg-aurora-primary-hover text-white px-5 py-2.5 rounded-md font-medium text-sm transition-colors flex items-center gap-2 shadow-sm">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                            Add Product
+                        </button>
+</div>
+</div>
+<!-- (b) Product Without Brief -->
+<div class="bg-aurora-surface rounded-xl border border-aurora-border p-6 shadow-sm flex flex-col">
+<span class="inline-block bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-1 rounded mb-4 self-start font-satoshi">Missing Brief</span>
+<div class="border border-gray-200 rounded-lg overflow-hidden">
+<!-- Product Row -->
+<div class="bg-white p-4 flex items-center justify-between border-b border-gray-100">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-gray-100 rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-gray-400">face_retouching_natural</span>
+</div>
+<div>
+<h4 class="font-satoshi font-semibold text-gray-800 text-sm">Glow Face Serum</h4>
+<p class="text-xs text-aurora-text-muted">SKU: GFS-001</p>
+</div>
+</div>
+<button class="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+<!-- Brief State Area -->
+<div class="bg-amber-50/50 p-4 flex items-center justify-between">
+<div class="flex items-center gap-2 text-amber-700">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">assignment_late</span>
+<span class="text-sm font-medium">No briefs added.</span>
+</div>
+<button class="bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 px-3 py-1.5 rounded-md font-medium text-sm transition-colors flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-[16px]">add</span>
+                                Add Brief
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 4. CampaignCopilot States -->
+<section class="space-y-6">
+<h2 class="font-satoshi text-xl font-bold text-gray-800 border-b border-aurora-border pb-2">4. CampaignCopilot States</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- (a) Loading -->
+<div class="bg-aurora-surface rounded-xl border border-aurora-border p-6 shadow-sm flex flex-col">
+<span class="inline-block bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-1 rounded mb-4 self-start font-satoshi">Loading State</span>
+<div class="flex items-center gap-3 mb-5">
+<div class="w-8 h-8 rounded-full animate-shimmer shrink-0"></div>
+<div class="h-5 w-32 rounded animate-shimmer"></div>
+</div>
+<div class="space-y-3 mb-6">
+<div class="h-4 w-full rounded animate-shimmer"></div>
+<div class="h-4 w-4/5 rounded animate-shimmer"></div>
+</div>
+<div class="flex flex-wrap gap-2">
+<div class="h-8 w-24 rounded-full animate-shimmer"></div>
+<div class="h-8 w-32 rounded-full animate-shimmer"></div>
+<div class="h-8 w-20 rounded-full animate-shimmer"></div>
+</div>
+</div>
+<!-- (b) No Priority Actions -->
+<div class="bg-aurora-surface rounded-xl border border-aurora-border p-6 shadow-sm flex flex-col">
+<span class="inline-block bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-1 rounded mb-4 self-start font-satoshi">No Actions</span>
+<div class="flex items-center gap-3 mb-3 text-indigo-600">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<h3 class="font-satoshi font-semibold">Campaign Copilot</h3>
+</div>
+<div class="bg-indigo-50/50 rounded-lg p-4 flex-grow flex flex-col justify-center text-center">
+<p class="text-sm text-indigo-800/70 font-medium">No priority actions needed right now. Your campaign is running smoothly.</p>
+</div>
+</div>
+<!-- (c) Unavailable -->
+<div class="bg-aurora-surface rounded-xl border border-aurora-border p-6 shadow-sm flex flex-col">
+<span class="inline-block bg-gray-100 text-gray-600 text-xs font-semibold px-2 py-1 rounded mb-4 self-start font-satoshi">Degraded/Unavailable</span>
+<div class="flex items-center gap-3 mb-4 text-gray-400">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<h3 class="font-satoshi font-semibold">Campaign Copilot</h3>
+</div>
+<div class="bg-aurora-error-bg border border-aurora-error-border rounded-lg p-4 flex items-start gap-3">
+<span class="material-symbols-outlined text-aurora-error shrink-0" style="font-variation-settings: 'FILL' 1;">error</span>
+<div>
+<h4 class="text-sm font-semibold text-aurora-error mb-1">Copilot is currently unavailable</h4>
+<p class="text-xs text-aurora-error/80">We are unable to connect to the AI service. Standard manual tools are still fully operational.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</body></html>

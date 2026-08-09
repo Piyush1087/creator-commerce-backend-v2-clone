@@ -47,7 +47,7 @@ tasks:
     required: true
     dependencies: [identity_core]
     canonical_dependencies: [country]
-    rule: "country == IN ? INR : USD"
+    rule: country == IN ? INR : USD
 
   - id: market_geography
     processor_id: market_geography

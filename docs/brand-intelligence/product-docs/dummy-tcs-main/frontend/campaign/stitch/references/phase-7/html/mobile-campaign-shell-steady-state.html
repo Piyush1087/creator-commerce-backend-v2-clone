@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Phase 6 Campaign Content Area</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Satoshi:wght@400;500;700;900&amp;family=Source+Sans+3:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        background: '#F8F8F8',
+                        surface: '#FFFFFF',
+                        primary: '#000000',
+                        secondary: '#4A4A4A',
+                        success: '#10B981',
+                        attention: '#F59E0B',
+                        border: '#E5E5E5',
+                        muted: '#9CA3AF'
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "card": "12px",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        'margin': '16px'
+                    },
+                    fontFamily: {
+                        "headline": ["Satoshi", "sans-serif"],
+                        "body": ["Source Sans 3", "sans-serif"],
+                        "label": ["Source Sans 3", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Source Sans 3', sans-serif; }
+        h1, h2, h3, h4, h5, h6 { font-family: 'Satoshi', sans-serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-primary antialiased">
+<main class="w-full max-w-[480px] mx-auto p-margin flex flex-col gap-6 pb-24">
+<!-- 1. Campaign Header -->
+<section class="flex flex-col gap-4">
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<h1 class="text-2xl font-bold font-headline tracking-tight">Summer Glow Launch</h1>
+<span class="inline-flex items-center gap-1 bg-success/10 text-success px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide">
+<span class="material-symbols-outlined text-[14px]">sensors</span>
+                            LIVE
+                        </span>
+</div>
+<button class="flex items-center gap-1 text-secondary text-sm hover:text-primary transition-colors text-left group">
+                        2 Products Â· 5 Briefs
+                        <span class="material-symbols-outlined text-[18px] group-hover:translate-y-0.5 transition-transform">expand_more</span>
+</button>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="flex-1 bg-primary text-surface py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[18px]">visibility</span>
+                    View
+                </button>
+<button class="flex-1 bg-surface border border-border text-primary py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+                    Edit
+                </button>
+<button aria-label="Share" class="w-10 bg-surface border border-border text-primary rounded-lg flex items-center justify-center active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[18px]">share</span>
+</button>
+</div>
+</section>
+<!-- 2. Campaign Copilot -->
+<section class="bg-surface rounded-card p-4 shadow-sm border border-border/50">
+<div class="flex items-center gap-2 mb-3">
+<span class="material-symbols-outlined text-primary text-[20px]">temp_preferences_custom</span>
+<h2 class="text-lg font-bold font-headline">Campaign Copilot</h2>
+</div>
+<p class="text-secondary text-sm mb-4 leading-relaxed">
+                The campaign is currently live and performing well. We have high engagement on recent reels, but need to finalize 2 more briefs to hit target metrics.
+            </p>
+<div class="flex flex-col gap-3">
+<!-- Action Card 1 -->
+<div class="bg-background rounded-lg p-3 flex justify-between items-center border border-border/40">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center text-success shrink-0">
+<span class="material-symbols-outlined text-[16px]">group_add</span>
+</div>
+<span class="text-sm font-medium leading-tight">8 new creators found for the campaign</span>
+</div>
+<button class="text-primary text-xs font-bold uppercase tracking-wider shrink-0 px-2 py-1 hover:bg-black/5 rounded transition-colors">Review</button>
+</div>
+<!-- Action Card 2 -->
+<div class="bg-background rounded-lg p-3 flex justify-between items-center border border-border/40">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-attention/10 flex items-center justify-center text-attention shrink-0">
+<span class="material-symbols-outlined text-[16px]">mail</span>
+</div>
+<span class="text-sm font-medium leading-tight">2 briefs need creator outreach</span>
+</div>
+<button class="text-primary text-xs font-bold uppercase tracking-wider shrink-0 px-2 py-1 hover:bg-black/5 rounded transition-colors whitespace-nowrap">Continue</button>
+</div>
+<!-- Action Card 3 -->
+<div class="bg-background rounded-lg p-3 flex justify-between items-center border border-border/40">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-[16px]">account_balance_wallet</span>
+</div>
+<span class="text-sm font-medium leading-tight">Budget has room for 3 more collaborations</span>
+</div>
+<button class="text-primary text-xs font-bold uppercase tracking-wider shrink-0 px-2 py-1 hover:bg-black/5 rounded transition-colors whitespace-nowrap">Review</button>
+</div>
+</div>
+</section>
+<!-- 3. Performance (Collapsible) -->
+<details class="bg-surface rounded-card shadow-sm border border-border/50 group" open="">
+<summary class="p-4 flex items-center justify-between cursor-pointer list-none select-none">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">monitoring</span>
+<h2 class="text-lg font-bold font-headline">Performance</h2>
+</div>
+<span class="material-symbols-outlined group-open:rotate-180 transition-transform text-secondary">expand_more</span>
+</summary>
+<div class="p-4 pt-0 grid grid-cols-2 gap-3 border-t border-border/30 mt-2 pt-4">
+<!-- Metric 1: Budget (Full Width) -->
+<div class="col-span-2 bg-success/5 border border-success/20 rounded-lg p-3 flex flex-col">
+<span class="text-xs text-secondary font-medium uppercase tracking-wide mb-1">Budget Available</span>
+<span class="text-xl font-bold font-headline text-success">$24,000</span>
+</div>
+<!-- Metric 2: Primary KPI -->
+<div class="bg-background rounded-lg p-3 flex flex-col border border-border/40">
+<span class="text-xs text-secondary font-medium uppercase tracking-wide mb-1">Primary KPI</span>
+<span class="text-lg font-bold font-headline">Reach</span>
+</div>
+<!-- Metric 3: Collaborations -->
+<div class="bg-background rounded-lg p-3 flex flex-col border border-border/40">
+<span class="text-xs text-secondary font-medium uppercase tracking-wide mb-1">Collaborations</span>
+<span class="text-lg font-bold font-headline">6 <span class="text-sm text-secondary font-normal lowercase">completed</span></span>
+</div>
+<!-- Metric 4: Reach -->
+<div class="bg-background rounded-lg p-3 flex flex-col border border-border/40">
+<span class="text-xs text-secondary font-medium uppercase tracking-wide mb-1">Est. Reach</span>
+<span class="text-lg font-bold font-headline">1.2M</span>
+</div>
+<!-- Metric 5: Engagement -->
+<div class="bg-background rounded-lg p-3 flex flex-col border border-border/40">
+<span class="text-xs text-secondary font-medium uppercase tracking-wide mb-1">Engagement</span>
+<span class="text-lg font-bold font-headline">4.8%</span>
+</div>
+</div>
+</details>
+<!-- 4. Products & Briefs -->
+<section class="bg-surface rounded-card p-4 shadow-sm border border-border/50">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">inventory_2</span>
+<h2 class="text-lg font-bold font-headline">Products &amp; Briefs</h2>
+</div>
+</div>
+<div class="flex flex-col gap-5">
+<!-- Product 1 -->
+<div class="flex flex-col gap-2">
+<h3 class="text-base font-bold font-headline border-b border-border/50 pb-2">Glow Face Serum</h3>
+<ul class="flex flex-col gap-2 mt-1">
+<li class="flex items-center gap-2 text-sm text-secondary before:content-[''] before:w-1.5 before:h-1.5 before:bg-primary/20 before:rounded-full">
+                            Instagram Reel
+                        </li>
+<li class="flex items-center gap-2 text-sm text-secondary before:content-[''] before:w-1.5 before:h-1.5 before:bg-primary/20 before:rounded-full">
+                            Instagram Story
+                        </li>
+<li class="flex items-center gap-2 text-sm text-secondary before:content-[''] before:w-1.5 before:h-1.5 before:bg-primary/20 before:rounded-full">
+                            UGC Video
+                        </li>
+</ul>
+<button class="text-primary text-sm font-semibold flex items-center gap-1 mt-1 w-fit hover:bg-black/5 px-2 py-1 -ml-2 rounded transition-colors">
+<span class="material-symbols-outlined text-[16px]">add</span>
+                        Add Brief
+                    </button>
+</div>
+<!-- Product 2 -->
+<div class="flex flex-col gap-2">
+<h3 class="text-base font-bold font-headline border-b border-border/50 pb-2">Night Repair Cream</h3>
+<ul class="flex flex-col gap-2 mt-1">
+<li class="flex items-center gap-2 text-sm text-secondary before:content-[''] before:w-1.5 before:h-1.5 before:bg-primary/20 before:rounded-full">
+                            Product Review Reel
+                        </li>
+<li class="flex items-center gap-2 text-sm text-secondary before:content-[''] before:w-1.5 before:h-1.5 before:bg-primary/20 before:rounded-full">
+                            Story + Link
+                        </li>
+</ul>
+<button class="text-primary text-sm font-semibold flex items-center gap-1 mt-1 w-fit hover:bg-black/5 px-2 py-1 -ml-2 rounded transition-colors">
+<span class="material-symbols-outlined text-[16px]">add</span>
+                        Add Brief
+                    </button>
+</div>
+</div>
+<!-- Add Product Action -->
+<div class="mt-6 pt-4 border-t border-border/50">
+<button class="w-full border border-dashed border-muted text-secondary py-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 hover:bg-background hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+                    Add Product
+                </button>
+</div>
+</section>
+</main>
+</body></html>
