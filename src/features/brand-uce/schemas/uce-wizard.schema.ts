@@ -17,6 +17,13 @@ export const UceCampaignObjectiveSchema = z.enum([
   "SALES_CONVERSIONS",
 ]);
 export const UceCompensationTypeSchema = z.enum(["FIXED_FEE", "NEGOTIABLE"]);
+export const UceAdvancePaymentPercentageSchema = z.union([
+  z.literal(0),
+  z.literal(25),
+  z.literal(50),
+  z.literal(75),
+  z.literal(100),
+]);
 export const UcePayoutTermsSchema = z.enum([
   "IMMEDIATE",
   "NET_7",
@@ -74,7 +81,10 @@ export const Step1StrategySchema = z
         });
       }
     }
-    if (data.timeline_type === "DYNAMIC_MILESTONES" && !data.dynamic_days_limit) {
+    if (
+      data.timeline_type === "DYNAMIC_MILESTONES" &&
+      !data.dynamic_days_limit
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Dynamic milestones require dynamic_days_limit.",
@@ -126,7 +136,7 @@ export const Step3CommercialsSchema = z
     negotiable_min_fee: z.number().nonnegative().optional().default(0),
     negotiable_max_fee: z.number().nonnegative().optional().default(0),
     total_campaign_budget_pool: z.number().positive(),
-    advance_payment_percentage: z.number().int().min(30).max(100),
+    advance_payment_percentage: UceAdvancePaymentPercentageSchema,
     final_balance_terms: UcePayoutTermsSchema,
   })
   .superRefine((data, ctx) => {

@@ -12,6 +12,9 @@ import {
   CollaborationPayoutMode,
   CollaborationPublicationAuthorizationState,
   CollaborationPublishingState,
+  CollaborationSecurementState,
+  CollaborationStage,
+  CollaborationStageStatus,
   Prisma,
   UceApplicationStatus,
   UceMilestoneStage,
@@ -19,12 +22,14 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import { UceAdvancePaymentPercentageSchema } from "../../brand-uce/schemas/uce-wizard.schema";
 import {
   provisionCollaborationSchema,
   type ProvisionCollaborationInput,
 } from "../schemas/provision-collaboration.schema";
 import { mapCollaborationThreadRow } from "../utils/collaboration-thread.mapper";
 import { mapBrandIndustryToCollaborationIndustry } from "../utils/map-collaboration-industry.util";
+import { resolveProvisioningNegotiationState } from "../utils/collaboration-provisioning-initialization";
 import { COLLABORATION_THREAD_INCLUDE } from "./collaboration-access.service";
 import { CollaborationRealtimeService } from "./collaboration-realtime.service";
 
@@ -133,9 +138,12 @@ export class CollaborationProvisionService {
         "Campaign commercial configuration is required",
       );
     }
-    if (![0, 25, 50, 75, 100].includes(commercials.advancePaymentPercentage)) {
+    const advancePercentage = UceAdvancePaymentPercentageSchema.safeParse(
+      commercials.advancePaymentPercentage,
+    );
+    if (!advancePercentage.success) {
       throw new BadRequestException(
-        "Campaign advance percentage is not canonical",
+        "Campaign advance percentage violates the Campaign-owned constraint",
       );
     }
     const currency = commercials.currency.toUpperCase();
@@ -144,6 +152,34 @@ export class CollaborationProvisionService {
         "Campaign commercial currency must be ISO-4217 shaped",
       );
     }
+
+    const negotiationState = resolveProvisioningNegotiationState(
+      commercials.compensationType,
+    );
+    const negotiationRequired =
+      negotiationState !== CollaborationNegotiationState.NOT_REQUIRED;
+    const fixedAgreedFee = negotiationRequired
+      ? null
+      : (application.proposedFee ?? commercials.fixedFeeAmount);
+    if (!negotiationRequired && fixedAgreedFee === null) {
+      throw new BadRequestException(
+        "Fixed Campaign compensation requires an authoritative fixed fee",
+      );
+    }
+    const advanceAmount = fixedAgreedFee?.mul(advancePercentage.data).div(100);
+    const balanceAmount = fixedAgreedFee?.minus(advanceAmount ?? 0);
+    const securementState = negotiationRequired
+      ? null
+      : fixedAgreedFee!.greaterThan(0)
+        ? CollaborationSecurementState.AWAITING_ESCROW_FUNDING
+        : CollaborationSecurementState.NOT_REQUIRED;
+    const canonicalStage = negotiationRequired
+      ? CollaborationStage.NEGOTIATION
+      : securementState === CollaborationSecurementState.AWAITING_ESCROW_FUNDING
+        ? CollaborationStage.SECUREMENT
+        : commercials.receivesBrandSupport
+          ? CollaborationStage.FULFILLMENT
+          : CollaborationStage.PRODUCTION;
 
     const welcome = `Congrats! You're approved for ${application.campaign.name}. View your brief and secure your spot.`;
     try {
@@ -161,6 +197,8 @@ export class CollaborationProvisionService {
             ucePipelineCollaborationId:
               application.legacyPipelineCollaborationId ?? undefined,
             currentStage: UceMilestoneStage.STAGE_1_NEGOTIATION,
+            canonicalStage,
+            currentStageStatus: CollaborationStageStatus.IN_PROGRESS,
             payoutMode: CollaborationPayoutMode.ESCROW,
             // Retained only for the legacy read model. Canonical Fulfillment is
             // initialized exclusively from the locked Campaign Brand Support fields.
@@ -181,25 +219,30 @@ export class CollaborationProvisionService {
                 brandSupportEstimatedValue:
                   commercials.brandSupportEstimatedValue,
                 campaignCommercialContext: toJson(commercials),
-                advancePercentageSnapshot: commercials.advancePaymentPercentage,
+                advancePercentageSnapshot: advancePercentage.data,
                 commercialCurrency: currency,
               },
             },
             commercialAgreement: {
               create: {
-                negotiationState:
-                  CollaborationNegotiationState.AWAITING_BRAND_DECISION,
+                negotiationState,
                 applicationProposedFee: application.proposedFee,
+                agreedCreatorFee: fixedAgreedFee,
                 currency,
-                advancePercentageSnapshot: commercials.advancePaymentPercentage,
+                advancePercentageSnapshot: advancePercentage.data,
+                advanceAmount,
+                balanceAmount,
                 paymentRail: CollaborationPaymentRail.PLATFORM_ESCROW,
+                securementState,
+                requiredSecuredAmount: fixedAgreedFee,
+                termsLockedAt: negotiationRequired ? null : new Date(),
               },
             },
             fulfillment: {
               create: {
                 state: commercials.receivesBrandSupport
                   ? CollaborationFulfillmentState.NOT_STARTED
-                  : CollaborationFulfillmentState.NOT_REQUIRED,
+                  : CollaborationFulfillmentState.SKIPPED,
               },
             },
             deliverables: {
@@ -219,7 +262,7 @@ export class CollaborationProvisionService {
                     create: publishingRequired
                       ? {
                           state:
-                            CollaborationPublishingState.AWAITING_AUTHORIZATION,
+                            CollaborationPublishingState.AWAITING_PUBLISHING,
                           authorizationState:
                             CollaborationPublicationAuthorizationState.NOT_AUTHORIZED,
                         }
@@ -242,7 +285,7 @@ export class CollaborationProvisionService {
         await tx.collaborationEvent.create({
           data: {
             collaborationId: thread.id,
-            kind: CollaborationEventKind.CREATED,
+            kind: CollaborationEventKind.DOMAIN,
             commandId: input.commandId,
             aggregateVersion: 1,
             payload: { sourceApplicationId: application.id },

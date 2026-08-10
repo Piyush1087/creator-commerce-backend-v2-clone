@@ -31,6 +31,7 @@ import { normalizeInstagramHandle } from "../utils/instagram-handle.util";
 import { mapCollaborationRow } from "../utils/uce-collaboration-row.mapper";
 import { decimalToNumber, splitEscrowQuote } from "../utils/uce-decimal.util";
 import { CollaborationProvisionService } from "../../collaboration/services/collaboration-provision.service";
+import { UceAdvancePaymentPercentageSchema } from "../schemas/uce-wizard.schema";
 import { BrandUceAccessService } from "./brand-uce-access.service";
 
 const PROSPECT_STATUSES: UceCollabStatus[] = [
@@ -318,7 +319,20 @@ export class BrandUcePipelineService {
     const commercials = await this.prisma.uceCampaignCommercials.findUnique({
       where: { campaignId },
     });
-    const advancePercent = commercials?.advancePaymentPercentage ?? 30;
+    if (!commercials) {
+      throw new BadRequestException(
+        "Campaign commercial configuration is required before approval",
+      );
+    }
+    const parsedAdvancePercentage = UceAdvancePaymentPercentageSchema.safeParse(
+      commercials.advancePaymentPercentage,
+    );
+    if (!parsedAdvancePercentage.success) {
+      throw new BadRequestException(
+        "Campaign advance percentage violates the Campaign-owned constraint",
+      );
+    }
+    const advancePercent = parsedAdvancePercentage.data;
 
     let totalQuote = dto.total_quote ?? 0;
     if (totalQuote <= 0 && commercials) {
