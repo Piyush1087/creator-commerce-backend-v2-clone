@@ -29,6 +29,7 @@ import { CollaborationCreatorProfileService } from "./services/collaboration-cre
 import { CollaborationFulfillmentService } from "./services/collaboration-fulfillment.service";
 import { CollaborationNegotiationService } from "./services/collaboration-negotiation.service";
 import { CollaborationProductionService } from "./services/collaboration-production.service";
+import { CollaborationPublishingService } from "./services/collaboration-publishing.service";
 import { CollaborationQueryService } from "./services/collaboration-query.service";
 import { CollaborationSecurementService } from "./services/collaboration-securement.service";
 import { CollaborationService } from "./services/collaboration.service";
@@ -43,6 +44,7 @@ export class CollaborationController {
     private readonly securement: CollaborationSecurementService,
     private readonly fulfillment: CollaborationFulfillmentService,
     private readonly production: CollaborationProductionService,
+    private readonly publishing: CollaborationPublishingService,
     private readonly creatorProfile: CollaborationCreatorProfileService,
   ) {}
 
@@ -259,6 +261,64 @@ export class CollaborationController {
     @Body() body: SubmitLivePostDto,
   ) {
     return this.collaboration.submitLivePost(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/publishing/authorize")
+  authorizePublishing(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.publishing.authorize(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/publishing/decline")
+  declinePublishing(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.publishing.decline(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/publishing/evidence")
+  submitPublishingEvidence(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.publishing.submitEvidence(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/publishing/verify")
+  verifyCanonicalPublishing(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.publishing.verify(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/publishing/request-correction")
+  requestPublishingCorrection(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.publishing.requestCorrection(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/publishing/corrected-evidence")
+  submitCorrectedPublishingEvidence(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.publishing.submitCorrectedEvidence(
+      req.user,
+      collaborationId,
+      body,
+    );
   }
 
   @Post("threads/:collaborationId/posting/verify-compliance")

@@ -44,7 +44,11 @@ export const COLLABORATION_THREAD_INCLUDE = {
   deliverables: {
     orderBy: { displayOrder: "asc" as const },
     include: {
-      publishing: true,
+      publishing: {
+        include: {
+          evidenceHistory: { orderBy: { sequence: "asc" as const } },
+        },
+      },
       submissions: { orderBy: { versionNumber: "asc" as const } },
     },
   },

@@ -132,44 +132,66 @@ function deliverableActionRequiredBy(state: CollaborationDeliverableState) {
   return "NONE" as const;
 }
 
-function derivePublishingActor(
-  deliverables: CollaborationReadSource["deliverables"],
-): CollaborationActorClass | "NONE" {
-  const brandRequired = deliverables.some(
-    (item) =>
-      item.state === CollaborationDeliverableState.AUTO_APPROVED &&
-      item.publishing?.authorizationState ===
-        CollaborationPublicationAuthorizationState.NOT_AUTHORIZED,
-  );
-  const creatorRequired = deliverables.some(
-    (item) =>
-      item.publishing?.authorizationState ===
-        CollaborationPublicationAuthorizationState.AUTHORIZED &&
-      (item.publishing.state ===
-        CollaborationPublishingState.AWAITING_PUBLISHING ||
-        item.publishing.state ===
-          CollaborationPublishingState.CORRECTION_REQUIRED),
-  );
-  if (brandRequired && creatorRequired) return "NONE";
-  if (brandRequired) return CollaborationActorClass.BRAND;
-  if (creatorRequired) return CollaborationActorClass.CREATOR;
-  const publishing = deliverables.flatMap((item) =>
-    item.publishing ? [item.publishing] : [],
-  );
+function publishingActionRequiredBy(
+  item: CollaborationReadSource["deliverables"][number],
+) {
+  const publishing = item.publishing;
+  if (!publishing) return "NONE" as const;
   if (
-    publishing.some(
-      (item) => item.state === CollaborationPublishingState.EVIDENCE_SUBMITTED,
-    )
+    item.state === CollaborationDeliverableState.AUTO_APPROVED &&
+    publishing.authorizationState ===
+      CollaborationPublicationAuthorizationState.NOT_AUTHORIZED
   )
     return CollaborationActorClass.BRAND;
   if (
-    publishing.some(
-      (item) => item.state === CollaborationPublishingState.BLOCKED,
-    )
-  ) {
+    publishing.authorizationState ===
+      CollaborationPublicationAuthorizationState.AUTHORIZED &&
+    (publishing.state === CollaborationPublishingState.AWAITING_PUBLISHING ||
+      publishing.state === CollaborationPublishingState.CORRECTION_REQUIRED)
+  )
+    return CollaborationActorClass.CREATOR;
+  if (publishing.state === CollaborationPublishingState.EVIDENCE_SUBMITTED)
+    return CollaborationActorClass.BRAND;
+  if (publishing.state === CollaborationPublishingState.BLOCKED)
     return CollaborationActorClass.ADMIN;
+  return "NONE" as const;
+}
+
+function publishingActions(
+  item: CollaborationReadSource["deliverables"][number],
+  viewerRole: CollaborationViewerRole,
+): CollaborationAvailableAction[] {
+  const actor = publishingActionRequiredBy(item);
+  if (viewerRole === "BRAND" && actor === CollaborationActorClass.BRAND) {
+    if (
+      item.state === CollaborationDeliverableState.AUTO_APPROVED &&
+      item.publishing?.authorizationState ===
+        CollaborationPublicationAuthorizationState.NOT_AUTHORIZED
+    )
+      return ["AuthorizePublishing", "DeclinePublishing"];
+    if (
+      item.publishing?.state === CollaborationPublishingState.EVIDENCE_SUBMITTED
+    )
+      return ["VerifyPublishing", "RequestPublishingCorrection"];
   }
-  return "NONE";
+  if (viewerRole === "CREATOR" && actor === CollaborationActorClass.CREATOR) {
+    return item.publishing?.state ===
+      CollaborationPublishingState.CORRECTION_REQUIRED
+      ? ["SubmitCorrectedPublishingEvidence"]
+      : ["SubmitPublishingEvidence"];
+  }
+  return [];
+}
+
+function derivePublishingActor(
+  deliverables: CollaborationReadSource["deliverables"],
+): CollaborationActorClass | "NONE" {
+  const actors = new Set(
+    deliverables
+      .map(publishingActionRequiredBy)
+      .filter((actor) => actor !== "NONE"),
+  );
+  return actors.size === 1 ? [...actors][0] : "NONE";
 }
 
 export function deriveActionRequiredBy(
@@ -307,6 +329,12 @@ export function deriveAvailableActions(
         if (!actions.includes(action)) actions.push(action);
       }
     }
+  } else if (row.canonicalStage === CollaborationStage.PUBLISHING_SETTLEMENT) {
+    for (const deliverable of row.deliverables) {
+      for (const action of publishingActions(deliverable, viewerRole)) {
+        if (!actions.includes(action)) actions.push(action);
+      }
+    }
   }
   return actions;
 }
@@ -421,6 +449,15 @@ export function projectCanonicalCollaborationDetail(
   const agreement = row.commercialAgreement;
   const snapshot = row.snapshot;
   const workflow = workflowProjection(row, viewerRole);
+  const publishingComplete = row.deliverables.every(
+    (item) =>
+      (!item.publishingRequired &&
+        item.publishing?.state ===
+          CollaborationPublishingState.PUBLISHING_NOT_REQUIRED) ||
+      (item.publishingRequired &&
+        item.publishing?.state ===
+          CollaborationPublishingState.COMPLIANCE_VERIFIED),
+  );
   const deliverables = row.deliverables.map((item) => {
     const submissions = item.submissions ?? [];
     const latestSubmission = submissions.at(-1) ?? null;
@@ -438,6 +475,21 @@ export function projectCanonicalCollaborationDetail(
       autoApprovedAt: submission.autoApprovedAt?.toISOString() ?? null,
       supersededAt: submission.supersededAt?.toISOString() ?? null,
     }));
+    const publishingEvidenceHistory = (
+      item.publishing?.evidenceHistory ?? []
+    ).map((evidence) => ({
+      publishingEvidenceId: evidence.id,
+      sequence: evidence.sequence,
+      evidenceRef: evidence.evidenceRef,
+      platform: evidence.platform,
+      creatorNote: evidence.creatorNote,
+      evidenceMetadata: evidence.evidenceMetadata,
+      submittedAt: evidence.submittedAt.toISOString(),
+      correctionReason: evidence.correctionReason,
+      reviewedAt: evidence.reviewedAt?.toISOString() ?? null,
+      complianceEvidenceRef: evidence.complianceEvidenceRef,
+      verifiedAt: evidence.verifiedAt?.toISOString() ?? null,
+    }));
     return {
       deliverableExecutionId: item.id,
       sourceBriefDeliverableId: item.sourceBriefDeliverableId,
@@ -447,7 +499,10 @@ export function projectCanonicalCollaborationDetail(
       revisionRequestCount: item.revisionRequestCount,
       revisionsRemaining: Math.max(0, 2 - item.revisionRequestCount),
       publishingRequired: item.publishingRequired,
-      actionRequiredBy: deliverableActionRequiredBy(item.state),
+      actionRequiredBy:
+        row.canonicalStage === CollaborationStage.PUBLISHING_SETTLEMENT
+          ? publishingActionRequiredBy(item)
+          : deliverableActionRequiredBy(item.state),
       activeSubmissionVersionId:
         item.state === CollaborationDeliverableState.UNDER_REVIEW
           ? (latestSubmission?.id ?? null)
@@ -465,17 +520,23 @@ export function projectCanonicalCollaborationDetail(
             state: item.publishing.state,
             authorizationState: item.publishing.authorizationState,
             authorizedAt: item.publishing.authorizedAt?.toISOString() ?? null,
-            publicationEvidence: null,
-            correctionReason: null,
-            complianceVerifiedAt: null,
-            blockedReason: null,
+            evidenceHistory: publishingEvidenceHistory,
+            activeEvidence: publishingEvidenceHistory.at(-1) ?? null,
+            correctionReason:
+              publishingEvidenceHistory.at(-1)?.correctionReason ?? null,
+            complianceVerifiedAt:
+              item.publishing.complianceVerifiedAt?.toISOString() ?? null,
+            blockedReason: item.publishing.blockedReason,
           }
         : null,
-      availableActions: deliverableActions(
-        item.state,
-        item.revisionRequestCount,
-        viewerRole,
-      ),
+      availableActions:
+        row.canonicalStage === CollaborationStage.PUBLISHING_SETTLEMENT
+          ? publishingActions(item, viewerRole)
+          : deliverableActions(
+              item.state,
+              item.revisionRequestCount,
+              viewerRole,
+            ),
     };
   });
 
@@ -605,7 +666,13 @@ export function projectCanonicalCollaborationDetail(
       publishingRequired: item.publishingRequired,
       ...item.publishing,
     })),
-    settlement: null,
+    publishingComplete,
+    settlement: {
+      status: publishingComplete ? "ELIGIBLE" : "NOT_ELIGIBLE",
+      actionRequiredBy: publishingComplete
+        ? CollaborationActorClass.SYSTEM
+        : "NONE",
+    },
     resolution: row.financialResolution
       ? {
           status: row.financialResolution.status,

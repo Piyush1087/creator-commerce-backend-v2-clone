@@ -152,6 +152,9 @@ function canonicalRow(
             CollaborationPublicationAuthorizationState.NOT_AUTHORIZED,
           authorizedAt: null,
           authorizedByUserId: null,
+          complianceVerifiedAt: null,
+          blockedReason: null,
+          evidenceHistory: [],
           createdAt: new Date("2026-08-10T08:00:00.000Z"),
           updatedAt: new Date("2026-08-10T08:00:00.000Z"),
         },
@@ -240,7 +243,10 @@ test("detail reconstructs Application identity, locked context, commercials, Del
   assert.equal(detail.deliverables[0].publishingRequired, true);
   assert.deepEqual(detail.deliverables[0].submissionVersions, []);
   assert.equal(detail.publishing[0].state, "AWAITING_PUBLISHING");
-  assert.equal(detail.settlement, null);
+  assert.deepEqual(detail.settlement, {
+    status: "NOT_ELIGIBLE",
+    actionRequiredBy: "NONE",
+  });
   assert.equal(detail.resolution, null);
 });
 
@@ -363,7 +369,7 @@ test("auto-approved Production truth projects without implying publication autho
   const detail = projectCanonicalCollaborationDetail(row, "BRAND");
   assert.equal(detail.workflow.actionRequiredBy, "BRAND");
   assert.equal(detail.deliverables[0].state, "AUTO_APPROVED");
-  assert.equal(detail.deliverables[0].actionRequiredBy, "NONE");
+  assert.equal(detail.deliverables[0].actionRequiredBy, "BRAND");
   assert.equal(
     detail.deliverables[0].autoApprovedAt,
     autoApprovedAt.toISOString(),
@@ -381,6 +387,85 @@ test("auto-approved Production truth projects without implying publication autho
       (action) => (action as string) === "AutoApproveDeliverable",
     ),
   );
+  assert.deepEqual(detail.deliverables[0].availableActions, [
+    "AuthorizePublishing",
+    "DeclinePublishing",
+  ]);
+});
+
+test("publishing projection exposes append-only evidence, correction and passive Settlement eligibility", () => {
+  const base = canonicalRow();
+  const item = base.deliverables[0];
+  const verifiedAt = new Date("2026-08-14T12:00:00.000Z");
+  const row = canonicalRow({
+    canonicalStage: CollaborationStage.PUBLISHING_SETTLEMENT,
+    deliverables: [
+      {
+        ...item,
+        state: CollaborationDeliverableState.APPROVED,
+        publishing: {
+          ...item.publishing!,
+          authorizationState:
+            CollaborationPublicationAuthorizationState.AUTHORIZED,
+          state: CollaborationPublishingState.COMPLIANCE_VERIFIED,
+          complianceVerifiedAt: verifiedAt,
+          evidenceHistory: [
+            {
+              id: "evidence-1",
+              publishingExecutionId: item.publishing!.id,
+              sequence: 1,
+              evidenceRef: "provider:v1",
+              platform: "ProviderA",
+              creatorNote: null,
+              evidenceMetadata: null,
+              submittedByUserId: "creator-1",
+              submittedAt: new Date("2026-08-14T09:00:00.000Z"),
+              correctionReason: "Disclosure correction",
+              reviewedByUserId: "brand-user-1",
+              reviewedAt: new Date("2026-08-14T10:00:00.000Z"),
+              complianceEvidenceRef: null,
+              verifiedAt: null,
+              createdAt: new Date("2026-08-14T09:00:00.000Z"),
+              updatedAt: new Date("2026-08-14T10:00:00.000Z"),
+            },
+            {
+              id: "evidence-2",
+              publishingExecutionId: item.publishing!.id,
+              sequence: 2,
+              evidenceRef: "provider:v2",
+              platform: "ProviderA",
+              creatorNote: "Corrected",
+              evidenceMetadata: { corrected: true },
+              submittedByUserId: "creator-1",
+              submittedAt: new Date("2026-08-14T11:00:00.000Z"),
+              correctionReason: null,
+              reviewedByUserId: "brand-user-1",
+              reviewedAt: verifiedAt,
+              complianceEvidenceRef: "compliance:check",
+              verifiedAt,
+              createdAt: new Date("2026-08-14T11:00:00.000Z"),
+              updatedAt: verifiedAt,
+            },
+          ],
+        },
+      },
+    ],
+  });
+
+  const detail = projectCanonicalCollaborationDetail(row, "BRAND");
+  const publishing = detail.deliverables[0].publishing!;
+  assert.deepEqual(
+    publishing.evidenceHistory.map((evidence) => evidence.sequence),
+    [1, 2],
+  );
+  assert.equal(publishing.activeEvidence?.evidenceRef, "provider:v2");
+  assert.equal(publishing.complianceVerifiedAt, verifiedAt.toISOString());
+  assert.equal(detail.publishingComplete, true);
+  assert.deepEqual(detail.settlement, {
+    status: "ELIGIBLE",
+    actionRequiredBy: "SYSTEM",
+  });
+  assert.equal(detail.lifecycle.state, CollaborationLifecycle.ACTIVE);
   assert.deepEqual(detail.deliverables[0].availableActions, []);
 });
 

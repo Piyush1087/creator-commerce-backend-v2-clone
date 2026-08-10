@@ -2395,11 +2395,38 @@ model CollaborationPublishingExecution {
   authorizationState CollaborationPublicationAuthorizationState @map("authorization_state")
   authorizedAt DateTime? @map("authorized_at")
   authorizedByUserId String? @map("authorized_by_user_id")
+  evidenceHistory CollaborationPublishingEvidence[]
+  complianceVerifiedAt DateTime? @map("compliance_verified_at")
+  blockedReason String? @map("blocked_reason") @db.Text
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([state])
   @@map("collaboration_publishing_executions")
+}
+
+model CollaborationPublishingEvidence {
+  id String @id @default(uuid())
+  publishingExecutionId String @map("publishing_execution_id")
+  publishingExecution CollaborationPublishingExecution @relation(fields: [publishingExecutionId], references: [id], onDelete: Cascade)
+  sequence Int
+  evidenceRef String @map("evidence_ref") @db.Text
+  platform String? @db.VarChar(100)
+  creatorNote String? @map("creator_note") @db.Text
+  evidenceMetadata Json? @map("evidence_metadata")
+  submittedByUserId String @map("submitted_by_user_id")
+  submittedAt DateTime @default(now()) @map("submitted_at")
+  correctionReason String? @map("correction_reason") @db.Text
+  reviewedByUserId String? @map("reviewed_by_user_id")
+  reviewedAt DateTime? @map("reviewed_at")
+  complianceEvidenceRef String? @map("compliance_evidence_ref") @db.Text
+  verifiedAt DateTime? @map("verified_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([publishingExecutionId, sequence])
+  @@index([publishingExecutionId, submittedAt])
+  @@map("collaboration_publishing_evidence")
 }
 
 model CollaborationEvent {

@@ -697,6 +697,7 @@ export class CollaborationService {
       throw new ForbiddenException("Creator access required");
     }
     const thread = await this.access.assertThreadForUser(user, collaborationId);
+    this.assertLegacyPublishingCompatibility(thread);
     this.assertStage(thread, UceMilestoneStage.STAGE_5_PUBLISHING);
     assertLivePostNotSubmitted(thread.finalization);
     if (!LIVE_URL_DOMAINS.some((re) => re.test(dto.live_post_url))) {
@@ -730,6 +731,7 @@ export class CollaborationService {
       throw new ForbiddenException("Brand access required");
     }
     const thread = await this.access.assertThreadForUser(user, collaborationId);
+    this.assertLegacyPublishingCompatibility(thread);
     this.assertStage(thread, UceMilestoneStage.STAGE_5_PUBLISHING);
     assertComplianceNotVerified(thread.finalization);
     const fin = thread.finalization;
@@ -860,6 +862,16 @@ export class CollaborationService {
     if (thread.sourceApplicationId) {
       throw new BadRequestException(
         "Canonical Collaborations require the Deliverable Production command API",
+      );
+    }
+  }
+
+  private assertLegacyPublishingCompatibility(thread: {
+    sourceApplicationId: string | null;
+  }) {
+    if (thread.sourceApplicationId) {
+      throw new BadRequestException(
+        "Canonical Collaborations require the Deliverable Publishing command API",
       );
     }
   }

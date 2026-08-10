@@ -80,3 +80,19 @@ export function resolveProductionHardStopFinancialOutcome(
     "PRODUCTION_HARD_STOP",
   );
 }
+
+export function resolveBrandDeclinedPublicationFinancialOutcome(
+  terms: LockedCommercialTerms,
+) {
+  if (terms.advanceAmount === null || terms.advanceAmount === undefined) {
+    throw new Error(
+      "Locked Advance amount is missing for Brand-declined publication resolution",
+    );
+  }
+  return resolveFinancialOutcome(
+    terms,
+    terms.advanceAmount,
+    CollaborationFinancialOutcome.BRAND_PROTECTED_POST_SECUREMENT_EXIT,
+    "BRAND_DECLINED_PUBLICATION",
+  );
+}

@@ -30,7 +30,13 @@ export type CollaborationAvailableAction =
   | "SubmitDeliverable"
   | "ApproveDeliverable"
   | "RequestDeliverableRevision"
-  | "RejectFinalDeliverable";
+  | "RejectFinalDeliverable"
+  | "AuthorizePublishing"
+  | "DeclinePublishing"
+  | "SubmitPublishingEvidence"
+  | "VerifyPublishing"
+  | "RequestPublishingCorrection"
+  | "SubmitCorrectedPublishingEvidence";
 
 export type CollaborationWorkflowProjection = {
   stage: CollaborationStage;
