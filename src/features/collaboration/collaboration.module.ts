@@ -7,6 +7,7 @@ import { CollaborationController } from "./collaboration.controller";
 import { CollaborationGateway } from "./collaboration.gateway";
 import { CollaborationAccessService } from "./services/collaboration-access.service";
 import { CollaborationCreatorProfileService } from "./services/collaboration-creator-profile.service";
+import { CollaborationExceptionService } from "./services/collaboration-exception.service";
 import { CollaborationFulfillmentService } from "./services/collaboration-fulfillment.service";
 import { CollaborationProvisionService } from "./services/collaboration-provision.service";
 import { CollaborationProductionService } from "./services/collaboration-production.service";
@@ -39,6 +40,7 @@ import { PricingModule } from "../pricing/pricing.module";
   providers: [
     CollaborationGateway,
     CollaborationAccessService,
+    CollaborationExceptionService,
     CollaborationProvisionService,
     CollaborationNegotiationService,
     CollaborationPaymentCapabilityService,
@@ -57,6 +59,7 @@ import { PricingModule } from "../pricing/pricing.module";
   ],
   exports: [
     CollaborationProvisionService,
+    CollaborationExceptionService,
     CollaborationProductionService,
     CollaborationPublishingService,
     CollaborationService,
