@@ -17,6 +17,7 @@
     "test:collaboration:phase4.4": "ts-node src/features/collaboration/services/collaboration-publishing.test.ts",
     "test:collaboration:phase4.5": "ts-node src/features/collaboration/services/collaboration-exception.test.ts",
     "test:collaboration:phase4.6": "ts-node src/features/collaboration/services/collaboration-settlement.test.ts",
+    "test:collaboration:phase4.7": "ts-node src/features/collaboration/services/collaboration-feedback.test.ts",
     "dev": "nest start --watch",
     "start": "nest start",
     "start:dev": "nest start --watch",

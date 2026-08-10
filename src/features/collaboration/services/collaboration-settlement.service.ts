@@ -261,6 +261,8 @@ export class CollaborationSettlementService {
           settledAt: complete ? now : null,
         },
       });
+      if (complete && row.lifecycle === CollaborationLifecycle.ACTIVE)
+        await this.initializeFeedbackWindow(tx, row.id, now);
       await this.bump(
         tx,
         row,
@@ -428,6 +430,8 @@ export class CollaborationSettlementService {
           settledAt: complete ? now : null,
         },
       });
+      if (complete && row.lifecycle === CollaborationLifecycle.ACTIVE)
+        await this.initializeFeedbackWindow(tx, row.id, now);
       await this.bump(
         tx,
         row,
@@ -465,6 +469,22 @@ export class CollaborationSettlementService {
     if (!result.replayed)
       void this.realtime.broadcast(input.collaborationId, "thread.updated");
     return result;
+  }
+
+  private initializeFeedbackWindow(
+    tx: Prisma.TransactionClient,
+    collaborationId: string,
+    completedAt: Date,
+  ) {
+    return tx.collaborationFeedbackWindow.upsert({
+      where: { collaborationId },
+      create: {
+        collaborationId,
+        openedAt: completedAt,
+        closesAt: new Date(completedAt.getTime() + 48 * 60 * 60 * 1000),
+      },
+      update: {},
+    });
   }
 
   private assertNormalSuccessGates(row: SettlementRow) {

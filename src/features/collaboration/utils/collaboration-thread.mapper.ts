@@ -2,6 +2,8 @@ import {
   CollaborationActorClass,
   CollaborationDeliverableState,
   CollaborationFulfillmentState,
+  CollaborationFeedbackAuthorRole,
+  CollaborationFeedbackVisibility,
   CollaborationLifecycle,
   CollaborationMessage,
   CollaborationNegotiationState,
@@ -280,6 +282,23 @@ export function deriveAvailableActions(
 ): CollaborationAvailableAction[] {
   const actions: CollaborationAvailableAction[] = ["PostCollaborationMessage"];
   if (
+    projectionSource(row) === "CANONICAL" &&
+    row.lifecycle === CollaborationLifecycle.COMPLETED
+  ) {
+    const authorRole =
+      viewerRole === "BRAND"
+        ? CollaborationFeedbackAuthorRole.BRAND
+        : CollaborationFeedbackAuthorRole.CREATOR;
+    if (
+      row.feedbackWindow?.visibility ===
+        CollaborationFeedbackVisibility.HIDDEN &&
+      Date.now() < row.feedbackWindow.closesAt.getTime() &&
+      !row.feedback.some((item) => item.authorRole === authorRole)
+    )
+      actions.push("SubmitCollaborationFeedback");
+    return actions;
+  }
+  if (
     projectionSource(row) !== "CANONICAL" ||
     row.lifecycle !== CollaborationLifecycle.ACTIVE
   )
@@ -464,6 +483,67 @@ export function projectCanonicalCollaborationThreadRow(
     },
     updatedAt: row.updatedAt.toISOString(),
     legacyCompatibility: legacyCompatibility(row),
+  };
+}
+
+function feedbackRecord(
+  item: CollaborationReadSource["feedback"][number] | undefined,
+) {
+  return item
+    ? {
+        authorRole: item.authorRole,
+        rating: item.rating,
+        reviewText: item.reviewText,
+        submittedAt: item.submittedAt.toISOString(),
+      }
+    : null;
+}
+
+function feedbackProjection(
+  row: CollaborationReadSource,
+  viewerRole: CollaborationViewerRole,
+) {
+  if (!row.feedbackWindow) return null;
+  const viewerAuthorRole =
+    viewerRole === "BRAND"
+      ? CollaborationFeedbackAuthorRole.BRAND
+      : CollaborationFeedbackAuthorRole.CREATOR;
+  const counterpartAuthorRole =
+    viewerAuthorRole === CollaborationFeedbackAuthorRole.BRAND
+      ? CollaborationFeedbackAuthorRole.CREATOR
+      : CollaborationFeedbackAuthorRole.BRAND;
+  const viewer = row.feedback.find(
+    (item) => item.authorRole === viewerAuthorRole,
+  );
+  const counterpart = row.feedback.find(
+    (item) => item.authorRole === counterpartAuthorRole,
+  );
+  const revealed =
+    row.feedbackWindow.visibility === CollaborationFeedbackVisibility.REVEALED;
+  return {
+    visibility: row.feedbackWindow.visibility,
+    windowOpenedAt: row.feedbackWindow.openedAt.toISOString(),
+    revealDeadlineAt: row.feedbackWindow.closesAt.toISOString(),
+    revealedAt: row.feedbackWindow.revealedAt?.toISOString() ?? null,
+    viewerSubmission: feedbackRecord(viewer),
+    counterpartSubmitted: Boolean(counterpart),
+    counterpartSubmission: revealed ? feedbackRecord(counterpart) : null,
+    revealedSubmissions: revealed
+      ? {
+          brand: feedbackRecord(
+            row.feedback.find(
+              (item) =>
+                item.authorRole === CollaborationFeedbackAuthorRole.BRAND,
+            ),
+          ),
+          creator: feedbackRecord(
+            row.feedback.find(
+              (item) =>
+                item.authorRole === CollaborationFeedbackAuthorRole.CREATOR,
+            ),
+          ),
+        }
+      : null,
   };
 }
 
@@ -766,7 +846,7 @@ export function projectCanonicalCollaborationDetail(
             effectiveLifecycle(row) !== CollaborationLifecycle.ACTIVE,
         }
       : null,
-    feedback: null,
+    feedback: feedbackProjection(row, viewerRole),
     blocking: blockingProjection(row),
     inbox: {
       unreadCount:

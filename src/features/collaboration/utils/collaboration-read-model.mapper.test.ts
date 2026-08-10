@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   CollaborationDeliverableState,
   CollaborationFulfillmentState,
+  CollaborationFeedbackAuthorRole,
+  CollaborationFeedbackVisibility,
   CollaborationLifecycle,
   CollaborationNegotiationState,
   CollaborationPaymentRail,
@@ -82,6 +84,8 @@ function canonicalRow(
     commercials: null,
     logistics: null,
     finalization: null,
+    feedbackWindow: null,
+    feedback: [],
     media: [],
     snapshot: {
       id: "snapshot-1",
@@ -771,6 +775,83 @@ test("Settlement read model keeps terminal entitlement separate from execution l
   assert.equal(detail.settlement.residualSettlementPending, true);
   assert.equal(detail.lifecycle.state, CollaborationLifecycle.TERMINATED);
   assert.equal(detail.workflow.actionRequiredBy, "SYSTEM");
+});
+
+test("Feedback read model is double-blind until reveal and keeps Completion ownerless", () => {
+  const openedAt = new Date("2026-08-15T09:00:00.000Z");
+  const closesAt = new Date("2099-08-17T09:00:00.000Z");
+  const brandFeedback = {
+    id: "feedback-brand",
+    collaborationId: "collaboration-1",
+    authorRole: CollaborationFeedbackAuthorRole.BRAND,
+    authorUserId: "brand-user",
+    rating: 5,
+    reviewText: "Excellent work",
+    submittedAt: new Date("2026-08-15T10:00:00.000Z"),
+    createdAt: new Date("2026-08-15T10:00:00.000Z"),
+    updatedAt: new Date("2026-08-15T10:00:00.000Z"),
+  };
+  const row = canonicalRow({
+    lifecycle: CollaborationLifecycle.COMPLETED,
+    completedAt: openedAt,
+    currentStageStatus: CollaborationStageStatus.COMPLETED,
+    feedbackWindow: {
+      id: "window-1",
+      collaborationId: "collaboration-1",
+      openedAt,
+      closesAt,
+      visibility: CollaborationFeedbackVisibility.HIDDEN,
+      revealedAt: null,
+      createdAt: openedAt,
+      updatedAt: openedAt,
+    },
+    feedback: [brandFeedback],
+  });
+  const brandView = projectCanonicalCollaborationDetail(row, "BRAND");
+  const creatorView = projectCanonicalCollaborationDetail(row, "CREATOR");
+  assert.equal(brandView.feedback!.viewerSubmission!.rating, 5);
+  assert.equal(creatorView.feedback!.viewerSubmission, null);
+  assert.equal(creatorView.feedback!.counterpartSubmitted, true);
+  assert.equal(creatorView.feedback!.counterpartSubmission, null);
+  assert.ok(
+    creatorView.workflow.availableActions.includes(
+      "SubmitCollaborationFeedback",
+    ),
+  );
+  assert.ok(
+    !brandView.workflow.availableActions.includes(
+      "SubmitCollaborationFeedback",
+    ),
+  );
+  assert.equal(creatorView.workflow.actionRequiredBy, "NONE");
+
+  const revealed = canonicalRow({
+    ...row,
+    feedbackWindow: {
+      ...row.feedbackWindow,
+      visibility: CollaborationFeedbackVisibility.REVEALED,
+      revealedAt: new Date("2026-08-15T11:00:00.000Z"),
+    },
+    feedback: [
+      brandFeedback,
+      {
+        ...brandFeedback,
+        id: "feedback-creator",
+        authorRole: CollaborationFeedbackAuthorRole.CREATOR,
+        authorUserId: "creator-1",
+        rating: 4,
+        reviewText: "Clear brief",
+      },
+    ],
+  });
+  const revealedView = projectCanonicalCollaborationDetail(revealed, "BRAND");
+  assert.equal(revealedView.feedback!.revealedSubmissions!.brand!.rating, 5);
+  assert.equal(revealedView.feedback!.revealedSubmissions!.creator!.rating, 4);
+  assert.ok(
+    !revealedView.workflow.availableActions.includes(
+      "SubmitCollaborationFeedback",
+    ),
+  );
 });
 
 function matchesPrismaFilter(

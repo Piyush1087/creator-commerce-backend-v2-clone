@@ -38,7 +38,8 @@ export type CollaborationAvailableAction =
   | "RequestPublishingCorrection"
   | "SubmitCorrectedPublishingEvidence"
   | "EndCollaborationByBrand"
-  | "CancelCollaborationByCreator";
+  | "CancelCollaborationByCreator"
+  | "SubmitCollaborationFeedback";
 
 export type CollaborationWorkflowProjection = {
   stage: CollaborationStage;

@@ -226,6 +226,8 @@ function harness(
         }
       : null,
     settlement: null,
+    feedbackWindow: null,
+    feedback: [],
   };
   const tx: any = {
     collaboration: {
@@ -263,6 +265,12 @@ function harness(
         return row.settlement;
       },
       update: async ({ data }: any) => Object.assign(row.settlement, data),
+    },
+    collaborationFeedbackWindow: {
+      upsert: async ({ create }: any) => {
+        row.feedbackWindow ??= { id: "feedback-window-1", ...create };
+        return row.feedbackWindow;
+      },
     },
   };
   const prisma: any = {
@@ -334,6 +342,14 @@ test("normal eligibility, request acceptance and confirmation remain distinct", 
   assert.equal(h.row.settlement.state, CollaborationSettlementState.SETTLED);
   assert.equal(h.row.lifecycle, CollaborationLifecycle.COMPLETED);
   assert.ok(h.row.completedAt instanceof Date);
+  assert.equal(
+    h.row.feedbackWindow.openedAt.toISOString(),
+    h.row.completedAt.toISOString(),
+  );
+  assert.equal(
+    h.row.feedbackWindow.closesAt.getTime() - h.row.completedAt.getTime(),
+    48 * 60 * 60 * 1000,
+  );
 });
 
 test("terminal entitlement is reused and partial confirmation cannot complete", async () => {
@@ -353,6 +369,7 @@ test("terminal entitlement is reused and partial confirmation cannot complete", 
   });
   assert.equal(h.row.settlement.state, CollaborationSettlementState.PROCESSING);
   assert.equal(h.row.lifecycle, CollaborationLifecycle.TERMINATED);
+  assert.equal(h.row.feedbackWindow, null);
   await assert.rejects(() =>
     h.service.confirmBrandRefund({
       ...command,
@@ -381,6 +398,7 @@ test("terminal entitlement is reused and partial confirmation cannot complete", 
   });
   assert.equal(h.row.settlement.state, CollaborationSettlementState.SETTLED);
   assert.equal(h.row.lifecycle, CollaborationLifecycle.TERMINATED);
+  assert.equal(h.row.feedbackWindow, null);
 });
 
 test("retryable request failure changes neither entitlement nor lifecycle", async () => {
@@ -465,4 +483,27 @@ test("zero-cash Settlement completes without external dispatch", async () => {
     CollaborationSettlementLegState.NOT_REQUIRED,
   );
   assert.equal(h.row.lifecycle, CollaborationLifecycle.TERMINATED);
+  assert.equal(h.row.feedbackWindow, null);
+});
+
+test("normal zero-cash completion initializes the exact 48-hour Feedback window", async () => {
+  const h = harness();
+  await h.service.establishNormalEligibility(command);
+  h.row.settlement.creatorSettlementAmount = d(0);
+  h.row.settlement.brandRefundAmount = d(0);
+  await h.service.requestExecution({
+    ...command,
+    commandId: "zero-cash-normal",
+    expectedAggregateVersion: 9,
+  });
+  assert.equal(h.row.lifecycle, CollaborationLifecycle.COMPLETED);
+  assert.equal(h.requests.length, 0);
+  assert.equal(
+    h.row.feedbackWindow.openedAt.toISOString(),
+    h.row.completedAt.toISOString(),
+  );
+  assert.equal(
+    h.row.feedbackWindow.closesAt.getTime() - h.row.completedAt.getTime(),
+    48 * 60 * 60 * 1000,
+  );
 });

@@ -19,7 +19,6 @@ import {
   ReportFulfillmentIssueDto,
   ReviewCollaborationMediaDto,
   SubmitCollaborationMediaDto,
-  SubmitCollaborationReviewDto,
   SubmitLivePostDto,
   UpsertCreatorBankDetailsDto,
   UpsertCreatorShippingAddressDto,
@@ -28,6 +27,7 @@ import { ListCollaborationThreadsQueryDto } from "./dto/collaboration-query.dto"
 import { CollaborationCreatorProfileService } from "./services/collaboration-creator-profile.service";
 import { CollaborationExceptionService } from "./services/collaboration-exception.service";
 import { CollaborationFulfillmentService } from "./services/collaboration-fulfillment.service";
+import { CollaborationFeedbackService } from "./services/collaboration-feedback.service";
 import { CollaborationNegotiationService } from "./services/collaboration-negotiation.service";
 import { CollaborationProductionService } from "./services/collaboration-production.service";
 import { CollaborationPublishingService } from "./services/collaboration-publishing.service";
@@ -45,6 +45,7 @@ export class CollaborationController {
     private readonly negotiation: CollaborationNegotiationService,
     private readonly securement: CollaborationSecurementService,
     private readonly fulfillment: CollaborationFulfillmentService,
+    private readonly feedback: CollaborationFeedbackService,
     private readonly production: CollaborationProductionService,
     private readonly publishing: CollaborationPublishingService,
     private readonly creatorProfile: CollaborationCreatorProfileService,
@@ -353,9 +354,9 @@ export class CollaborationController {
   submitReview(
     @Req() req: RequestWithAuthUser,
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
-    @Body() body: SubmitCollaborationReviewDto,
+    @Body() body: unknown,
   ) {
-    return this.collaboration.submitReview(req.user, collaborationId, body);
+    return this.feedback.submit(req.user, collaborationId, body);
   }
 
   @Get("creator/profile")

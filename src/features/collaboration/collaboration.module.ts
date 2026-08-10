@@ -9,6 +9,7 @@ import { CollaborationAccessService } from "./services/collaboration-access.serv
 import { CollaborationCreatorProfileService } from "./services/collaboration-creator-profile.service";
 import { CollaborationExceptionService } from "./services/collaboration-exception.service";
 import { CollaborationFulfillmentService } from "./services/collaboration-fulfillment.service";
+import { CollaborationFeedbackService } from "./services/collaboration-feedback.service";
 import { CollaborationProvisionService } from "./services/collaboration-provision.service";
 import { CollaborationProductionService } from "./services/collaboration-production.service";
 import { CollaborationPublishingService } from "./services/collaboration-publishing.service";
@@ -51,6 +52,7 @@ import { PricingModule } from "../pricing/pricing.module";
     CollaborationPaymentCapabilityService,
     CollaborationSecurementService,
     CollaborationFulfillmentService,
+    CollaborationFeedbackService,
     CollaborationProductionService,
     CollaborationPublishingService,
     CollaborationSettlementService,
@@ -73,6 +75,7 @@ import { PricingModule } from "../pricing/pricing.module";
     CollaborationProductionService,
     CollaborationPublishingService,
     CollaborationSettlementService,
+    CollaborationFeedbackService,
     CollaborationService,
   ],
 })

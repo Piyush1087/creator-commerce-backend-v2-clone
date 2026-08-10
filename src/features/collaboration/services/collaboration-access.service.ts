@@ -42,6 +42,8 @@ export const COLLABORATION_THREAD_INCLUDE = {
   },
   financialResolution: true,
   settlement: true,
+  feedbackWindow: true,
+  feedback: { orderBy: { submittedAt: "asc" as const } },
   deliverables: {
     orderBy: { displayOrder: "asc" as const },
     include: {
