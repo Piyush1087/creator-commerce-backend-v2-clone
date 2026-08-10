@@ -21,6 +21,10 @@ import {
 } from "../schemas/collaboration-settlement-command.schema";
 import { resolveFinancialOutcome } from "../utils/collaboration-financial-resolution.policy";
 import {
+  CollaborationSettlementGateway,
+  DeferredCollaborationSettlementGateway,
+} from "./collaboration-settlement.gateway";
+import {
   deriveActionRequiredBy,
   projectCanonicalCollaborationDetail,
 } from "../utils/collaboration-thread.mapper";
@@ -165,6 +169,7 @@ function harness(
   options: {
     terminal?: boolean;
     gatewayStatus?: "ACCEPTED" | "RETRYABLE_FAILURE";
+    gateway?: CollaborationSettlementGateway;
   } = {},
 ) {
   const events: any[] = [];
@@ -274,15 +279,19 @@ function harness(
       }
     },
   };
-  const gateway: any = {
+  const recordingGateway: any = {
     requestExecution: async (instruction: any) => {
       requests.push(instruction);
       return { status: options.gatewayStatus ?? "ACCEPTED" };
     },
   };
-  const service = new CollaborationSettlementService(prisma, gateway, {
-    broadcast: async () => undefined,
-  } as any);
+  const service = new CollaborationSettlementService(
+    prisma,
+    options.gateway ?? recordingGateway,
+    {
+      broadcast: async () => undefined,
+    } as any,
+  );
   return { service, row, events, requests };
 }
 
@@ -384,5 +393,76 @@ test("retryable request failure changes neither entitlement nor lifecycle", asyn
     "40000",
   );
   assert.equal(h.row.lifecycle, CollaborationLifecycle.TERMINATED);
+  assert.equal(h.row.settlement.processingAt ?? null, null);
+  assert.equal(
+    h.row.settlement.creatorPayoutState,
+    CollaborationSettlementLegState.PENDING,
+  );
+  assert.equal(
+    h.row.settlement.brandRefundState,
+    CollaborationSettlementLegState.PENDING,
+  );
   assert.equal(h.events.length, 0);
+
+  const refs = {
+    payout: h.row.settlement.payoutInstructionRef,
+    refund: h.row.settlement.refundInstructionRef,
+  };
+  await h.service.requestExecution({
+    ...command,
+    commandId: "retry-request",
+  });
+  assert.equal(h.requests.length, 2);
+  assert.equal(
+    h.requests[0].idempotencyKey,
+    "collaboration-settlement:settlement-1",
+  );
+  assert.equal(h.requests[1].idempotencyKey, h.requests[0].idempotencyKey);
+  assert.equal(h.requests[1].payoutInstructionRef, refs.payout);
+  assert.equal(h.requests[1].refundInstructionRef, refs.refund);
+});
+
+test("deferred gateway truthfully leaves non-zero Settlement eligible and pending", async () => {
+  const h = harness({
+    terminal: true,
+    gateway: new DeferredCollaborationSettlementGateway(),
+  });
+  const result = await h.service.requestExecution(command);
+  assert.deepEqual(result, {
+    replayed: false,
+    accepted: false,
+    retryable: true,
+  });
+  assert.equal(h.row.settlement.state, CollaborationSettlementState.ELIGIBLE);
+  assert.equal(h.row.settlement.processingAt ?? null, null);
+  assert.equal(
+    h.row.settlement.creatorPayoutState,
+    CollaborationSettlementLegState.PENDING,
+  );
+  assert.equal(
+    h.row.settlement.brandRefundState,
+    CollaborationSettlementLegState.PENDING,
+  );
+  assert.ok(h.row.settlement.payoutInstructionRef);
+  assert.ok(h.row.settlement.refundInstructionRef);
+  assert.equal(h.events.length, 0);
+});
+
+test("zero-cash Settlement completes without external dispatch", async () => {
+  const h = harness({ terminal: true });
+  h.row.financialResolution.creatorGrossEntitlementAmount = d(0);
+  h.row.financialResolution.brandCommercialRefundEntitlementAmount = d(0);
+  const result = await h.service.requestExecution(command);
+  assert.equal(result.accepted, true);
+  assert.equal(h.requests.length, 0);
+  assert.equal(h.row.settlement.state, CollaborationSettlementState.SETTLED);
+  assert.equal(
+    h.row.settlement.creatorPayoutState,
+    CollaborationSettlementLegState.NOT_REQUIRED,
+  );
+  assert.equal(
+    h.row.settlement.brandRefundState,
+    CollaborationSettlementLegState.NOT_REQUIRED,
+  );
+  assert.equal(h.row.lifecycle, CollaborationLifecycle.TERMINATED);
 });

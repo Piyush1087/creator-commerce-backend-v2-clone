@@ -17,6 +17,7 @@ export type CollaborationSettlementInstruction = {
 
 export type SettlementRequestAcceptance = {
   status: "ACCEPTED" | "ALREADY_ACCEPTED" | "REJECTED" | "RETRYABLE_FAILURE";
+  reason?: string;
 };
 
 export abstract class CollaborationSettlementGateway {
@@ -29,6 +30,9 @@ export abstract class CollaborationSettlementGateway {
 @Injectable()
 export class DeferredCollaborationSettlementGateway extends CollaborationSettlementGateway {
   async requestExecution(): Promise<SettlementRequestAcceptance> {
-    return { status: "ACCEPTED" };
+    return {
+      status: "RETRYABLE_FAILURE",
+      reason: "SETTLEMENT_EXECUTION_OWNER_UNAVAILABLE",
+    };
   }
 }
