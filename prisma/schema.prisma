@@ -2347,7 +2347,11 @@ model CollaborationDeliverableExecution {
   state CollaborationDeliverableState @default(AWAITING_SUBMISSION)
   revisionRequestCount Int @default(0) @map("revision_request_count")
   publishingRequired Boolean @map("publishing_required")
+  submissions CollaborationSubmissionVersion[]
   publishing CollaborationPublishingExecution?
+  approvedAt DateTime? @map("approved_at")
+  autoApprovedAt DateTime? @map("auto_approved_at")
+  hardStoppedAt DateTime? @map("hard_stopped_at")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -2357,12 +2361,40 @@ model CollaborationDeliverableExecution {
   @@map("collaboration_deliverable_executions")
 }
 
+model CollaborationSubmissionVersion {
+  id String @id @default(uuid())
+  deliverableExecutionId String @map("deliverable_execution_id")
+  deliverableExecution CollaborationDeliverableExecution @relation(fields: [deliverableExecutionId], references: [id], onDelete: Cascade)
+  versionNumber Int @map("version_number")
+  assetRef String @map("asset_ref")
+  creatorNote String? @map("creator_note")
+  submissionMetadata Json? @map("submission_metadata")
+  submittedByUserId String @map("submitted_by_user_id")
+  submittedAt DateTime @default(now()) @map("submitted_at")
+  reviewDeadlineAt DateTime @map("review_deadline_at")
+  reviewState CollaborationSubmissionReviewState @default(UNDER_REVIEW) @map("review_state")
+  brandFeedback String? @map("brand_feedback")
+  reviewedByUserId String? @map("reviewed_by_user_id")
+  reviewedAt DateTime? @map("reviewed_at")
+  supersededAt DateTime? @map("superseded_at")
+  autoApprovedAt DateTime? @map("auto_approved_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([deliverableExecutionId, versionNumber])
+  @@index([reviewState, reviewDeadlineAt])
+  @@index([deliverableExecutionId, submittedAt])
+  @@map("collaboration_submission_versions")
+}
+
 model CollaborationPublishingExecution {
   id String @id @default(uuid())
   deliverableExecutionId String @unique @map("deliverable_execution_id")
   deliverableExecution CollaborationDeliverableExecution @relation(fields: [deliverableExecutionId], references: [id], onDelete: Cascade)
   state CollaborationPublishingState
   authorizationState CollaborationPublicationAuthorizationState @map("authorization_state")
+  authorizedAt DateTime? @map("authorized_at")
+  authorizedByUserId String? @map("authorized_by_user_id")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

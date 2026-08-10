@@ -138,6 +138,10 @@ function canonicalRow(
         state: CollaborationDeliverableState.AWAITING_SUBMISSION,
         revisionRequestCount: 0,
         publishingRequired: true,
+        approvedAt: null,
+        autoApprovedAt: null,
+        hardStoppedAt: null,
+        submissions: [],
         createdAt: new Date("2026-08-10T08:00:00.000Z"),
         updatedAt: new Date("2026-08-10T08:00:00.000Z"),
         publishing: {
@@ -146,6 +150,8 @@ function canonicalRow(
           state: CollaborationPublishingState.AWAITING_PUBLISHING,
           authorizationState:
             CollaborationPublicationAuthorizationState.NOT_AUTHORIZED,
+          authorizedAt: null,
+          authorizedByUserId: null,
           createdAt: new Date("2026-08-10T08:00:00.000Z"),
           updatedAt: new Date("2026-08-10T08:00:00.000Z"),
         },
@@ -236,6 +242,86 @@ test("detail reconstructs Application identity, locked context, commercials, Del
   assert.equal(detail.publishing[0].state, "AWAITING_PUBLISHING");
   assert.equal(detail.settlement, null);
   assert.equal(detail.resolution, null);
+});
+
+test("detail projects ordered per-Deliverable submission history without legacy media authority", () => {
+  const base = canonicalRow();
+  const item = base.deliverables[0];
+  const row = canonicalRow({
+    canonicalStage: CollaborationStage.PRODUCTION,
+    media: [
+      {
+        id: "legacy-media",
+        status: "APPROVED",
+        versionNumber: 99,
+      },
+    ],
+    deliverables: [
+      {
+        ...item,
+        state: CollaborationDeliverableState.UNDER_REVIEW,
+        revisionRequestCount: 1,
+        submissions: [
+          {
+            id: "submission-v1",
+            deliverableExecutionId: item.id,
+            versionNumber: 1,
+            assetRef: "asset:v1",
+            creatorNote: "Initial",
+            submissionMetadata: null,
+            submittedByUserId: "creator-1",
+            submittedAt: new Date("2026-08-10T09:00:00.000Z"),
+            reviewDeadlineAt: new Date("2026-08-13T09:00:00.000Z"),
+            reviewState: "REVISION_REQUESTED",
+            brandFeedback: "Please revise",
+            reviewedByUserId: "brand-user-1",
+            reviewedAt: new Date("2026-08-10T10:00:00.000Z"),
+            supersededAt: new Date("2026-08-10T11:00:00.000Z"),
+            autoApprovedAt: null,
+            createdAt: new Date("2026-08-10T09:00:00.000Z"),
+            updatedAt: new Date("2026-08-10T11:00:00.000Z"),
+          },
+          {
+            id: "submission-v2",
+            deliverableExecutionId: item.id,
+            versionNumber: 2,
+            assetRef: "asset:v2",
+            creatorNote: "Revision",
+            submissionMetadata: null,
+            submittedByUserId: "creator-1",
+            submittedAt: new Date("2026-08-10T11:00:00.000Z"),
+            reviewDeadlineAt: new Date("2026-08-13T11:00:00.000Z"),
+            reviewState: "UNDER_REVIEW",
+            brandFeedback: null,
+            reviewedByUserId: null,
+            reviewedAt: null,
+            supersededAt: null,
+            autoApprovedAt: null,
+            createdAt: new Date("2026-08-10T11:00:00.000Z"),
+            updatedAt: new Date("2026-08-10T11:00:00.000Z"),
+          },
+        ],
+      },
+    ],
+  });
+  const detail = projectCanonicalCollaborationDetail(row, "BRAND");
+  const projected = detail.deliverables[0];
+  assert.deepEqual(
+    projected.submissionVersions.map((submission) => submission.versionNumber),
+    [1, 2],
+  );
+  assert.equal(projected.activeSubmissionVersionId, "submission-v2");
+  assert.equal(projected.revisionsRemaining, 1);
+  assert.deepEqual(projected.availableActions, [
+    "ApproveDeliverable",
+    "RequestDeliverableRevision",
+  ]);
+  assert.equal(projected.latestSubmissionVersion?.assetRef, "asset:v2");
+  assert.ok(
+    projected.submissionVersions.every(
+      (submission) => submission.versionNumber !== 99,
+    ),
+  );
 });
 
 test("fixed commercial terms project locked amounts and securement without fixed 30/70 semantics", () => {

@@ -43,7 +43,10 @@ export const COLLABORATION_THREAD_INCLUDE = {
   financialResolution: true,
   deliverables: {
     orderBy: { displayOrder: "asc" as const },
-    include: { publishing: true },
+    include: {
+      publishing: true,
+      submissions: { orderBy: { versionNumber: "asc" as const } },
+    },
   },
 } as const;
 

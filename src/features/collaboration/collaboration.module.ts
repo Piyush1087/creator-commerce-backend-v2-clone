@@ -9,6 +9,7 @@ import { CollaborationAccessService } from "./services/collaboration-access.serv
 import { CollaborationCreatorProfileService } from "./services/collaboration-creator-profile.service";
 import { CollaborationFulfillmentService } from "./services/collaboration-fulfillment.service";
 import { CollaborationProvisionService } from "./services/collaboration-provision.service";
+import { CollaborationProductionService } from "./services/collaboration-production.service";
 import {
   CollaborationFundingGateway,
   DeferredCollaborationFundingGateway,
@@ -42,6 +43,7 @@ import { PricingModule } from "../pricing/pricing.module";
     CollaborationPaymentCapabilityService,
     CollaborationSecurementService,
     CollaborationFulfillmentService,
+    CollaborationProductionService,
     {
       provide: CollaborationFundingGateway,
       useClass: DeferredCollaborationFundingGateway,

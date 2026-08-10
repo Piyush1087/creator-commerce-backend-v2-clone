@@ -26,7 +26,11 @@ export type CollaborationAvailableAction =
   | "ProvideFulfillment"
   | "ConfirmFulfillment"
   | "ReportFulfillmentIssue"
-  | "ProvideFulfillmentRemediation";
+  | "ProvideFulfillmentRemediation"
+  | "SubmitDeliverable"
+  | "ApproveDeliverable"
+  | "RequestDeliverableRevision"
+  | "RejectFinalDeliverable";
 
 export type CollaborationWorkflowProjection = {
   stage: CollaborationStage;

@@ -83,23 +83,52 @@ function effectiveStage(row: CollaborationReadSource): CollaborationStage {
 function deriveProductionActor(
   deliverables: CollaborationReadSource["deliverables"],
 ): CollaborationActorClass | "NONE" {
-  if (
-    deliverables.some(
-      (item) =>
-        item.state === CollaborationDeliverableState.AWAITING_SUBMISSION ||
-        item.state === CollaborationDeliverableState.REVISION_REQUESTED,
-    )
-  ) {
-    return CollaborationActorClass.CREATOR;
-  }
-  if (
-    deliverables.some(
-      (item) => item.state === CollaborationDeliverableState.UNDER_REVIEW,
-    )
-  ) {
-    return CollaborationActorClass.BRAND;
-  }
+  const creatorRequired = deliverables.some(
+    (item) =>
+      item.state === CollaborationDeliverableState.AWAITING_SUBMISSION ||
+      item.state === CollaborationDeliverableState.REVISION_REQUESTED,
+  );
+  const brandRequired = deliverables.some(
+    (item) => item.state === CollaborationDeliverableState.UNDER_REVIEW,
+  );
+  if (creatorRequired && brandRequired) return "NONE";
+  if (creatorRequired) return CollaborationActorClass.CREATOR;
+  if (brandRequired) return CollaborationActorClass.BRAND;
   return "NONE";
+}
+
+function deliverableActions(
+  state: CollaborationDeliverableState,
+  revisionRequestCount: number,
+  viewerRole: CollaborationViewerRole,
+): CollaborationAvailableAction[] {
+  if (
+    viewerRole === "CREATOR" &&
+    (state === CollaborationDeliverableState.AWAITING_SUBMISSION ||
+      state === CollaborationDeliverableState.REVISION_REQUESTED)
+  ) {
+    return ["SubmitDeliverable"];
+  }
+  if (
+    viewerRole === "BRAND" &&
+    state === CollaborationDeliverableState.UNDER_REVIEW
+  ) {
+    return revisionRequestCount < 2
+      ? ["ApproveDeliverable", "RequestDeliverableRevision"]
+      : ["ApproveDeliverable", "RejectFinalDeliverable"];
+  }
+  return [];
+}
+
+function deliverableActionRequiredBy(state: CollaborationDeliverableState) {
+  if (
+    state === CollaborationDeliverableState.AWAITING_SUBMISSION ||
+    state === CollaborationDeliverableState.REVISION_REQUESTED
+  )
+    return CollaborationActorClass.CREATOR;
+  if (state === CollaborationDeliverableState.UNDER_REVIEW)
+    return CollaborationActorClass.BRAND;
+  return "NONE" as const;
 }
 
 function derivePublishingActor(
@@ -259,6 +288,16 @@ export function deriveAvailableActions(
     ) {
       actions.push("ProvideFulfillmentRemediation");
     }
+  } else if (row.canonicalStage === CollaborationStage.PRODUCTION) {
+    for (const deliverable of row.deliverables) {
+      for (const action of deliverableActions(
+        deliverable.state,
+        deliverable.revisionRequestCount,
+        viewerRole,
+      )) {
+        if (!actions.includes(action)) actions.push(action);
+      }
+    }
   }
   return actions;
 }
@@ -373,29 +412,62 @@ export function projectCanonicalCollaborationDetail(
   const agreement = row.commercialAgreement;
   const snapshot = row.snapshot;
   const workflow = workflowProjection(row, viewerRole);
-  const deliverables = row.deliverables.map((item) => ({
-    deliverableExecutionId: item.id,
-    sourceBriefDeliverableId: item.sourceBriefDeliverableId,
-    definitionSnapshot: item.definitionSnapshot,
-    displayOrder: item.displayOrder,
-    state: item.state,
-    revisionRequestCount: item.revisionRequestCount,
-    publishingRequired: item.publishingRequired,
-    latestSubmission: null,
-    submissionVersions: [],
-    reviewDeadlineAt: null,
-    publishing: item.publishing
-      ? {
-          state: item.publishing.state,
-          authorizationState: item.publishing.authorizationState,
-          publicationEvidence: null,
-          correctionReason: null,
-          complianceVerifiedAt: null,
-          blockedReason: null,
-        }
-      : null,
-    availableActions: [] as string[],
-  }));
+  const deliverables = row.deliverables.map((item) => {
+    const submissions = item.submissions ?? [];
+    const latestSubmission = submissions.at(-1) ?? null;
+    const submissionVersions = submissions.map((submission) => ({
+      submissionVersionId: submission.id,
+      versionNumber: submission.versionNumber,
+      assetRef: submission.assetRef,
+      creatorNote: submission.creatorNote,
+      submissionMetadata: submission.submissionMetadata,
+      submittedAt: submission.submittedAt.toISOString(),
+      reviewDeadlineAt: submission.reviewDeadlineAt.toISOString(),
+      reviewState: submission.reviewState,
+      brandFeedback: submission.brandFeedback,
+      reviewedAt: submission.reviewedAt?.toISOString() ?? null,
+      supersededAt: submission.supersededAt?.toISOString() ?? null,
+    }));
+    return {
+      deliverableExecutionId: item.id,
+      sourceBriefDeliverableId: item.sourceBriefDeliverableId,
+      definitionSnapshot: item.definitionSnapshot,
+      displayOrder: item.displayOrder,
+      state: item.state,
+      revisionRequestCount: item.revisionRequestCount,
+      revisionsRemaining: Math.max(0, 2 - item.revisionRequestCount),
+      publishingRequired: item.publishingRequired,
+      actionRequiredBy: deliverableActionRequiredBy(item.state),
+      activeSubmissionVersionId:
+        item.state === CollaborationDeliverableState.UNDER_REVIEW
+          ? (latestSubmission?.id ?? null)
+          : null,
+      latestSubmissionVersion: latestSubmission
+        ? (submissionVersions.at(-1) ?? null)
+        : null,
+      submissionVersions,
+      productionApprovalState: item.state,
+      approvedAt: item.approvedAt?.toISOString() ?? null,
+      autoApprovedAt: item.autoApprovedAt?.toISOString() ?? null,
+      hardStoppedAt: item.hardStoppedAt?.toISOString() ?? null,
+      publishing: item.publishing
+        ? {
+            state: item.publishing.state,
+            authorizationState: item.publishing.authorizationState,
+            authorizedAt: item.publishing.authorizedAt?.toISOString() ?? null,
+            publicationEvidence: null,
+            correctionReason: null,
+            complianceVerifiedAt: null,
+            blockedReason: null,
+          }
+        : null,
+      availableActions: deliverableActions(
+        item.state,
+        item.revisionRequestCount,
+        viewerRole,
+      ),
+    };
+  });
 
   return {
     projectionSource: projectionSource(row),

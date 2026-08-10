@@ -13,10 +13,14 @@ type LockedCommercialTerms = {
   platformCommissionAmount: Prisma.Decimal | null;
   platformCommissionGstRateSnapshot: Prisma.Decimal | null;
   platformCommissionGstAmount: Prisma.Decimal | null;
+  advanceAmount?: Prisma.Decimal | null;
 };
 
-export function resolveFulfillmentHardStopFinancialOutcome(
+function resolveFinancialOutcome(
   terms: LockedCommercialTerms,
+  creatorGrossEntitlementAmount: Prisma.Decimal,
+  outcome: CollaborationFinancialOutcome,
+  reasonCode: string,
 ) {
   if (
     terms.agreedCreatorFee === null ||
@@ -26,29 +30,53 @@ export function resolveFulfillmentHardStopFinancialOutcome(
     terms.platformCommissionGstAmount === null
   ) {
     throw new Error(
-      "Locked commercial terms are incomplete for Fulfillment hard-stop resolution",
+      "Locked commercial terms are incomplete for terminal financial resolution",
     );
   }
-
-  const zero = new Prisma.Decimal(0);
   const decomposition = calculateFinancialResolution(
     terms.agreedCreatorFee,
-    zero,
+    creatorGrossEntitlementAmount,
     terms.platformCommissionRateSnapshot,
     terms.platformCommissionAmount,
     terms.platformCommissionGstRateSnapshot,
     terms.platformCommissionGstAmount,
   );
-
   return {
     status: CollaborationResolutionStatus.RESOLVED,
-    outcome: CollaborationFinancialOutcome.FULFILLMENT_HARD_STOP,
+    outcome,
     creatorEntitlementAmount: decomposition.creatorGrossEntitlementAmount,
     brandRefundEntitlementAmount:
       decomposition.brandCommercialRefundEntitlementAmount,
     ...decomposition,
     currency: terms.currency,
-    reasonCode: "FULFILLMENT_HARD_STOP",
+    reasonCode,
     decidedByActorClass: "SYSTEM" as const,
   };
+}
+
+export function resolveFulfillmentHardStopFinancialOutcome(
+  terms: LockedCommercialTerms,
+) {
+  return resolveFinancialOutcome(
+    terms,
+    new Prisma.Decimal(0),
+    CollaborationFinancialOutcome.FULFILLMENT_HARD_STOP,
+    "FULFILLMENT_HARD_STOP",
+  );
+}
+
+export function resolveProductionHardStopFinancialOutcome(
+  terms: LockedCommercialTerms,
+) {
+  if (terms.advanceAmount === null || terms.advanceAmount === undefined) {
+    throw new Error(
+      "Locked Advance amount is missing for Production hard-stop resolution",
+    );
+  }
+  return resolveFinancialOutcome(
+    terms,
+    terms.advanceAmount,
+    CollaborationFinancialOutcome.PRODUCTION_HARD_STOP,
+    "PRODUCTION_HARD_STOP",
+  );
 }

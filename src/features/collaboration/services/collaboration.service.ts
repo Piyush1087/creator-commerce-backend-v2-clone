@@ -578,6 +578,7 @@ export class CollaborationService {
       throw new ForbiddenException("Creator access required");
     }
     const thread = await this.access.assertThreadForUser(user, collaborationId);
+    this.assertLegacyProductionCompatibility(thread);
     this.assertStage(thread, UceMilestoneStage.STAGE_4_CONTENT_REVIEW);
     if (!thread.logistics?.isReceivedConfirmed) {
       throw new BadRequestException(
@@ -629,6 +630,7 @@ export class CollaborationService {
       throw new ForbiddenException("Brand access required");
     }
     const thread = await this.access.assertThreadForUser(user, collaborationId);
+    this.assertLegacyProductionCompatibility(thread);
     this.assertStage(thread, UceMilestoneStage.STAGE_4_CONTENT_REVIEW);
 
     const pending = await this.prisma.collaborationMedia.findFirst({
@@ -848,6 +850,16 @@ export class CollaborationService {
     if (thread.sourceApplicationId) {
       throw new BadRequestException(
         "Canonical Collaborations require the Fulfillment command API",
+      );
+    }
+  }
+
+  private assertLegacyProductionCompatibility(thread: {
+    sourceApplicationId: string | null;
+  }) {
+    if (thread.sourceApplicationId) {
+      throw new BadRequestException(
+        "Canonical Collaborations require the Deliverable Production command API",
       );
     }
   }

@@ -28,6 +28,7 @@ import { ListCollaborationThreadsQueryDto } from "./dto/collaboration-query.dto"
 import { CollaborationCreatorProfileService } from "./services/collaboration-creator-profile.service";
 import { CollaborationFulfillmentService } from "./services/collaboration-fulfillment.service";
 import { CollaborationNegotiationService } from "./services/collaboration-negotiation.service";
+import { CollaborationProductionService } from "./services/collaboration-production.service";
 import { CollaborationQueryService } from "./services/collaboration-query.service";
 import { CollaborationSecurementService } from "./services/collaboration-securement.service";
 import { CollaborationService } from "./services/collaboration.service";
@@ -41,6 +42,7 @@ export class CollaborationController {
     private readonly negotiation: CollaborationNegotiationService,
     private readonly securement: CollaborationSecurementService,
     private readonly fulfillment: CollaborationFulfillmentService,
+    private readonly production: CollaborationProductionService,
     private readonly creatorProfile: CollaborationCreatorProfileService,
   ) {}
 
@@ -203,6 +205,42 @@ export class CollaborationController {
     @Body() body: SubmitCollaborationMediaDto,
   ) {
     return this.collaboration.submitMedia(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/production/submit-deliverable")
+  submitDeliverable(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.production.submit(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/production/approve-deliverable")
+  approveDeliverable(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.production.approve(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/production/request-revision")
+  requestDeliverableRevision(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.production.requestRevision(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/production/reject-final")
+  rejectFinalDeliverable(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.production.rejectFinal(req.user, collaborationId, body);
   }
 
   @Post("threads/:collaborationId/production/review")
