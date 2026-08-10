@@ -121,19 +121,20 @@ export function validateAdminEconomicAllocation(input: {
   agreedCreatorFee: Prisma.Decimal;
   creatorEntitlementAmount: Prisma.Decimal;
   brandRefundEntitlementAmount: Prisma.Decimal;
+  derivedBrandCommercialRefundEntitlementAmount: Prisma.Decimal;
   aggregateVersion: number;
 }) {
   if (
     input.creatorEntitlementAmount.isNegative() ||
     input.creatorEntitlementAmount.greaterThan(input.agreedCreatorFee) ||
     input.brandRefundEntitlementAmount.isNegative() ||
-    !input.creatorEntitlementAmount
-      .add(input.brandRefundEntitlementAmount)
-      .equals(input.agreedCreatorFee)
+    !input.brandRefundEntitlementAmount.equals(
+      input.derivedBrandCommercialRefundEntitlementAmount.toDecimalPlaces(2),
+    )
   ) {
     commandConflict(
       "INVALID_STATE",
-      "Admin Creator entitlement plus Creator-fee refund must equal the locked agreed Creator fee",
+      "Admin Brand refund must equal the backend-derived total Brand commercial refund entitlement",
       input.aggregateVersion,
     );
   }
