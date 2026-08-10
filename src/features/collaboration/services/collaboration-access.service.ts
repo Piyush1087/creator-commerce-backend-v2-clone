@@ -11,6 +11,15 @@ import type { AuthUser } from "../../auth/types/auth-user";
 export const COLLABORATION_THREAD_INCLUDE = {
   campaign: { select: { name: true, brandProfileId: true } },
   brief: { select: { internalTitle: true, creativeGuidelines: true } },
+  product: {
+    select: {
+      id: true,
+      productName: true,
+      assetType: true,
+      skuCode: true,
+      imageUrl: true,
+    },
+  },
   brandProfile: { select: { name: true, id: true } },
   creatorUser: {
     select: {
@@ -26,6 +35,13 @@ export const COLLABORATION_THREAD_INCLUDE = {
   logistics: true,
   finalization: true,
   media: { orderBy: { createdAt: "desc" as const }, take: 5 },
+  snapshot: true,
+  commercialAgreement: true,
+  fulfillment: true,
+  deliverables: {
+    orderBy: { displayOrder: "asc" as const },
+    include: { publishing: true },
+  },
 } as const;
 
 @Injectable()

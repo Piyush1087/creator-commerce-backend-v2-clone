@@ -9,6 +9,7 @@ import {
   CollaborationMediaReviewStatus,
   CollaborationMessageKind,
   CollaborationPayoutMode,
+  CollaborationStage,
   Prisma,
   UceMilestoneStage,
   UserRole,
@@ -66,9 +67,13 @@ export class CollaborationService {
     private readonly realtime: CollaborationRealtimeService,
   ) {}
 
-  async listThreads(user: AuthUser, query: ListCollaborationThreadsQueryDto) {
+  async listThreads(
+    user: AuthUser,
+    query: Omit<ListCollaborationThreadsQueryDto, "stage"> & {
+      stage?: CollaborationStage | UceMilestoneStage;
+    },
+  ) {
     const where: Prisma.CollaborationWhereInput = {};
-
     if (user.role === UserRole.BRAND) {
       where.brandProfileId = await this.access.resolveBrandProfileId(user);
     } else if (user.role === UserRole.CREATOR) {
@@ -76,15 +81,13 @@ export class CollaborationService {
     } else {
       throw new ForbiddenException("Unsupported role");
     }
-
-    if (query.campaign_id) {
-      where.campaignId = query.campaign_id;
-    }
-    if (query.brief_id) {
-      where.briefId = query.brief_id;
-    }
-    if (query.stage) {
-      where.currentStage = query.stage;
+    if (query.campaign_id) where.campaignId = query.campaign_id;
+    if (query.brief_id) where.briefId = query.brief_id;
+    if (query.lifecycle) where.lifecycle = query.lifecycle;
+    if (query.stage?.startsWith("STAGE_")) {
+      where.currentStage = query.stage as UceMilestoneStage;
+    } else if (query.stage) {
+      where.canonicalStage = query.stage as CollaborationStage;
     }
     if (query.search?.trim()) {
       const term = query.search.trim();
@@ -101,14 +104,12 @@ export class CollaborationService {
         },
       ];
     }
-
     const rows = await this.prisma.collaboration.findMany({
       where,
       include: COLLABORATION_THREAD_INCLUDE,
       orderBy: [{ lastMessageAt: "desc" }, { updatedAt: "desc" }],
-      take: 100,
+      take: query.limit ?? 50,
     });
-
     const viewerRole = user.role === UserRole.BRAND ? "BRAND" : "CREATOR";
     return {
       rows: rows.map((row) => mapCollaborationThreadRow(row, viewerRole)),
@@ -117,10 +118,7 @@ export class CollaborationService {
 
   async getThread(user: AuthUser, collaborationId: string) {
     const thread = await this.access.assertThreadForUser(user, collaborationId);
-    const viewerRole = user.role === UserRole.BRAND ? "BRAND" : "CREATOR";
-
     await this.clearUnread(user, collaborationId);
-
     return mapCollaborationDetail(thread);
   }
 
@@ -139,10 +137,7 @@ export class CollaborationService {
     collaborationId: string,
     dto: PostCollaborationMessageDto,
   ) {
-    const thread = await this.access.assertThreadForUser(user, collaborationId);
-    if (thread.isTerminated) {
-      throw new BadRequestException("Collaboration is terminated");
-    }
+    await this.access.assertThreadForUser(user, collaborationId);
 
     const msg = await this.prisma.$transaction(async (tx) => {
       const created = await tx.collaborationMessage.create({

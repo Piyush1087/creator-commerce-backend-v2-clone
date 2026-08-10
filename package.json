@@ -8,6 +8,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "test:collaboration:phase1": "ts-node src/features/collaboration/schemas/provision-collaboration.schema.test.ts",
+    "test:collaboration:phase2": "ts-node src/features/collaboration/utils/collaboration-read-model.mapper.test.ts",
     "dev": "nest start --watch",
     "start": "nest start",
     "start:dev": "nest start --watch",

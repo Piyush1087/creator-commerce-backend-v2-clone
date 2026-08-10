@@ -9,6 +9,7 @@ import { CollaborationAccessService } from "./services/collaboration-access.serv
 import { CollaborationCreatorProfileService } from "./services/collaboration-creator-profile.service";
 import { CollaborationProvisionService } from "./services/collaboration-provision.service";
 import { CollaborationRealtimeService } from "./services/collaboration-realtime.service";
+import { CollaborationQueryService } from "./services/collaboration-query.service";
 import { CollaborationService } from "./services/collaboration.service";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { NotificationProcessorService } from "../notifications/services/notification-processor.service";
@@ -21,6 +22,7 @@ import { NotificationProcessorService } from "../notifications/services/notifica
     CollaborationAccessService,
     CollaborationProvisionService,
     CollaborationRealtimeService,
+    CollaborationQueryService,
     CollaborationService,
     CollaborationCreatorProfileService,
   ],

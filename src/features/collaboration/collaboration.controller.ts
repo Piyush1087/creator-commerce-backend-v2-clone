@@ -31,6 +31,7 @@ import {
 } from "./dto/collaboration-actions.dto";
 import { ListCollaborationThreadsQueryDto } from "./dto/collaboration-query.dto";
 import { CollaborationCreatorProfileService } from "./services/collaboration-creator-profile.service";
+import { CollaborationQueryService } from "./services/collaboration-query.service";
 import { CollaborationService } from "./services/collaboration.service";
 
 @Controller("api/v1/collaboration")
@@ -38,6 +39,7 @@ import { CollaborationService } from "./services/collaboration.service";
 export class CollaborationController {
   constructor(
     private readonly collaboration: CollaborationService,
+    private readonly collaborationQueries: CollaborationQueryService,
     private readonly creatorProfile: CollaborationCreatorProfileService,
   ) {}
 
@@ -46,7 +48,7 @@ export class CollaborationController {
     @Req() req: RequestWithAuthUser,
     @Query() query: ListCollaborationThreadsQueryDto,
   ) {
-    return this.collaboration.listThreads(req.user, query);
+    return this.collaborationQueries.list(req.user, query);
   }
 
   @Get("threads/:collaborationId")
@@ -54,7 +56,7 @@ export class CollaborationController {
     @Req() req: RequestWithAuthUser,
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
   ) {
-    return this.collaboration.getThread(req.user, collaborationId);
+    return this.collaborationQueries.detail(req.user, collaborationId);
   }
 
   @Get("threads/:collaborationId/messages")
