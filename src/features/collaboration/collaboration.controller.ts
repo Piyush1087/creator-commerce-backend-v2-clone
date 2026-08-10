@@ -26,6 +26,7 @@ import {
 } from "./dto/collaboration-actions.dto";
 import { ListCollaborationThreadsQueryDto } from "./dto/collaboration-query.dto";
 import { CollaborationCreatorProfileService } from "./services/collaboration-creator-profile.service";
+import { CollaborationExceptionService } from "./services/collaboration-exception.service";
 import { CollaborationFulfillmentService } from "./services/collaboration-fulfillment.service";
 import { CollaborationNegotiationService } from "./services/collaboration-negotiation.service";
 import { CollaborationProductionService } from "./services/collaboration-production.service";
@@ -39,6 +40,7 @@ import { CollaborationService } from "./services/collaboration.service";
 export class CollaborationController {
   constructor(
     private readonly collaboration: CollaborationService,
+    private readonly exceptions: CollaborationExceptionService,
     private readonly collaborationQueries: CollaborationQueryService,
     private readonly negotiation: CollaborationNegotiationService,
     private readonly securement: CollaborationSecurementService,
@@ -62,6 +64,24 @@ export class CollaborationController {
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
   ) {
     return this.collaborationQueries.detail(req.user, collaborationId);
+  }
+
+  @Post("threads/:collaborationId/end-by-brand")
+  endCollaborationByBrand(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.exceptions.endByBrand(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/cancel-by-creator")
+  cancelCollaborationByCreator(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.exceptions.cancelByCreator(req.user, collaborationId, body);
   }
 
   @Get("threads/:collaborationId/messages")
