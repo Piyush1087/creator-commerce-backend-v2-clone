@@ -20,6 +20,7 @@ import {
   unauthorizedActor,
 } from "../errors/collaboration-command.error";
 import {
+  autoApproveDeliverableSchema,
   approveDeliverableSchema,
   rejectFinalDeliverableSchema,
   requestDeliverableRevisionSchema,
@@ -157,10 +158,9 @@ export class CollaborationProductionService {
             },
           });
         }
-        const allApproved = row.deliverables.every(
-          (item) =>
-            item.id === deliverable.id ||
-            item.state === CollaborationDeliverableState.APPROVED,
+        const allApproved = this.productionCompleteAfterAcceptance(
+          row,
+          deliverable.id,
         );
         return {
           collaborationData: allApproved
@@ -180,6 +180,114 @@ export class CollaborationProductionService {
         };
       },
     );
+  }
+
+  /** Trusted SYSTEM boundary for a future scheduler/worker adapter. */
+  async autoApprove(collaborationId: string, raw: unknown, now = new Date()) {
+    const input = parseCommand(autoApproveDeliverableSchema, raw);
+    if (input.collaborationId !== collaborationId) {
+      commandConflict(
+        "INVALID_STATE",
+        "Command Collaboration identity does not match the target",
+      );
+    }
+    const fingerprint = requestFingerprint(input);
+    const result = await this.prisma.$transaction(async (tx) => {
+      if (
+        await replayOrThrow(
+          tx,
+          collaborationId,
+          input.commandId,
+          "DELIVERABLE_AUTO_APPROVED",
+          fingerprint,
+        )
+      ) {
+        return { replayed: true };
+      }
+      const row = await this.load(tx, collaborationId);
+      assertExpectedVersion(
+        row.aggregateVersion,
+        input.expectedAggregateVersion,
+      );
+      this.assertProduction(row);
+      const deliverable = this.reviewTarget(
+        row,
+        input.deliverableExecutionId,
+        input.submissionVersionId,
+      );
+      const submission = deliverable.submissions.at(-1)!;
+      if (now.getTime() < submission.reviewDeadlineAt.getTime()) {
+        commandConflict(
+          "REVIEW_DEADLINE_NOT_REACHED",
+          "Submission review deadline has not been reached",
+          row.aggregateVersion,
+        );
+      }
+
+      await tx.collaborationSubmissionVersion.update({
+        where: { id: submission.id },
+        data: {
+          reviewState: CollaborationSubmissionReviewState.AUTO_APPROVED,
+          reviewedByUserId: null,
+          reviewedAt: now,
+          autoApprovedAt: now,
+        },
+      });
+      await tx.collaborationDeliverableExecution.update({
+        where: { id: deliverable.id },
+        data: {
+          state: CollaborationDeliverableState.AUTO_APPROVED,
+          autoApprovedAt: now,
+        },
+      });
+
+      const productionComplete = this.productionCompleteAfterAcceptance(
+        row,
+        deliverable.id,
+      );
+      const updated = await tx.collaboration.updateMany({
+        where: { id: collaborationId, aggregateVersion: row.aggregateVersion },
+        data: {
+          aggregateVersion: { increment: 1 },
+          ...(productionComplete
+            ? {
+                canonicalStage: CollaborationStage.PUBLISHING_SETTLEMENT,
+                currentStageStatus: CollaborationStageStatus.IN_PROGRESS,
+                currentStage: UceMilestoneStage.STAGE_5_PUBLISHING,
+                stageUpdatedAt: now,
+              }
+            : {}),
+        },
+      });
+      if (updated.count !== 1) {
+        commandConflict(
+          "STALE_AGGREGATE_VERSION",
+          "Collaboration changed while the command was executing",
+          row.aggregateVersion,
+        );
+      }
+      await appendCommandEvent(tx, {
+        collaborationId,
+        eventType: "DELIVERABLE_AUTO_APPROVED",
+        actorClass: CollaborationActorClass.SYSTEM,
+        commandId: input.commandId,
+        aggregateVersion: row.aggregateVersion + 1,
+        requestFingerprint: fingerprint,
+        payload: {
+          deliverableExecutionId: deliverable.id,
+          submissionVersionId: submission.id,
+          versionNumber: submission.versionNumber,
+          reviewDeadlineAt: submission.reviewDeadlineAt.toISOString(),
+          autoApprovedAt: now.toISOString(),
+          productionComplete,
+        },
+      });
+      return { replayed: false, productionComplete };
+    });
+    if (!result.replayed) {
+      void this.realtime.broadcast(collaborationId, "thread.updated");
+    }
+    return result;
   }
 
   requestRevision(user: AuthUser, collaborationId: string, raw: unknown) {
@@ -439,6 +547,18 @@ export class CollaborationProductionService {
       );
     }
     return deliverable;
+  }
+
+  private productionCompleteAfterAcceptance(
+    row: ProductionRow,
+    acceptedDeliverableId: string,
+  ) {
+    return row.deliverables.every(
+      (item) =>
+        item.id === acceptedDeliverableId ||
+        item.state === CollaborationDeliverableState.APPROVED ||
+        item.state === CollaborationDeliverableState.AUTO_APPROVED,
+    );
   }
 
   private assertRole(user: AuthUser, role: UserRole) {

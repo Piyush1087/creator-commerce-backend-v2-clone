@@ -40,6 +40,15 @@ export const rejectFinalDeliverableSchema = z
   })
   .strict();
 
+export const autoApproveDeliverableSchema = z
+  .object({
+    ...commandEnvelope,
+    collaborationId: z.string().uuid(),
+    deliverableExecutionId,
+    submissionVersionId,
+  })
+  .strict();
+
 export type SubmitDeliverableInput = z.infer<typeof submitDeliverableSchema>;
 export type ApproveDeliverableInput = z.infer<typeof approveDeliverableSchema>;
 export type RequestDeliverableRevisionInput = z.infer<
@@ -47,4 +56,7 @@ export type RequestDeliverableRevisionInput = z.infer<
 >;
 export type RejectFinalDeliverableInput = z.infer<
   typeof rejectFinalDeliverableSchema
+>;
+export type AutoApproveDeliverableInput = z.infer<
+  typeof autoApproveDeliverableSchema
 >;

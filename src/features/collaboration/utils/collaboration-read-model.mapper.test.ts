@@ -324,6 +324,66 @@ test("detail projects ordered per-Deliverable submission history without legacy 
   );
 });
 
+test("auto-approved Production truth projects without implying publication authorization", () => {
+  const base = canonicalRow();
+  const item = base.deliverables[0];
+  const autoApprovedAt = new Date("2026-08-13T09:00:00.000Z");
+  const row = canonicalRow({
+    canonicalStage: CollaborationStage.PUBLISHING_SETTLEMENT,
+    deliverables: [
+      {
+        ...item,
+        state: CollaborationDeliverableState.AUTO_APPROVED,
+        autoApprovedAt,
+        submissions: [
+          {
+            id: "submission-auto-v1",
+            deliverableExecutionId: item.id,
+            versionNumber: 1,
+            assetRef: "asset:auto-v1",
+            creatorNote: null,
+            submissionMetadata: null,
+            submittedByUserId: "creator-1",
+            submittedAt: new Date("2026-08-10T09:00:00.000Z"),
+            reviewDeadlineAt: autoApprovedAt,
+            reviewState: "AUTO_APPROVED",
+            brandFeedback: null,
+            reviewedByUserId: null,
+            reviewedAt: autoApprovedAt,
+            supersededAt: null,
+            autoApprovedAt,
+            createdAt: new Date("2026-08-10T09:00:00.000Z"),
+            updatedAt: autoApprovedAt,
+          },
+        ],
+      },
+    ],
+  });
+
+  const detail = projectCanonicalCollaborationDetail(row, "BRAND");
+  assert.equal(detail.workflow.actionRequiredBy, "BRAND");
+  assert.equal(detail.deliverables[0].state, "AUTO_APPROVED");
+  assert.equal(detail.deliverables[0].actionRequiredBy, "NONE");
+  assert.equal(
+    detail.deliverables[0].autoApprovedAt,
+    autoApprovedAt.toISOString(),
+  );
+  assert.equal(
+    detail.deliverables[0].submissionVersions[0].autoApprovedAt,
+    autoApprovedAt.toISOString(),
+  );
+  assert.equal(
+    detail.deliverables[0].publishing?.authorizationState,
+    "NOT_AUTHORIZED",
+  );
+  assert.ok(
+    !detail.workflow.availableActions.some(
+      (action) => (action as string) === "AutoApproveDeliverable",
+    ),
+  );
+  assert.deepEqual(detail.deliverables[0].availableActions, []);
+});
+
 test("fixed commercial terms project locked amounts and securement without fixed 30/70 semantics", () => {
   const row = canonicalRow({
     canonicalStage: CollaborationStage.SECUREMENT,

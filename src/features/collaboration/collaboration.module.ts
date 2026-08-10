@@ -53,6 +53,10 @@ import { PricingModule } from "../pricing/pricing.module";
     CollaborationService,
     CollaborationCreatorProfileService,
   ],
-  exports: [CollaborationProvisionService, CollaborationService],
+  exports: [
+    CollaborationProvisionService,
+    CollaborationProductionService,
+    CollaborationService,
+  ],
 })
 export class CollaborationModule {}

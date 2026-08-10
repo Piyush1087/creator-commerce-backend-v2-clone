@@ -5,6 +5,7 @@ import {
   CollaborationLifecycle,
   CollaborationMessage,
   CollaborationNegotiationState,
+  CollaborationPublicationAuthorizationState,
   CollaborationPublishingState,
   CollaborationSecurementState,
   CollaborationStage,
@@ -134,25 +135,33 @@ function deliverableActionRequiredBy(state: CollaborationDeliverableState) {
 function derivePublishingActor(
   deliverables: CollaborationReadSource["deliverables"],
 ): CollaborationActorClass | "NONE" {
+  const brandRequired = deliverables.some(
+    (item) =>
+      item.state === CollaborationDeliverableState.AUTO_APPROVED &&
+      item.publishing?.authorizationState ===
+        CollaborationPublicationAuthorizationState.NOT_AUTHORIZED,
+  );
+  const creatorRequired = deliverables.some(
+    (item) =>
+      item.publishing?.authorizationState ===
+        CollaborationPublicationAuthorizationState.AUTHORIZED &&
+      (item.publishing.state ===
+        CollaborationPublishingState.AWAITING_PUBLISHING ||
+        item.publishing.state ===
+          CollaborationPublishingState.CORRECTION_REQUIRED),
+  );
+  if (brandRequired && creatorRequired) return "NONE";
+  if (brandRequired) return CollaborationActorClass.BRAND;
+  if (creatorRequired) return CollaborationActorClass.CREATOR;
   const publishing = deliverables.flatMap((item) =>
     item.publishing ? [item.publishing] : [],
   );
   if (
     publishing.some(
-      (item) =>
-        item.state === CollaborationPublishingState.AWAITING_PUBLISHING ||
-        item.state === CollaborationPublishingState.CORRECTION_REQUIRED,
-    )
-  ) {
-    return CollaborationActorClass.CREATOR;
-  }
-  if (
-    publishing.some(
       (item) => item.state === CollaborationPublishingState.EVIDENCE_SUBMITTED,
     )
-  ) {
+  )
     return CollaborationActorClass.BRAND;
-  }
   if (
     publishing.some(
       (item) => item.state === CollaborationPublishingState.BLOCKED,
@@ -426,6 +435,7 @@ export function projectCanonicalCollaborationDetail(
       reviewState: submission.reviewState,
       brandFeedback: submission.brandFeedback,
       reviewedAt: submission.reviewedAt?.toISOString() ?? null,
+      autoApprovedAt: submission.autoApprovedAt?.toISOString() ?? null,
       supersededAt: submission.supersededAt?.toISOString() ?? null,
     }));
     return {

@@ -13,6 +13,7 @@
     "test:collaboration:phase3.1": "ts-node src/features/collaboration/services/collaboration-financial-boundary.test.ts",
     "test:collaboration:phase4.1": "ts-node src/features/collaboration/services/collaboration-fulfillment.test.ts",
     "test:collaboration:phase4.2": "ts-node src/features/collaboration/services/collaboration-production.test.ts",
+    "test:collaboration:phase4.3": "ts-node src/features/collaboration/services/collaboration-auto-approval.test.ts",
     "dev": "nest start --watch",
     "start": "nest start",
     "start:dev": "nest start --watch",
