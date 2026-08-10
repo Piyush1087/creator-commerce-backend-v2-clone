@@ -68,10 +68,12 @@ test("MANUAL remains technically representable but is absent from ordinary MVP a
   };
   assert.deepEqual(deriveAvailableActions(row, "BRAND"), [
     "PostCollaborationMessage",
+    "EndCollaborationByBrand",
   ]);
   row.commercialAgreement.securementState = "AWAITING_CREATOR_CONFIRMATION";
   assert.deepEqual(deriveAvailableActions(row, "CREATOR"), [
     "PostCollaborationMessage",
+    "CancelCollaborationByCreator",
   ]);
 });
 
