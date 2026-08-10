@@ -8,6 +8,7 @@ import {
   CollaborationPublicationAuthorizationState,
   CollaborationPublishingState,
   CollaborationSecurementState,
+  CollaborationSettlementState,
   CollaborationStage,
   CollaborationStageStatus,
   Prisma,
@@ -198,8 +199,14 @@ export function deriveActionRequiredBy(
   row: CollaborationReadSource,
 ): CollaborationActorClass | "NONE" {
   const lifecycle = effectiveLifecycle(row);
-  if (lifecycle !== CollaborationLifecycle.ACTIVE) return "NONE";
   if (projectionSource(row) === "LEGACY_COMPATIBILITY") return "NONE";
+  if (
+    row.settlement &&
+    (row.settlement.state === CollaborationSettlementState.ELIGIBLE ||
+      row.settlement.state === CollaborationSettlementState.PROCESSING)
+  )
+    return CollaborationActorClass.SYSTEM;
+  if (lifecycle !== CollaborationLifecycle.ACTIVE) return "NONE";
 
   switch (row.canonicalStage) {
     case CollaborationStage.NEGOTIATION:
@@ -687,12 +694,35 @@ export function projectCanonicalCollaborationDetail(
       ...item.publishing,
     })),
     publishingComplete,
-    settlement: {
-      status: publishingComplete ? "ELIGIBLE" : "NOT_ELIGIBLE",
-      actionRequiredBy: publishingComplete
-        ? CollaborationActorClass.SYSTEM
-        : "NONE",
-    },
+    settlement: row.settlement
+      ? {
+          state: row.settlement.state,
+          eligibleAt: row.settlement.eligibleAt?.toISOString() ?? null,
+          processingAt: row.settlement.processingAt?.toISOString() ?? null,
+          creatorSettlementAmount: decimalOrNull(
+            row.settlement.creatorSettlementAmount,
+          ),
+          brandRefundAmount: decimalOrNull(row.settlement.brandRefundAmount),
+          currency: row.settlement.currency,
+          payoutInstructionRef: row.settlement.payoutInstructionRef,
+          creatorPayoutState: row.settlement.creatorPayoutState,
+          payoutExecutionRef: row.settlement.payoutExecutionRef,
+          brandRefundState: row.settlement.brandRefundState,
+          refundExecutionRef: row.settlement.refundExecutionRef,
+          settledAt: row.settlement.settledAt?.toISOString() ?? null,
+          residualSettlementPending:
+            row.settlement.state !== CollaborationSettlementState.SETTLED,
+          actionRequiredBy:
+            row.settlement.state === CollaborationSettlementState.ELIGIBLE ||
+            row.settlement.state === CollaborationSettlementState.PROCESSING
+              ? CollaborationActorClass.SYSTEM
+              : "NONE",
+        }
+      : {
+          state: CollaborationSettlementState.NOT_ELIGIBLE,
+          actionRequiredBy: "NONE",
+          residualSettlementPending: false,
+        },
     resolution: row.financialResolution
       ? {
           status: row.financialResolution.status,
@@ -732,6 +762,7 @@ export function projectCanonicalCollaborationDetail(
           decidedAt: row.financialResolution.decidedAt?.toISOString() ?? null,
           resolvedAt: row.financialResolution.resolvedAt?.toISOString() ?? null,
           residualSettlementPending:
+            row.settlement?.state !== CollaborationSettlementState.SETTLED &&
             effectiveLifecycle(row) !== CollaborationLifecycle.ACTIVE,
         }
       : null,
