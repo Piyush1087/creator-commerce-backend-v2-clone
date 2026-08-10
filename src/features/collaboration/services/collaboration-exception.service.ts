@@ -133,21 +133,23 @@ export class CollaborationExceptionService {
       const creatorEntitlement = new Prisma.Decimal(
         input.creatorEntitlementAmount,
       );
-      const creatorFeeRefund = new Prisma.Decimal(
+      const explicitBrandCommercialRefund = new Prisma.Decimal(
         input.brandRefundEntitlementAmount,
       );
-      validateAdminEconomicAllocation({
-        agreedCreatorFee: agreement.agreedCreatorFee,
-        creatorEntitlementAmount: creatorEntitlement,
-        brandRefundEntitlementAmount: creatorFeeRefund,
-        aggregateVersion: row.aggregateVersion,
-      });
       const resolution = resolveFinancialOutcome(
         agreement,
         creatorEntitlement,
         CollaborationFinancialOutcome.ADMIN_RESOLUTION,
         input.reasonCode,
       );
+      validateAdminEconomicAllocation({
+        agreedCreatorFee: agreement.agreedCreatorFee,
+        creatorEntitlementAmount: creatorEntitlement,
+        brandRefundEntitlementAmount: explicitBrandCommercialRefund,
+        derivedBrandCommercialRefundEntitlementAmount:
+          resolution.brandCommercialRefundEntitlementAmount,
+        aggregateVersion: row.aggregateVersion,
+      });
       const now = new Date();
       const adminResolution = {
         ...resolution,
@@ -188,7 +190,8 @@ export class CollaborationExceptionService {
         payload: {
           reasonCode: input.reasonCode,
           creatorGrossEntitlementAmount: creatorEntitlement.toString(),
-          requestedCreatorFeeRefundAmount: creatorFeeRefund.toString(),
+          brandRefundEntitlementAmount:
+            explicitBrandCommercialRefund.toString(),
           brandCommercialRefundEntitlementAmount:
             resolution.brandCommercialRefundEntitlementAmount.toString(),
           residualObligations: input.residualObligations,
