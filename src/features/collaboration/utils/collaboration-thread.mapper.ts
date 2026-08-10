@@ -336,6 +336,24 @@ export function deriveAvailableActions(
       }
     }
   }
+
+  const brandHasSpecificPublishingDecision = (row.deliverables ?? []).some(
+    (deliverable) =>
+      deliverable.publishingRequired &&
+      deliverable.state === CollaborationDeliverableState.AUTO_APPROVED &&
+      deliverable.publishing?.authorizationState ===
+        CollaborationPublicationAuthorizationState.NOT_AUTHORIZED,
+  );
+  if (
+    row.currentStageStatus !== CollaborationStageStatus.BLOCKED &&
+    row.canonicalStage !== CollaborationStage.NEGOTIATION
+  ) {
+    if (viewerRole === "CREATOR") {
+      actions.push("CancelCollaborationByCreator");
+    } else if (!brandHasSpecificPublishingDecision) {
+      actions.push("EndCollaborationByBrand");
+    }
+  }
   return actions;
 }
 
@@ -575,6 +593,8 @@ export function projectCanonicalCollaborationDetail(
       endedReason: row.endedReasonCode
         ? { code: row.endedReasonCode, text: row.endedReasonText }
         : null,
+      endedByActorClass: row.endedByActorClass,
+      endedByUserId: row.endedByUserId,
       endedAt: row.endedAt?.toISOString() ?? null,
     },
     workflow,
@@ -708,7 +728,11 @@ export function projectCanonicalCollaborationDetail(
           reasonCode: row.financialResolution.reasonCode,
           reasonText: row.financialResolution.reasonText,
           residualObligations: row.financialResolution.residualObligations,
+          decidedByActorClass: row.financialResolution.decidedByActorClass,
+          decidedAt: row.financialResolution.decidedAt?.toISOString() ?? null,
           resolvedAt: row.financialResolution.resolvedAt?.toISOString() ?? null,
+          residualSettlementPending:
+            effectiveLifecycle(row) !== CollaborationLifecycle.ACTIVE,
         }
       : null,
     feedback: null,
