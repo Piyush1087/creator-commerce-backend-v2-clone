@@ -535,6 +535,22 @@ enum CollaborationResolutionStatus {
   RESOLVED
 }
 
+enum CollaborationSettlementState {
+  NOT_ELIGIBLE
+  ELIGIBLE
+  PROCESSING
+  SETTLED
+  BLOCKED
+}
+
+enum CollaborationSettlementLegState {
+  NOT_REQUIRED
+  PENDING
+  PROCESSING
+  CONFIRMED
+  BLOCKED
+}
+
 enum CollaborationFinancialOutcome {
   NORMAL_SUCCESS
   NEGOTIATION_EXIT
@@ -2224,6 +2240,7 @@ model Collaboration {
   deliverables  CollaborationDeliverableExecution[]
   events         CollaborationEvent[]
   financialResolution CollaborationFinancialResolution?
+  settlement          CollaborationSettlement?
 
   @@index([campaignId, creatorUserId])
   @@index([brandProfileId, currentStage])
@@ -2478,6 +2495,35 @@ model CollaborationFinancialResolution {
   @@index([status])
   @@index([outcome])
   @@map("collaboration_financial_resolutions")
+}
+
+model CollaborationSettlement {
+  id String @id @default(uuid())
+  collaborationId String @unique @map("collaboration_id")
+  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  state CollaborationSettlementState @default(NOT_ELIGIBLE)
+  creatorPayoutState CollaborationSettlementLegState @default(NOT_REQUIRED) @map("creator_payout_state")
+  brandRefundState CollaborationSettlementLegState @default(NOT_REQUIRED) @map("brand_refund_state")
+  creatorSettlementAmount Decimal? @map("creator_settlement_amount") @db.Decimal(14, 2)
+  brandRefundAmount Decimal? @map("brand_refund_amount") @db.Decimal(14, 2)
+  currency String? @db.VarChar(3)
+  payoutInstructionRef String? @map("payout_instruction_ref")
+  refundInstructionRef String? @map("refund_instruction_ref")
+  payoutExecutionRef String? @map("payout_execution_ref")
+  refundExecutionRef String? @map("refund_execution_ref")
+  payoutConfirmationRef String? @map("payout_confirmation_ref")
+  refundConfirmationRef String? @map("refund_confirmation_ref")
+  authoritativeConfirmationRef String? @map("authoritative_confirmation_ref")
+  eligibleAt DateTime? @map("eligible_at")
+  processingAt DateTime? @map("processing_at")
+  settledAt DateTime? @map("settled_at")
+  blockedAt DateTime? @map("blocked_at")
+  blockedReason String? @map("blocked_reason")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([state])
+  @@map("collaboration_settlements")
 }
 
 model CollaborationCommercial {
