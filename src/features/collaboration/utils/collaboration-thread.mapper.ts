@@ -158,12 +158,12 @@ export function deriveActionRequiredBy(
     case CollaborationStage.SECUREMENT:
       switch (row.commercialAgreement?.securementState) {
         case CollaborationSecurementState.AWAITING_ESCROW_FUNDING:
-        case CollaborationSecurementState.AWAITING_PAYOUT_DETAILS:
         case CollaborationSecurementState.AWAITING_BRAND_PAYMENT:
           return CollaborationActorClass.BRAND;
         case CollaborationSecurementState.PROCESSING_FUNDING:
           return CollaborationActorClass.SYSTEM;
         case CollaborationSecurementState.AWAITING_CREATOR_CONFIRMATION:
+        case CollaborationSecurementState.AWAITING_PAYOUT_DETAILS:
           return CollaborationActorClass.CREATOR;
         case CollaborationSecurementState.PAYMENT_DISPUTED:
         case CollaborationSecurementState.BLOCKED:

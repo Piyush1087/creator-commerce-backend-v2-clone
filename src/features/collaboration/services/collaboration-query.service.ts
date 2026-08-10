@@ -1,5 +1,11 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
-import { Prisma, UserRole } from "@prisma/client";
+import {
+  CollaborationLifecycle,
+  CollaborationStage,
+  Prisma,
+  UceMilestoneStage,
+  UserRole,
+} from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
@@ -32,8 +38,8 @@ export class CollaborationQueryService {
 
     if (query.campaign_id) where.campaignId = query.campaign_id;
     if (query.brief_id) where.briefId = query.brief_id;
-    if (query.lifecycle) where.lifecycle = query.lifecycle;
-    if (query.stage) where.canonicalStage = query.stage;
+    const compatibilityFilters = buildCompatibilityAwareFilters(query);
+    if (compatibilityFilters.length > 0) where.AND = compatibilityFilters;
 
     if (query.search?.trim()) {
       const term = query.search.trim();
@@ -107,5 +113,82 @@ export class CollaborationQueryService {
     if (user.role === UserRole.BRAND) return "BRAND";
     if (user.role === UserRole.CREATOR) return "CREATOR";
     throw new ForbiddenException("Unsupported role");
+  }
+}
+
+export function buildCompatibilityAwareFilters(
+  query: Pick<ListCollaborationThreadsQueryDto, "lifecycle" | "stage">,
+): Prisma.CollaborationWhereInput[] {
+  const filters: Prisma.CollaborationWhereInput[] = [];
+
+  if (query.lifecycle) {
+    const alternatives: Prisma.CollaborationWhereInput[] = [
+      {
+        sourceApplicationId: { not: null },
+        lifecycle: query.lifecycle,
+      },
+    ];
+    const legacy = legacyLifecycleFilter(query.lifecycle);
+    if (legacy) alternatives.push(legacy);
+    filters.push({ OR: alternatives });
+  }
+
+  if (query.stage) {
+    filters.push({
+      OR: [
+        {
+          sourceApplicationId: { not: null },
+          canonicalStage: query.stage,
+        },
+        {
+          sourceApplicationId: null,
+          currentStage: { in: legacyStagesFor(query.stage) },
+        },
+      ],
+    });
+  }
+
+  return filters;
+}
+
+function legacyLifecycleFilter(
+  lifecycle: CollaborationLifecycle,
+): Prisma.CollaborationWhereInput | null {
+  switch (lifecycle) {
+    case CollaborationLifecycle.ACTIVE:
+      return {
+        sourceApplicationId: null,
+        isTerminated: false,
+        isPaused: false,
+      };
+    case CollaborationLifecycle.PAUSED:
+      return {
+        sourceApplicationId: null,
+        isTerminated: false,
+        isPaused: true,
+      };
+    case CollaborationLifecycle.TERMINATED:
+      return { sourceApplicationId: null, isTerminated: true };
+    case CollaborationLifecycle.COMPLETED:
+    case CollaborationLifecycle.CANCELLED:
+      return null;
+  }
+}
+
+function legacyStagesFor(stage: CollaborationStage): UceMilestoneStage[] {
+  switch (stage) {
+    case CollaborationStage.NEGOTIATION:
+      return [UceMilestoneStage.STAGE_1_NEGOTIATION];
+    case CollaborationStage.SECUREMENT:
+      return [UceMilestoneStage.STAGE_2_SECUREMENT];
+    case CollaborationStage.FULFILLMENT:
+      return [UceMilestoneStage.STAGE_3_LOGISTICS];
+    case CollaborationStage.PRODUCTION:
+      return [UceMilestoneStage.STAGE_4_CONTENT_REVIEW];
+    case CollaborationStage.PUBLISHING_SETTLEMENT:
+      return [
+        UceMilestoneStage.STAGE_5_PUBLISHING,
+        UceMilestoneStage.STAGE_6_FEEDBACK_SYNC,
+      ];
   }
 }

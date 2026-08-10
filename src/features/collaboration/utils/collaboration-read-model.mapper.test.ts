@@ -13,6 +13,7 @@ import {
   CollaborationStage,
   CollaborationStageStatus,
   UceMilestoneStage,
+  UserRole,
 } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 
@@ -21,6 +22,10 @@ import {
   projectCanonicalCollaborationThreadRow,
   type CollaborationReadSource,
 } from "./collaboration-thread.mapper";
+import {
+  buildCompatibilityAwareFilters,
+  CollaborationQueryService,
+} from "../services/collaboration-query.service";
 
 function canonicalRow(
   overrides: Record<string, unknown> = {},
@@ -253,6 +258,182 @@ test("fixed commercial terms project locked amounts and securement without fixed
   assert.ok(!("advance30Amount" in (detail.commercial ?? {})));
 });
 
+test("legacy lifecycle filters use terminal precedence instead of migration defaults", () => {
+  const terminated = buildCompatibilityAwareFilters({
+    lifecycle: CollaborationLifecycle.TERMINATED,
+  });
+  const active = buildCompatibilityAwareFilters({
+    lifecycle: CollaborationLifecycle.ACTIVE,
+  });
+
+  assert.deepEqual(terminated, [
+    {
+      OR: [
+        {
+          sourceApplicationId: { not: null },
+          lifecycle: CollaborationLifecycle.TERMINATED,
+        },
+        { sourceApplicationId: null, isTerminated: true },
+      ],
+    },
+  ]);
+  assert.deepEqual(active, [
+    {
+      OR: [
+        {
+          sourceApplicationId: { not: null },
+          lifecycle: CollaborationLifecycle.ACTIVE,
+        },
+        {
+          sourceApplicationId: null,
+          isTerminated: false,
+          isPaused: false,
+        },
+      ],
+    },
+  ]);
+});
+
+test("legacy STAGE_4 filters as canonical PRODUCTION and not NEGOTIATION", () => {
+  const production = buildCompatibilityAwareFilters({
+    stage: CollaborationStage.PRODUCTION,
+  });
+  const negotiation = buildCompatibilityAwareFilters({
+    stage: CollaborationStage.NEGOTIATION,
+  });
+
+  assert.deepEqual(production[0], {
+    OR: [
+      {
+        sourceApplicationId: { not: null },
+        canonicalStage: CollaborationStage.PRODUCTION,
+      },
+      {
+        sourceApplicationId: null,
+        currentStage: { in: [UceMilestoneStage.STAGE_4_CONTENT_REVIEW] },
+      },
+    ],
+  });
+  assert.notDeepEqual(production, negotiation);
+});
+
+test("canonical filters are gated by Application identity and ignore contradictory legacy fields", () => {
+  const filters = buildCompatibilityAwareFilters({
+    lifecycle: CollaborationLifecycle.ACTIVE,
+    stage: CollaborationStage.NEGOTIATION,
+  });
+
+  assert.deepEqual(filters[0]?.OR?.[0], {
+    sourceApplicationId: { not: null },
+    lifecycle: CollaborationLifecycle.ACTIVE,
+  });
+  assert.deepEqual(filters[1]?.OR?.[0], {
+    sourceApplicationId: { not: null },
+    canonicalStage: CollaborationStage.NEGOTIATION,
+  });
+});
+
+test("list query applies effective legacy filters while canonical rows use canonical fields exclusively", async () => {
+  const legacy = canonicalRow({
+    id: "legacy",
+    sourceApplicationId: null,
+    lifecycle: CollaborationLifecycle.ACTIVE,
+    canonicalStage: CollaborationStage.NEGOTIATION,
+    isTerminated: true,
+    isPaused: false,
+    currentStage: UceMilestoneStage.STAGE_4_CONTENT_REVIEW,
+  });
+  const canonical = canonicalRow({
+    id: "canonical",
+    lifecycle: CollaborationLifecycle.ACTIVE,
+    canonicalStage: CollaborationStage.NEGOTIATION,
+    isTerminated: true,
+    currentStage: UceMilestoneStage.STAGE_4_CONTENT_REVIEW,
+  });
+  const rows = [legacy, canonical];
+  const prisma = {
+    collaboration: {
+      findMany: async ({ where }: { where: Record<string, unknown> }) =>
+        rows.filter((row) => matchesPrismaFilter(row, where)),
+    },
+  };
+  const service = new CollaborationQueryService(prisma as never, {} as never);
+  const user = {
+    id: "creator-1",
+    role: UserRole.CREATOR,
+  } as never;
+
+  const terminated = await service.list(user, {
+    lifecycle: CollaborationLifecycle.TERMINATED,
+  });
+  const active = await service.list(user, {
+    lifecycle: CollaborationLifecycle.ACTIVE,
+  });
+  const production = await service.list(user, {
+    stage: CollaborationStage.PRODUCTION,
+  });
+  const negotiation = await service.list(user, {
+    stage: CollaborationStage.NEGOTIATION,
+  });
+
+  assert.deepEqual(
+    terminated.rows.map((row) => row.collaborationId),
+    ["legacy"],
+  );
+  assert.deepEqual(
+    active.rows.map((row) => row.collaborationId),
+    ["canonical"],
+  );
+  assert.deepEqual(
+    production.rows.map((row) => row.collaborationId),
+    ["legacy"],
+  );
+  assert.deepEqual(
+    negotiation.rows.map((row) => row.collaborationId),
+    ["canonical"],
+  );
+});
+
+test("AWAITING_PAYOUT_DETAILS is Creator-owned while other Securement actors remain canonical", () => {
+  const actorFor = (state: CollaborationSecurementState) =>
+    projectCanonicalCollaborationDetail(
+      canonicalRow({
+        canonicalStage: CollaborationStage.SECUREMENT,
+        commercialAgreement: {
+          ...canonicalRow().commercialAgreement,
+          securementState: state,
+        },
+      }),
+      "CREATOR",
+    ).workflow.actionRequiredBy;
+
+  assert.equal(
+    actorFor(CollaborationSecurementState.AWAITING_PAYOUT_DETAILS),
+    "CREATOR",
+  );
+  assert.equal(
+    actorFor(CollaborationSecurementState.AWAITING_ESCROW_FUNDING),
+    "BRAND",
+  );
+  assert.equal(
+    actorFor(CollaborationSecurementState.PROCESSING_FUNDING),
+    "SYSTEM",
+  );
+  assert.equal(
+    actorFor(CollaborationSecurementState.AWAITING_BRAND_PAYMENT),
+    "BRAND",
+  );
+  assert.equal(
+    actorFor(CollaborationSecurementState.AWAITING_CREATOR_CONFIRMATION),
+    "CREATOR",
+  );
+  assert.equal(
+    actorFor(CollaborationSecurementState.PAYMENT_DISPUTED),
+    "ADMIN",
+  );
+  assert.equal(actorFor(CollaborationSecurementState.BLOCKED), "ADMIN");
+});
+
 test("terminal lifecycle remains distinct and readable", () => {
   for (const lifecycle of [
     CollaborationLifecycle.PAUSED,
@@ -302,3 +483,28 @@ test("HTTP projector reconstruction has no socket or realtime input", () => {
   );
   assert.deepEqual(reentered, first);
 });
+
+function matchesPrismaFilter(
+  row: CollaborationReadSource,
+  where: Record<string, unknown>,
+): boolean {
+  if (Array.isArray(where.AND)) {
+    if (!where.AND.every((item) => matchesPrismaFilter(row, item)))
+      return false;
+  }
+  if (Array.isArray(where.OR)) {
+    if (!where.OR.some((item) => matchesPrismaFilter(row, item))) return false;
+  }
+
+  return Object.entries(where).every(([key, expected]) => {
+    if (key === "AND" || key === "OR") return true;
+    const actual = row[key as keyof CollaborationReadSource];
+    if (expected && typeof expected === "object" && !Array.isArray(expected)) {
+      if ("not" in expected) return actual !== expected.not;
+      if ("in" in expected && Array.isArray(expected.in)) {
+        return expected.in.includes(actual);
+      }
+    }
+    return actual === expected;
+  });
+}
