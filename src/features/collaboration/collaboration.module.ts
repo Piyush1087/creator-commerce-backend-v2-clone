@@ -22,6 +22,11 @@ import { CollaborationRealtimeService } from "./services/collaboration-realtime.
 import { CollaborationQueryService } from "./services/collaboration-query.service";
 import { CollaborationService } from "./services/collaboration.service";
 import { CollaborationSecurementService } from "./services/collaboration-securement.service";
+import {
+  CollaborationSettlementGateway,
+  DeferredCollaborationSettlementGateway,
+} from "./services/collaboration-settlement.gateway";
+import { CollaborationSettlementService } from "./services/collaboration-settlement.service";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { NotificationProcessorService } from "../notifications/services/notification-processor.service";
 import { BrandEscrowModule } from "../brand-escrow/brand-escrow.module";
@@ -48,6 +53,11 @@ import { PricingModule } from "../pricing/pricing.module";
     CollaborationFulfillmentService,
     CollaborationProductionService,
     CollaborationPublishingService,
+    CollaborationSettlementService,
+    {
+      provide: CollaborationSettlementGateway,
+      useClass: DeferredCollaborationSettlementGateway,
+    },
     {
       provide: CollaborationFundingGateway,
       useClass: DeferredCollaborationFundingGateway,
@@ -62,6 +72,7 @@ import { PricingModule } from "../pricing/pricing.module";
     CollaborationExceptionService,
     CollaborationProductionService,
     CollaborationPublishingService,
+    CollaborationSettlementService,
     CollaborationService,
   ],
 })
