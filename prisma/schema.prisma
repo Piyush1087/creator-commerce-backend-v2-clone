@@ -529,6 +529,25 @@ enum CollaborationEventKind {
   INTEGRATION
 }
 
+enum CollaborationResolutionStatus {
+  NOT_REQUIRED
+  PENDING
+  RESOLVED
+}
+
+enum CollaborationFinancialOutcome {
+  NORMAL_SUCCESS
+  NEGOTIATION_EXIT
+  PRE_SECUREMENT_EXIT
+  BRAND_PROTECTED_POST_SECUREMENT_EXIT
+  FULFILLMENT_HARD_STOP
+  PRODUCTION_HARD_STOP
+  CREATOR_NON_PERFORMANCE
+  CREATOR_PUBLISHING_NON_PERFORMANCE
+  ADMIN_RESOLUTION
+  OTHER_POLICY_RESOLUTION
+}
+
 enum CollaborationIndustryType {
   D2C_ECOMMERCE
   HEALTHCARE_CLINICAL
@@ -2166,6 +2185,13 @@ model Collaboration {
   canonicalStage CollaborationStage @default(NEGOTIATION) @map("canonical_stage")
   currentStageStatus CollaborationStageStatus @default(IN_PROGRESS) @map("current_stage_status")
   aggregateVersion Int @default(1) @map("aggregate_version")
+  endedFromStage CollaborationStage? @map("ended_from_stage")
+  endedReasonCode String? @map("ended_reason_code")
+  endedReasonText String? @map("ended_reason_text")
+  endedByActorClass CollaborationActorClass? @map("ended_by_actor_class")
+  endedByUserId String? @map("ended_by_user_id")
+  endedAt DateTime? @map("ended_at")
+  completedAt DateTime? @map("completed_at")
 
   currentStage UceMilestoneStage       @default(STAGE_1_NEGOTIATION) @map("current_stage")
   payoutMode   CollaborationPayoutMode @default(ESCROW) @map("payout_mode")
@@ -2197,6 +2223,7 @@ model Collaboration {
   fulfillment   CollaborationFulfillment?
   deliverables  CollaborationDeliverableExecution[]
   events         CollaborationEvent[]
+  financialResolution CollaborationFinancialResolution?
 
   @@index([campaignId, creatorUserId])
   @@index([brandProfileId, currentStage])
@@ -2245,7 +2272,13 @@ model CollaborationCommercialAgreement {
   securementState CollaborationSecurementState? @map("securement_state")
   requiredSecuredAmount Decimal? @map("required_secured_amount") @db.Decimal(14, 2)
   confirmedSecuredAmount Decimal? @map("confirmed_secured_amount") @db.Decimal(14, 2)
+  fundingInstructionRef String? @map("funding_instruction_ref")
+  fundingConfirmationRef String? @map("funding_confirmation_ref")
+  manualPaymentEvidenceRef String? @map("manual_payment_evidence_ref")
+  manualCreatorConfirmedAt DateTime? @map("manual_creator_confirmed_at")
+  paymentDisputeRef String? @map("payment_dispute_ref")
   termsLockedAt DateTime? @map("terms_locked_at")
+  securementCompletedAt DateTime? @map("securement_completed_at")
 
   @@index([negotiationState])
   @@index([securementState])
@@ -2304,14 +2337,43 @@ model CollaborationEvent {
   collaborationId String @map("collaboration_id")
   collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
   kind CollaborationEventKind
+  eventType String @map("event_type")
+  actorClass CollaborationActorClass @map("actor_class")
+  actorUserId String? @map("actor_user_id")
   commandId String? @map("command_id")
+  correlationId String? @map("correlation_id")
   aggregateVersion Int @map("aggregate_version")
   payload Json?
   occurredAt DateTime @default(now()) @map("occurred_at")
 
   @@unique([collaborationId, commandId])
+  @@unique([collaborationId, aggregateVersion])
   @@index([collaborationId, aggregateVersion])
+  @@index([eventType, occurredAt])
   @@map("collaboration_events")
+}
+
+model CollaborationFinancialResolution {
+  id String @id @default(uuid())
+  collaborationId String @unique @map("collaboration_id")
+  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  status CollaborationResolutionStatus @default(NOT_REQUIRED)
+  outcome CollaborationFinancialOutcome?
+  creatorEntitlementAmount Decimal? @map("creator_entitlement_amount") @db.Decimal(14, 2)
+  brandRefundEntitlementAmount Decimal? @map("brand_refund_entitlement_amount") @db.Decimal(14, 2)
+  currency String? @db.VarChar(3)
+  reasonCode String? @map("reason_code")
+  reasonText String? @map("reason_text")
+  resolutionEvidence Json? @map("resolution_evidence")
+  residualObligations Json? @map("residual_obligations")
+  decidedByActorClass CollaborationActorClass? @map("decided_by_actor_class")
+  decidedByUserId String? @map("decided_by_user_id")
+  decidedAt DateTime? @map("decided_at")
+  resolvedAt DateTime? @map("resolved_at")
+
+  @@index([status])
+  @@index([outcome])
+  @@map("collaboration_financial_resolutions")
 }
 
 model CollaborationCommercial {

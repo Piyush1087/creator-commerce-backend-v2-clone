@@ -287,6 +287,8 @@ export class CollaborationProvisionService {
           data: {
             collaborationId: thread.id,
             kind: CollaborationEventKind.DOMAIN,
+            eventType: "COLLABORATION_PROVISIONED",
+            actorClass: "SYSTEM",
             commandId: input.commandId,
             aggregateVersion: 1,
             payload: { sourceApplicationId: application.id },

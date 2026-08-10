@@ -17,6 +17,7 @@ import { Decimal } from "@prisma/client/runtime/library";
 import { decimalToNumber } from "../../brand-uce/utils/uce-decimal.util";
 import type {
   CanonicalCollaborationThreadRow,
+  CollaborationAvailableAction,
   CollaborationMessageRow,
   CollaborationProjectionSource,
   CollaborationThreadRow,
@@ -192,6 +193,7 @@ export function deriveActionRequiredBy(
 
 function workflowProjection(
   row: CollaborationReadSource,
+  viewerRole: CollaborationViewerRole,
 ): CollaborationWorkflowProjection {
   return {
     stage: effectiveStage(row),
@@ -200,11 +202,55 @@ function workflowProjection(
         ? row.currentStageStatus
         : CollaborationStageStatus.IN_PROGRESS,
     actionRequiredBy: deriveActionRequiredBy(row),
-    // Phase 2 does not advertise future workflow commands. Persisted chat is the
-    // only canonical command currently implemented without relying on legacy state.
-    availableActions: ["PostCollaborationMessage"],
+    availableActions: deriveAvailableActions(row, viewerRole),
     aggregateVersion: row.aggregateVersion,
   };
+}
+
+export function deriveAvailableActions(
+  row: CollaborationReadSource,
+  viewerRole: CollaborationViewerRole,
+): CollaborationAvailableAction[] {
+  const actions: CollaborationAvailableAction[] = ["PostCollaborationMessage"];
+  if (
+    projectionSource(row) !== "CANONICAL" ||
+    row.lifecycle !== CollaborationLifecycle.ACTIVE
+  )
+    return actions;
+
+  if (
+    row.canonicalStage === CollaborationStage.NEGOTIATION &&
+    row.commercialAgreement?.negotiationState ===
+      CollaborationNegotiationState.AWAITING_BRAND_DECISION &&
+    viewerRole === "BRAND"
+  ) {
+    actions.push("AcceptProposedFee", "CounterOffer", "DeclineNegotiation");
+  } else if (
+    row.canonicalStage === CollaborationStage.NEGOTIATION &&
+    row.commercialAgreement?.negotiationState ===
+      CollaborationNegotiationState.AWAITING_CREATOR_DECISION &&
+    viewerRole === "CREATOR"
+  ) {
+    actions.push("AcceptCounterOffer", "DeclineNegotiation");
+  } else if (row.canonicalStage === CollaborationStage.SECUREMENT) {
+    const state = row.commercialAgreement?.securementState;
+    if (
+      viewerRole === "BRAND" &&
+      state === CollaborationSecurementState.AWAITING_ESCROW_FUNDING
+    )
+      actions.push("RequestEscrowFunding");
+    if (
+      viewerRole === "BRAND" &&
+      state === CollaborationSecurementState.AWAITING_BRAND_PAYMENT
+    )
+      actions.push("SubmitManualPaymentEvidence");
+    if (
+      viewerRole === "CREATOR" &&
+      state === CollaborationSecurementState.AWAITING_CREATOR_CONFIRMATION
+    )
+      actions.push("ConfirmManualPaymentReceipt", "DisputeManualPayment");
+  }
+  return actions;
 }
 
 function creatorSummary(row: CollaborationReadSource) {
@@ -292,7 +338,7 @@ export function projectCanonicalCollaborationThreadRow(
       },
     },
     lifecycle: effectiveLifecycle(row),
-    workflow: workflowProjection(row),
+    workflow: workflowProjection(row, viewerRole),
     blocking: blockingProjection(row),
     resolution: null,
     inbox: {
@@ -316,7 +362,7 @@ export function projectCanonicalCollaborationDetail(
 ) {
   const agreement = row.commercialAgreement;
   const snapshot = row.snapshot;
-  const workflow = workflowProjection(row);
+  const workflow = workflowProjection(row, viewerRole);
   const deliverables = row.deliverables.map((item) => ({
     deliverableExecutionId: item.id,
     sourceBriefDeliverableId: item.sourceBriefDeliverableId,
@@ -371,10 +417,12 @@ export function projectCanonicalCollaborationDetail(
     },
     lifecycle: {
       state: effectiveLifecycle(row),
-      completedAt: null,
-      endedFromStage: null,
-      endedReason: null,
-      endedAt: null,
+      completedAt: row.completedAt?.toISOString() ?? null,
+      endedFromStage: row.endedFromStage,
+      endedReason: row.endedReasonCode
+        ? { code: row.endedReasonCode, text: row.endedReasonText }
+        : null,
+      endedAt: row.endedAt?.toISOString() ?? null,
     },
     workflow,
     commercial: agreement
@@ -426,7 +474,23 @@ export function projectCanonicalCollaborationDetail(
       ...item.publishing,
     })),
     settlement: null,
-    resolution: null,
+    resolution: row.financialResolution
+      ? {
+          status: row.financialResolution.status,
+          outcome: row.financialResolution.outcome,
+          creatorEntitlementAmount: decimalOrNull(
+            row.financialResolution.creatorEntitlementAmount,
+          ),
+          brandRefundEntitlementAmount: decimalOrNull(
+            row.financialResolution.brandRefundEntitlementAmount,
+          ),
+          currency: row.financialResolution.currency,
+          reasonCode: row.financialResolution.reasonCode,
+          reasonText: row.financialResolution.reasonText,
+          residualObligations: row.financialResolution.residualObligations,
+          resolvedAt: row.financialResolution.resolvedAt?.toISOString() ?? null,
+        }
+      : null,
     feedback: null,
     blocking: blockingProjection(row),
     inbox: {

@@ -13,7 +13,16 @@ export type CollaborationViewerRole = "BRAND" | "CREATOR";
 export type CollaborationProjectionSource =
   "CANONICAL" | "LEGACY_COMPATIBILITY";
 
-export type CollaborationAvailableAction = "PostCollaborationMessage";
+export type CollaborationAvailableAction =
+  | "PostCollaborationMessage"
+  | "AcceptProposedFee"
+  | "CounterOffer"
+  | "AcceptCounterOffer"
+  | "DeclineNegotiation"
+  | "RequestEscrowFunding"
+  | "SubmitManualPaymentEvidence"
+  | "ConfirmManualPaymentReceipt"
+  | "DisputeManualPayment";
 
 export type CollaborationWorkflowProjection = {
   stage: CollaborationStage;

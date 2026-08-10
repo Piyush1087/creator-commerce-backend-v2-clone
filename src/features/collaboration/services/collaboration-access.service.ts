@@ -27,7 +27,7 @@ export const COLLABORATION_THREAD_INCLUDE = {
       name: true,
       email: true,
       creatorProfile: {
-        select: { displayName: true, instagramHandle: true },
+        select: { id: true, displayName: true, instagramHandle: true },
       },
     },
   },
@@ -38,6 +38,7 @@ export const COLLABORATION_THREAD_INCLUDE = {
   snapshot: true,
   commercialAgreement: true,
   fulfillment: true,
+  financialResolution: true,
   deliverables: {
     orderBy: { displayOrder: "asc" as const },
     include: { publishing: true },

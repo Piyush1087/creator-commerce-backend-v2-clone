@@ -14,24 +14,21 @@ import { ThrottlerGuard } from "@nestjs/throttler";
 import type { RequestWithAuthUser } from "../auth/auth.controller";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import {
-  AcceptCommercialsDto,
-  BrandCounterOfferDto,
   DispatchLogisticsDto,
-  FundEscrowDto,
   PostCollaborationMessageDto,
   ReportFulfillmentIssueDto,
   ReviewCollaborationMediaDto,
   SubmitCollaborationMediaDto,
   SubmitCollaborationReviewDto,
-  SubmitCreatorQuoteDto,
   SubmitLivePostDto,
-  UploadReceiptDto,
   UpsertCreatorBankDetailsDto,
   UpsertCreatorShippingAddressDto,
 } from "./dto/collaboration-actions.dto";
 import { ListCollaborationThreadsQueryDto } from "./dto/collaboration-query.dto";
 import { CollaborationCreatorProfileService } from "./services/collaboration-creator-profile.service";
+import { CollaborationNegotiationService } from "./services/collaboration-negotiation.service";
 import { CollaborationQueryService } from "./services/collaboration-query.service";
+import { CollaborationSecurementService } from "./services/collaboration-securement.service";
 import { CollaborationService } from "./services/collaboration.service";
 
 @Controller("api/v1/collaboration")
@@ -40,6 +37,8 @@ export class CollaborationController {
   constructor(
     private readonly collaboration: CollaborationService,
     private readonly collaborationQueries: CollaborationQueryService,
+    private readonly negotiation: CollaborationNegotiationService,
+    private readonly securement: CollaborationSecurementService,
     private readonly creatorProfile: CollaborationCreatorProfileService,
   ) {}
 
@@ -76,75 +75,87 @@ export class CollaborationController {
     return this.collaboration.postMessage(req.user, collaborationId, body);
   }
 
-  @Post("threads/:collaborationId/negotiation/quote")
-  submitQuote(
+  @Post("threads/:collaborationId/negotiation/accept-proposed-fee")
+  acceptProposedFee(
     @Req() req: RequestWithAuthUser,
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
-    @Body() body: SubmitCreatorQuoteDto,
+    @Body() body: unknown,
   ) {
-    return this.collaboration.submitCreatorQuote(
-      req.user,
-      collaborationId,
-      body,
-    );
+    return this.negotiation.acceptProposedFee(req.user, collaborationId, body);
   }
 
   @Post("threads/:collaborationId/negotiation/counter-offer")
   counterOffer(
     @Req() req: RequestWithAuthUser,
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
-    @Body() body: BrandCounterOfferDto,
+    @Body() body: unknown,
   ) {
-    return this.collaboration.brandCounterOffer(
+    return this.negotiation.counterOffer(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/negotiation/accept-counter-offer")
+  acceptCounterOffer(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.negotiation.acceptCounterOffer(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/negotiation/decline")
+  declineNegotiation(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.negotiation.decline(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/securement/request-escrow-funding")
+  requestEscrowFunding(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.securement.requestEscrowFunding(
       req.user,
       collaborationId,
       body,
     );
   }
 
-  @Post("threads/:collaborationId/negotiation/accept")
-  acceptCommercials(
+  @Post("threads/:collaborationId/securement/manual-payment-evidence")
+  reportManualPayment(
     @Req() req: RequestWithAuthUser,
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
-    @Body() body: AcceptCommercialsDto,
+    @Body() body: unknown,
   ) {
-    return this.collaboration.acceptCommercials(
+    return this.securement.reportManualPayment(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/securement/confirm-manual-payment")
+  confirmManualPayment(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.securement.confirmManualPayment(
       req.user,
       collaborationId,
       body,
     );
   }
 
-  @Post("threads/:collaborationId/securement/fund-escrow")
-  fundEscrow(
+  @Post("threads/:collaborationId/securement/dispute-manual-payment")
+  disputeManualPayment(
     @Req() req: RequestWithAuthUser,
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
-    @Body() body: FundEscrowDto,
+    @Body() body: unknown,
   ) {
-    return this.collaboration.fundEscrow(req.user, collaborationId, body);
-  }
-
-  @Post("threads/:collaborationId/securement/advance-receipt")
-  uploadAdvanceReceipt(
-    @Req() req: RequestWithAuthUser,
-    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
-    @Body() body: UploadReceiptDto,
-  ) {
-    return this.collaboration.uploadAdvanceReceipt(
+    return this.securement.disputeManualPayment(
       req.user,
       collaborationId,
       body,
-    );
-  }
-
-  @Post("threads/:collaborationId/securement/confirm-manual-advance")
-  confirmManualAdvance(
-    @Req() req: RequestWithAuthUser,
-    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
-  ) {
-    return this.collaboration.confirmManualAdvanceReceived(
-      req.user,
-      collaborationId,
     );
   }
 

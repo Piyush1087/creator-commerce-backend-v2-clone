@@ -74,14 +74,14 @@ test("Prisma identity is Application-based and publishingRequired has no default
     /model Collaboration \{[\s\S]*?\n\}/,
   )?.[0];
   assert.ok(collaborationModel);
-  assert.match(collaborationModel, /sourceApplicationId String\? @unique/);
+  assert.match(collaborationModel, /sourceApplicationId\s+String\?\s+@unique/);
   assert.doesNotMatch(
     collaborationModel,
     /@@unique\(\[campaignId, creatorUserId\]\)/,
   );
   assert.match(
     schema,
-    /publishingRequired Boolean @map\("publishing_required"\)/,
+    /publishingRequired\s+Boolean\s+@map\("publishing_required"\)/,
   );
 });
 

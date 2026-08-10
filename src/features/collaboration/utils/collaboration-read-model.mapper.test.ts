@@ -168,6 +168,9 @@ test("projects canonical Brand and Creator inbox rows with actor-specific counte
   assert.equal(creator.inbox.unreadCount, 2);
   assert.deepEqual(brand.workflow.availableActions, [
     "PostCollaborationMessage",
+    "AcceptProposedFee",
+    "CounterOffer",
+    "DeclineNegotiation",
   ]);
   assert.deepEqual(creator.workflow.availableActions, [
     "PostCollaborationMessage",
@@ -188,7 +191,7 @@ test("canonical fields override contradictory legacy workflow fields", () => {
   assert.equal(projected.legacyCompatibility, null);
 });
 
-test("actionRequiredBy follows canonical negotiable actor state without advertising future commands", () => {
+test("actionRequiredBy and available actions follow canonical negotiable actor state", () => {
   const row = canonicalRow({
     commercialAgreement: {
       ...canonicalRow().commercialAgreement,
@@ -205,6 +208,8 @@ test("actionRequiredBy follows canonical negotiable actor state without advertis
   ]);
   assert.deepEqual(creator.workflow.availableActions, [
     "PostCollaborationMessage",
+    "AcceptCounterOffer",
+    "DeclineNegotiation",
   ]);
   assert.ok(
     !brand.workflow.availableActions.includes("AcceptBrandCounter" as never),
