@@ -54,7 +54,7 @@ function deliverable(id: string, publishingRequired: boolean) {
   };
 }
 
-function harness(options: { failEvent?: boolean } = {}) {
+function harness(options: { failEvent?: boolean; assetOnly?: boolean } = {}) {
   const row: any = {
     id: collaborationId,
     sourceApplicationId: "application-1",
@@ -64,7 +64,7 @@ function harness(options: { failEvent?: boolean } = {}) {
     currentStage: "STAGE_4_CONTENT_REVIEW",
     aggregateVersion: 1,
     deliverables: [
-      deliverable(deliverableAId, true),
+      deliverable(deliverableAId, !options.assetOnly),
       deliverable(deliverableBId, false),
     ],
     commercialAgreement: {
@@ -76,6 +76,8 @@ function harness(options: { failEvent?: boolean } = {}) {
       platformCommissionGstRateSnapshot: d(18),
       platformCommissionGstAmount: d(126),
     },
+    financialResolution: null,
+    settlement: null,
   };
   const events: any[] = [];
   let nextSubmission = 1;
@@ -138,9 +140,19 @@ function harness(options: { failEvent?: boolean } = {}) {
       },
     },
     collaborationFinancialResolution: {
-      upsert: async ({ create }: any) => {
-        row.financialResolution = create;
-        return create;
+      upsert: async ({ create, update }: any) => {
+        row.financialResolution = row.financialResolution
+          ? { ...row.financialResolution, ...update }
+          : create;
+        return row.financialResolution;
+      },
+    },
+    collaborationSettlement: {
+      upsert: async ({ create, update }: any) => {
+        row.settlement = row.settlement
+          ? { ...row.settlement, ...update }
+          : { id: "settlement-1", ...create };
+        return row.settlement;
       },
     },
   };
@@ -156,6 +168,7 @@ function harness(options: { failEvent?: boolean } = {}) {
         endedByActorClass: row.endedByActorClass,
         endedByUserId: row.endedByUserId,
         financialResolution: row.financialResolution,
+        settlement: row.settlement,
         deliverables: row.deliverables.map((item: any) => ({
           ...item,
           publishing: { ...item.publishing },
@@ -210,6 +223,39 @@ test("Production command schemas reject backend-owned state and require exact id
       deliverableExecutionId: deliverableAId,
     }).success,
     false,
+  );
+});
+
+test("final asset-only Production approval atomically establishes normal Settlement eligibility", async () => {
+  const h = harness({ assetOnly: true });
+  await h.service.submit(creator, collaborationId, submit("asset-a", 1));
+  const submissionA = h.row.deliverables[0].submissions[0].id;
+  await h.service.approve(brand, collaborationId, {
+    commandId: "approve-a",
+    expectedAggregateVersion: 2,
+    deliverableExecutionId: deliverableAId,
+    submissionVersionId: submissionA,
+  });
+  await h.service.submit(
+    creator,
+    collaborationId,
+    submit("asset-b", 3, deliverableBId),
+  );
+  const submissionB = h.row.deliverables[1].submissions[0].id;
+  await h.service.approve(brand, collaborationId, {
+    commandId: "approve-b",
+    expectedAggregateVersion: 4,
+    deliverableExecutionId: deliverableBId,
+    submissionVersionId: submissionB,
+  });
+
+  assert.equal(h.row.canonicalStage, CollaborationStage.PUBLISHING_SETTLEMENT);
+  assert.equal(h.row.financialResolution.outcome, "NORMAL_SUCCESS");
+  assert.equal(h.row.settlement.state, "ELIGIBLE");
+  assert.equal(h.row.aggregateVersion, 6);
+  assert.equal(
+    h.events.at(-1).eventType,
+    "NORMAL_SETTLEMENT_ELIGIBILITY_ESTABLISHED",
   );
 });
 
@@ -420,7 +466,7 @@ test("final rejection is SYSTEM-attributed, Advance-protected, atomic and idempo
   );
   assert.equal(rollback.row.lifecycle, "ACTIVE");
   assert.equal(rollback.row.deliverables[0].state, "UNDER_REVIEW");
-  assert.equal(rollback.row.financialResolution, undefined);
+  assert.equal(rollback.row.financialResolution, null);
   assert.equal(rollback.row.aggregateVersion, 1);
 });
 

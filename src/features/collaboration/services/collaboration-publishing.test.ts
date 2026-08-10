@@ -117,6 +117,7 @@ function harness(options: { failEvent?: boolean } = {}) {
       platformCommissionGstAmount: d(126),
     },
     financialResolution: null,
+    settlement: null,
   };
   const events: any[] = [];
   let evidenceSequence = 1;
@@ -174,9 +175,19 @@ function harness(options: { failEvent?: boolean } = {}) {
       },
     },
     collaborationFinancialResolution: {
-      upsert: async ({ create }: any) => {
-        row.financialResolution = create;
-        return create;
+      upsert: async ({ create, update }: any) => {
+        row.financialResolution = row.financialResolution
+          ? { ...row.financialResolution, ...update }
+          : create;
+        return row.financialResolution;
+      },
+    },
+    collaborationSettlement: {
+      upsert: async ({ create, update }: any) => {
+        row.settlement = row.settlement
+          ? { ...row.settlement, ...update }
+          : { id: "settlement-1", ...create };
+        return row.settlement;
       },
     },
   };
@@ -265,7 +276,7 @@ test("auto-approved Deliverable requires Brand authorization before provider-neu
   assert.equal((h.row as any).finalization?.livePostUrl, undefined);
 });
 
-test("correction appends evidence history and exact active evidence verification is settlement-passive", async () => {
+test("final exact evidence verification atomically establishes normal Settlement eligibility", async () => {
   const h = harness();
   await h.service.authorize(brand, collaborationId, command("authorize", 1));
   await h.service.submitEvidence(creator, collaborationId, {
@@ -303,9 +314,37 @@ test("correction appends evidence history and exact active evidence verification
   assert.equal(h.row.deliverables[0].publishing.state, "COMPLIANCE_VERIFIED");
   assert.equal(h.row.lifecycle, CollaborationLifecycle.ACTIVE);
   assert.equal(h.row.canonicalStage, CollaborationStage.PUBLISHING_SETTLEMENT);
-  assert.equal(h.row.financialResolution, null);
+  assert.equal(h.row.financialResolution.outcome, "NORMAL_SUCCESS");
+  assert.equal(h.row.settlement.state, "ELIGIBLE");
   assert.equal((h.row as any).escrowStatus, undefined);
-  assert.equal(h.events.at(-1).payload.settlementEligible, true);
+  assert.equal(
+    h.events.at(-1).eventType,
+    "NORMAL_SETTLEMENT_ELIGIBILITY_ESTABLISHED",
+  );
+  assert.equal(
+    h.events.find((event) => event.eventType === "PUBLISHING_VERIFIED").payload
+      .settlementEligible,
+    true,
+  );
+  const settlement = h.row.settlement;
+  const resolution = h.row.financialResolution;
+  const eligibilityEventCount = h.events.filter(
+    (event) => event.eventType === "NORMAL_SETTLEMENT_ELIGIBILITY_ESTABLISHED",
+  ).length;
+  await h.service.verify(brand, collaborationId, {
+    ...command("verify", 5),
+    publishingEvidenceId: history[1].id,
+    complianceEvidenceRef: "compliance:brand-check",
+  });
+  assert.equal(h.row.settlement, settlement);
+  assert.equal(h.row.financialResolution, resolution);
+  assert.equal(
+    h.events.filter(
+      (event) =>
+        event.eventType === "NORMAL_SETTLEMENT_ELIGIBILITY_ESTABLISHED",
+    ).length,
+    eligibilityEventCount,
+  );
 });
 
 test("evidence replay and review races cannot duplicate or resolve twice", async () => {

@@ -176,6 +176,7 @@ export class CollaborationService {
       throw new ForbiddenException("Creator access required");
     }
     const thread = await this.access.assertThreadForUser(user, collaborationId);
+    this.assertLegacyCommercialCompatibility(thread);
     this.assertStage(thread, UceMilestoneStage.STAGE_1_NEGOTIATION);
     if (
       thread.payoutMode === CollaborationPayoutMode.BARTER &&
@@ -242,6 +243,7 @@ export class CollaborationService {
       throw new ForbiddenException("Brand access required");
     }
     const thread = await this.access.assertThreadForUser(user, collaborationId);
+    this.assertLegacyCommercialCompatibility(thread);
     this.assertStage(thread, UceMilestoneStage.STAGE_1_NEGOTIATION);
     if (thread.negotiationRound >= 2) {
       throw new BadRequestException("Negotiation round cap reached");
@@ -289,6 +291,7 @@ export class CollaborationService {
     dto: AcceptCommercialsDto,
   ) {
     const thread = await this.access.assertThreadForUser(user, collaborationId);
+    this.assertLegacyCommercialCompatibility(thread);
     this.assertStage(thread, UceMilestoneStage.STAGE_1_NEGOTIATION);
 
     const finalQuote =
@@ -345,6 +348,7 @@ export class CollaborationService {
       throw new ForbiddenException("Brand access required");
     }
     const thread = await this.access.assertThreadForUser(user, collaborationId);
+    this.assertLegacyCommercialCompatibility(thread);
     this.assertStage(thread, UceMilestoneStage.STAGE_2_SECUREMENT);
     if (thread.payoutMode !== CollaborationPayoutMode.ESCROW) {
       throw new BadRequestException(
@@ -386,6 +390,7 @@ export class CollaborationService {
       throw new ForbiddenException("Brand access required");
     }
     const thread = await this.access.assertThreadForUser(user, collaborationId);
+    this.assertLegacyCommercialCompatibility(thread);
     if (thread.payoutMode !== CollaborationPayoutMode.MANUAL) {
       throw new BadRequestException(
         "Manual receipt upload requires MANUAL payout mode",
@@ -406,6 +411,7 @@ export class CollaborationService {
       throw new ForbiddenException("Creator access required");
     }
     const thread = await this.access.assertThreadForUser(user, collaborationId);
+    this.assertLegacyCommercialCompatibility(thread);
     if (thread.payoutMode !== CollaborationPayoutMode.MANUAL) {
       throw new BadRequestException(
         "Manual confirmation requires MANUAL payout mode",
@@ -853,6 +859,18 @@ export class CollaborationService {
       throw new BadRequestException(
         "Canonical Collaborations require the Fulfillment command API",
       );
+    }
+  }
+
+  private assertLegacyCommercialCompatibility(thread: {
+    sourceApplicationId: string | null;
+  }): void {
+    if (thread.sourceApplicationId) {
+      throw new BadRequestException({
+        code: "LEGACY_ROUTE_CANONICAL_ROW",
+        message:
+          "Canonical Application-origin Collaboration requires the canonical Negotiation/Securement command service",
+      });
     }
   }
 

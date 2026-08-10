@@ -34,6 +34,7 @@ import {
   requestFingerprint,
 } from "../utils/collaboration-command-support";
 import { resolveBrandDeclinedPublicationFinancialOutcome } from "../utils/collaboration-financial-resolution.policy";
+import { establishNormalSettlementEligibilityFromFinalGate } from "../utils/collaboration-normal-settlement";
 import { projectCanonicalCollaborationDetail } from "../utils/collaboration-thread.mapper";
 import {
   COLLABORATION_THREAD_INCLUDE,
@@ -212,6 +213,7 @@ export class CollaborationPublishingService {
             publishingComplete,
             settlementEligible: publishingComplete,
           },
+          establishNormalSettlementEligibility: publishingComplete,
         };
       },
     );
@@ -419,6 +421,7 @@ export class CollaborationPublishingService {
     ) => Promise<{
       collaborationData?: Prisma.CollaborationUpdateManyMutationInput;
       payload?: Record<string, unknown>;
+      establishNormalSettlementEligibility?: boolean;
     }>,
   ) {
     const fingerprint = requestFingerprint(input);
@@ -444,6 +447,7 @@ export class CollaborationPublishingService {
       );
       this.assertPublishing(row);
       const result = await transition(tx, row);
+      const finalGateVersion = row.aggregateVersion + 1;
       const updated = await tx.collaboration.updateMany({
         where: { id: collaborationId, aggregateVersion: row.aggregateVersion },
         data: {
@@ -465,6 +469,12 @@ export class CollaborationPublishingService {
         requestFingerprint: fingerprint,
         payload: result.payload,
       });
+      if (result.establishNormalSettlementEligibility)
+        await establishNormalSettlementEligibilityFromFinalGate(tx, {
+          collaborationId,
+          sourceCommandId: input.commandId,
+          expectedAggregateVersion: finalGateVersion,
+        });
     });
     if (!replayed)
       void this.realtime.broadcast(collaborationId, "thread.updated");

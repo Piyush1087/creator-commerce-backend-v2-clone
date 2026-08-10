@@ -12,6 +12,8 @@ import { BrandCentreUceBridgeService } from "../../brand-centre-uce-bridge/servi
 import { BrandSettingsService } from "../../brand-settings/services/brand-settings.service";
 import { BrandUceCampaignService } from "../../brand-uce/services/brand-uce-campaign.service";
 import { CollaborationService } from "../../collaboration/services/collaboration.service";
+import { CollaborationNegotiationService } from "../../collaboration/services/collaboration-negotiation.service";
+import { CollaborationSecurementService } from "../../collaboration/services/collaboration-securement.service";
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
 import {
@@ -90,6 +92,8 @@ export class CoPilotHitlService {
     private readonly planner: BrandCentrePlannerService,
     private readonly bridge: BrandCentreUceBridgeService,
     private readonly collaboration: CollaborationService,
+    private readonly collaborationNegotiation: CollaborationNegotiationService,
+    private readonly collaborationSecurement: CollaborationSecurementService,
     private readonly brandSettings: BrandSettingsService,
     private readonly conversationMemory: CoPilotConversationMemoryService,
   ) {}
@@ -1471,6 +1475,55 @@ export class CoPilotHitlService {
     return detail.thread.currentStage;
   }
 
+  private async canonicalInvocationContext(
+    collaborationId: string,
+    staged: Record<string, unknown>,
+  ) {
+    const row = await this.prisma.collaboration.findUniqueOrThrow({
+      where: { id: collaborationId },
+      select: { sourceApplicationId: true, aggregateVersion: true },
+    });
+    return {
+      row,
+      command: {
+        commandId: String(staged.idempotencyKey),
+        expectedAggregateVersion: row.aggregateVersion,
+      },
+    };
+  }
+
+  private async collaborationMeta(collaborationId: string) {
+    const row = await this.prisma.collaboration.findUniqueOrThrow({
+      where: { id: collaborationId },
+      select: {
+        sourceApplicationId: true,
+        canonicalStage: true,
+        currentStage: true,
+        campaign: { select: { name: true } },
+        creatorUser: {
+          select: {
+            name: true,
+            email: true,
+            creatorProfile: {
+              select: { displayName: true, instagramHandle: true },
+            },
+          },
+        },
+      },
+    });
+    return {
+      stage: String(
+        row.sourceApplicationId ? row.canonicalStage : row.currentStage,
+      ),
+      campaignName: row.campaign.name,
+      creatorLabel:
+        row.creatorUser.creatorProfile?.displayName ??
+        row.creatorUser.name ??
+        row.creatorUser.creatorProfile?.instagramHandle ??
+        row.creatorUser.email.split("@")[0],
+    };
+  }
+
   private async confirmCollabCounterOffer(
     args: { userId: string; threadId: string },
     staged: Record<string, unknown>,
@@ -1485,19 +1538,23 @@ export class CoPilotHitlService {
       action: "COUNTER_OFFER",
       staged,
       run: async (authUser, collaborationId) => {
-        const detail = await this.collaboration.brandCounterOffer(
-          authUser,
+        const context = await this.canonicalInvocationContext(
           collaborationId,
-          { counter_offer: amount },
+          staged,
         );
-        return {
-          stage: this.stageFromDetail(detail),
-          campaignName: detail.thread.campaign.name,
-          creatorLabel:
-            detail.thread.creatorUser.creatorProfile?.displayName ??
-            detail.thread.creatorUser.name ??
-            detail.thread.creatorHandle,
-        };
+        if (context.row.sourceApplicationId)
+          await this.collaborationNegotiation.counterOffer(
+            authUser,
+            collaborationId,
+            { ...context.command, counterFee: amount },
+          );
+        else
+          await this.collaboration.brandCounterOffer(
+            authUser,
+            collaborationId,
+            { counter_offer: amount },
+          );
+        return this.collaborationMeta(collaborationId);
       },
       successSummary: (meta) =>
         `Counter-offer ₹${amount} sent for ${meta.creatorLabel ?? "creator"} (${meta.stage ?? "negotiation"}).`,
@@ -1514,19 +1571,23 @@ export class CoPilotHitlService {
       action: "ACCEPT_TERMS",
       staged,
       run: async (authUser, collaborationId) => {
-        const detail = await this.collaboration.acceptCommercials(
-          authUser,
+        const context = await this.canonicalInvocationContext(
           collaborationId,
-          {},
+          staged,
         );
-        return {
-          stage: this.stageFromDetail(detail),
-          campaignName: detail.thread.campaign.name,
-          creatorLabel:
-            detail.thread.creatorUser.creatorProfile?.displayName ??
-            detail.thread.creatorUser.name ??
-            detail.thread.creatorHandle,
-        };
+        if (context.row.sourceApplicationId)
+          await this.collaborationNegotiation.acceptProposedFee(
+            authUser,
+            collaborationId,
+            context.command,
+          );
+        else
+          await this.collaboration.acceptCommercials(
+            authUser,
+            collaborationId,
+            {},
+          );
+        return this.collaborationMeta(collaborationId);
       },
       successSummary: (meta) =>
         `Terms accepted. Workflow advanced to ${meta.stage ?? "next stage"}.`,
@@ -1543,19 +1604,18 @@ export class CoPilotHitlService {
       action: "FUND_ESCROW",
       staged,
       run: async (authUser, collaborationId) => {
-        const detail = await this.collaboration.fundEscrow(
-          authUser,
+        const context = await this.canonicalInvocationContext(
           collaborationId,
-          {},
+          staged,
         );
-        return {
-          stage: this.stageFromDetail(detail),
-          campaignName: detail.thread.campaign.name,
-          creatorLabel:
-            detail.thread.creatorUser.creatorProfile?.displayName ??
-            detail.thread.creatorUser.name ??
-            detail.thread.creatorHandle,
-        };
+        if (context.row.sourceApplicationId)
+          await this.collaborationSecurement.requestEscrowFunding(
+            authUser,
+            collaborationId,
+            context.command,
+          );
+        else await this.collaboration.fundEscrow(authUser, collaborationId, {});
+        return this.collaborationMeta(collaborationId);
       },
       successSummary: (meta) =>
         `Escrow funded. Now in ${meta.stage ?? "logistics"}.`,

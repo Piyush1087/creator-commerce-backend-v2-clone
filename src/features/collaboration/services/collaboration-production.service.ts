@@ -34,6 +34,7 @@ import {
   requestFingerprint,
 } from "../utils/collaboration-command-support";
 import { resolveProductionHardStopFinancialOutcome } from "../utils/collaboration-financial-resolution.policy";
+import { establishNormalSettlementEligibilityFromFinalGate } from "../utils/collaboration-normal-settlement";
 import { projectCanonicalCollaborationDetail } from "../utils/collaboration-thread.mapper";
 import {
   COLLABORATION_THREAD_INCLUDE,
@@ -177,6 +178,9 @@ export class CollaborationProductionService {
             publicationAuthorized: deliverable.publishingRequired,
             productionComplete: allApproved,
           },
+          establishNormalSettlementEligibility:
+            allApproved &&
+            row.deliverables.every((item) => !item.publishingRequired),
         };
       },
     );
@@ -245,6 +249,7 @@ export class CollaborationProductionService {
         row,
         deliverable.id,
       );
+      const finalGateVersion = row.aggregateVersion + 1;
       const updated = await tx.collaboration.updateMany({
         where: { id: collaborationId, aggregateVersion: row.aggregateVersion },
         data: {
@@ -282,6 +287,15 @@ export class CollaborationProductionService {
           productionComplete,
         },
       });
+      if (
+        productionComplete &&
+        row.deliverables.every((item) => !item.publishingRequired)
+      )
+        await establishNormalSettlementEligibilityFromFinalGate(tx, {
+          collaborationId,
+          sourceCommandId: input.commandId,
+          expectedAggregateVersion: finalGateVersion,
+        });
       return { replayed: false, productionComplete };
     });
     if (!result.replayed) {
@@ -432,6 +446,7 @@ export class CollaborationProductionService {
     ) => Promise<{
       collaborationData?: Prisma.CollaborationUpdateManyMutationInput;
       eventPayload?: Record<string, unknown>;
+      establishNormalSettlementEligibility?: boolean;
     }>,
   ) {
     const fingerprint = requestFingerprint(input);
@@ -454,6 +469,7 @@ export class CollaborationProductionService {
       );
       this.assertProduction(row);
       const result = await transition(tx, row);
+      const finalGateVersion = row.aggregateVersion + 1;
       const updated = await tx.collaboration.updateMany({
         where: { id: collaborationId, aggregateVersion: row.aggregateVersion },
         data: {
@@ -481,6 +497,12 @@ export class CollaborationProductionService {
         requestFingerprint: fingerprint,
         payload: result.eventPayload,
       });
+      if (result.establishNormalSettlementEligibility)
+        await establishNormalSettlementEligibilityFromFinalGate(tx, {
+          collaborationId,
+          sourceCommandId: input.commandId,
+          expectedAggregateVersion: finalGateVersion,
+        });
     });
     void this.realtime.broadcast(collaborationId, "thread.updated");
     return this.result(user, collaborationId);
