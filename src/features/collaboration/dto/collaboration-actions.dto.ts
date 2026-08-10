@@ -1,8 +1,4 @@
-import {
-  CollaborationMediaPhase,
-  CollaborationPayoutMode,
-  FulfillmentIssueType,
-} from "@prisma/client";
+import { CollaborationMediaPhase, FulfillmentIssueType } from "@prisma/client";
 import {
   IsBoolean,
   IsEnum,
@@ -12,45 +8,11 @@ import {
   IsOptional,
   IsString,
   IsUrl,
-  IsUUID,
   Max,
   MaxLength,
   Min,
   MinLength,
 } from "class-validator";
-
-export class CreateCollaborationThreadDto {
-  @IsUUID()
-  campaign_id!: string;
-
-  @IsUUID()
-  brief_id!: string;
-
-  @IsUUID()
-  creator_user_id!: string;
-
-  @IsOptional()
-  @IsUUID()
-  product_id?: string;
-
-  @IsOptional()
-  @IsUUID()
-  uce_pipeline_collaboration_id?: string;
-
-  @IsOptional()
-  @IsEnum(CollaborationPayoutMode)
-  payout_mode?: CollaborationPayoutMode;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  product_retail_value?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  initial_quote?: number;
-}
 
 export class PostCollaborationMessageDto {
   @IsString()

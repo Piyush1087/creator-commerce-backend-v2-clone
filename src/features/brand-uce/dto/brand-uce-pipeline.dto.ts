@@ -1,5 +1,12 @@
-import { UceCollabStatus, UceMilestoneStage, UcePipelineHealthStatus } from "@prisma/client";
 import {
+  UceCollabStatus,
+  UceMilestoneStage,
+  UcePipelineHealthStatus,
+} from "@prisma/client";
+import {
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsIn,
@@ -13,7 +20,9 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from "class-validator";
+import { Type } from "class-transformer";
 
 export class PipelineQueryDto {
   @IsOptional()
@@ -64,6 +73,14 @@ export class RejectApplicantDto {
   rejection_reason!: string;
 }
 
+export class DeliverablePublishingApplicabilityDto {
+  @IsUUID()
+  source_brief_deliverable_id!: string;
+
+  @IsBoolean()
+  publishing_required!: boolean;
+}
+
 export class ApproveApplicantDto {
   @IsOptional()
   @IsUUID()
@@ -73,6 +90,12 @@ export class ApproveApplicantDto {
   @IsNumber()
   @Min(0)
   total_quote?: number;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => DeliverablePublishingApplicabilityDto)
+  deliverable_publishing_applicability!: DeliverablePublishingApplicabilityDto[];
 }
 
 export class AddTrackingDto {

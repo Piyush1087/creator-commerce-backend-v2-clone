@@ -54,8 +54,6 @@ import {
   COLLABORATION_THREAD_INCLUDE,
   CollaborationAccessService,
 } from "./collaboration-access.service";
-import type { ProvisionCollaborationInput } from "./collaboration-provision.service";
-import { CollaborationProvisionService } from "./collaboration-provision.service";
 import { CollaborationRealtimeService } from "./collaboration-realtime.service";
 
 const LIVE_URL_DOMAINS = [/instagram\.com/i, /tiktok\.com/i, /youtube\.com/i];
@@ -65,7 +63,6 @@ export class CollaborationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: CollaborationAccessService,
-    private readonly provision: CollaborationProvisionService,
     private readonly realtime: CollaborationRealtimeService,
   ) {}
 
@@ -175,20 +172,6 @@ export class CollaborationService {
     return mapMessageRow(msg);
   }
 
-  async provisionThread(
-    user: AuthUser,
-    input: ProvisionCollaborationInput,
-  ) {
-    if (user.role !== UserRole.BRAND) {
-      throw new ForbiddenException("Only brands can open collaboration threads");
-    }
-    const brandProfileId = await this.access.resolveBrandProfileId(user);
-    if (brandProfileId !== input.brandProfileId) {
-      throw new ForbiddenException("Brand profile mismatch");
-    }
-    return this.provision.provisionFromUceApproval(input);
-  }
-
   async submitCreatorQuote(
     user: AuthUser,
     collaborationId: string,
@@ -199,7 +182,10 @@ export class CollaborationService {
     }
     const thread = await this.access.assertThreadForUser(user, collaborationId);
     this.assertStage(thread, UceMilestoneStage.STAGE_1_NEGOTIATION);
-    if (thread.payoutMode === CollaborationPayoutMode.BARTER && dto.total_quote !== 0) {
+    if (
+      thread.payoutMode === CollaborationPayoutMode.BARTER &&
+      dto.total_quote !== 0
+    ) {
       throw new BadRequestException("Barter collaborations require zero quote");
     }
     if (thread.negotiationRound >= 2) {
@@ -222,7 +208,8 @@ export class CollaborationService {
       await tx.collaborationCommercial.update({
         where: { collaborationId },
         data: {
-          initialQuote: thread.commercials?.initialQuote ?? toDecimal(dto.total_quote),
+          initialQuote:
+            thread.commercials?.initialQuote ?? toDecimal(dto.total_quote),
           finalQuote: toDecimal(dto.total_quote),
           productRetailValue: toDecimal(
             dto.product_retail_value ??
@@ -318,7 +305,10 @@ export class CollaborationService {
           0,
       );
 
-    if (thread.payoutMode !== CollaborationPayoutMode.BARTER && finalQuote <= 0) {
+    if (
+      thread.payoutMode !== CollaborationPayoutMode.BARTER &&
+      finalQuote <= 0
+    ) {
       throw new BadRequestException("Final quote must be positive");
     }
 
@@ -362,7 +352,9 @@ export class CollaborationService {
     const thread = await this.access.assertThreadForUser(user, collaborationId);
     this.assertStage(thread, UceMilestoneStage.STAGE_2_SECUREMENT);
     if (thread.payoutMode !== CollaborationPayoutMode.ESCROW) {
-      throw new BadRequestException("Escrow funding only applies to ESCROW mode");
+      throw new BadRequestException(
+        "Escrow funding only applies to ESCROW mode",
+      );
     }
     assertEscrowNotFunded(thread.commercials);
 
@@ -400,7 +392,9 @@ export class CollaborationService {
     }
     const thread = await this.access.assertThreadForUser(user, collaborationId);
     if (thread.payoutMode !== CollaborationPayoutMode.MANUAL) {
-      throw new BadRequestException("Manual receipt upload requires MANUAL payout mode");
+      throw new BadRequestException(
+        "Manual receipt upload requires MANUAL payout mode",
+      );
     }
     this.assertStage(thread, UceMilestoneStage.STAGE_2_SECUREMENT);
     assertAdvanceReceiptNotUploaded(thread.commercials);
@@ -412,19 +406,20 @@ export class CollaborationService {
     return this.broadcastAndReturnThread(user, collaborationId);
   }
 
-  async confirmManualAdvanceReceived(
-    user: AuthUser,
-    collaborationId: string,
-  ) {
+  async confirmManualAdvanceReceived(user: AuthUser, collaborationId: string) {
     if (user.role !== UserRole.CREATOR) {
       throw new ForbiddenException("Creator access required");
     }
     const thread = await this.access.assertThreadForUser(user, collaborationId);
     if (thread.payoutMode !== CollaborationPayoutMode.MANUAL) {
-      throw new BadRequestException("Manual confirmation requires MANUAL payout mode");
+      throw new BadRequestException(
+        "Manual confirmation requires MANUAL payout mode",
+      );
     }
     if (!thread.commercials?.advanceReceiptUrl) {
-      throw new BadRequestException("Brand has not uploaded advance receipt yet");
+      throw new BadRequestException(
+        "Brand has not uploaded advance receipt yet",
+      );
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -460,7 +455,9 @@ export class CollaborationService {
       thread.industry === CollaborationIndustryType.D2C_ECOMMERCE &&
       !dto.tracking_id?.trim()
     ) {
-      throw new BadRequestException("tracking_id is required for D2C collaborations");
+      throw new BadRequestException(
+        "tracking_id is required for D2C collaborations",
+      );
     }
     if (
       thread.industry !== CollaborationIndustryType.D2C_ECOMMERCE &&
@@ -559,9 +556,7 @@ export class CollaborationService {
         where: { id: collaborationId },
         data: {
           fulfillmentIssueCount: nextCount,
-          ...(deadlock
-            ? { isTerminated: true, isPaused: true }
-            : {}),
+          ...(deadlock ? { isTerminated: true, isPaused: true } : {}),
         },
       });
       await this.appendSystemMessage(
@@ -587,7 +582,9 @@ export class CollaborationService {
     const thread = await this.access.assertThreadForUser(user, collaborationId);
     this.assertStage(thread, UceMilestoneStage.STAGE_4_CONTENT_REVIEW);
     if (!thread.logistics?.isReceivedConfirmed) {
-      throw new BadRequestException("Confirm logistics receipt before uploading content");
+      throw new BadRequestException(
+        "Confirm logistics receipt before uploading content",
+      );
     }
 
     const pendingCount = await this.prisma.collaborationMedia.count({
@@ -748,7 +745,8 @@ export class CollaborationService {
         where: { collaborationId },
         data: {
           isComplianceVerified: true,
-          isFinalPayoutReleased: thread.payoutMode === CollaborationPayoutMode.ESCROW,
+          isFinalPayoutReleased:
+            thread.payoutMode === CollaborationPayoutMode.ESCROW,
         },
       });
       if (thread.payoutMode === CollaborationPayoutMode.ESCROW) {
@@ -824,7 +822,10 @@ export class CollaborationService {
     return this.broadcastAndReturnThread(user, collaborationId);
   }
 
-  private async broadcastAndReturnThread(user: AuthUser, collaborationId: string) {
+  private async broadcastAndReturnThread(
+    user: AuthUser,
+    collaborationId: string,
+  ) {
     await this.realtime.broadcast(collaborationId, "thread.updated");
     return this.getThread(user, collaborationId);
   }

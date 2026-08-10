@@ -400,6 +400,121 @@ enum CollaborationPayoutMode {
   BARTER
 }
 
+enum UceApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+  EXPIRED
+  SUPERSEDED
+}
+
+enum UceApplicationSource {
+  DIRECT
+  OUTREACH
+  SHARE
+  LEGACY_PIPELINE
+}
+
+enum UceBrandSupportType {
+  PRODUCT
+  SERVICE
+  EXPERIENCE
+  ACCESS_SUBSCRIPTION
+  OTHER
+}
+
+enum CollaborationLifecycle {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+  TERMINATED
+}
+
+enum CollaborationStage {
+  NEGOTIATION
+  SECUREMENT
+  FULFILLMENT
+  PRODUCTION
+  PUBLISHING_SETTLEMENT
+}
+
+enum CollaborationStageStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  BLOCKED
+  HARD_STOPPED
+}
+
+enum CollaborationNegotiationState {
+  NOT_REQUIRED
+  AWAITING_BRAND_DECISION
+  AWAITING_CREATOR_DECISION
+  AGREED
+  DECLINED
+}
+
+enum CollaborationPaymentRail {
+  PLATFORM_ESCROW
+  MANUAL
+}
+
+enum CollaborationSecurementState {
+  NOT_REQUIRED
+  AWAITING_FUNDING
+  FUNDING_REQUESTED
+  FUNDED
+  AWAITING_MANUAL_PAYMENT
+  AWAITING_CREATOR_CONFIRMATION
+  DISPUTED
+  COMPLETED
+}
+
+enum CollaborationFulfillmentState {
+  NOT_REQUIRED
+  NOT_STARTED
+  AWAITING_BRAND_FULFILLMENT
+  AWAITING_CREATOR_CONFIRMATION
+  REMEDIATION_REQUIRED
+  COMPLETED
+  HARD_STOPPED
+}
+
+enum CollaborationDeliverableState {
+  AWAITING_SUBMISSION
+  UNDER_REVIEW
+  REVISION_REQUESTED
+  APPROVED
+  AUTO_APPROVED
+  HARD_STOPPED
+}
+
+enum CollaborationPublishingState {
+  PUBLISHING_NOT_REQUIRED
+  AWAITING_AUTHORIZATION
+  AWAITING_EVIDENCE
+  UNDER_REVIEW
+  CORRECTION_REQUIRED
+  VERIFIED
+  BLOCKED
+}
+
+enum CollaborationPublicationAuthorizationState {
+  NOT_REQUIRED
+  NOT_AUTHORIZED
+  AUTHORIZED
+}
+
+enum CollaborationEventKind {
+  CREATED
+  STATE_TRANSITION
+  COMMAND_ACCEPTED
+  SYSTEM_NOTE
+}
+
 enum CollaborationIndustryType {
   D2C_ECOMMERCE
   HEALTHCARE_CLINICAL
@@ -657,6 +772,7 @@ model User {
   historicChatThreads HistoricChatThread[]
   metricPostPulses MetricPostPulse[]
   collaborationsAsCreator Collaboration[] @relation("CollaborationCreator")
+  uceCampaignCreatorLinks UceCampaignCreator[] @relation("UceCampaignCreatorUser")
   coPilotThreads CoPilotThread[]
   coPilotMessageFeedback CoPilotMessageFeedback[]
   creatorCoPilotThreadsAuthored CreatorCoPilotThread[] @relation("CreatorCoPilotThreadAuthor")
@@ -1221,6 +1337,8 @@ model UceCampaign {
   reportingTimeseries  UceCampaignReportingTimeseriesHourly[]
   reportingAssets      UceCampaignReportingAssetGallery[]
   bridgeSignals        IntegrationBridgeSignalLedger[]
+  applicationCreators  UceCampaignCreator[]
+  applications         UceApplication[]
 
   @@index([brandProfileId, status])
   @@map("uce_campaigns")
@@ -1281,6 +1399,10 @@ model UceCampaignCommercials {
   totalCampaignBudgetPool  Decimal             @map("total_campaign_budget_pool") @db.Decimal(14, 2)
   advancePaymentPercentage Int                 @default(30) @map("advance_payment_percentage")
   finalBalanceTerms        UcePayoutTerms      @default(NET_30) @map("final_balance_terms")
+  receivesBrandSupport     Boolean             @default(false) @map("receives_brand_support")
+  brandSupportType         UceBrandSupportType? @map("brand_support_type")
+  brandSupportEstimatedValue Decimal?          @map("brand_support_estimated_value") @db.Decimal(12, 2)
+  currency                 String              @default("USD") @db.VarChar(3)
 
   @@map("uce_campaign_commercials")
 }
@@ -1320,6 +1442,7 @@ model UceCampaignProduct {
   briefs         UceCampaignBrief[]
   collaborations UceCampaignCollaboration[]
   workflowCollaborations Collaboration[]
+  applications UceApplication[]
 
   @@unique([campaignId, skuCode])
   @@index([campaignId])
@@ -1350,10 +1473,90 @@ model UceCampaignBrief {
 
   collaborations UceCampaignCollaboration[]
   workflowCollaborations Collaboration[]
+  deliverables UceBriefDeliverable[]
+  applications UceApplication[]
 
   @@index([campaignId])
   @@index([productId])
   @@map("uce_campaign_briefs")
+}
+
+model UceBriefDeliverable {
+  id String @id @default(uuid())
+  briefId String @map("brief_id")
+  brief UceCampaignBrief @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  format String @db.VarChar(80)
+  displayOrder Int @map("display_order")
+  configuration Json?
+  creativeGuidance Json? @map("creative_guidance")
+  amplifyTargetDeliverableId String? @map("amplify_target_deliverable_id")
+  amplifyTargetDeliverable UceBriefDeliverable? @relation("BriefDeliverableAmplifyTarget", fields: [amplifyTargetDeliverableId], references: [id], onDelete: Restrict)
+  amplifiedBy UceBriefDeliverable[] @relation("BriefDeliverableAmplifyTarget")
+  collaborationExecutions CollaborationDeliverableExecution[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([briefId, displayOrder])
+  @@index([amplifyTargetDeliverableId])
+  @@map("uce_brief_deliverables")
+}
+
+model UceCampaignCreator {
+  id String @id @default(uuid())
+  campaignId String @map("campaign_id")
+  campaign UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creatorUserId String @map("creator_user_id")
+  creatorUser User @relation("UceCampaignCreatorUser", fields: [creatorUserId], references: [id], onDelete: Restrict)
+  applications UceApplication[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([campaignId, creatorUserId])
+  @@index([creatorUserId])
+  @@map("uce_campaign_creators")
+}
+
+model UceApplication {
+  id String @id @default(uuid())
+  requestId String @unique @map("request_id")
+  campaignId String @map("campaign_id")
+  campaignCreatorId String @map("campaign_creator_id")
+  campaignAssetId String @map("campaign_asset_id")
+  briefId String @map("brief_id")
+  legacyPipelineCollaborationId String? @unique @map("legacy_pipeline_collaboration_id")
+  status UceApplicationStatus @default(PENDING)
+  source UceApplicationSource @default(DIRECT)
+  proposedFee Decimal? @map("proposed_fee") @db.Decimal(14, 2)
+  campaign UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  campaignCreator UceCampaignCreator @relation(fields: [campaignCreatorId], references: [id], onDelete: Restrict)
+  campaignAsset UceCampaignProduct @relation(fields: [campaignAssetId], references: [id], onDelete: Restrict)
+  brief UceCampaignBrief @relation(fields: [briefId], references: [id], onDelete: Restrict)
+  legacyPipelineCollaboration UceCampaignCollaboration? @relation(fields: [legacyPipelineCollaborationId], references: [id], onDelete: SetNull)
+  snapshot UceApplicationSnapshot?
+  collaboration Collaboration?
+  appliedAt DateTime @default(now()) @map("applied_at")
+  approvedAt DateTime? @map("approved_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([campaignId, status])
+  @@index([campaignCreatorId, status])
+  @@index([briefId, status])
+  @@map("uce_applications")
+}
+
+model UceApplicationSnapshot {
+  id String @id @default(uuid())
+  applicationId String @unique @map("application_id")
+  application UceApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  campaignContext Json @map("campaign_context")
+  campaignAssetContext Json @map("campaign_asset_context")
+  briefContext Json @map("brief_context")
+  commercialContext Json @map("commercial_context")
+  creatorIdentity Json @map("creator_identity")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("uce_application_snapshots")
 }
 
 enum PlannerSignalType {
@@ -1453,6 +1656,7 @@ model UceCampaignCollaboration {
   logisticsRegistry UceCollaborationLogistics?
   contentDrafts     UceCollaborationContentDraft[]
   liveTelemetry     UceCollaborationLiveTelemetry?
+  sourceApplication UceApplication?
 
   @@unique([campaignId, instagramHandle])
   @@index([campaignId, collabStatus, currentMilestone])
@@ -1940,6 +2144,15 @@ model Collaboration {
   ucePipelineCollaborationId String?                  @unique @map("uce_pipeline_collaboration_id")
   ucePipelineCollaboration   UceCampaignCollaboration? @relation(fields: [ucePipelineCollaborationId], references: [id], onDelete: SetNull)
 
+  sourceApplicationId String? @unique @map("source_application_id")
+  sourceApplication UceApplication? @relation(fields: [sourceApplicationId], references: [id], onDelete: Restrict)
+  campaignCreatorId String? @map("campaign_creator_id")
+  campaignAssetId String? @map("campaign_asset_id")
+  lifecycle CollaborationLifecycle @default(ACTIVE)
+  canonicalStage CollaborationStage @default(NEGOTIATION) @map("canonical_stage")
+  currentStageStatus CollaborationStageStatus @default(IN_PROGRESS) @map("current_stage_status")
+  aggregateVersion Int @default(1) @map("aggregate_version")
+
   currentStage UceMilestoneStage       @default(STAGE_1_NEGOTIATION) @map("current_stage")
   payoutMode   CollaborationPayoutMode @default(ESCROW) @map("payout_mode")
   industry     CollaborationIndustryType
@@ -1965,12 +2178,126 @@ model Collaboration {
   finalization   CollaborationFinalization?
   messages       CollaborationMessage[]
   escrowLock     CollaborationEscrowLock?
+  snapshot       CollaborationExecutionSnapshot?
+  commercialAgreement CollaborationCommercialAgreement?
+  fulfillment   CollaborationFulfillment?
+  deliverables  CollaborationDeliverableExecution[]
+  events         CollaborationEvent[]
 
-  @@unique([campaignId, creatorUserId])
+  @@index([campaignId, creatorUserId])
   @@index([brandProfileId, currentStage])
   @@index([creatorUserId, currentStage])
   @@index([lastMessageAt])
   @@map("collaborations")
+}
+
+model CollaborationExecutionSnapshot {
+  id String @id @default(uuid())
+  collaborationId String @unique @map("collaboration_id")
+  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  campaignContext Json @map("campaign_context")
+  campaignAssetContext Json @map("campaign_asset_context")
+  briefContext Json @map("brief_context")
+  applicationContext Json? @map("application_context")
+  creatorContext Json? @map("creator_context")
+  brandContext Json? @map("brand_context")
+  usageRights Json? @map("usage_rights")
+  creatorRequirements String? @map("creator_requirements")
+  receivesBrandSupport Boolean @default(false) @map("receives_brand_support")
+  brandSupportType UceBrandSupportType? @map("brand_support_type")
+  brandSupportEstimatedValue Decimal? @map("brand_support_estimated_value") @db.Decimal(12, 2)
+  campaignCommercialContext Json? @map("campaign_commercial_context")
+  advancePercentageSnapshot Int @map("advance_percentage_snapshot")
+  commercialCurrency String @db.VarChar(3) @map("commercial_currency")
+  lockedAt DateTime @default(now()) @map("locked_at")
+
+  @@map("collaboration_execution_snapshots")
+}
+
+model CollaborationCommercialAgreement {
+  id String @id @default(uuid())
+  collaborationId String @unique @map("collaboration_id")
+  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  negotiationState CollaborationNegotiationState @map("negotiation_state")
+  applicationProposedFee Decimal? @map("application_proposed_fee") @db.Decimal(14, 2)
+  brandCounterFee Decimal? @map("brand_counter_fee") @db.Decimal(14, 2)
+  agreedCreatorFee Decimal? @map("agreed_creator_fee") @db.Decimal(14, 2)
+  currency String @db.VarChar(3)
+  advancePercentageSnapshot Int @map("advance_percentage_snapshot")
+  advanceAmount Decimal? @map("advance_amount") @db.Decimal(14, 2)
+  balanceAmount Decimal? @map("balance_amount") @db.Decimal(14, 2)
+  nonCashConsideration Json? @map("non_cash_consideration")
+  paymentRail CollaborationPaymentRail @default(PLATFORM_ESCROW) @map("payment_rail")
+  securementState CollaborationSecurementState? @map("securement_state")
+  requiredSecuredAmount Decimal? @map("required_secured_amount") @db.Decimal(14, 2)
+  confirmedSecuredAmount Decimal? @map("confirmed_secured_amount") @db.Decimal(14, 2)
+  termsLockedAt DateTime? @map("terms_locked_at")
+
+  @@index([negotiationState])
+  @@index([securementState])
+  @@map("collaboration_commercial_agreements")
+}
+
+model CollaborationFulfillment {
+  id String @id @default(uuid())
+  collaborationId String @unique @map("collaboration_id")
+  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  state CollaborationFulfillmentState @default(NOT_STARTED)
+  issueCount Int @default(0) @map("issue_count")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([state])
+  @@map("collaboration_fulfillments")
+}
+
+model CollaborationDeliverableExecution {
+  id String @id @default(uuid())
+  collaborationId String @map("collaboration_id")
+  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  sourceBriefDeliverableId String @map("source_brief_deliverable_id")
+  sourceBriefDeliverable UceBriefDeliverable @relation(fields: [sourceBriefDeliverableId], references: [id], onDelete: Restrict)
+  displayOrder Int @map("display_order")
+  definitionSnapshot Json @map("definition_snapshot")
+  state CollaborationDeliverableState @default(AWAITING_SUBMISSION)
+  revisionRequestCount Int @default(0) @map("revision_request_count")
+  publishingRequired Boolean @map("publishing_required")
+  publishing CollaborationPublishingExecution?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([collaborationId, sourceBriefDeliverableId])
+  @@index([collaborationId, state])
+  @@index([sourceBriefDeliverableId])
+  @@map("collaboration_deliverable_executions")
+}
+
+model CollaborationPublishingExecution {
+  id String @id @default(uuid())
+  deliverableExecutionId String @unique @map("deliverable_execution_id")
+  deliverableExecution CollaborationDeliverableExecution @relation(fields: [deliverableExecutionId], references: [id], onDelete: Cascade)
+  state CollaborationPublishingState
+  authorizationState CollaborationPublicationAuthorizationState @map("authorization_state")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([state])
+  @@map("collaboration_publishing_executions")
+}
+
+model CollaborationEvent {
+  id String @id @default(uuid())
+  collaborationId String @map("collaboration_id")
+  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  kind CollaborationEventKind
+  commandId String? @map("command_id")
+  aggregateVersion Int @map("aggregate_version")
+  payload Json?
+  occurredAt DateTime @default(now()) @map("occurred_at")
+
+  @@unique([collaborationId, commandId])
+  @@index([collaborationId, aggregateVersion])
+  @@map("collaboration_events")
 }
 
 model CollaborationCommercial {

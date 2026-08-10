@@ -13,11 +13,9 @@ import { ThrottlerGuard } from "@nestjs/throttler";
 
 import type { RequestWithAuthUser } from "../auth/auth.controller";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
-import { BrandCentreAuthService } from "../brand-centre/brand-centre-auth.service";
 import {
   AcceptCommercialsDto,
   BrandCounterOfferDto,
-  CreateCollaborationThreadDto,
   DispatchLogisticsDto,
   FundEscrowDto,
   PostCollaborationMessageDto,
@@ -39,7 +37,6 @@ import { CollaborationService } from "./services/collaboration.service";
 @UseGuards(ThrottlerGuard, JwtAuthGuard)
 export class CollaborationController {
   constructor(
-    private readonly brandAuth: BrandCentreAuthService,
     private readonly collaboration: CollaborationService,
     private readonly creatorProfile: CollaborationCreatorProfileService,
   ) {}
@@ -50,25 +47,6 @@ export class CollaborationController {
     @Query() query: ListCollaborationThreadsQueryDto,
   ) {
     return this.collaboration.listThreads(req.user, query);
-  }
-
-  @Post("threads")
-  async createThread(
-    @Req() req: RequestWithAuthUser,
-    @Body() body: CreateCollaborationThreadDto,
-  ) {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
-    return this.collaboration.provisionThread(req.user, {
-      brandProfileId,
-      campaignId: body.campaign_id,
-      briefId: body.brief_id,
-      creatorUserId: body.creator_user_id,
-      productId: body.product_id,
-      ucePipelineCollaborationId: body.uce_pipeline_collaboration_id,
-      payoutMode: body.payout_mode,
-      initialQuote: body.initial_quote,
-      productRetailValue: body.product_retail_value,
-    });
   }
 
   @Get("threads/:collaborationId")
@@ -102,7 +80,11 @@ export class CollaborationController {
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
     @Body() body: SubmitCreatorQuoteDto,
   ) {
-    return this.collaboration.submitCreatorQuote(req.user, collaborationId, body);
+    return this.collaboration.submitCreatorQuote(
+      req.user,
+      collaborationId,
+      body,
+    );
   }
 
   @Post("threads/:collaborationId/negotiation/counter-offer")
@@ -111,7 +93,11 @@ export class CollaborationController {
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
     @Body() body: BrandCounterOfferDto,
   ) {
-    return this.collaboration.brandCounterOffer(req.user, collaborationId, body);
+    return this.collaboration.brandCounterOffer(
+      req.user,
+      collaborationId,
+      body,
+    );
   }
 
   @Post("threads/:collaborationId/negotiation/accept")
@@ -120,7 +106,11 @@ export class CollaborationController {
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
     @Body() body: AcceptCommercialsDto,
   ) {
-    return this.collaboration.acceptCommercials(req.user, collaborationId, body);
+    return this.collaboration.acceptCommercials(
+      req.user,
+      collaborationId,
+      body,
+    );
   }
 
   @Post("threads/:collaborationId/securement/fund-escrow")
@@ -162,7 +152,11 @@ export class CollaborationController {
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
     @Body() body: DispatchLogisticsDto,
   ) {
-    return this.collaboration.dispatchLogistics(req.user, collaborationId, body);
+    return this.collaboration.dispatchLogistics(
+      req.user,
+      collaborationId,
+      body,
+    );
   }
 
   @Post("threads/:collaborationId/logistics/confirm-receipt")
