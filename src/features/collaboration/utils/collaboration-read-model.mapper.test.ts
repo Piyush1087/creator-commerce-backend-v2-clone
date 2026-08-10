@@ -244,8 +244,9 @@ test("detail reconstructs Application identity, locked context, commercials, Del
   assert.deepEqual(detail.deliverables[0].submissionVersions, []);
   assert.equal(detail.publishing[0].state, "AWAITING_PUBLISHING");
   assert.deepEqual(detail.settlement, {
-    status: "NOT_ELIGIBLE",
+    state: "NOT_ELIGIBLE",
     actionRequiredBy: "NONE",
+    residualSettlementPending: false,
   });
   assert.equal(detail.resolution, null);
 });
@@ -462,8 +463,9 @@ test("publishing projection exposes append-only evidence, correction and passive
   assert.equal(publishing.complianceVerifiedAt, verifiedAt.toISOString());
   assert.equal(detail.publishingComplete, true);
   assert.deepEqual(detail.settlement, {
-    status: "ELIGIBLE",
-    actionRequiredBy: "SYSTEM",
+    state: "NOT_ELIGIBLE",
+    actionRequiredBy: "NONE",
+    residualSettlementPending: false,
   });
   assert.equal(detail.lifecycle.state, CollaborationLifecycle.ACTIVE);
   assert.deepEqual(detail.deliverables[0].availableActions, []);
@@ -718,6 +720,57 @@ test("HTTP projector reconstruction has no socket or realtime input", () => {
     "BRAND",
   );
   assert.deepEqual(reentered, first);
+});
+
+test("Settlement read model keeps terminal entitlement separate from execution legs", () => {
+  const row = canonicalRow({
+    lifecycle: CollaborationLifecycle.TERMINATED,
+    financialResolution: {
+      ...canonicalRow().financialResolution,
+      status: "RESOLVED",
+      outcome: "PRODUCTION_HARD_STOP",
+      creatorEntitlementAmount: new Decimal(30000),
+      brandRefundEntitlementAmount: new Decimal(75782),
+      creatorGrossEntitlementAmount: new Decimal(30000),
+      brandCommercialRefundEntitlementAmount: new Decimal(75782),
+      currency: "INR",
+    } as any,
+    settlement: {
+      id: "settlement-1",
+      collaborationId: "collaboration-1",
+      state: "PROCESSING",
+      creatorPayoutState: "PROCESSING",
+      brandRefundState: "CONFIRMED",
+      creatorSettlementAmount: new Decimal(30000),
+      brandRefundAmount: new Decimal(75782),
+      currency: "INR",
+      payoutInstructionRef: "payout:intent",
+      refundInstructionRef: "refund:intent",
+      payoutExecutionRef: null,
+      refundExecutionRef: "refund:execution",
+      payoutConfirmationRef: null,
+      refundConfirmationRef: "refund:confirmation",
+      authoritativeConfirmationRef: null,
+      eligibleAt: new Date("2026-08-15T09:00:00.000Z"),
+      processingAt: new Date("2026-08-15T10:00:00.000Z"),
+      settledAt: null,
+      blockedAt: null,
+      blockedReason: null,
+      createdAt: new Date("2026-08-15T09:00:00.000Z"),
+      updatedAt: new Date("2026-08-15T10:00:00.000Z"),
+    } as any,
+  });
+  const detail = projectCanonicalCollaborationDetail(row, "CREATOR");
+  assert.equal(detail.resolution!.creatorGrossEntitlementAmount, 30000);
+  assert.equal(
+    detail.resolution!.brandCommercialRefundEntitlementAmount,
+    75782,
+  );
+  assert.equal(detail.settlement.creatorPayoutState, "PROCESSING");
+  assert.equal(detail.settlement.brandRefundState, "CONFIRMED");
+  assert.equal(detail.settlement.residualSettlementPending, true);
+  assert.equal(detail.lifecycle.state, CollaborationLifecycle.TERMINATED);
+  assert.equal(detail.workflow.actionRequiredBy, "SYSTEM");
 });
 
 function matchesPrismaFilter(
