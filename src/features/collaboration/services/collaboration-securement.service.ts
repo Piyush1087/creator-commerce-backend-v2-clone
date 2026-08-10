@@ -116,11 +116,25 @@ export class CollaborationSecurementService {
         "Required secured amount is missing",
         before.aggregateVersion,
       );
-    const instruction = await this.funding.requestFunding({
+    if (
+      !agreement.agreedCreatorFee ||
+      !agreement.platformCommissionAmount ||
+      !agreement.platformCommissionGstAmount
+    ) {
+      commandConflict(
+        "INVALID_STATE",
+        "Locked financial policy snapshot is incomplete",
+        before.aggregateVersion,
+      );
+    }
+    const reserve = await this.funding.reserveFunds({
       collaborationId,
-      commandId: input.commandId,
-      amount: required.toNumber(),
+      brandProfileId: before.brandProfileId,
       currency: agreement.currency,
+      creatorGrossFee: agreement.agreedCreatorFee,
+      platformCommissionAmount: agreement.platformCommissionAmount,
+      platformCommissionGstAmount: agreement.platformCommissionGstAmount,
+      requiredSecuredAmount: required,
     });
 
     await this.prisma.$transaction(async (tx) => {
@@ -140,14 +154,50 @@ export class CollaborationSecurementService {
         input.expectedAggregateVersion,
       );
       const version = row.aggregateVersion + 1;
+      const now = new Date();
+      const reserved = reserve.status === "RESERVED";
+      const progression = reserved
+        ? afterSecurementProgression(row.fulfillment?.state ?? null)
+        : null;
       await tx.collaborationCommercialAgreement.update({
         where: { collaborationId },
         data: {
-          fundingInstructionRef: instruction.fundingInstructionRef,
-          securementState: CollaborationSecurementState.PROCESSING_FUNDING,
+          fundingInstructionRef: `escrow-reserve:${input.commandId}`,
+          escrowLockRef: reserved ? reserve.escrowLockRef : undefined,
+          confirmedSecuredAmount: reserved
+            ? reserve.confirmedAmount
+            : new Prisma.Decimal(0),
+          securementState: reserved
+            ? CollaborationSecurementState.COMPLETED
+            : CollaborationSecurementState.AWAITING_ESCROW_FUNDING,
+          securementCompletedAt: reserved ? now : null,
         },
       });
-      await this.bump(tx, collaborationId, row.aggregateVersion);
+      if (
+        reserved &&
+        row.fulfillment &&
+        progression!.fulfillmentState !== row.fulfillment.state
+      ) {
+        await tx.collaborationFulfillment.update({
+          where: { collaborationId },
+          data: { state: progression!.fulfillmentState! },
+        });
+      }
+      const updated = await tx.collaboration.updateMany({
+        where: { id: collaborationId, aggregateVersion: row.aggregateVersion },
+        data: {
+          aggregateVersion: { increment: 1 },
+          ...(progression
+            ? {
+                canonicalStage: progression.canonicalStage,
+                currentStageStatus: progression.currentStageStatus,
+                currentStage: progression.legacyStage,
+                stageUpdatedAt: now,
+              }
+            : {}),
+        },
+      });
+      if (updated.count !== 1) this.stale(row.aggregateVersion);
       await appendCommandEvent(tx, {
         collaborationId,
         eventType: "ESCROW_FUNDING_REQUESTED",
@@ -157,8 +207,13 @@ export class CollaborationSecurementService {
         aggregateVersion: version,
         requestFingerprint: fingerprint,
         payload: {
-          fundingInstructionRef: instruction.fundingInstructionRef,
+          reserveStatus: reserve.status,
+          escrowLockRef: reserved ? reserve.escrowLockRef : undefined,
           requiredSecuredAmount: required.toString(),
+          shortfallAmount:
+            reserve.status === "INSUFFICIENT_AVAILABLE_BALANCE"
+              ? reserve.shortfallAmount.toString()
+              : undefined,
           currency: agreement.currency,
         },
       });
@@ -225,7 +280,28 @@ export class CollaborationSecurementService {
           "Required secured amount is missing",
           row.aggregateVersion,
         );
+      const authoritativeLock = await tx.collaborationEscrowLock.findUnique({
+        where: { id: input.escrowLockRef },
+      });
+      if (
+        !authoritativeLock ||
+        authoritativeLock.collaborationId !== collaborationId ||
+        authoritativeLock.brandProfileId !== row.brandProfileId
+      ) {
+        commandConflict(
+          "FUNDING_NOT_CONFIRMED",
+          "Authoritative Escrow lock evidence was not found",
+          row.aggregateVersion,
+        );
+      }
       const confirmed = new Prisma.Decimal(input.confirmedAmount);
+      if (!authoritativeLock.totalEscrowLockedAmount.equals(confirmed)) {
+        commandConflict(
+          "FUNDING_NOT_CONFIRMED",
+          "Confirmed amount does not match the authoritative Escrow lock",
+          row.aggregateVersion,
+        );
+      }
       const complete = confirmed.greaterThanOrEqualTo(
         agreement.requiredSecuredAmount,
       );
@@ -238,6 +314,7 @@ export class CollaborationSecurementService {
         where: { collaborationId },
         data: {
           fundingConfirmationRef: input.fundingConfirmationRef,
+          escrowLockRef: input.escrowLockRef,
           confirmedSecuredAmount: confirmed,
           securementState: complete
             ? CollaborationSecurementState.COMPLETED
@@ -279,6 +356,7 @@ export class CollaborationSecurementService {
         requestFingerprint: fingerprint,
         payload: {
           fundingConfirmationRef: input.fundingConfirmationRef,
+          escrowLockRef: input.escrowLockRef,
           confirmedAmount: confirmed.toString(),
           currency: input.currency,
           sufficient: complete,

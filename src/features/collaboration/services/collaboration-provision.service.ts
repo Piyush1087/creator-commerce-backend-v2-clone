@@ -31,6 +31,9 @@ import { mapBrandIndustryToCollaborationIndustry } from "../utils/map-collaborat
 import { resolveProvisioningNegotiationState } from "../utils/collaboration-provisioning-initialization";
 import { COLLABORATION_THREAD_INCLUDE } from "./collaboration-access.service";
 import { CollaborationRealtimeService } from "./collaboration-realtime.service";
+import { PlanCommercialPolicyService } from "../../pricing/services/plan-commercial-policy.service";
+import { BusinessGeographyFinancialPolicyService } from "../../pricing/services/business-geography-financial-policy.service";
+import { calculateCommercialReserve } from "../utils/collaboration-financial-calculation";
 
 const toJson = (value: unknown): Prisma.InputJsonValue =>
   JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
@@ -40,6 +43,8 @@ export class CollaborationProvisionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtime: CollaborationRealtimeService,
+    private readonly planPolicies: PlanCommercialPolicyService,
+    private readonly geographyPolicies: BusinessGeographyFinancialPolicyService,
   ) {}
 
   async ensureCreatorUser(email: string, instagramHandle?: string) {
@@ -169,6 +174,26 @@ export class CollaborationProvisionService {
     }
     const advanceAmount = fixedAgreedFee?.mul(advancePercentage).div(100);
     const balanceAmount = fixedAgreedFee?.minus(advanceAmount ?? 0);
+    const fixedPolicy = !negotiationRequired
+      ? await this.prisma.$transaction(async (tx) => {
+          const plan = await this.planPolicies.resolveForBrand(
+            application.campaign.brandProfileId,
+            tx,
+          );
+          const geography = this.geographyPolicies.resolve(
+            application.campaign.brandProfile.countryCode,
+          );
+          return {
+            plan,
+            geography,
+            reserve: calculateCommercialReserve(
+              fixedAgreedFee!,
+              plan.platformCommissionRate,
+              geography.platformCommissionGstRate,
+            ),
+          };
+        })
+      : null;
     const securementState = negotiationRequired
       ? null
       : fixedAgreedFee!.greaterThan(0)
@@ -233,9 +258,23 @@ export class CollaborationProvisionService {
                 advancePercentageSnapshot: advancePercentage,
                 advanceAmount,
                 balanceAmount,
+                pricingTierSnapshot: fixedPolicy?.plan.tier,
+                businessCountryCodeSnapshot: fixedPolicy?.geography.countryCode,
+                financialPolicyVersionSnapshot: fixedPolicy
+                  ? `${fixedPolicy.plan.policyVersion}|${fixedPolicy.geography.policyVersion}`
+                  : undefined,
+                platformCommissionRateSnapshot:
+                  fixedPolicy?.plan.platformCommissionRate,
+                platformCommissionAmount:
+                  fixedPolicy?.reserve.platformCommissionAmount,
+                platformCommissionGstRateSnapshot:
+                  fixedPolicy?.geography.platformCommissionGstRate,
+                platformCommissionGstAmount:
+                  fixedPolicy?.reserve.platformCommissionGstAmount,
                 paymentRail: CollaborationPaymentRail.PLATFORM_ESCROW,
                 securementState,
-                requiredSecuredAmount: fixedAgreedFee,
+                requiredSecuredAmount:
+                  fixedPolicy?.reserve.requiredSecuredAmount,
                 termsLockedAt: negotiationRequired ? null : new Date(),
               },
             },

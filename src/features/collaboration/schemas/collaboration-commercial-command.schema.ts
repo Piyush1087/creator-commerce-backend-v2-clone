@@ -26,6 +26,7 @@ export const confirmEscrowFundingSchema = z
   .object({
     ...commandEnvelope,
     fundingConfirmationRef: evidenceRef,
+    escrowLockRef: evidenceRef,
     confirmedAmount: z.coerce.number().finite().nonnegative(),
     currency: z
       .string()

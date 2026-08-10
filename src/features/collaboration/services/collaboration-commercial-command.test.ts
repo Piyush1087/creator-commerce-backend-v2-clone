@@ -81,7 +81,7 @@ function makeRow(): any {
       skuCode: null,
       imageUrl: null,
     },
-    brandProfile: { id: "brand-1", name: "Brand" },
+    brandProfile: { id: "brand-1", name: "Brand", countryCode: "IN" },
     creatorUser: {
       id: "creator-1",
       name: "Creator",
@@ -140,6 +140,7 @@ function harness(
   const row = makeRow();
   const events: Array<Record<string, any>> = [];
   let fundingRequests = 0;
+  let commissionRate = 7;
   const tx: any = {
     collaboration: {
       findUniqueOrThrow: async () => row,
@@ -187,6 +188,16 @@ function harness(
       findUnique: async () =>
         options.payoutProfile ? { id: "settlement-profile-1" } : null,
     },
+    collaborationEscrowLock: {
+      findUnique: async ({ where }: any) => ({
+        id: where.id,
+        collaborationId: row.id,
+        brandProfileId: row.brandProfileId,
+        totalEscrowLockedAmount: new Prisma.Decimal(
+          where.id === "lock-partial" ? 500 : 1082.6,
+        ),
+      }),
+    },
   };
   const prisma: any = {
     ...tx,
@@ -198,20 +209,43 @@ function harness(
     manualEnabledForNewObligations: () => options.manualEnabled ?? false,
   };
   const funding: any = {
-    requestFunding: async ({ commandId }: any) => {
+    reserveFunds: async () => {
       fundingRequests += 1;
-      return { fundingInstructionRef: `instruction:${commandId}` };
+      return {
+        status: "INSUFFICIENT_AVAILABLE_BALANCE",
+        availableAmount: new Prisma.Decimal(0),
+        shortfallAmount: new Prisma.Decimal(1082.6),
+      };
     },
+  };
+  const planPolicies: any = {
+    resolveForBrand: async () => ({
+      tier: "FOUNDERS_BETA",
+      policyVersion: "subscription-commercial-v1:FOUNDERS_BETA",
+      platformCommissionRate: new Prisma.Decimal(commissionRate),
+    }),
+  };
+  const geographyPolicies: any = {
+    resolve: () => ({
+      countryCode: "IN",
+      policyVersion: "IN-MVP-2026-01",
+      platformCommissionGstRate: new Prisma.Decimal(18),
+    }),
   };
   return {
     row,
     events,
     fundingRequests: () => fundingRequests,
+    setCommissionRate: (value: number) => {
+      commissionRate = value;
+    },
     negotiation: new CollaborationNegotiationService(
       prisma,
       access,
       realtime,
       capabilities,
+      planPolicies,
+      geographyPolicies,
     ),
     securement: new CollaborationSecurementService(
       prisma,
@@ -233,11 +267,29 @@ test("Brand accepts proposal once, locks snapshotted commercial arithmetic, and 
   assert.equal(h.row.commercialAgreement.balanceAmount?.toNumber(), 600);
   assert.equal(
     h.row.commercialAgreement.requiredSecuredAmount?.toNumber(),
-    1000,
+    1082.6,
   );
   assert.equal(h.row.canonicalStage, CollaborationStage.SECUREMENT);
   assert.equal(h.row.aggregateVersion, 2);
+  assert.equal(
+    h.row.commercialAgreement.platformCommissionRateSnapshot?.toNumber(),
+    7,
+  );
+  assert.equal(
+    h.row.commercialAgreement.platformCommissionAmount?.toNumber(),
+    70,
+  );
+  assert.equal(
+    h.row.commercialAgreement.platformCommissionGstAmount?.toNumber(),
+    12.6,
+  );
   assert.equal(h.events.length, 1);
+
+  h.setCommissionRate(9);
+  assert.equal(
+    h.row.commercialAgreement.platformCommissionRateSnapshot?.toNumber(),
+    7,
+  );
 
   await h.negotiation.acceptProposedFee(brandUser, h.row.id, command);
   assert.equal(h.row.aggregateVersion, 2);
@@ -351,7 +403,11 @@ test("Escrow request is not confirmation; only trusted confirmation can complete
   h.row.commercialAgreement.negotiationState =
     CollaborationNegotiationState.LOCKED;
   h.row.commercialAgreement.agreedCreatorFee = new Prisma.Decimal(1000);
-  h.row.commercialAgreement.requiredSecuredAmount = new Prisma.Decimal(1000);
+  h.row.commercialAgreement.platformCommissionAmount = new Prisma.Decimal(70);
+  h.row.commercialAgreement.platformCommissionGstAmount = new Prisma.Decimal(
+    12.6,
+  );
+  h.row.commercialAgreement.requiredSecuredAmount = new Prisma.Decimal(1082.6);
   h.row.commercialAgreement.confirmedSecuredAmount = new Prisma.Decimal(0);
   h.row.commercialAgreement.securementState =
     CollaborationSecurementState.AWAITING_ESCROW_FUNDING;
@@ -361,7 +417,10 @@ test("Escrow request is not confirmation; only trusted confirmation can complete
     expectedAggregateVersion: 1,
   });
   assert.equal(h.fundingRequests(), 1);
-  assert.equal(h.row.commercialAgreement.securementState, "PROCESSING_FUNDING");
+  assert.equal(
+    h.row.commercialAgreement.securementState,
+    "AWAITING_ESCROW_FUNDING",
+  );
   assert.equal(h.row.commercialAgreement.confirmedSecuredAmount?.toNumber(), 0);
   await assert.rejects(
     () =>
@@ -372,7 +431,8 @@ test("Escrow request is not confirmation; only trusted confirmation can complete
           commandId: "brand-confirm",
           expectedAggregateVersion: 2,
           fundingConfirmationRef: "confirmation-brand",
-          confirmedAmount: 1000,
+          escrowLockRef: "lock-full",
+          confirmedAmount: 1082.6,
           currency: "USD",
         },
       ),
@@ -382,6 +442,7 @@ test("Escrow request is not confirmation; only trusted confirmation can complete
     commandId: "partial-confirm",
     expectedAggregateVersion: 2,
     fundingConfirmationRef: "confirmation-500",
+    escrowLockRef: "lock-partial",
     confirmedAmount: 500,
     currency: "USD",
   });
@@ -390,7 +451,8 @@ test("Escrow request is not confirmation; only trusted confirmation can complete
     commandId: "full-confirm",
     expectedAggregateVersion: 3,
     fundingConfirmationRef: "confirmation-1000",
-    confirmedAmount: 1000,
+    escrowLockRef: "lock-full",
+    confirmedAmount: 1082.6,
     currency: "USD",
   });
   assert.equal(h.row.commercialAgreement.securementState, "COMPLETED");

@@ -20,7 +20,7 @@ export const COLLABORATION_THREAD_INCLUDE = {
       imageUrl: true,
     },
   },
-  brandProfile: { select: { name: true, id: true } },
+  brandProfile: { select: { name: true, id: true, countryCode: true } },
   creatorUser: {
     select: {
       id: true,

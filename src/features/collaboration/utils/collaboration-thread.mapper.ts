@@ -239,16 +239,8 @@ export function deriveAvailableActions(
       state === CollaborationSecurementState.AWAITING_ESCROW_FUNDING
     )
       actions.push("RequestEscrowFunding");
-    if (
-      viewerRole === "BRAND" &&
-      state === CollaborationSecurementState.AWAITING_BRAND_PAYMENT
-    )
-      actions.push("SubmitManualPaymentEvidence");
-    if (
-      viewerRole === "CREATOR" &&
-      state === CollaborationSecurementState.AWAITING_CREATOR_CONFIRMATION
-    )
-      actions.push("ConfirmManualPaymentReceipt", "DisputeManualPayment");
+    // MANUAL remains a supported internal capability but is deliberately not
+    // advertised to ordinary MVP Brand/Creator clients.
   }
   return actions;
 }
@@ -437,6 +429,22 @@ export function projectCanonicalCollaborationDetail(
           advancePercentage: agreement.advancePercentageSnapshot,
           advanceAmount: decimalOrNull(agreement.advanceAmount),
           balanceAmount: decimalOrNull(agreement.balanceAmount),
+          pricingTierSnapshot: agreement.pricingTierSnapshot,
+          businessCountryCodeSnapshot: agreement.businessCountryCodeSnapshot,
+          financialPolicyVersionSnapshot:
+            agreement.financialPolicyVersionSnapshot,
+          platformCommissionRate: decimalOrNull(
+            agreement.platformCommissionRateSnapshot,
+          ),
+          platformCommissionAmount: decimalOrNull(
+            agreement.platformCommissionAmount,
+          ),
+          platformCommissionGstRate: decimalOrNull(
+            agreement.platformCommissionGstRateSnapshot,
+          ),
+          platformCommissionGstAmount: decimalOrNull(
+            agreement.platformCommissionGstAmount,
+          ),
           nonCashConsideration: agreement.nonCashConsideration,
           termsLocked: agreement.termsLockedAt !== null,
           termsLockedAt: agreement.termsLockedAt?.toISOString() ?? null,
@@ -451,6 +459,7 @@ export function projectCanonicalCollaborationDetail(
             agreement.confirmedSecuredAmount,
           ),
           currency: agreement.currency,
+          escrowLockRef: agreement.escrowLockRef,
         }
       : null,
     fulfillment: row.fulfillment
@@ -483,6 +492,27 @@ export function projectCanonicalCollaborationDetail(
           ),
           brandRefundEntitlementAmount: decimalOrNull(
             row.financialResolution.brandRefundEntitlementAmount,
+          ),
+          creatorGrossEntitlementAmount: decimalOrNull(
+            row.financialResolution.creatorGrossEntitlementAmount,
+          ),
+          creatorCommercialRefundAmount: decimalOrNull(
+            row.financialResolution.creatorCommercialRefundAmount,
+          ),
+          platformCommissionRetainedAmount: decimalOrNull(
+            row.financialResolution.platformCommissionRetainedAmount,
+          ),
+          platformCommissionRefundAmount: decimalOrNull(
+            row.financialResolution.platformCommissionRefundAmount,
+          ),
+          platformCommissionGstRetainedAmount: decimalOrNull(
+            row.financialResolution.platformCommissionGstRetainedAmount,
+          ),
+          platformCommissionGstRefundAmount: decimalOrNull(
+            row.financialResolution.platformCommissionGstRefundAmount,
+          ),
+          brandCommercialRefundEntitlementAmount: decimalOrNull(
+            row.financialResolution.brandCommercialRefundEntitlementAmount,
           ),
           currency: row.financialResolution.currency,
           reasonCode: row.financialResolution.reasonCode,

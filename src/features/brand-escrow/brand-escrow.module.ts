@@ -21,6 +21,7 @@ import { EscrowComputationEngine } from "./services/escrow-computation.engine";
 import { EscrowSubscriptionContextService } from "./services/escrow-subscription-context.service";
 import { IdempotencyManager } from "./services/idempotency.manager";
 import { RazorpayClient } from "./services/razorpay.client";
+import { CollaborationEscrowReserveService } from "./services/collaboration-escrow-reserve.service";
 
 @Module({
   imports: [PrismaModule, AuthModule, BrandCentreModule, PricingModule],
@@ -42,12 +43,14 @@ import { RazorpayClient } from "./services/razorpay.client";
     EscrowSubscriptionContextService,
     IdempotencyManager,
     RazorpayClient,
+    CollaborationEscrowReserveService,
   ],
   exports: [
     BrandEscrowService,
     BrandEscrowComputationService,
     BrandEscrowInterlockService,
     BrandEscrowHardenedService,
+    CollaborationEscrowReserveService,
   ],
 })
 export class BrandEscrowModule {}

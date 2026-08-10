@@ -43,6 +43,9 @@ import {
 } from "./collaboration-access.service";
 import { CollaborationRealtimeService } from "./collaboration-realtime.service";
 import { CollaborationPaymentCapabilityService } from "./collaboration-payment-capability.service";
+import { PlanCommercialPolicyService } from "../../pricing/services/plan-commercial-policy.service";
+import { BusinessGeographyFinancialPolicyService } from "../../pricing/services/business-geography-financial-policy.service";
+import { calculateCommercialReserve } from "../utils/collaboration-financial-calculation";
 
 @Injectable()
 export class CollaborationNegotiationService {
@@ -51,6 +54,8 @@ export class CollaborationNegotiationService {
     private readonly access: CollaborationAccessService,
     private readonly realtime: CollaborationRealtimeService,
     private readonly paymentCapabilities: CollaborationPaymentCapabilityService,
+    private readonly planPolicies: PlanCommercialPolicyService,
+    private readonly geographyPolicies: BusinessGeographyFinancialPolicyService,
   ) {}
 
   acceptProposedFee(user: AuthUser, collaborationId: string, raw: unknown) {
@@ -213,6 +218,13 @@ export class CollaborationNegotiationService {
           outcome: CollaborationFinancialOutcome.NEGOTIATION_EXIT,
           creatorEntitlementAmount: new Prisma.Decimal(0),
           brandRefundEntitlementAmount: new Prisma.Decimal(0),
+          creatorGrossEntitlementAmount: new Prisma.Decimal(0),
+          creatorCommercialRefundAmount: new Prisma.Decimal(0),
+          platformCommissionRetainedAmount: new Prisma.Decimal(0),
+          platformCommissionRefundAmount: new Prisma.Decimal(0),
+          platformCommissionGstRetainedAmount: new Prisma.Decimal(0),
+          platformCommissionGstRefundAmount: new Prisma.Decimal(0),
+          brandCommercialRefundEntitlementAmount: new Prisma.Decimal(0),
           currency: row.commercialAgreement?.currency,
           reasonCode: input.reasonCode,
           reasonText: input.reasonText,
@@ -309,6 +321,18 @@ export class CollaborationNegotiationService {
         .mul(agreement.advancePercentageSnapshot)
         .div(100);
       const balanceAmount = fee.minus(advanceAmount);
+      const planPolicy = await this.planPolicies.resolveForBrand(
+        row.brandProfileId,
+        tx,
+      );
+      const geographyPolicy = this.geographyPolicies.resolve(
+        row.brandProfile.countryCode,
+      );
+      const reserve = calculateCommercialReserve(
+        fee,
+        planPolicy.platformCommissionRate,
+        geographyPolicy.platformCommissionGstRate,
+      );
       if (
         agreement.paymentRail === CollaborationPaymentRail.MANUAL &&
         !this.paymentCapabilities.manualEnabledForNewObligations()
@@ -355,7 +379,15 @@ export class CollaborationNegotiationService {
           agreedCreatorFee: fee,
           advanceAmount,
           balanceAmount,
-          requiredSecuredAmount: fee,
+          pricingTierSnapshot: planPolicy.tier,
+          businessCountryCodeSnapshot: geographyPolicy.countryCode,
+          financialPolicyVersionSnapshot: `${planPolicy.policyVersion}|${geographyPolicy.policyVersion}`,
+          platformCommissionRateSnapshot: planPolicy.platformCommissionRate,
+          platformCommissionAmount: reserve.platformCommissionAmount,
+          platformCommissionGstRateSnapshot:
+            geographyPolicy.platformCommissionGstRate,
+          platformCommissionGstAmount: reserve.platformCommissionGstAmount,
+          requiredSecuredAmount: reserve.requiredSecuredAmount,
           confirmedSecuredAmount: new Prisma.Decimal(0),
           negotiationState: CollaborationNegotiationState.LOCKED,
           securementState,
@@ -400,6 +432,7 @@ export class CollaborationNegotiationService {
         payload: {
           feeSource,
           agreedCreatorFee: fee.toString(),
+          requiredSecuredAmount: reserve.requiredSecuredAmount.toString(),
           currency: agreement.currency,
           securementState,
         },

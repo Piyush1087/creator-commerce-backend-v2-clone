@@ -2267,6 +2267,13 @@ model CollaborationCommercialAgreement {
   advancePercentageSnapshot Int @map("advance_percentage_snapshot")
   advanceAmount Decimal? @map("advance_amount") @db.Decimal(14, 2)
   balanceAmount Decimal? @map("balance_amount") @db.Decimal(14, 2)
+  pricingTierSnapshot String? @map("pricing_tier_snapshot") @db.VarChar(80)
+  businessCountryCodeSnapshot String? @map("business_country_code_snapshot") @db.VarChar(2)
+  financialPolicyVersionSnapshot String? @map("financial_policy_version_snapshot") @db.VarChar(80)
+  platformCommissionRateSnapshot Decimal? @map("platform_commission_rate_snapshot") @db.Decimal(7, 4)
+  platformCommissionAmount Decimal? @map("platform_commission_amount") @db.Decimal(14, 2)
+  platformCommissionGstRateSnapshot Decimal? @map("platform_commission_gst_rate_snapshot") @db.Decimal(7, 4)
+  platformCommissionGstAmount Decimal? @map("platform_commission_gst_amount") @db.Decimal(14, 2)
   nonCashConsideration Json? @map("non_cash_consideration")
   paymentRail CollaborationPaymentRail @default(PLATFORM_ESCROW) @map("payment_rail")
   securementState CollaborationSecurementState? @map("securement_state")
@@ -2274,6 +2281,7 @@ model CollaborationCommercialAgreement {
   confirmedSecuredAmount Decimal? @map("confirmed_secured_amount") @db.Decimal(14, 2)
   fundingInstructionRef String? @map("funding_instruction_ref")
   fundingConfirmationRef String? @map("funding_confirmation_ref")
+  escrowLockRef String? @map("escrow_lock_ref")
   manualPaymentEvidenceRef String? @map("manual_payment_evidence_ref")
   manualCreatorConfirmedAt DateTime? @map("manual_creator_confirmed_at")
   paymentDisputeRef String? @map("payment_dispute_ref")
@@ -2282,6 +2290,7 @@ model CollaborationCommercialAgreement {
 
   @@index([negotiationState])
   @@index([securementState])
+  @@index([pricingTierSnapshot, businessCountryCodeSnapshot])
   @@map("collaboration_commercial_agreements")
 }
 
@@ -2361,6 +2370,13 @@ model CollaborationFinancialResolution {
   outcome CollaborationFinancialOutcome?
   creatorEntitlementAmount Decimal? @map("creator_entitlement_amount") @db.Decimal(14, 2)
   brandRefundEntitlementAmount Decimal? @map("brand_refund_entitlement_amount") @db.Decimal(14, 2)
+  creatorGrossEntitlementAmount Decimal? @map("creator_gross_entitlement_amount") @db.Decimal(14, 2)
+  creatorCommercialRefundAmount Decimal? @map("creator_commercial_refund_amount") @db.Decimal(14, 2)
+  platformCommissionRetainedAmount Decimal? @map("platform_commission_retained_amount") @db.Decimal(14, 2)
+  platformCommissionRefundAmount Decimal? @map("platform_commission_refund_amount") @db.Decimal(14, 2)
+  platformCommissionGstRetainedAmount Decimal? @map("platform_commission_gst_retained_amount") @db.Decimal(14, 2)
+  platformCommissionGstRefundAmount Decimal? @map("platform_commission_gst_refund_amount") @db.Decimal(14, 2)
+  brandCommercialRefundEntitlementAmount Decimal? @map("brand_commercial_refund_entitlement_amount") @db.Decimal(14, 2)
   currency String? @db.VarChar(3)
   reasonCode String? @map("reason_code")
   reasonText String? @map("reason_text")

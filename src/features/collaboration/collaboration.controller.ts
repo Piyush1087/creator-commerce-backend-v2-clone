@@ -124,41 +124,6 @@ export class CollaborationController {
     );
   }
 
-  @Post("threads/:collaborationId/securement/manual-payment-evidence")
-  reportManualPayment(
-    @Req() req: RequestWithAuthUser,
-    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
-    @Body() body: unknown,
-  ) {
-    return this.securement.reportManualPayment(req.user, collaborationId, body);
-  }
-
-  @Post("threads/:collaborationId/securement/confirm-manual-payment")
-  confirmManualPayment(
-    @Req() req: RequestWithAuthUser,
-    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
-    @Body() body: unknown,
-  ) {
-    return this.securement.confirmManualPayment(
-      req.user,
-      collaborationId,
-      body,
-    );
-  }
-
-  @Post("threads/:collaborationId/securement/dispute-manual-payment")
-  disputeManualPayment(
-    @Req() req: RequestWithAuthUser,
-    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
-    @Body() body: unknown,
-  ) {
-    return this.securement.disputeManualPayment(
-      req.user,
-      collaborationId,
-      body,
-    );
-  }
-
   @Post("threads/:collaborationId/logistics/dispatch")
   dispatchLogistics(
     @Req() req: RequestWithAuthUser,

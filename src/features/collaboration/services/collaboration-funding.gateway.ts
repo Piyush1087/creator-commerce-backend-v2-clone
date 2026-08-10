@@ -1,24 +1,29 @@
 import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 
-export type FundingInstructionRequest = {
+import { CollaborationEscrowReserveService } from "../../brand-escrow/services/collaboration-escrow-reserve.service";
+
+export type EscrowReserveRequest = {
   collaborationId: string;
-  commandId: string;
-  amount: number;
+  brandProfileId: string;
   currency: string;
+  creatorGrossFee: Prisma.Decimal;
+  platformCommissionAmount: Prisma.Decimal;
+  platformCommissionGstAmount: Prisma.Decimal;
+  requiredSecuredAmount: Prisma.Decimal;
 };
 
 export abstract class CollaborationFundingGateway {
-  abstract requestFunding(
-    request: FundingInstructionRequest,
-  ): Promise<{ fundingInstructionRef: string }>;
+  abstract reserveFunds(
+    request: EscrowReserveRequest,
+  ): ReturnType<CollaborationEscrowReserveService["reserveFunds"]>;
 }
 
 @Injectable()
 export class DeferredCollaborationFundingGateway implements CollaborationFundingGateway {
-  async requestFunding(request: FundingInstructionRequest) {
-    // Provider-neutral, stable correlation only. This is not payment confirmation.
-    return {
-      fundingInstructionRef: `collaboration-funding:${request.commandId}`,
-    };
+  constructor(private readonly escrow: CollaborationEscrowReserveService) {}
+
+  reserveFunds(request: EscrowReserveRequest) {
+    return this.escrow.reserveFunds(request);
   }
 }
