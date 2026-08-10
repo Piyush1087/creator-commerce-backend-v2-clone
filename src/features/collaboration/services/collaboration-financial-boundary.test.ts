@@ -79,6 +79,8 @@ function reserveHarness(available: number) {
   const vault = { available: d(available), locked: d(0) };
   const locks = new Map<string, any>();
   const ledgers: any[] = [];
+  const collaboration = { secured: false, aggregateVersion: 1 };
+  const events: any[] = [];
   let sequence = Promise.resolve();
   const tx: any = {
     $queryRaw: async () => [
@@ -112,6 +114,10 @@ function reserveHarness(available: number) {
       },
     },
     escrowTransactionLedger: {
+      findUnique: async ({ where }: any) =>
+        ledgers.find(
+          (ledger) => ledger.idempotencyKey === where.idempotencyKey,
+        ) ?? null,
       create: async ({ data }: any) => {
         ledgers.push(data);
         return data;
@@ -120,7 +126,28 @@ function reserveHarness(available: number) {
   };
   const prisma: any = {
     $transaction: (callback: any) => {
-      const run = sequence.then(() => callback(tx));
+      const run = sequence.then(async () => {
+        const snapshot = {
+          available: vault.available,
+          locked: vault.locked,
+          locks: new Map(locks),
+          ledgers: [...ledgers],
+          collaboration: { ...collaboration },
+          events: [...events],
+        };
+        try {
+          return await callback(tx);
+        } catch (error) {
+          vault.available = snapshot.available;
+          vault.locked = snapshot.locked;
+          locks.clear();
+          snapshot.locks.forEach((value, key) => locks.set(key, value));
+          ledgers.splice(0, ledgers.length, ...snapshot.ledgers);
+          Object.assign(collaboration, snapshot.collaboration);
+          events.splice(0, events.length, ...snapshot.events);
+          throw error;
+        }
+      });
       sequence = run.then(
         () => undefined,
         () => undefined,
@@ -129,10 +156,14 @@ function reserveHarness(available: number) {
     },
   };
   return {
-    service: new CollaborationEscrowReserveService(prisma),
+    service: new CollaborationEscrowReserveService(),
+    run: prisma.$transaction,
+    tx,
     vault,
     locks,
     ledgers,
+    collaboration,
+    events,
   };
 }
 
@@ -148,8 +179,12 @@ const reserveInput = (collaborationId: string) => ({
 
 test("pooled Escrow reserve is sufficient/insufficient, idempotent, TDS-neutral and charge-exclusive", async () => {
   const h = reserveHarness(10_826);
-  const first = await h.service.reserveFunds(reserveInput("collaboration-1"));
-  const replay = await h.service.reserveFunds(reserveInput("collaboration-1"));
+  const first = await h.run((tx: any) =>
+    h.service.reserveFunds(tx, reserveInput("collaboration-1")),
+  );
+  const replay = await h.run((tx: any) =>
+    h.service.reserveFunds(tx, reserveInput("collaboration-1")),
+  );
   assert.equal(first.status, "RESERVED");
   assert.equal(replay.status, "RESERVED");
   assert.equal(h.locks.size, 1);
@@ -164,8 +199,8 @@ test("pooled Escrow reserve is sufficient/insufficient, idempotent, TDS-neutral 
   );
 
   const insufficient = reserveHarness(10_000);
-  const result = await insufficient.service.reserveFunds(
-    reserveInput("collaboration-2"),
+  const result = await insufficient.run((tx: any) =>
+    insufficient.service.reserveFunds(tx, reserveInput("collaboration-2")),
   );
   assert.equal(result.status, "INSUFFICIENT_AVAILABLE_BALANCE");
   assert.equal(insufficient.locks.size, 0);
@@ -175,8 +210,12 @@ test("pooled Escrow reserve is sufficient/insufficient, idempotent, TDS-neutral 
 test("concurrent reserve attempts cannot overspend the pooled vault", async () => {
   const h = reserveHarness(15_000);
   const results = await Promise.all([
-    h.service.reserveFunds(reserveInput("collaboration-a")),
-    h.service.reserveFunds(reserveInput("collaboration-b")),
+    h.run((tx: any) =>
+      h.service.reserveFunds(tx, reserveInput("collaboration-a")),
+    ),
+    h.run((tx: any) =>
+      h.service.reserveFunds(tx, reserveInput("collaboration-b")),
+    ),
   ]);
   assert.equal(results.filter((item) => item.status === "RESERVED").length, 1);
   assert.equal(
@@ -186,4 +225,41 @@ test("concurrent reserve attempts cannot overspend the pooled vault", async () =
   );
   assert.equal(h.vault.available.toNumber(), 4_174);
   assert.equal(h.locks.size, 1);
+});
+
+test("shared transaction rolls back Escrow movement when Collaboration persistence fails", async () => {
+  const h = reserveHarness(10_826);
+  await assert.rejects(
+    () =>
+      h.run(async (tx: any) => {
+        await h.service.reserveFunds(tx, reserveInput("collaboration-atomic"));
+        throw new Error("forced Collaboration update failure");
+      }),
+    /forced Collaboration update failure/,
+  );
+  assert.equal(h.vault.available.toNumber(), 10_826);
+  assert.equal(h.vault.locked.toNumber(), 0);
+  assert.equal(h.locks.size, 0);
+  assert.equal(h.ledgers.length, 0);
+});
+
+test("shared transaction commits Escrow, Collaboration state and event together", async () => {
+  const h = reserveHarness(10_826);
+  await h.run(async (tx: any) => {
+    const reserve = await h.service.reserveFunds(
+      tx,
+      reserveInput("collaboration-atomic"),
+    );
+    assert.equal(reserve.status, "RESERVED");
+    h.collaboration.secured = true;
+    h.collaboration.aggregateVersion += 1;
+    h.events.push({ type: "ESCROW_FUNDING_REQUESTED" });
+  });
+  assert.equal(h.vault.available.toNumber(), 0);
+  assert.equal(h.vault.locked.toNumber(), 10_826);
+  assert.equal(h.locks.size, 1);
+  assert.equal(h.ledgers.length, 1);
+  assert.equal(h.collaboration.secured, true);
+  assert.equal(h.collaboration.aggregateVersion, 2);
+  assert.equal(h.events.length, 1);
 });

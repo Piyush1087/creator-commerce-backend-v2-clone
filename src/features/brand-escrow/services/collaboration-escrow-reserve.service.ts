@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 
-import { PrismaService } from "../../../prisma/prisma.service";
 import type { VaultRowLock } from "../types";
 
 export type CollaborationEscrowReserveInput = {
@@ -28,102 +27,139 @@ export type CollaborationEscrowReserveResult =
 
 @Injectable()
 export class CollaborationEscrowReserveService {
-  constructor(private readonly prisma: PrismaService) {}
-
-  reserveFunds(input: CollaborationEscrowReserveInput) {
-    return this.prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<VaultRowLock[]>`
+  async reserveFunds(
+    tx: Prisma.TransactionClient,
+    input: CollaborationEscrowReserveInput,
+  ): Promise<CollaborationEscrowReserveResult> {
+    const rows = await tx.$queryRaw<VaultRowLock[]>`
         SELECT vault_id, brand_id, total_pooled_balance, locked_campaign_funds, available_balance, currency
         FROM brand_escrow_vaults
         WHERE brand_id = ${input.brandProfileId}
         FOR UPDATE
       `;
-      if (!rows.length) {
-        throw new NotFoundException(
-          "Escrow vault not initialized for this Brand",
-        );
-      }
-      const vault = rows[0];
-      const vaultId = String(vault.vault_id);
-      const currency = String(vault.currency).toUpperCase();
-      if (currency !== input.currency.toUpperCase()) {
+    if (!rows.length) {
+      throw new NotFoundException(
+        "Escrow vault not initialized for this Brand",
+      );
+    }
+    const vault = rows[0];
+    const vaultId = String(vault.vault_id);
+    const currency = String(vault.currency).toUpperCase();
+    if (currency !== input.currency.toUpperCase()) {
+      throw new Error(
+        "Escrow vault currency does not match Collaboration currency",
+      );
+    }
+
+    const existing = await tx.collaborationEscrowLock.findUnique({
+      where: { collaborationId: input.collaborationId },
+    });
+    if (existing) {
+      if (
+        existing.brandProfileId !== input.brandProfileId ||
+        !existing.grossCreatorQuote.equals(input.creatorGrossFee) ||
+        !existing.platformCommissionFee.equals(
+          input.platformCommissionAmount,
+        ) ||
+        !existing.platformCommissionGst.equals(
+          input.platformCommissionGstAmount,
+        ) ||
+        !existing.totalEscrowLockedAmount.equals(input.requiredSecuredAmount)
+      ) {
         throw new Error(
-          "Escrow vault currency does not match Collaboration currency",
+          "Existing Escrow lock conflicts with locked Collaboration terms",
         );
       }
-
-      const existing = await tx.collaborationEscrowLock.findUnique({
-        where: { collaborationId: input.collaborationId },
+      const idempotencyKey = `collaboration-reserve:${input.collaborationId}`;
+      const ledger = await tx.escrowTransactionLedger.findUnique({
+        where: { idempotencyKey },
       });
-      if (existing) {
-        if (
-          !existing.totalEscrowLockedAmount.equals(input.requiredSecuredAmount)
-        ) {
-          throw new Error(
-            "Existing Escrow lock conflicts with locked Collaboration terms",
-          );
-        }
-        return {
-          status: "RESERVED" as const,
-          escrowLockRef: existing.id,
-          confirmedAmount: existing.totalEscrowLockedAmount,
-        };
+      if (!ledger) {
+        await tx.escrowTransactionLedger.create({
+          data: {
+            vaultId,
+            brandProfileId: input.brandProfileId,
+            collaborationId: input.collaborationId,
+            transactionType: "CONTRACT_LOCK_RESERVE",
+            amount: input.requiredSecuredAmount,
+            currency,
+            gatewayProcessingSurcharge: new Prisma.Decimal(0),
+            gatewaySurchargeGst: new Prisma.Decimal(0),
+            idempotencyKey,
+            transactionStatus: "CLEARED",
+          },
+        });
+      } else if (
+        ledger.vaultId !== vaultId ||
+        ledger.brandProfileId !== input.brandProfileId ||
+        ledger.collaborationId !== input.collaborationId ||
+        !ledger.amount.equals(input.requiredSecuredAmount) ||
+        ledger.currency.toUpperCase() !== currency
+      ) {
+        throw new Error(
+          "Existing Escrow ledger conflicts with Collaboration reserve",
+        );
       }
-
-      const available = new Prisma.Decimal(vault.available_balance);
-      if (available.lessThan(input.requiredSecuredAmount)) {
-        return {
-          status: "INSUFFICIENT_AVAILABLE_BALANCE" as const,
-          availableAmount: available,
-          shortfallAmount: input.requiredSecuredAmount.minus(available),
-        };
-      }
-
-      const updated = await tx.brandEscrowVault.updateMany({
-        where: {
-          id: vaultId,
-          availableBalance: { gte: input.requiredSecuredAmount },
-        },
-        data: {
-          availableBalance: { decrement: input.requiredSecuredAmount },
-          lockedCampaignFunds: { increment: input.requiredSecuredAmount },
-        },
-      });
-      if (updated.count !== 1) {
-        throw new Error("Escrow reserve lost its concurrent balance lock");
-      }
-      const lock = await tx.collaborationEscrowLock.create({
-        data: {
-          collaborationId: input.collaborationId,
-          brandProfileId: input.brandProfileId,
-          grossCreatorQuote: input.creatorGrossFee,
-          platformCommissionFee: input.platformCommissionAmount,
-          platformCommissionGst: input.platformCommissionGstAmount,
-          totalEscrowLockedAmount: input.requiredSecuredAmount,
-          expectedTdsPercentage: new Prisma.Decimal(0),
-          calculatedTdsDeduction: new Prisma.Decimal(0),
-          netCreatorPayoutPool: input.creatorGrossFee,
-        },
-      });
-      await tx.escrowTransactionLedger.create({
-        data: {
-          vaultId,
-          brandProfileId: input.brandProfileId,
-          collaborationId: input.collaborationId,
-          transactionType: "CONTRACT_LOCK_RESERVE",
-          amount: input.requiredSecuredAmount,
-          currency,
-          gatewayProcessingSurcharge: new Prisma.Decimal(0),
-          gatewaySurchargeGst: new Prisma.Decimal(0),
-          idempotencyKey: `collaboration-reserve:${input.collaborationId}`,
-          transactionStatus: "CLEARED",
-        },
-      });
       return {
         status: "RESERVED" as const,
-        escrowLockRef: lock.id,
-        confirmedAmount: lock.totalEscrowLockedAmount,
+        escrowLockRef: existing.id,
+        confirmedAmount: existing.totalEscrowLockedAmount,
       };
+    }
+
+    const available = new Prisma.Decimal(vault.available_balance);
+    if (available.lessThan(input.requiredSecuredAmount)) {
+      return {
+        status: "INSUFFICIENT_AVAILABLE_BALANCE" as const,
+        availableAmount: available,
+        shortfallAmount: input.requiredSecuredAmount.minus(available),
+      };
+    }
+
+    const updated = await tx.brandEscrowVault.updateMany({
+      where: {
+        id: vaultId,
+        availableBalance: { gte: input.requiredSecuredAmount },
+      },
+      data: {
+        availableBalance: { decrement: input.requiredSecuredAmount },
+        lockedCampaignFunds: { increment: input.requiredSecuredAmount },
+      },
     });
+    if (updated.count !== 1) {
+      throw new Error("Escrow reserve lost its concurrent balance lock");
+    }
+    const lock = await tx.collaborationEscrowLock.create({
+      data: {
+        collaborationId: input.collaborationId,
+        brandProfileId: input.brandProfileId,
+        grossCreatorQuote: input.creatorGrossFee,
+        platformCommissionFee: input.platformCommissionAmount,
+        platformCommissionGst: input.platformCommissionGstAmount,
+        totalEscrowLockedAmount: input.requiredSecuredAmount,
+        expectedTdsPercentage: new Prisma.Decimal(0),
+        calculatedTdsDeduction: new Prisma.Decimal(0),
+        netCreatorPayoutPool: input.creatorGrossFee,
+      },
+    });
+    await tx.escrowTransactionLedger.create({
+      data: {
+        vaultId,
+        brandProfileId: input.brandProfileId,
+        collaborationId: input.collaborationId,
+        transactionType: "CONTRACT_LOCK_RESERVE",
+        amount: input.requiredSecuredAmount,
+        currency,
+        gatewayProcessingSurcharge: new Prisma.Decimal(0),
+        gatewaySurchargeGst: new Prisma.Decimal(0),
+        idempotencyKey: `collaboration-reserve:${input.collaborationId}`,
+        transactionStatus: "CLEARED",
+      },
+    });
+    return {
+      status: "RESERVED" as const,
+      escrowLockRef: lock.id,
+      confirmedAmount: lock.totalEscrowLockedAmount,
+    };
   }
 }

@@ -15,6 +15,7 @@ export type EscrowReserveRequest = {
 
 export abstract class CollaborationFundingGateway {
   abstract reserveFunds(
+    tx: Prisma.TransactionClient,
     request: EscrowReserveRequest,
   ): ReturnType<CollaborationEscrowReserveService["reserveFunds"]>;
 }
@@ -23,7 +24,7 @@ export abstract class CollaborationFundingGateway {
 export class DeferredCollaborationFundingGateway implements CollaborationFundingGateway {
   constructor(private readonly escrow: CollaborationEscrowReserveService) {}
 
-  reserveFunds(request: EscrowReserveRequest) {
-    return this.escrow.reserveFunds(request);
+  reserveFunds(tx: Prisma.TransactionClient, request: EscrowReserveRequest) {
+    return this.escrow.reserveFunds(tx, request);
   }
 }

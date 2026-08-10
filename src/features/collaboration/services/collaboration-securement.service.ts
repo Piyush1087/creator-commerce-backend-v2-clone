@@ -64,79 +64,6 @@ export class CollaborationSecurementService {
     const input = parseCommand(collaborationCommandEnvelopeSchema, raw);
     const fingerprint = requestFingerprint(input);
     await this.access.assertThreadForUser(user, collaborationId);
-    const replay = await this.prisma.collaborationEvent.findFirst({
-      where: { collaborationId, commandId: input.commandId },
-    });
-    if (replay) {
-      await this.prisma.$transaction((tx) =>
-        replayOrThrow(
-          tx,
-          collaborationId,
-          input.commandId,
-          "ESCROW_FUNDING_REQUESTED",
-          fingerprint,
-        ),
-      );
-      return this.result(user, collaborationId);
-    }
-    const before = await this.prisma.collaboration.findUniqueOrThrow({
-      where: { id: collaborationId },
-      include: COLLABORATION_THREAD_INCLUDE,
-    });
-    this.assertSecurement(before);
-    assertExpectedVersion(
-      before.aggregateVersion,
-      input.expectedAggregateVersion,
-    );
-    const agreement = before.commercialAgreement;
-    if (
-      !agreement ||
-      agreement.paymentRail !== CollaborationPaymentRail.PLATFORM_ESCROW
-    ) {
-      commandConflict(
-        "INVALID_STATE",
-        "Platform escrow does not apply",
-        before.aggregateVersion,
-      );
-    }
-    if (
-      agreement.securementState !==
-      CollaborationSecurementState.AWAITING_ESCROW_FUNDING
-    ) {
-      commandConflict(
-        "INVALID_STATE",
-        "Escrow funding cannot be requested in this state",
-        before.aggregateVersion,
-      );
-    }
-    const required = agreement.requiredSecuredAmount;
-    if (required === null)
-      commandConflict(
-        "INVALID_STATE",
-        "Required secured amount is missing",
-        before.aggregateVersion,
-      );
-    if (
-      !agreement.agreedCreatorFee ||
-      !agreement.platformCommissionAmount ||
-      !agreement.platformCommissionGstAmount
-    ) {
-      commandConflict(
-        "INVALID_STATE",
-        "Locked financial policy snapshot is incomplete",
-        before.aggregateVersion,
-      );
-    }
-    const reserve = await this.funding.reserveFunds({
-      collaborationId,
-      brandProfileId: before.brandProfileId,
-      currency: agreement.currency,
-      creatorGrossFee: agreement.agreedCreatorFee,
-      platformCommissionAmount: agreement.platformCommissionAmount,
-      platformCommissionGstAmount: agreement.platformCommissionGstAmount,
-      requiredSecuredAmount: required,
-    });
-
     await this.prisma.$transaction(async (tx) => {
       if (
         await replayOrThrow(
@@ -149,10 +76,59 @@ export class CollaborationSecurementService {
       )
         return;
       const row = await this.load(tx, collaborationId);
+      this.assertSecurement(row);
       assertExpectedVersion(
         row.aggregateVersion,
         input.expectedAggregateVersion,
       );
+      const agreement = row.commercialAgreement;
+      if (
+        !agreement ||
+        agreement.paymentRail !== CollaborationPaymentRail.PLATFORM_ESCROW
+      ) {
+        commandConflict(
+          "INVALID_STATE",
+          "Platform escrow does not apply",
+          row.aggregateVersion,
+        );
+      }
+      if (
+        agreement.securementState !==
+        CollaborationSecurementState.AWAITING_ESCROW_FUNDING
+      ) {
+        commandConflict(
+          "INVALID_STATE",
+          "Escrow funding cannot be requested in this state",
+          row.aggregateVersion,
+        );
+      }
+      const required = agreement.requiredSecuredAmount;
+      if (required === null)
+        commandConflict(
+          "INVALID_STATE",
+          "Required secured amount is missing",
+          row.aggregateVersion,
+        );
+      if (
+        !agreement.agreedCreatorFee ||
+        !agreement.platformCommissionAmount ||
+        !agreement.platformCommissionGstAmount
+      ) {
+        commandConflict(
+          "INVALID_STATE",
+          "Locked financial policy snapshot is incomplete",
+          row.aggregateVersion,
+        );
+      }
+      const reserve = await this.funding.reserveFunds(tx, {
+        collaborationId,
+        brandProfileId: row.brandProfileId,
+        currency: agreement.currency,
+        creatorGrossFee: agreement.agreedCreatorFee,
+        platformCommissionAmount: agreement.platformCommissionAmount,
+        platformCommissionGstAmount: agreement.platformCommissionGstAmount,
+        requiredSecuredAmount: required,
+      });
       const version = row.aggregateVersion + 1;
       const now = new Date();
       const reserved = reserve.status === "RESERVED";

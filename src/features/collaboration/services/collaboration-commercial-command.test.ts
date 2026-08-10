@@ -135,11 +135,16 @@ function makeRow(): any {
 }
 
 function harness(
-  options: { manualEnabled?: boolean; payoutProfile?: boolean } = {},
+  options: {
+    manualEnabled?: boolean;
+    payoutProfile?: boolean;
+    reserveSucceeds?: boolean;
+  } = {},
 ) {
   const row = makeRow();
   const events: Array<Record<string, any>> = [];
   let fundingRequests = 0;
+  let fundingUsedTransaction = false;
   let commissionRate = 7;
   const tx: any = {
     collaboration: {
@@ -209,8 +214,16 @@ function harness(
     manualEnabledForNewObligations: () => options.manualEnabled ?? false,
   };
   const funding: any = {
-    reserveFunds: async () => {
+    reserveFunds: async (transaction: any) => {
       fundingRequests += 1;
+      fundingUsedTransaction = transaction === tx;
+      if (options.reserveSucceeds) {
+        return {
+          status: "RESERVED",
+          escrowLockRef: "lock-reserved",
+          confirmedAmount: new Prisma.Decimal(1082.6),
+        };
+      }
       return {
         status: "INSUFFICIENT_AVAILABLE_BALANCE",
         availableAmount: new Prisma.Decimal(0),
@@ -236,6 +249,7 @@ function harness(
     row,
     events,
     fundingRequests: () => fundingRequests,
+    fundingUsedTransaction: () => fundingUsedTransaction,
     setCommissionRate: (value: number) => {
       commissionRate = value;
     },
@@ -457,6 +471,46 @@ test("Escrow request is not confirmation; only trusted confirmation can complete
   });
   assert.equal(h.row.commercialAgreement.securementState, "COMPLETED");
   assert.equal(h.row.canonicalStage, CollaborationStage.PRODUCTION);
+});
+
+test("stale Escrow command is rejected before reserve and successful reserve shares the Collaboration transaction", async () => {
+  const stale = harness({ reserveSucceeds: true });
+  stale.row.canonicalStage = CollaborationStage.SECUREMENT;
+  stale.row.commercialAgreement.negotiationState =
+    CollaborationNegotiationState.LOCKED;
+  stale.row.commercialAgreement.agreedCreatorFee = new Prisma.Decimal(1000);
+  stale.row.commercialAgreement.platformCommissionAmount = new Prisma.Decimal(
+    70,
+  );
+  stale.row.commercialAgreement.platformCommissionGstAmount =
+    new Prisma.Decimal(12.6);
+  stale.row.commercialAgreement.requiredSecuredAmount = new Prisma.Decimal(
+    1082.6,
+  );
+  stale.row.commercialAgreement.securementState =
+    CollaborationSecurementState.AWAITING_ESCROW_FUNDING;
+  await assert.rejects(
+    () =>
+      stale.securement.requestEscrowFunding(brandUser, stale.row.id, {
+        commandId: "stale-funding",
+        expectedAggregateVersion: 99,
+      }),
+    (error: any) => error.response?.code === "STALE_AGGREGATE_VERSION",
+  );
+  assert.equal(stale.fundingRequests(), 0);
+  assert.equal(stale.events.length, 0);
+
+  await stale.securement.requestEscrowFunding(brandUser, stale.row.id, {
+    commandId: "atomic-funding",
+    expectedAggregateVersion: 1,
+  });
+  assert.equal(stale.fundingRequests(), 1);
+  assert.equal(stale.fundingUsedTransaction(), true);
+  assert.equal(stale.row.commercialAgreement.escrowLockRef, "lock-reserved");
+  assert.equal(stale.row.commercialAgreement.securementState, "COMPLETED");
+  assert.equal(stale.row.canonicalStage, CollaborationStage.PRODUCTION);
+  assert.equal(stale.row.aggregateVersion, 2);
+  assert.equal(stale.events.length, 1);
 });
 
 test("Manual evidence requires Creator confirmation and dispute blocks Securement", async () => {
