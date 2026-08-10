@@ -26,6 +26,7 @@ import {
 } from "./dto/collaboration-actions.dto";
 import { ListCollaborationThreadsQueryDto } from "./dto/collaboration-query.dto";
 import { CollaborationCreatorProfileService } from "./services/collaboration-creator-profile.service";
+import { CollaborationFulfillmentService } from "./services/collaboration-fulfillment.service";
 import { CollaborationNegotiationService } from "./services/collaboration-negotiation.service";
 import { CollaborationQueryService } from "./services/collaboration-query.service";
 import { CollaborationSecurementService } from "./services/collaboration-securement.service";
@@ -39,6 +40,7 @@ export class CollaborationController {
     private readonly collaborationQueries: CollaborationQueryService,
     private readonly negotiation: CollaborationNegotiationService,
     private readonly securement: CollaborationSecurementService,
+    private readonly fulfillment: CollaborationFulfillmentService,
     private readonly creatorProfile: CollaborationCreatorProfileService,
   ) {}
 
@@ -122,6 +124,42 @@ export class CollaborationController {
       collaborationId,
       body,
     );
+  }
+
+  @Post("threads/:collaborationId/fulfillment/provide")
+  provideFulfillment(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.fulfillment.provide(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/fulfillment/confirm")
+  confirmFulfillment(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.fulfillment.confirm(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/fulfillment/report-issue")
+  reportCanonicalFulfillmentIssue(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.fulfillment.reportIssue(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/fulfillment/remediate")
+  provideFulfillmentRemediation(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.fulfillment.remediate(req.user, collaborationId, body);
   }
 
   @Post("threads/:collaborationId/logistics/dispatch")

@@ -241,6 +241,24 @@ export function deriveAvailableActions(
       actions.push("RequestEscrowFunding");
     // MANUAL remains a supported internal capability but is deliberately not
     // advertised to ordinary MVP Brand/Creator clients.
+  } else if (row.canonicalStage === CollaborationStage.FULFILLMENT) {
+    const state = row.fulfillment?.state;
+    if (
+      viewerRole === "BRAND" &&
+      state === CollaborationFulfillmentState.AWAITING_BRAND_FULFILLMENT
+    ) {
+      actions.push("ProvideFulfillment");
+    } else if (
+      viewerRole === "CREATOR" &&
+      state === CollaborationFulfillmentState.AWAITING_CREATOR_CONFIRMATION
+    ) {
+      actions.push("ConfirmFulfillment", "ReportFulfillmentIssue");
+    } else if (
+      viewerRole === "BRAND" &&
+      state === CollaborationFulfillmentState.REMEDIATION_REQUIRED
+    ) {
+      actions.push("ProvideFulfillmentRemediation");
+    }
   }
   return actions;
 }
@@ -471,9 +489,32 @@ export function projectCanonicalCollaborationDetail(
           ),
           state: row.fulfillment.state,
           issueCount: row.fulfillment.issueCount,
-          evidence: null,
-          confirmation: null,
-          issueHistory: [],
+          evidence: {
+            shipmentTrackingRef: row.fulfillment.shipmentTrackingRef,
+            courierName: row.fulfillment.courierName,
+            accessEvidenceRef: row.fulfillment.accessEvidenceRef,
+            redemptionCode: row.fulfillment.redemptionCode,
+            serviceEvidenceRef: row.fulfillment.serviceEvidenceRef,
+            genericFulfillmentEvidence:
+              row.fulfillment.genericFulfillmentEvidence,
+            brandFulfilledAt:
+              row.fulfillment.brandFulfilledAt?.toISOString() ?? null,
+          },
+          confirmation: {
+            creatorConfirmedAt:
+              row.fulfillment.creatorConfirmedAt?.toISOString() ?? null,
+            completedAt: row.fulfillment.completedAt?.toISOString() ?? null,
+            hardStoppedAt: row.fulfillment.hardStoppedAt?.toISOString() ?? null,
+          },
+          issues: (row.fulfillment.issues ?? []).map((issue) => ({
+            sequence: issue.sequence,
+            issueCode: issue.issueCode,
+            description: issue.description,
+            evidenceRef: issue.evidenceRef,
+            reportedAt: issue.reportedAt.toISOString(),
+            remediationEvidenceRef: issue.remediationEvidenceRef,
+            remediationAt: issue.remediationAt?.toISOString() ?? null,
+          })),
         }
       : null,
     deliverables,

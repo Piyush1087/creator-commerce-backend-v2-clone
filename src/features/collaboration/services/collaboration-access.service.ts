@@ -37,7 +37,9 @@ export const COLLABORATION_THREAD_INCLUDE = {
   media: { orderBy: { createdAt: "desc" as const }, take: 5 },
   snapshot: true,
   commercialAgreement: true,
-  fulfillment: true,
+  fulfillment: {
+    include: { issues: { orderBy: { sequence: "asc" as const } } },
+  },
   financialResolution: true,
   deliverables: {
     orderBy: { displayOrder: "asc" as const },

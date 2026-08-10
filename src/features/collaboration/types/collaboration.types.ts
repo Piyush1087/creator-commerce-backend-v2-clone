@@ -22,7 +22,11 @@ export type CollaborationAvailableAction =
   | "RequestEscrowFunding"
   | "SubmitManualPaymentEvidence"
   | "ConfirmManualPaymentReceipt"
-  | "DisputeManualPayment";
+  | "DisputeManualPayment"
+  | "ProvideFulfillment"
+  | "ConfirmFulfillment"
+  | "ReportFulfillmentIssue"
+  | "ProvideFulfillmentRemediation";
 
 export type CollaborationWorkflowProjection = {
   stage: CollaborationStage;

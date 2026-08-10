@@ -11,6 +11,7 @@
     "test:collaboration:phase2": "ts-node src/features/collaboration/utils/collaboration-read-model.mapper.test.ts",
     "test:collaboration:phase3": "ts-node src/features/collaboration/services/collaboration-commercial-command.test.ts",
     "test:collaboration:phase3.1": "ts-node src/features/collaboration/services/collaboration-financial-boundary.test.ts",
+    "test:collaboration:phase4.1": "ts-node src/features/collaboration/services/collaboration-fulfillment.test.ts",
     "dev": "nest start --watch",
     "start": "nest start",
     "start:dev": "nest start --watch",

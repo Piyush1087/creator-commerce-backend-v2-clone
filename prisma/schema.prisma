@@ -2300,11 +2300,40 @@ model CollaborationFulfillment {
   collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
   state CollaborationFulfillmentState @default(NOT_STARTED)
   issueCount Int @default(0) @map("issue_count")
+  shipmentTrackingRef String? @map("shipment_tracking_ref")
+  courierName String? @map("courier_name")
+  accessEvidenceRef String? @map("access_evidence_ref")
+  redemptionCode String? @map("redemption_code")
+  serviceEvidenceRef String? @map("service_evidence_ref")
+  genericFulfillmentEvidence Json? @map("generic_fulfillment_evidence")
+  brandFulfilledAt DateTime? @map("brand_fulfilled_at")
+  creatorConfirmedAt DateTime? @map("creator_confirmed_at")
+  completedAt DateTime? @map("completed_at")
+  hardStoppedAt DateTime? @map("hard_stopped_at")
+  issues CollaborationFulfillmentIssue[]
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([state])
   @@map("collaboration_fulfillments")
+}
+
+model CollaborationFulfillmentIssue {
+  id String @id @default(uuid())
+  fulfillmentId String @map("fulfillment_id")
+  fulfillment CollaborationFulfillment @relation(fields: [fulfillmentId], references: [id], onDelete: Cascade)
+  sequence Int
+  issueCode String @map("issue_code")
+  description String
+  evidenceRef String? @map("evidence_ref")
+  reportedByUserId String? @map("reported_by_user_id")
+  reportedAt DateTime @default(now()) @map("reported_at")
+  remediationEvidenceRef String? @map("remediation_evidence_ref")
+  remediationAt DateTime? @map("remediation_at")
+
+  @@unique([fulfillmentId, sequence])
+  @@index([fulfillmentId, reportedAt])
+  @@map("collaboration_fulfillment_issues")
 }
 
 model CollaborationDeliverableExecution {

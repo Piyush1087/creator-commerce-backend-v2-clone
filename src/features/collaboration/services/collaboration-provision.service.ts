@@ -281,7 +281,9 @@ export class CollaborationProvisionService {
             fulfillment: {
               create: {
                 state: commercials.receivesBrandSupport
-                  ? CollaborationFulfillmentState.NOT_STARTED
+                  ? canonicalStage === CollaborationStage.FULFILLMENT
+                    ? CollaborationFulfillmentState.AWAITING_BRAND_FULFILLMENT
+                    : CollaborationFulfillmentState.NOT_STARTED
                   : CollaborationFulfillmentState.SKIPPED,
               },
             },

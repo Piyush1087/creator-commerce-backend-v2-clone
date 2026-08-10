@@ -443,6 +443,7 @@ export class CollaborationService {
       throw new ForbiddenException("Brand access required");
     }
     const thread = await this.access.assertThreadForUser(user, collaborationId);
+    this.assertLegacyFulfillmentCompatibility(thread);
     this.assertStage(thread, UceMilestoneStage.STAGE_3_LOGISTICS);
     assertLogisticsNotDispatched(thread.logistics);
 
@@ -492,6 +493,7 @@ export class CollaborationService {
       throw new ForbiddenException("Creator access required");
     }
     const thread = await this.access.assertThreadForUser(user, collaborationId);
+    this.assertLegacyFulfillmentCompatibility(thread);
     this.assertStage(thread, UceMilestoneStage.STAGE_3_LOGISTICS);
     assertReceiptNotConfirmed(thread.logistics);
     if (!logisticsIsDispatched(thread.logistics)) {
@@ -533,6 +535,7 @@ export class CollaborationService {
       throw new ForbiddenException("Creator access required");
     }
     const thread = await this.access.assertThreadForUser(user, collaborationId);
+    this.assertLegacyFulfillmentCompatibility(thread);
     this.assertStage(thread, UceMilestoneStage.STAGE_3_LOGISTICS);
     assertReceiptNotConfirmed(thread.logistics);
 
@@ -835,6 +838,16 @@ export class CollaborationService {
     if (thread.currentStage !== expected) {
       throw new BadRequestException(
         `Expected stage ${expected}, current ${thread.currentStage}`,
+      );
+    }
+  }
+
+  private assertLegacyFulfillmentCompatibility(thread: {
+    sourceApplicationId: string | null;
+  }) {
+    if (thread.sourceApplicationId) {
+      throw new BadRequestException(
+        "Canonical Collaborations require the Fulfillment command API",
       );
     }
   }
