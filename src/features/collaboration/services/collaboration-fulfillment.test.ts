@@ -53,6 +53,7 @@ test("Fulfillment action ownership exposes only Phase 4.1 commands", () => {
   assert.deepEqual(deriveAvailableActions(awaitingBrand, "BRAND"), [
     "PostCollaborationMessage",
     "ProvideFulfillment",
+    "EndCollaborationByBrand",
   ]);
 
   const awaitingCreator = fulfillmentRow(
@@ -63,6 +64,7 @@ test("Fulfillment action ownership exposes only Phase 4.1 commands", () => {
     "PostCollaborationMessage",
     "ConfirmFulfillment",
     "ReportFulfillmentIssue",
+    "CancelCollaborationByCreator",
   ]);
 
   const remediation = fulfillmentRow(
@@ -72,6 +74,7 @@ test("Fulfillment action ownership exposes only Phase 4.1 commands", () => {
   assert.deepEqual(deriveAvailableActions(remediation, "BRAND"), [
     "PostCollaborationMessage",
     "ProvideFulfillmentRemediation",
+    "EndCollaborationByBrand",
   ]);
 });
 
