@@ -8,7 +8,7 @@ const reasonText = z.string().trim().min(1).max(4000).optional();
 const evidenceRef = z.string().trim().min(1).max(4096).optional();
 const trusted = { ...envelope, collaborationId: z.string().uuid() };
 const money = z.union([
-  z.number().finite().nonnegative(),
+  z.number().finite().nonnegative().multipleOf(0.01),
   z
     .string()
     .trim()
