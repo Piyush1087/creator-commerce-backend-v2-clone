@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -128,4 +129,35 @@ test("Fulfillment hard-stop refunds the full commercial reserve but excludes cha
   );
   assert.ok(!("gatewayProcessingCharge" in result));
   assert.ok(!("tds" in result));
+});
+
+test("second issue keeps Creator reporting evidence but attributes the automatic hard-stop to SYSTEM", () => {
+  const serviceSource = readFileSync(
+    require.resolve("./collaboration-fulfillment.service"),
+    "utf8",
+  );
+  assert.match(serviceSource, /reportedByUserId:\s*user\.id/);
+  assert.match(
+    serviceSource,
+    /endedByActorClass:\s*CollaborationActorClass\.SYSTEM/,
+  );
+  assert.match(serviceSource, /endedByUserId:\s*null/);
+  assert.match(serviceSource, /eventType,\s*actorClass:/);
+  assert.doesNotMatch(
+    serviceSource,
+    /endedByActorClass:\s*CollaborationActorClass\.CREATOR/,
+  );
+
+  const resolution = resolveFulfillmentHardStopFinancialOutcome({
+    agreedCreatorFee: d(10_000),
+    currency: "INR",
+    platformCommissionRateSnapshot: d(7),
+    platformCommissionAmount: d(700),
+    platformCommissionGstRateSnapshot: d(18),
+    platformCommissionGstAmount: d(126),
+  });
+  assert.equal(resolution.decidedByActorClass, "SYSTEM");
+  assert.equal(resolution.outcome, "FULFILLMENT_HARD_STOP");
+  assert.notEqual(resolution.outcome, "CREATOR_NON_PERFORMANCE");
+  assert.notEqual(resolution.outcome, "CREATOR_CANCELLED");
 });

@@ -201,8 +201,8 @@ export class CollaborationFulfillmentService {
             currentStageStatus: CollaborationStageStatus.BLOCKED,
             endedFromStage: CollaborationStage.FULFILLMENT,
             endedReasonCode: "FULFILLMENT_HARD_STOP",
-            endedByActorClass: CollaborationActorClass.CREATOR,
-            endedByUserId: user.id,
+            endedByActorClass: CollaborationActorClass.SYSTEM,
+            endedByUserId: null,
             endedAt: now,
           },
           eventPayload: {
