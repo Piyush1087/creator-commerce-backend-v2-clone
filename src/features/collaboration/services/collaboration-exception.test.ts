@@ -91,7 +91,7 @@ test("ApplyAdminResolution accepts only frozen economic inputs", () => {
     commandId: "20000000-0000-4000-8000-000000000001",
     expectedAggregateVersion: 4,
     creatorEntitlementAmount: "600.00",
-    brandRefundEntitlementAmount: "400.00",
+    brandRefundEntitlementAmount: "447.20",
     currency: "inr",
     reasonCode: "ADMIN_RESOLUTION",
     reasonText: "Evidence reviewed",
@@ -105,13 +105,20 @@ test("ApplyAdminResolution accepts only frozen economic inputs", () => {
       platformCommissionRetainedAmount: 10,
     }),
   );
+  assert.throws(() =>
+    applyAdminResolutionSchema.parse({
+      ...input,
+      brandRefundEntitlementAmount: 447.201,
+    }),
+  );
 });
 
-test("Admin allocation cannot exceed or create the locked Creator fee", () => {
+test("Admin allocation must reconcile with the total derived Brand commercial refund", () => {
   const valid = {
     agreedCreatorFee: d(1000),
     creatorEntitlementAmount: d(600),
-    brandRefundEntitlementAmount: d(400),
+    brandRefundEntitlementAmount: d(447.2),
+    derivedBrandCommercialRefundEntitlementAmount: d(447.2),
     aggregateVersion: 4,
   };
   assert.doesNotThrow(() => validateAdminEconomicAllocation(valid));
@@ -119,13 +126,59 @@ test("Admin allocation cannot exceed or create the locked Creator fee", () => {
     validateAdminEconomicAllocation({
       ...valid,
       creatorEntitlementAmount: d(1001),
-      brandRefundEntitlementAmount: d(0),
     }),
   );
   assert.throws(() =>
     validateAdminEconomicAllocation({
       ...valid,
-      brandRefundEntitlementAmount: d(399),
+      brandRefundEntitlementAmount: d(400),
+    }),
+  );
+});
+
+test("India Admin example accepts 64956 total refund and rejects fee-only 60000", () => {
+  const resolution = resolveFinancialOutcome(
+    {
+      agreedCreatorFee: d(100000),
+      platformCommissionRateSnapshot: d(7),
+      platformCommissionAmount: d(7000),
+      platformCommissionGstRateSnapshot: d(18),
+      platformCommissionGstAmount: d(1260),
+      currency: "INR",
+    },
+    d(40000),
+    CollaborationFinancialOutcome.ADMIN_RESOLUTION,
+    "ADMIN_RESOLUTION",
+  );
+  const allocation = {
+    agreedCreatorFee: d(100000),
+    creatorEntitlementAmount: d(40000),
+    derivedBrandCommercialRefundEntitlementAmount:
+      resolution.brandCommercialRefundEntitlementAmount,
+    aggregateVersion: 4,
+  };
+  assert.equal(resolution.creatorCommercialRefundAmount.toString(), "60000");
+  assert.equal(resolution.platformCommissionRetainedAmount.toString(), "2800");
+  assert.equal(resolution.platformCommissionRefundAmount.toString(), "4200");
+  assert.equal(
+    resolution.platformCommissionGstRetainedAmount.toString(),
+    "504",
+  );
+  assert.equal(resolution.platformCommissionGstRefundAmount.toString(), "756");
+  assert.equal(
+    resolution.brandCommercialRefundEntitlementAmount.toString(),
+    "64956",
+  );
+  assert.doesNotThrow(() =>
+    validateAdminEconomicAllocation({
+      ...allocation,
+      brandRefundEntitlementAmount: d(64956),
+    }),
+  );
+  assert.throws(() =>
+    validateAdminEconomicAllocation({
+      ...allocation,
+      brandRefundEntitlementAmount: d(60000),
     }),
   );
 });
