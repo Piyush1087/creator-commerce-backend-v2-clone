@@ -16,7 +16,7 @@ type LockedCommercialTerms = {
   advanceAmount?: Prisma.Decimal | null;
 };
 
-function resolveFinancialOutcome(
+export function resolveFinancialOutcome(
   terms: LockedCommercialTerms,
   creatorGrossEntitlementAmount: Prisma.Decimal,
   outcome: CollaborationFinancialOutcome,
