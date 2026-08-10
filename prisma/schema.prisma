@@ -1411,7 +1411,7 @@ model UceCampaignCommercials {
   negotiableMinFee         Decimal?            @default(0) @map("negotiable_min_fee") @db.Decimal(12, 2)
   negotiableMaxFee         Decimal?            @default(0) @map("negotiable_max_fee") @db.Decimal(12, 2)
   totalCampaignBudgetPool  Decimal             @map("total_campaign_budget_pool") @db.Decimal(14, 2)
-  advancePaymentPercentage Int                 @default(0) @map("advance_payment_percentage")
+  advancePaymentPercentage Int                 @default(30) @map("advance_payment_percentage")
   finalBalanceTerms        UcePayoutTerms      @default(NET_30) @map("final_balance_terms")
   receivesBrandSupport     Boolean             @default(false) @map("receives_brand_support")
   brandSupportType         UceBrandSupportType? @map("brand_support_type")

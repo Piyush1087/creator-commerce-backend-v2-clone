@@ -11,7 +11,6 @@ import {
   UceCompensationType,
 } from "@prisma/client";
 
-import { UceAdvancePaymentPercentageSchema } from "../../brand-uce/schemas/uce-wizard.schema";
 import { resolveProvisioningNegotiationState } from "../utils/collaboration-provisioning-initialization";
 import { provisionCollaborationSchema } from "./provision-collaboration.schema";
 
@@ -117,14 +116,20 @@ test("uses the frozen canonical Collaboration enum vocabulary", () => {
   ]);
 });
 
-test("reuses the Campaign-owned advance percentage constraint", () => {
-  for (const value of [0, 25, 50, 75, 100]) {
-    assert.equal(
-      UceAdvancePaymentPercentageSchema.safeParse(value).success,
-      true,
-    );
-  }
-  assert.equal(UceAdvancePaymentPercentageSchema.safeParse(30).success, false);
+test("does not impose Collaboration product policy on Campaign advance percentages", () => {
+  const schema = readFileSync(
+    join(
+      process.cwd(),
+      "src/features/collaboration/services/collaboration-provision.service.ts",
+    ),
+    "utf8",
+  );
+
+  assert.match(schema, /Number\.isInteger\(advancePercentage\)/);
+  assert.match(schema, /advancePercentage < 0/);
+  assert.match(schema, /advancePercentage > 100/);
+  assert.doesNotMatch(schema, /\[0,\s*25,\s*50,\s*75,\s*100\]/);
+  assert.doesNotMatch(schema, /UceAdvancePaymentPercentageSchema/);
 });
 
 test("skips Negotiation for fixed compensation and waits for Brand on negotiable", () => {

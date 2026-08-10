@@ -53,8 +53,7 @@ DROP INDEX "collaborations_campaign_id_creator_id_key";
 ALTER TABLE "uce_campaign_commercials" ADD COLUMN     "brand_support_estimated_value" DECIMAL(12,2),
 ADD COLUMN     "brand_support_type" "UceBrandSupportType",
 ADD COLUMN     "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
-ADD COLUMN     "receives_brand_support" BOOLEAN NOT NULL DEFAULT false,
-ALTER COLUMN "advance_payment_percentage" SET DEFAULT 0;
+ADD COLUMN     "receives_brand_support" BOOLEAN NOT NULL DEFAULT false;
 
 -- AlterTable
 ALTER TABLE "collaborations" ADD COLUMN     "aggregate_version" INTEGER NOT NULL DEFAULT 1,

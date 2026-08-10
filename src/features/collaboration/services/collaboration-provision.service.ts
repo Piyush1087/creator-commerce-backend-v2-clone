@@ -22,7 +22,6 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
-import { UceAdvancePaymentPercentageSchema } from "../../brand-uce/schemas/uce-wizard.schema";
 import {
   provisionCollaborationSchema,
   type ProvisionCollaborationInput,
@@ -138,12 +137,14 @@ export class CollaborationProvisionService {
         "Campaign commercial configuration is required",
       );
     }
-    const advancePercentage = UceAdvancePaymentPercentageSchema.safeParse(
-      commercials.advancePaymentPercentage,
-    );
-    if (!advancePercentage.success) {
+    const advancePercentage = commercials.advancePaymentPercentage;
+    if (
+      !Number.isInteger(advancePercentage) ||
+      advancePercentage < 0 ||
+      advancePercentage > 100
+    ) {
       throw new BadRequestException(
-        "Campaign advance percentage violates the Campaign-owned constraint",
+        "Campaign advance percentage must be an integer from 0 to 100",
       );
     }
     const currency = commercials.currency.toUpperCase();
@@ -166,7 +167,7 @@ export class CollaborationProvisionService {
         "Fixed Campaign compensation requires an authoritative fixed fee",
       );
     }
-    const advanceAmount = fixedAgreedFee?.mul(advancePercentage.data).div(100);
+    const advanceAmount = fixedAgreedFee?.mul(advancePercentage).div(100);
     const balanceAmount = fixedAgreedFee?.minus(advanceAmount ?? 0);
     const securementState = negotiationRequired
       ? null
@@ -219,7 +220,7 @@ export class CollaborationProvisionService {
                 brandSupportEstimatedValue:
                   commercials.brandSupportEstimatedValue,
                 campaignCommercialContext: toJson(commercials),
-                advancePercentageSnapshot: advancePercentage.data,
+                advancePercentageSnapshot: advancePercentage,
                 commercialCurrency: currency,
               },
             },
@@ -229,7 +230,7 @@ export class CollaborationProvisionService {
                 applicationProposedFee: application.proposedFee,
                 agreedCreatorFee: fixedAgreedFee,
                 currency,
-                advancePercentageSnapshot: advancePercentage.data,
+                advancePercentageSnapshot: advancePercentage,
                 advanceAmount,
                 balanceAmount,
                 paymentRail: CollaborationPaymentRail.PLATFORM_ESCROW,
