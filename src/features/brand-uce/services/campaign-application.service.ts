@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -8,11 +9,20 @@ import {
   UceApplicationStatus,
   UceCampaignCreatorIngestionMethod,
   UceCampaignCreatorSource,
+  UceCampaignStatus,
   UceCollabStatus,
   UceMediaPlatform,
+  UceMilestoneStage,
+  UceNegotiationSubState,
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import { buildPhaseSyncPatch } from "../../../shared/uce/uce-production-phase.util";
+import { CollaborationProvisionService } from "../../collaboration/services/collaboration-provision.service";
+import {
+  decimalToNumber,
+  splitEscrowQuote,
+} from "../utils/uce-decimal.util";
 import {
   approveApplicationInputSchema,
   rejectApplicationInputSchema,
@@ -24,12 +34,17 @@ function normalizeHandle(handle: string): string {
   return handle.trim().replace(/^@/, "").toLowerCase();
 }
 
+function defaultMilestoneDeadline(days = 14): Date {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+}
+
 @Injectable()
 export class CampaignApplicationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: BrandUceAccessService,
     private readonly pipeline: BrandUcePipelineService,
+    private readonly collaborationProvision: CollaborationProvisionService,
   ) {}
 
   /**
@@ -188,21 +203,79 @@ export class CampaignApplicationService {
     }
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
 
-    const application = await this.prisma.uceApplication.findFirst({
-      where: { id: applicationId, campaignId },
-      include: { campaignCreator: true },
-    });
-    if (!application) throw new NotFoundException("Application not found");
-    if (application.status !== UceApplicationStatus.PENDING) {
-      throw new BadRequestException("Only PENDING applications can be approved");
-    }
-
-    const now = new Date();
-    await this.prisma.$transaction(async (tx) => {
-      await tx.uceApplication.update({
-        where: { id: applicationId },
-        data: { status: UceApplicationStatus.APPROVED, approvedAt: now },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const application = await tx.uceApplication.findFirst({
+        where: { id: applicationId, campaignId },
+        include: { campaignCreator: true },
       });
+      if (!application) throw new NotFoundException("Application not found");
+      if (application.status !== UceApplicationStatus.PENDING) {
+        throw new BadRequestException("Only PENDING applications can be approved");
+      }
+      if (!application.campaignCreator.email?.trim()) {
+        throw new BadRequestException(
+          "Creator email is required before an Application can be approved",
+        );
+      }
+
+      const campaign = await tx.uceCampaign.findFirst({
+        where: { id: campaignId, brandProfileId },
+      });
+      if (!campaign) throw new NotFoundException("Campaign not found");
+      if (
+        campaign.status !== UceCampaignStatus.LIVE &&
+        campaign.status !== UceCampaignStatus.PAUSED
+      ) {
+        throw new BadRequestException(
+          "Applications can only be approved for LIVE or PAUSED Campaigns",
+        );
+      }
+
+      const product = await tx.uceCampaignProduct.findFirst({
+        where: {
+          id: application.campaignAssetId,
+          campaignId,
+          isActive: true,
+        },
+      });
+      if (!product) {
+        throw new BadRequestException(
+          "The Application Campaign Asset is no longer active",
+        );
+      }
+
+      const brief = await tx.uceCampaignBrief.findFirst({
+        where: {
+          id: application.briefId,
+          campaignId,
+          productId: application.campaignAssetId,
+          isActive: true,
+        },
+      });
+      if (!brief) {
+        throw new BadRequestException(
+          "The Application Brief is no longer active for this Campaign Asset",
+        );
+      }
+
+      const claimed = await tx.uceApplication.updateMany({
+        where: {
+          id: applicationId,
+          campaignId,
+          status: UceApplicationStatus.PENDING,
+        },
+        data: {
+          status: UceApplicationStatus.APPROVED,
+          approvedAt: new Date(),
+        },
+      });
+      if (claimed.count !== 1) {
+        throw new ConflictException(
+          "Application approval was already resolved by another request",
+        );
+      }
+
+      const now = new Date();
       await tx.uceApplication.updateMany({
         where: {
           campaignId,
@@ -216,36 +289,124 @@ export class CampaignApplicationService {
           supersededAt: now,
         },
       });
-    });
 
-    // Explicit Collaboration handoff (downstream), not Applicant truth.
-    const collab = await this.prisma.uceCampaignCollaboration.findFirst({
-      where: {
-        campaignId,
-        instagramHandle: {
-          equals: application.campaignCreator.socialHandle,
-          mode: "insensitive",
-        },
-      },
-    });
-    if (collab) {
-      if (
-        collab.collabStatus === UceCollabStatus.APPLICANT_PENDING ||
-        collab.collabStatus === UceCollabStatus.APPLICANT_SHORTLISTED
-      ) {
-        await this.pipeline.approveApplicant(
-          brandProfileId,
+      const legacyCollab = await tx.uceCampaignCollaboration.findFirst({
+        where: {
           campaignId,
-          collab.id,
-          {
-            product_id: application.campaignAssetId,
+          instagramHandle: {
+            equals: application.campaignCreator.socialHandle,
+            mode: "insensitive",
           },
-          actorId,
-        );
-      }
-    }
+        },
+      });
 
-    return { ok: true, applicationId, status: "APPROVED" as const };
+      const commercials = await tx.uceCampaignCommercials.findUnique({
+        where: { campaignId },
+      });
+      const advancePercent = commercials?.advancePaymentPercentage ?? 30;
+      let totalQuote = 0;
+      if (commercials) {
+        totalQuote =
+          commercials.compensationType === "FIXED_FEE"
+            ? decimalToNumber(commercials.fixedFeeAmount)
+            : decimalToNumber(commercials.negotiableMaxFee);
+      }
+      const { advance30Value, balance70Value } = splitEscrowQuote(
+        totalQuote,
+        advancePercent,
+      );
+
+      if (product.inventoryCount > 0) {
+        await tx.uceCampaignProduct.update({
+          where: { id: product.id },
+          data: { inventoryCount: { decrement: 1 } },
+        });
+      }
+
+      if (
+        legacyCollab &&
+        (legacyCollab.collabStatus === UceCollabStatus.APPLICANT_PENDING ||
+          legacyCollab.collabStatus === UceCollabStatus.APPLICANT_SHORTLISTED)
+      ) {
+        const milestoneDeadline = defaultMilestoneDeadline(14);
+        await tx.uceCampaignCollaboration.update({
+          where: { id: legacyCollab.id },
+          data: {
+            collabStatus: UceCollabStatus.ACTIVE_WORKFLOW,
+            currentMilestone: UceMilestoneStage.STAGE_1_NEGOTIATION,
+            productId: application.campaignAssetId,
+            totalQuote,
+            advance30Value,
+            balance70Value,
+            negotiationState: UceNegotiationSubState.CREATOR_COUNTER,
+            currentMilestoneDeadline: milestoneDeadline,
+            ...buildPhaseSyncPatch({
+              ...legacyCollab,
+              collabStatus: UceCollabStatus.ACTIVE_WORKFLOW,
+              currentMilestone: UceMilestoneStage.STAGE_1_NEGOTIATION,
+              currentMilestoneDeadline: milestoneDeadline,
+            }),
+          },
+        });
+
+        await tx.uceCollaborationAuditLog.create({
+          data: {
+            collaborationId: legacyCollab.id,
+            stageContext: UceMilestoneStage.STAGE_1_NEGOTIATION,
+            systemEventTag: "APPLICANT_APPROVED",
+            messagePayload: `Creator ${legacyCollab.instagramHandle} approved and Collaboration created`,
+            actorIdentifier: actorId,
+          },
+        });
+
+        await tx.uceCampaignPerformanceAggregate.update({
+          where: { campaignId },
+          data: {
+            totalApplicantsCount: { decrement: 1 },
+            totalActiveCollabsCount: { increment: 1 },
+          },
+        });
+      }
+
+      const creatorUserId =
+        await this.collaborationProvision.ensureCreatorUserInTransaction(
+          tx,
+          application.campaignCreator.email,
+          application.campaignCreator.socialHandle,
+        );
+
+      const workflow =
+        await this.collaborationProvision.provisionFromUceApprovalInTransaction(
+          tx,
+          {
+            brandProfileId,
+            campaignId,
+            briefId: application.briefId,
+            creatorUserId,
+            productId: application.campaignAssetId,
+            ucePipelineCollaborationId: legacyCollab?.id,
+            initialQuote: totalQuote,
+            advancePercent,
+            allowExisting: false,
+            welcomeMessage: `Congrats @${application.campaignCreator.socialHandle}! You're approved. View your brief and secure your spot.`,
+          },
+        );
+
+      return {
+        workflowCollaborationId: workflow.collaboration_id,
+      };
+    });
+
+    await this.collaborationProvision.broadcastProvisioned(
+      result.workflowCollaborationId,
+    );
+
+    return {
+      ok: true,
+      applicationId,
+      status: "APPROVED" as const,
+      workflowCollaborationId: result.workflowCollaborationId,
+    };
   }
 
   async reject(
