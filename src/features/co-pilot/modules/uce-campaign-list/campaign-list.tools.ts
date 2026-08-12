@@ -183,7 +183,7 @@ export class CampaignListToolsService {
         label: "Status",
         value: shell.current_status,
         statusColor:
-          shell.current_status === "ACTIVE"
+          shell.current_status === "LIVE" || shell.current_status === "PUBLISHED"
             ? "GREEN"
             : shell.current_status === "DRAFT"
               ? "YELLOW"
@@ -191,8 +191,8 @@ export class CampaignListToolsService {
       },
       {
         label: "Live?",
-        value: shell.current_status === "ACTIVE" ? "Yes" : "No",
-        statusColor: shell.current_status === "ACTIVE" ? "GREEN" : "YELLOW",
+        value: shell.current_status === "LIVE" ? "Yes" : "No",
+        statusColor: shell.current_status === "LIVE" ? "GREEN" : "YELLOW",
       },
       {
         label: "Draft?",
@@ -213,7 +213,7 @@ export class CampaignListToolsService {
   }
 
   statusNarrative(shell: CampaignShell): string {
-    const live = shell.current_status === "ACTIVE";
+    const live = shell.current_status === "LIVE";
     const draft = shell.current_status === "DRAFT";
     return `"${shell.campaign_name}" is ${shell.current_status}${
       live ? " (live)" : draft ? " (still a draft)" : ""
@@ -227,7 +227,7 @@ export class CampaignListToolsService {
     >,
   ): string {
     const blockers = checklist.filter((c) => !c.satisfied);
-    if (shell.current_status === "ACTIVE") {
+    if (shell.current_status === "LIVE") {
       return `"${shell.campaign_name}" is already live. Checklist is for publish readiness on drafts.`;
     }
     if (blockers.length === 0) {

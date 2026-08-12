@@ -86,7 +86,7 @@ export class PublicBrandService {
     const openCampaigns = await this.prisma.uceCampaign.findMany({
       where: {
         brandProfileId: profile.id,
-        status: UceCampaignStatus.ACTIVE,
+        status: UceCampaignStatus.LIVE,
         targeting: {
           visibilityScopes: { has: UceVisibilityScope.EVERYONE },
         },

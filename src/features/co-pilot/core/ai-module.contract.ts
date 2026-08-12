@@ -24,7 +24,13 @@ export type CoPilotModuleReadContext = {
   resolvedCampaignName?: string;
   resolvedCompareIds?: string[];
   classifierFilters?: {
-    status?: "DRAFT" | "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED";
+    status?:
+      | "DRAFT"
+      | "PUBLISHED"
+      | "LIVE"
+      | "PAUSED"
+      | "COMPLETED"
+      | "ARCHIVED";
     objective?: "BRAND_AWARENESS" | "TRAFFIC_CLICKS" | "SALES_CONVERSIONS";
     sortBy?: "updatedAt" | "name" | "budget" | "spend";
     search?: string;

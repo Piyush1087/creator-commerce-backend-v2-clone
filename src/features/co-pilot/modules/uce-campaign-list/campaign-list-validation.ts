@@ -412,7 +412,7 @@ export function mapCampaignListValidationError(args: {
       message,
       {
         id: "status_archiveable",
-        title: "Campaign must be ACTIVE, PAUSED, or COMPLETED",
+        title: "Campaign must be LIVE, PAUSED, or COMPLETED",
         satisfied: false,
         helpText: "Draft campaigns cannot be archived from chat.",
         repairHint:
@@ -437,7 +437,7 @@ export function mapCampaignListValidationError(args: {
         title: "Campaign still editable / actionable",
         satisfied: false,
         helpText: message,
-        repairHint: "Choose an ACTIVE, PAUSED, or DRAFT campaign instead.",
+        repairHint: "Choose a LIVE, PAUSED, or DRAFT campaign instead.",
       },
       campaign,
     );

@@ -116,7 +116,7 @@ export class CreatorMarketplaceService {
 
     const campaigns = await this.prisma.uceCampaign.findMany({
       where: {
-        status: UceCampaignStatus.ACTIVE,
+        status: UceCampaignStatus.LIVE,
         ...this.brandSlugWhere(filters.brand_slug),
         ...(filters.search_query
           ? {
@@ -318,7 +318,7 @@ export class CreatorMarketplaceService {
     };
 
     const campaign = await this.prisma.uceCampaign.findFirst({
-      where: { id: campaignId, status: UceCampaignStatus.ACTIVE },
+      where: { id: campaignId, status: UceCampaignStatus.LIVE },
       include: {
         brandProfile: { select: { name: true, logoUrl: true, tagline: true, domain: true } },
         strategy: true,
@@ -488,7 +488,7 @@ export class CreatorMarketplaceService {
     const filters = parsed.data;
     const campaigns = await this.prisma.uceCampaign.findMany({
       where: {
-        status: UceCampaignStatus.ACTIVE,
+        status: UceCampaignStatus.LIVE,
         targeting: {
           visibilityScopes: { has: UceVisibilityScope.EVERYONE },
         },
@@ -585,7 +585,7 @@ export class CreatorMarketplaceService {
     inviteToken?: string,
   ) {
     const campaign = await this.prisma.uceCampaign.findFirst({
-      where: { id: campaignId, status: UceCampaignStatus.ACTIVE },
+      where: { id: campaignId, status: UceCampaignStatus.LIVE },
       include: {
         brandProfile: { select: { name: true, logoUrl: true, tagline: true, domain: true } },
         strategy: true,

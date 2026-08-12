@@ -260,7 +260,8 @@ enum BrandCentreJobStatus {
 
 enum UceCampaignStatus {
   DRAFT
-  ACTIVE
+  PUBLISHED
+  LIVE
   PAUSED
   COMPLETED
   ARCHIVED
@@ -302,6 +303,49 @@ enum UcePayoutTerms {
   NET_7
   NET_15
   NET_30
+}
+
+enum UceApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+  EXPIRED
+  SUPERSEDED
+}
+
+enum UceApplicationSource {
+  DIRECT
+  OUTREACH
+  SHARE
+}
+
+enum UceCampaignCreatorSource {
+  META_MARKETPLACE
+  MANUAL
+}
+
+enum UceCampaignCreatorIngestionMethod {
+  MARKETPLACE_RECOMMENDATION
+  MANUAL_SINGLE
+  MANUAL_CSV
+}
+
+enum UceCampaignCreatorReviewState {
+  PENDING_REVIEW
+  REVIEWED
+  REJECTED
+}
+
+enum UceCampaignShareChannel {
+  COPY_LINK
+  WHATSAPP
+  INSTAGRAM
+  NATIVE_SHARE
+}
+
+enum UceCampaignShareTrackingEventType {
+  LINK_CLICKED
 }
 
 enum UceCollabStatus {
@@ -1216,6 +1260,9 @@ model UceCampaign {
   products             UceCampaignProduct[]
   briefs               UceCampaignBrief[]
   collaborations       UceCampaignCollaboration[]
+  campaignCreators     UceCampaignCreator[]
+  applications         UceApplication[]
+  shares               UceCampaignShare[]
   workflowCollaborations Collaboration[]
   reportingSnapshots   UceCampaignReportingSnapshot[]
   reportingTimeseries  UceCampaignReportingTimeseriesHourly[]
@@ -1224,6 +1271,105 @@ model UceCampaign {
 
   @@index([brandProfileId, status])
   @@map("uce_campaigns")
+}
+
+/// Durable Campaign↔creator bridge used by Discovery/Applicants/Outreach.
+model UceCampaignCreator {
+  id                     String                           @id @default(uuid())
+  campaignId             String                           @map("campaign_id")
+  campaign               UceCampaign                      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creatorProfileId       String?                          @map("creator_profile_id")
+  creatorProfile         CreatorProfile?                  @relation(fields: [creatorProfileId], references: [id], onDelete: SetNull)
+  platform               UceMediaPlatform                 @default(INSTAGRAM)
+  socialHandle           String                           @map("social_handle")
+  normalizedSocialHandle String                           @map("normalized_social_handle")
+  email                  String?
+  source                 UceCampaignCreatorSource         @default(MANUAL)
+  ingestionMethod        UceCampaignCreatorIngestionMethod @default(MANUAL_SINGLE) @map("ingestion_method")
+  reviewState            UceCampaignCreatorReviewState    @default(PENDING_REVIEW) @map("review_state")
+  applications           UceApplication[]
+  archivedAt             DateTime?                        @map("archived_at")
+  createdAt              DateTime                         @default(now()) @map("created_at")
+  updatedAt              DateTime                         @updatedAt @map("updated_at")
+
+  @@unique([campaignId, platform, normalizedSocialHandle])
+  @@index([campaignId, reviewState])
+  @@map("uce_campaign_creators")
+}
+
+/// Campaign-owned Application decision record (Applicants truth).
+model UceApplication {
+  id                        String               @id @default(uuid())
+  requestId                 String               @unique @map("request_id")
+  campaignId                String               @map("campaign_id")
+  campaign                  UceCampaign          @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  campaignCreatorId         String               @map("campaign_creator_id")
+  campaignCreator           UceCampaignCreator   @relation(fields: [campaignCreatorId], references: [id], onDelete: Restrict)
+  /// Maps to current product persistence until Asset rename is approved.
+  campaignAssetId           String               @map("campaign_asset_id")
+  campaignAsset             UceCampaignProduct   @relation(fields: [campaignAssetId], references: [id], onDelete: Restrict)
+  briefId                   String               @map("brief_id")
+  brief                     UceCampaignBrief     @relation(fields: [briefId], references: [id], onDelete: Restrict)
+  status                    UceApplicationStatus @default(PENDING)
+  source                    UceApplicationSource @default(DIRECT)
+  supersededByApplicationId String?              @map("superseded_by_application_id")
+  supersededByApplication   UceApplication?      @relation("ApplicationSupersession", fields: [supersededByApplicationId], references: [id], onDelete: Restrict)
+  supersededApplications    UceApplication[]     @relation("ApplicationSupersession")
+  snapshot                  UceApplicationSnapshot?
+  appliedAt                 DateTime             @default(now()) @map("applied_at")
+  approvedAt                DateTime?            @map("approved_at")
+  rejectedAt                DateTime?            @map("rejected_at")
+  withdrawnAt               DateTime?            @map("withdrawn_at")
+  expiredAt                 DateTime?            @map("expired_at")
+  supersededAt              DateTime?            @map("superseded_at")
+  createdAt                 DateTime             @default(now()) @map("created_at")
+  updatedAt                 DateTime             @updatedAt @map("updated_at")
+
+  @@index([campaignId, status])
+  @@index([campaignCreatorId, status])
+  @@index([briefId, status])
+  @@map("uce_applications")
+}
+
+model UceApplicationSnapshot {
+  id                   String        @id @default(uuid())
+  applicationId        String        @unique @map("application_id")
+  application          UceApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  campaignContext      Json          @map("campaign_context")
+  campaignAssetContext Json          @map("campaign_asset_context")
+  briefContext         Json          @map("brief_context")
+  commercialContext    Json          @map("commercial_context")
+  creatorIdentity      Json          @map("creator_identity")
+  createdAt            DateTime      @default(now()) @map("created_at")
+
+  @@map("uce_application_snapshots")
+}
+
+model UceCampaignShare {
+  id             String                        @id @default(uuid())
+  requestId      String                        @unique @map("request_id")
+  campaignId     String                        @map("campaign_id")
+  campaign       UceCampaign                   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  channel        UceCampaignShareChannel
+  trackingToken  String                        @unique @map("tracking_token")
+  trackingEvents UceCampaignShareTrackingEvent[]
+  initiatedAt    DateTime                      @default(now()) @map("initiated_at")
+  createdAt      DateTime                      @default(now()) @map("created_at")
+
+  @@index([campaignId, initiatedAt])
+  @@map("uce_campaign_shares")
+}
+
+model UceCampaignShareTrackingEvent {
+  id         String                           @id @default(uuid())
+  shareId    String                           @map("share_id")
+  share      UceCampaignShare                 @relation(fields: [shareId], references: [id], onDelete: Cascade)
+  type       UceCampaignShareTrackingEventType
+  occurredAt DateTime                         @default(now()) @map("occurred_at")
+  createdAt  DateTime                         @default(now()) @map("created_at")
+
+  @@index([shareId, occurredAt])
+  @@map("uce_campaign_share_tracking_events")
 }
 
 model UceCampaignPerformanceAggregate {
@@ -1319,6 +1465,7 @@ model UceCampaignProduct {
 
   briefs         UceCampaignBrief[]
   collaborations UceCampaignCollaboration[]
+  applications   UceApplication[]
   workflowCollaborations Collaboration[]
 
   @@unique([campaignId, skuCode])
@@ -1349,6 +1496,7 @@ model UceCampaignBrief {
   createdAt                    DateTime             @default(now()) @map("created_at")
 
   collaborations UceCampaignCollaboration[]
+  applications   UceApplication[]
   workflowCollaborations Collaboration[]
 
   @@index([campaignId])
@@ -1619,6 +1767,7 @@ model CreatorProfile {
   coPilotMessageFeedback CreatorCoPilotMessageFeedback[]
   coPilotInteractionLogs CreatorCoPilotInteractionLog[]
   uceCollaborations      UceCampaignCollaboration[]
+  campaignCreators       UceCampaignCreator[]
 
   @@map("creator_profiles")
 }

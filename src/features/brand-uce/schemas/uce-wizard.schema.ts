@@ -2,7 +2,8 @@ import { z } from "zod";
 
 export const UceCampaignStatusSchema = z.enum([
   "DRAFT",
-  "ACTIVE",
+  "PUBLISHED",
+  "LIVE",
   "PAUSED",
   "COMPLETED",
   "ARCHIVED",
@@ -16,7 +17,12 @@ export const UceCampaignObjectiveSchema = z.enum([
   "TRAFFIC_CLICKS",
   "SALES_CONVERSIONS",
 ]);
-export const UceCompensationTypeSchema = z.enum(["FIXED_FEE", "NEGOTIABLE"]);
+/** Product vocab FIXED maps to persistence FIXED_FEE at the service boundary. */
+export const UceCompensationTypeSchema = z.enum([
+  "FIXED",
+  "FIXED_FEE",
+  "NEGOTIABLE",
+]);
 export const UcePayoutTermsSchema = z.enum([
   "IMMEDIATE",
   "NET_7",
@@ -89,6 +95,12 @@ export const UceVisibilityScopeSchema = z.enum([
   "INVITED_ONLY",
 ]);
 
+export const UceCampaignVisibilitySchema = z.enum([
+  "PUBLIC",
+  "ELIGIBLE_CREATORS_ONLY",
+  "INVITE_ONLY",
+]);
+
 export const UceApplicationScopeSchema = z.enum([
   "EVERYONE",
   "ELIGIBLE_ONLY",
@@ -108,6 +120,7 @@ export const Step2TargetingSchema = z
     audience_gender: z.string().default("ALL"),
     target_locations: z.array(z.string()).min(1),
     disqualifying_keywords: z.array(z.string()).optional().default([]),
+    campaign_visibility: UceCampaignVisibilitySchema.optional(),
     visibility_scopes: z
       .array(UceVisibilityScopeSchema)
       .min(1)
@@ -126,11 +139,15 @@ export const Step3CommercialsSchema = z
     negotiable_min_fee: z.number().nonnegative().optional().default(0),
     negotiable_max_fee: z.number().nonnegative().optional().default(0),
     total_campaign_budget_pool: z.number().positive(),
-    advance_payment_percentage: z.number().int().min(30).max(100),
+    advance_payment_percentage: z.number().int().min(0).max(100),
     final_balance_terms: UcePayoutTermsSchema,
   })
   .superRefine((data, ctx) => {
-    if (data.compensation_type === "FIXED_FEE" && data.fixed_fee_amount <= 0) {
+    if (
+      (data.compensation_type === "FIXED" ||
+        data.compensation_type === "FIXED_FEE") &&
+      data.fixed_fee_amount <= 0
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Fixed compensation requires a positive fixed_fee_amount.",

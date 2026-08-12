@@ -467,7 +467,7 @@ export class BrandSettingsIntegrationsService {
     const activeCount = await this.prisma.uceCampaign.count({
       where: {
         brandProfileId,
-        status: UceCampaignStatus.ACTIVE,
+        status: UceCampaignStatus.LIVE,
       },
     });
     if (activeCount > 0) {
