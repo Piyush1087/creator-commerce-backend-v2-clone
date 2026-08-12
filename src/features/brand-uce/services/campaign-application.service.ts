@@ -26,10 +26,7 @@ import {
 } from "../validation/applicants/application.schema";
 import { BrandUceAccessService } from "./brand-uce-access.service";
 import { BrandUcePipelineService } from "./brand-uce-pipeline.service";
-
-function normalizeHandle(handle: string): string {
-  return handle.trim().replace(/^@/, "").toLowerCase();
-}
+import { normalizeInstagramHandle } from "../utils/instagram-handle.util";
 
 function defaultMilestoneDeadline(days = 14): Date {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
@@ -64,7 +61,7 @@ export class CampaignApplicationService {
     });
 
     for (const row of applicantRows) {
-      const normalized = normalizeHandle(row.instagramHandle);
+      const normalized = normalizeInstagramHandle(row.instagramHandle);
       const creator = await this.prisma.uceCampaignCreator.upsert({
         where: {
           campaignId_platform_normalizedSocialHandle: {

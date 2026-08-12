@@ -402,6 +402,14 @@ describe.sequential("F6C canonical Campaign runtime", () => {
     });
     expect(afterLegacySync.canonicalCampaignAssetId).toBe(canonicalAssetId);
     expect(afterLegacySync.canonicalBriefId).toBe(canonicalBriefId);
+    const synchronizedApplications = await prisma.uceApplication.findMany({
+      where: { campaignId: IDS.ready },
+    });
+    expect(synchronizedApplications).toHaveLength(1);
+    expect(synchronizedApplications[0].canonicalCampaignAssetId).toBe(
+      canonicalAssetId,
+    );
+    expect(synchronizedApplications[0].canonicalBriefId).toBe(canonicalBriefId);
   });
 
   it("approves using persisted canonical IDs and provisions one snapshot", async () => {
