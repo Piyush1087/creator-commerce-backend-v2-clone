@@ -5,6 +5,7 @@ import type { RequestWithAuthUser } from "../auth/auth.controller";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { BrandCentreAuthService } from "../brand-centre/brand-centre-auth.service";
 import { CanonicalCampaignCreateService } from "./services/canonical-campaign-create.service";
+import { CanonicalCampaignDraftReadService } from "./services/canonical-campaign-draft-read.service";
 
 @Controller("api/v1/brand-uce")
 @UseGuards(ThrottlerGuard, JwtAuthGuard)
@@ -12,6 +13,7 @@ export class CanonicalCampaignCreateController {
   constructor(
     private readonly auth: BrandCentreAuthService,
     private readonly canonicalCreate: CanonicalCampaignCreateService,
+    private readonly canonicalDraftRead: CanonicalCampaignDraftReadService,
   ) {}
 
   /** Transitional atomic endpoint retained for clients that do not yet use draft runtime. */
@@ -36,7 +38,7 @@ export class CanonicalCampaignCreateController {
     @Param("campaignId") campaignId: string,
   ) {
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
-    return this.canonicalCreate.getDraft(brandProfileId, campaignId);
+    return this.canonicalDraftRead.getDraft(brandProfileId, campaignId);
   }
 
   @Patch("campaigns/canonical-drafts/:campaignId/field")
