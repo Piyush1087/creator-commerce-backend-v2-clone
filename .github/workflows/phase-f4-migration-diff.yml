@@ -33,10 +33,10 @@ jobs:
         run: npx prisma validate
 
       - name: Generate migration SQL diff
-        run: npx prisma migrate diff --from-schema /tmp/baseline-schema.prisma --to-schema prisma/schema.prisma --script --output /tmp/consolidated-schema.sql
+        run: npx prisma migrate diff --from-schema-datamodel /tmp/baseline-schema.prisma --to-schema-datamodel prisma/schema.prisma --script --output /tmp/consolidated-schema.sql
 
       - name: Generate human-readable diff
-        run: npx prisma migrate diff --from-schema /tmp/baseline-schema.prisma --to-schema prisma/schema.prisma > /tmp/consolidated-schema-summary.txt
+        run: npx prisma migrate diff --from-schema-datamodel /tmp/baseline-schema.prisma --to-schema-datamodel prisma/schema.prisma > /tmp/consolidated-schema-summary.txt
 
       - name: Copy artifacts
         run: |
