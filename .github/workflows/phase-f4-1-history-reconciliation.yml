@@ -30,149 +30,35 @@ jobs:
       DATABASE_URL: postgresql://phasef41:phasef41@127.0.0.1:5432/phasef41
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Isolate existing F4 migration
+      - run: npm ci
+      - name: Isolate old F4
         run: |
           test -f prisma/migrations/20260813005000_consolidated_preprod/migration.sql
           mv prisma/migrations/20260813005000_consolidated_preprod /tmp/f4_existing
-
-      - name: Materialize real pre-F4 migration history
+      - name: Apply real pre-F4 history
         run: npx prisma migrate deploy
-
-      - name: Preserve canonical_definition in Prisma authority
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('prisma/schema.prisma')
-          s = p.read_text()
-          anchor = '  creationSource          UceCampaignCreationSource @default(MANUAL) @map("creation_source")\n'
-          insert = anchor + '  canonicalDefinition     Json?                     @map("canonical_definition")\n'
-          if 'canonicalDefinition     Json?' not in s:
-              if anchor not in s:
-                  raise SystemExit('UceCampaign creationSource anchor not found; stop for review')
-              s = s.replace(anchor, insert, 1)
-              p.write_text(s)
-          PY
-
-      - name: Generate raw diff from real migration baseline
-        run: |
-          npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --script --output /tmp/f4_reconciled_raw.sql
-
-      - name: Safety-audit and produce corrected F4 SQL
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          sql = Path('/tmp/f4_reconciled_raw.sql').read_text()
-
-          targeting_old = '''ALTER TABLE "uce_campaign_targeting" ADD COLUMN     "audience_affinity_ids" TEXT[] DEFAULT ARRAY[]::TEXT[],
-ADD COLUMN     "audience_geographies" JSONB NOT NULL DEFAULT '[]',
-ADD COLUMN     "maximum_followers" INTEGER,
-ADD COLUMN     "minimum_followers" INTEGER NOT NULL DEFAULT 0,
-DROP COLUMN "audience_gender",
-ADD COLUMN     "audience_gender" "UceAudienceGender" NOT NULL DEFAULT 'ALL';'''
-          targeting_safe = '''ALTER TABLE "uce_campaign_targeting" ADD COLUMN     "audience_affinity_ids" TEXT[] DEFAULT ARRAY[]::TEXT[],
-ADD COLUMN     "audience_geographies" JSONB NOT NULL DEFAULT '[]',
-ADD COLUMN     "maximum_followers" INTEGER,
-ADD COLUMN     "minimum_followers" INTEGER NOT NULL DEFAULT 0;
-
-ALTER TABLE "uce_campaign_targeting"
-ALTER COLUMN "audience_gender" DROP DEFAULT,
-ALTER COLUMN "audience_gender" TYPE "UceAudienceGender"
-USING ("audience_gender"::"UceAudienceGender"),
-ALTER COLUMN "audience_gender" SET DEFAULT 'ALL';'''
-          if targeting_old not in sql:
-              raise SystemExit('Expected destructive audience_gender block not found; stop for review')
-          sql = sql.replace(targeting_old, targeting_safe, 1)
-
-          campaign_old = '''ALTER TABLE "uce_campaigns" ADD COLUMN     "ai_recommendation_id" TEXT,
-ADD COLUMN     "ai_recommendation_version" TEXT,
-ADD COLUMN     "archived_at" TIMESTAMP(3),
-ADD COLUMN     "completed_at" TIMESTAMP(3),
-ADD COLUMN     "live_at" TIMESTAMP(3),
-ADD COLUMN     "published_at" TIMESTAMP(3),
-DROP COLUMN "creation_source",
-ADD COLUMN     "creation_source" "UceCampaignCreationSource" NOT NULL DEFAULT 'MANUAL';'''
-          campaign_safe = '''ALTER TABLE "uce_campaigns" ADD COLUMN     "ai_recommendation_id" TEXT,
-ADD COLUMN     "ai_recommendation_version" TEXT,
-ADD COLUMN     "archived_at" TIMESTAMP(3),
-ADD COLUMN     "completed_at" TIMESTAMP(3),
-ADD COLUMN     "live_at" TIMESTAMP(3),
-ADD COLUMN     "published_at" TIMESTAMP(3);
-
-ALTER TABLE "uce_campaigns"
-DROP CONSTRAINT IF EXISTS "uce_campaigns_creation_source_check";
-
-ALTER TABLE "uce_campaigns"
-ALTER COLUMN "creation_source" DROP DEFAULT,
-ALTER COLUMN "creation_source" TYPE "UceCampaignCreationSource"
-USING ("creation_source"::"UceCampaignCreationSource"),
-ALTER COLUMN "creation_source" SET DEFAULT 'MANUAL';'''
-          if campaign_old not in sql:
-              raise SystemExit('Expected destructive creation_source block not found; stop for review')
-          sql = sql.replace(campaign_old, campaign_safe, 1)
-
-          marker = 'CREATE TABLE "uce_campaign_assets"'
-          idx = sql.find(marker)
-          if idx < 0:
-              raise SystemExit('Campaign Asset table block not found')
-          tail = sql[idx:]
-          asset_old = '''    CONSTRAINT "uce_campaign_assets_pkey" PRIMARY KEY ("id")
-);'''
-          asset_safe = '''    CONSTRAINT "uce_campaign_assets_pkey" PRIMARY KEY ("id"),
-    CONSTRAINT "uce_campaign_assets_exactly_one_reference_check" CHECK (
-      ("kind" = 'BRAND' AND "brand_profile_id" IS NOT NULL AND "offering_id" IS NULL AND "brand_offer_id" IS NULL) OR
-      ("kind" = 'OFFERING' AND "brand_profile_id" IS NULL AND "offering_id" IS NOT NULL AND "brand_offer_id" IS NULL) OR
-      ("kind" = 'OFFER' AND "brand_profile_id" IS NULL AND "offering_id" IS NULL AND "brand_offer_id" IS NOT NULL)
-    )
-);'''
-          if asset_old not in tail:
-              raise SystemExit('Campaign Asset primary-key block not found')
-          sql = sql[:idx] + tail.replace(asset_old, asset_safe, 1)
-
-          sql = sql.replace('CREATE UNIQUE INDEX "', 'CREATE UNIQUE INDEX IF NOT EXISTS "')
-          sql = sql.replace('CREATE INDEX "', 'CREATE INDEX IF NOT EXISTS "')
-
-          forbidden = [
-              'DROP COLUMN "canonical_definition"',
-              'DROP TABLE "uce_campaign_products"',
-              'DROP TABLE "uce_campaign_briefs"',
-              'DROP TABLE "uce_campaign_collaborations"',
-              'DROP TABLE "brand_escrow_vaults"',
-              'DROP TABLE "escrow_transaction_ledger"',
-          ]
-          for token in forbidden:
-              if token in sql:
-                  raise SystemExit(f'Forbidden destructive operation remains: {token}')
-
-          header = '''-- Phase F4.1 consolidated pre-production migration, reconciled against the real repository migration history.\n-- The prior F4 schema-snapshot artifact was superseded after F5 exposed baseline overlap.\n-- DEV/PRE-PRODUCTION ONLY. Production requires independent data/backfill review.\n\n'''
-          Path('/tmp/f4_corrected.sql').write_text(header + sql)
-          PY
-
-      - name: Rebuild clean baseline for migration proof
+      - name: Patch Prisma compatibility authority
+        run: python scripts/f4_1_reconcile.py patch-schema
+      - name: Generate raw history-aware diff
+        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --script --output /tmp/f4_raw.sql
+      - name: Produce corrected F4.1 SQL
+        run: python scripts/f4_1_reconcile.py patch-sql /tmp/f4_raw.sql /tmp/f4_corrected.sql
+      - name: Rebuild clean baseline
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
           npx prisma migrate deploy
-
-      - name: Apply corrected F4.1 SQL
+      - name: Apply corrected F4.1
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f /tmp/f4_corrected.sql
-
-      - name: Verify corrected DB matches Prisma authority
+      - name: Require zero Prisma diff
         run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
-
-      - name: Verify compatibility and canonical constraints
+      - name: Verify retained and canonical constraints
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT conname FROM pg_constraint WHERE conname='uce_campaign_assets_exactly_one_reference_check'" | grep -Fx 'uce_campaign_assets_exactly_one_reference_check'
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT to_regclass('public.uce_campaign_products') IS NOT NULL" | grep -Fx 't'
@@ -180,30 +66,11 @@ ALTER COLUMN "creation_source" SET DEFAULT 'MANUAL';'''
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT to_regclass('public.uce_campaign_collaborations') IS NOT NULL" | grep -Fx 't'
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='uce_campaigns' AND column_name='canonical_definition')" | grep -Fx 't'
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT udt_name FROM information_schema.columns WHERE table_name='uce_campaigns' AND column_name='creation_source'" | grep -Fx 'UceCampaignCreationSource'
-
-      - name: Publish corrected schema and migration to reconciliation branch
+      - name: Publish corrected artifact
         run: |
           mkdir -p prisma/migrations/20260813005000_consolidated_preprod
           cp /tmp/f4_corrected.sql prisma/migrations/20260813005000_consolidated_preprod/migration.sql
-          mkdir -p docs/database
-          cat > docs/database/consolidated_schema_migration_f4_1_audit.md <<'EOF'
-          # Phase F4.1 — Migration-History Reconciliation
-
-          F5 exposed that the original F4 artifact was generated from a schema snapshot rather than from the repository's fully materialized migration history. The baseline migration `20260812170000_uce_campaign_canonical_definition` already created `uce_campaigns.creation_source` as TEXT and `canonical_definition` as JSONB.
-
-          F4.1 regenerates the consolidated diff from an ephemeral PostgreSQL 16 database after applying the real pre-F4 migration history.
-
-          Safety decisions:
-          - preserve `canonical_definition` and model it explicitly in Prisma because current Campaign publish runtime still writes it as compatibility evidence;
-          - convert `uce_campaigns.creation_source` TEXT → `UceCampaignCreationSource` in place after dropping the legacy check constraint;
-          - convert `uce_campaign_targeting.audience_gender` String → enum in place;
-          - retain the Campaign Asset exactly-one-reference CHECK constraint;
-          - tolerate already-existing same-name indexes during migration and rely on the final Prisma zero-diff gate to catch semantic mismatches;
-          - retain legacy Campaign Product, Brief and UCE Collaboration tables;
-          - do not rewrite escrow, payout, financial ledger or settlement history.
-
-          Validation: all pre-F4 migrations were applied to a fresh ephemeral PostgreSQL 16 database, corrected F4.1 SQL was then applied, and Prisma reported no remaining schema difference.
-          EOF
+          python scripts/f4_1_reconcile.py write-audit
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add prisma/schema.prisma prisma/migrations/20260813005000_consolidated_preprod/migration.sql docs/database/consolidated_schema_migration_f4_1_audit.md
