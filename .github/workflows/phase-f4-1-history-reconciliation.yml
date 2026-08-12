@@ -5,74 +5,9 @@ on:
     branches:
       - phase-f4-1-history-reconciliation
 
-permissions:
-  contents: write
-
 jobs:
   reconcile:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: phasef41
-          POSTGRES_PASSWORD: phasef41
-          POSTGRES_DB: phasef41
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U phasef41 -d phasef41"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=10
-    env:
-      DATABASE_URL: postgresql://phasef41:phasef41@127.0.0.1:5432/phasef41
-
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - name: Isolate old F4
-        run: |
-          test -f prisma/migrations/20260813005000_consolidated_preprod/migration.sql
-          mv prisma/migrations/20260813005000_consolidated_preprod /tmp/f4_existing
-      - name: Apply real pre-F4 history
-        run: npx prisma migrate deploy
-      - name: Patch Prisma compatibility authority
-        run: python scripts/f4_1_reconcile.py patch-schema
-      - name: Generate raw history-aware diff
-        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --script --output /tmp/f4_raw.sql
-      - name: Produce corrected F4.1 SQL
-        run: python scripts/f4_1_reconcile.py patch-sql /tmp/f4_raw.sql /tmp/f4_corrected.sql
-      - name: Rebuild clean baseline
-        run: |
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
-          npx prisma migrate deploy
-      - name: Apply corrected F4.1
-        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f /tmp/f4_corrected.sql
-      - name: Require zero Prisma diff
-        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
-      - name: Verify retained and canonical constraints
-        run: |
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT conname FROM pg_constraint WHERE conname='uce_campaign_assets_exactly_one_reference_check'" | grep -Fx 'uce_campaign_assets_exactly_one_reference_check'
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT to_regclass('public.uce_campaign_products') IS NOT NULL" | grep -Fx 't'
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT to_regclass('public.uce_campaign_briefs') IS NOT NULL" | grep -Fx 't'
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT to_regclass('public.uce_campaign_collaborations') IS NOT NULL" | grep -Fx 't'
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='uce_campaigns' AND column_name='canonical_definition')" | grep -Fx 't'
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT udt_name FROM information_schema.columns WHERE table_name='uce_campaigns' AND column_name='creation_source'" | grep -Fx 'UceCampaignCreationSource'
-      - name: Publish corrected artifact
-        run: |
-          mkdir -p prisma/migrations/20260813005000_consolidated_preprod
-          cp /tmp/f4_corrected.sql prisma/migrations/20260813005000_consolidated_preprod/migration.sql
-          python scripts/f4_1_reconcile.py write-audit
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add prisma/schema.prisma prisma/migrations/20260813005000_consolidated_preprod/migration.sql docs/database/consolidated_schema_migration_f4_1_audit.md
-          git commit -m "F4.1 reconcile migration with materialized history"
-          git push origin HEAD:phase-f4-1-history-reconciliation
+      - run: echo "F4.1 runner available"
