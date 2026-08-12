@@ -25,6 +25,10 @@ const brandSupportTypeSchema = z.enum([
   "OTHER",
 ]);
 
+function utcDayStart(value: Date) {
+  return Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate());
+}
+
 const strategySchema = z
   .object({
     campaign_name: z.string().trim().min(3).max(60),
@@ -42,6 +46,9 @@ const strategySchema = z
       }
       if (!value.publish_until) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["publish_until"], message: "Scheduled campaigns require publish_until." });
+      }
+      if (value.publish_from && utcDayStart(new Date(value.publish_from)) < utcDayStart(new Date())) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["publish_from"], message: "publish_from cannot be in the past." });
       }
       if (value.publish_from && value.publish_until && new Date(value.publish_until) < new Date(value.publish_from)) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["publish_until"], message: "publish_until must be on or after publish_from." });
