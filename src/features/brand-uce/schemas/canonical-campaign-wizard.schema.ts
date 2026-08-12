@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+import {
+  canonicalAudienceAffinityIdSchema,
+  canonicalAudienceGeographiesSchema,
+  canonicalCreatorArchetypeIdSchema,
+} from "./canonical-campaign-taxonomy";
+
 const campaignObjectiveSchema = z.enum(["PULSE", "PROOF", "PRODUCTION", "PUSH"]);
 const publishingScheduleSchema = z.enum(["EVERGREEN", "SCHEDULED"]);
 const campaignVisibilitySchema = z.enum([
@@ -54,21 +60,21 @@ const strategySchema = z
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["publish_until"], message: "publish_until must be on or after publish_from." });
       }
     }
-    if (value.publishing_schedule === "EVERGREEN" && value.publish_until != null) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["publish_until"], message: "Evergreen campaigns cannot supply publish_until." });
+    if (value.publishing_schedule === "EVERGREEN" && (value.publish_from != null || value.publish_until != null)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["publish_until"], message: "Evergreen campaigns cannot supply publishing dates." });
     }
   });
 
 const targetingSchema = z
   .object({
-    creator_archetypes: z.array(z.string().trim().min(1)).min(1).max(5),
+    creator_archetypes: z.array(canonicalCreatorArchetypeIdSchema).min(1).max(5),
     minimum_followers: z.number().int().min(0),
     maximum_followers: z.number().int().min(0).optional().nullable(),
     audience_age_min: z.number().int().min(13).max(65),
     audience_age_max: z.number().int().min(13).max(65),
     audience_gender: audienceGenderSchema,
-    audience_affinity_ids: z.array(z.string().trim().min(1)).max(5).default([]),
-    audience_geographies: z.array(z.record(z.unknown())).min(1),
+    audience_affinity_ids: z.array(canonicalAudienceAffinityIdSchema).max(5).default([]),
+    audience_geographies: canonicalAudienceGeographiesSchema,
   })
   .superRefine((value, ctx) => {
     if (value.maximum_followers != null && value.maximum_followers <= value.minimum_followers) {
