@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+import {
+  canonicalAudienceAffinityIdSchema,
+  canonicalAudienceGeographiesSchema,
+  canonicalCreatorArchetypeIdSchema,
+} from "./canonical-campaign-taxonomy";
+
 export const canonicalCampaignDraftPathSchema = z.enum([
   "strategy.campaign_name",
   "strategy.publishing_schedule",
@@ -45,14 +51,14 @@ const valueSchemas: Record<CanonicalCampaignDraftPath, z.ZodTypeAny> = {
     "ELIGIBLE_CREATORS_ONLY",
     "INVITE_ONLY",
   ]),
-  "targeting.creator_archetypes": z.array(z.string().trim().min(1)).min(1).max(5),
+  "targeting.creator_archetypes": z.array(canonicalCreatorArchetypeIdSchema).min(1).max(5),
   "targeting.minimum_followers": z.number().int().min(0),
   "targeting.maximum_followers": z.number().int().min(0).nullable(),
   "targeting.audience_age_min": z.number().int().min(13).max(65),
   "targeting.audience_age_max": z.number().int().min(13).max(65),
   "targeting.audience_gender": z.enum(["ALL", "FEMALE", "MALE"]),
-  "targeting.audience_affinity_ids": z.array(z.string().trim().min(1)).max(5),
-  "targeting.audience_geographies": z.array(z.record(z.unknown())),
+  "targeting.audience_affinity_ids": z.array(canonicalAudienceAffinityIdSchema).max(5),
+  "targeting.audience_geographies": canonicalAudienceGeographiesSchema,
   "commercials.receives_brand_support": z.boolean(),
   "commercials.brand_support_type": z
     .enum(["PRODUCT", "SERVICE", "EXPERIENCE", "ACCESS_SUBSCRIPTION", "OTHER"])
