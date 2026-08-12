@@ -34,6 +34,7 @@ export type ProvisionCollaborationInput = {
   productRetailValue?: number;
   advancePercent?: number;
   welcomeMessage?: string;
+  allowExisting?: boolean;
 };
 
 type Tx = Prisma.TransactionClient;
@@ -118,6 +119,11 @@ export class CollaborationProvisionService {
       },
     });
     if (existing) {
+      if (input.allowExisting === false) {
+        throw new ConflictException(
+          "A Collaboration already exists for this campaign and creator",
+        );
+      }
       const row = await tx.collaboration.findUniqueOrThrow({
         where: { id: existing.id },
         include: COLLABORATION_THREAD_INCLUDE,
@@ -153,10 +159,7 @@ export class CollaborationProvisionService {
     }
 
     const payoutMode =
-      input.payoutMode ??
-      (campaign.commercials?.compensationType === "FIXED_FEE"
-        ? CollaborationPayoutMode.ESCROW
-        : CollaborationPayoutMode.ESCROW);
+      input.payoutMode ?? CollaborationPayoutMode.ESCROW;
 
     const advancePercent =
       input.advancePercent ?? campaign.commercials?.advancePaymentPercentage ?? 30;
