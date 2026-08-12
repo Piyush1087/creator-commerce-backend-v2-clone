@@ -267,6 +267,118 @@ enum UceCampaignStatus {
   ARCHIVED
 }
 
+enum UceCampaignCreationSource {
+  MANUAL
+  AI_RECOMMENDED
+}
+
+enum UcePublishingSchedule {
+  EVERGREEN
+  SCHEDULED
+}
+
+enum UceAudienceGender {
+  ALL
+  FEMALE
+  MALE
+}
+
+enum UceBrandSupportType {
+  PRODUCT
+  SERVICE
+  EXPERIENCE
+  ACCESS_SUBSCRIPTION
+  OTHER
+}
+
+enum UceCampaignAssetKind {
+  BRAND
+  OFFERING
+  OFFER
+}
+
+enum UceCampaignAssetStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum UceBriefStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+}
+
+enum UceBriefCreationSource {
+  MANUAL
+  AI_RECOMMENDED
+}
+
+enum UceBriefType {
+  CREATOR_LED
+  BRAND_LED
+}
+
+enum UceDeliverableFormat {
+  REEL_VIDEO
+  STORY
+  PHOTOSHOOT
+  BANNER_CAROUSEL
+}
+
+enum UceRecommendationScoreBand {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum UceCreatorRecommendationRunType {
+  INITIAL
+  REPLENISHMENT
+}
+
+enum UceCreatorRecommendationRunStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum UceCampaignCreatorImportStatus {
+  PENDING
+  VALIDATED
+  IMPORTING
+  COMPLETED
+  FAILED
+}
+
+enum UceApplicantIntelligenceStatus {
+  PROCESSING
+  READY
+  UNAVAILABLE
+}
+
+enum UceOutreachChannel {
+  PRIORITY_DM
+  EMAIL
+}
+
+enum UceOutreachAttemptStatus {
+  COMPOSE_INITIATED
+  ACCEPTED
+  SCHEDULED
+  EXECUTED
+  FAILED
+  CANCELLED
+}
+
+enum UceOutreachTrackingEventType {
+  LINK_CLICKED
+}
+
+enum UceReportAvailability {
+  AVAILABLE
+  PARTIAL
+}
+
 enum UceTimelineStructure {
   FIXED_DATES
   DYNAMIC_MILESTONES
@@ -303,6 +415,8 @@ enum UcePayoutTerms {
   NET_7
   NET_15
   NET_30
+  NET_45
+  NET_60
 }
 
 enum UceApplicationStatus {
@@ -575,6 +689,148 @@ enum CollaborationMessageKind {
   SYSTEM
 }
 
+enum CollaborationLifecycle {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+  TERMINATED
+}
+
+enum CollaborationStage {
+  NEGOTIATION
+  SECUREMENT
+  FULFILLMENT
+  PRODUCTION
+  PUBLISHING_SETTLEMENT
+}
+
+enum CollaborationStageStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  BLOCKED
+  COMPLETED
+  SKIPPED
+}
+
+enum CollaborationActorClass {
+  BRAND
+  CREATOR
+  SYSTEM
+  ADMIN
+}
+
+enum CollaborationNegotiationState {
+  NOT_REQUIRED
+  AWAITING_BRAND_DECISION
+  AWAITING_CREATOR_DECISION
+  LOCKED
+  FAILED
+}
+
+enum CollaborationPaymentRail {
+  PLATFORM_ESCROW
+  MANUAL
+}
+
+enum CollaborationSecurementState {
+  NOT_REQUIRED
+  AWAITING_ESCROW_FUNDING
+  PROCESSING_FUNDING
+  AWAITING_PAYOUT_DETAILS
+  AWAITING_BRAND_PAYMENT
+  AWAITING_CREATOR_CONFIRMATION
+  PAYMENT_DISPUTED
+  COMPLETED
+  BLOCKED
+}
+
+enum CollaborationFulfillmentState {
+  NOT_STARTED
+  AWAITING_BRAND_FULFILLMENT
+  AWAITING_CREATOR_CONFIRMATION
+  REMEDIATION_REQUIRED
+  COMPLETED
+  SKIPPED
+  HARD_STOP
+  BLOCKED
+}
+
+enum CollaborationDeliverableState {
+  AWAITING_SUBMISSION
+  UNDER_REVIEW
+  REVISION_REQUESTED
+  APPROVED
+  AUTO_APPROVED
+  HARD_STOP
+}
+
+enum CollaborationSubmissionReviewState {
+  UNDER_REVIEW
+  REVISION_REQUESTED
+  APPROVED
+  AUTO_APPROVED
+  FINAL_REJECTED
+}
+
+enum CollaborationPublishingState {
+  PUBLISHING_NOT_REQUIRED
+  AWAITING_PUBLISHING
+  EVIDENCE_SUBMITTED
+  CORRECTION_REQUIRED
+  COMPLIANCE_VERIFIED
+  BLOCKED
+}
+
+enum CollaborationPublicationAuthorizationState {
+  NOT_REQUIRED
+  NOT_AUTHORIZED
+  AUTHORIZED
+}
+
+enum CollaborationSettlementState {
+  NOT_ELIGIBLE
+  ELIGIBLE
+  PROCESSING
+  SETTLED
+  BLOCKED
+}
+
+enum CollaborationResolutionStatus {
+  NOT_REQUIRED
+  PENDING
+  RESOLVED
+}
+
+enum CollaborationFinancialOutcome {
+  NORMAL_SUCCESS
+  NEGOTIATION_EXIT
+  PRE_SECUREMENT_EXIT
+  BRAND_PROTECTED_POST_SECUREMENT_EXIT
+  FULFILLMENT_HARD_STOP
+  PRODUCTION_HARD_STOP
+  CREATOR_NON_PERFORMANCE
+  CREATOR_PUBLISHING_NON_PERFORMANCE
+  ADMIN_RESOLUTION
+  OTHER_POLICY_RESOLUTION
+}
+
+enum CollaborationFeedbackAuthorRole {
+  BRAND
+  CREATOR
+}
+
+enum CollaborationFeedbackVisibility {
+  HIDDEN
+  REVEALED
+}
+
+enum CollaborationEventKind {
+  DOMAIN
+  AUDIT
+  INTEGRATION
+}
+
 // ============================================================================
 // CREATOR ONBOARDING & CENTRE ENUMS
 // ============================================================================
@@ -680,1988 +936,26 @@ model Organization {
 }
 
 model User {
-  id             String          @id @default(uuid())
-  email          String          @unique
+  id                            String                          @id @default(uuid())
+  email                         String                          @unique
   /// Display name; brand onboarding sets local-part of work email.
-  name           String?
+  name                          String?
   /// Scrypt hash for creator email/password signup.
-  hashedPassword String?         @map("hashed_password")
+  hashedPassword                String?                         @map("hashed_password")
   /// Google OAuth subject (`sub` claim) for creator Google signup/sign-in.
-  googleSubjectId String?        @unique @map("google_subject_id")
-  emailVerifiedAt DateTime?      @map("email_verified_at")
-  role           UserRole
-  organizationId String?         @map("organization_id")
-  organization   Organization?   @relation(fields: [organizationId], references: [id])
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-  discoveryLeads DiscoveryLead[]
-  creatorProfile CreatorProfile?
-  creatorOnboardingTrack CreatorOnboardingTrack?
-  userProfile UserProfile?
-  historicChatThreads HistoricChatThread[]
-  metricPostPulses MetricPostPulse[]
-  collaborationsAsCreator Collaboration[] @relation("CollaborationCreator")
-  coPilotThreads CoPilotThread[]
-  coPilotMessageFeedback CoPilotMessageFeedback[]
-  creatorCoPilotThreadsAuthored CreatorCoPilotThread[] @relation("CreatorCoPilotThreadAuthor")
-  creatorCoPilotMessageFeedback CreatorCoPilotMessageFeedback[]
-  brandTeamMemberships BrandTeamMember[]
-  triggeredNotifications Notification[] @relation("NotificationTriggerUser")
-  notificationRecipients NotificationRecipient[]
-
-  @@index([organizationId])
-  @@index([role])
-  @@map("users")
-}
-
-// ============================================================================
-// DISCOVERY MODELS (Step 1)
-// ============================================================================
-
-model DiscoveryLead {
-  id            String              @id @default(uuid())
-  rawUrl        String              @map("raw_url")
-  normalizedUrl String              @unique @map("normalized_url")
-  status        DiscoveryLeadStatus @default(PENDING)
-  isSupported   Boolean             @default(false) @map("is_supported")
-  industry      IndustryVertical?
-  subIndustry   String?             @map("sub_industry")
-  industryNiche String?             @map("industry_niche")
-  securityScore Int                 @default(0) @map("security_score")
-  metaHandshake Boolean             @default(false) @map("meta_handshake")
-  /// Step 1 session cache payload (AI classification output â€” populated when Neika/Invuet pipeline ships).
-  temporaryPayload       Json?     @map("temporary_payload")
-  /// TTL for unverified Step 1 cache rows (change doc: 7-day horizon).
-  expiresAt              DateTime? @map("expires_at")
-  signupCompleted        Boolean   @default(false) @map("signup_completed")
-  classificationEvidence String?   @map("classification_evidence") @db.VarChar(250)
-  userId        String?             @map("user_id")
-  user          User?               @relation(fields: [userId], references: [id])
-  createdAt     DateTime            @default(now()) @map("created_at")
-  waitlistLeads          WaitlistLead[]
-  brandIntelligenceScan  BrandIntelligenceScan?
-  intelligenceJobs       BrandIntelligenceJob[]
-
-  @@index([createdAt])
-  @@index([userId])
-  @@index([normalizedUrl, signupCompleted, expiresAt], map: "idx_discovery_cache_lookup")
-  @@map("discovery_leads")
-}
-
-/// Brand Intelligence pipeline state (Checkpoint 1 â†’ Stage 1B â†’ Brand DNA).
-/// Replaces ad-hoc temporaryPayload.stage1a/stage1b for Phases 4â€“7.
-model BrandIntelligenceScan {
-  id                       String                 @id @default(uuid())
-  discoveryLeadId          String                 @unique @map("discovery_lead_id")
-  discoveryLead            DiscoveryLead          @relation(fields: [discoveryLeadId], references: [id], onDelete: Cascade)
-  brandProfileId           String?                @map("brand_profile_id")
-  brandProfile             BrandProfile?          @relation(fields: [brandProfileId], references: [id], onDelete: SetNull)
-  websiteUrl               String                 @map("website_url")
-  currentStage             BrandIntelligenceStage @map("current_stage")
-  stage1aSnapshot          Json?                  @map("stage1a_snapshot")
-  authoritativeIdentity    Json?                  @map("authoritative_identity")
-  runtimeContext           Json?                  @map("runtime_context")
-  brandDnaRaw              Json?                  @map("brand_dna_raw")
-  brandDnaVerifiedSnapshot Json?                  @map("brand_dna_verified_snapshot")
-  checkpoint2Confirmation  Json?                  @map("checkpoint2_confirmation")
-  errorLogs                String?                @map("error_logs") @db.Text
-  createdAt                DateTime               @default(now()) @map("created_at")
-  updatedAt                DateTime               @updatedAt @map("updated_at")
-  intelligenceJobs         BrandIntelligenceJob[]
-
-  @@index([brandProfileId])
-  @@index([currentStage])
-  @@map("brand_intelligence_scans")
-}
-
-/// Durable queue for Stage 1B â†’ Prompt A pipeline after Checkpoint 1.
-model BrandIntelligenceJob {
-  id              String                     @id @default(uuid())
-  discoveryLeadId String                     @map("discovery_lead_id")
-  discoveryLead   DiscoveryLead              @relation(fields: [discoveryLeadId], references: [id], onDelete: Cascade)
-  scanId          String?                    @map("scan_id")
-  scan            BrandIntelligenceScan?     @relation(fields: [scanId], references: [id], onDelete: SetNull)
-  type            BrandIntelligenceJobType   @default(STAGE_1B_PIPELINE)
-  status          BrandIntelligenceJobStatus @default(QUEUED)
-  payload         Json?
-  attempt         Int                        @default(0)
-  maxAttempts     Int                        @default(3) @map("max_attempts")
-  errorMessage    String?                    @map("error_message") @db.Text
-  queuedAt        DateTime                   @default(now()) @map("queued_at")
-  startedAt       DateTime?                  @map("started_at")
-  finishedAt      DateTime?                  @map("finished_at")
-
-  @@index([status, queuedAt])
-  @@index([discoveryLeadId])
-  @@map("brand_intelligence_jobs")
-}
-
-model MarketIntelligenceLog {
-  id               String                   @id @default(uuid())
-  domainName       String                   @unique @map("domain_name")
-  detectedIndustry IndustryVertical         @map("detected_industry")
-  rejectionType    MarketIntelRejectionType @map("rejection_type")
-  geoLocation      String?                  @map("geo_location")
-  attemptCount     Int                      @default(1) @map("attempt_count")
-  lastAttempt      DateTime                 @default(now()) @map("last_attempt")
-  waitlistLeads    WaitlistLead[]
-
-  @@index([lastAttempt])
-  @@map("market_intelligence_logs")
-}
-
-model WaitlistLead {
-  id                      String                 @id @default(uuid())
-  email                   String
-  industryInterest        IndustryVertical       @map("industry_interest")
-  domain                  String?                @db.VarChar(255)
-  reason                  WaitlistReason?        @map("reason")
-  isNotified              Boolean                @default(false) @map("is_notified")
-  discoveryLeadId         String?                @map("discovery_lead_id")
-  discoveryLead           DiscoveryLead?         @relation(fields: [discoveryLeadId], references: [id])
-  marketIntelligenceLogId String?                @map("market_intelligence_log_id")
-  marketIntelligenceLog   MarketIntelligenceLog? @relation(fields: [marketIntelligenceLogId], references: [id])
-  creatorOnboardingTrack  CreatorOnboardingTrack?
-  createdAt               DateTime               @default(now()) @map("created_at")
-
-  @@index([email])
-  @@index([domain])
-  @@index([discoveryLeadId])
-  @@index([marketIntelligenceLogId])
-  @@map("waitlist_leads")
-}
-
-model SurfaceScanAttempt {
-  id              String                 @id @default(uuid())
-  domain          String
-  clientIp        String                 @map("client_ip")
-  discoveryLeadId String?                @map("discovery_lead_id")
-  brandProfileId  String?                @map("brand_profile_id")
-  kind            SurfaceScanAttemptKind @default(SURFACE_VENDOR)
-  createdAt       DateTime               @default(now()) @map("created_at")
-
-  @@index([domain, createdAt])
-  @@index([clientIp, createdAt])
-  @@map("surface_scan_attempts")
-}
-
-// ============================================================================
-// BRAND ONBOARDING & LIFECYCLE MODELS
-// ============================================================================
-
-model BrandProfile {
-  id                      String           @id @default(uuid())
-  organizationId          String?          @unique @map("organization_id")
-  organization            Organization?    @relation(fields: [organizationId], references: [id])
-  domain                  String           @unique
-  name                    String           @map("brand_name")
-  industry                IndustryVertical
-  subIndustry             String?          @map("sub_industry")
-  industryNiche           String?          @map("industry_niche")
-  logoUrl                 String?          @map("logo_url")
-  tagline                 String?
-  description             String?
-  /// Official social profile URLs (e.g. Instagram / TikTok) from surface scan (product Prompt 1).
-  socialLinks             String[]         @default([]) @map("social_links")
-  /// Banner offers / coupon codes detected during surface scan (product Prompt 2).
-  surfaceOffers           Json?            @map("surface_offers")
-  /// Parallel markdown bundles from surface scan â€” Prompt 1 input (REQ-AI-001).
-  surfaceScrapeBundles    String?          @map("surface_scrape_bundles") @db.Text
-  /// Last authenticated Brand Centre API activity â€” session eviction (REQ-EVT-004).
-  brandCentreLastActiveAt DateTime?        @map("brand_centre_last_active_at")
-  visualIdentity          Json?            @map("visual_identity")
-  brandValues             String[]         @map("brand_values")
-  policyFlags             String[]         @map("policy_flags")
-  targetAudience          Json?            @map("target_audience")
-
-  // Step 6: Verification (isVerified flips only after password gate)
-  isVerified        Boolean   @default(false) @map("is_verified")
-  verifiedAt        DateTime? @map("verified_at")
-  verificationEmail String?   @map("verification_email")
-  /// Set when OTP/Google identity succeeds; password step still required for isVerified.
-  identityConfirmedAt DateTime? @map("identity_confirmed_at")
-
-  // Step 7: Deep Intel
-  scanStatus      ScanStatus  @default(PENDING) @map("scan_status")
-  deepIntelStatus IntelStatus @default(PENDING) @map("deep_intel_status")
-
-  /// Step 8: brand skipped Instagram Login during onboarding.
-  socialSyncSkipped Boolean @default(false) @map("social_sync_skipped")
-
-  // Regional Context (Captured in Step 2)
-  countryCode  String? @map("country_code")
-  currencyCode String  @default("USD") @map("currency_code")
-
-  // Subscription State (Step 8)
-  planType           PlanType           @default(FREE_TRIAL) @map("plan_type")
-  subscriptionStatus SubscriptionStatus @default(TRIALING) @map("subscription_status")
-  planStartedAt      DateTime?          @map("plan_started_at")
-  trialEndsAt        DateTime?          @map("trial_ends_at")
-
-  /// Payouts hub permission scope â€” Campaign Manager is read-only on funding actions.
-  payoutsWorkspaceRole BrandPayoutsWorkspaceRole @default(FINANCE_ADMIN) @map("payouts_workspace_role")
-
-  // Usage Tracking (Beta Buffer)
-  deepScanCount   Int @default(0) @map("deep_scan_count")
-  competitorCount Int @default(0) @map("competitor_count")
-  outreachCount   Int @default(0) @map("outreach_count")
-
-  // Brand Centre â€” Tab 1 routing & DNA
-  brandRoutingType    BrandRoutingType @default(D2C_SKINCARE) @map("brand_routing_type")
-  lifecycleStage      String           @default("GROWTH_STAGE") @map("lifecycle_stage")
-  strategicDna        Json?            @map("strategic_dna")
-  igHandle            String?          @map("ig_handle")
-  ytHandle            String?          @map("yt_handle")
-  tiktokHandle        String?          @map("tiktok_handle")
-  deepScanCompletedAt DateTime?        @map("deep_scan_completed_at")
-
-  isUserEdited Json?    @map("is_user_edited")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  offerings              Offering[]
-  competitors            Competitor[]
-  locations              Location[]
-  subscriptions          Subscription[]
-  teamInvitations        TeamInvitation[]
-  brandCentreJobs        BrandCentreJob[]
-  budgetConfiguration    BrandBudgetConfiguration?
-  audiencePersonas       BrandAudiencePersona[]
-  brandOffers            BrandOffer[]
-  budgetModificationLogs BrandBudgetModificationLog[]
-  intelligenceBaseline   BrandIntelligenceBaseline?
-  performanceLeaks       BrandPerformanceLeak[]
-  plannerCards           BrandPlannerCard[]
-  brandIntelligenceScans BrandIntelligenceScan[]
-
-  // UCE (Universal Campaign Engine)
-  uceCampaigns UceCampaign[]
-
-  // Bridge ledger (Brand Centre â†’ UCE)
-  integrationBridgeSignals IntegrationBridgeSignalLedger[]
-
-  collaborations    Collaboration[]
-  escrowVault       BrandEscrowVault?
-  brandSubscription BrandSubscription?
-  coPilotThreads           CoPilotThread[]
-  coPilotInteractionLogs   CoPilotInteractionLog[]
-  coPilotMessageFeedback   CoPilotMessageFeedback[]
-
-  teamMembers          BrandTeamMember[]
-  billingProfile       BrandBillingProfile?
-  withdrawalAccounts   BrandWithdrawalAccount[]
-  notificationSettings BrandNotificationSetting[]
-  notifications        Notification[]
-  integrations         BrandIntegration[]
-  instagramSyncInvitations InstagramSyncInvitation[]
-
-  @@map("brand_profiles")
-}
-
-/// Brand OAuth connections (Instagram Login + optional Meta Business Suite in Settings).
-model BrandIntegration {
-  id                     String                  @id @default(uuid()) @map("integration_id")
-  brandProfileId         String                  @map("brand_id")
-  brandProfile           BrandProfile            @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  provider               BrandIntegrationProvider
-  status                 BrandIntegrationStatus  @default(DISCONNECTED)
-  currentPlatformHandle  String                  @map("current_platform_handle") @db.VarChar(255)
-  inboundOauthHandle     String?                 @map("inbound_oauth_handle") @db.VarChar(255)
-  accessTokenEncrypted   String?                 @map("access_token_encrypted") @db.Text
-  refreshTokenEncrypted  String?                 @map("refresh_token_encrypted") @db.Text
-  grantedScopes          BrandIntegrationScope[] @default([]) @map("granted_scopes")
-  tokenExpiresAt         DateTime?               @map("token_expires_at")
-  isActive               Boolean                 @default(true) @map("is_active")
-  createdAt              DateTime                @default(now()) @map("created_at")
-  updatedAt              DateTime                @updatedAt @map("updated_at")
-
-  @@unique([brandProfileId, provider], map: "uq_brand_provider_pair")
-  @@index([brandProfileId, provider, status], map: "idx_brand_integrations_lookup")
-  @@index([status, tokenExpiresAt], map: "idx_integrations_token_expiration")
-  @@map("brand_integrations")
-}
-
-/// Temporary agent invites for onboarding Instagram sync (no permanent User).
-model InstagramSyncInvitation {
-  id            String                       @id @default(uuid())
-  email         String
-  status        InstagramSyncInvitationStatus @default(PENDING)
-  token         String                       @unique
-  otpCode       String?                      @map("otp_code")
-  otpExpiresAt  DateTime?                    @map("otp_expires_at")
-  brandProfileId String                      @map("brand_id")
-  brandProfile  BrandProfile                 @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  createdAt     DateTime                     @default(now()) @map("created_at")
-  expiresAt     DateTime                     @map("expires_at")
-
-  @@index([token])
-  @@index([brandProfileId])
-  @@map("instagram_sync_invitations")
-}
-
-model Offering {
-  id                 String       @id @default(uuid())
-  brandProfileId     String       @map("brand_profile_id")
-  brandProfile       BrandProfile @relation(fields: [brandProfileId], references: [id])
-  type               OfferingType
-  name               String
-  description        String?
-  imageUrl           String?      @map("image_url")
-  url                String       @map("offering_url")
-  /// Collection or healthcare specialty label from list pages (product Prompt 2).
-  categoryTag        String?      @map("category_tag")
-  /// Human-visible starting price from list view, before deep scan parses `priceAmount`.
-  startingPriceLabel String?      @map("starting_price_label")
-  priceAmount        Decimal?     @map("price_amount")
-  currency           String       @default("USD")
-  locationIds        String[]     @map("location_ids")
-  isActive           Boolean      @default(true) @map("is_active")
-  isDeepScanned      Boolean      @default(false) @map("is_deep_scanned")
-  isUserEdited       Boolean      @default(false) @map("is_user_edited")
-  sellingPoints      String[]     @default([]) @map("selling_points")
-  doNotSay           String[]     @default([]) @map("do_not_say")
-  createdAt          DateTime     @default(now()) @map("created_at")
-  updatedAt          DateTime     @updatedAt @map("updated_at")
-
-  @@map("offerings")
-}
-
-model Location {
-  id             String       @id @default(uuid())
-  brandProfileId String       @map("brand_profile_id")
-  brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id])
-  name           String?
-  address        String
-  city           String?
-  zip            String?
-  lat            Float?
-  lng            Float?
-  contactDetails Json?        @map("contact_details")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-
-  @@map("locations")
-}
-
-model Competitor {
-  id             String       @id @default(uuid())
-  brandProfileId String       @map("brand_profile_id")
-  brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id])
-  name           String
-  websiteUrl     String       @map("website_url")
-  logoUrl        String?      @map("logo_url")
-  socialHandles  String[]     @map("social_handles")
-  whyCompetitor  String?      @map("why_competitor")
-  isActive       Boolean      @default(true) @map("is_active")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-
-  @@map("competitors")
-}
-
-model VerificationCode {
-  id         String   @id @default(uuid())
-  identifier String   @map("identifier") // Email or brand_profile_id
-  code       String
-  expiresAt  DateTime @map("expires_at")
-  attempts   Int      @default(0)
-  isUsed     Boolean  @default(false) @map("is_used")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-
-  @@index([identifier])
-  @@map("verification_codes")
-}
-
-model Subscription {
-  id               String       @id @default(uuid())
-  brandProfileId   String       @map("brand_profile_id")
-  brandProfile     BrandProfile @relation(fields: [brandProfileId], references: [id])
-  stripeCustomerId String?      @map("stripe_customer_id")
-  amount           Decimal      @default(99.00) @db.Decimal(10, 2)
-  currency         String       @default("USD")
-  createdAt        DateTime     @default(now()) @map("created_at")
-
-  @@map("subscriptions")
-}
-
-model TeamInvitation {
-  id             String       @id @default(uuid())
-  email          String
-  role           String       @default("ADMIN")
-  status         String       @default("PENDING") // PENDING, ACCEPTED, EXPIRED
-  brandProfileId String       @map("brand_profile_id")
-  brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id])
-  token          String       @unique
-  createdAt      DateTime     @default(now()) @map("created_at")
-  expiresAt      DateTime     @map("expires_at")
-
-  @@map("team_invitations")
-}
-
-model BrandCentreJob {
-  id             String               @id @default(uuid())
-  brandProfileId String               @map("brand_profile_id")
-  brandProfile   BrandProfile         @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  type           BrandCentreJobType
-  status         BrandCentreJobStatus @default(QUEUED)
-  payload        Json?
-  attempt        Int                  @default(0)
-  errorMessage   String?              @map("error_message")
-  queuedAt       DateTime             @default(now()) @map("queued_at")
-  startedAt      DateTime?            @map("started_at")
-  finishedAt     DateTime?            @map("finished_at")
-
-  @@index([brandProfileId, type, status])
-  @@map("brand_centre_jobs")
-}
-
-model BrandBudgetConfiguration {
-  id                  String                @id @default(uuid())
-  brandProfileId      String                @unique @map("brand_profile_id")
-  brandProfile        BrandProfile          @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  masterMonthlyBudget Decimal               @map("master_monthly_budget") @db.Decimal(14, 2)
-  allocationPhase     BudgetAllocationPhase @default(PHASE_1_COLD_START) @map("allocation_phase")
-  assetMix            Json                  @map("asset_mix")
-  tierMix             Json                  @map("tier_mix")
-  objectiveMix        Json                  @map("objective_mix")
-  utilizedBooked      Decimal               @default(0) @map("utilized_booked") @db.Decimal(14, 2)
-  utilizedSpent       Decimal               @default(0) @map("utilized_spent") @db.Decimal(14, 2)
-  aiExplanationText   String?               @map("ai_explanation_text")
-  createdAt           DateTime              @default(now()) @map("created_at")
-  updatedAt           DateTime              @updatedAt @map("updated_at")
-
-  @@map("brand_budget_configurations")
-}
-
-model BrandAudiencePersona {
-  id                 String       @id @default(uuid())
-  brandProfileId     String       @map("brand_profile_id")
-  brandProfile       BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  personaName        String       @map("persona_name")
-  demographicsJson   Json         @map("demographics_json")
-  psychographicsText String?      @map("psychographics_text")
-  sortOrder          Int          @default(0) @map("sort_order")
-  isUserEdited       Boolean      @default(false) @map("is_user_edited")
-  createdAt          DateTime     @default(now()) @map("created_at")
-  updatedAt          DateTime     @updatedAt @map("updated_at")
-
-  @@index([brandProfileId])
-  @@map("brand_audience_personas")
-}
-
-model BrandOffer {
-  id                 String       @id @default(uuid())
-  brandProfileId     String       @map("brand_profile_id")
-  brandProfile       BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  offerName          String       @map("offer_name")
-  promoCode          String       @map("promo_code")
-  applicabilityScope String       @map("applicability_scope")
-  validityStart      DateTime     @map("validity_start")
-  validityEnd        DateTime     @map("validity_end")
-  description        String?
-  entityLink         String?      @map("entity_link")
-  termsText          String?      @map("terms_text")
-  isActive           Boolean      @default(true) @map("is_active")
-  createdAt          DateTime     @default(now()) @map("created_at")
-  updatedAt          DateTime     @updatedAt @map("updated_at")
-
-  @@unique([brandProfileId, promoCode])
-  @@map("brand_offers")
-}
-
-model BrandBudgetModificationLog {
-  id             String       @id @default(uuid())
-  brandProfileId String       @map("brand_profile_id")
-  brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  oldBudget      Decimal      @map("old_budget") @db.Decimal(14, 2)
-  newBudget      Decimal      @map("new_budget") @db.Decimal(14, 2)
-  modifiedAt     DateTime     @default(now()) @map("modified_at")
-
-  @@index([brandProfileId, modifiedAt])
-  @@map("brand_budget_modification_logs")
-}
-
-model BrandIntelligenceBaseline {
-  id                 String       @id @default(uuid())
-  brandProfileId     String       @unique @map("brand_profile_id")
-  brandProfile       BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  growthImpactMatrix Json         @map("growth_impact_matrix")
-  baselineHealth     Json         @map("baseline_health")
-  shareOfVoice       Json         @map("share_of_voice")
-  source             String       @default("ai_inferred")
-  refreshedAt        DateTime?    @map("refreshed_at")
-  createdAt          DateTime     @default(now()) @map("created_at")
-  updatedAt          DateTime     @updatedAt @map("updated_at")
-
-  @@map("brand_intelligence_baselines")
-}
-
-model BrandPerformanceLeak {
-  id                      String            @id @default(uuid())
-  brandProfileId          String            @map("brand_profile_id")
-  brandProfile            BrandProfile      @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  insightTitle            String            @map("insight_title")
-  shortDescription        String            @map("short_description")
-  priorityRank            PriorityRank      @map("priority_rank")
-  leakBucket              LeakBucket        @map("leak_bucket")
-  performanceStatus       PerformanceColor  @map("performance_status")
-  projectedLiftPercentage Decimal           @map("projected_lift_percentage") @db.Decimal(6, 2)
-  drawerDeepDive          Json              @map("drawer_deep_dive")
-  plannerStatus           LeakPlannerStatus @default(PENDING_USER_REVIEW) @map("planner_status")
-  plannerCardId           String?           @map("planner_card_id")
-  plannerCard             BrandPlannerCard? @relation(fields: [plannerCardId], references: [id], onDelete: SetNull)
-  isArchived              Boolean           @default(false) @map("is_archived")
-  archivedAt              DateTime?         @map("archived_at")
-  movedByUserId           String?           @map("moved_by_user_id")
-  createdAt               DateTime          @default(now()) @map("created_at")
-  updatedAt               DateTime          @updatedAt @map("updated_at")
-
-  @@index([brandProfileId, isArchived, priorityRank])
-  @@map("brand_performance_leaks")
-}
-
-model BrandPlannerCard {
-  id                       String                 @id @default(uuid())
-  brandProfileId           String                 @map("brand_profile_id")
-  brandProfile             BrandProfile           @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  cardType                 PlannerCardType        @map("card_type")
-  aggregationKey           Json                   @map("aggregation_key")
-  existingTargetCampaignId String?                @map("existing_target_campaign_id")
-  campaignMetadata         Json                   @map("campaign_metadata")
-  assetsAndBriefsMatrix    Json                   @map("assets_and_briefs_matrix")
-  workflowStatus           PlannerWorkflowStatus  @default(PENDING_USER_REVIEW) @map("workflow_status")
-  sourceLeakId             String?                @map("source_leak_id")
-  createdAt                DateTime               @default(now()) @map("created_at")
-  updatedAt                DateTime               @updatedAt @map("updated_at")
-  sourceLeaks              BrandPerformanceLeak[]
-
-  @@index([brandProfileId, workflowStatus])
-  @@map("brand_planner_cards")
-}
-
-// ============================================================================
-// UCE (Universal Campaign Engine) MODELS
-// ============================================================================
-
-model UceCampaign {
-  id             String            @id @default(uuid())
-  brandProfileId String            @map("brand_profile_id")
-  brandProfile   BrandProfile      @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  name           String            @map("campaign_name")
-  status         UceCampaignStatus @default(DRAFT) @map("current_status")
-  createdAt      DateTime          @default(now()) @map("created_at")
-  updatedAt      DateTime          @updatedAt @map("updated_at")
-
-  performanceAggregate UceCampaignPerformanceAggregate?
-  strategy             UceCampaignStrategy?
-  targeting            UceCampaignTargeting?
-  commercials          UceCampaignCommercials?
-  products             UceCampaignProduct[]
-  briefs               UceCampaignBrief[]
-  collaborations       UceCampaignCollaboration[]
-  campaignCreators     UceCampaignCreator[]
-  applications         UceApplication[]
-  shares               UceCampaignShare[]
-  workflowCollaborations Collaboration[]
-  reportingSnapshots   UceCampaignReportingSnapshot[]
-  reportingTimeseries  UceCampaignReportingTimeseriesHourly[]
-  reportingAssets      UceCampaignReportingAssetGallery[]
-  bridgeSignals        IntegrationBridgeSignalLedger[]
-
-  @@index([brandProfileId, status])
-  @@map("uce_campaigns")
-}
-
-/// Durable Campaignâ†”creator bridge used by Discovery/Applicants/Outreach.
-model UceCampaignCreator {
-  id                     String                           @id @default(uuid())
-  campaignId             String                           @map("campaign_id")
-  campaign               UceCampaign                      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  creatorProfileId       String?                          @map("creator_profile_id")
-  creatorProfile         CreatorProfile?                  @relation(fields: [creatorProfileId], references: [id], onDelete: SetNull)
-  platform               UceMediaPlatform                 @default(INSTAGRAM)
-  socialHandle           String                           @map("social_handle")
-  normalizedSocialHandle String                           @map("normalized_social_handle")
-  email                  String?
-  source                 UceCampaignCreatorSource         @default(MANUAL)
-  ingestionMethod        UceCampaignCreatorIngestionMethod @default(MANUAL_SINGLE) @map("ingestion_method")
-  reviewState            UceCampaignCreatorReviewState    @default(PENDING_REVIEW) @map("review_state")
-  applications           UceApplication[]
-  archivedAt             DateTime?                        @map("archived_at")
-  createdAt              DateTime                         @default(now()) @map("created_at")
-  updatedAt              DateTime                         @updatedAt @map("updated_at")
-
-  @@unique([campaignId, platform, normalizedSocialHandle])
-  @@index([campaignId, reviewState])
-  @@map("uce_campaign_creators")
-}
-
-/// Campaign-owned Application decision record (Applicants truth).
-model UceApplication {
-  id                        String               @id @default(uuid())
-  requestId                 String               @unique @map("request_id")
-  campaignId                String               @map("campaign_id")
-  campaign                  UceCampaign          @relation(fields: [campaignId], references: [id], onDelete: Restrict)
-  campaignCreatorId         String               @map("campaign_creator_id")
-  campaignCreator           UceCampaignCreator   @relation(fields: [campaignCreatorId], references: [id], onDelete: Restrict)
-  /// Maps to current product persistence until Asset rename is approved.
-  campaignAssetId           String               @map("campaign_asset_id")
-  campaignAsset             UceCampaignProduct   @relation(fields: [campaignAssetId], references: [id], onDelete: Restrict)
-  briefId                   String               @map("brief_id")
-  brief                     UceCampaignBrief     @relation(fields: [briefId], references: [id], onDelete: Restrict)
-  status                    UceApplicationStatus @default(PENDING)
-  source                    UceApplicationSource @default(DIRECT)
-  supersededByApplicationId String?              @map("superseded_by_application_id")
-  supersededByApplication   UceApplication?      @relation("ApplicationSupersession", fields: [supersededByApplicationId], references: [id], onDelete: Restrict)
-  supersededApplications    UceApplication[]     @relation("ApplicationSupersession")
-  snapshot                  UceApplicationSnapshot?
-  appliedAt                 DateTime             @default(now()) @map("applied_at")
-  approvedAt                DateTime?            @map("approved_at")
-  rejectedAt                DateTime?            @map("rejected_at")
-  withdrawnAt               DateTime?            @map("withdrawn_at")
-  expiredAt                 DateTime?            @map("expired_at")
-  supersededAt              DateTime?            @map("superseded_at")
-  createdAt                 DateTime             @default(now()) @map("created_at")
-  updatedAt                 DateTime             @updatedAt @map("updated_at")
-
-  @@index([campaignId, status])
-  @@index([campaignCreatorId, status])
-  @@index([briefId, status])
-  @@map("uce_applications")
-}
-
-model UceApplicationSnapshot {
-  id                   String        @id @default(uuid())
-  applicationId        String        @unique @map("application_id")
-  application          UceApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  campaignContext      Json          @map("campaign_context")
-  campaignAssetContext Json          @map("campaign_asset_context")
-  briefContext         Json          @map("brief_context")
-  commercialContext    Json          @map("commercial_context")
-  creatorIdentity      Json          @map("creator_identity")
-  createdAt            DateTime      @default(now()) @map("created_at")
-
-  @@map("uce_application_snapshots")
-}
-
-model UceCampaignShare {
-  id             String                        @id @default(uuid())
-  requestId      String                        @unique @map("request_id")
-  campaignId     String                        @map("campaign_id")
-  campaign       UceCampaign                   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  channel        UceCampaignShareChannel
-  trackingToken  String                        @unique @map("tracking_token")
-  trackingEvents UceCampaignShareTrackingEvent[]
-  initiatedAt    DateTime                      @default(now()) @map("initiated_at")
-  createdAt      DateTime                      @default(now()) @map("created_at")
-
-  @@index([campaignId, initiatedAt])
-  @@map("uce_campaign_shares")
-}
-
-model UceCampaignShareTrackingEvent {
-  id         String                           @id @default(uuid())
-  shareId    String                           @map("share_id")
-  share      UceCampaignShare                 @relation(fields: [shareId], references: [id], onDelete: Cascade)
-  type       UceCampaignShareTrackingEventType
-  occurredAt DateTime                         @default(now()) @map("occurred_at")
-  createdAt  DateTime                         @default(now()) @map("created_at")
-
-  @@index([shareId, occurredAt])
-  @@map("uce_campaign_share_tracking_events")
-}
-
-model UceCampaignPerformanceAggregate {
-  campaignId              String      @id @map("campaign_id")
-  campaign                UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  totalSpendToDate        Decimal     @default(0) @map("total_spend_to_date") @db.Decimal(14, 2)
-  totalImpressionsCount   BigInt      @default(0) @map("total_impressions_count")
-  totalClicksCount        BigInt      @default(0) @map("total_clicks_count")
-  totalConversionsCount   Int         @default(0) @map("total_conversions_count")
-  totalProspectsCount     Int         @default(0) @map("total_prospects_count")
-  totalApplicantsCount    Int         @default(0) @map("total_applicants_count")
-  totalActiveCollabsCount Int         @default(0) @map("total_active_collabs_count")
-  updatedAt               DateTime    @updatedAt @map("updated_at")
-
-  @@map("uce_campaign_performance_aggregates")
-}
-
-model UceCampaignStrategy {
-  campaignId           String               @id @map("campaign_id")
-  campaign             UceCampaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  timelineType         UceTimelineStructure @map("timeline_type")
-  fixedStartDate       DateTime?            @map("fixed_start_date")
-  fixedEndDate         DateTime?            @map("fixed_end_date")
-  dynamicDaysLimit     Int?                 @map("dynamic_days_limit")
-  coreObjective        UceCampaignObjective @map("core_objective")
-  platformDeliverables Json                 @map("platform_deliverables")
-
-  @@map("uce_campaign_strategy")
-}
-
-model UceCampaignTargeting {
-  campaignId            String                @id @map("campaign_id")
-  campaign              UceCampaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  industryVertical      String                @map("industry_vertical")
-  creatorArchetypes     String[]              @default([]) @map("creator_archetypes")
-  followerTiers         String[]              @default([]) @map("follower_tiers")
-  audienceAgeMin        Int                   @default(18) @map("audience_age_min")
-  audienceAgeMax        Int                   @default(65) @map("audience_age_max")
-  audienceGender        String                @default("ALL") @map("audience_gender")
-  targetLocations       String[]              @default([]) @map("target_locations")
-  disqualifyingKeywords String[]              @default([]) @map("disqualifying_keywords")
-  visibilityScopes      UceVisibilityScope[]  @default([EVERYONE]) @map("visibility_scopes")
-  applicationScope      UceApplicationScope   @default(EVERYONE) @map("application_scope")
-
-  @@map("uce_campaign_targeting")
-}
-
-model UceCampaignCommercials {
-  campaignId               String              @id @map("campaign_id")
-  campaign                 UceCampaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  compensationType         UceCompensationType @map("compensation_type")
-  fixedFeeAmount           Decimal?            @default(0) @map("fixed_fee_amount") @db.Decimal(12, 2)
-  negotiableMinFee         Decimal?            @default(0) @map("negotiable_min_fee") @db.Decimal(12, 2)
-  negotiableMaxFee         Decimal?            @default(0) @map("negotiable_max_fee") @db.Decimal(12, 2)
-  totalCampaignBudgetPool  Decimal             @map("total_campaign_budget_pool") @db.Decimal(14, 2)
-  advancePaymentPercentage Int                 @default(30) @map("advance_payment_percentage")
-  finalBalanceTerms        UcePayoutTerms      @default(NET_30) @map("final_balance_terms")
-
-  @@map("uce_campaign_commercials")
-}
-
-enum UceCampaignAssetType {
-  INDIVIDUAL_PRODUCT_SKU
-  CURATED_COLLECTION_LINE
-  CORE_BRAND_IDENTITY
-  ACTIVE_SALE_PROMOTION
-
-  @@map("uce_campaign_asset_type_enum")
-}
-
-enum UceBriefStrategyMode {
-  CREATOR_LED
-  BRAND_LED
-
-  @@map("uce_brief_strategy_mode_enum")
-}
-
-model UceCampaignProduct {
-  id             String              @id @default(uuid()) @map("product_id")
-  campaignId     String              @map("campaign_id")
-  campaign       UceCampaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  assetType      UceCampaignAssetType @default(INDIVIDUAL_PRODUCT_SKU) @map("asset_type")
-  skuCode        String?             @map("sku_code")
-  productName    String              @map("product_name")
-  isActive       Boolean             @default(true) @map("is_active")
-  /// Stock is managed via essentials/inventory patch â€” not on Add Asset create.
-  inventoryCount Int                 @default(0) @map("inventory_count")
-  costPerUnit    Decimal             @default(0) @map("cost_per_unit") @db.Decimal(10, 2)
-  imageUrl       String?             @map("image_url")
-  /// Validated MasterAddAssetDrawer payload (minus campaign_id).
-  assetPayload   Json                @default("{}") @map("asset_payload")
-  createdAt      DateTime            @default(now()) @map("created_at")
-
-  briefs         UceCampaignBrief[]
-  collaborations UceCampaignCollaboration[]
-  applications   UceApplication[]
-  workflowCollaborations Collaboration[]
-
-  @@unique([campaignId, skuCode])
-  @@index([campaignId])
-  @@index([campaignId, assetType])
-  @@map("uce_campaign_products")
-}
-
-model UceCampaignBrief {
-  id                           String               @id @default(uuid()) @map("brief_id")
-  campaignId                   String               @map("campaign_id")
-  campaign                     UceCampaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  productId                    String?              @map("product_id")
-  product                      UceCampaignProduct?  @relation(fields: [productId], references: [id], onDelete: SetNull)
-  internalTitle                String               @map("internal_title")
-  creativeGuidelines           String               @map("creative_guidelines") @db.Text
-  isActive                     Boolean              @default(true) @map("is_active")
-  requiredPlatforms            UceMediaPlatform[]   @map("required_platforms")
-  deliverableFormatTags        String[]             @default([]) @map("deliverable_format_tags")
-  briefType                    UceBriefStrategyMode? @map("brief_type")
-  purpose                      String?              @map("purpose") @db.Text
-  objective                    String?              @map("objective") @db.Text
-  targetInfluencerArchetype    String?              @map("target_influencer_archetype")
-  mandatoryCreatorRequirements String?              @map("mandatory_creator_requirements") @db.Text
-  deliverablesInventory        Json?                @map("deliverables_inventory")
-  contentGuidanceMatrix        Json?                @map("content_guidance_matrix")
-  parentPlannerLogisticsSnapshot Json?              @map("parent_planner_logistics_snapshot")
-  createdAt                    DateTime             @default(now()) @map("created_at")
-
-  collaborations UceCampaignCollaboration[]
-  applications   UceApplication[]
-  workflowCollaborations Collaboration[]
-
-  @@index([campaignId])
-  @@index([productId])
-  @@map("uce_campaign_briefs")
-}
-
-enum PlannerSignalType {
-  LAUNCH_NEW_FRAMEWORK
-  INJECT_ASSET_LINE
-  FAST_TRACK_INTERRUPT
-
-  @@map("planner_signal_type_enum")
-}
-
-enum BridgeSyncStatus {
-  RECEIVED
-  PROCESSING
-  SYNCHRONIZED
-  VALIDATION_FAILED
-
-  @@map("bridge_sync_status_enum")
-}
-
-model IntegrationBridgeSignalLedger {
-  id                  String           @id @default(uuid()) @map("signal_id")
-  brandProfileId      String           @map("brand_profile_id")
-  brandProfile        BrandProfile     @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  campaignId          String?          @map("campaign_id")
-  campaign            UceCampaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  signalType          PlannerSignalType @map("signal_type")
-  syncStatus          BridgeSyncStatus @default(RECEIVED) @map("sync_status")
-  rawPayloadSnapshot  Json             @map("raw_payload_snapshot")
-  executionErrorLogs  String?          @map("execution_error_logs") @db.Text
-  synchronizedAt      DateTime?        @map("synchronized_at")
-  createdAt           DateTime         @default(now()) @map("created_at")
-  updatedAt           DateTime         @updatedAt @map("updated_at")
-
-  @@index([syncStatus, signalType])
-  @@index([brandProfileId, createdAt])
-  @@map("integration_bridge_signals_ledger")
-}
-
-model UceCampaignCollaboration {
-  id         String              @id @default(uuid()) @map("collaboration_id")
-  campaignId String              @map("campaign_id")
-  campaign   UceCampaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  briefId    String              @map("brief_id")
-  brief      UceCampaignBrief    @relation(fields: [briefId], references: [id], onDelete: Restrict)
-  productId  String?             @map("product_id")
-  product    UceCampaignProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
-
-  creatorProfileId String?         @map("creator_profile_id")
-  creatorProfile   CreatorProfile? @relation(fields: [creatorProfileId], references: [id], onDelete: SetNull)
-
-  instagramHandle String  @map("instagram_handle")
-  creatorEmail    String  @map("creator_email")
-  matchScore      Decimal @default(0) @map("match_score") @db.Decimal(5, 2)
-  contentFormatType String? @map("content_format_type") @db.VarChar(50)
-  vettingRemark   String? @map("vetting_remark")
-  rejectionReason String? @map("rejection_reason")
-
-  collabStatus     UceCollabStatus         @default(PROSPECT_CURATED) @map("collab_status")
-  currentPhase     UceProductionPhase      @default(APPLICATION_REVIEW) @map("current_phase")
-  actionRequiredByRole UceWorkflowActionRole @default(BRAND) @map("action_required_by_role")
-  currentMilestone UceMilestoneStage       @default(STAGE_1_NEGOTIATION) @map("current_milestone")
-  pipelineHealth   UcePipelineHealthStatus @default(ON_TRACK) @map("pipeline_health")
-
-  negotiationState UceNegotiationSubState? @map("negotiation_state")
-  securementState  UceSecurementSubState?  @map("securement_state")
-  logisticsState   UceLogisticsSubState?   @map("logistics_state")
-  reviewState      UceReviewSubState?      @map("review_state")
-  publishingState  UcePublishingSubState?  @map("publishing_state")
-
-  negotiationRoundCount Int @default(0) @map("negotiation_round_count")
-  fulfillmentIssueCount Int @default(0) @map("fulfillment_issue_count")
-  revisionRoundCount    Int @default(0) @map("revision_round_count")
-
-  totalQuote     Decimal @default(0) @map("total_quote") @db.Decimal(12, 2)
-  advance30Value Decimal @default(0) @map("advance_30_value") @db.Decimal(12, 2)
-  balance70Value Decimal @default(0) @map("balance_70_value") @db.Decimal(12, 2)
-
-  logisticsCarrier        String? @map("logistics_carrier")
-  logisticsTrackingNumber String? @map("logistics_tracking_number")
-  contentDraftUrl         String? @map("content_draft_url")
-  livePublishedUrl        String? @map("live_published_url")
-  complianceVerified      Boolean @default(false) @map("compliance_verified")
-
-  autoApprovalDeadline72h  DateTime? @map("auto_approval_deadline_72h")
-  currentMilestoneDeadline DateTime  @map("current_milestone_deadline")
-  productionDeadlineAt     DateTime? @map("production_deadline_at")
-
-  invitationToken         String? @unique @map("invitation_token")
-  invitationSourceChannel String? @map("invitation_source_channel")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  auditLogs       UceCollaborationAuditLog[]
-  reportingAssets UceCampaignReportingAssetGallery[]
-  workflowCollaboration Collaboration?
-  logisticsRegistry UceCollaborationLogistics?
-  contentDrafts     UceCollaborationContentDraft[]
-  liveTelemetry     UceCollaborationLiveTelemetry?
-
-  @@unique([campaignId, instagramHandle])
-  @@index([campaignId, collabStatus, currentMilestone])
-  @@index([pipelineHealth, currentMilestoneDeadline])
-  @@index([creatorProfileId, actionRequiredByRole, productionDeadlineAt], map: "idx_panic_panel_evaluation")
-  @@index([creatorProfileId, currentPhase], map: "idx_workspace_phase_router")
-  @@map("uce_campaign_collaborations")
-}
-
-model UceCollaborationLogistics {
-  id              String                   @id @default(uuid())
-  collaborationId String                   @unique @map("collaboration_id")
-  collaboration   UceCampaignCollaboration @relation(fields: [collaborationId], references: [id], onDelete: Restrict)
-  carrierName     String                   @map("carrier_name") @db.VarChar(100)
-  trackingId      String                   @map("tracking_id") @db.VarChar(100)
-  estimatedDeliveryAt DateTime?            @map("estimated_delivery_at")
-  actualDeliveredAt   DateTime?            @map("actual_delivered_at")
-  isReceivedByCreator Boolean              @default(false) @map("is_received_by_creator")
-  isPackageDamaged    Boolean              @default(false) @map("is_package_damaged")
-  createdAt       DateTime                 @default(now()) @map("created_at")
-  updatedAt       DateTime                 @updatedAt @map("updated_at")
-
-  @@map("uce_collaboration_logistics")
-}
-
-model UceCollaborationContentDraft {
-  id                  String                   @id @default(uuid())
-  collaborationId     String                   @map("collaboration_id")
-  collaboration       UceCampaignCollaboration @relation(fields: [collaborationId], references: [id], onDelete: Restrict)
-  draftUrl            String                   @map("draft_url") @db.Text
-  submissionVersion   Int                      @default(1) @map("submission_version")
-  reviewState         UceDraftReviewStatus     @default(AWAITING_REVIEW) @map("review_state")
-  brandSafetyFeedback String?                  @map("brand_safety_feedback") @db.Text
-  submissionNotes     String?                  @map("submission_notes") @db.Text
-  submittedAt         DateTime                 @default(now()) @map("submitted_at")
-  reviewedAt          DateTime?                @map("reviewed_at")
-
-  @@index([collaborationId, reviewState], map: "idx_draft_review_lookup")
-  @@map("uce_collaboration_content_drafts")
-}
-
-model UceCollaborationLiveTelemetry {
-  id              String                   @id @default(uuid())
-  collaborationId String                   @unique @map("collaboration_id")
-  collaboration   UceCampaignCollaboration @relation(fields: [collaborationId], references: [id], onDelete: Restrict)
-  contentLiveUrl  String                   @map("content_live_url") @db.Text
-  totalViews      Int                      @default(0) @map("total_views")
-  totalReach      Int                      @default(0) @map("total_reach")
-  engagementRate  Decimal                  @default(0.00) @map("engagement_rate") @db.Decimal(5, 2)
-  daysPublicCount Int                      @default(0) @map("days_public_count")
-  lastScrapedAt   DateTime                 @default(now()) @map("last_scraped_at")
-  createdAt       DateTime                 @default(now()) @map("created_at")
-  updatedAt       DateTime                 @updatedAt @map("updated_at")
-
-  @@map("uce_collaboration_live_telemetry")
-}
-
-model UceCollaborationAuditLog {
-  id              String                   @id @default(uuid()) @map("log_id")
-  collaborationId String                   @map("collaboration_id")
-  collaboration   UceCampaignCollaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
-  stageContext    UceMilestoneStage        @map("stage_context")
-  systemEventTag  String                   @map("system_event_tag")
-  messagePayload  String                   @map("log_message_payload") @db.Text
-  actorIdentifier String                   @map("actor_identifier")
-  loggedAt        DateTime                 @default(now()) @map("logged_at")
-
-  @@index([collaborationId, loggedAt])
-  @@map("uce_collaboration_audit_logs")
-}
-
-model UceCampaignReportingSnapshot {
-  id                        String               @id @default(uuid()) @map("snapshot_id")
-  campaignId                String               @map("campaign_id")
-  campaign                  UceCampaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  primaryObjective          UceCampaignObjective @map("primary_objective")
-  totalSpendAllocated       Decimal              @default(0) @map("total_spend_allocated") @db.Decimal(12, 2)
-  totalEarnedMediaValue     Decimal              @default(0) @map("total_earned_media_value") @db.Decimal(12, 2)
-  totalVerifiedImpressions  BigInt               @default(0) @map("total_verified_impressions")
-  totalVerifiedReach        BigInt               @default(0) @map("total_verified_reach")
-  calculatedCpmRate         Decimal              @default(0) @map("calculated_cpm_rate") @db.Decimal(10, 2)
-  calculatedCpeRate         Decimal              @default(0) @map("calculated_cpe_rate") @db.Decimal(10, 2)
-  totalTrackedLinkClicks    BigInt               @default(0) @map("total_tracked_link_clicks")
-  aggregatedCtrPercentage   Decimal              @default(0) @map("aggregated_ctr_percentage") @db.Decimal(5, 2)
-  calculatedCpcRate         Decimal              @default(0) @map("calculated_cpc_rate") @db.Decimal(10, 2)
-  attributedSalesRevenue    Decimal              @default(0) @map("attributed_sales_revenue") @db.Decimal(14, 2)
-  attributedConversionCount Int                  @default(0) @map("attributed_conversion_count")
-  aggregatedConversionRate  Decimal              @default(0) @map("aggregated_conversion_rate") @db.Decimal(5, 2)
-  calculatedCacRate         Decimal              @default(0) @map("calculated_cac_rate") @db.Decimal(10, 2)
-  lastApiSyncTimestamp      DateTime             @map("last_api_sync_timestamp")
-  updatedAt                 DateTime             @updatedAt @map("updated_at")
-
-  @@index([campaignId, updatedAt])
-  @@map("uce_campaign_reporting_snapshots")
-}
-
-model UceCampaignReportingTimeseriesHourly {
-  id                     String      @id @default(uuid()) @map("log_id")
-  campaignId             String      @map("campaign_id")
-  campaign               UceCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  recordedHour           DateTime    @map("recorded_hour")
-  hourlyLikesCount       Int         @default(0) @map("hourly_likes_count")
-  hourlyCommentsCount    Int         @default(0) @map("hourly_comments_count")
-  hourlySavesCount       Int         @default(0) @map("hourly_saves_count")
-  hourlySharesCount      Int         @default(0) @map("hourly_shares_count")
-  hourlyImpressionsDelta Int         @default(0) @map("hourly_impressions_delta")
-  createdAt              DateTime    @default(now()) @map("created_at")
-
-  @@unique([campaignId, recordedHour])
-  @@map("uce_campaign_reporting_timeseries_hourly")
-}
-
-model UceCampaignReportingAssetGallery {
-  id                       String                   @id @default(uuid()) @map("asset_id")
-  campaignId               String                   @map("campaign_id")
-  campaign                 UceCampaign              @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  collaborationId          String                   @map("collaboration_id")
-  collaboration            UceCampaignCollaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
-  instagramHandle          String                   @map("instagram_handle")
-  platform                 UceMediaPlatform         @map("platform")
-  mediaThumbnailUrl        String                   @map("media_thumbnail_url")
-  highResSourceDownloadUrl String                   @map("high_res_source_download_url")
-  engagementRatePercentage Decimal                  @default(0) @map("engagement_rate_percentage") @db.Decimal(5, 2)
-  savesCount               Int                      @default(0) @map("saves_count")
-  sharesCount              Int                      @default(0) @map("shares_count")
-  storyStickerClicksCount  Int                      @default(0) @map("story_sticker_clicks_count")
-  sparkAdAuthorizationCode String?                  @map("spark_ad_authorization_code")
-  isWhitelistingActive     Boolean                  @default(false) @map("is_whitelisting_active")
-  publishedAt              DateTime                 @map("published_at")
-  createdAt                DateTime                 @default(now()) @map("created_at")
-
-  @@index([campaignId, engagementRatePercentage])
-  @@map("uce_campaign_reporting_asset_gallery")
-}
-
-// ============================================================================
-// CREATOR PROFILE (Collaboration + payout prerequisites)
-// ============================================================================
-
-model CreatorProfile {
-  id                        String   @id @default(uuid())
-  userId                    String   @unique @map("user_id")
-  user                      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  displayName               String?  @map("display_name")
-  instagramHandle           String?  @map("instagram_handle")
-  /// Public media-kit URL slug (e.g. chef-insights from @chef_insights).
-  publicSlug                String?  @unique @map("public_slug")
-  isMediaKitPublic          Boolean  @default(true) @map("is_media_kit_public")
-  tiktokHandle              String?  @map("tiktok_handle")
-  avatarUrl                 String?  @map("avatar_url")
-  primaryRegion             String   @default("US") @map("primary_region")
-  followerCount             Int      @default(0) @map("follower_count")
-  audienceDemographicsMatrix Json  @default("{}") @map("audience_demographics_matrix")
-  createdAt                 DateTime @default(now()) @map("created_at")
-  updatedAt                 DateTime @updatedAt @map("updated_at")
-
-  bankDetails       CreatorBankDetails[]
-  shippingAddresses CreatorShippingAddress[]
-  settlementProfile CreatorSettlementProfile?
-  ownedWorkspaces   CreatorWorkspace[]         @relation("CreatorWorkspaceOwner")
-  workspaceSeats    CreatorWorkspaceMember[]   @relation("CreatorWorkspaceMemberProfile")
-  socialIntegrations CreatorSocialIntegration[]
-  coPilotThreads    CreatorCoPilotThread[]
-  coPilotMessageFeedback CreatorCoPilotMessageFeedback[]
-  coPilotInteractionLogs CreatorCoPilotInteractionLog[]
-  uceCollaborations      UceCampaignCollaboration[]
-  campaignCreators       UceCampaignCreator[]
-
-  @@map("creator_profiles")
-}
-
-model CreatorBankDetails {
-  id               String         @id @default(uuid())
-  creatorProfileId String         @map("creator_profile_id")
-  creatorProfile   CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
-  accountHolder    String         @map("account_holder")
-  bankName         String         @map("bank_name")
-  accountNumber    String         @map("account_number")
-  ifscOrRouting    String         @map("ifsc_or_routing")
-  isPrimary        Boolean        @default(true) @map("is_primary")
-  verificationStatus CreatorBankVerificationStatus @default(VERIFIED) @map("verification_status")
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime       @updatedAt @map("updated_at")
-
-  commercialPayoutLinks CollaborationCommercial[]
-
-  @@index([creatorProfileId])
-  @@map("creator_bank_details")
-}
-
-model CreatorShippingAddress {
-  id               String         @id @default(uuid())
-  creatorProfileId String         @map("creator_profile_id")
-  creatorProfile   CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
-  recipientName    String         @map("recipient_name")
-  addressLine1     String         @map("address_line_1")
-  addressLine2     String?        @map("address_line_2")
-  city             String
-  stateRegion      String?        @map("state_region")
-  postalCode       String         @map("postal_code")
-  countryCode      String         @default("IN") @map("country_code")
-  phone                         String?
-  deliveryInstructionsNarrative String?  @map("delivery_instructions_narrative") @db.Text
-  isDefault                     Boolean  @default(true) @map("is_default")
-  createdAt                     DateTime @default(now()) @map("created_at")
-  updatedAt                     DateTime @updatedAt @map("updated_at")
-
-  @@index([creatorProfileId, isDefault], map: "creator_shipping_addresses_profile_default_idx")
-  @@map("creator_shipping_addresses")
-}
-
-// ============================================================================
-// SETTINGS MODULE â€” BRAND & CREATOR
-// ============================================================================
-
-model BrandTeamMember {
-  id             String       @id @default(uuid()) @map("membership_id")
-  brandProfileId String       @map("brand_id")
-  brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  userId         String       @map("user_id")
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role           BrandRole    @default(CAMPAIGN_MANAGER)
-  isActive       Boolean      @default(true) @map("is_active")
-  joinedAt       DateTime     @default(now()) @map("joined_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-
-  @@unique([brandProfileId, userId])
-  @@index([userId, brandProfileId, role])
-  @@map("brand_team_members")
-}
-
-model BrandBillingProfile {
-  id                      String       @id @default(uuid()) @map("profile_id")
-  brandProfileId          String       @unique @map("brand_id")
-  brandProfile            BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  registeredCompanyName   String       @map("registered_company_name") @db.VarChar(255)
-  corporateBillingAddress String       @map("corporate_billing_address") @db.Text
-  gstin                   String?      @db.VarChar(15)
-  pan                     String?      @db.VarChar(10)
-  defaultTdsPercentage    Decimal      @default(2.00) @map("default_tds_percentage") @db.Decimal(5, 2)
-  currencyPreference      String       @default("INR") @map("currency_preference") @db.VarChar(3)
-  updatedAt               DateTime     @updatedAt @map("updated_at")
-
-  @@map("brand_billing_profiles")
-}
-
-model BrandWithdrawalAccount {
-  id                          String       @id @default(uuid()) @map("account_id")
-  brandProfileId              String       @map("brand_id")
-  brandProfile                BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  beneficiaryName             String       @map("beneficiary_name") @db.VarChar(255)
-  bankName                    String       @map("bank_name") @db.VarChar(255)
-  accountNumberEncrypted      String       @map("account_number_encrypted") @db.Text
-  ifscCode                    String       @map("ifsc_code") @db.VarChar(11)
-  isVerifiedPayoutDestination Boolean      @default(false) @map("is_verified_payout_destination")
-  createdAt                   DateTime     @default(now()) @map("created_at")
-  updatedAt                   DateTime     @updatedAt @map("updated_at")
-
-  @@index([brandProfileId])
-  @@map("brand_withdrawal_accounts")
-}
-
-model BrandNotificationSetting {
-  id              String                       @id @default(uuid()) @map("setting_id")
-  brandProfileId  String                       @map("brand_id")
-  brandProfile    BrandProfile                 @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  category        SettingsNotificationCategory
-  channel         SettingsNotificationChannel
-  isEnabled       Boolean                      @default(true) @map("is_enabled")
-  slackWebhookUrl String?                      @map("slack_webhook_url") @db.Text
-  updatedAt       DateTime                     @updatedAt @map("updated_at")
-
-  @@unique([brandProfileId, category, channel])
-  @@index([brandProfileId, category])
-  @@map("brand_notification_settings")
-}
-
-model CreatorWorkspace {
-  id                      String         @id @default(uuid())
-  ownerProfileId          String         @map("owner_profile_id")
-  ownerProfile            CreatorProfile @relation("CreatorWorkspaceOwner", fields: [ownerProfileId], references: [id], onDelete: Cascade)
-  organizationDisplayName String         @default("My Creative Workspace") @map("organization_display_name") @db.VarChar(150)
-  createdAt               DateTime       @default(now()) @map("created_at")
-  updatedAt               DateTime       @updatedAt @map("updated_at")
-
-  members     CreatorWorkspaceMember[]
-  invitations CreatorWorkspaceInvitation[]
-
-  @@map("creator_workspaces")
-}
-
-model CreatorWorkspaceMember {
-  id                String           @id @default(uuid())
-  workspaceId       String           @map("workspace_id")
-  workspace         CreatorWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  assignedProfileId String?          @map("assigned_profile_id")
-  assignedProfile   CreatorProfile?  @relation("CreatorWorkspaceMemberProfile", fields: [assignedProfileId], references: [id], onDelete: SetNull)
-  associatedEmail   String           @map("associated_email") @db.VarChar(255)
-  securityRole      CreatorTeamRole  @default(ASSISTANT) @map("security_role_token")
-  isActive          Boolean          @default(true) @map("is_active_active")
-  joinedAt          DateTime?        @map("joined_at")
-  createdAt         DateTime         @default(now()) @map("created_at")
-  updatedAt         DateTime         @updatedAt @map("updated_at")
-
-  @@unique([workspaceId, associatedEmail])
-  @@index([associatedEmail, isActive])
-  @@map("creator_workspace_members")
-}
-
-model CreatorWorkspaceInvitation {
-  id               String                    @id @default(uuid())
-  workspaceId      String                    @map("workspace_id")
-  workspace        CreatorWorkspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  recipientEmail   String                    @map("recipient_email") @db.VarChar(255)
-  allocatedRole    CreatorTeamRole           @default(ASSISTANT) @map("allocated_role")
-  invitationStatus WorkspaceInvitationStatus @default(PENDING) @map("invitation_status")
-  secureTokenHash  String                    @unique @map("secure_token_hash") @db.VarChar(255)
-  expiresAt        DateTime                  @map("expires_at")
-  createdAt        DateTime                  @default(now()) @map("created_at")
-
-  @@map("creator_workspace_invitations")
-}
-
-model CreatorSocialIntegration {
-  id                         String                @id @default(uuid())
-  creatorProfileId           String                @map("creator_profile_id")
-  creatorProfile             CreatorProfile        @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
-  platformNetwork            SocialNetworkProvider @map("platform_network")
-  nativePlatformUserId       String                @map("native_platform_user_id") @db.VarChar(100)
-  channelHandleString        String                @map("channel_handle_string") @db.VarChar(100)
-  channelDisplayTitle        String?               @map("channel_display_title") @db.VarChar(255)
-  verifiedAvatarUrl          String?               @map("verified_avatar_url") @db.Text
-  oauthAccessTokenEncrypted  String                @map("oauth_access_token_encrypted") @db.Text
-  oauthRefreshTokenEncrypted String?               @map("oauth_refresh_token_encrypted") @db.Text
-  tokenScopePermissions      String[]              @default([]) @map("token_scope_permissions")
-  tokenStateCondition        OAuthTokenStatus      @default(ACTIVE) @map("token_state_condition")
-  tokenExpiresAt             DateTime?             @map("token_expires_at")
-  lastMetadataSyncAt         DateTime?             @map("last_metadata_sync_at")
-  professionalAccountType    InstagramProfessionalAccountType? @map("professional_account_type")
-  mediaCountCache            Int?                  @map("media_count_cache")
-  createdAt                  DateTime              @default(now()) @map("created_at")
-  updatedAt                  DateTime              @updatedAt @map("updated_at")
-
-  @@unique([creatorProfileId, platformNetwork], map: "creator_social_integrations_profile_platform_key")
-  @@unique([platformNetwork, nativePlatformUserId], map: "creator_social_integrations_platform_native_user_key")
-  @@index([creatorProfileId, platformNetwork, tokenStateCondition], map: "creator_social_integrations_profile_platform_state_idx")
-  @@map("creator_social_integrations")
-}
-
-// ============================================================================
-// CREATOR ONBOARDING
-// ============================================================================
-
-model CreatorOnboardingTrack {
-  id                  String             @id @default(uuid())
-  instagramHandle     String             @map("instagram_handle") @db.VarChar(150)
-  instagramMetaId     String?            @unique @map("instagram_meta_id") @db.VarChar(100)
-  status              OnboardingStatus   @default(HANDLE_INPUTTED)
-  eligibilityScore    Int                @default(0) @map("eligibility_score")
-  percentileRank      Decimal?           @map("percentile_rank") @db.Decimal(5, 2)
-  isApproved          Boolean            @default(false) @map("is_approved")
-  detectedVertical    IndustryVertical   @default(UNKNOWN) @map("detected_vertical")
-  isExistingUserRoute Boolean            @default(false) @map("is_existing_user_route")
-  stagedModules       ActivatedModule[]  @default([]) @map("staged_modules")
-  clientIp            String             @map("client_ip") @db.VarChar(100)
-  userAgent           String?            @map("user_agent") @db.Text
-  userId              String?            @unique @map("user_id")
-  user                User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  waitlistLeadId      String?            @unique @map("waitlist_lead_id")
-  waitlistLead        WaitlistLead?      @relation(fields: [waitlistLeadId], references: [id], onDelete: SetNull)
-  createdAt           DateTime           @default(now()) @map("created_at")
-  updatedAt           DateTime           @updatedAt @map("updated_at")
-
-  @@index([instagramHandle])
-  @@index([status])
-  @@index([clientIp])
-  @@index([createdAt])
-  @@map("creator_onboarding_tracks")
-}
-
-model IpValidationLimit {
-  clientIp        String   @id @map("client_ip") @db.VarChar(100)
-  validationCount Int      @default(1) @map("validation_count")
-  firstAttemptAt  DateTime @default(now()) @map("first_attempt_at")
-  lastAttemptAt   DateTime @default(now()) @map("last_attempt_at")
-
-  @@map("ip_validation_limits")
-}
-
-model EmailOtpVerification {
-  id            String   @id @default(uuid())
-  email         String   @db.VarChar(255)
-  hashedOtp     String   @map("hashed_otp") @db.VarChar(128)
-  attemptsCount Int      @default(0) @map("attempts_count")
-  maxAttempts   Int      @default(5) @map("max_attempts")
-  expiresAt     DateTime @map("expires_at")
-  createdAt     DateTime @default(now()) @map("created_at")
-
-  @@index([email])
-  @@map("email_otp_verifications")
-}
-
-// ============================================================================
-// CREATOR CENTRE (media kit, analytics, historic chat compat)
-// ============================================================================
-
-model UserProfile {
-  id                   String      @id @default(uuid())
-  userId               String      @unique @map("user_id")
-  user                 User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  displayName          String?     @map("display_name") @db.VarChar(150)
-  totalReachCache      Int         @default(0) @map("total_reach_cache")
-  engagementRateCache  Decimal     @default(0.00) @map("engagement_rate_cache") @db.Decimal(5, 2)
-  topLocationCache     String?     @map("top_location_cache") @db.VarChar(100)
-  showTotalReach       Boolean     @default(true) @map("show_total_reach")
-  showEngagementRate   Boolean     @default(true) @map("show_engagement_rate")
-  showViewsMetric      Boolean     @default(true) @map("show_views_metric")
-  showRatesColumn      Boolean     @default(true) @map("show_rates_column")
-  activeTheme          DesignTheme @default(MINIMAL_STARK) @map("active_theme")
-  aiGeneratedTagline   String?     @map("ai_generated_tagline") @db.Text
-  customBioOverride    String?     @map("custom_bio_override") @db.Text
-  shortFormVideoRate   Decimal     @default(0.00) @map("short_form_video_rate") @db.Decimal(12, 2)
-  storyBundleRate      Decimal     @default(0.00) @map("story_bundle_rate") @db.Decimal(12, 2)
-  pastBrandLogos       String[]    @default([]) @map("past_brand_logos")
-  createdAt            DateTime    @default(now()) @map("created_at")
-  updatedAt            DateTime    @updatedAt @map("updated_at")
-
-  @@map("user_profiles")
-}
-
-model HistoricChatThread {
-  id           String   @id @default(uuid())
-  userId       String   @map("user_id")
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  threadTitle  String   @map("thread_title") @db.VarChar(255)
-  lastActiveAt DateTime @default(now()) @map("last_active_at")
-  messagesJson Json     @map("messages_json")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  @@index([userId])
-  @@index([lastActiveAt])
-  @@map("historic_chat_threads")
-}
-
-model MetricPostPulse {
-  id                String   @id @default(uuid())
-  userId            String   @map("user_id")
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  metaPostId        String   @unique @map("meta_post_id") @db.VarChar(150)
-  postType          String   @map("post_type") @db.VarChar(50)
-  mediaThumbnailUrl String   @map("media_thumbnail_url") @db.Text
-  captionContent    String?  @map("caption_content") @db.Text
-  publishedAt       DateTime @map("published_at")
-  viewsCount        Int      @default(0) @map("views_count")
-  impressionsCount  Int      @default(0) @map("impressions_count")
-  savesCount        Int      @default(0) @map("saves_count")
-  sharesCount       Int      @default(0) @map("shares_count")
-  engagementDelta   Decimal  @default(0) @map("engagement_delta") @db.Decimal(7, 2)
-  aiPerformanceNote String?  @map("ai_performance_note") @db.Text
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
-
-  @@index([userId])
-  @@index([publishedAt])
-  @@map("metric_post_pulses")
-}
-
-// ============================================================================
-// COLLABORATION WORKFLOW MODELS
-// ============================================================================
-
-model Collaboration {
-  id             String       @id @default(uuid())
-  brandProfileId String       @map("brand_id")
-  brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  creatorUserId  String       @map("creator_id")
-  creatorUser    User         @relation("CollaborationCreator", fields: [creatorUserId], references: [id], onDelete: Restrict)
-  campaignId     String       @map("campaign_id")
-  campaign       UceCampaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  briefId        String       @map("brief_id")
-  brief          UceCampaignBrief @relation(fields: [briefId], references: [id], onDelete: Restrict)
-  productId      String?      @map("product_id")
-  product        UceCampaignProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
-
-  ucePipelineCollaborationId String?                  @unique @map("uce_pipeline_collaboration_id")
-  ucePipelineCollaboration   UceCampaignCollaboration? @relation(fields: [ucePipelineCollaborationId], references: [id], onDelete: SetNull)
-
-  currentStage UceMilestoneStage       @default(STAGE_1_NEGOTIATION) @map("current_stage")
-  payoutMode   CollaborationPayoutMode @default(ESCROW) @map("payout_mode")
-  industry     CollaborationIndustryType
-
-  negotiationRound      Int @default(0) @map("negotiation_round")
-  fulfillmentIssueCount Int @default(0) @map("fulfillment_issue_count")
-  revisionCount         Int @default(0) @map("revision_count")
-
-  unreadCountBrand   Int     @default(0) @map("unread_count_brand")
-  unreadCountCreator Int     @default(0) @map("unread_count_creator")
-  lastMessageSnippet String? @map("last_message_snippet")
-  lastMessageAt      DateTime? @map("last_message_at")
-  stageUpdatedAt     DateTime @default(now()) @map("stage_updated_at")
-
-  isPaused      Boolean @default(false) @map("is_paused")
-  isTerminated  Boolean @default(false) @map("is_terminated")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  commercials    CollaborationCommercial?
-  logistics      CollaborationLogistics?
-  media          CollaborationMedia[]
-  finalization   CollaborationFinalization?
-  messages       CollaborationMessage[]
-  escrowLock     CollaborationEscrowLock?
-
-  @@unique([campaignId, creatorUserId])
-  @@index([brandProfileId, currentStage])
-  @@index([creatorUserId, currentStage])
-  @@index([lastMessageAt])
-  @@map("collaborations")
-}
-
-model CollaborationCommercial {
-  id               String        @id @default(uuid())
-  collaborationId  String        @unique @map("collaboration_id")
-  collaboration    Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
-
-  initialQuote       Decimal? @map("initial_quote") @db.Decimal(12, 2)
-  brandCounterOffer  Decimal? @map("brand_counter_offer") @db.Decimal(12, 2)
-  finalQuote         Decimal? @map("final_quote") @db.Decimal(12, 2)
-  productRetailValue Decimal  @default(0) @map("product_retail_value") @db.Decimal(12, 2)
-  isFinalOffer       Boolean  @default(false) @map("is_final_offer")
-
-  advance30Amount Decimal @default(0) @map("advance_30_amount") @db.Decimal(12, 2)
-  balance70Amount Decimal @default(0) @map("balance_70_amount") @db.Decimal(12, 2)
-
-  creatorBankDetailsId String?            @map("creator_bank_details_id")
-  creatorBankDetails   CreatorBankDetails? @relation(fields: [creatorBankDetailsId], references: [id], onDelete: SetNull)
-  escrowVaultId        String?            @map("escrow_vault_id")
-  escrowStatus         CollaborationEscrowStatus? @map("escrow_status")
-  advanceReceiptUrl    String?            @map("advance_receipt_url") @db.Text
-  finalReceiptUrl      String?            @map("final_receipt_url") @db.Text
-  agreementPdfUrl      String?            @map("agreement_pdf_url") @db.Text
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("collaboration_commercials")
-}
-
-model CollaborationLogistics {
-  id              String        @id @default(uuid())
-  collaborationId String        @unique @map("collaboration_id")
-  collaboration   Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
-
-  trackingId               String?              @map("tracking_id")
-  courierName              String?              @map("courier_name")
-  digitalAccessCredentials String?              @map("digital_access_credentials") @db.Text
-  redemptionCode           String?              @map("redemption_code")
-
-  isReceivedConfirmed Boolean              @default(false) @map("is_received_confirmed")
-  confirmedAt         DateTime?            @map("confirmed_at")
-  lastReportedIssue   FulfillmentIssueType? @map("last_reported_issue")
-  issueDescription    String?              @map("issue_description") @db.Text
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("collaboration_logistics")
-}
-
-model CollaborationMedia {
-  id              String        @id @default(uuid())
-  collaborationId String        @map("collaboration_id")
-  collaboration   Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
-
-  phase                  CollaborationMediaPhase        @map("phase")
-  versionNumber          Int                            @default(1) @map("version_number")
-  mediaUrl               String                         @map("media_url") @db.Text
-  deliverableType        String?                        @map("deliverable_type")
-  status                 CollaborationMediaReviewStatus @default(PENDING)
-  brandFeedback          String?                        @map("brand_feedback") @db.Text
-  isAspectRatioVerified  Boolean                        @default(false) @map("is_aspect_ratio_verified")
-  autoApprovalDeadline DateTime?                      @map("auto_approval_deadline")
-  createdAt              DateTime                       @default(now()) @map("created_at")
-  updatedAt              DateTime                       @updatedAt @map("updated_at")
-
-  @@index([collaborationId, phase, versionNumber])
-  @@map("collaboration_media")
-}
-
-model CollaborationFinalization {
-  id              String        @id @default(uuid())
-  collaborationId String        @unique @map("collaboration_id")
-  collaboration   Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
-
-  livePostUrl              String?  @map("live_post_url") @db.Text
-  partnershipAdCode        String?  @map("partnership_ad_code")
-  isComplianceVerified       Boolean  @default(false) @map("is_compliance_verified")
-  isFinalPayoutReleased    Boolean  @default(false) @map("is_final_payout_released")
-
-  creatorRating      Int?    @map("creator_rating")
-  creatorReviewText  String? @map("creator_review_text") @db.Text
-  brandRating        Int?    @map("brand_rating")
-  brandReviewText    String? @map("brand_review_text") @db.Text
-  reviewsVisible     Boolean @default(false) @map("reviews_visible")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("collaboration_finalization")
-}
-
-model CollaborationMessage {
-  id              String                   @id @default(uuid())
-  collaborationId String                   @map("collaboration_id")
-  collaboration   Collaboration            @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
-  senderUserId    String?                  @map("sender_user_id")
-  kind            CollaborationMessageKind @default(USER)
-  body            String                   @db.Text
-  systemEventTag  String?                  @map("system_event_tag")
-  createdAt       DateTime                 @default(now()) @map("created_at")
-
-  @@index([collaborationId, createdAt])
-  @@map("collaboration_messages")
-}
-
-// ============================================================================
-// BRAND ESCROW MODELS
-// ============================================================================
-
-model BrandEscrowVault {
-  id                       String   @id @default(uuid()) @map("vault_id")
-  brandProfileId           String   @unique @map("brand_id")
-  brandProfile             BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
-  razorpayVirtualAccountId String   @unique @map("razorpay_virtual_account_id")
-  virtualAccountNumber     String   @unique @map("virtual_account_number")
-  ifscCode                 String   @map("ifsc_code")
-  upiVpa                   String?  @map("upi_vpa")
-  bankName                 String   @default("RBL Bank (Razorpay Escrow Partner Node)") @map("bank_name")
-  currency                 String   @default("INR") @db.VarChar(3)
-  totalPooledBalance       Decimal  @default(0) @map("total_pooled_balance") @db.Decimal(15, 4)
-  lockedCampaignFunds      Decimal  @default(0) @map("locked_campaign_funds") @db.Decimal(15, 4)
-  availableBalance         Decimal  @default(0) @map("available_balance") @db.Decimal(15, 4)
-  tdsBufferBalance         Decimal  @default(0) @map("tds_buffer_balance") @db.Decimal(15, 4)
-  createdAt                DateTime @default(now()) @map("created_at")
-  updatedAt                DateTime @updatedAt @map("updated_at")
-
-  ledgerEntries EscrowTransactionLedger[]
-
-  @@index([brandProfileId])
-  @@map("brand_escrow_vaults")
-}
-
-model CollaborationEscrowLock {
-  id                      String        @id @default(uuid()) @map("lock_id")
-  collaborationId         String        @unique @map("collaboration_id")
-  collaboration           Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Restrict)
-  brandProfileId          String        @map("brand_id")
-  grossCreatorQuote       Decimal       @map("gross_creator_quote") @db.Decimal(15, 4)
-  platformCommissionFee   Decimal       @map("platform_commission_fee") @db.Decimal(15, 4)
-  platformCommissionGst     Decimal       @default(0) @map("platform_commission_gst") @db.Decimal(15, 4)
-  totalEscrowLockedAmount Decimal       @map("total_escrow_locked_amount") @db.Decimal(15, 4)
-  expectedTdsPercentage   Decimal       @default(0) @map("expected_tds_percentage") @db.Decimal(4, 2)
-  calculatedTdsDeduction  Decimal       @default(0) @map("calculated_tds_deduction") @db.Decimal(15, 4)
-  netCreatorPayoutPool    Decimal       @map("net_creator_payout_pool") @db.Decimal(15, 4)
-  advanceTrancheDisbursed Boolean       @default(false) @map("advance_tranche_disbursed")
-  finalTrancheDisbursed   Boolean       @default(false) @map("final_tranche_disbursed")
-  lockReleasedViaRefund   Boolean       @default(false) @map("lock_released_via_refund")
-  createdAt               DateTime      @default(now()) @map("created_at")
-  updatedAt               DateTime      @updatedAt @map("updated_at")
-
-  @@index([collaborationId])
-  @@index([brandProfileId])
-  @@map("collaboration_escrow_locks")
-}
-
-model EscrowTransactionLedger {
-  id                         String                  @id @default(uuid()) @map("transaction_id")
-  vaultId                    String                  @map("vault_id")
-  vault                      BrandEscrowVault        @relation(fields: [vaultId], references: [id], onDelete: Restrict)
-  brandProfileId             String                  @map("brand_id")
-  collaborationId            String?                 @map("collaboration_id")
-  transactionType            EscrowTransactionType   @map("transaction_type")
-  payoutTrancheTarget        EscrowPayoutTranche?    @map("payout_tranche_target")
-  amount                     Decimal                 @db.Decimal(15, 4)
-  currency                   String                  @db.VarChar(3)
-  gatewayProcessingSurcharge Decimal                 @default(0) @map("gateway_processing_surcharge") @db.Decimal(15, 4)
-  gatewaySurchargeGst        Decimal                 @default(0) @map("gateway_surcharge_gst") @db.Decimal(15, 4)
-  idempotencyKey             String                  @unique @map("idempotency_key")
-  gatewayReferenceId         String?                 @unique @map("gateway_reference_id")
-  transactionStatus          EscrowTransactionStatus @default(PROCESSING_GATEWAY) @map("transaction_status")
-  errorDiagnosticPayload     Json?                   @map("error_diagnostic_payload")
-  createdAt                  DateTime                @default(now()) @map("created_at")
-
-  @@index([vaultId])
-  @@index([brandProfileId, collaborationId, transactionType])
-  @@index([collaborationId])
-  @@map("escrow_transaction_ledger")
-}
-
-model CreatorSettlementProfile {
-  id                    String         @id @default(uuid()) @map("settlement_profile_id")
-  creatorProfileId      String         @unique @map("creator_profile_id")
-  creatorProfile        CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
-  accountHolderName     String         @map("account_holder_name")
-  bankAccountNumber     String         @map("bank_account_number")
-  ifscCode              String         @map("ifsc_code")
-  panNumber             String?        @map("pan_number") @db.VarChar(10)
-  isPanVerified         Boolean        @default(false) @map("is_pan_verified")
-  razorpayFundAccountId String?        @unique @map("razorpay_fund_account_id")
-  isSettlementRouteActive Boolean      @default(false) @map("is_settlement_route_active")
-  createdAt             DateTime       @default(now()) @map("created_at")
-  updatedAt             DateTime       @updatedAt @map("updated_at")
-
-  @@index([creatorProfileId])
-  @@map("creator_settlement_profiles")
-}
-
-model IdempotencyRegistry {
-  idempotencyKey String                    @id @map("idempotency_key")
-  requestPath    String                    @map("request_path")
-  executionState IdempotencyExecutionState @default(IN_FLIGHT) @map("execution_state")
-  cachedResponse Json?                     @map("cached_response")
-  lockedAt       DateTime                  @default(now()) @map("locked_at")
-  updatedAt      DateTime                  @updatedAt @map("updated_at")
-
-  @@map("idempotency_registry")
-}
-
-// ---------------------------------------------------------------------------
-// Pricing â€” subscription lifecycle & entitlement (product: brand_subscriptions)
-// ---------------------------------------------------------------------------
-
-model BrandSubscription {
-  id                     String               @id @default(uuid()) @map("subscription_id")
-  brandProfileId         String               @unique @map("brand_id")
-  brandProfile           BrandProfile         @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  tier                   SubscriptionTier     @default(FOUNDERS_BETA)
-  status                 SubscriptionStatus   @default(TRIALING)
-  currency               SubscriptionCurrency @default(USD)
-  razorpayCustomerId     String?              @map("razorpay_customer_id")
-  razorpaySubscriptionId String?              @unique @map("razorpay_subscription_id")
-  razorpayPlanId         String?              @map("razorpay_plan_id")
-  trialEndsAt            DateTime?            @map("trial_ends_at")
-  currentPeriodStart     DateTime             @default(now()) @map("current_period_start")
-  currentPeriodEnd       DateTime             @map("current_period_end")
-  createdAt              DateTime             @default(now()) @map("created_at")
-  updatedAt              DateTime             @updatedAt @map("updated_at")
-
-  featureUsages   FeatureUsage[]
-  billingInvoices BrandBillingInvoice[]
-
-  @@index([brandProfileId])
-  @@index([status])
-  @@map("brand_subscriptions")
-}
-
-model BrandBillingInvoice {
-  id                     String            @id @default(uuid()) @map("invoice_row_id")
-  brandProfileId         String            @map("brand_id")
-  brandSubscriptionId    String            @map("subscription_id")
-  brandSubscription      BrandSubscription @relation(fields: [brandSubscriptionId], references: [id], onDelete: Cascade)
-  razorpayInvoiceId      String            @unique @map("razorpay_invoice_id")
-  razorpaySubscriptionId String            @map("razorpay_subscription_id")
-  razorpayPaymentId      String?           @map("razorpay_payment_id")
-  shortUrl               String?           @map("short_url")
-  status                 String
-  amount                 Int
-  amountPaid             Int               @default(0) @map("amount_paid")
-  currency               String            @default("USD")
-  invoiceNumber          String?           @map("invoice_number")
-  paidAt                 DateTime?         @map("paid_at")
-  billingPeriodStart     DateTime?         @map("billing_period_start")
-  billingPeriodEnd       DateTime?         @map("billing_period_end")
-  issuedAt               DateTime?         @map("issued_at")
-  createdAt              DateTime          @default(now()) @map("created_at")
-  updatedAt              DateTime          @updatedAt @map("updated_at")
-
-  @@index([brandProfileId])
-  @@index([brandSubscriptionId])
-  @@index([paidAt])
-  @@map("brand_billing_invoices")
-}
-
-model FeatureUsage {
-  id                String            @id @default(uuid()) @map("usage_id")
-  subscriptionId    String            @map("subscription_id")
-  subscription      BrandSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  featureKey        String            @map("feature_key")
-  currentUsageCount Int               @default(0) @map("current_usage_count")
-  resetAt           DateTime?         @map("reset_at")
-  createdAt         DateTime          @default(now()) @map("created_at")
-  updatedAt         DateTime          @updatedAt @map("updated_at")
-
-  @@unique([subscriptionId, featureKey])
-  @@map("feature_usages")
-}
-
-// ============================================================================
-// CO-PILOT (Brand Home Chat Engine)
-// ============================================================================
-
-model CoPilotThread {
-  id               String                  @id @default(uuid())
-  brandProfileId   String                  @map("brand_profile_id")
-  brandProfile     BrandProfile            @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  createdByUserId  String                  @map("created_by_user_id")
-  createdByUser    User                    @relation(fields: [createdByUserId], references: [id])
-  title            String
-  scopeContext     CoPilotScopeContext     @default(BRAND_CENTRE) @map("scope_context")
-  linkedEntityType CoPilotLinkedEntityType @default(NONE) @map("linked_entity_type")
-  linkedEntityId   String?                 @map("linked_entity_id")
-  archivedAt       DateTime?               @map("archived_at")
-  lastMessageAt    DateTime                @map("last_message_at")
-  createdAt        DateTime                @default(now()) @map("created_at")
-  updatedAt        DateTime                @updatedAt @map("updated_at")
-
-  messages        CoPilotMessage[]
-  messageFeedback CoPilotMessageFeedback[]
-  slotSession     CoPilotSlotSession?
-  interactionLogs CoPilotInteractionLog[] @relation("CoPilotThreadLogs")
-
-  @@index([brandProfileId, lastMessageAt(sort: Desc)])
-  @@index([brandProfileId, archivedAt])
-  @@map("co_pilot_threads")
-}
-
-enum CoPilotFeedbackRating {
-  THUMBS_UP
-  THUMBS_DOWN
-}
-
-model CoPilotMessage {
-  id          String              @id @default(uuid())
-  threadId    String              @map("thread_id")
-  thread      CoPilotThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  role        CoPilotMessageRole
-  textContent String?             @map("text_content") @db.Text
-  payloadJson Json?               @map("payload_json")
-  formatType  CoPilotFormatType?  @map("format_type")
-  createdAt   DateTime            @default(now()) @map("created_at")
-  feedback    CoPilotMessageFeedback?
-
-  @@index([threadId, createdAt])
-  @@map("co_pilot_messages")
-}
-
-model CoPilotMessageFeedback {
-  id             String                @id @default(uuid())
-  messageId      String                @unique @map("message_id")
-  message        CoPilotMessage        @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  threadId       String                @map("thread_id")
-  thread         CoPilotThread         @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  brandProfileId String                @map("brand_profile_id")
-  brandProfile   BrandProfile          @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  userId         String                @map("user_id")
-  user           User                  @relation(fields: [userId], references: [id])
-  rating         CoPilotFeedbackRating
-  reason         String?
-  createdAt      DateTime              @default(now()) @map("created_at")
-
-  @@index([brandProfileId, createdAt])
-  @@map("co_pilot_message_feedback")
-}
-
-model CoPilotSlotSession {
-  id                     String        @id @default(uuid())
-  threadId               String        @unique @map("thread_id")
-  thread                 CoPilotThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  intentWorkspaceContext String        @map("intent_workspace_context")
-  stagedPayload          Json          @map("staged_payload")
-  missingSlots           Json          @map("missing_slots")
-  expiresAt              DateTime      @map("expires_at")
-  createdAt              DateTime      @default(now()) @map("created_at")
-  updatedAt              DateTime      @updatedAt @map("updated_at")
-
-  @@map("co_pilot_slot_sessions")
-}
-
-model CoPilotInteractionLog {
-  id                 String                   @id @default(uuid())
-  brandProfileId     String                   @map("brand_profile_id")
-  brandProfile       BrandProfile             @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  userId             String                   @map("user_id")
-  threadId           String?                  @map("thread_id")
-  thread             CoPilotThread?           @relation("CoPilotThreadLogs", fields: [threadId], references: [id], onDelete: SetNull)
-  messageId          String?                  @map("message_id")
-  scopeContext       CoPilotScopeContext      @map("scope_context")
-  intentKey          String?                  @map("intent_key")
-  modelId            String                   @map("model_id")
-  inputTokens        Int?                     @map("input_tokens")
-  outputTokens       Int?                     @map("output_tokens")
-  estimatedCostMinor Int?                     @map("estimated_cost_minor")
-  toolsInvoked       String[]                 @default([]) @map("tools_invoked")
-  status             CoPilotInteractionStatus
-  latencyMs          Int?                     @map("latency_ms")
-  idempotencyKey     String?                  @map("idempotency_key")
-  errorCode          String?                  @map("error_code")
-  createdAt          DateTime                 @default(now()) @map("created_at")
-
-  @@index([brandProfileId, createdAt])
-  @@map("co_pilot_interaction_logs")
-}
-
-// ============================================================================
-// CREATOR CO-PILOT (Creator Command Center Chat Engine)
-// ============================================================================
-
-model CreatorCoPilotThread {
-  id               String                       @id @default(uuid())
-  creatorProfileId String                       @map("creator_profile_id")
-  creatorProfile   CreatorProfile               @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
-  createdByUserId  String                       @map("created_by_user_id")
-  createdByUser    User                         @relation("CreatorCoPilotThreadAuthor", fields: [createdByUserId], references: [id])
-  title            String
-  scopeContext     CreatorCoPilotScopeContext   @default(COMMAND_CENTER) @map("scope_context")
-  linkedEntityType CreatorCoPilotLinkedEntityType @default(NONE) @map("linked_entity_type")
-  linkedEntityId   String?                      @map("linked_entity_id")
-  archivedAt       DateTime?                    @map("archived_at")
-  lastMessageAt    DateTime                     @map("last_message_at")
-  createdAt        DateTime                     @default(now()) @map("created_at")
-  updatedAt        DateTime                     @updatedAt @map("updated_at")
-
-  messages        CreatorCoPilotMessage[]
-  messageFeedback CreatorCoPilotMessageFeedback[]
-  slotSession     CreatorCoPilotSlotSession?
-  interactionLogs CreatorCoPilotInteractionLog[] @relation("CreatorCoPilotThreadLogs")
-
-  @@index([creatorProfileId, lastMessageAt(sort: Desc)])
-  @@index([creatorProfileId, archivedAt])
-  @@map("creator_co_pilot_threads")
-}
-
-model CreatorCoPilotMessage {
-  id          String              @id @default(uuid())
-  threadId    String              @map("thread_id")
-  thread      CreatorCoPilotThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  role        CoPilotMessageRole
-  textContent String?             @map("text_content") @db.Text
-  payloadJson Json?               @map("payload_json")
-  formatType  CoPilotFormatType?  @map("format_type")
-  createdAt   DateTime            @default(now()) @map("created_at")
-  feedback    CreatorCoPilotMessageFeedback?
-
-  @@index([threadId, createdAt])
-  @@map("creator_co_pilot_messages")
-}
-
-model CreatorCoPilotMessageFeedback {
-  id               String                @id @default(uuid())
-  messageId        String                @unique @map("message_id")
-  message          CreatorCoPilotMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  threadId         String                @map("thread_id")
-  thread           CreatorCoPilotThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  creatorProfileId String                @map("creator_profile_id")
-  creatorProfile   CreatorProfile        @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
-  userId           String                @map("user_id")
-  user             User                  @relation(fields: [userId], references: [id])
-  rating           CoPilotFeedbackRating
-  reason           String?
-  createdAt        DateTime              @default(now()) @map("created_at")
-
-  @@index([creatorProfileId, createdAt])
-  @@map("creator_co_pilot_message_feedback")
-}
-
-model CreatorCoPilotSlotSession {
-  id                     String               @id @default(uuid())
-  threadId               String               @unique @map("thread_id")
-  thread                 CreatorCoPilotThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  intentWorkspaceContext String               @map("intent_workspace_context")
-  stagedPayload          Json                 @map("staged_payload")
-  missingSlots           Json                 @map("missing_slots")
-  expiresAt              DateTime             @map("expires_at")
-  createdAt              DateTime             @default(now()) @map("created_at")
-  updatedAt              DateTime             @updatedAt @map("updated_at")
-
-  @@map("creator_co_pilot_slot_sessions")
-}
-
-model CreatorCoPilotInteractionLog {
-  id                 String                     @id @default(uuid())
-  creatorProfileId   String                     @map("creator_profile_id")
-  creatorProfile     CreatorProfile             @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
-  userId             String                     @map("user_id")
-  threadId           String?                    @map("thread_id")
-  thread             CreatorCoPilotThread?      @relation("CreatorCoPilotThreadLogs", fields: [threadId], references: [id], onDelete: SetNull)
-  messageId          String?                    @map("message_id")
-  scopeContext       CreatorCoPilotScopeContext @map("scope_context")
-  intentKey          String?                    @map("intent_key")
-  modelId            String                     @map("model_id")
-  inputTokens        Int?                       @map("input_tokens")
-  outputTokens       Int?                       @map("output_tokens")
-  estimatedCostMinor Int?                       @map("estimated_cost_minor")
-  toolsInvoked       String[]                   @default([]) @map("tools_invoked")
-  status             CoPilotInteractionStatus
-  latencyMs          Int?                       @map("latency_ms")
-  idempotencyKey     String?                    @map("idempotency_key")
-  errorCode          String?                    @map("error_code")
-  createdAt          DateTime                   @default(now()) @map("created_at")
-
-  @@index([creatorProfileId, createdAt])
-  @@map("creator_co_pilot_interaction_logs")
-}
-
-// ============================================================================
-// NOTIFICATIONS MODULE (Phase 1 â€” Postgres job queue, no Redis)
-// ============================================================================
-
-model Notification {
-  id            String                   @id @default(uuid())
-  workspaceId   String                   @map("workspace_id")
-  brandProfile  BrandProfile             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  triggerUserId String?                  @map("trigger_user_id")
-  triggerUser   User?                    @relation("NotificationTriggerUser", fields: [triggerUserId], references: [id], onDelete: SetNull)
-  eventType     String                   @map("event_type") @db.VarChar(100)
-  urgencyLevel  NotificationUrgencyLevel @map("urgency_level")
-  payload       Json
-  createdAt     DateTime                 @default(now()) @map("created_at")
-  updatedAt     DateTime                 @updatedAt @map("updated_at")
-
-  recipients NotificationRecipient[]
-
-  @@index([workspaceId])
-  @@index([workspaceId, eventType, createdAt])
-  @@map("notifications")
-}
-
-model NotificationRecipient {
-  id             String       @id @default(uuid())
-  notificationId String       @map("notification_id")
-  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
-  userId         String       @map("user_id")
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  isRead         Boolean      @default(false) @map("is_read")
-  isEmailed      Boolean      @default(false) @map("is_emailed")
-  readAt         DateTime?    @map("read_at")
-
-  @@unique([notificationId, userId])
-  @@index([userId, isRead])
-  @@map("notification_recipients")
-}
-
-model NotificationJob {
-  id            String                   @id @default(uuid())
-  workspaceId   String                   @map("workspace_id")
-  eventType     String                   @map("event_type") @db.VarChar(100)
-  urgencyLevel  NotificationUrgencyLevel @map("urgency_level")
-  triggerUserId String?                  @map("trigger_user_id")
-  payload       Json
-  actorName     String?                  @map("actor_name") @db.VarChar(200)
-  status        NotificationJobStatus    @default(PENDING)
-  attempts      Int                      @default(0)
-  maxAttempts   Int                      @default(5) @map("max_attempts")
-  scheduledAt   DateTime                 @default(now()) @map("scheduled_at")
-  lockedAt      DateTime?                @map("locked_at")
-  lockedBy      String?                  @map("locked_by") @db.VarChar(100)
-  lastError     String?                  @map("last_error") @db.Text
-  completedAt   DateTime?                @map("completed_at")
-  createdAt     DateTime                 @default(now()) @map("created_at")
-
-  @@index([status, scheduledAt])
-  @@map("notification_jobs")
-}
+  googleSubjectId               String?                         @unique @map("google_subject_id")
+  emailVerifiedAt               DateTime?                       @map("email_verified_at")
+  role                          UserRole
+  organizationId                String?                         @map("organization_id")
+  organization                  Organization?                   @relation(fields: [organizationId], references: [id])
+  createdAt                     DateTime                        @default(now()) @map("created_at")
+  updatedAt                     DateTime                        @updatedAt @map("updated_at")
+  discoveryLeads                DiscoveryLead[]
+  creatorProfile                CreatorProfile?
+  creatorOnboardingTrack        CreatorOnboardingTrack?
+  userProfile                   UserProfile?
+  historicChatThreads           HistoricChatThread[]
+  metricPostPulses              MetricPostPulse[]
+  collaborationsAsCreator       Collaboration[]                 @relation("CollaborationCreator")
+  coPilotThreads                CoPilotThread[]
+  coPilotMessageFeedback      ã5ÚÚ$z{-®éÜj×F–ÖSòÖ‚&—77VVEöB"¢7&VFVDBFFUF–ÖRFVfVÇB†æ÷r‚’’Ö‚&7&VFVEöB"¢WFFVDBFFUF–ÖRWFFVDBÖ‚'WFFVEöB" ¢–æFW‚…¶'&æE&öf–ÆT–EÒ¢–æFW‚…¶'&æE7V'67&—F–öä–EÒ¢–æFW‚…·–DEÒ¢Ö‚&'&æEö&–ÆÆ–æuö–çfö–6W2"§Ğ ¦ÖöFVÂfVGW&UW6vR°¢–B7G&–ær–BFVfVÇB‡WV–B‚’’Ö‚'W6vUö–B"¢7V'67&—F–öä–B7G&–ærÖ‚'7V'67&—F–öåö–B"¢7V'67&—F–öâ'&æE7V'67&—F–öâ&VÆF–öâ†f–VÆG3¢·7V'67&—F–öä–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢fVGW&T¶W’7G&–ærÖ‚&fVGW&Uö¶W’"¢7W'&VçEW6vT6÷VçB–çBFVfVÇBƒ’Ö‚&7W'&VçE÷W6vUö6÷VçB"¢&W6WDBFFUF–ÖSòÖ‚'&W6WEöB"¢7&VFVDBFFUF–ÖRFVfVÇB†æ÷r‚’’Ö‚&7&VFVEöB"¢WFFVDBFFUF–ÖRWFFVDBÖ‚'WFFVEöB" ¢Væ—VR…·7V'67&—F–öä–BÂfVGW&T¶W•Ò¢Ö‚&fVGW&U÷W6vW2"§Ğ ¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ¢òò4òÕ”ÄõB„'&æB†öÖR6†BVæv–æR¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ ¦ÖöFVÂ6õ–Æ÷EF‡&VB°¢–B7G&–ær–BFVfVÇB‡WV–B‚’¢'&æE&öf–ÆT–B7G&–ærÖ‚&'&æE÷&öf–ÆUö–B"¢'&æE&öf–ÆR'&æE&öf–ÆR&VÆF–öâ†f–VÆG3¢¶'&æE&öf–ÆT–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢7&VFVD'•W6W$–B7G&–ærÖ‚&7&VFVEö'•÷W6W%ö–B"¢7&VFVD'•W6W"W6W"&VÆF–öâ†f–VÆG3¢¶7&VFVD'•W6W$–EÒÂ&VfW&Væ6W3¢¶–EÒ¢F—FÆR7G&–æp¢66÷T6öçFW‡B6õ–Æ÷E66÷T6öçFW‡BFVfVÇB„%$äEô4TåE$R’Ö‚'66÷Uö6öçFW‡B"¢Æ–æ¶VDVçF—G•G—R6õ–Æ÷DÆ–æ¶VDVçF—G•G—RFVfVÇB„äôäR’Ö‚&Æ–æ¶VEöVçF—G•÷G—R"¢Æ–æ¶VDVçF—G”–B7G&–æsòÖ‚&Æ–æ¶VEöVçF—G•ö–B"¢&6†—fVDBFFUF–ÖSòÖ‚&&6†—fVEöB"¢Æ7DÖW76vTBFFUF–ÖRÖ‚&Æ7EöÖW76vUöB"¢7&VFVDBFFUF–ÖRFVfVÇB†æ÷r‚’’Ö‚&7&VFVEöB"¢WFFVDBFFUF–ÖRWFFVDBÖ‚'WFFVEöB" ¢ÖW76vW26õ–Æ÷DÖW76vUµĞ¢ÖW76vTfVVF&6²6õ–Æ÷DÖW76vTfVVF&6µµĞ¢6Æ÷E6W76–öâ6õ–Æ÷E6Æ÷E6W76–öãğ¢–çFW&7F–öäÆöw26õ–Æ÷D–çFW&7F–öäÆöuµÒ&VÆF–öâ‚$6õ–Æ÷EF‡&VDÆöw2" ¢–æFW‚…¶'&æE&öf–ÆT–BÂÆ7DÖW76vTB‡6÷'C¢FW62•Ò¢–æFW‚…¶'&æE&öf–ÆT–BÂ&6†—fVDEÒ¢Ö‚&6õ÷–Æ÷E÷F‡&VG2"§Ğ ¦VçVÒ6õ–Æ÷DfVVF&6µ&F–ær°¢D…TÔ%5õU ¢D…TÔ%5ôDõtà§Ğ ¦ÖöFVÂ6õ–Æ÷DÖW76vR°¢–B7G&–ær–BFVfVÇB‡WV–B‚’¢F‡&VD–B7G&–ærÖ‚'F‡&VEö–B"¢F‡&VB6õ–Æ÷EF‡&VB&VÆF–öâ†f–VÆG3¢·F‡&VD–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢&öÆR6õ–Æ÷DÖW76vU&öÆP¢FW‡D6öçFVçB7G&–æsòÖ‚'FW‡Eö6öçFVçB"’F"åFW‡@¢–ÆöD§6öâ§6öãòÖ‚'–ÆöEö§6öâ"¢f÷&ÖEG—R6õ–Æ÷Df÷&ÖEG—SòÖ‚&f÷&ÖE÷G—R"¢7&VFVDBFFUF–ÖRFVfVÇB†æ÷r‚’’Ö‚&7&VFVEöB"¢fVVF&6²6õ–Æ÷DÖW76vTfVVF&6³ğ ¢–æFW‚…·F‡&VD–BÂ7&VFVDEÒ¢Ö‚&6õ÷–Æ÷EöÖW76vW2"§Ğ ¦ÖöFVÂ6õ–Æ÷DÖW76vTfVVF&6²°¢–B7G&–ær–BFVfVÇB‡WV–B‚’¢ÖW76vT–B7G&–ærVæ—VRÖ‚&ÖW76vUö–B"¢ÖW76vR6õ–Æ÷DÖW76vR&VÆF–öâ†f–VÆG3¢¶ÖW76vT–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢F‡&VD–B7G&–ærÖ‚'F‡&VEö–B"¢F‡&VB6õ–Æ÷EF‡&VB&VÆF–öâ†f–VÆG3¢·F‡&VD–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢'&æE&öf–ÆT–B7G&–ærÖ‚&'&æE÷&öf–ÆUö–B"¢'&æE&öf–ÆR'&æE&öf–ÆR&VÆF–öâ†f–VÆG3¢¶'&æE&öf–ÆT–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢W6W$–B7G&–ærÖ‚'W6W%ö–B"¢W6W"W6W"&VÆF–öâ†f–VÆG3¢·W6W$–EÒÂ&VfW&Væ6W3¢¶–EÒ¢&F–ær6õ–Æ÷DfVVF&6µ&F–æp¢&V6öâ7G&–æsğ¢7&VFVDBFFUF–ÖRFVfVÇB†æ÷r‚’’Ö‚&7&VFVEöB" ¢–æFW‚…¶'&æE&öf–ÆT–BÂ7&VFVDEÒ¢Ö‚&6õ÷–Æ÷EöÖW76vUöfVVF&6²"§Ğ ¦ÖöFVÂ6õ–Æ÷E6Æ÷E6W76–öâ°¢–B7G&–ær–BFVfVÇB‡WV–B‚’¢F‡&VD–B7G&–ærVæ—VRÖ‚'F‡&VEö–B"¢F‡&VB6õ–Æ÷EF‡&VB&VÆF–öâ†f–VÆG3¢·F‡&VD–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢–çFVçEv÷&·76T6öçFW‡B7G&–ærÖ‚&–çFVçE÷v÷&·76Uö6öçFW‡B"¢7FvVE–ÆöB§6öâÖ‚'7FvVE÷–ÆöB"¢Ö—76–æu6Æ÷G2§6öâÖ‚&Ö—76–æu÷6Æ÷G2"¢W‡—&W4BFFUF–ÖRÖ‚&W‡—&W5öB"¢7&VFVDBFFUF–ÖRFVfVÇB†æ÷r‚’’Ö‚&7&VFVEöB"¢WFFVDBFFUF–ÖRWFFVDBÖ‚'WFFVEöB" ¢Ö‚&6õ÷–Æ÷E÷6Æ÷E÷6W76–öç2"§Ğ ¦ÖöFVÂ6õ–Æ÷D–çFW&7F–öäÆör°¢–B7G&–ær–BFVfVÇB‡WV–B‚’¢'&æE&öf–ÆT–B7G&–ærÖ‚&'&æE÷&öf–ÆUö–B"¢'&æE&öf–ÆR'&æE&öf–ÆR&VÆF–öâ†f–VÆG3¢¶'&æE&öf–ÆT–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢W6W$–B7G&–ærÖ‚'W6W%ö–B"¢F‡&VD–B7G&–æsòÖ‚'F‡&VEö–B"¢F‡&VB6õ–Æ÷EF‡&VCò&VÆF–öâ‚$6õ–Æ÷EF‡&VDÆöw2"Âf–VÆG3¢·F‡&VD–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢6WDçVÆÂ¢ÖW76vT–B7G&–æsòÖ‚&ÖW76vUö–B"¢66÷T6öçFW‡B6õ–Æ÷E66÷T6öçFW‡BÖ‚'66÷Uö6öçFW‡B"¢–çFVçD¶W’7G&–æsòÖ‚&–çFVçEö¶W’"¢ÖöFVÄ–B7G&–ærÖ‚&ÖöFVÅö–B"¢–çWEFö¶Vç2–çCòÖ‚&–çWE÷Fö¶Vç2"¢÷WGWEFö¶Vç2–çCòÖ‚&÷WGWE÷Fö¶Vç2"¢W7F–ÖFVD6÷7DÖ–æ÷"–çCòÖ‚&W7F–ÖFVEö6÷7EöÖ–æ÷""¢FööÇ4–çfö¶VB7G&–æuµÒFVfVÇB…µÒ’Ö‚'FööÇ5ö–çfö¶VB"¢7FGW26õ–Æ÷D–çFW&7F–öå7FGW0¢ÆFVæ7”×2–çCòÖ‚&ÆFVæ7•ö×2"¢–FV×÷FVæ7”¶W’7G&–æsòÖ‚&–FV×÷FVæ7•ö¶W’"¢W'&÷$6öFR7G&–æsòÖ‚&W'&÷%ö6öFR"¢7&VFVDBFFUF–ÖRFVfVÇB†æ÷r‚’’Ö‚&7&VFVEöB" ¢–æFW‚…¶'&æE&öf–ÆT–BÂ7&VFVDEÒ¢Ö‚&6õ÷–Æ÷Eö–çFW&7F–öåöÆöw2"§Ğ ¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ¢òò5$TDõ"4òÕ”ÄõB„7&VF÷"6öÖÖæB6VçFW"6†BVæv–æR¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ ¦ÖöFVÂ7&VF÷$6õ–Æ÷EF‡&VB°¢–B7G&–ær–BFVfVÇB‡WV–B‚’¢7&VF÷%&öf–ÆT–B7G&–ærÖ‚&7&VF÷%÷&öf–ÆUö–B"¢7&VF÷%&öf–ÆR7&VF÷%&öf–ÆR&VÆF–öâ†f–VÆG3¢¶7&VF÷%&öf–ÆT–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢7&VFVD'•W6W$–B7G&–ærÖ‚&7&VFVEö'•÷W6W%ö–B"¢7&VFVD'•W6W"W6W"&VÆF–öâ‚$7&VF÷$6õ–Æ÷EF‡&VDWF†÷""Âf–VÆG3¢¶7&VFVD'•W6W$–EÒÂ&VfW&Væ6W3¢¶–EÒ¢F—FÆR7G&–æp¢66÷T6öçFW‡B7&VF÷$6õ–Æ÷E66÷T6öçFW‡BFVfVÇB„4ôÔÔäEô4TåDU"’Ö‚'66÷Uö6öçFW‡B"¢Æ–æ¶VDVçF—G•G—R7&VF÷$6õ–Æ÷DÆ–æ¶VDVçF—G•G—RFVfVÇB„äôäR’Ö‚&Æ–æ¶VEöVçF—G•÷G—R"¢Æ–æ¶VDVçF—G”–B7G&–æsòÖ‚&Æ–æ¶VEöVçF—G•ö–B"¢&6†—fVDBFFUF–ÖSòÖ‚&&6†—fVEöB"¢Æ7DÖW76vTBFFUF–ÖRÖ‚&Æ7EöÖW76vUöB"¢7&VFVDBFFUF–ÖRFVfVÇB†æ÷r‚’’Ö‚&7&VFVEöB"¢WFFVDBFFUF–ÖRWFFVDBÖ‚'WFFVEöB" ¢ÖW76vW27&VF÷$6õ–Æ÷DÖW76vUµĞ¢ÖW76vTfVVF&6²7&VF÷$6õ–Æ÷DÖW76vTfVVF&6µµĞ¢6Æ÷E6W76–öâ7&VF÷$6õ–Æ÷E6Æ÷E6W76–öãğ¢–çFW&7F–öäÆöw27&VF÷$6õ–Æ÷D–çFW&7F–öäÆöuµÒ&VÆF–öâ‚$7&VF÷$6õ–Æ÷EF‡&VDÆöw2" ¢–æFW‚…¶7&VF÷%&öf–ÆT–BÂÆ7DÖW76vTB‡6÷'C¢FW62•Ò¢–æFW‚…¶7&VF÷%&öf–ÆT–BÂ&6†—fVDEÒ¢Ö‚&7&VF÷%ö6õ÷–Æ÷E÷F‡&VG2"§Ğ ¦ÖöFVÂ7&VF÷$6õ–Æ÷DÖW76vR°¢–B7G&–ær–BFVfVÇB‡WV–B‚’¢F‡&VD–B7G&–ærÖ‚'F‡&VEö–B"¢F‡&VB7&VF÷$6õ–Æ÷EF‡&VB&VÆF–öâ†f–VÆG3¢·F‡&VD–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢&öÆR6õ–Æ÷DÖW76vU&öÆP¢FW‡D6öçFVçB7G&–æsòÖ‚'FW‡Eö6öçFVçB"’F"åFW‡@¢–ÆöD§6öâ§6öãòÖ‚'–ÆöEö§6öâ"¢f÷&ÖEG—R6õ–Æ÷Df÷&ÖEG—SòÖ‚&f÷&ÖE÷G—R"¢7&VFVDBFFUF–ÖRFVfVÇB†æ÷r‚’’Ö‚&7&VFVEöB"¢fVVF&6²7&VF÷$6õ–Æ÷DÖW76vTfVVF&6³ğ ¢–æFW‚…·F‡&VD–BÂ7&VFVDEÒ¢Ö‚&7&VF÷%ö6õ÷–Æ÷EöÖW76vW2"§Ğ ¦ÖöFVÂ7&VF÷$6õ–Æ÷DÖW76vTfVVF&6²°¢–B7G&–ær–BFVfVÇB‡WV–B‚’¢ÖW76vT–B7G&–ærVæ—VRÖ‚&ÖW76vUö–B"¢ÖW76vR7&VF÷$6õ–Æ÷DÖW76vR&VÆF–öâ†f–VÆG3¢¶ÖW76vT–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢F‡&VD–B7G&–ærÖ‚'F‡&VEö–B"¢F‡&VB7&VF÷$6õ–Æ÷EF‡&VB&VÆF–öâ†f–VÆG3¢·F‡&VD–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢7&VF÷%&öf–ÆT–B7G&–ærÖ‚&7&VF÷%÷&öf–ÆUö–B"¢7&VF÷%&öf–ÆR7&VF÷%&öf–ÆR&VÆF–öâ†f–VÆG3¢¶7&VF÷%&öf–ÆT–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢W6W$–B7G&–ærÖ‚'W6W%ö–B"¢W6W"W6W"&VÆF–öâ†f–VÆG3¢·W6W$–EÒÂ&VfW&Væ6W3¢¶–EÒ¢&F–ær6õ–Æ÷DfVVF&6µ&F–æp¢&V6öâ7G&–æsğ¢7&VFVDBFFUF–ÖRFVfVÇB†æ÷r‚’’Ö‚&7&VFVEöB" ¢–æFW‚…¶7&VF÷%&öf–ÆT–BÂ7&VFVDEÒ¢Ö‚&7&VF÷%ö6õ÷–Æ÷EöÖW76vUöfVVF&6²"§Ğ ¦ÖöFVÂ7&VF÷$6õ–Æ÷E6Æ÷E6W76–öâ°¢–B7G&–ær–BFVfVÇB‡WV–B‚’¢F‡&VD–B7G&–ærVæ—VRÖ‚'F‡&VEö–B"¢F‡&VB7&VF÷$6õ–Æ÷EF‡&VB&VÆF–öâ†f–VÆG3¢·F‡&VD–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢–çFVçEv÷&·76T6öçFW‡B7G&–ærÖ‚&–çFVçE÷v÷&·76Uö6öçFW‡B"¢7FvVE–ÆöB§6öâÖ‚'7FvVE÷–ÆöB"¢Ö—76–æu6Æ÷G2§6öâÖ‚&Ö—76–æu÷6Æ÷G2"¢W‡—&W4BFFUF–ÖRÖ‚&W‡—&W5öB"¢7&VFVDBFFUF–ÖRFVfVÇB†æ÷r‚’’Ö‚&7&VFVEöB"¢WFFVDBFFUF–ÖRWFFVDBÖ‚'WFFVEöB" ¢Ö‚&7&VF÷%ö6õ÷–Æ÷E÷6Æ÷E÷6W76–öç2"§Ğ ¦ÖöFVÂ7&VF÷$6õ–Æ÷D–çFW&7F–öäÆör°¢–B7G&–ær–BFVfVÇB‡WV–B‚’¢7&VF÷%&öf–ÆT–B7G&–ærÖ‚&7&VF÷%÷&öf–ÆUö–B"¢7&VF÷%&öf–ÆR7&VF÷%&öf–ÆR&VÆF–öâ†f–VÆG3¢¶7&VF÷%&öf–ÆT–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢W6W$–B7G&–ærÖ‚'W6W%ö–B"¢F‡&VD–B7G&–æsòÖ‚'F‡&VEö–B"¢F‡&VB7&VF÷$6õ–Æ÷EF‡&VCò&VÆF–öâ‚$7&VF÷$6õ–Æ÷EF‡&VDÆöw2"Âf–VÆG3¢·F‡&VD–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢6WDçVÆÂ¢ÖW76vT–B7G&–æsòÖ‚&ÖW76vUö–B"¢66÷T6öçFW‡B7&VF÷$6õ–Æ÷E66÷T6öçFW‡BÖ‚'66÷Uö6öçFW‡B"¢–çFVçD¶W’7G&–æsòÖ‚&–çFVçEö¶W’"¢ÖöFVÄ–B7G&–ærÖ‚&ÖöFVÅö–B"¢–çWEFö¶Vç2–çCòÖ‚&–çWE÷Fö¶Vç2"¢÷WGWEFö¶Vç2–çCòÖ‚&÷WGWE÷Fö¶Vç2"¢W7F–ÖFVD6÷7DÖ–æ÷"–çCòÖ‚&W7F–ÖFVEö6÷7EöÖ–æ÷""¢FööÇ4–çfö¶VB7G&–æuµÒFVfVÇB…µÒ’Ö‚'FööÇ5ö–çfö¶VB"¢7FGW26õ–Æ÷D–çFW&7F–öå7FGW0¢ÆFVæ7”×2–çCòÖ‚&ÆFVæ7•ö×2"¢–FV×÷FVæ7”¶W’7G&–æsòÖ‚&–FV×÷FVæ7•ö¶W’"¢W'&÷$6öFR7G&–æsòÖ‚&W'&÷%ö6öFR"¢7&VFVDBFFUF–ÖRFVfVÇB†æ÷r‚’’Ö‚&7&VFVEöB" ¢–æFW‚…¶7&VF÷%&öf–ÆT–BÂ7&VFVDEÒ¢Ö‚&7&VF÷%ö6õ÷–Æ÷Eö–çFW&7F–öåöÆöw2"§Ğ ¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ¢òòäõD”d”4D”ôå2ÔôETÄR…†6R(	B÷7Fw&W2¦ö"VWVRÂæò&VF—2¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ ¦ÖöFVÂæ÷F–f–6F–öâ°¢–B7G&–ær–BFVfVÇB‡WV–B‚’¢v÷&·76T–B7G&–ærÖ‚'v÷&·76Uö–B"¢'&æE&öf–ÆR'&æE&öf–ÆR&VÆF–öâ†f–VÆG3¢·v÷&·76T–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢G&–vvW%W6W$–B7G&–æsòÖ‚'G&–vvW%÷W6W%ö–B"¢G&–vvW%W6W"W6W#ò&VÆF–öâ‚$æ÷F–f–6F–öåG&–vvW%W6W""Âf–VÆG3¢·G&–vvW%W6W$–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢6WDçVÆÂ¢WfVçEG—R7G&–ærÖ‚&WfVçE÷G—R"’F"åf$6†"ƒ¢W&vVæ7”ÆWfVÂæ÷F–f–6F–öåW&vVæ7”ÆWfVÂÖ‚'W&vVæ7•öÆWfVÂ"¢–ÆöB§6öà¢7&VFVDBFFUF–ÖRFVfVÇB†æ÷r‚’’Ö‚&7&VFVEöB"¢WFFVDBFFUF–ÖRWFFVDBÖ‚'WFFVEöB" ¢&V6—–VçG2æ÷F–f–6F–öå&V6—–VçEµĞ ¢–æFW‚…·v÷&·76T–EÒ¢–æFW‚…·v÷&·76T–BÂWfVçEG—RÂ7&VFVDEÒ¢Ö‚&æ÷F–f–6F–öç2"§Ğ ¦ÖöFVÂæ÷F–f–6F–öå&V6—–VçB°¢–B7G&–ær–BFVfVÇB‡WV–B‚’¢æ÷F–f–6F–öä–B7G&–ærÖ‚&æ÷F–f–6F–öåö–B"¢æ÷F–f–6F–öâæ÷F–f–6F–öâ&VÆF–öâ†f–VÆG3¢¶æ÷F–f–6F–öä–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢W6W$–B7G&–ærÖ‚'W6W%ö–B"¢W6W"W6W"&VÆF–öâ†f–VÆG3¢·W6W$–EÒÂ&VfW&Væ6W3¢¶–EÒÂöäFVÆWFS¢666FR¢—5&VB&ööÆVâFVfVÇB†fÇ6R’Ö‚&—5÷&VB"¢—4VÖ–ÆVB&ööÆVâFVfVÇB†fÇ6R’Ö‚&—5öVÖ–ÆVB"¢&VDBFFUF–ÖSòÖ‚'&VEöB" ¢Væ—VR…¶æ÷F–f–6F–öä–BÂW6W$–EÒ¢–æFW‚…·W6W$–BÂ—5&VEÒ¢Ö‚&æ÷F–f–6F–öå÷&V6—–VçG2"§Ğ ¦ÖöFVÂæ÷F–f–6F–öä¦ö"°¢–B7G&–ær–BFVfVÇB‡WV–B‚’¢v÷&·76T–B7G&–ærÖ‚'v÷&·76Uö–B"¢WfVçEG—R7G&–ærÖ‚&WfVçE÷G—R"’F"åf$6†"ƒ¢W&vVæ7”ÆWfVÂæ÷F–f–6F–öåW&vVæ7”ÆWfVÂÖ‚'W&vVæ7•öÆWfVÂ"¢G&–vvW%W6W$–B7G&–æsòÖ‚'G&–vvW%÷W6W%ö–B"¢–ÆöB§6öà¢7F÷$æÖR7G&–æsòÖ‚&7F÷%öæÖR"’F"åf$6†"ƒ#¢7FGW2æ÷F–f–6F–öä¦ö%7FGW2FVfVÇB…TäD”är¢GFV×G2–çBFVfVÇBƒ¢Ö„GFV×G2–çBFVfVÇBƒR’Ö‚&Ö…öGFV×G2"¢66†VGVÆVDBFFUF–ÖRFVfVÇB†æ÷r‚’’Ö‚'66†VGVÆVEöB"¢Æö6¶VDBFFUF–ÖSòÖ‚&Æö6¶VEöB"¢Æö6¶VD'’7G&–æsòÖ‚&Æö6¶VEö'’"’F"åf$6†"ƒ¢Æ7DW'&÷"7G&–æsòÖ‚&Æ7EöW'&÷""’F"åFW‡@¢6ö×ÆWFVDBFFUF–ÖSòÖ‚&6ö×ÆWFVEöB"¢7&VFVDBFFUF–ÖRFVfVÇB†æ÷r‚’’Ö‚&7&VFVEöB" ¢–æFW‚…·7FGW2Â66†VGVÆVDEÒ¢Ö‚&æ÷F–f–6F–öåö¦ö'2"§Ğ 

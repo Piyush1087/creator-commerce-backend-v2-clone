@@ -366,14 +366,9 @@ export class CanonicalCampaignCreateService {
         },
       });
 
-      await tx.uceCampaignReportingSnapshot.upsert({
-        where: { campaignId },
-        create: {
+      await tx.uceCampaignReportingSnapshot.create({
+        data: {
           campaignId,
-          primaryObjective: legacyObjective(objective),
-          lastApiSyncTimestamp: new Date(),
-        },
-        update: {
           primaryObjective: legacyObjective(objective),
           lastApiSyncTimestamp: new Date(),
         },
