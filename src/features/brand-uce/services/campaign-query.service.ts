@@ -49,7 +49,21 @@ export class CampaignQueryService {
       throw new NotFoundException("Campaign not found");
     }
 
-    const executionReady = await this.resolveExecutionReady(campaignId);
+    const [executionReady, applicationCounts, provenanceRows] = await Promise.all([
+      this.resolveExecutionReady(campaignId),
+      this.resolveApplicationCounts(campaignId),
+      this.prisma.$queryRaw<Array<{ creation_source: string | null }>>`
+        SELECT "creation_source"
+        FROM "uce_campaigns"
+        WHERE "id" = ${campaignId}
+        LIMIT 1
+      `,
+    ]);
+    const creationSource =
+      provenanceRows[0]?.creation_source === "AI_RECOMMENDED"
+        ? ("AI_RECOMMENDED" as const)
+        : ("MANUAL" as const);
+
     const status = campaign.status;
     const isLive = status === UceCampaignStatus.LIVE;
     const operational = isLive && executionReady;
@@ -84,27 +98,27 @@ export class CampaignQueryService {
     });
 
     const share = operational ? enabled : disabled;
-    const applicantStatuses: UceCollabStatus[] = [
-      UceCollabStatus.APPLICANT_PENDING,
-      UceCollabStatus.APPLICANT_SHORTLISTED,
-      UceCollabStatus.APPLICANT_REJECTED,
-      UceCollabStatus.ACTIVE_WORKFLOW,
-    ];
     const discoveryStatuses: UceCollabStatus[] = [
       UceCollabStatus.PROSPECT_CURATED,
       UceCollabStatus.PROSPECT_INVITED,
     ];
-    const applicantsInstantiated = campaign.collaborations.some((c) =>
-      applicantStatuses.includes(c.collabStatus),
-    );
+    const collaborationStatuses: UceCollabStatus[] = [
+      UceCollabStatus.ACTIVE_WORKFLOW,
+    ];
     const discoveryInstantiated = campaign.collaborations.some((c) =>
       discoveryStatuses.includes(c.collabStatus),
     );
+    const collaborationsInstantiated = campaign.collaborations.some((c) =>
+      collaborationStatuses.includes(c.collabStatus),
+    );
+    const applicantsInstantiated = applicationCounts.total > 0;
     const preserveOperationalWorkspaces = isLive || paused || historical;
     const discoveryVisible =
       preserveOperationalWorkspaces && (discoveryInstantiated || operational);
     const applicantsVisible =
       preserveOperationalWorkspaces && applicantsInstantiated;
+    const collaborationsVisible =
+      preserveOperationalWorkspaces && collaborationsInstantiated;
     const reportingAvailable = isLive || paused || historical;
 
     return {
@@ -112,7 +126,7 @@ export class CampaignQueryService {
         id: campaign.id,
         name: campaign.name,
         lifecycleStatus: status,
-        creationSource: "MANUAL" as const,
+        creationSource,
         productCount: activeProducts.length,
         briefCount: activeBriefCount,
         capabilities: {
@@ -159,7 +173,9 @@ export class CampaignQueryService {
         label: "Campaign Copilot",
         summary:
           operational || paused
-            ? "Prioritize highest-match prospects and pending applicants."
+            ? creationSource === "AI_RECOMMENDED"
+              ? "Continue the AI-recommended Campaign with current creator and applicant signals."
+              : "Prioritize highest-match prospects and pending applicants."
             : undefined,
         actions: operational
           ? [
@@ -189,9 +205,7 @@ export class CampaignQueryService {
               {
                 metricId: "applicants",
                 label: "Applicants",
-                value: String(
-                  campaign.performanceAggregate?.totalApplicantsCount ?? 0,
-                ),
+                value: String(applicationCounts.total),
                 tone: "attention" as const,
               },
             ]
@@ -211,15 +225,17 @@ export class CampaignQueryService {
           state: (applicantsVisible ? "READY" : "UNAVAILABLE") as SurfaceState,
           instantiated: applicantsInstantiated,
           visible: applicantsVisible,
-          count: campaign.performanceAggregate?.totalApplicantsCount ?? 0,
+          count: applicationCounts.total,
+          pendingCount: applicationCounts.pending,
+          rejectedCount: applicationCounts.rejected,
           expand: applicantsVisible ? enabled : disabled,
         },
         {
           workspace: "COLLABORATIONS" as const,
-          state: "UNAVAILABLE" as SurfaceState,
-          instantiated: false,
-          visible: false,
-          expand: hidden,
+          state: (collaborationsVisible ? "READY" : "UNAVAILABLE") as SurfaceState,
+          instantiated: collaborationsInstantiated,
+          visible: collaborationsVisible,
+          expand: collaborationsVisible ? enabled : hidden,
         },
       ],
       share: {
@@ -244,8 +260,6 @@ export class CampaignQueryService {
 
   async getDiscovery(brandProfileId: string, campaignId: string) {
     await this.requireOwned(brandProfileId, campaignId);
-    // Backfill CampaignCreator from legacy prospect collaborations.
-    await this.applications.syncFromLegacyCollaborations(campaignId);
     const rows = await this.prisma.uceCampaignCollaboration.findMany({
       where: {
         campaignId,
@@ -418,13 +432,23 @@ export class CampaignQueryService {
   }
 
   private async resolveExecutionReady(campaignId: string): Promise<boolean> {
-    const [productCount, briefCount, commercials] = await Promise.all([
-      this.prisma.uceCampaignProduct.count({ where: { campaignId } }),
-      this.prisma.uceCampaignBrief.count({ where: { campaignId } }),
-      this.prisma.uceCampaignCommercials.findUnique({ where: { campaignId } }),
+    const activeAssetWithBrief = await this.prisma.uceCampaignProduct.findFirst({
+      where: {
+        campaignId,
+        isActive: true,
+        briefs: { some: { isActive: true } },
+      },
+      select: { id: true },
+    });
+    return activeAssetWithBrief != null;
+  }
+
+  private async resolveApplicationCounts(campaignId: string) {
+    const [total, pending, rejected] = await Promise.all([
+      this.prisma.uceApplication.count({ where: { campaignId } }),
+      this.prisma.uceApplication.count({ where: { campaignId, status: "PENDING" } }),
+      this.prisma.uceApplication.count({ where: { campaignId, status: "REJECTED" } }),
     ]);
-    const budgetOk =
-      commercials != null && Number(commercials.totalCampaignBudgetPool) > 0;
-    return productCount >= 1 && briefCount >= 1 && budgetOk;
+    return { total, pending, rejected };
   }
 }
