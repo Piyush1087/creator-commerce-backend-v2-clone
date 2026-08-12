@@ -32,6 +32,15 @@ export class CampaignQueryService {
     const campaign = await this.prisma.uceCampaign.findFirst({
       where: { id: campaignId, brandProfileId },
       include: {
+        assets: {
+          orderBy: { createdAt: "asc" },
+          include: {
+            brandProfile: { select: { name: true } },
+            offering: { select: { name: true } },
+            brandOffer: { select: { offerName: true } },
+            briefs: { orderBy: { createdAt: "asc" } },
+          },
+        },
         products: {
           orderBy: { createdAt: "asc" },
           include: { briefs: { orderBy: { createdAt: "asc" } } },
@@ -49,16 +58,17 @@ export class CampaignQueryService {
       throw new NotFoundException("Campaign not found");
     }
 
-    const [executionReady, applicationCounts, provenanceRows] = await Promise.all([
-      this.resolveExecutionReady(campaignId),
-      this.resolveApplicationCounts(campaignId),
-      this.prisma.$queryRaw<Array<{ creation_source: string | null }>>`
+    const [executionReady, applicationCounts, provenanceRows] =
+      await Promise.all([
+        this.resolveExecutionReady(campaignId),
+        this.resolveApplicationCounts(campaignId),
+        this.prisma.$queryRaw<Array<{ creation_source: string | null }>>`
         SELECT "creation_source"
         FROM "uce_campaigns"
         WHERE "id" = ${campaignId}
         LIMIT 1
       `,
-    ]);
+      ]);
     const creationSource =
       provenanceRows[0]?.creation_source === "AI_RECOMMENDED"
         ? ("AI_RECOMMENDED" as const)
@@ -74,20 +84,26 @@ export class CampaignQueryService {
     const postLiveReadinessBlocked = isLive && !executionReady;
     const published = status === UceCampaignStatus.PUBLISHED;
 
-    const products = campaign.products.map((product) => ({
-      campaignAssetId: product.id,
-      name: product.productName,
-      status: product.isActive ? ("ACTIVE" as const) : ("PAUSED" as const),
-      briefs: product.briefs.map((brief) => ({
+    const products = campaign.assets.map((asset) => ({
+      campaignAssetId: asset.id,
+      kind: asset.kind,
+      name:
+        asset.brandProfile?.name ??
+        asset.offering?.name ??
+        asset.brandOffer?.offerName ??
+        "Campaign Asset",
+      status: asset.status,
+      briefs: asset.briefs.map((brief) => ({
         briefId: brief.id,
-        name: brief.internalTitle,
-        status: brief.isActive ? ("PUBLISHED" as const) : ("PAUSED" as const),
+        name: brief.briefName ?? "Campaign Brief",
+        status: brief.status,
       })),
     }));
     const activeProducts = products.filter((p) => p.status === "ACTIVE");
     const activeBriefCount = activeProducts.reduce(
       (n, product) =>
-        n + product.briefs.filter((brief) => brief.status === "PUBLISHED").length,
+        n +
+        product.briefs.filter((brief) => brief.status === "PUBLISHED").length,
       0,
     );
 
@@ -216,7 +232,9 @@ export class CampaignQueryService {
         },
         {
           workspace: "COLLABORATIONS" as const,
-          state: (collaborationsVisible ? "READY" : "UNAVAILABLE") as SurfaceState,
+          state: (collaborationsVisible
+            ? "READY"
+            : "UNAVAILABLE") as SurfaceState,
           instantiated: collaborationsInstantiated,
           visible: collaborationsVisible,
           expand: collaborationsVisible ? enabled : hidden,
@@ -318,23 +336,55 @@ export class CampaignQueryService {
     campaignAssetId: string,
   ) {
     await this.requireOwned(brandProfileId, campaignId);
-    const product = await this.prisma.uceCampaignProduct.findFirst({
+    const asset = await this.prisma.uceCampaignAsset.findFirst({
       where: { id: campaignAssetId, campaignId },
-      include: { briefs: { orderBy: { createdAt: "asc" } } },
+      include: {
+        brandProfile: { select: { name: true } },
+        offering: { select: { name: true } },
+        brandOffer: { select: { offerName: true } },
+        briefs: { orderBy: { createdAt: "asc" } },
+      },
     });
-    if (!product) throw new NotFoundException("Product not found");
+    if (!asset) {
+      const legacyProduct = await this.prisma.uceCampaignProduct.findFirst({
+        where: { id: campaignAssetId, campaignId },
+        include: { briefs: { orderBy: { createdAt: "asc" } } },
+      });
+      if (!legacyProduct)
+        throw new NotFoundException("Campaign Asset not found");
+      return {
+        state: "READY" as SurfaceState,
+        authority: "LEGACY_COMPATIBILITY" as const,
+        campaignAssetId: legacyProduct.id,
+        name: legacyProduct.productName,
+        status: legacyProduct.isActive
+          ? ("ACTIVE" as const)
+          : ("PAUSED" as const),
+        skuCode: legacyProduct.skuCode,
+        inventoryCount: legacyProduct.inventoryCount,
+        imageUrl: legacyProduct.imageUrl,
+        briefs: legacyProduct.briefs.map((brief) => ({
+          briefId: brief.id,
+          name: brief.internalTitle,
+          status: brief.isActive ? ("PUBLISHED" as const) : ("PAUSED" as const),
+        })),
+      };
+    }
     return {
       state: "READY" as SurfaceState,
-      campaignAssetId: product.id,
-      name: product.productName,
-      status: product.isActive ? ("ACTIVE" as const) : ("PAUSED" as const),
-      skuCode: product.skuCode,
-      inventoryCount: product.inventoryCount,
-      imageUrl: product.imageUrl,
-      briefs: product.briefs.map((brief) => ({
+      authority: "CANONICAL" as const,
+      campaignAssetId: asset.id,
+      kind: asset.kind,
+      name:
+        asset.brandProfile?.name ??
+        asset.offering?.name ??
+        asset.brandOffer?.offerName ??
+        "Campaign Asset",
+      status: asset.status,
+      briefs: asset.briefs.map((brief) => ({
         briefId: brief.id,
-        name: brief.internalTitle,
-        status: brief.isActive ? ("PUBLISHED" as const) : ("PAUSED" as const),
+        name: brief.briefName ?? "Campaign Brief",
+        status: brief.status,
       })),
     };
   }
@@ -345,22 +395,56 @@ export class CampaignQueryService {
     briefId: string,
   ) {
     await this.requireOwned(brandProfileId, campaignId);
-    const brief = await this.prisma.uceCampaignBrief.findFirst({
-      where: { id: briefId, campaignId },
-      include: { product: true },
+    const brief = await this.prisma.uceBrief.findFirst({
+      where: { id: briefId, campaignAsset: { campaignId } },
+      include: {
+        campaignAsset: {
+          include: {
+            brandProfile: { select: { name: true } },
+            offering: { select: { name: true } },
+            brandOffer: { select: { offerName: true } },
+          },
+        },
+        deliverables: { orderBy: { displayOrder: "asc" } },
+      },
     });
-    if (!brief) throw new NotFoundException("Brief not found");
+    if (!brief) {
+      const legacyBrief = await this.prisma.uceCampaignBrief.findFirst({
+        where: { id: briefId, campaignId },
+        include: { product: true },
+      });
+      if (!legacyBrief) throw new NotFoundException("Brief not found");
+      return {
+        state: "READY" as SurfaceState,
+        authority: "LEGACY_COMPATIBILITY" as const,
+        briefId: legacyBrief.id,
+        name: legacyBrief.internalTitle,
+        status: legacyBrief.isActive
+          ? ("PUBLISHED" as const)
+          : ("PAUSED" as const),
+        campaignAssetId: legacyBrief.productId,
+        productName: legacyBrief.product?.productName ?? null,
+        briefType: legacyBrief.briefType,
+        creativeGuidelines: legacyBrief.creativeGuidelines,
+        deliverableFormatTags: legacyBrief.deliverableFormatTags,
+        requiredPlatforms: legacyBrief.requiredPlatforms,
+      };
+    }
     return {
       state: "READY" as SurfaceState,
+      authority: "CANONICAL" as const,
       briefId: brief.id,
-      name: brief.internalTitle,
-      status: brief.isActive ? ("PUBLISHED" as const) : ("PAUSED" as const),
-      campaignAssetId: brief.productId,
-      productName: brief.product?.productName ?? null,
+      name: brief.briefName ?? "Campaign Brief",
+      status: brief.status,
+      campaignAssetId: brief.campaignAssetId,
+      productName:
+        brief.campaignAsset.brandProfile?.name ??
+        brief.campaignAsset.offering?.name ??
+        brief.campaignAsset.brandOffer?.offerName ??
+        null,
       briefType: brief.briefType,
-      creativeGuidelines: brief.creativeGuidelines,
-      deliverableFormatTags: brief.deliverableFormatTags,
-      requiredPlatforms: brief.requiredPlatforms,
+      creativeGuidelines: brief.creatorBrief,
+      deliverables: brief.deliverables,
     };
   }
 
@@ -383,6 +467,8 @@ export class CampaignQueryService {
             appliedAt: true,
             briefId: true,
             campaignAssetId: true,
+            canonicalCampaignAssetId: true,
+            canonicalBriefId: true,
           },
         },
       },
@@ -403,6 +489,8 @@ export class CampaignQueryService {
         appliedAt: app.appliedAt.toISOString(),
         briefId: app.briefId,
         campaignAssetId: app.campaignAssetId,
+        canonicalCampaignAssetId: app.canonicalCampaignAssetId,
+        canonicalBriefId: app.canonicalBriefId,
       })),
     };
   }
@@ -416,11 +504,11 @@ export class CampaignQueryService {
   }
 
   private async resolveExecutionReady(campaignId: string): Promise<boolean> {
-    const activeAssetWithBrief = await this.prisma.uceCampaignProduct.findFirst({
+    const activeAssetWithBrief = await this.prisma.uceCampaignAsset.findFirst({
       where: {
         campaignId,
-        isActive: true,
-        briefs: { some: { isActive: true } },
+        status: "ACTIVE",
+        briefs: { some: { status: "PUBLISHED" } },
       },
       select: { id: true },
     });
@@ -430,8 +518,12 @@ export class CampaignQueryService {
   private async resolveApplicationCounts(campaignId: string) {
     const [total, pending, rejected] = await Promise.all([
       this.prisma.uceApplication.count({ where: { campaignId } }),
-      this.prisma.uceApplication.count({ where: { campaignId, status: "PENDING" } }),
-      this.prisma.uceApplication.count({ where: { campaignId, status: "REJECTED" } }),
+      this.prisma.uceApplication.count({
+        where: { campaignId, status: "PENDING" },
+      }),
+      this.prisma.uceApplication.count({
+        where: { campaignId, status: "REJECTED" },
+      }),
     ]);
     return { total, pending, rejected };
   }

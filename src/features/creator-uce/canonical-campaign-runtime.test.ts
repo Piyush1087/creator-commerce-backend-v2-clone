@@ -13,7 +13,12 @@ import { BrandUceAccessService } from "../brand-uce/services/brand-uce-access.se
 import { BrandUceBriefService } from "../brand-uce/services/brand-uce-brief.service";
 import { BrandUceCampaignService } from "../brand-uce/services/brand-uce-campaign.service";
 import { BrandUceProductService } from "../brand-uce/services/brand-uce-product.service";
+import { BrandUcePipelineService } from "../brand-uce/services/brand-uce-pipeline.service";
 import { CampaignApplicationService } from "../brand-uce/services/campaign-application.service";
+import { CampaignCommandService } from "../brand-uce/services/campaign-command.service";
+import { CampaignQueryService } from "../brand-uce/services/campaign-query.service";
+import { CanonicalCampaignCreateService } from "../brand-uce/services/canonical-campaign-create.service";
+import { CanonicalCampaignDraftReadService } from "../brand-uce/services/canonical-campaign-draft-read.service";
 import { CollaborationProvisionService } from "../collaboration/services/collaboration-provision.service";
 import { CreatorUceCampaignsService } from "./services/creator-uce-campaigns.service";
 
@@ -21,6 +26,9 @@ const IDS = {
   brand: "f6c00000-0000-4000-8000-000000000001",
   offering: "f6c00000-0000-4000-8000-000000000002",
   creatorUser: "f6c00000-0000-4000-8000-000000000003",
+  secondCreatorUser: "f6c00000-0000-4000-8000-000000000004",
+  organization: "f6c00000-0000-4000-8000-000000000005",
+  brandOwnerUser: "f6c00000-0000-4000-8000-000000000006",
   noAsset: "f6c00000-0000-4000-8000-000000000010",
   assetOnly: "f6c00000-0000-4000-8000-000000000011",
   legacyOnly: "f6c00000-0000-4000-8000-000000000012",
@@ -47,17 +55,73 @@ const creatorCampaigns = new CreatorUceCampaignsService(
 );
 const realtime = { broadcast: async () => undefined };
 const provision = new CollaborationProvisionService(prisma, realtime as never);
+const pipeline = new BrandUcePipelineService(prisma, access, provision);
 const applicationService = new CampaignApplicationService(
   prisma,
   access,
-  {} as never,
+  pipeline,
   provision,
 );
+const campaignQuery = new CampaignQueryService(prisma, applicationService);
+const campaignCommands = new CampaignCommandService(
+  prisma,
+  access,
+  campaignQuery,
+);
+const canonicalCreate = new CanonicalCampaignCreateService(prisma, campaigns);
+const canonicalDraftRead = new CanonicalCampaignDraftReadService(prisma);
 
 const creator = {
   id: IDS.creatorUser,
   email: "f6c.creator@example.invalid",
   role: UserRole.CREATOR,
+};
+const secondCreator = {
+  id: IDS.secondCreatorUser,
+  email: "f6c.second.creator@example.invalid",
+  role: UserRole.CREATOR,
+};
+
+const canonicalCampaignPayload = {
+  strategy: {
+    campaign_name: "F6 Full Runtime Acceptance",
+    publishing_schedule: "EVERGREEN" as const,
+    publish_from: null,
+    publish_until: null,
+    core_objective: "PROOF" as const,
+    platforms: ["INSTAGRAM"] as const,
+    campaign_visibility: "PUBLIC" as const,
+  },
+  targeting: {
+    creator_archetypes: ["EDUCATOR"] as const,
+    minimum_followers: 20_000,
+    maximum_followers: 100_000,
+    audience_age_min: 18,
+    audience_age_max: 34,
+    audience_gender: "ALL" as const,
+    audience_affinity_ids: ["SKINCARE"] as const,
+    audience_geographies: [
+      {
+        scope: "COUNTRY" as const,
+        label: "India",
+        country_code: "IN",
+        locality: null,
+        region: null,
+        radius_km: null,
+        is_primary: true,
+      },
+    ],
+  },
+  commercials: {
+    receives_brand_support: false,
+    brand_support_type: null,
+    brand_support_estimated_value: null,
+    compensation_model: "FIXED" as const,
+    commercial_offer: 10_000,
+    total_campaign_budget: 100_000,
+    advance_payment_percentage: 25 as const,
+    payout_terms: "NET_30" as const,
+  },
 };
 
 const productPayload = (campaignId: string) => ({
@@ -130,6 +194,13 @@ const briefPayload = (
 });
 
 async function cleanAcceptanceFixtures() {
+  await prisma.uceCampaign.deleteMany({
+    where: {
+      name: {
+        startsWith: canonicalCampaignPayload.strategy.campaign_name,
+      },
+    },
+  });
   await prisma.collaboration.deleteMany({
     where: {
       campaignId: {
@@ -151,7 +222,14 @@ async function cleanAcceptanceFixtures() {
   });
   await prisma.offering.deleteMany({ where: { id: IDS.offering } });
   await prisma.brandProfile.deleteMany({ where: { id: IDS.brand } });
-  await prisma.user.deleteMany({ where: { id: IDS.creatorUser } });
+  await prisma.user.deleteMany({
+    where: {
+      id: {
+        in: [IDS.creatorUser, IDS.secondCreatorUser, IDS.brandOwnerUser],
+      },
+    },
+  });
+  await prisma.organization.deleteMany({ where: { id: IDS.organization } });
 }
 
 async function createCampaign(id: string, status = UceCampaignStatus.DRAFT) {
@@ -195,9 +273,21 @@ beforeAll(async () => {
   }
   await prisma.$connect();
   await cleanAcceptanceFixtures();
+  await prisma.organization.create({
+    data: { id: IDS.organization, name: "F6C Acceptance Organization" },
+  });
+  await prisma.user.create({
+    data: {
+      id: IDS.brandOwnerUser,
+      email: "f6c.brand.owner@example.invalid",
+      role: UserRole.BRAND,
+      organizationId: IDS.organization,
+    },
+  });
   await prisma.brandProfile.create({
     data: {
       id: IDS.brand,
+      organizationId: IDS.organization,
       domain: "f6c-acceptance.example.invalid",
       name: "F6C Acceptance Brand",
       industry: IndustryVertical.D2C,
@@ -230,6 +320,20 @@ beforeAll(async () => {
       },
     },
   });
+  await prisma.user.create({
+    data: {
+      id: IDS.secondCreatorUser,
+      email: secondCreator.email,
+      role: secondCreator.role,
+      creatorProfile: {
+        create: {
+          instagramHandle: "f6c_second_acceptance_creator",
+          followerCount: 60000,
+          primaryRegion: "IN",
+        },
+      },
+    },
+  });
   await Promise.all([
     createCampaign(IDS.noAsset),
     createCampaign(IDS.assetOnly),
@@ -254,11 +358,230 @@ beforeAll(async () => {
 });
 
 describe.sequential("F6C canonical Campaign runtime", () => {
+  let fullCampaignId: string;
   let legacyProductId: string;
   let canonicalAssetId: string;
   let legacyBriefId: string;
   let canonicalBriefId: string;
   let applicationId: string;
+
+  it("autosaves, hydrates, and atomically publishes a canonical Campaign", async () => {
+    const draft = await canonicalCreate.createDraft(IDS.brand);
+    fullCampaignId = draft.campaignId;
+    expect(draft.status).toBe("DRAFT");
+    expect(draft.creationSource).toBe("MANUAL");
+
+    const patches = [
+      [
+        "strategy.campaign_name",
+        canonicalCampaignPayload.strategy.campaign_name,
+      ],
+      [
+        "strategy.publishing_schedule",
+        canonicalCampaignPayload.strategy.publishing_schedule,
+      ],
+      ["strategy.publish_from", canonicalCampaignPayload.strategy.publish_from],
+      [
+        "strategy.publish_until",
+        canonicalCampaignPayload.strategy.publish_until,
+      ],
+      [
+        "strategy.core_objective",
+        canonicalCampaignPayload.strategy.core_objective,
+      ],
+      [
+        "strategy.campaign_visibility",
+        canonicalCampaignPayload.strategy.campaign_visibility,
+      ],
+      [
+        "targeting.creator_archetypes",
+        canonicalCampaignPayload.targeting.creator_archetypes,
+      ],
+      [
+        "targeting.minimum_followers",
+        canonicalCampaignPayload.targeting.minimum_followers,
+      ],
+      [
+        "targeting.maximum_followers",
+        canonicalCampaignPayload.targeting.maximum_followers,
+      ],
+      [
+        "targeting.audience_age_min",
+        canonicalCampaignPayload.targeting.audience_age_min,
+      ],
+      [
+        "targeting.audience_age_max",
+        canonicalCampaignPayload.targeting.audience_age_max,
+      ],
+      [
+        "targeting.audience_gender",
+        canonicalCampaignPayload.targeting.audience_gender,
+      ],
+      [
+        "targeting.audience_affinity_ids",
+        canonicalCampaignPayload.targeting.audience_affinity_ids,
+      ],
+      [
+        "targeting.audience_geographies",
+        canonicalCampaignPayload.targeting.audience_geographies,
+      ],
+      [
+        "commercials.receives_brand_support",
+        canonicalCampaignPayload.commercials.receives_brand_support,
+      ],
+      [
+        "commercials.brand_support_type",
+        canonicalCampaignPayload.commercials.brand_support_type,
+      ],
+      [
+        "commercials.brand_support_estimated_value",
+        canonicalCampaignPayload.commercials.brand_support_estimated_value,
+      ],
+      [
+        "commercials.compensation_model",
+        canonicalCampaignPayload.commercials.compensation_model,
+      ],
+      [
+        "commercials.commercial_offer",
+        canonicalCampaignPayload.commercials.commercial_offer,
+      ],
+      [
+        "commercials.total_campaign_budget",
+        canonicalCampaignPayload.commercials.total_campaign_budget,
+      ],
+      [
+        "commercials.advance_payment_percentage",
+        canonicalCampaignPayload.commercials.advance_payment_percentage,
+      ],
+      [
+        "commercials.payout_terms",
+        canonicalCampaignPayload.commercials.payout_terms,
+      ],
+    ] as const;
+
+    for (const [path, value] of patches) {
+      await canonicalCreate.autosaveField(IDS.brand, fullCampaignId, {
+        path,
+        value,
+      });
+    }
+    await canonicalCreate.autosaveField(IDS.brand, fullCampaignId, {
+      path: "strategy.campaign_name",
+      value: canonicalCampaignPayload.strategy.campaign_name,
+    });
+
+    const hydrated = await canonicalDraftRead.getDraft(
+      IDS.brand,
+      fullCampaignId,
+    );
+    expect(hydrated.draft).toEqual({
+      strategy: expect.objectContaining({
+        campaign_name: canonicalCampaignPayload.strategy.campaign_name,
+        core_objective: "PROOF",
+      }),
+      targeting: expect.objectContaining({
+        minimum_followers: 20_000,
+        audience_affinity_ids: ["SKINCARE"],
+      }),
+      commercials: expect.objectContaining({
+        commercial_offer: 10_000,
+        total_campaign_budget: 100_000,
+      }),
+    });
+    expect(
+      await prisma.uceCampaign.count({ where: { id: fullCampaignId } }),
+    ).toBe(1);
+
+    await expect(
+      canonicalCreate.publishDraft(IDS.brand, fullCampaignId, {}),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(
+      await prisma.uceCampaign.findUniqueOrThrow({
+        where: { id: fullCampaignId },
+        select: { status: true },
+      }),
+    ).toEqual({ status: "DRAFT" });
+    expect(
+      await prisma.uceCampaignReportingSnapshot.count({
+        where: { campaignId: fullCampaignId },
+      }),
+    ).toBe(0);
+
+    const product = await products.create(
+      IDS.brand,
+      fullCampaignId,
+      productPayload(fullCampaignId),
+    );
+    const brief = await briefs.create(
+      IDS.brand,
+      fullCampaignId,
+      briefPayload(
+        fullCampaignId,
+        product.product_id,
+        product.canonical_campaign_asset_id,
+      ),
+    );
+    await canonicalCreate.publishDraft(
+      IDS.brand,
+      fullCampaignId,
+      canonicalCampaignPayload,
+    );
+
+    const persisted = await prisma.uceCampaign.findUniqueOrThrow({
+      where: { id: fullCampaignId },
+      include: {
+        strategy: true,
+        targeting: true,
+        commercials: true,
+        assets: { include: { briefs: true } },
+      },
+    });
+    expect(persisted.status).toBe("PUBLISHED");
+    expect(persisted.creationSource).toBe("MANUAL");
+    expect(persisted.publishedAt).not.toBeNull();
+    expect(persisted.strategy?.canonicalObjective).toBe("PROOF");
+    expect(persisted.targeting?.minimumFollowers).toBe(20_000);
+    expect(Number(persisted.commercials?.totalCampaignBudget)).toBe(100_000);
+    expect(persisted.assets).toHaveLength(1);
+    expect(persisted.assets[0].id).toBe(product.canonical_campaign_asset_id);
+    expect(persisted.assets[0].briefs[0].id).toBe(brief.canonical_brief_id);
+    expect(persisted.canonicalDefinition).toEqual(
+      expect.objectContaining({ version: "1.2", creationSource: "MANUAL" }),
+    );
+    expect(
+      await prisma.uceCampaignReportingSnapshot.count({
+        where: { campaignId: fullCampaignId },
+      }),
+    ).toBe(1);
+    await expect(
+      canonicalCreate.publishDraft(
+        IDS.brand,
+        fullCampaignId,
+        canonicalCampaignPayload,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(
+      await prisma.uceCampaignReportingSnapshot.count({
+        where: { campaignId: fullCampaignId },
+      }),
+    ).toBe(1);
+
+    const cards = await campaigns.listCampaigns(IDS.brand, {
+      search: canonicalCampaignPayload.strategy.campaign_name,
+    });
+    expect(cards).toEqual([
+      expect.objectContaining({
+        campaign_id: fullCampaignId,
+        product_count: 1,
+        brief_count: 1,
+      }),
+    ]);
+    const page = await campaignQuery.getCampaignPage(IDS.brand, fullCampaignId);
+    expect(page.hydration.executionReady).toBe(true);
+    expect(page.productsBriefsSummary.products[0].campaignAssetId).toBe(
+      product.canonical_campaign_asset_id,
+    );
+  });
 
   it("does not treat missing or legacy-only Asset/Brief rows as ready", async () => {
     const noAsset = await campaigns.getActivationChecklist(
@@ -366,6 +689,83 @@ describe.sequential("F6C canonical Campaign runtime", () => {
     ]);
   });
 
+  it("uses canonical Asset/Brief authority in Campaign Page and detail reads", async () => {
+    const page = await campaignQuery.getCampaignPage(IDS.brand, IDS.ready);
+    expect(page.hydration.executionReady).toBe(true);
+    expect(page.productsBriefsSummary.products).toEqual([
+      expect.objectContaining({
+        campaignAssetId: canonicalAssetId,
+        briefs: [expect.objectContaining({ briefId: canonicalBriefId })],
+      }),
+    ]);
+
+    const legacyOnlyPage = await campaignQuery.getCampaignPage(
+      IDS.brand,
+      IDS.legacyOnly,
+    );
+    expect(legacyOnlyPage.hydration.executionReady).toBe(false);
+    expect(legacyOnlyPage.productsBriefsSummary.products).toEqual([]);
+
+    await expect(
+      campaignQuery.getProductDetails(IDS.brand, IDS.ready, canonicalAssetId),
+    ).resolves.toEqual(
+      expect.objectContaining({ campaignAssetId: canonicalAssetId }),
+    );
+    await expect(
+      campaignQuery.getBriefDetails(IDS.brand, IDS.ready, canonicalBriefId),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        briefId: canonicalBriefId,
+        campaignAssetId: canonicalAssetId,
+      }),
+    );
+  });
+
+  it("shares an owned ready Campaign idempotently and records a click", async () => {
+    const first = await campaignCommands.executeShare(
+      IDS.brand,
+      IDS.ready,
+      "COPY_LINK",
+      "f6c-share-ready",
+    );
+    const replay = await campaignCommands.executeShare(
+      IDS.brand,
+      IDS.ready,
+      "COPY_LINK",
+      "f6c-share-ready",
+    );
+    expect(first.replayed).toBe(false);
+    expect(replay.replayed).toBe(true);
+    expect(replay.trackingToken).toBe(first.trackingToken);
+    await expect(
+      campaignCommands.recordShareClick(first.trackingToken),
+    ).resolves.toEqual({ ok: true, campaignId: IDS.ready });
+    await expect(
+      campaignCommands.executeShare(
+        IDS.offering,
+        IDS.ready,
+        "COPY_LINK",
+        "f6c-share-wrong-owner",
+      ),
+    ).rejects.toThrow("Campaign not found");
+    await expect(
+      campaignCommands.executeShare(
+        IDS.brand,
+        IDS.noAsset,
+        "COPY_LINK",
+        "f6c-share-draft",
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      campaignCommands.executeShare(
+        IDS.brand,
+        "f6c00000-0000-4000-8000-000000000099",
+        "COPY_LINK",
+        "f6c-share-missing",
+      ),
+    ).rejects.toThrow("Campaign not found");
+  });
+
   it("rejects absent or mismatched canonical selections", async () => {
     await expect(
       creatorCampaigns.applyToCampaign(creator, IDS.ready, {
@@ -410,6 +810,40 @@ describe.sequential("F6C canonical Campaign runtime", () => {
       canonicalAssetId,
     );
     expect(synchronizedApplications[0].canonicalBriefId).toBe(canonicalBriefId);
+
+    await expect(
+      creatorCampaigns.applyToCampaign(creator, IDS.ready, {
+        brief_id: legacyBriefId,
+        product_id: legacyProductId,
+        canonical_campaign_asset_id: canonicalAssetId,
+        canonical_brief_id: canonicalBriefId,
+      }),
+    ).rejects.toThrow("already have a pipeline row");
+
+    await creatorCampaigns.applyToCampaign(secondCreator, IDS.ready, {
+      brief_id: legacyBriefId,
+      product_id: legacyProductId,
+      canonical_campaign_asset_id: canonicalAssetId,
+      canonical_brief_id: canonicalBriefId,
+    });
+    const secondApplication = await prisma.uceApplication.findFirstOrThrow({
+      where: {
+        campaignId: IDS.ready,
+        campaignCreator: { creatorProfile: { userId: IDS.secondCreatorUser } },
+      },
+    });
+    await applicationService.reject(
+      IDS.brand,
+      IDS.ready,
+      secondApplication.id,
+      IDS.brand,
+      "F6 acceptance rejection",
+    );
+    const rejected = await prisma.uceApplication.findUniqueOrThrow({
+      where: { id: secondApplication.id },
+    });
+    expect(rejected.status).toBe("REJECTED");
+    expect(rejected.rejectedAt).not.toBeNull();
   });
 
   it("approves using persisted canonical IDs and provisions one snapshot", async () => {
@@ -442,5 +876,85 @@ describe.sequential("F6C canonical Campaign runtime", () => {
         where: { sourceApplicationId: applicationId },
       }),
     ).toBe(1);
+
+    const rejectedApplication = await prisma.uceApplication.findFirstOrThrow({
+      where: { campaignId: IDS.ready, status: "REJECTED" },
+    });
+    const invalidApproval = await prisma.uceApplication.create({
+      data: {
+        requestId: "f6c-invalid-approval",
+        campaignId: IDS.ready,
+        campaignCreatorId: rejectedApplication.campaignCreatorId,
+        campaignAssetId: legacyProductId,
+        briefId: legacyBriefId,
+        status: "PENDING",
+        source: "DIRECT",
+      },
+    });
+    await expect(
+      applicationService.approve(
+        IDS.brand,
+        IDS.ready,
+        invalidApproval.id,
+        IDS.brand,
+      ),
+    ).rejects.toThrow("Canonical Campaign Asset and Brief are required");
+    const rolledBack = await prisma.uceApplication.findUniqueOrThrow({
+      where: { id: invalidApproval.id },
+      include: { collaboration: true },
+    });
+    expect(rolledBack.status).toBe("PENDING");
+    expect(rolledBack.approvedAt).toBeNull();
+    expect(rolledBack.collaboration).toBeNull();
+    await prisma.uceApplication.delete({ where: { id: invalidApproval.id } });
+
+    const applicants = await campaignQuery.getApplicants(IDS.brand, IDS.ready);
+    expect(applicants.applicants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ applicationStatus: "APPROVED" }),
+        expect.objectContaining({ applicationStatus: "REJECTED" }),
+      ]),
+    );
+  });
+
+  it("enforces supported lifecycle transitions and canonical timestamps", async () => {
+    await expect(
+      campaigns.goLiveCampaign(IDS.brand, fullCampaignId),
+    ).resolves.toEqual(expect.objectContaining({ current_status: "LIVE" }));
+    expect(
+      (
+        await prisma.uceCampaign.findUniqueOrThrow({
+          where: { id: fullCampaignId },
+        })
+      ).liveAt,
+    ).not.toBeNull();
+    await expect(
+      campaigns.publishCampaign(IDS.brand, IDS.ready),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      campaigns.pauseCampaign(IDS.brand, IDS.ready),
+    ).resolves.toEqual(expect.objectContaining({ current_status: "PAUSED" }));
+    await expect(
+      campaigns.pauseCampaign(IDS.brand, IDS.ready),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      campaigns.resumeCampaign(IDS.brand, IDS.ready),
+    ).resolves.toEqual(expect.objectContaining({ current_status: "LIVE" }));
+    await expect(
+      campaigns.completeCampaign(IDS.brand, IDS.ready),
+    ).resolves.toEqual(
+      expect.objectContaining({ current_status: "COMPLETED" }),
+    );
+    await expect(
+      campaigns.resumeCampaign(IDS.brand, IDS.ready),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      campaigns.archiveCampaign(IDS.brand, IDS.ready),
+    ).resolves.toEqual(expect.objectContaining({ current_status: "ARCHIVED" }));
+    const persisted = await prisma.uceCampaign.findUniqueOrThrow({
+      where: { id: IDS.ready },
+    });
+    expect(persisted.completedAt).not.toBeNull();
+    expect(persisted.archivedAt).not.toBeNull();
   });
 });

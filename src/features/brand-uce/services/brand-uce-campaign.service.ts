@@ -96,12 +96,26 @@ export class BrandUceCampaignService {
       where.strategy = { coreObjective: filters.objective };
     }
     if (filters.product?.trim()) {
-      where.products = {
+      const productSearch = filters.product.trim();
+      where.assets = {
         some: {
-          productName: {
-            contains: filters.product.trim(),
-            mode: "insensitive",
-          },
+          OR: [
+            {
+              offering: {
+                name: { contains: productSearch, mode: "insensitive" },
+              },
+            },
+            {
+              brandProfile: {
+                name: { contains: productSearch, mode: "insensitive" },
+              },
+            },
+            {
+              brandOffer: {
+                offerName: { contains: productSearch, mode: "insensitive" },
+              },
+            },
+          ],
         },
       };
     }
@@ -122,6 +136,16 @@ export class BrandUceCampaignService {
         performanceAggregate: true,
         strategy: true,
         commercials: true,
+        assets: {
+          where: { status: "ACTIVE" },
+          select: {
+            id: true,
+            briefs: {
+              where: { status: "PUBLISHED" },
+              select: { id: true },
+            },
+          },
+        },
         _count: {
           select: {
             products: true,
@@ -157,8 +181,13 @@ export class BrandUceCampaignService {
         campaign_name: c.name,
         current_status: c.status,
         core_objective: c.strategy?.coreObjective ?? null,
-        product_count: c._count.products,
-        brief_count: c._count.briefs,
+        product_count: c.assets.length,
+        brief_count: c.assets.reduce(
+          (count, asset) => count + asset.briefs.length,
+          0,
+        ),
+        legacy_product_count: c._count.products,
+        legacy_brief_count: c._count.briefs,
         prospects_count: prospects,
         applicants_count: applicants,
         active_collabs_count: activeCollabs,
@@ -624,9 +653,29 @@ export class BrandUceCampaignService {
       }
     }
 
+    const transitionAt = new Date();
     const updated = await this.prisma.uceCampaign.update({
       where: { id: campaignId },
-      data: { status },
+      data: {
+        status,
+        publishedAt:
+          status === UceCampaignStatus.PUBLISHED
+            ? (existing.publishedAt ?? transitionAt)
+            : undefined,
+        liveAt:
+          status === UceCampaignStatus.LIVE &&
+          existing.status === UceCampaignStatus.PUBLISHED
+            ? (existing.liveAt ?? transitionAt)
+            : undefined,
+        completedAt:
+          status === UceCampaignStatus.COMPLETED
+            ? (existing.completedAt ?? transitionAt)
+            : undefined,
+        archivedAt:
+          status === UceCampaignStatus.ARCHIVED
+            ? (existing.archivedAt ?? transitionAt)
+            : undefined,
+      },
     });
 
     return {
