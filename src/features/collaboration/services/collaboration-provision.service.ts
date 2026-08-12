@@ -7,6 +7,7 @@ import {
   CollaborationEscrowStatus,
   CollaborationMessageKind,
   CollaborationPayoutMode,
+  Prisma,
   UceMilestoneStage,
   UserRole,
 } from "@prisma/client";
@@ -35,6 +36,8 @@ export type ProvisionCollaborationInput = {
   welcomeMessage?: string;
 };
 
+type Tx = Prisma.TransactionClient;
+
 @Injectable()
 export class CollaborationProvisionService {
   constructor(
@@ -46,8 +49,18 @@ export class CollaborationProvisionService {
     email: string,
     instagramHandle?: string,
   ): Promise<string> {
+    return this.prisma.$transaction((tx) =>
+      this.ensureCreatorUserInTransaction(tx, email, instagramHandle),
+    );
+  }
+
+  async ensureCreatorUserInTransaction(
+    tx: Tx,
+    email: string,
+    instagramHandle?: string,
+  ): Promise<string> {
     const normalizedEmail = email.trim().toLowerCase();
-    const existing = await this.prisma.user.findUnique({
+    const existing = await tx.user.findUnique({
       where: { email: normalizedEmail },
       include: { creatorProfile: true },
     });
@@ -58,7 +71,7 @@ export class CollaborationProvisionService {
         );
       }
       if (!existing.creatorProfile && instagramHandle) {
-        await this.prisma.creatorProfile.create({
+        await tx.creatorProfile.create({
           data: {
             userId: existing.id,
             instagramHandle: instagramHandle.replace(/^@/, ""),
@@ -68,7 +81,7 @@ export class CollaborationProvisionService {
       return existing.id;
     }
 
-    const user = await this.prisma.user.create({
+    const user = await tx.user.create({
       data: {
         email: normalizedEmail,
         role: UserRole.CREATOR,
@@ -85,7 +98,18 @@ export class CollaborationProvisionService {
   }
 
   async provisionFromUceApproval(input: ProvisionCollaborationInput) {
-    const existing = await this.prisma.collaboration.findUnique({
+    const result = await this.prisma.$transaction((tx) =>
+      this.provisionFromUceApprovalInTransaction(tx, input),
+    );
+    await this.broadcastProvisioned(result.collaboration_id);
+    return result;
+  }
+
+  async provisionFromUceApprovalInTransaction(
+    tx: Tx,
+    input: ProvisionCollaborationInput,
+  ) {
+    const existing = await tx.collaboration.findUnique({
       where: {
         campaignId_creatorUserId: {
           campaignId: input.campaignId,
@@ -94,14 +118,14 @@ export class CollaborationProvisionService {
       },
     });
     if (existing) {
-      const row = await this.prisma.collaboration.findUniqueOrThrow({
+      const row = await tx.collaboration.findUniqueOrThrow({
         where: { id: existing.id },
         include: COLLABORATION_THREAD_INCLUDE,
       });
       return mapCollaborationThreadRow(row, "BRAND");
     }
 
-    const campaign = await this.prisma.uceCampaign.findFirst({
+    const campaign = await tx.uceCampaign.findFirst({
       where: { id: input.campaignId, brandProfileId: input.brandProfileId },
       include: {
         brandProfile: {
@@ -114,14 +138,14 @@ export class CollaborationProvisionService {
       throw new BadRequestException("Campaign not found for brand");
     }
 
-    const brief = await this.prisma.uceCampaignBrief.findFirst({
+    const brief = await tx.uceCampaignBrief.findFirst({
       where: { id: input.briefId, campaignId: input.campaignId },
     });
     if (!brief) {
       throw new BadRequestException("Brief not found for campaign");
     }
 
-    const creator = await this.prisma.user.findUnique({
+    const creator = await tx.user.findUnique({
       where: { id: input.creatorUserId },
     });
     if (!creator) {
@@ -152,59 +176,54 @@ export class CollaborationProvisionService {
       `Congrats! You're approved for ${campaign.name}. View your brief and secure your spot.`;
 
     try {
-      const created = await this.prisma.$transaction(async (tx) => {
-        const thread = await tx.collaboration.create({
-          data: {
-            brandProfileId: input.brandProfileId,
-            creatorUserId: input.creatorUserId,
-            campaignId: input.campaignId,
-            briefId: input.briefId,
-            productId: input.productId ?? undefined,
-            ucePipelineCollaborationId: input.ucePipelineCollaborationId,
-            currentStage: UceMilestoneStage.STAGE_1_NEGOTIATION,
-            payoutMode,
-            industry,
-            commercials: {
-              create: {
-                initialQuote: toDecimal(quote),
-                productRetailValue: toDecimal(input.productRetailValue ?? 0),
-                advance30Amount: toDecimal(advance30Value),
-                balance70Amount: toDecimal(balance70Value),
-                escrowStatus:
-                  payoutMode === CollaborationPayoutMode.BARTER
-                    ? null
-                    : CollaborationEscrowStatus.AWAITING_FUNDS,
-              },
+      const thread = await tx.collaboration.create({
+        data: {
+          brandProfileId: input.brandProfileId,
+          creatorUserId: input.creatorUserId,
+          campaignId: input.campaignId,
+          briefId: input.briefId,
+          productId: input.productId ?? undefined,
+          ucePipelineCollaborationId: input.ucePipelineCollaborationId,
+          currentStage: UceMilestoneStage.STAGE_1_NEGOTIATION,
+          payoutMode,
+          industry,
+          commercials: {
+            create: {
+              initialQuote: toDecimal(quote),
+              productRetailValue: toDecimal(input.productRetailValue ?? 0),
+              advance30Amount: toDecimal(advance30Value),
+              balance70Amount: toDecimal(balance70Value),
+              escrowStatus:
+                payoutMode === CollaborationPayoutMode.BARTER
+                  ? null
+                  : CollaborationEscrowStatus.AWAITING_FUNDS,
             },
-            logistics: { create: {} },
-            finalization: { create: {} },
           },
-          include: COLLABORATION_THREAD_INCLUDE,
-        });
-
-        await tx.collaborationMessage.create({
-          data: {
-            collaborationId: thread.id,
-            kind: CollaborationMessageKind.SYSTEM,
-            systemEventTag: "STAGE_1_STARTED",
-            body: welcome,
-          },
-        });
-
-        await tx.collaboration.update({
-          where: { id: thread.id },
-          data: {
-            lastMessageSnippet: welcome.slice(0, 200),
-            lastMessageAt: new Date(),
-            unreadCountCreator: { increment: 1 },
-          },
-        });
-
-        return thread;
+          logistics: { create: {} },
+          finalization: { create: {} },
+        },
+        include: COLLABORATION_THREAD_INCLUDE,
       });
 
-      void this.realtime.broadcast(created.id, "thread.updated");
-      return mapCollaborationThreadRow(created, "BRAND");
+      await tx.collaborationMessage.create({
+        data: {
+          collaborationId: thread.id,
+          kind: CollaborationMessageKind.SYSTEM,
+          systemEventTag: "STAGE_1_STARTED",
+          body: welcome,
+        },
+      });
+
+      await tx.collaboration.update({
+        where: { id: thread.id },
+        data: {
+          lastMessageSnippet: welcome.slice(0, 200),
+          lastMessageAt: new Date(),
+          unreadCountCreator: { increment: 1 },
+        },
+      });
+
+      return mapCollaborationThreadRow(thread, "BRAND");
     } catch (err) {
       if (
         typeof err === "object" &&
@@ -218,5 +237,9 @@ export class CollaborationProvisionService {
       }
       throw err;
     }
+  }
+
+  async broadcastProvisioned(collaborationId: string) {
+    await this.realtime.broadcast(collaborationId, "thread.updated");
   }
 }
