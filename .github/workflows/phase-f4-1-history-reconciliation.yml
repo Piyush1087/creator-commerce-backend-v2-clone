@@ -69,15 +69,7 @@ jobs:
 
       - name: Generate raw diff from real migration baseline
         run: |
-          npx prisma migrate diff \
-            --from-url "$DATABASE_URL" \
-            --to-schema-datamodel prisma/schema.prisma \
-            --script \
-            --output /tmp/f4_reconciled_raw.sql
-          npx prisma migrate diff \
-            --from-url "$DATABASE_URL" \
-            --to-schema-datamodel prisma/schema.prisma \
-            > /tmp/f4_reconciled_summary.txt
+          npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --script --output /tmp/f4_reconciled_raw.sql
 
       - name: Safety-audit and produce corrected F4 SQL
         run: |
@@ -85,74 +77,74 @@ jobs:
           from pathlib import Path
           sql = Path('/tmp/f4_reconciled_raw.sql').read_text()
 
-          # Prisma cannot safely infer String -> enum preservation for legacy values.
           targeting_old = '''ALTER TABLE "uce_campaign_targeting" ADD COLUMN     "audience_affinity_ids" TEXT[] DEFAULT ARRAY[]::TEXT[],
-          ADD COLUMN     "audience_geographies" JSONB NOT NULL DEFAULT '[]',
-          ADD COLUMN     "maximum_followers" INTEGER,
-          ADD COLUMN     "minimum_followers" INTEGER NOT NULL DEFAULT 0,
-          DROP COLUMN "audience_gender",
-          ADD COLUMN     "audience_gender" "UceAudienceGender" NOT NULL DEFAULT 'ALL';'''
+ADD COLUMN     "audience_geographies" JSONB NOT NULL DEFAULT '[]',
+ADD COLUMN     "maximum_followers" INTEGER,
+ADD COLUMN     "minimum_followers" INTEGER NOT NULL DEFAULT 0,
+DROP COLUMN "audience_gender",
+ADD COLUMN     "audience_gender" "UceAudienceGender" NOT NULL DEFAULT 'ALL';'''
           targeting_safe = '''ALTER TABLE "uce_campaign_targeting" ADD COLUMN     "audience_affinity_ids" TEXT[] DEFAULT ARRAY[]::TEXT[],
-          ADD COLUMN     "audience_geographies" JSONB NOT NULL DEFAULT '[]',
-          ADD COLUMN     "maximum_followers" INTEGER,
-          ADD COLUMN     "minimum_followers" INTEGER NOT NULL DEFAULT 0;
+ADD COLUMN     "audience_geographies" JSONB NOT NULL DEFAULT '[]',
+ADD COLUMN     "maximum_followers" INTEGER,
+ADD COLUMN     "minimum_followers" INTEGER NOT NULL DEFAULT 0;
 
-          ALTER TABLE "uce_campaign_targeting"
-          ALTER COLUMN "audience_gender" DROP DEFAULT,
-          ALTER COLUMN "audience_gender" TYPE "UceAudienceGender"
-          USING ("audience_gender"::"UceAudienceGender"),
-          ALTER COLUMN "audience_gender" SET DEFAULT 'ALL';'''
+ALTER TABLE "uce_campaign_targeting"
+ALTER COLUMN "audience_gender" DROP DEFAULT,
+ALTER COLUMN "audience_gender" TYPE "UceAudienceGender"
+USING ("audience_gender"::"UceAudienceGender"),
+ALTER COLUMN "audience_gender" SET DEFAULT 'ALL';'''
           if targeting_old not in sql:
               raise SystemExit('Expected destructive audience_gender block not found; stop for review')
           sql = sql.replace(targeting_old, targeting_safe, 1)
 
           campaign_old = '''ALTER TABLE "uce_campaigns" ADD COLUMN     "ai_recommendation_id" TEXT,
-          ADD COLUMN     "ai_recommendation_version" TEXT,
-          ADD COLUMN     "archived_at" TIMESTAMP(3),
-          ADD COLUMN     "completed_at" TIMESTAMP(3),
-          ADD COLUMN     "live_at" TIMESTAMP(3),
-          ADD COLUMN     "published_at" TIMESTAMP(3),
-          DROP COLUMN "creation_source",
-          ADD COLUMN     "creation_source" "UceCampaignCreationSource" NOT NULL DEFAULT 'MANUAL';'''
+ADD COLUMN     "ai_recommendation_version" TEXT,
+ADD COLUMN     "archived_at" TIMESTAMP(3),
+ADD COLUMN     "completed_at" TIMESTAMP(3),
+ADD COLUMN     "live_at" TIMESTAMP(3),
+ADD COLUMN     "published_at" TIMESTAMP(3),
+DROP COLUMN "creation_source",
+ADD COLUMN     "creation_source" "UceCampaignCreationSource" NOT NULL DEFAULT 'MANUAL';'''
           campaign_safe = '''ALTER TABLE "uce_campaigns" ADD COLUMN     "ai_recommendation_id" TEXT,
-          ADD COLUMN     "ai_recommendation_version" TEXT,
-          ADD COLUMN     "archived_at" TIMESTAMP(3),
-          ADD COLUMN     "completed_at" TIMESTAMP(3),
-          ADD COLUMN     "live_at" TIMESTAMP(3),
-          ADD COLUMN     "published_at" TIMESTAMP(3);
+ADD COLUMN     "ai_recommendation_version" TEXT,
+ADD COLUMN     "archived_at" TIMESTAMP(3),
+ADD COLUMN     "completed_at" TIMESTAMP(3),
+ADD COLUMN     "live_at" TIMESTAMP(3),
+ADD COLUMN     "published_at" TIMESTAMP(3);
 
-          ALTER TABLE "uce_campaigns"
-          DROP CONSTRAINT IF EXISTS "uce_campaigns_creation_source_check";
+ALTER TABLE "uce_campaigns"
+DROP CONSTRAINT IF EXISTS "uce_campaigns_creation_source_check";
 
-          ALTER TABLE "uce_campaigns"
-          ALTER COLUMN "creation_source" DROP DEFAULT,
-          ALTER COLUMN "creation_source" TYPE "UceCampaignCreationSource"
-          USING ("creation_source"::"UceCampaignCreationSource"),
-          ALTER COLUMN "creation_source" SET DEFAULT 'MANUAL';'''
+ALTER TABLE "uce_campaigns"
+ALTER COLUMN "creation_source" DROP DEFAULT,
+ALTER COLUMN "creation_source" TYPE "UceCampaignCreationSource"
+USING ("creation_source"::"UceCampaignCreationSource"),
+ALTER COLUMN "creation_source" SET DEFAULT 'MANUAL';'''
           if campaign_old not in sql:
               raise SystemExit('Expected destructive creation_source block not found; stop for review')
           sql = sql.replace(campaign_old, campaign_safe, 1)
 
-          asset_old = '''    CONSTRAINT "uce_campaign_assets_pkey" PRIMARY KEY ("id")
-          );'''
-          asset_safe = '''    CONSTRAINT "uce_campaign_assets_pkey" PRIMARY KEY ("id"),
-              CONSTRAINT "uce_campaign_assets_exactly_one_reference_check" CHECK (
-                ("kind" = 'BRAND' AND "brand_profile_id" IS NOT NULL AND "offering_id" IS NULL AND "brand_offer_id" IS NULL) OR
-                ("kind" = 'OFFERING' AND "brand_profile_id" IS NULL AND "offering_id" IS NOT NULL AND "brand_offer_id" IS NULL) OR
-                ("kind" = 'OFFER' AND "brand_profile_id" IS NULL AND "offering_id" IS NULL AND "brand_offer_id" IS NOT NULL)
-              )
-          );'''
           marker = 'CREATE TABLE "uce_campaign_assets"'
           idx = sql.find(marker)
           if idx < 0:
               raise SystemExit('Campaign Asset table block not found')
           tail = sql[idx:]
+          asset_old = '''    CONSTRAINT "uce_campaign_assets_pkey" PRIMARY KEY ("id")
+);'''
+          asset_safe = '''    CONSTRAINT "uce_campaign_assets_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "uce_campaign_assets_exactly_one_reference_check" CHECK (
+      ("kind" = 'BRAND' AND "brand_profile_id" IS NOT NULL AND "offering_id" IS NULL AND "brand_offer_id" IS NULL) OR
+      ("kind" = 'OFFERING' AND "brand_profile_id" IS NULL AND "offering_id" IS NOT NULL AND "brand_offer_id" IS NULL) OR
+      ("kind" = 'OFFER' AND "brand_profile_id" IS NULL AND "offering_id" IS NULL AND "brand_offer_id" IS NOT NULL)
+    )
+);'''
           if asset_old not in tail:
               raise SystemExit('Campaign Asset primary-key block not found')
-          tail = tail.replace(asset_old, asset_safe, 1)
-          sql = sql[:idx] + tail
+          sql = sql[:idx] + tail.replace(asset_old, asset_safe, 1)
 
-          # Scope guard: never drop canonical_definition, legacy authority tables, or financial tables here.
+          sql = sql.replace('CREATE UNIQUE INDEX "', 'CREATE UNIQUE INDEX IF NOT EXISTS "')
+          sql = sql.replace('CREATE INDEX "', 'CREATE INDEX IF NOT EXISTS "')
+
           forbidden = [
               'DROP COLUMN "canonical_definition"',
               'DROP TABLE "uce_campaign_products"',
@@ -199,13 +191,14 @@ jobs:
 
           F5 exposed that the original F4 artifact was generated from a schema snapshot rather than from the repository's fully materialized migration history. The baseline migration `20260812170000_uce_campaign_canonical_definition` already created `uce_campaigns.creation_source` as TEXT and `canonical_definition` as JSONB.
 
-          F4.1 therefore regenerates the consolidated diff from an ephemeral PostgreSQL 16 database after applying the real pre-F4 migration history.
+          F4.1 regenerates the consolidated diff from an ephemeral PostgreSQL 16 database after applying the real pre-F4 migration history.
 
           Safety decisions:
           - preserve `canonical_definition` and model it explicitly in Prisma because current Campaign publish runtime still writes it as compatibility evidence;
           - convert `uce_campaigns.creation_source` TEXT → `UceCampaignCreationSource` in place after dropping the legacy check constraint;
           - convert `uce_campaign_targeting.audience_gender` String → enum in place;
           - retain the Campaign Asset exactly-one-reference CHECK constraint;
+          - tolerate already-existing same-name indexes during migration and rely on the final Prisma zero-diff gate to catch semantic mismatches;
           - retain legacy Campaign Product, Brief and UCE Collaboration tables;
           - do not rewrite escrow, payout, financial ledger or settlement history.
 
