@@ -1,11 +1,17 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import {
+  CampaignObjective,
   Prisma,
   UceApplicationScope,
+  UceAudienceGender,
+  UceBrandSupportType,
+  UceCampaignCreationSource,
   UceCampaignObjective,
   UceCampaignStatus,
   UceCompensationType,
+  UceMediaPlatform,
   UcePayoutTerms,
+  UcePublishingSchedule,
   UceTimelineStructure,
   UceVisibilityScope,
 } from "@prisma/client";
@@ -76,6 +82,36 @@ function legacyObjective(
   return UceCampaignObjective.BRAND_AWARENESS;
 }
 
+function canonicalObjective(
+  objective: CanonicalCampaignWizardPayload["strategy"]["core_objective"],
+): CampaignObjective {
+  if (objective === "PULSE") return CampaignObjective.PULSE;
+  if (objective === "PROOF") return CampaignObjective.PROOF;
+  if (objective === "PRODUCTION") return CampaignObjective.PRODUCTION;
+  return CampaignObjective.PUSH;
+}
+
+function canonicalGender(
+  gender: CanonicalCampaignWizardPayload["targeting"]["audience_gender"],
+): UceAudienceGender {
+  if (gender === "FEMALE") return UceAudienceGender.FEMALE;
+  if (gender === "MALE") return UceAudienceGender.MALE;
+  return UceAudienceGender.ALL;
+}
+
+function canonicalBrandSupportType(
+  value: CanonicalCampaignWizardPayload["commercials"]["brand_support_type"],
+): UceBrandSupportType | null {
+  if (!value) return null;
+  if (value === "PRODUCT") return UceBrandSupportType.PRODUCT;
+  if (value === "SERVICE") return UceBrandSupportType.SERVICE;
+  if (value === "EXPERIENCE") return UceBrandSupportType.EXPERIENCE;
+  if (value === "ACCESS_SUBSCRIPTION") {
+    return UceBrandSupportType.ACCESS_SUBSCRIPTION;
+  }
+  return UceBrandSupportType.OTHER;
+}
+
 function legacyVisibility(
   value: CanonicalCampaignWizardPayload["strategy"]["campaign_visibility"],
 ): UceVisibilityScope {
@@ -97,6 +133,8 @@ function legacyPayout(
 ): UcePayoutTerms {
   if (value === "NET_7") return UcePayoutTerms.NET_7;
   if (value === "NET_15") return UcePayoutTerms.NET_15;
+  if (value === "NET_45") return UcePayoutTerms.NET_45;
+  if (value === "NET_60") return UcePayoutTerms.NET_60;
   return UcePayoutTerms.NET_30;
 }
 
@@ -162,14 +200,14 @@ export class CanonicalCampaignCreateService {
         // as canonical Campaign name and is replaced only after a valid name autosaves.
         name: "",
         status: UceCampaignStatus.DRAFT,
+        creationSource: UceCampaignCreationSource.MANUAL,
       },
       select: { id: true, status: true },
     });
 
     await this.prisma.$executeRaw`
       UPDATE "uce_campaigns"
-      SET "creation_source" = 'MANUAL',
-          "canonical_definition" = ${JSON.stringify(draft)}::jsonb
+      SET "canonical_definition" = ${JSON.stringify(draft)}::jsonb
       WHERE "id" = ${campaign.id}
     `;
 
@@ -303,17 +341,32 @@ export class CanonicalCampaignCreateService {
     const visibility = legacyVisibility(payload.strategy.campaign_visibility);
     const isScheduled = payload.strategy.publishing_schedule === "SCHEDULED";
     const isFixed = payload.commercials.compensation_model === "FIXED";
+    const publishFrom = payload.strategy.publish_from
+      ? new Date(payload.strategy.publish_from)
+      : null;
+    const publishUntil = payload.strategy.publish_until
+      ? new Date(payload.strategy.publish_until)
+      : null;
 
     const strategyData = {
+      // Canonical authority.
+      publishingSchedule: isScheduled
+        ? UcePublishingSchedule.SCHEDULED
+        : UcePublishingSchedule.EVERGREEN,
+      publishFrom,
+      publishUntil,
+      canonicalObjective: canonicalObjective(objective),
+      primaryKpiId: PRIMARY_KPI[objective],
+      supportingKpiIds: [...supportingKpis],
+      platforms: [UceMediaPlatform.INSTAGRAM],
+      visibilityScope: visibility,
+
+      // Transitional compatibility projection.
       timelineType: isScheduled
         ? UceTimelineStructure.FIXED_DATES
         : UceTimelineStructure.DYNAMIC_MILESTONES,
-      fixedStartDate: payload.strategy.publish_from
-        ? new Date(payload.strategy.publish_from)
-        : null,
-      fixedEndDate: payload.strategy.publish_until
-        ? new Date(payload.strategy.publish_until)
-        : null,
+      fixedStartDate: publishFrom,
+      fixedEndDate: publishUntil,
       dynamicDaysLimit: isScheduled ? null : 1,
       coreObjective: legacyObjective(objective),
       platformDeliverables: {
@@ -324,45 +377,74 @@ export class CanonicalCampaignCreateService {
     };
 
     const targetingData = {
-      industryVertical: String(brand.industry),
+      // Canonical authority.
       creatorArchetypes: payload.targeting.creator_archetypes,
+      minimumFollowers: payload.targeting.minimum_followers,
+      maximumFollowers: payload.targeting.maximum_followers,
+      audienceAgeMin: payload.targeting.audience_age_min,
+      audienceAgeMax: payload.targeting.audience_age_max,
+      audienceGender: canonicalGender(payload.targeting.audience_gender),
+      audienceAffinityIds: payload.targeting.audience_affinity_ids,
+      audienceGeographies:
+        payload.targeting.audience_geographies as unknown as Prisma.InputJsonValue,
+
+      // Transitional compatibility projection.
+      industryVertical: String(brand.industry),
       followerTiers: [
         `MIN:${payload.targeting.minimum_followers}`,
         payload.targeting.maximum_followers == null
           ? "MAX:UNBOUNDED"
           : `MAX:${payload.targeting.maximum_followers}`,
       ],
-      audienceAgeMin: payload.targeting.audience_age_min,
-      audienceAgeMax: payload.targeting.audience_age_max,
-      audienceGender: payload.targeting.audience_gender,
-      targetLocations: payload.targeting.audience_geographies.map((g) => JSON.stringify(g)),
+      targetLocations: payload.targeting.audience_geographies.map((g) =>
+        JSON.stringify(g),
+      ),
       disqualifyingKeywords: [],
       visibilityScopes: [visibility],
-      applicationScope: legacyApplicationScope(payload.strategy.campaign_visibility),
+      applicationScope: legacyApplicationScope(
+        payload.strategy.campaign_visibility,
+      ),
     };
 
     const commercialsData = {
+      // Canonical authority.
+      receivesBrandSupport: payload.commercials.receives_brand_support,
+      brandSupportType: canonicalBrandSupportType(
+        payload.commercials.brand_support_type,
+      ),
+      brandSupportEstimatedValue:
+        payload.commercials.brand_support_estimated_value ?? null,
       compensationType: isFixed
         ? UceCompensationType.FIXED_FEE
         : UceCompensationType.NEGOTIABLE,
+      commercialOffer: payload.commercials.commercial_offer,
+      totalCampaignBudget: payload.commercials.total_campaign_budget,
+      currency,
+      advancePaymentPercentage: payload.commercials.advance_payment_percentage,
+      finalBalanceTerms: legacyPayout(payload.commercials.payout_terms),
+
+      // Transitional compatibility projection.
       fixedFeeAmount: isFixed ? payload.commercials.commercial_offer : 0,
       negotiableMinFee: isFixed ? 0 : payload.commercials.commercial_offer,
       negotiableMaxFee: 0,
       totalCampaignBudgetPool: payload.commercials.total_campaign_budget,
-      advancePaymentPercentage: payload.commercials.advance_payment_percentage,
-      finalBalanceTerms: legacyPayout(payload.commercials.payout_terms),
     };
 
+    const publishedAt = new Date();
     await this.prisma.$transaction(async (tx) => {
       await tx.uceCampaign.update({
         where: { id: campaignId },
         data: {
           name: payload.strategy.campaign_name,
           status: UceCampaignStatus.PUBLISHED,
+          creationSource: UceCampaignCreationSource.MANUAL,
+          publishedAt,
           performanceAggregate: { upsert: { create: {}, update: {} } },
           strategy: { upsert: { create: strategyData, update: strategyData } },
           targeting: { upsert: { create: targetingData, update: targetingData } },
-          commercials: { upsert: { create: commercialsData, update: commercialsData } },
+          commercials: {
+            upsert: { create: commercialsData, update: commercialsData },
+          },
         },
       });
 
@@ -376,8 +458,7 @@ export class CanonicalCampaignCreateService {
 
       await tx.$executeRaw`
         UPDATE "uce_campaigns"
-        SET "creation_source" = 'MANUAL',
-            "canonical_definition" = ${JSON.stringify(canonicalDefinition)}::jsonb,
+        SET "canonical_definition" = ${JSON.stringify(canonicalDefinition)}::jsonb,
             "updated_at" = NOW()
         WHERE "id" = ${campaignId}
       `;
