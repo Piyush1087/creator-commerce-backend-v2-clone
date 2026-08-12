@@ -5,6 +5,7 @@ import { AuthModule } from "../auth/auth.module";
 import { BrandCentreModule } from "../brand-centre/brand-centre.module";
 import { CollaborationModule } from "../collaboration/collaboration.module";
 import { BrandUceController } from "./brand-uce.controller";
+import { CanonicalCampaignCreateController } from "./canonical-campaign-create.controller";
 import { BrandUceAccessService } from "./services/brand-uce-access.service";
 import { BrandUceBriefService } from "./services/brand-uce-brief.service";
 import { BrandUceCampaignService } from "./services/brand-uce-campaign.service";
@@ -14,10 +15,11 @@ import { BrandUceReportingService } from "./services/brand-uce-reporting.service
 import { CampaignApplicationService } from "./services/campaign-application.service";
 import { CampaignCommandService } from "./services/campaign-command.service";
 import { CampaignQueryService } from "./services/campaign-query.service";
+import { CanonicalCampaignCreateService } from "./services/canonical-campaign-create.service";
 
 @Module({
   imports: [PrismaModule, AuthModule, BrandCentreModule, CollaborationModule],
-  controllers: [BrandUceController],
+  controllers: [BrandUceController, CanonicalCampaignCreateController],
   providers: [
     BrandUceAccessService,
     BrandUceCampaignService,
@@ -28,6 +30,7 @@ import { CampaignQueryService } from "./services/campaign-query.service";
     CampaignApplicationService,
     CampaignQueryService,
     CampaignCommandService,
+    CanonicalCampaignCreateService,
   ],
   exports: [
     BrandUceCampaignService,
@@ -36,6 +39,7 @@ import { CampaignQueryService } from "./services/campaign-query.service";
     CampaignApplicationService,
     CampaignQueryService,
     CampaignCommandService,
+    CanonicalCampaignCreateService,
   ],
 })
 export class BrandUceModule {}
