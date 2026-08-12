@@ -19,10 +19,7 @@ import {
 import { PrismaService } from "../../../prisma/prisma.service";
 import { buildPhaseSyncPatch } from "../../../shared/uce/uce-production-phase.util";
 import { CollaborationProvisionService } from "../../collaboration/services/collaboration-provision.service";
-import {
-  decimalToNumber,
-  splitEscrowQuote,
-} from "../utils/uce-decimal.util";
+import { decimalToNumber, splitEscrowQuote } from "../utils/uce-decimal.util";
 import {
   approveApplicationInputSchema,
   rejectApplicationInputSchema,
@@ -210,7 +207,9 @@ export class CampaignApplicationService {
       });
       if (!application) throw new NotFoundException("Application not found");
       if (application.status !== UceApplicationStatus.PENDING) {
-        throw new BadRequestException("Only PENDING applications can be approved");
+        throw new BadRequestException(
+          "Only PENDING applications can be approved",
+        );
       }
       if (!application.campaignCreator.email?.trim()) {
         throw new BadRequestException(
@@ -243,6 +242,27 @@ export class CampaignApplicationService {
           "The Application Campaign Asset is no longer active",
         );
       }
+
+      if (
+        !application.canonicalCampaignAssetId ||
+        !application.canonicalBriefId
+      ) {
+        throw new BadRequestException(
+          "Canonical Campaign Asset and Brief are required before Application approval",
+        );
+      }
+      const canonicalBrief = await tx.uceBrief.findFirst({
+        where: {
+          id: application.canonicalBriefId,
+          campaignAssetId: application.canonicalCampaignAssetId,
+          status: "PUBLISHED",
+          campaignAsset: { campaignId },
+        },
+      });
+      if (!canonicalBrief)
+        throw new BadRequestException(
+          "Canonical Application references are not valid for this Campaign",
+        );
 
       const brief = await tx.uceCampaignBrief.findFirst({
         where: {
@@ -437,7 +457,9 @@ export class CampaignApplicationService {
     });
     if (!application) throw new NotFoundException("Application not found");
     if (application.status !== UceApplicationStatus.PENDING) {
-      throw new BadRequestException("Only PENDING applications can be rejected");
+      throw new BadRequestException(
+        "Only PENDING applications can be rejected",
+      );
     }
 
     await this.prisma.uceApplication.update({

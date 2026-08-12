@@ -4,6 +4,12 @@ export class CreatorApplyToCampaignDto {
   @IsUUID()
   brief_id!: string;
 
+  @IsUUID()
+  canonical_campaign_asset_id!: string;
+
+  @IsUUID()
+  canonical_brief_id!: string;
+
   @IsOptional()
   @IsUUID()
   product_id?: string;

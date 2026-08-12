@@ -7,6 +7,10 @@ import {
 import {
   Prisma,
   UceBriefStrategyMode,
+  UceBriefStatus,
+  UceBriefCreationSource,
+  UceBriefType,
+  UceDeliverableFormat,
   UceMediaPlatform,
   type UceCampaignBrief,
 } from "@prisma/client";
@@ -35,11 +39,7 @@ export class BrandUceBriefService {
     return briefs.map((b) => this.mapBrief(b));
   }
 
-  async create(
-    brandProfileId: string,
-    campaignId: string,
-    body: unknown,
-  ) {
+  async create(brandProfileId: string, campaignId: string, body: unknown) {
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
 
     const parsed = MasterAddBriefWizardSchema.safeParse(body);
@@ -66,8 +66,64 @@ export class BrandUceBriefService {
     }
 
     const data = parsed.data;
-    const brief = await this.prisma.uceCampaignBrief.create({
-      data: {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const asset = await tx.uceCampaignAsset.findFirst({
+        where: {
+          id: data.canonical_campaign_asset_id,
+          campaignId,
+          status: "ACTIVE",
+        },
+      });
+      if (!asset)
+        throw new BadRequestException(
+          "Canonical Campaign Asset is required and must belong to this Campaign.",
+        );
+      const existingCanonical = await tx.uceBrief.findFirst({
+        where: { campaignAssetId: asset.id, briefName: data.brief_name },
+      });
+      const canonicalData = {
+        status: UceBriefStatus.PUBLISHED,
+        creationSource: UceBriefCreationSource.MANUAL,
+        briefName: data.brief_name,
+        creativeIntent: data.objective,
+        creatorBrief: this.summarizeGuidelines(data),
+        briefType:
+          data.brief_type === "CREATOR_LED"
+            ? UceBriefType.CREATOR_LED
+            : UceBriefType.BRAND_LED,
+        platform: UceMediaPlatform.INSTAGRAM,
+        briefLevelGuidance:
+          data.content_guidance_matrix as unknown as Prisma.InputJsonValue,
+        creatorRequirements: data.mandatory_creator_requirements,
+      };
+      const deliverables = data.deliverables_inventory.map((d, index) => ({
+        format: this.canonicalFormat(d.format_type),
+        displayOrder: index,
+        configuration: d as unknown as Prisma.InputJsonValue,
+      }));
+      const canonical = existingCanonical
+        ? await tx.uceBrief.update({
+            where: { id: existingCanonical.id },
+            data: {
+              ...canonicalData,
+              deliverables: { deleteMany: {}, create: deliverables },
+            },
+          })
+        : await tx.uceBrief.create({
+            data: {
+              campaignAssetId: asset.id,
+              ...canonicalData,
+              deliverables: { create: deliverables },
+            },
+          });
+      const existingProjection = await tx.uceCampaignBrief.findFirst({
+        where: {
+          campaignId,
+          productId: data.product_id,
+          internalTitle: data.brief_name,
+        },
+      });
+      const legacyData = {
         campaignId,
         productId: data.product_id,
         internalTitle: data.brief_name,
@@ -87,9 +143,20 @@ export class BrandUceBriefService {
           data.content_guidance_matrix as unknown as Prisma.InputJsonValue,
         parentPlannerLogisticsSnapshot:
           data.parent_planner_logistics_snapshot as unknown as Prisma.InputJsonValue,
-      },
+      };
+      const brief = existingProjection
+        ? await tx.uceCampaignBrief.update({
+            where: { id: existingProjection.id },
+            data: legacyData,
+          })
+        : await tx.uceCampaignBrief.create({ data: legacyData });
+      return { brief, canonical };
     });
-    return this.mapBrief(brief);
+    return {
+      ...this.mapBrief(result.brief),
+      canonical_brief_id: result.canonical.id,
+      canonical_campaign_asset_id: result.canonical.campaignAssetId,
+    };
   }
 
   async update(
@@ -135,6 +202,14 @@ export class BrandUceBriefService {
       `Strategy: ${data.brief_type}`,
       `Mandatory: ${data.mandatory_creator_requirements}`,
     ].join("\n");
+  }
+
+  private canonicalFormat(
+    value: MasterAddBriefWizardRequest["deliverables_inventory"][number]["format_type"],
+  ): UceDeliverableFormat {
+    if (value === "CAROUSEL_BANNER")
+      return UceDeliverableFormat.BANNER_CAROUSEL;
+    return value;
   }
 
   mapBrief(b: UceCampaignBrief) {

@@ -22,16 +22,22 @@ export const LinkProductAssetPayloadSchema = z.object({
   asset_type: z.literal("INDIVIDUAL_PRODUCT_SKU"),
   campaign_id: z
     .string()
-    .uuid("Campaign verification identifier framework requires a clean UUID structure."),
+    .uuid(
+      "Campaign verification identifier framework requires a clean UUID structure.",
+    ),
   product_name: z
     .string()
     .min(1, "Asset naming properties require structural label identities."),
   price: z
     .number()
-    .positive("Item retail pricing thresholds cannot settle below or equal to zero assets."),
+    .positive(
+      "Item retail pricing thresholds cannot settle below or equal to zero assets.",
+    ),
   pdp_url: z
     .string()
-    .url("Product Detail Page parameter requires standard URL domain protocols."),
+    .url(
+      "Product Detail Page parameter requires standard URL domain protocols.",
+    ),
   thumbnail_asset_url: z.string().url().nullable(),
   brief_description: z
     .string()
@@ -45,6 +51,7 @@ export const LinkProductAssetPayloadSchema = z.object({
     .max(3, "Brand DNA operational guidelines cap allowable USPs at 3 items."),
   compliance_do_not_say_tokens: z.array(z.string()),
   is_sync_locked: z.boolean().default(true),
+  canonical_offering_id: z.string().uuid(),
 });
 
 export const LinkCollectionAssetPayloadSchema = z.object({
@@ -57,7 +64,11 @@ export const LinkCollectionAssetPayloadSchema = z.object({
   collection_usps: z.array(z.string()).max(3),
   linked_product_ids: z
     .array(z.string().uuid())
-    .min(1, "Curated collections require at least one attached child Product SKU ID value."),
+    .min(
+      1,
+      "Curated collections require at least one attached child Product SKU ID value.",
+    ),
+  canonical_offering_id: z.string().uuid(),
 });
 
 export const LinkBrandIdentityPayloadSchema = z.object({
@@ -94,6 +105,7 @@ export const LinkPromotionPayloadSchema = z.object({
   entity_deep_link_url: z
     .string()
     .url("Promotion destination route requires clean path URL formatting."),
+  canonical_brand_offer_id: z.string().uuid(),
 });
 
 export const MasterAddAssetDrawerSchema = z

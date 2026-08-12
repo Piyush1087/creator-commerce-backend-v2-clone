@@ -11,6 +11,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
+    "test:campaign": "vitest run src/features/brand-uce src/features/creator-uce --maxWorkers=1 --no-file-parallelism",
     "prisma:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
@@ -72,6 +73,7 @@
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.9"
   }
 }
