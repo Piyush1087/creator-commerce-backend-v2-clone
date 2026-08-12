@@ -167,26 +167,10 @@ export class CampaignQueryService {
         products,
       },
       copilotSummary: {
-        state: (operational || paused
-          ? "READY"
-          : "UNAVAILABLE") as SurfaceState,
+        state: "UNAVAILABLE" as SurfaceState,
         label: "Campaign Copilot",
-        summary:
-          operational || paused
-            ? creationSource === "AI_RECOMMENDED"
-              ? "Continue the AI-recommended Campaign with current creator and applicant signals."
-              : "Prioritize highest-match prospects and pending applicants."
-            : undefined,
-        actions: operational
-          ? [
-              {
-                id: "new-creators",
-                label: "Review",
-                context: "Review Discovery prospects",
-                action: "DISCOVERY",
-              },
-            ]
-          : [],
+        summary: undefined,
+        actions: [],
       },
       performanceSummary: {
         state: (reportingAvailable ? "READY" : "UNAVAILABLE") as SurfaceState,
