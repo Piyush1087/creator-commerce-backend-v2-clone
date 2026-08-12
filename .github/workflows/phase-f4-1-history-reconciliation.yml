@@ -1,0 +1,92 @@
+name: Phase F4.1 Migration History Reconciliation
+
+on:
+  push:
+    branches:
+      - phase-f4-1-history-reconciliation
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: phasef41
+          POSTGRES_PASSWORD: phasef41
+          POSTGRES_DB: phasef41
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U phasef41 -d phasef41"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL: postgresql://phasef41:phasef41@127.0.0.1:5432/phasef41
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Isolate existing F4 migration
+        run: |
+          test -f prisma/migrations/20260813005000_consolidated_preprod/migration.sql
+          mv prisma/migrations/20260813005000_consolidated_preprod /tmp/f4_existing
+
+      - name: Materialize real pre-F4 migration history
+        run: npx prisma migrate deploy
+
+      - name: Inspect materialized baseline
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT column_name, data_type, udt_name FROM information_schema.columns WHERE table_name='uce_campaigns' AND column_name IN ('creation_source','canonical_definition') ORDER BY column_name;"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid='uce_campaigns'::regclass AND conname LIKE '%creation_source%';"
+
+      - name: Generate schema diff from materialized baseline
+        run: |
+          npx prisma migrate diff \
+            --from-url "$DATABASE_URL" \
+            --to-schema-datamodel prisma/schema.prisma \
+            --script \
+            --output /tmp/f4_reconciled_raw.sql
+          npx prisma migrate diff \
+            --from-url "$DATABASE_URL" \
+            --to-schema-datamodel prisma/schema.prisma \
+            > /tmp/f4_reconciled_summary.txt
+
+      - name: Show risky generated operations
+        run: |
+          echo '--- creation_source ---'
+          grep -n -C 4 'creation_source' /tmp/f4_reconciled_raw.sql || true
+          echo '--- audience_gender ---'
+          grep -n -C 4 'audience_gender' /tmp/f4_reconciled_raw.sql || true
+          echo '--- uce_campaign_assets ---'
+          grep -n -C 3 'CREATE TABLE "uce_campaign_assets"' /tmp/f4_reconciled_raw.sql || true
+
+      - name: Package reconciliation artifacts
+        run: |
+          mkdir -p phase-f4-1-artifact
+          cp /tmp/f4_reconciled_raw.sql phase-f4-1-artifact/f4_reconciled_raw.sql
+          cp /tmp/f4_reconciled_summary.txt phase-f4-1-artifact/f4_reconciled_summary.txt
+          cp /tmp/f4_existing/migration.sql phase-f4-1-artifact/f4_previous_audited.sql
+          printf '%s\n' 'Generated from the fully materialized repository migration history with the prior F4 migration excluded.' > phase-f4-1-artifact/README.txt
+          printf '%s\n' 'No external database was contacted; only the ephemeral PostgreSQL 16 service was used.' >> phase-f4-1-artifact/README.txt
+
+      - name: Upload reconciliation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-f4-1-history-reconciliation
+          path: phase-f4-1-artifact
+          if-no-files-found: error
