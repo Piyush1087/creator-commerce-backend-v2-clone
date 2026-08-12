@@ -1,0 +1,38 @@
+name: Phase F Static Validation
+
+on:
+  push:
+    branches:
+      - phase-f-runtime-cutover
+  pull_request:
+    branches:
+      - feature/consolidated-schema-preprod
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Static Prisma commands require DATABASE_URL to exist, but do not connect.
+      DATABASE_URL: postgresql://validation:validation@127.0.0.1:5432/phase_f_validation?schema=public
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma validate
+        run: npx prisma validate
+
+      - name: Prisma generate
+        run: npm run prisma:generate
+
+      - name: Nest build
+        run: npm run build

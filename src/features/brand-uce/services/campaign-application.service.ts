@@ -303,13 +303,18 @@ export class CampaignApplicationService {
       const commercials = await tx.uceCampaignCommercials.findUnique({
         where: { campaignId },
       });
-      const advancePercent = commercials?.advancePaymentPercentage ?? 30;
+      const advancePercent = commercials?.advancePaymentPercentage ?? 0;
       let totalQuote = 0;
       if (commercials) {
-        totalQuote =
-          commercials.compensationType === "FIXED_FEE"
-            ? decimalToNumber(commercials.fixedFeeAmount)
-            : decimalToNumber(commercials.negotiableMaxFee);
+        const canonicalOffer = decimalToNumber(commercials.commercialOffer);
+        if (canonicalOffer > 0) {
+          totalQuote = canonicalOffer;
+        } else {
+          totalQuote =
+            commercials.compensationType === "FIXED_FEE"
+              ? decimalToNumber(commercials.fixedFeeAmount)
+              : decimalToNumber(commercials.negotiableMinFee);
+        }
       }
       const { advance30Value, balance70Value } = splitEscrowQuote(
         totalQuote,
@@ -383,6 +388,10 @@ export class CampaignApplicationService {
             campaignId,
             briefId: application.briefId,
             creatorUserId,
+            sourceApplicationId: application.id,
+            campaignCreatorId: application.campaignCreatorId,
+            canonicalCampaignAssetId: application.canonicalCampaignAssetId,
+            canonicalBriefId: application.canonicalBriefId,
             productId: application.campaignAssetId,
             ucePipelineCollaborationId: legacyCollab?.id,
             initialQuote: totalQuote,
