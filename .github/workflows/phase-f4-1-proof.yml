@@ -1,0 +1,83 @@
+name: Phase F4.1 Proof
+
+on:
+  push:
+    branches:
+      - phase-f4-1-history-reconciliation
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: phasef41
+          POSTGRES_PASSWORD: phasef41
+          POSTGRES_DB: phasef41
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U phasef41 -d phasef41"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL: postgresql://phasef41:phasef41@127.0.0.1:5432/phasef41
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Isolate old F4
+        run: |
+          test -f prisma/migrations/20260813005000_consolidated_preprod/migration.sql
+          mv prisma/migrations/20260813005000_consolidated_preprod /tmp/f4_existing
+      - name: Apply pre-F4 migration history
+        run: npx prisma migrate deploy
+      - name: Patch Prisma compatibility authority
+        run: python scripts/f4_1_reconcile.py patch-schema
+      - name: Generate real history-aware diff
+        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --script --output /tmp/f4_raw.sql
+      - name: Produce corrected migration
+        run: python scripts/f4_1_reconcile.py patch-sql /tmp/f4_raw.sql /tmp/f4_corrected.sql
+      - name: Rebuild clean baseline
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+          npx prisma migrate deploy
+      - name: Apply corrected F4.1 migration
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f /tmp/f4_corrected.sql
+      - name: Require zero Prisma diff
+        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+      - name: Verify required invariants
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT conname FROM pg_constraint WHERE conname='uce_campaign_assets_exactly_one_reference_check'" | grep -Fx 'uce_campaign_assets_exactly_one_reference_check'
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT to_regclass('public.uce_campaign_products') IS NOT NULL" | grep -Fx 't'
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT to_regclass('public.uce_campaign_briefs') IS NOT NULL" | grep -Fx 't'
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT to_regclass('public.uce_campaign_collaborations') IS NOT NULL" | grep -Fx 't'
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='uce_campaigns' AND column_name='canonical_definition')" | grep -Fx 't'
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT udt_name FROM information_schema.columns WHERE table_name='uce_campaigns' AND column_name='creation_source'" | grep -Fx 'UceCampaignCreationSource'
+      - name: Package corrected files
+        run: |
+          mkdir -p f4-1-proof
+          cp /tmp/f4_corrected.sql f4-1-proof/migration.sql
+          cp prisma/schema.prisma f4-1-proof/schema.prisma
+          python scripts/f4_1_reconcile.py write-audit
+          cp docs/database/consolidated_schema_migration_f4_1_audit.md f4-1-proof/audit.md
+      - name: Upload proof artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-f4-1-proof
+          path: f4-1-proof
+          if-no-files-found: error
