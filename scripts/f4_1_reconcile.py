@@ -82,8 +82,28 @@ ALTER COLUMN "creation_source" SET DEFAULT 'MANUAL';'''
         raise SystemExit('Campaign Asset primary-key block not found')
     sql = sql[:idx] + tail.replace(asset_old, asset_safe, 1)
 
+    # History contains non-unique indexes using names that the consolidated Prisma
+    # schema now assigns to UNIQUE indexes. Replace those exact legacy indexes rather
+    # than silently skipping them; the zero-diff gate verifies final semantics.
+    for index_name in (
+        'creator_profiles_public_slug_key',
+        'users_google_subject_id_key',
+    ):
+        statement = f'CREATE UNIQUE INDEX "{index_name}"'
+        if statement in sql:
+            sql = sql.replace(
+                statement,
+                f'DROP INDEX IF EXISTS "{index_name}";\nCREATE UNIQUE INDEX "{index_name}"',
+                1,
+            )
+
+    # Other same-name index drift can safely skip recreation. A semantic difference
+    # still fails the final Prisma diff gate.
     sql = sql.replace('CREATE UNIQUE INDEX "', 'CREATE UNIQUE INDEX IF NOT EXISTS "')
     sql = sql.replace('CREATE INDEX "', 'CREATE INDEX IF NOT EXISTS "')
+    # Undo IF NOT EXISTS for the two indexes we intentionally replace above.
+    sql = sql.replace('CREATE UNIQUE INDEX IF NOT EXISTS "creator_profiles_public_slug_key"', 'CREATE UNIQUE INDEX "creator_profiles_public_slug_key"')
+    sql = sql.replace('CREATE UNIQUE INDEX IF NOT EXISTS "users_google_subject_id_key"', 'CREATE UNIQUE INDEX "users_google_subject_id_key"')
 
     forbidden = [
         'DROP COLUMN "canonical_definition"',
@@ -119,7 +139,7 @@ Safety decisions:
 - convert `uce_campaigns.creation_source` TEXT → `UceCampaignCreationSource` in place after dropping the legacy check constraint;
 - convert `uce_campaign_targeting.audience_gender` String → enum in place;
 - retain the Campaign Asset exactly-one-reference CHECK constraint;
-- tolerate already-existing same-name indexes during migration and rely on the final Prisma zero-diff gate to catch semantic mismatches;
+- reconcile historical same-name index drift, including replacing legacy non-unique `creator_profiles_public_slug_key` and `users_google_subject_id_key` indexes with the unique indexes required by the consolidated Prisma schema;
 - retain legacy Campaign Product, Brief and UCE Collaboration tables;
 - do not rewrite escrow, payout, financial ledger or settlement history.
 
