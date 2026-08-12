@@ -1,0 +1,66 @@
+name: Phase F4 Migration Validation
+
+on:
+  push:
+    branches:
+      - phase-f4-migration-artifact
+
+jobs:
+  validate-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: phasef4
+          POSTGRES_PASSWORD: phasef4
+          POSTGRES_DB: phasef4
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U phasef4 -d phasef4"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL: postgresql://phasef4:phasef4@127.0.0.1:5432/phasef4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Write baseline schema
+        run: git show b8360dfd0cd9ea5d326ec5890e2139c9b9975281:prisma/schema.prisma > /tmp/baseline-schema.prisma
+
+      - name: Materialize baseline in ephemeral PostgreSQL
+        run: npx prisma db push --schema /tmp/baseline-schema.prisma --skip-generate
+
+      - name: Apply audited F4 migration
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f prisma/migrations/20260813005000_consolidated_preprod/migration.sql
+
+      - name: Verify migrated database matches consolidated Prisma schema
+        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+
+      - name: Verify Campaign Asset CHECK constraint exists
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT conname FROM pg_constraint WHERE conname='uce_campaign_assets_exactly_one_reference_check'" | grep -Fx 'uce_campaign_assets_exactly_one_reference_check'
+
+      - name: Verify legacy authority tables remain
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT to_regclass('public.uce_campaign_products') IS NOT NULL" | grep -Fx 't'
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT to_regclass('public.uce_campaign_briefs') IS NOT NULL" | grep -Fx 't'
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "SELECT to_regclass('public.uce_campaign_collaborations') IS NOT NULL" | grep -Fx 't'
+
+      - name: Verify no production/dev external database was used
+        run: echo "Validated only against ephemeral postgres:16 service inside this GitHub Actions job."
