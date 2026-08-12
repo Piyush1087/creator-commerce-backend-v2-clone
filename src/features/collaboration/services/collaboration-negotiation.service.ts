@@ -151,6 +151,7 @@ export class CollaborationNegotiationService {
 
   async decline(user: AuthUser, collaborationId: string, raw: unknown) {
     const input = parseCommand(declineNegotiationSchema, raw);
+    const reasonCode = "NEGOTIATION_DECLINED";
     const fingerprint = requestFingerprint(input);
     await this.access.assertThreadForUser(user, collaborationId);
     const actorClass =
@@ -202,7 +203,7 @@ export class CollaborationNegotiationService {
           currentStageStatus: CollaborationStageStatus.COMPLETED,
           aggregateVersion: { increment: 1 },
           endedFromStage: CollaborationStage.NEGOTIATION,
-          endedReasonCode: input.reasonCode,
+          endedReasonCode: reasonCode,
           endedReasonText: input.reasonText,
           endedByActorClass: actorClass,
           endedByUserId: user.id,
@@ -226,7 +227,7 @@ export class CollaborationNegotiationService {
           platformCommissionGstRefundAmount: new Prisma.Decimal(0),
           brandCommercialRefundEntitlementAmount: new Prisma.Decimal(0),
           currency: row.commercialAgreement?.currency,
-          reasonCode: input.reasonCode,
+          reasonCode,
           reasonText: input.reasonText,
           decidedByActorClass: actorClass,
           decidedByUserId: user.id,
@@ -243,7 +244,7 @@ export class CollaborationNegotiationService {
         commandId: input.commandId,
         aggregateVersion: version,
         requestFingerprint: fingerprint,
-        payload: { reasonCode: input.reasonCode },
+        payload: { reasonCode },
       });
     });
     return this.result(user, collaborationId);

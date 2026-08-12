@@ -777,6 +777,46 @@ test("Settlement read model keeps terminal entitlement separate from execution l
   assert.equal(detail.workflow.actionRequiredBy, "SYSTEM");
 });
 
+test("blocked Settlement projects its reason, timestamp and trusted owner", () => {
+  const blockedAt = new Date("2026-08-15T11:00:00.000Z");
+  const row = canonicalRow({
+    canonicalStage: CollaborationStage.PUBLISHING_SETTLEMENT,
+    settlement: {
+      id: "settlement-blocked",
+      collaborationId: "collaboration-1",
+      state: "BLOCKED",
+      creatorPayoutState: "BLOCKED",
+      brandRefundState: "NOT_REQUIRED",
+      creatorSettlementAmount: new Decimal(1000),
+      brandRefundAmount: new Decimal(0),
+      currency: "INR",
+      payoutInstructionRef: "payout:intent",
+      refundInstructionRef: null,
+      payoutExecutionRef: null,
+      refundExecutionRef: null,
+      payoutConfirmationRef: null,
+      refundConfirmationRef: null,
+      authoritativeConfirmationRef: null,
+      eligibleAt: new Date("2026-08-15T09:00:00.000Z"),
+      processingAt: null,
+      settledAt: null,
+      blockedAt,
+      blockedReason: "PAYOUT_ROUTE_UNAVAILABLE",
+      createdAt: new Date("2026-08-15T09:00:00.000Z"),
+      updatedAt: blockedAt,
+    } as any,
+  });
+  const detail = projectCanonicalCollaborationDetail(row, "CREATOR");
+  assert.equal(detail.settlement.state, "BLOCKED");
+  assert.equal(detail.settlement.blockedAt, blockedAt.toISOString());
+  assert.equal(detail.settlement.blockedReason, "PAYOUT_ROUTE_UNAVAILABLE");
+  assert.deepEqual(detail.blocking, {
+    category: "SETTLEMENT_BLOCKED",
+    reason: "PAYOUT_ROUTE_UNAVAILABLE",
+  });
+  assert.equal(detail.workflow.actionRequiredBy, "ADMIN");
+});
+
 test("Feedback read model is double-blind until reveal and keeps Completion ownerless", () => {
   const openedAt = new Date("2026-08-15T09:00:00.000Z");
   const closesAt = new Date("2099-08-17T09:00:00.000Z");

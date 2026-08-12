@@ -208,6 +208,8 @@ export function deriveActionRequiredBy(
       row.settlement.state === CollaborationSettlementState.PROCESSING)
   )
     return CollaborationActorClass.SYSTEM;
+  if (row.settlement?.state === CollaborationSettlementState.BLOCKED)
+    return CollaborationActorClass.ADMIN;
   if (lifecycle !== CollaborationLifecycle.ACTIVE) return "NONE";
 
   switch (row.canonicalStage) {
@@ -420,6 +422,12 @@ function sourceContext(row: CollaborationReadSource) {
 function blockingProjection(row: CollaborationReadSource) {
   if (effectiveLifecycle(row) === CollaborationLifecycle.PAUSED) {
     return { category: "PAUSED", reason: null };
+  }
+  if (row.settlement?.state === CollaborationSettlementState.BLOCKED) {
+    return {
+      category: "SETTLEMENT_BLOCKED",
+      reason: row.settlement.blockedReason,
+    };
   }
   if (row.currentStageStatus === CollaborationStageStatus.BLOCKED) {
     return {
@@ -790,6 +798,8 @@ export function projectCanonicalCollaborationDetail(
           brandRefundState: row.settlement.brandRefundState,
           refundExecutionRef: row.settlement.refundExecutionRef,
           settledAt: row.settlement.settledAt?.toISOString() ?? null,
+          blockedAt: row.settlement.blockedAt?.toISOString() ?? null,
+          blockedReason: row.settlement.blockedReason,
           residualSettlementPending:
             row.settlement.state !== CollaborationSettlementState.SETTLED,
           actionRequiredBy:

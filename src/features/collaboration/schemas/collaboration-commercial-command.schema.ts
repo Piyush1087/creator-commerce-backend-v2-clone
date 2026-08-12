@@ -18,7 +18,6 @@ export const counterCreatorProposalSchema = z
 export const declineNegotiationSchema = z
   .object({
     ...commandEnvelope,
-    reasonCode: z.string().trim().min(1).max(100),
     reasonText: z.string().trim().min(1).max(2000).optional(),
   })
   .strict();

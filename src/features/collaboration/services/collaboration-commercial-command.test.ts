@@ -370,9 +370,9 @@ test("Negotiation decline cancels without inventing Creator entitlement", async 
   await h.negotiation.decline(brandUser, h.row.id, {
     commandId: "decline-1",
     expectedAggregateVersion: 1,
-    reasonCode: "BRAND_DECLINED",
   });
   assert.equal(h.row.lifecycle, CollaborationLifecycle.CANCELLED);
+  assert.equal(h.row.endedReasonCode, "NEGOTIATION_DECLINED");
   assert.equal(h.row.commercialAgreement.negotiationState, "FAILED");
   assert.equal(
     (h.row.financialResolution as any).creatorEntitlementAmount.toNumber(),
