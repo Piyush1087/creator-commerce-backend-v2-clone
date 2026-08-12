@@ -117,7 +117,7 @@ export const Step2TargetingSchema = z
     follower_tiers: z.array(z.string()).min(1),
     audience_age_min: z.number().int().min(13),
     audience_age_max: z.number().int().max(65),
-    audience_gender: z.string().default("ALL"),
+    audience_gender: z.enum(["ALL", "FEMALE", "MALE"]).default("ALL"),
     target_locations: z.array(z.string()).min(1),
     disqualifying_keywords: z.array(z.string()).optional().default([]),
     campaign_visibility: UceCampaignVisibilitySchema.optional(),
