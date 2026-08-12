@@ -1516,6 +1516,7 @@ model UceCampaign {
   name                    String                    @map("campaign_name")
   status                  UceCampaignStatus         @default(DRAFT) @map("current_status")
   creationSource          UceCampaignCreationSource @default(MANUAL) @map("creation_source")
+  canonicalDefinition     Json?                     @map("canonical_definition")
   aiRecommendationId      String?                   @map("ai_recommendation_id")
   aiRecommendationVersion String?                   @map("ai_recommendation_version")
   publishedAt             DateTime?                 @map("published_at")
