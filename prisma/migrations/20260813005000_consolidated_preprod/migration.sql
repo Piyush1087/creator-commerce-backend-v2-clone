@@ -1,7 +1,5 @@
--- Phase F4 consolidated pre-production migration artifact.
--- Baseline schema commit: b8360dfd0cd9ea5d326ec5890e2139c9b9975281
--- Target consolidated runtime/schema commit: 7e346185b009f618bbfc02c3c8cbae143c10e1fe
--- Generated from Prisma schema-to-schema diff and safety-audited before database use.
+-- Phase F4.1 consolidated pre-production migration, reconciled against the real repository migration history.
+-- The prior F4 schema-snapshot artifact was superseded after F5 exposed baseline overlap.
 -- DEV/PRE-PRODUCTION ONLY. Production requires independent data/backfill review.
 
 -- CreateEnum
@@ -126,6 +124,9 @@ CREATE TYPE "CollaborationEventKind" AS ENUM ('DOMAIN', 'AUDIT', 'INTEGRATION');
 ALTER TYPE "UcePayoutTerms" ADD VALUE 'NET_45';
 ALTER TYPE "UcePayoutTerms" ADD VALUE 'NET_60';
 
+-- DropIndex
+DROP INDEX "creator_shipping_addresses_creator_profile_id_idx";
+
 -- AlterTable
 ALTER TABLE "brand_profiles" ADD COLUMN     "business_geography" JSONB,
 ADD COLUMN     "facebook_handle" TEXT,
@@ -133,52 +134,6 @@ ADD COLUMN     "linkedin_handle" TEXT,
 ADD COLUMN     "markets_served" JSONB,
 ADD COLUMN     "primary_language" TEXT,
 ADD COLUMN     "website_currency" TEXT;
-
--- AlterTable
-ALTER TABLE "uce_campaigns" ADD COLUMN     "ai_recommendation_id" TEXT,
-ADD COLUMN     "ai_recommendation_version" TEXT,
-ADD COLUMN     "archived_at" TIMESTAMP(3),
-ADD COLUMN     "completed_at" TIMESTAMP(3),
-ADD COLUMN     "creation_source" "UceCampaignCreationSource" NOT NULL DEFAULT 'MANUAL',
-ADD COLUMN     "live_at" TIMESTAMP(3),
-ADD COLUMN     "published_at" TIMESTAMP(3);
-
--- AlterTable
-ALTER TABLE "uce_applications" ADD COLUMN     "canonical_brief_id" TEXT,
-ADD COLUMN     "canonical_campaign_asset_id" TEXT;
-
--- AlterTable
-ALTER TABLE "uce_campaign_strategy" ADD COLUMN     "canonical_objective" "CampaignObjective",
-ADD COLUMN     "platforms" "UceMediaPlatform"[] DEFAULT ARRAY['INSTAGRAM']::"UceMediaPlatform"[],
-ADD COLUMN     "primary_kpi_id" TEXT,
-ADD COLUMN     "publish_from" TIMESTAMP(3),
-ADD COLUMN     "publish_until" TIMESTAMP(3),
-ADD COLUMN     "publishing_schedule" "UcePublishingSchedule" NOT NULL DEFAULT 'EVERGREEN',
-ADD COLUMN     "supporting_kpi_ids" TEXT[] DEFAULT ARRAY[]::TEXT[],
-ADD COLUMN     "visibility_scope" "UceVisibilityScope" NOT NULL DEFAULT 'EVERYONE';
-
--- AlterTable
-ALTER TABLE "uce_campaign_targeting" ADD COLUMN     "audience_affinity_ids" TEXT[] DEFAULT ARRAY[]::TEXT[],
-ADD COLUMN     "audience_geographies" JSONB NOT NULL DEFAULT '[]',
-ADD COLUMN     "maximum_followers" INTEGER,
-ADD COLUMN     "minimum_followers" INTEGER NOT NULL DEFAULT 0;
-
--- Preserve legacy audience_gender values while moving String -> enum.
--- Unexpected legacy values intentionally fail rather than being silently coerced.
-ALTER TABLE "uce_campaign_targeting"
-ALTER COLUMN "audience_gender" DROP DEFAULT,
-ALTER COLUMN "audience_gender" TYPE "UceAudienceGender"
-USING ("audience_gender"::"UceAudienceGender"),
-ALTER COLUMN "audience_gender" SET DEFAULT 'ALL';
-
--- AlterTable
-ALTER TABLE "uce_campaign_commercials" ADD COLUMN     "brand_support_estimated_value" DECIMAL(12,2),
-ADD COLUMN     "brand_support_type" "UceBrandSupportType",
-ADD COLUMN     "commercial_offer" DECIMAL(12,2) NOT NULL DEFAULT 0,
-ADD COLUMN     "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
-ADD COLUMN     "receives_brand_support" BOOLEAN NOT NULL DEFAULT false,
-ADD COLUMN     "total_campaign_budget" DECIMAL(14,2) NOT NULL DEFAULT 0,
-ALTER COLUMN "advance_payment_percentage" SET DEFAULT 0;
 
 -- AlterTable
 ALTER TABLE "collaborations" ADD COLUMN     "aggregate_version" INTEGER NOT NULL DEFAULT 1,
@@ -196,6 +151,61 @@ ADD COLUMN     "ended_reason_code" TEXT,
 ADD COLUMN     "ended_reason_text" TEXT,
 ADD COLUMN     "lifecycle" "CollaborationLifecycle" NOT NULL DEFAULT 'ACTIVE',
 ADD COLUMN     "source_application_id" TEXT;
+
+-- AlterTable
+ALTER TABLE "discovery_leads" ALTER COLUMN "expires_at" SET DATA TYPE TIMESTAMP(3);
+
+-- AlterTable
+ALTER TABLE "uce_applications" ADD COLUMN     "canonical_brief_id" TEXT,
+ADD COLUMN     "canonical_campaign_asset_id" TEXT;
+
+-- AlterTable
+ALTER TABLE "uce_campaign_commercials" ADD COLUMN     "brand_support_estimated_value" DECIMAL(12,2),
+ADD COLUMN     "brand_support_type" "UceBrandSupportType",
+ADD COLUMN     "commercial_offer" DECIMAL(12,2) NOT NULL DEFAULT 0,
+ADD COLUMN     "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
+ADD COLUMN     "receives_brand_support" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "total_campaign_budget" DECIMAL(14,2) NOT NULL DEFAULT 0,
+ALTER COLUMN "advance_payment_percentage" SET DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "uce_campaign_strategy" ADD COLUMN     "canonical_objective" "CampaignObjective",
+ADD COLUMN     "platforms" "UceMediaPlatform"[] DEFAULT ARRAY['INSTAGRAM']::"UceMediaPlatform"[],
+ADD COLUMN     "primary_kpi_id" TEXT,
+ADD COLUMN     "publish_from" TIMESTAMP(3),
+ADD COLUMN     "publish_until" TIMESTAMP(3),
+ADD COLUMN     "publishing_schedule" "UcePublishingSchedule" NOT NULL DEFAULT 'EVERGREEN',
+ADD COLUMN     "supporting_kpi_ids" TEXT[] DEFAULT ARRAY[]::TEXT[],
+ADD COLUMN     "visibility_scope" "UceVisibilityScope" NOT NULL DEFAULT 'EVERYONE';
+
+-- AlterTable
+ALTER TABLE "uce_campaign_targeting" ADD COLUMN     "audience_affinity_ids" TEXT[] DEFAULT ARRAY[]::TEXT[],
+ADD COLUMN     "audience_geographies" JSONB NOT NULL DEFAULT '[]',
+ADD COLUMN     "maximum_followers" INTEGER,
+ADD COLUMN     "minimum_followers" INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE "uce_campaign_targeting"
+ALTER COLUMN "audience_gender" DROP DEFAULT,
+ALTER COLUMN "audience_gender" TYPE "UceAudienceGender"
+USING ("audience_gender"::"UceAudienceGender"),
+ALTER COLUMN "audience_gender" SET DEFAULT 'ALL';
+
+-- AlterTable
+ALTER TABLE "uce_campaigns" ADD COLUMN     "ai_recommendation_id" TEXT,
+ADD COLUMN     "ai_recommendation_version" TEXT,
+ADD COLUMN     "archived_at" TIMESTAMP(3),
+ADD COLUMN     "completed_at" TIMESTAMP(3),
+ADD COLUMN     "live_at" TIMESTAMP(3),
+ADD COLUMN     "published_at" TIMESTAMP(3);
+
+ALTER TABLE "uce_campaigns"
+DROP CONSTRAINT IF EXISTS "uce_campaigns_creation_source_check";
+
+ALTER TABLE "uce_campaigns"
+ALTER COLUMN "creation_source" DROP DEFAULT,
+ALTER COLUMN "creation_source" TYPE "UceCampaignCreationSource"
+USING ("creation_source"::"UceCampaignCreationSource"),
+ALTER COLUMN "creation_source" SET DEFAULT 'MANUAL';
 
 -- CreateTable
 CREATE TABLE "uce_campaign_assets" (
@@ -660,223 +670,231 @@ CREATE TABLE "collaboration_events" (
 );
 
 -- CreateIndex
-CREATE INDEX "uce_campaign_assets_campaign_id_status_idx" ON "uce_campaign_assets"("campaign_id", "status");
+CREATE INDEX IF NOT EXISTS "uce_campaign_assets_campaign_id_status_idx" ON "uce_campaign_assets"("campaign_id", "status");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "uce_campaign_assets_campaign_id_brand_profile_id_key" ON "uce_campaign_assets"("campaign_id", "brand_profile_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "uce_campaign_assets_campaign_id_brand_profile_id_key" ON "uce_campaign_assets"("campaign_id", "brand_profile_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "uce_campaign_assets_campaign_id_offering_id_key" ON "uce_campaign_assets"("campaign_id", "offering_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "uce_campaign_assets_campaign_id_offering_id_key" ON "uce_campaign_assets"("campaign_id", "offering_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "uce_campaign_assets_campaign_id_brand_offer_id_key" ON "uce_campaign_assets"("campaign_id", "brand_offer_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "uce_campaign_assets_campaign_id_brand_offer_id_key" ON "uce_campaign_assets"("campaign_id", "brand_offer_id");
 
 -- CreateIndex
-CREATE INDEX "uce_briefs_campaign_asset_id_status_idx" ON "uce_briefs"("campaign_asset_id", "status");
+CREATE INDEX IF NOT EXISTS "uce_briefs_campaign_asset_id_status_idx" ON "uce_briefs"("campaign_asset_id", "status");
 
 -- CreateIndex
-CREATE INDEX "uce_briefs_creation_source_idx" ON "uce_briefs"("creation_source");
+CREATE INDEX IF NOT EXISTS "uce_briefs_creation_source_idx" ON "uce_briefs"("creation_source");
 
 -- CreateIndex
-CREATE INDEX "uce_brief_deliverables_brief_id_display_order_idx" ON "uce_brief_deliverables"("brief_id", "display_order");
+CREATE INDEX IF NOT EXISTS "uce_brief_deliverables_brief_id_display_order_idx" ON "uce_brief_deliverables"("brief_id", "display_order");
 
 -- CreateIndex
-CREATE INDEX "uce_brief_deliverables_amplify_target_deliverable_id_idx" ON "uce_brief_deliverables"("amplify_target_deliverable_id");
+CREATE INDEX IF NOT EXISTS "uce_brief_deliverables_amplify_target_deliverable_id_idx" ON "uce_brief_deliverables"("amplify_target_deliverable_id");
 
 -- CreateIndex
-CREATE INDEX "uce_campaign_recommendation_contexts_campaign_id_idx" ON "uce_campaign_recommendation_contexts"("campaign_id");
+CREATE INDEX IF NOT EXISTS "uce_campaign_recommendation_contexts_campaign_id_idx" ON "uce_campaign_recommendation_contexts"("campaign_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "uce_campaign_recommendation_contexts_campaign_id_version_key" ON "uce_campaign_recommendation_contexts"("campaign_id", "version");
+CREATE UNIQUE INDEX IF NOT EXISTS "uce_campaign_recommendation_contexts_campaign_id_version_key" ON "uce_campaign_recommendation_contexts"("campaign_id", "version");
 
 -- CreateIndex
-CREATE INDEX "uce_creator_recommendation_runs_campaign_id_status_idx" ON "uce_creator_recommendation_runs"("campaign_id", "status");
+CREATE INDEX IF NOT EXISTS "uce_creator_recommendation_runs_campaign_id_status_idx" ON "uce_creator_recommendation_runs"("campaign_id", "status");
 
 -- CreateIndex
-CREATE INDEX "uce_creator_recommendation_runs_recommendation_context_id_idx" ON "uce_creator_recommendation_runs"("recommendation_context_id");
+CREATE INDEX IF NOT EXISTS "uce_creator_recommendation_runs_recommendation_context_id_idx" ON "uce_creator_recommendation_runs"("recommendation_context_id");
 
 -- CreateIndex
-CREATE INDEX "uce_campaign_creator_recommendations_recommendation_run_id__idx" ON "uce_campaign_creator_recommendations"("recommendation_run_id", "rank");
+CREATE INDEX IF NOT EXISTS "uce_campaign_creator_recommendations_recommendation_run_id__idx" ON "uce_campaign_creator_recommendations"("recommendation_run_id", "rank");
 
 -- CreateIndex
-CREATE INDEX "uce_campaign_creator_recommendations_recommendation_context_idx" ON "uce_campaign_creator_recommendations"("recommendation_context_id");
+CREATE INDEX IF NOT EXISTS "uce_campaign_creator_recommendations_recommendation_context_idx" ON "uce_campaign_creator_recommendations"("recommendation_context_id");
 
 -- CreateIndex
-CREATE INDEX "uce_campaign_creator_recommendations_campaign_creator_id_ev_idx" ON "uce_campaign_creator_recommendations"("campaign_creator_id", "evaluated_at");
+CREATE INDEX IF NOT EXISTS "uce_campaign_creator_recommendations_campaign_creator_id_ev_idx" ON "uce_campaign_creator_recommendations"("campaign_creator_id", "evaluated_at");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "uce_campaign_creator_recommendations_campaign_creator_id_re_key" ON "uce_campaign_creator_recommendations"("campaign_creator_id", "recommendation_run_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "uce_campaign_creator_recommendations_campaign_creator_id_re_key" ON "uce_campaign_creator_recommendations"("campaign_creator_id", "recommendation_run_id");
 
 -- CreateIndex
-CREATE INDEX "uce_campaign_creator_imports_campaign_id_status_idx" ON "uce_campaign_creator_imports"("campaign_id", "status");
+CREATE INDEX IF NOT EXISTS "uce_campaign_creator_imports_campaign_id_status_idx" ON "uce_campaign_creator_imports"("campaign_id", "status");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "uce_outreach_campaign_creator_id_key" ON "uce_outreach"("campaign_creator_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "uce_outreach_campaign_creator_id_key" ON "uce_outreach"("campaign_creator_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "uce_outreach_tracking_token_key" ON "uce_outreach"("tracking_token");
+CREATE UNIQUE INDEX IF NOT EXISTS "uce_outreach_tracking_token_key" ON "uce_outreach"("tracking_token");
 
 -- CreateIndex
-CREATE INDEX "uce_outreach_channel_initiated_at_idx" ON "uce_outreach"("channel", "initiated_at");
+CREATE INDEX IF NOT EXISTS "uce_outreach_channel_initiated_at_idx" ON "uce_outreach"("channel", "initiated_at");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "uce_outreach_attempts_request_id_key" ON "uce_outreach_attempts"("request_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "uce_outreach_attempts_request_id_key" ON "uce_outreach_attempts"("request_id");
 
 -- CreateIndex
-CREATE INDEX "uce_outreach_attempts_status_scheduled_for_idx" ON "uce_outreach_attempts"("status", "scheduled_for");
+CREATE INDEX IF NOT EXISTS "uce_outreach_attempts_status_scheduled_for_idx" ON "uce_outreach_attempts"("status", "scheduled_for");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "uce_outreach_attempts_outreach_id_sequence_key" ON "uce_outreach_attempts"("outreach_id", "sequence");
+CREATE UNIQUE INDEX IF NOT EXISTS "uce_outreach_attempts_outreach_id_sequence_key" ON "uce_outreach_attempts"("outreach_id", "sequence");
 
 -- CreateIndex
-CREATE INDEX "uce_outreach_tracking_events_outreach_id_occurred_at_idx" ON "uce_outreach_tracking_events"("outreach_id", "occurred_at");
+CREATE INDEX IF NOT EXISTS "uce_outreach_tracking_events_outreach_id_occurred_at_idx" ON "uce_outreach_tracking_events"("outreach_id", "occurred_at");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "uce_applicant_intelligence_application_id_key" ON "uce_applicant_intelligence"("application_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "uce_applicant_intelligence_application_id_key" ON "uce_applicant_intelligence"("application_id");
 
 -- CreateIndex
-CREATE INDEX "uce_applicant_intelligence_status_idx" ON "uce_applicant_intelligence"("status");
+CREATE INDEX IF NOT EXISTS "uce_applicant_intelligence_status_idx" ON "uce_applicant_intelligence"("status");
 
 -- CreateIndex
-CREATE INDEX "uce_applicant_intelligence_score_idx" ON "uce_applicant_intelligence"("score");
+CREATE INDEX IF NOT EXISTS "uce_applicant_intelligence_score_idx" ON "uce_applicant_intelligence"("score");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "uce_campaign_reports_campaign_id_key" ON "uce_campaign_reports"("campaign_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "uce_campaign_reports_campaign_id_key" ON "uce_campaign_reports"("campaign_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "uce_campaign_reports_latest_calculation_id_key" ON "uce_campaign_reports"("latest_calculation_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "uce_campaign_reports_latest_calculation_id_key" ON "uce_campaign_reports"("latest_calculation_id");
 
 -- CreateIndex
-CREATE INDEX "uce_campaign_report_calculations_report_id_calculated_at_idx" ON "uce_campaign_report_calculations"("report_id", "calculated_at");
+CREATE INDEX IF NOT EXISTS "uce_campaign_report_calculations_report_id_calculated_at_idx" ON "uce_campaign_report_calculations"("report_id", "calculated_at");
 
 -- CreateIndex
-CREATE INDEX "uce_campaign_report_calculations_availability_idx" ON "uce_campaign_report_calculations"("availability");
+CREATE INDEX IF NOT EXISTS "uce_campaign_report_calculations_availability_idx" ON "uce_campaign_report_calculations"("availability");
 
 -- CreateIndex
-CREATE INDEX "uce_campaign_report_calculations_is_final_idx" ON "uce_campaign_report_calculations"("is_final");
+CREATE INDEX IF NOT EXISTS "uce_campaign_report_calculations_is_final_idx" ON "uce_campaign_report_calculations"("is_final");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "uce_campaign_report_calculations_report_id_version_key" ON "uce_campaign_report_calculations"("report_id", "version");
+CREATE UNIQUE INDEX IF NOT EXISTS "uce_campaign_report_calculations_report_id_version_key" ON "uce_campaign_report_calculations"("report_id", "version");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "collaboration_execution_snapshots_collaboration_id_key" ON "collaboration_execution_snapshots"("collaboration_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "collaboration_execution_snapshots_collaboration_id_key" ON "collaboration_execution_snapshots"("collaboration_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "collaboration_commercial_agreements_collaboration_id_key" ON "collaboration_commercial_agreements"("collaboration_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "collaboration_commercial_agreements_collaboration_id_key" ON "collaboration_commercial_agreements"("collaboration_id");
 
 -- CreateIndex
-CREATE INDEX "collaboration_commercial_agreements_negotiation_state_idx" ON "collaboration_commercial_agreements"("negotiation_state");
+CREATE INDEX IF NOT EXISTS "collaboration_commercial_agreements_negotiation_state_idx" ON "collaboration_commercial_agreements"("negotiation_state");
 
 -- CreateIndex
-CREATE INDEX "collaboration_commercial_agreements_securement_state_idx" ON "collaboration_commercial_agreements"("securement_state");
+CREATE INDEX IF NOT EXISTS "collaboration_commercial_agreements_securement_state_idx" ON "collaboration_commercial_agreements"("securement_state");
 
 -- CreateIndex
-CREATE INDEX "collaboration_commercial_agreements_pricing_tier_snapshot_b_idx" ON "collaboration_commercial_agreements"("pricing_tier_snapshot", "business_country_code_snapshot");
+CREATE INDEX IF NOT EXISTS "collaboration_commercial_agreements_pricing_tier_snapshot_b_idx" ON "collaboration_commercial_agreements"("pricing_tier_snapshot", "business_country_code_snapshot");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "collaboration_fulfillments_collaboration_id_key" ON "collaboration_fulfillments"("collaboration_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "collaboration_fulfillments_collaboration_id_key" ON "collaboration_fulfillments"("collaboration_id");
 
 -- CreateIndex
-CREATE INDEX "collaboration_fulfillments_state_idx" ON "collaboration_fulfillments"("state");
+CREATE INDEX IF NOT EXISTS "collaboration_fulfillments_state_idx" ON "collaboration_fulfillments"("state");
 
 -- CreateIndex
-CREATE INDEX "collaboration_fulfillment_issues_fulfillment_id_reported_at_idx" ON "collaboration_fulfillment_issues"("fulfillment_id", "reported_at");
+CREATE INDEX IF NOT EXISTS "collaboration_fulfillment_issues_fulfillment_id_reported_at_idx" ON "collaboration_fulfillment_issues"("fulfillment_id", "reported_at");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "collaboration_fulfillment_issues_fulfillment_id_sequence_key" ON "collaboration_fulfillment_issues"("fulfillment_id", "sequence");
+CREATE UNIQUE INDEX IF NOT EXISTS "collaboration_fulfillment_issues_fulfillment_id_sequence_key" ON "collaboration_fulfillment_issues"("fulfillment_id", "sequence");
 
 -- CreateIndex
-CREATE INDEX "collaboration_deliverable_executions_collaboration_id_state_idx" ON "collaboration_deliverable_executions"("collaboration_id", "state");
+CREATE INDEX IF NOT EXISTS "collaboration_deliverable_executions_collaboration_id_state_idx" ON "collaboration_deliverable_executions"("collaboration_id", "state");
 
 -- CreateIndex
-CREATE INDEX "collaboration_deliverable_executions_source_brief_deliverab_idx" ON "collaboration_deliverable_executions"("source_brief_deliverable_id");
+CREATE INDEX IF NOT EXISTS "collaboration_deliverable_executions_source_brief_deliverab_idx" ON "collaboration_deliverable_executions"("source_brief_deliverable_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "collaboration_deliverable_executions_collaboration_id_sourc_key" ON "collaboration_deliverable_executions"("collaboration_id", "source_brief_deliverable_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "collaboration_deliverable_executions_collaboration_id_sourc_key" ON "collaboration_deliverable_executions"("collaboration_id", "source_brief_deliverable_id");
 
 -- CreateIndex
-CREATE INDEX "collaboration_submission_versions_review_state_review_deadl_idx" ON "collaboration_submission_versions"("review_state", "review_deadline_at");
+CREATE INDEX IF NOT EXISTS "collaboration_submission_versions_review_state_review_deadl_idx" ON "collaboration_submission_versions"("review_state", "review_deadline_at");
 
 -- CreateIndex
-CREATE INDEX "collaboration_submission_versions_deliverable_execution_id__idx" ON "collaboration_submission_versions"("deliverable_execution_id", "created_at");
+CREATE INDEX IF NOT EXISTS "collaboration_submission_versions_deliverable_execution_id__idx" ON "collaboration_submission_versions"("deliverable_execution_id", "created_at");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "collaboration_submission_versions_deliverable_execution_id__key" ON "collaboration_submission_versions"("deliverable_execution_id", "version_number");
+CREATE UNIQUE INDEX IF NOT EXISTS "collaboration_submission_versions_deliverable_execution_id__key" ON "collaboration_submission_versions"("deliverable_execution_id", "version_number");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "collaboration_publishing_executions_deliverable_execution_i_key" ON "collaboration_publishing_executions"("deliverable_execution_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "collaboration_publishing_executions_deliverable_execution_i_key" ON "collaboration_publishing_executions"("deliverable_execution_id");
 
 -- CreateIndex
-CREATE INDEX "collaboration_publishing_executions_state_idx" ON "collaboration_publishing_executions"("state");
+CREATE INDEX IF NOT EXISTS "collaboration_publishing_executions_state_idx" ON "collaboration_publishing_executions"("state");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "collaboration_financial_resolutions_collaboration_id_key" ON "collaboration_financial_resolutions"("collaboration_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "collaboration_financial_resolutions_collaboration_id_key" ON "collaboration_financial_resolutions"("collaboration_id");
 
 -- CreateIndex
-CREATE INDEX "collaboration_financial_resolutions_status_idx" ON "collaboration_financial_resolutions"("status");
+CREATE INDEX IF NOT EXISTS "collaboration_financial_resolutions_status_idx" ON "collaboration_financial_resolutions"("status");
 
 -- CreateIndex
-CREATE INDEX "collaboration_financial_resolutions_outcome_idx" ON "collaboration_financial_resolutions"("outcome");
+CREATE INDEX IF NOT EXISTS "collaboration_financial_resolutions_outcome_idx" ON "collaboration_financial_resolutions"("outcome");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "collaboration_settlements_collaboration_id_key" ON "collaboration_settlements"("collaboration_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "collaboration_settlements_collaboration_id_key" ON "collaboration_settlements"("collaboration_id");
 
 -- CreateIndex
-CREATE INDEX "collaboration_settlements_state_idx" ON "collaboration_settlements"("state");
+CREATE INDEX IF NOT EXISTS "collaboration_settlements_state_idx" ON "collaboration_settlements"("state");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "collaboration_feedback_windows_collaboration_id_key" ON "collaboration_feedback_windows"("collaboration_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "collaboration_feedback_windows_collaboration_id_key" ON "collaboration_feedback_windows"("collaboration_id");
 
 -- CreateIndex
-CREATE INDEX "collaboration_feedback_windows_visibility_closes_at_idx" ON "collaboration_feedback_windows"("visibility", "closes_at");
+CREATE INDEX IF NOT EXISTS "collaboration_feedback_windows_visibility_closes_at_idx" ON "collaboration_feedback_windows"("visibility", "closes_at");
 
 -- CreateIndex
-CREATE INDEX "collaboration_feedback_collaboration_id_submitted_at_idx" ON "collaboration_feedback"("collaboration_id", "submitted_at");
+CREATE INDEX IF NOT EXISTS "collaboration_feedback_collaboration_id_submitted_at_idx" ON "collaboration_feedback"("collaboration_id", "submitted_at");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "collaboration_feedback_collaboration_id_author_role_key" ON "collaboration_feedback"("collaboration_id", "author_role");
+CREATE UNIQUE INDEX IF NOT EXISTS "collaboration_feedback_collaboration_id_author_role_key" ON "collaboration_feedback"("collaboration_id", "author_role");
 
 -- CreateIndex
-CREATE INDEX "collaboration_events_collaboration_id_occurred_at_idx" ON "collaboration_events"("collaboration_id", "occurred_at");
+CREATE INDEX IF NOT EXISTS "collaboration_events_collaboration_id_occurred_at_idx" ON "collaboration_events"("collaboration_id", "occurred_at");
 
 -- CreateIndex
-CREATE INDEX "collaboration_events_command_id_idx" ON "collaboration_events"("command_id");
+CREATE INDEX IF NOT EXISTS "collaboration_events_command_id_idx" ON "collaboration_events"("command_id");
 
 -- CreateIndex
-CREATE INDEX "collaboration_events_event_type_occurred_at_idx" ON "collaboration_events"("event_type", "occurred_at");
+CREATE INDEX IF NOT EXISTS "collaboration_events_event_type_occurred_at_idx" ON "collaboration_events"("event_type", "occurred_at");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "collaboration_events_collaboration_id_aggregate_version_key" ON "collaboration_events"("collaboration_id", "aggregate_version");
+CREATE UNIQUE INDEX IF NOT EXISTS "collaboration_events_collaboration_id_aggregate_version_key" ON "collaboration_events"("collaboration_id", "aggregate_version");
 
 -- CreateIndex
-CREATE INDEX "uce_applications_canonical_campaign_asset_id_status_idx" ON "uce_applications"("canonical_campaign_asset_id", "status");
+CREATE INDEX IF NOT EXISTS "collaboration_messages_sender_user_id_idx" ON "collaboration_messages"("sender_user_id");
 
 -- CreateIndex
-CREATE INDEX "uce_applications_canonical_brief_id_status_idx" ON "uce_applications"("canonical_brief_id", "status");
+CREATE UNIQUE INDEX IF NOT EXISTS "collaborations_source_application_id_key" ON "collaborations"("source_application_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "collaborations_source_application_id_key" ON "collaborations"("source_application_id");
+CREATE INDEX IF NOT EXISTS "collaborations_campaign_id_lifecycle_idx" ON "collaborations"("campaign_id", "lifecycle");
 
 -- CreateIndex
-CREATE INDEX "collaborations_campaign_id_lifecycle_idx" ON "collaborations"("campaign_id", "lifecycle");
+CREATE INDEX IF NOT EXISTS "collaborations_campaign_creator_id_idx" ON "collaborations"("campaign_creator_id");
 
 -- CreateIndex
-CREATE INDEX "collaborations_campaign_creator_id_idx" ON "collaborations"("campaign_creator_id");
+CREATE INDEX IF NOT EXISTS "collaborations_campaign_asset_id_idx" ON "collaborations"("campaign_asset_id");
 
 -- CreateIndex
-CREATE INDEX "collaborations_campaign_asset_id_idx" ON "collaborations"("campaign_asset_id");
+CREATE INDEX IF NOT EXISTS "collaborations_canonical_brief_id_idx" ON "collaborations"("canonical_brief_id");
 
 -- CreateIndex
-CREATE INDEX "collaborations_canonical_brief_id_idx" ON "collaborations"("canonical_brief_id");
+CREATE INDEX IF NOT EXISTS "collaborations_brief_id_idx" ON "collaborations"("brief_id");
 
 -- CreateIndex
-CREATE INDEX "collaborations_brief_id_idx" ON "collaborations"("brief_id");
+CREATE INDEX IF NOT EXISTS "collaborations_canonical_current_stage_current_stage_status_idx" ON "collaborations"("canonical_current_stage", "current_stage_status");
 
 -- CreateIndex
-CREATE INDEX "collaborations_canonical_current_stage_current_stage_status_idx" ON "collaborations"("canonical_current_stage", "current_stage_status");
+DROP INDEX IF EXISTS "creator_profiles_public_slug_key";
+CREATE UNIQUE INDEX "creator_profiles_public_slug_key" ON "creator_profiles"("public_slug");
 
 -- CreateIndex
-CREATE INDEX "collaboration_messages_sender_user_id_idx" ON "collaboration_messages"("sender_user_id");
+CREATE INDEX IF NOT EXISTS "uce_applications_canonical_campaign_asset_id_status_idx" ON "uce_applications"("canonical_campaign_asset_id", "status");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "uce_applications_canonical_brief_id_status_idx" ON "uce_applications"("canonical_brief_id", "status");
+
+-- CreateIndex
+DROP INDEX IF EXISTS "users_google_subject_id_key";
+CREATE UNIQUE INDEX "users_google_subject_id_key" ON "users"("google_subject_id");
 
 -- AddForeignKey
 ALTER TABLE "uce_applications" ADD CONSTRAINT "uce_applications_canonical_campaign_asset_id_fkey" FOREIGN KEY ("canonical_campaign_asset_id") REFERENCES "uce_campaign_assets"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -997,3 +1015,12 @@ ALTER TABLE "collaboration_feedback" ADD CONSTRAINT "collaboration_feedback_coll
 
 -- AddForeignKey
 ALTER TABLE "collaboration_events" ADD CONSTRAINT "collaboration_events_collaboration_id_fkey" FOREIGN KEY ("collaboration_id") REFERENCES "collaborations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- RenameIndex
+ALTER INDEX "creator_co_pilot_interaction_logs_creator_profile_id_created_at" RENAME TO "creator_co_pilot_interaction_logs_creator_profile_id_create_idx";
+
+-- RenameIndex
+ALTER INDEX "creator_co_pilot_message_feedback_creator_profile_id_created_at" RENAME TO "creator_co_pilot_message_feedback_creator_profile_id_create_idx";
+
+-- RenameIndex
+ALTER INDEX "uce_campaign_creators_campaign_id_platform_normalized_social_ha" RENAME TO "uce_campaign_creators_campaign_id_platform_normalized_socia_key";
