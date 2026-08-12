@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { ThrottlerGuard } from "@nestjs/throttler";
 
 import type { RequestWithAuthUser } from "../auth/auth.controller";
@@ -28,6 +28,15 @@ export class CanonicalCampaignCreateController {
   async createCanonicalDraft(@Req() req: RequestWithAuthUser) {
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
     return this.canonicalCreate.createDraft(brandProfileId);
+  }
+
+  @Get("campaigns/canonical-drafts/:campaignId")
+  async getCanonicalDraft(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.canonicalCreate.getDraft(brandProfileId, campaignId);
   }
 
   @Patch("campaigns/canonical-drafts/:campaignId/field")
