@@ -61,7 +61,7 @@ const targetingSchema = z
     audience_age_max: z.number().int().min(13).max(65),
     audience_gender: audienceGenderSchema,
     audience_affinity_ids: z.array(z.string().trim().min(1)).max(5).default([]),
-    audience_geographies: z.array(z.record(z.unknown())).default([]),
+    audience_geographies: z.array(z.record(z.unknown())).min(1),
   })
   .superRefine((value, ctx) => {
     if (value.maximum_followers != null && value.maximum_followers <= value.minimum_followers) {
