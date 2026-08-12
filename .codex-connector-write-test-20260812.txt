@@ -1,2 +1,0 @@
-Codex GitHub connector write-access test.
-Created temporarily on 2026-08-12 and intended for immediate deletion.
