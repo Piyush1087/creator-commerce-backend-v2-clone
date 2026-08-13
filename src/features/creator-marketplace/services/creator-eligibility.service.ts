@@ -25,6 +25,26 @@ export type EligibilityBreakdown = {
   apply_bypass?: boolean;
 };
 
+type EligibilityTargeting = Pick<
+  UceCampaignTargeting,
+  | "followerTiers"
+  | "targetLocations"
+  | "audienceAgeMin"
+  | "audienceAgeMax"
+  | "audienceGender"
+  | "disqualifyingKeywords"
+> & {
+  audienceGeographies?: unknown;
+  minimumFollowers?: number;
+  maximumFollowers?: number | null;
+};
+
+type NormalizedGeography = {
+  hasTargeting: boolean;
+  unrestricted: boolean;
+  countryCodes: string[];
+};
+
 const BYPASS_ELIGIBLE: EligibilityBreakdown = {
   is_eligible: true,
   tier_match: true,
@@ -42,34 +62,24 @@ export class CreatorEligibilityService {
    */
   evaluateTargeting(
     creator: CreatorEligibilityInput,
-    targeting: Pick<
-      UceCampaignTargeting,
-      | "followerTiers"
-      | "targetLocations"
-      | "audienceAgeMin"
-      | "audienceAgeMax"
-      | "audienceGender"
-      | "disqualifyingKeywords"
-    >,
+    targeting: EligibilityTargeting,
     options?: { creatorEmail?: string | null },
   ): EligibilityBreakdown {
     if (isCreatorApplyBypassEmail(options?.creatorEmail)) {
       return { ...BYPASS_ELIGIBLE };
     }
 
-    const tierMatch = creatorMatchesFollowerTiers(
+    const tierMatch = this.matchesFollowerTargeting(
       creator.followerCount,
-      targeting.followerTiers,
+      targeting,
     );
 
-    const regionMatch = this.matchesRegion(
-      creator.primaryRegion,
-      targeting.targetLocations,
-    );
+    const geography = this.normalizeGeography(targeting);
+    const regionMatch = this.matchesRegion(creator.primaryRegion, geography);
 
     const audienceGeoMatch = this.matchesAudienceGeo(
       creator.audienceDemographicsMatrix,
-      targeting.targetLocations,
+      geography,
       creator.primaryRegion,
     );
 
@@ -97,19 +107,30 @@ export class CreatorEligibilityService {
     return normalizedFilter.has(resolved);
   }
 
+  private matchesFollowerTargeting(
+    followerCount: number,
+    targeting: EligibilityTargeting,
+  ): boolean {
+    if (typeof targeting.minimumFollowers === "number") {
+      return (
+        followerCount >= targeting.minimumFollowers &&
+        (targeting.maximumFollowers == null ||
+          followerCount <= targeting.maximumFollowers)
+      );
+    }
+
+    return creatorMatchesFollowerTiers(followerCount, targeting.followerTiers);
+  }
+
   private matchesRegion(
     primaryRegion: string,
-    targetLocations: string[],
+    geography: NormalizedGeography,
   ): boolean {
-    if (targetLocations.length === 0) {
+    if (!geography.hasTargeting || geography.unrestricted) {
       return true;
     }
     const creatorRegion = primaryRegion.trim().toUpperCase();
-    const targets = targetLocations.map((l) => l.trim().toUpperCase());
-    if (targets.includes("GLOBAL") || targets.includes("ALL")) {
-      return true;
-    }
-    return targets.includes(creatorRegion);
+    return geography.countryCodes.includes(creatorRegion);
   }
 
   /**
@@ -117,20 +138,14 @@ export class CreatorEligibilityService {
    */
   private matchesAudienceGeo(
     matrix: CreatorAudienceDemographicsMatrix,
-    targetLocations: string[],
+    geography: NormalizedGeography,
     primaryRegion: string,
   ): boolean {
-    if (targetLocations.length === 0) {
+    if (!geography.hasTargeting || geography.unrestricted) {
       return true;
     }
 
-    const targets = targetLocations
-      .map((l) => l.trim().toUpperCase())
-      .filter((l) => l !== "GLOBAL" && l !== "ALL");
-
-    if (targets.length === 0) {
-      return true;
-    }
+    const targets = geography.countryCodes;
 
     const topCountries = matrix.top_countries ?? {};
     const entries = Object.entries(topCountries);
@@ -147,5 +162,74 @@ export class CreatorEligibilityService {
     }
 
     return false;
+  }
+
+  /**
+   * Canonical audienceGeographies is authoritative when present. Creator
+   * geography authority is currently country-level, so COUNTRY, REGION and
+   * LOCALITY selections deterministically bridge through country_code.
+   * Legacy targetLocations remains a fallback for pre-canonical campaigns.
+   */
+  private normalizeGeography(
+    targeting: EligibilityTargeting,
+  ): NormalizedGeography {
+    const canonical = Array.isArray(targeting.audienceGeographies)
+      ? targeting.audienceGeographies
+      : [];
+    const source = canonical.length > 0 ? canonical : targeting.targetLocations;
+
+    if (source.length === 0) {
+      return { hasTargeting: false, unrestricted: false, countryCodes: [] };
+    }
+
+    let unrestricted = false;
+    const countryCodes = new Set<string>();
+
+    for (const entry of source) {
+      const normalized = this.normalizeGeographyEntry(entry);
+      if (normalized === "GLOBAL") {
+        unrestricted = true;
+      } else if (normalized) {
+        countryCodes.add(normalized);
+      }
+    }
+
+    return {
+      hasTargeting: true,
+      unrestricted,
+      countryCodes: [...countryCodes],
+    };
+  }
+
+  private normalizeGeographyEntry(entry: unknown): string | null {
+    if (typeof entry === "string") {
+      const value = entry.trim();
+      if (!value) {
+        return null;
+      }
+      try {
+        return this.normalizeGeographyEntry(JSON.parse(value));
+      } catch {
+        const normalized = value.toUpperCase();
+        return normalized === "ALL" ? "GLOBAL" : normalized;
+      }
+    }
+
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      return null;
+    }
+
+    const geography = entry as Record<string, unknown>;
+    const scope =
+      typeof geography.scope === "string"
+        ? geography.scope.trim().toUpperCase()
+        : "";
+    if (scope === "GLOBAL") {
+      return "GLOBAL";
+    }
+
+    return typeof geography.country_code === "string"
+      ? geography.country_code.trim().toUpperCase()
+      : null;
   }
 }
