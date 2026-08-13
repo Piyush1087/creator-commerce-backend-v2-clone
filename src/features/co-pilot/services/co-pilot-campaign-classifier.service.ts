@@ -37,7 +37,14 @@ const CampaignClassifierOutputSchema = z.object({
   campaignNameHint: z.string().nullable().optional(),
   campaignNameHintB: z.string().nullable().optional(),
   statusFilter: z
-    .enum(["DRAFT", "ACTIVE", "PAUSED", "COMPLETED", "ARCHIVED"])
+    .enum([
+      "DRAFT",
+      "PUBLISHED",
+      "LIVE",
+      "PAUSED",
+      "COMPLETED",
+      "ARCHIVED",
+    ])
     .nullable()
     .optional(),
   objectiveFilter: z

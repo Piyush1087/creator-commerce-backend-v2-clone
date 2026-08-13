@@ -42,6 +42,12 @@ import { BrandUceCampaignService } from "./services/brand-uce-campaign.service";
 import { BrandUcePipelineService } from "./services/brand-uce-pipeline.service";
 import { BrandUceProductService } from "./services/brand-uce-product.service";
 import { BrandUceReportingService } from "./services/brand-uce-reporting.service";
+import { CampaignApplicationService } from "./services/campaign-application.service";
+import {
+  CampaignCommandService,
+  type ShareChannel,
+} from "./services/campaign-command.service";
+import { CampaignQueryService } from "./services/campaign-query.service";
 
 @Controller("api/v1/brand-uce")
 @UseGuards(ThrottlerGuard, JwtAuthGuard)
@@ -53,6 +59,9 @@ export class BrandUceController {
     private readonly briefs: BrandUceBriefService,
     private readonly pipeline: BrandUcePipelineService,
     private readonly reporting: BrandUceReportingService,
+    private readonly campaignQuery: CampaignQueryService,
+    private readonly campaignCommands: CampaignCommandService,
+    private readonly campaignApplications: CampaignApplicationService,
   ) {}
 
   @Get("campaigns/aggregates")
@@ -447,5 +456,166 @@ export class BrandUceController {
   ) {
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
     return this.reporting.forceRefreshSync(brandProfileId, campaignId);
+  }
+
+  @Get("campaigns/:campaignId/page")
+  async getCampaignPage(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.campaignQuery.getCampaignPage(brandProfileId, campaignId);
+  }
+
+  @Get("campaigns/:campaignId/discovery")
+  async getDiscoveryWorkspace(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.campaignQuery.getDiscovery(brandProfileId, campaignId);
+  }
+
+  @Get("campaigns/:campaignId/applications")
+  async getApplicationsWorkspace(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.campaignQuery.getApplicants(brandProfileId, campaignId);
+  }
+
+  @Post("campaigns/:campaignId/applications/:applicationId/approve")
+  @HttpCode(200)
+  async approveApplication(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Param("applicationId") applicationId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.campaignApplications.approve(
+      brandProfileId,
+      campaignId,
+      applicationId,
+      req.user.id,
+    );
+  }
+
+  @Post("campaigns/:campaignId/applications/:applicationId/reject")
+  @HttpCode(200)
+  async rejectApplication(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Param("applicationId") applicationId: string,
+    @Body() body: { reason?: string },
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.campaignApplications.reject(
+      brandProfileId,
+      campaignId,
+      applicationId,
+      req.user.id,
+      body?.reason,
+    );
+  }
+
+  @Get("campaigns/:campaignId/products/:campaignAssetId/details")
+  async getProductDetails(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Param("campaignAssetId") campaignAssetId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.campaignQuery.getProductDetails(
+      brandProfileId,
+      campaignId,
+      campaignAssetId,
+    );
+  }
+
+  @Get("campaigns/:campaignId/briefs/:briefId/details")
+  async getBriefDetails(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Param("briefId") briefId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.campaignQuery.getBriefDetails(
+      brandProfileId,
+      campaignId,
+      briefId,
+    );
+  }
+
+  @Get("campaigns/:campaignId/creators/:campaignCreatorId/profile")
+  async getCreatorProfile(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Param("campaignCreatorId") campaignCreatorId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.campaignQuery.getCreatorProfile(
+      brandProfileId,
+      campaignId,
+      campaignCreatorId,
+    );
+  }
+
+  @Post("campaigns/:campaignId/publish")
+  @HttpCode(200)
+  async publishCampaign(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.campaigns.publishCampaign(brandProfileId, campaignId);
+  }
+
+  @Post("campaigns/:campaignId/go-live")
+  @HttpCode(200)
+  async goLiveCampaign(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.campaigns.goLiveCampaign(brandProfileId, campaignId);
+  }
+
+  @Post("campaigns/:campaignId/share")
+  @HttpCode(200)
+  async shareCampaign(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Body() body: { channel: ShareChannel; requestId: string },
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.campaignCommands.executeShare(
+      brandProfileId,
+      campaignId,
+      body.channel,
+      body.requestId,
+    );
+  }
+
+  @Post("campaigns/:campaignId/outreach/compose")
+  @HttpCode(200)
+  async composeOutreach(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Body()
+    body: {
+      campaignCreatorId: string;
+      /** @deprecated Prefer campaignCreatorId; kept for transitional clients. */
+      collaborationId?: string;
+      brandInstruction?: string;
+    },
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.campaignCommands.composeOutreach(
+      brandProfileId,
+      campaignId,
+      body.campaignCreatorId ?? body.collaborationId ?? "",
+      body.brandInstruction,
+    );
   }
 }

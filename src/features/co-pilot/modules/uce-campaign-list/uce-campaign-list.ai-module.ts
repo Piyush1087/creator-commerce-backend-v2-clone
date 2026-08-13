@@ -432,7 +432,7 @@ export class UceCampaignListAiModule implements CoPilotAiModule {
         | "";
       const statusFilter =
         action === "PAUSE"
-          ? ("ACTIVE" as const)
+          ? ("LIVE" as const)
           : action === "RESUME"
             ? ("PAUSED" as const)
             : action === "ARCHIVE"
@@ -483,7 +483,7 @@ export class UceCampaignListAiModule implements CoPilotAiModule {
 
     const listStatus =
       intent.kind === "PAUSE_CAMPAIGN"
-        ? ("ACTIVE" as const)
+        ? ("LIVE" as const)
         : intent.kind === "RESUME_CAMPAIGN"
           ? ("PAUSED" as const)
           : intent.kind === "GO_LIVE_CAMPAIGN"
@@ -626,27 +626,27 @@ export class UceCampaignListAiModule implements CoPilotAiModule {
           stagedPayload.source_campaign_name ?? row.campaign_name;
       }
 
-      if (kind === "PAUSE_CAMPAIGN" && status && status !== "ACTIVE") {
+      if (kind === "PAUSE_CAMPAIGN" && status && status !== "LIVE") {
         stagedPayload.hitl_blocked = true;
         stagedPayload.hitl_block_title = "Pause blocked";
         stagedPayload.hitl_block_action = "PAUSE";
         stagedPayload.hitl_block_code = "CAMPAIGN_STATUS_MISMATCH";
-        stagedPayload.hitl_block_narrative = `"${row?.campaign_name ?? "Campaign"}" is ${status}. Only ACTIVE campaigns can be paused.`;
+        stagedPayload.hitl_block_narrative = `"${row?.campaign_name ?? "Campaign"}" is ${status}. Only LIVE campaigns can be paused.`;
         stagedPayload.hitl_block_deep_link = `/brand/campaigns/${String(stagedPayload.campaign_id)}`;
         stagedPayload.hitl_block_items = [
           {
             id: "status",
-            title: "Campaign is ACTIVE",
+            title: "Campaign is LIVE",
             satisfied: false,
             helpText: `Current status: ${status}`,
-            repairHint: "Pause only works on live (ACTIVE) campaigns.",
+            repairHint: "Pause only works on LIVE campaigns.",
           },
         ];
       }
 
       if (kind === "ARCHIVE_CAMPAIGN" && status) {
         const ok =
-          status === "ACTIVE" ||
+          status === "LIVE" ||
           status === "PAUSED" ||
           status === "COMPLETED";
         if (!ok) {
@@ -654,7 +654,7 @@ export class UceCampaignListAiModule implements CoPilotAiModule {
           stagedPayload.hitl_block_title = "Archive blocked";
           stagedPayload.hitl_block_action = "ARCHIVE";
           stagedPayload.hitl_block_code = "CAMPAIGN_STATUS_MISMATCH";
-          stagedPayload.hitl_block_narrative = `"${row?.campaign_name ?? "Campaign"}" is ${status}. Archive requires ACTIVE, PAUSED, or COMPLETED.`;
+          stagedPayload.hitl_block_narrative = `"${row?.campaign_name ?? "Campaign"}" is ${status}. Archive requires LIVE, PAUSED, or COMPLETED.`;
           stagedPayload.hitl_block_deep_link = `/brand/campaigns/${String(stagedPayload.campaign_id)}`;
           stagedPayload.hitl_block_items = [
             {

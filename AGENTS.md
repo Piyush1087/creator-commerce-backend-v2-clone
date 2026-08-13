@@ -62,6 +62,18 @@ Rules:
 - Do not enable container startup migrations without updating this file and
   `docs/database`.
 
+## Git remotes
+
+Read `BRANCHING.md` before creating branches or opening PRs.
+
+- `origin` (`growth-verse/creator-commerce-backend-v2`) is the source of truth.
+- `piyush` (`Piyush1087/creator-commerce-backend-v2-clone`) is a convenience
+  mirror for AI-agent review.
+- Open PRs to `development` on **origin only**. Do not duplicate PRs on the
+  clone.
+- Dual-push feature branches to `piyush` only when the clone should see the
+  current work. The clone may lag until a catch-up push.
+
 ## Definition Of Done
 
 - API module has clear ownership and naming.

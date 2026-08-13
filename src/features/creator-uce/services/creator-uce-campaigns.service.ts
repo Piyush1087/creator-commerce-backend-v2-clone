@@ -56,7 +56,7 @@ export class CreatorUceCampaignsService {
     );
 
     const campaigns = await this.prisma.uceCampaign.findMany({
-      where: { status: UceCampaignStatus.ACTIVE },
+      where: { status: UceCampaignStatus.LIVE },
       orderBy: { updatedAt: "desc" },
       include: {
         brandProfile: { select: { name: true } },
@@ -112,7 +112,7 @@ export class CreatorUceCampaignsService {
     }
 
     const campaign = await this.prisma.uceCampaign.findFirst({
-      where: { id: campaignId, status: UceCampaignStatus.ACTIVE },
+      where: { id: campaignId, status: UceCampaignStatus.LIVE },
       include: { targeting: true },
     });
     if (!campaign || !campaign.targeting) {

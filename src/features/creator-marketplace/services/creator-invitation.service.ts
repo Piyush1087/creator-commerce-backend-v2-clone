@@ -36,7 +36,7 @@ export class CreatorInvitationService {
       },
     });
 
-    if (!collab || collab.campaign.status !== UceCampaignStatus.ACTIVE) {
+    if (!collab || collab.campaign.status !== UceCampaignStatus.LIVE) {
       throw new NotFoundException("Invitation not found or campaign is unavailable");
     }
 

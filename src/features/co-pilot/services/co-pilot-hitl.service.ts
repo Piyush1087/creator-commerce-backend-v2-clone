@@ -872,9 +872,9 @@ export class CoPilotHitlService {
       args.brandProfileId,
       campaignId,
     );
-    if (shell.current_status !== "ACTIVE") {
+    if (shell.current_status !== "LIVE") {
       const mapped = mapCampaignListValidationError({
-        err: new BadRequestException("Only ACTIVE campaigns can be paused."),
+        err: new BadRequestException("Only LIVE campaigns can be paused."),
         action: "PAUSE",
         campaignId,
         campaignName:
@@ -1110,11 +1110,11 @@ export class CoPilotHitlService {
     );
     const status = shell.current_status;
     const archivable =
-      status === "ACTIVE" || status === "PAUSED" || status === "COMPLETED";
+      status === "LIVE" || status === "PAUSED" || status === "COMPLETED";
     if (!archivable) {
       const mapped = mapCampaignListValidationError({
         err: new BadRequestException(
-          "Only ACTIVE, PAUSED, or COMPLETED campaigns can be archived.",
+          "Only LIVE, PAUSED, or COMPLETED campaigns can be archived.",
         ),
         action: "ARCHIVE",
         campaignId,

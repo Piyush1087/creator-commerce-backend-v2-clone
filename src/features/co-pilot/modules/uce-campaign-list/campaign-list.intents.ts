@@ -12,7 +12,8 @@ const OBJECTIVES: UceCampaignObjective[] = [
 
 const STATUSES: UceCampaignStatus[] = [
   "DRAFT",
-  "ACTIVE",
+  "PUBLISHED",
+  "LIVE",
   "PAUSED",
   "COMPLETED",
   "ARCHIVED",
@@ -53,8 +54,14 @@ export function extractCampaignNameHint(userText: string): string | undefined {
 export function extractStatusFilter(
   normalized: string,
 ): UceCampaignStatus | undefined {
-  if (/\bactive\b/.test(normalized) || /\brunning\b/.test(normalized) || /\blive\b/.test(normalized)) {
-    return "ACTIVE";
+  if (/\blive\b/.test(normalized) || /\brunning\b/.test(normalized)) {
+    return "LIVE";
+  }
+  if (/\bpublished\b/.test(normalized)) {
+    return "PUBLISHED";
+  }
+  if (/\bactive\b/.test(normalized)) {
+    return "LIVE";
   }
   if (/\bpaused\b/.test(normalized)) {
     return "PAUSED";

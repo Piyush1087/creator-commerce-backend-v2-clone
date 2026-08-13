@@ -14,6 +14,13 @@ import {
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { CreateCampaignWizardDto } from "../dto/brand-uce-campaign.dto";
 import { IntegratedCampaignWizardPayloadSchema } from "../schemas/uce-wizard.schema";
+import {
+  campaignCurrencyForBrandCountry,
+  campaignVisibilityToPersistence,
+  compensationModelToPersistence,
+  publishCampaignInputSchema,
+  updateDraftCampaignInputSchema,
+} from "../validation";
 import { decimalToNumber } from "../utils/uce-decimal.util";
 import { BrandUceAccessService } from "./brand-uce-access.service";
 
@@ -44,7 +51,7 @@ export class BrandUceCampaignService {
 
   async listAggregates(brandProfileId: string) {
     const campaigns = await this.prisma.uceCampaign.findMany({
-      where: { brandProfileId, status: UceCampaignStatus.ACTIVE },
+      where: { brandProfileId, status: UceCampaignStatus.LIVE },
       include: { performanceAggregate: true },
     });
 
@@ -199,6 +206,28 @@ export class BrandUceCampaignService {
 
     const { strategy, targeting, commercials } = parsed.data;
 
+    // Phase 1 adapters: product vocab → persistence enums.
+    const visibilityScopes = targeting.campaign_visibility
+      ? [
+          campaignVisibilityToPersistence[
+            targeting.campaign_visibility as keyof typeof campaignVisibilityToPersistence
+          ],
+        ]
+      : targeting.visibility_scopes;
+    const compensationType =
+      commercials.compensation_type === "FIXED" ||
+      commercials.compensation_type === "FIXED_FEE"
+        ? compensationModelToPersistence.FIXED
+        : compensationModelToPersistence.NEGOTIABLE;
+
+    const brand = await this.prisma.brandProfile.findUnique({
+      where: { id: brandProfileId },
+      select: { countryCode: true },
+    });
+    // Currency is Brand-derived (Phase 1); not Brand free-input on Campaign.
+    // Resolved for Publish/readiness; not Brand-authored Campaign input.
+    void campaignCurrencyForBrandCountry(brand?.countryCode ?? "US");
+
     const campaign = await this.prisma.$transaction(async (tx) => {
       const created = await tx.uceCampaign.create({
         data: {
@@ -217,6 +246,7 @@ export class BrandUceCampaignService {
                 : null,
               dynamicDaysLimit: strategy.dynamic_days_limit ?? null,
               coreObjective: strategy.core_objective,
+              // Keep deliverables array shape for shell consumers; currency is service-derived.
               platformDeliverables:
                 strategy.platform_deliverables as Prisma.InputJsonValue,
             },
@@ -231,13 +261,13 @@ export class BrandUceCampaignService {
               audienceGender: targeting.audience_gender,
               targetLocations: targeting.target_locations,
               disqualifyingKeywords: targeting.disqualifying_keywords,
-              visibilityScopes: targeting.visibility_scopes,
+              visibilityScopes,
               applicationScope: targeting.application_scope,
             },
           },
           commercials: {
             create: {
-              compensationType: commercials.compensation_type,
+              compensationType,
               fixedFeeAmount: commercials.fixed_fee_amount,
               negotiableMinFee: commercials.negotiable_min_fee,
               negotiableMaxFee: commercials.negotiable_max_fee,
@@ -398,6 +428,13 @@ export class BrandUceCampaignService {
   ) {
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
 
+    const draftPatch = updateDraftCampaignInputSchema.safeParse({
+      name: body.campaign_name,
+    });
+    if (body.campaign_name !== undefined && !draftPatch.success) {
+      throw new BadRequestException(draftPatch.error.flatten());
+    }
+
     const campaign = await this.prisma.uceCampaign.findFirst({
       where: { id: campaignId, brandProfileId },
       include: { strategy: true, commercials: true },
@@ -524,41 +561,57 @@ export class BrandUceCampaignService {
       throw new BadRequestException("Campaign not found");
     }
 
-    if (status === UceCampaignStatus.PAUSED) {
-      if (existing.status !== UceCampaignStatus.ACTIVE) {
+    if (status === UceCampaignStatus.PUBLISHED) {
+      if (existing.status !== UceCampaignStatus.DRAFT) {
         throw new BadRequestException(
-          "Only ACTIVE campaigns can be paused.",
+          "Only DRAFT campaigns can be published.",
         );
       }
     }
 
-    if (status === UceCampaignStatus.ACTIVE) {
+    if (status === UceCampaignStatus.PAUSED) {
+      if (existing.status !== UceCampaignStatus.LIVE) {
+        throw new BadRequestException("Only LIVE campaigns can be paused.");
+      }
+    }
+
+    if (status === UceCampaignStatus.LIVE) {
       if (
         existing.status !== UceCampaignStatus.PAUSED &&
-        existing.status !== UceCampaignStatus.DRAFT
+        existing.status !== UceCampaignStatus.PUBLISHED
       ) {
         throw new BadRequestException(
-          "Only PAUSED or DRAFT campaigns can be activated/resumed.",
+          "Only PUBLISHED or PAUSED campaigns can become LIVE.",
         );
       }
-      const checklist = await this.buildActivationChecklist(campaignId);
-      const blockers = checklist.filter((c) => !c.satisfied);
-      if (blockers.length > 0) {
-        throw new BadRequestException({
-          message: "Campaign cannot be activated until checklist criteria are met",
-          checklist,
-        });
+      if (existing.status === UceCampaignStatus.PUBLISHED) {
+        const checklist = await this.buildActivationChecklist(campaignId);
+        const blockers = checklist.filter((c) => !c.satisfied);
+        if (blockers.length > 0) {
+          throw new BadRequestException({
+            message:
+              "Campaign cannot go LIVE until execution-readiness checklist criteria are met",
+            checklist,
+          });
+        }
+      }
+    }
+
+    if (status === UceCampaignStatus.COMPLETED) {
+      if (
+        existing.status !== UceCampaignStatus.LIVE &&
+        existing.status !== UceCampaignStatus.PAUSED
+      ) {
+        throw new BadRequestException(
+          "Only LIVE or PAUSED campaigns can be completed.",
+        );
       }
     }
 
     if (status === UceCampaignStatus.ARCHIVED) {
-      if (
-        existing.status !== UceCampaignStatus.ACTIVE &&
-        existing.status !== UceCampaignStatus.PAUSED &&
-        existing.status !== UceCampaignStatus.COMPLETED
-      ) {
+      if (existing.status !== UceCampaignStatus.COMPLETED) {
         throw new BadRequestException(
-          "Only ACTIVE, PAUSED, or COMPLETED campaigns can be archived.",
+          "Only COMPLETED campaigns can be archived.",
         );
       }
     }
@@ -587,7 +640,20 @@ export class BrandUceCampaignService {
     );
   }
 
-  /** Publish a DRAFT campaign (go live). */
+  /** Publish a DRAFT campaign to PUBLISHED (setup may still be incomplete). */
+  async publishCampaign(brandProfileId: string, campaignId: string) {
+    const parsed = publishCampaignInputSchema.safeParse({ campaignId });
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.flatten());
+    }
+    return this.patchStatus(
+      brandProfileId,
+      campaignId,
+      UceCampaignStatus.PUBLISHED,
+    );
+  }
+
+  /** Move PUBLISHED → LIVE when execution-ready, or keep legacy alias for go-live. */
   async goLiveCampaign(brandProfileId: string, campaignId: string) {
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
     const existing = await this.prisma.uceCampaign.findFirst({
@@ -596,19 +662,17 @@ export class BrandUceCampaignService {
     if (!existing) {
       throw new BadRequestException("Campaign not found");
     }
-    if (existing.status !== UceCampaignStatus.DRAFT) {
-      throw new BadRequestException(
-        "Only DRAFT campaigns can go live. Use resume for PAUSED campaigns.",
-      );
+    if (existing.status === UceCampaignStatus.DRAFT) {
+      await this.publishCampaign(brandProfileId, campaignId);
     }
     return this.patchStatus(
       brandProfileId,
       campaignId,
-      UceCampaignStatus.ACTIVE,
+      UceCampaignStatus.LIVE,
     );
   }
 
-  /** Resume a PAUSED campaign back to ACTIVE. */
+  /** Resume a PAUSED campaign back to LIVE. */
   async resumeCampaign(brandProfileId: string, campaignId: string) {
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
     const existing = await this.prisma.uceCampaign.findFirst({
@@ -619,13 +683,21 @@ export class BrandUceCampaignService {
     }
     if (existing.status !== UceCampaignStatus.PAUSED) {
       throw new BadRequestException(
-        "Only PAUSED campaigns can be resumed. Use go live for DRAFT campaigns.",
+        "Only PAUSED campaigns can be resumed. Use publish/go-live for DRAFT or PUBLISHED campaigns.",
       );
     }
     return this.patchStatus(
       brandProfileId,
       campaignId,
-      UceCampaignStatus.ACTIVE,
+      UceCampaignStatus.LIVE,
+    );
+  }
+
+  async completeCampaign(brandProfileId: string, campaignId: string) {
+    return this.patchStatus(
+      brandProfileId,
+      campaignId,
+      UceCampaignStatus.COMPLETED,
     );
   }
 
