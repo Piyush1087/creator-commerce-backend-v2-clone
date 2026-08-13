@@ -15,7 +15,9 @@ generate backend code.
 - Current deploy identity: kept as `creatorshop-be`.
 - Current env baseline: `PORT`, `STAGE`, `DATABASE_URL`, `DEV_DATABASE_URL`.
 - Git status: not initialized/committed by the agent yet.
-- Branch policy: long-lived branches are `main` and `development`.
+- Branch policy: long-lived branches are `main` and `development`. Remotes:
+  `origin` (growth-verse, source of truth / PRs) and `piyush` (clone mirror).
+  See `BRANCHING.md`.
 
 ## Completed Setup
 
@@ -92,7 +94,7 @@ Acceptance checks:
 ## Docs Map
 
 - `README.md` quick repo overview.
-- `BRANCHING.md` long-lived branch and promotion policy.
+- `BRANCHING.md` long-lived branch, remotes (`origin` + `piyush`), and PR policy.
 - `AGENTS.md` non-negotiable agent rules.
 - `BACKEND_DIRECTIVES.md` module/API/schema naming and structure rules.
 - `docs/database/README.md` Prisma and migration workflow.
@@ -122,3 +124,4 @@ npm run lint
 | 2026-05-13 | Keep migrations manual until deployment flow is reviewed. |
 | 2026-05-13 | Use feature-owned modules for future APIs. |
 | 2026-05-14 | First domain module: `brand-discovery` with `POST /api/v1/discovery/validate`, Prisma slice for discovery + users, OpenAPI contract, throttling, redacted logs. |
+| 2026-08-12 | Dual remotes: PRs to `development` on `origin` only; `piyush` clone is an optional mirror, not a second PR path. |

@@ -8,11 +8,30 @@ This repo uses two long-lived branches:
 
 Use the exact spelling `development`.
 
+## Remotes
+
+Local clones keep two remotes:
+
+| Remote | Repository | Role |
+|--------|------------|------|
+| `origin` | `growth-verse/creator-commerce-backend-v2` | Source of truth. PRs, `development`, and `main` live here. |
+| `piyush` | `Piyush1087/creator-commerce-backend-v2-clone` | Convenience mirror for Piyush / AI-agent review. Not a second integration repo. |
+
+Frontend uses the same pattern (`origin` + `piyush` clone). `dummy_tcs` is a separate repo and is not part of this dual-push.
+
+```bash
+git remote -v
+# origin  https://github.com/growth-verse/creator-commerce-backend-v2.git
+# piyush  https://github.com/Piyush1087/creator-commerce-backend-v2-clone.git
+```
+
 ## Rules
 
 - New work branches should branch from `development`.
 - Merge completed feature/API/schema work back into `development` first.
 - Promote `development` to `main` only after review and verification.
+- Open pull requests **only on `origin`**, targeting `development`.
+- Do **not** open a matching PR on the Piyush clone for every origin PR.
 - Do not deploy from both old and v2 repos to the same SST stage at the same
   time.
 - Keep `RUNBOOK.md` updated when temporary work, APIs, or schema decisions
@@ -27,11 +46,13 @@ git pull
 git checkout -b feature/<short-task-name>
 ```
 
-After review:
+After review, merge via GitHub PR on **origin** into `development` (preferred),
+or locally:
 
 ```bash
 git checkout development
 git merge feature/<short-task-name>
+git push origin development
 ```
 
 When ready to promote:
@@ -39,6 +60,38 @@ When ready to promote:
 ```bash
 git checkout main
 git merge development
+git push origin main
+```
+
+## Origin vs clone — what to push when
+
+**PRs and `development` / `main`:** origin only.
+
+Keep updating the origin PR as usual. You do **not** need a second PR on
+`piyush` every time you PR to `development`. The clone is not the team merge
+path.
+
+**Feature branches:** optional dual-push.
+
+Push to `origin` whenever the work should be on GitHub. Push the same branch to
+`piyush` when you want the clone / AI agent to see that work:
+
+```bash
+git push origin feature/<short-task-name>
+git push piyush feature/<short-task-name>
+```
+
+If you skip `piyush`, the clone can lag. That is fine.
+
+**Catch-up sync:** when you want the clone to match current local work, push the
+branches you care about to `piyush` (feature branches, and `development` /
+`main` only if you intentionally want those mirrored). Do not invent a parallel
+merge history on the clone.
+
+```bash
+git push piyush feature/<short-task-name>
+# optional, only when you want clone long-lived branches to catch up:
+git push piyush development
 ```
 
 ## Required Checks Before Merge
