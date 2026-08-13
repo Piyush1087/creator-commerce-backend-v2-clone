@@ -8,6 +8,7 @@ import {
 import {
   Prisma,
   UceCampaignAssetType,
+  UceCampaignAssetKind,
   type UceCampaignProduct,
 } from "@prisma/client";
 
@@ -45,11 +46,7 @@ export class BrandUceProductService {
     return products.map((p) => this.mapProduct(p));
   }
 
-  async create(
-    brandProfileId: string,
-    campaignId: string,
-    body: unknown,
-  ) {
+  async create(brandProfileId: string, campaignId: string, body: unknown) {
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
 
     const parsed = MasterAddAssetDrawerSchema.safeParse(body);
@@ -84,19 +81,47 @@ export class BrandUceProductService {
       }
     }
 
-    const product = await this.prisma.uceCampaignProduct.create({
-      data: {
+    const product = await this.prisma.$transaction(async (tx) => {
+      const canonical = await this.resolveCanonicalAsset(
+        tx,
         campaignId,
-        assetType: fields.assetType,
-        skuCode: fields.skuCode,
-        productName: fields.productName,
-        inventoryCount: 0,
-        costPerUnit: fields.costPerUnit,
-        imageUrl: fields.imageUrl,
-        assetPayload: fields.assetPayload,
-      },
+        brandProfileId,
+        parsed.data,
+      );
+      const existingProjection = await tx.uceCampaignProduct.findFirst({
+        where: {
+          campaignId,
+          assetType: fields.assetType,
+          assetPayload: { equals: fields.assetPayload },
+        },
+      });
+      const product = existingProjection
+        ? await tx.uceCampaignProduct.update({
+            where: { id: existingProjection.id },
+            data: {
+              productName: fields.productName,
+              costPerUnit: fields.costPerUnit,
+              imageUrl: fields.imageUrl,
+            },
+          })
+        : await tx.uceCampaignProduct.create({
+            data: {
+              campaignId,
+              assetType: fields.assetType,
+              skuCode: fields.skuCode,
+              productName: fields.productName,
+              inventoryCount: 0,
+              costPerUnit: fields.costPerUnit,
+              imageUrl: fields.imageUrl,
+              assetPayload: fields.assetPayload,
+            },
+          });
+      return { product, canonicalAssetId: canonical.id };
     });
-    return this.mapProduct(product);
+    return {
+      ...this.mapProduct(product.product),
+      canonical_campaign_asset_id: product.canonicalAssetId,
+    };
   }
 
   async update(
@@ -198,6 +223,68 @@ export class BrandUceProductService {
         return _exhaustive;
       }
     }
+  }
+
+  private async resolveCanonicalAsset(
+    tx: Prisma.TransactionClient,
+    campaignId: string,
+    brandProfileId: string,
+    data: MasterAddAssetDrawerRequest,
+  ) {
+    if (data.asset_type === "CORE_BRAND_IDENTITY") {
+      if (data.brand_id !== brandProfileId) {
+        throw new BadRequestException(
+          "Brand asset must reference the owning BrandProfile.",
+        );
+      }
+      return tx.uceCampaignAsset.upsert({
+        where: { campaignId_brandProfileId: { campaignId, brandProfileId } },
+        create: {
+          campaignId,
+          kind: UceCampaignAssetKind.BRAND,
+          brandProfileId,
+        },
+        update: { status: "ACTIVE" },
+      });
+    }
+    if (data.asset_type === "ACTIVE_SALE_PROMOTION") {
+      const offer = await tx.brandOffer.findFirst({
+        where: { id: data.canonical_brand_offer_id, brandProfileId },
+      });
+      if (!offer) {
+        throw new BadRequestException(
+          "Selected canonical BrandOffer was not found for this Brand.",
+        );
+      }
+      return tx.uceCampaignAsset.upsert({
+        where: {
+          campaignId_brandOfferId: { campaignId, brandOfferId: offer.id },
+        },
+        create: {
+          campaignId,
+          kind: UceCampaignAssetKind.OFFER,
+          brandOfferId: offer.id,
+        },
+        update: { status: "ACTIVE" },
+      });
+    }
+    const offering = await tx.offering.findFirst({
+      where: { id: data.canonical_offering_id, brandProfileId },
+    });
+    if (!offering) {
+      throw new BadRequestException(
+        "Selected canonical Offering was not found for this Brand.",
+      );
+    }
+    return tx.uceCampaignAsset.upsert({
+      where: { campaignId_offeringId: { campaignId, offeringId: offering.id } },
+      create: {
+        campaignId,
+        kind: UceCampaignAssetKind.OFFERING,
+        offeringId: offering.id,
+      },
+      update: { status: "ACTIVE" },
+    });
   }
 
   mapProduct(p: UceCampaignProduct) {

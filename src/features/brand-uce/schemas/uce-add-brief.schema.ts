@@ -19,10 +19,7 @@ export const VideoDurationRangeSchema = z.enum([
   "15_45S",
   "OVER_45S",
 ]);
-export const CarouselAspectRatioSchema = z.enum([
-  "4_5_PORTRAIT",
-  "1_1_SQUARE",
-]);
+export const CarouselAspectRatioSchema = z.enum(["4_5_PORTRAIT", "1_1_SQUARE"]);
 
 export const AudioStrategySchema = z.enum([
   "DIRECT_VOICEOVER",
@@ -118,7 +115,10 @@ export const CreatorLedGuidanceSchema = z.object({
     ),
   description: z
     .string()
-    .min(1, "Theme descriptions must be populated manually by system operators."),
+    .min(
+      1,
+      "Theme descriptions must be populated manually by system operators.",
+    ),
   hook_ideas: z
     .array(z.string().min(1))
     .min(1, "Provide at least one conversion optimization hook tag."),
@@ -130,7 +130,10 @@ export const CreatorLedGuidanceSchema = z.object({
     .min(1, "Define at least one execution target."),
   creator_donts: z
     .array(z.string().min(1))
-    .min(1, "Establish at least one regulatory or brand protection safety parameter."),
+    .min(
+      1,
+      "Establish at least one regulatory or brand protection safety parameter.",
+    ),
   audio_strategy: AudioStrategySchema,
   lighting_requirements: LightingEnvironmentSchema,
   background_setting: z.string().min(1),
@@ -182,6 +185,7 @@ export const MasterAddBriefWizardSchema = z
   .object({
     campaign_id: z.string().uuid(),
     product_id: z.string().uuid(),
+    canonical_campaign_asset_id: z.string().uuid(),
     brief_name: z
       .string()
       .min(2, "Brief labels require identification attributes."),
@@ -224,7 +228,10 @@ export const MasterAddBriefWizardSchema = z
     }
 
     master.content_guidance_matrix.forEach((guidance, idx) => {
-      if (master.brief_type === "CREATOR_LED" && !guidance.is_reel_amplification) {
+      if (
+        master.brief_type === "CREATOR_LED" &&
+        !guidance.is_reel_amplification
+      ) {
         if (!guidance.creator_led_details) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,

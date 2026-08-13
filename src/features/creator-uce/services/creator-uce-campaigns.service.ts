@@ -11,11 +11,19 @@ import {
   UceCollabStatus,
   UceMilestoneStage,
   UceNegotiationSubState,
+  UceApplicationSource,
+  UceApplicationStatus,
+  UceCampaignCreatorIngestionMethod,
+  UceCampaignCreatorSource,
+  UceMediaPlatform,
   UserRole,
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
-import { buildPhaseSyncPatch, mapContentFormatFromTags } from "../../../shared/uce/uce-production-phase.util";
+import {
+  buildPhaseSyncPatch,
+  mapContentFormatFromTags,
+} from "../../../shared/uce/uce-production-phase.util";
 import { CreatorEligibilityService } from "../../creator-marketplace/services/creator-eligibility.service";
 import type { CreatorAudienceDemographicsMatrix } from "../../creator-marketplace/types/creator-audience.types";
 import { isInvitedCollaboration } from "../../creator-marketplace/utils/visibility-scope.util";
@@ -69,6 +77,15 @@ export class CreatorUceCampaignsService {
           where: { isActive: true },
           orderBy: { createdAt: "asc" },
         },
+        assets: {
+          where: { status: "ACTIVE" },
+          include: {
+            briefs: {
+              where: { status: "PUBLISHED" },
+              include: { deliverables: true },
+            },
+          },
+        },
       },
     });
 
@@ -92,6 +109,15 @@ export class CreatorUceCampaignsService {
         inventory_count: p.inventoryCount,
         out_of_stock: p.inventoryCount <= 0,
       })),
+      canonical_assets: c.assets.map((asset) => ({
+        campaign_asset_id: asset.id,
+        kind: asset.kind,
+        briefs: asset.briefs.map((brief) => ({
+          canonical_brief_id: brief.id,
+          brief_name: brief.briefName,
+          deliverable_count: brief.deliverables.length,
+        })),
+      })),
     }));
   }
 
@@ -101,6 +127,11 @@ export class CreatorUceCampaignsService {
     dto: CreatorApplyToCampaignDto,
   ) {
     this.assertCreator(user);
+    if (!dto.canonical_campaign_asset_id || !dto.canonical_brief_id) {
+      throw new BadRequestException(
+        "Canonical Campaign Asset and Brief selections are required.",
+      );
+    }
 
     const profile = await this.prisma.creatorProfile.findUnique({
       where: { userId: user.id },
@@ -116,7 +147,9 @@ export class CreatorUceCampaignsService {
       include: { targeting: true },
     });
     if (!campaign || !campaign.targeting) {
-      throw new NotFoundException("Campaign not found or not open for applications");
+      throw new NotFoundException(
+        "Campaign not found or not open for applications",
+      );
     }
 
     const handle = normalizeInstagramHandle(profile.instagramHandle);
@@ -157,10 +190,30 @@ export class CreatorUceCampaignsService {
     if (!brief) {
       throw new BadRequestException("Brief not found for campaign");
     }
+    const legacyProductId = dto.product_id ?? brief.productId;
+    if (!legacyProductId) {
+      throw new BadRequestException(
+        "A legacy Product projection is required while compatibility consumers remain active.",
+      );
+    }
 
-    if (dto.product_id) {
+    const canonicalBrief = await this.prisma.uceBrief.findFirst({
+      where: {
+        id: dto.canonical_brief_id,
+        campaignAssetId: dto.canonical_campaign_asset_id,
+        status: "PUBLISHED",
+        campaignAsset: { campaignId, status: "ACTIVE" },
+      },
+    });
+    if (!canonicalBrief) {
+      throw new BadRequestException(
+        "A valid canonical Campaign Asset and Brief selection is required.",
+      );
+    }
+
+    if (legacyProductId) {
       const product = await this.prisma.uceCampaignProduct.findFirst({
-        where: { id: dto.product_id, campaignId, isActive: true },
+        where: { id: legacyProductId, campaignId, isActive: true },
       });
       if (!product) {
         throw new BadRequestException("Product not found for campaign");
@@ -181,7 +234,9 @@ export class CreatorUceCampaignsService {
       existing &&
       existing.collabStatus !== UceCollabStatus.APPLICANT_REJECTED
     ) {
-      throw new ConflictException("You already have a pipeline row for this campaign");
+      throw new ConflictException(
+        "You already have a pipeline row for this campaign",
+      );
     }
 
     const milestoneDeadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -197,23 +252,76 @@ export class CreatorUceCampaignsService {
 
     const collab = await this.prisma.$transaction(async (tx) => {
       if (existing?.collabStatus === UceCollabStatus.APPLICANT_REJECTED) {
-        await tx.uceCampaignCollaboration.delete({ where: { id: existing.id } });
+        await tx.uceCampaignCollaboration.delete({
+          where: { id: existing.id },
+        });
       }
 
       const created = await tx.uceCampaignCollaboration.create({
         data: {
           campaignId,
           briefId: dto.brief_id,
-          productId: dto.product_id ?? null,
+          productId: legacyProductId,
           instagramHandle: handle,
           creatorEmail: user.email,
           creatorProfileId: profile.id,
-          contentFormatType: mapContentFormatFromTags(brief.deliverableFormatTags),
+          contentFormatType: mapContentFormatFromTags(
+            brief.deliverableFormatTags,
+          ),
           matchScore: dto.match_score ?? 0,
           collabStatus: UceCollabStatus.APPLICANT_PENDING,
           negotiationState: UceNegotiationSubState.CREATOR_COUNTER,
           currentMilestoneDeadline: milestoneDeadline,
           ...buildPhaseSyncPatch(phaseSeed),
+        },
+      });
+
+      const campaignCreator = await tx.uceCampaignCreator.upsert({
+        where: {
+          campaignId_platform_normalizedSocialHandle: {
+            campaignId,
+            platform: UceMediaPlatform.INSTAGRAM,
+            normalizedSocialHandle: handle,
+          },
+        },
+        create: {
+          campaignId,
+          creatorProfileId: profile.id,
+          platform: UceMediaPlatform.INSTAGRAM,
+          socialHandle: handle,
+          normalizedSocialHandle: handle,
+          email: user.email,
+          source: UceCampaignCreatorSource.MANUAL,
+          ingestionMethod: UceCampaignCreatorIngestionMethod.MANUAL_SINGLE,
+        },
+        update: { creatorProfileId: profile.id, email: user.email },
+      });
+      await tx.uceApplication.create({
+        data: {
+          requestId: `creator-${created.id}`,
+          campaignId,
+          campaignCreatorId: campaignCreator.id,
+          campaignAssetId: legacyProductId,
+          briefId: dto.brief_id,
+          canonicalCampaignAssetId: dto.canonical_campaign_asset_id,
+          canonicalBriefId: dto.canonical_brief_id,
+          status: UceApplicationStatus.PENDING,
+          source: UceApplicationSource.DIRECT,
+          snapshot: {
+            create: {
+              campaignContext: { campaignId },
+              campaignAssetContext: {
+                canonicalCampaignAssetId: dto.canonical_campaign_asset_id,
+                legacyProductId,
+              },
+              briefContext: {
+                canonicalBriefId: dto.canonical_brief_id,
+                legacyBriefId: dto.brief_id,
+              },
+              commercialContext: {},
+              creatorIdentity: { email: user.email, socialHandle: handle },
+            },
+          },
         },
       });
 

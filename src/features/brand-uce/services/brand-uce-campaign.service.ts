@@ -24,10 +24,7 @@ import {
 import { decimalToNumber } from "../utils/uce-decimal.util";
 import { BrandUceAccessService } from "./brand-uce-access.service";
 
-const PROSPECT_STATUSES = [
-  "PROSPECT_CURATED",
-  "PROSPECT_INVITED",
-] as const;
+const PROSPECT_STATUSES = ["PROSPECT_CURATED", "PROSPECT_INVITED"] as const;
 
 const APPLICANT_STATUSES = [
   "APPLICANT_PENDING",
@@ -99,12 +96,26 @@ export class BrandUceCampaignService {
       where.strategy = { coreObjective: filters.objective };
     }
     if (filters.product?.trim()) {
-      where.products = {
+      const productSearch = filters.product.trim();
+      where.assets = {
         some: {
-          productName: {
-            contains: filters.product.trim(),
-            mode: "insensitive",
-          },
+          OR: [
+            {
+              offering: {
+                name: { contains: productSearch, mode: "insensitive" },
+              },
+            },
+            {
+              brandProfile: {
+                name: { contains: productSearch, mode: "insensitive" },
+              },
+            },
+            {
+              brandOffer: {
+                offerName: { contains: productSearch, mode: "insensitive" },
+              },
+            },
+          ],
         },
       };
     }
@@ -125,6 +136,16 @@ export class BrandUceCampaignService {
         performanceAggregate: true,
         strategy: true,
         commercials: true,
+        assets: {
+          where: { status: "ACTIVE" },
+          select: {
+            id: true,
+            briefs: {
+              where: { status: "PUBLISHED" },
+              select: { id: true },
+            },
+          },
+        },
         _count: {
           select: {
             products: true,
@@ -160,15 +181,18 @@ export class BrandUceCampaignService {
         campaign_name: c.name,
         current_status: c.status,
         core_objective: c.strategy?.coreObjective ?? null,
-        product_count: c._count.products,
-        brief_count: c._count.briefs,
+        product_count: c.assets.length,
+        brief_count: c.assets.reduce(
+          (count, asset) => count + asset.briefs.length,
+          0,
+        ),
+        legacy_product_count: c._count.products,
+        legacy_brief_count: c._count.briefs,
         prospects_count: prospects,
         applicants_count: applicants,
         active_collabs_count: activeCollabs,
         total_spend_to_date: spend,
-        total_impressions: agg
-          ? agg.totalImpressionsCount.toString()
-          : "0",
+        total_impressions: agg ? agg.totalImpressionsCount.toString() : "0",
         budget_pool: budgetPool,
         created_at: c.createdAt.toISOString(),
         updated_at: c.updatedAt.toISOString(),
@@ -314,7 +338,9 @@ export class BrandUceCampaignService {
       throw new BadRequestException("Campaign not found");
     }
 
-    const activationChecklist = await this.buildActivationChecklist(campaign.id);
+    const activationChecklist = await this.buildActivationChecklist(
+      campaign.id,
+    );
     const canEditEssentials = await this.canEditCampaignEssentials(campaign.id);
     const totalInventoryAllocated = campaign.products.reduce(
       (sum, product) => sum + product.inventoryCount,
@@ -334,8 +360,10 @@ export class BrandUceCampaignService {
       zone_1_master: campaign.strategy
         ? {
             timeline_type: campaign.strategy.timelineType,
-            fixed_start_date: campaign.strategy.fixedStartDate?.toISOString() ?? null,
-            fixed_end_date: campaign.strategy.fixedEndDate?.toISOString() ?? null,
+            fixed_start_date:
+              campaign.strategy.fixedStartDate?.toISOString() ?? null,
+            fixed_end_date:
+              campaign.strategy.fixedEndDate?.toISOString() ?? null,
             dynamic_days_limit: campaign.strategy.dynamicDaysLimit,
             core_objective: campaign.strategy.coreObjective,
             platform_deliverables: campaign.strategy.platformDeliverables,
@@ -359,9 +387,15 @@ export class BrandUceCampaignService {
       zone_1_commercials: campaign.commercials
         ? {
             compensation_type: campaign.commercials.compensationType,
-            fixed_fee_amount: decimalToNumber(campaign.commercials.fixedFeeAmount),
-            negotiable_min_fee: decimalToNumber(campaign.commercials.negotiableMinFee),
-            negotiable_max_fee: decimalToNumber(campaign.commercials.negotiableMaxFee),
+            fixed_fee_amount: decimalToNumber(
+              campaign.commercials.fixedFeeAmount,
+            ),
+            negotiable_min_fee: decimalToNumber(
+              campaign.commercials.negotiableMinFee,
+            ),
+            negotiable_max_fee: decimalToNumber(
+              campaign.commercials.negotiableMaxFee,
+            ),
             total_campaign_budget_pool: decimalToNumber(
               campaign.commercials.totalCampaignBudgetPool,
             ),
@@ -496,8 +530,13 @@ export class BrandUceCampaignService {
     if (!campaign) {
       throw new BadRequestException("Campaign not found");
     }
-    if (campaign.status === UceCampaignStatus.COMPLETED || campaign.status === UceCampaignStatus.ARCHIVED) {
-      throw new BadRequestException("Completed or archived campaigns cannot be edited.");
+    if (
+      campaign.status === UceCampaignStatus.COMPLETED ||
+      campaign.status === UceCampaignStatus.ARCHIVED
+    ) {
+      throw new BadRequestException(
+        "Completed or archived campaigns cannot be edited.",
+      );
     }
 
     const canEdit = await this.canEditCampaignEssentials(campaignId);
@@ -563,9 +602,7 @@ export class BrandUceCampaignService {
 
     if (status === UceCampaignStatus.PUBLISHED) {
       if (existing.status !== UceCampaignStatus.DRAFT) {
-        throw new BadRequestException(
-          "Only DRAFT campaigns can be published.",
-        );
+        throw new BadRequestException("Only DRAFT campaigns can be published.");
       }
     }
 
@@ -616,9 +653,29 @@ export class BrandUceCampaignService {
       }
     }
 
+    const transitionAt = new Date();
     const updated = await this.prisma.uceCampaign.update({
       where: { id: campaignId },
-      data: { status },
+      data: {
+        status,
+        publishedAt:
+          status === UceCampaignStatus.PUBLISHED
+            ? (existing.publishedAt ?? transitionAt)
+            : undefined,
+        liveAt:
+          status === UceCampaignStatus.LIVE &&
+          existing.status === UceCampaignStatus.PUBLISHED
+            ? (existing.liveAt ?? transitionAt)
+            : undefined,
+        completedAt:
+          status === UceCampaignStatus.COMPLETED
+            ? (existing.completedAt ?? transitionAt)
+            : undefined,
+        archivedAt:
+          status === UceCampaignStatus.ARCHIVED
+            ? (existing.archivedAt ?? transitionAt)
+            : undefined,
+      },
     });
 
     return {
@@ -665,11 +722,7 @@ export class BrandUceCampaignService {
     if (existing.status === UceCampaignStatus.DRAFT) {
       await this.publishCampaign(brandProfileId, campaignId);
     }
-    return this.patchStatus(
-      brandProfileId,
-      campaignId,
-      UceCampaignStatus.LIVE,
-    );
+    return this.patchStatus(brandProfileId, campaignId, UceCampaignStatus.LIVE);
   }
 
   /** Resume a PAUSED campaign back to LIVE. */
@@ -686,11 +739,7 @@ export class BrandUceCampaignService {
         "Only PAUSED campaigns can be resumed. Use publish/go-live for DRAFT or PUBLISHED campaigns.",
       );
     }
-    return this.patchStatus(
-      brandProfileId,
-      campaignId,
-      UceCampaignStatus.LIVE,
-    );
+    return this.patchStatus(brandProfileId, campaignId, UceCampaignStatus.LIVE);
   }
 
   async completeCampaign(brandProfileId: string, campaignId: string) {
@@ -755,9 +804,9 @@ export class BrandUceCampaignService {
 
   async getCampaignPerformance(brandProfileId: string, campaignId: string) {
     const shell = await this.getCampaignShell(brandProfileId, campaignId);
-    const listRow = (
-      await this.listCampaigns(brandProfileId, {})
-    ).find((c) => c.campaign_id === campaignId);
+    const listRow = (await this.listCampaigns(brandProfileId, {})).find(
+      (c) => c.campaign_id === campaignId,
+    );
 
     return {
       campaign_id: shell.campaign_id,
@@ -792,10 +841,7 @@ export class BrandUceCampaignService {
     return rows;
   }
 
-  async findCampaignByNameHint(
-    brandProfileId: string,
-    nameHint: string,
-  ) {
+  async findCampaignByNameHint(brandProfileId: string, nameHint: string) {
     const hint = nameHint.trim();
     if (!hint) {
       return null;
@@ -857,8 +903,8 @@ export class BrandUceCampaignService {
               fixedEndDate: source.strategy!.fixedEndDate,
               dynamicDaysLimit: source.strategy!.dynamicDaysLimit,
               coreObjective: source.strategy!.coreObjective,
-              platformDeliverables:
-                source.strategy!.platformDeliverables as Prisma.InputJsonValue,
+              platformDeliverables: source.strategy!
+                .platformDeliverables as Prisma.InputJsonValue,
             },
           },
           targeting: {
@@ -995,9 +1041,13 @@ export class BrandUceCampaignService {
   }
 
   private async buildActivationChecklist(campaignId: string) {
-    const [productCount, briefCount, commercials] = await Promise.all([
-      this.prisma.uceCampaignProduct.count({ where: { campaignId } }),
-      this.prisma.uceCampaignBrief.count({ where: { campaignId } }),
+    const [assetCount, briefCount, commercials] = await Promise.all([
+      this.prisma.uceCampaignAsset.count({
+        where: { campaignId, status: "ACTIVE" },
+      }),
+      this.prisma.uceBrief.count({
+        where: { campaignAsset: { campaignId }, status: "PUBLISHED" },
+      }),
       this.prisma.uceCampaignCommercials.findUnique({ where: { campaignId } }),
     ]);
 
@@ -1009,7 +1059,7 @@ export class BrandUceCampaignService {
       {
         key: "product_sku",
         label: "At least one product SKU",
-        satisfied: productCount >= 1,
+        satisfied: assetCount >= 1,
       },
       {
         key: "active_brief",
@@ -1024,7 +1074,9 @@ export class BrandUceCampaignService {
     ];
   }
 
-  private async canEditCampaignEssentials(campaignId: string): Promise<boolean> {
+  private async canEditCampaignEssentials(
+    campaignId: string,
+  ): Promise<boolean> {
     const blockingRows = await this.prisma.uceCampaignCollaboration.count({
       where: {
         campaignId,

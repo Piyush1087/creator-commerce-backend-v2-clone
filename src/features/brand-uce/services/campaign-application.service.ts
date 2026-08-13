@@ -19,20 +19,14 @@ import {
 import { PrismaService } from "../../../prisma/prisma.service";
 import { buildPhaseSyncPatch } from "../../../shared/uce/uce-production-phase.util";
 import { CollaborationProvisionService } from "../../collaboration/services/collaboration-provision.service";
-import {
-  decimalToNumber,
-  splitEscrowQuote,
-} from "../utils/uce-decimal.util";
+import { decimalToNumber, splitEscrowQuote } from "../utils/uce-decimal.util";
 import {
   approveApplicationInputSchema,
   rejectApplicationInputSchema,
 } from "../validation/applicants/application.schema";
 import { BrandUceAccessService } from "./brand-uce-access.service";
 import { BrandUcePipelineService } from "./brand-uce-pipeline.service";
-
-function normalizeHandle(handle: string): string {
-  return handle.trim().replace(/^@/, "").toLowerCase();
-}
+import { normalizeInstagramHandle } from "../utils/instagram-handle.util";
 
 function defaultMilestoneDeadline(days = 14): Date {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
@@ -67,7 +61,7 @@ export class CampaignApplicationService {
     });
 
     for (const row of applicantRows) {
-      const normalized = normalizeHandle(row.instagramHandle);
+      const normalized = normalizeInstagramHandle(row.instagramHandle);
       const creator = await this.prisma.uceCampaignCreator.upsert({
         where: {
           campaignId_platform_normalizedSocialHandle: {
@@ -210,7 +204,9 @@ export class CampaignApplicationService {
       });
       if (!application) throw new NotFoundException("Application not found");
       if (application.status !== UceApplicationStatus.PENDING) {
-        throw new BadRequestException("Only PENDING applications can be approved");
+        throw new BadRequestException(
+          "Only PENDING applications can be approved",
+        );
       }
       if (!application.campaignCreator.email?.trim()) {
         throw new BadRequestException(
@@ -243,6 +239,27 @@ export class CampaignApplicationService {
           "The Application Campaign Asset is no longer active",
         );
       }
+
+      if (
+        !application.canonicalCampaignAssetId ||
+        !application.canonicalBriefId
+      ) {
+        throw new BadRequestException(
+          "Canonical Campaign Asset and Brief are required before Application approval",
+        );
+      }
+      const canonicalBrief = await tx.uceBrief.findFirst({
+        where: {
+          id: application.canonicalBriefId,
+          campaignAssetId: application.canonicalCampaignAssetId,
+          status: "PUBLISHED",
+          campaignAsset: { campaignId },
+        },
+      });
+      if (!canonicalBrief)
+        throw new BadRequestException(
+          "Canonical Application references are not valid for this Campaign",
+        );
 
       const brief = await tx.uceCampaignBrief.findFirst({
         where: {
@@ -437,7 +454,9 @@ export class CampaignApplicationService {
     });
     if (!application) throw new NotFoundException("Application not found");
     if (application.status !== UceApplicationStatus.PENDING) {
-      throw new BadRequestException("Only PENDING applications can be rejected");
+      throw new BadRequestException(
+        "Only PENDING applications can be rejected",
+      );
     }
 
     await this.prisma.uceApplication.update({
