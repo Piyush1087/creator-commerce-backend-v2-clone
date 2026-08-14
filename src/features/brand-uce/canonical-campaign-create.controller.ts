@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
 import { ThrottlerGuard } from "@nestjs/throttler";
 
 import type { RequestWithAuthUser } from "../auth/auth.controller";
@@ -6,6 +15,7 @@ import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { BrandCentreAuthService } from "../brand-centre/brand-centre-auth.service";
 import { CanonicalCampaignCreateService } from "./services/canonical-campaign-create.service";
 import { CanonicalCampaignDraftReadService } from "./services/canonical-campaign-draft-read.service";
+import { CanonicalCampaignReadinessService } from "./services/canonical-campaign-readiness.service";
 
 @Controller("api/v1/brand-uce")
 @UseGuards(ThrottlerGuard, JwtAuthGuard)
@@ -14,6 +24,7 @@ export class CanonicalCampaignCreateController {
     private readonly auth: BrandCentreAuthService,
     private readonly canonicalCreate: CanonicalCampaignCreateService,
     private readonly canonicalDraftRead: CanonicalCampaignDraftReadService,
+    private readonly canonicalReadiness: CanonicalCampaignReadinessService,
   ) {}
 
   /** Transitional atomic endpoint retained for clients that do not yet use draft runtime. */
@@ -39,6 +50,15 @@ export class CanonicalCampaignCreateController {
   ) {
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
     return this.canonicalDraftRead.getDraft(brandProfileId, campaignId);
+  }
+
+  @Get("campaigns/canonical-drafts/:campaignId/readiness")
+  async getCanonicalDraftReadiness(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.canonicalReadiness.getReadiness(brandProfileId, campaignId);
   }
 
   @Patch("campaigns/canonical-drafts/:campaignId/field")

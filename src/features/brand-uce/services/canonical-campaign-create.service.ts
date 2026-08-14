@@ -21,34 +21,10 @@ import {
   type CanonicalCampaignWizardPayload,
 } from "../schemas/canonical-campaign-wizard.schema";
 import { BrandUceCampaignService } from "./brand-uce-campaign.service";
-
-const PRIMARY_KPI = {
-  PULSE: "REACH",
-  PROOF: "MEANINGFUL_ENGAGEMENT",
-  PRODUCTION: "ASSET_QUALITY_SCORE",
-  PUSH: "UNIQUE_CTA_CLICKS",
-} as const;
-
-const SUPPORTING_KPIS = {
-  D2C: {
-    PULSE: ["DISCOVER_REACH", "IMPRESSIONS", "PROFILE_VISITS", "NEW_FOLLOWERS"],
-    PROOF: ["SAVES", "SHARES", "COMMENT_SENTIMENT", "UGC_MENTIONS"],
-    PRODUCTION: ["BRAND_COMPLIANCE", "CREATIVE_VARIETY", "VISUAL_QUALITY", "ASSET_REUSABILITY"],
-    PUSH: ["CTR", "TOTAL_CTA_CLICKS", "REPEAT_CLICKS", "PROMO_LINK_CLICKS"],
-  },
-  SAAS_AI: {
-    PULSE: ["IMPRESSIONS", "PROFILE_VISITS", "WEBSITE_CLICKS", "NEW_FOLLOWERS"],
-    PROOF: ["STORY_COMPLETION_RATE", "SAVES", "PROFILE_VISITS", "DM_INQUIRIES"],
-    PRODUCTION: ["FEATURE_CLARITY", "SCREEN_RECORDING_QUALITY", "TECHNICAL_ACCURACY", "ASSET_REUSABILITY"],
-    PUSH: ["CTR", "LANDING_PAGE_VISITS", "DOCUMENTATION_CLICKS", "TRIAL_PAGE_VISITS"],
-  },
-  HEALTHCARE: {
-    PULSE: ["LOCAL_REACH", "PROFILE_VISITS", "NEW_FOLLOWERS", "LOCAL_AUDIENCE_PERCENT"],
-    PROOF: ["DM_INQUIRIES", "SAVES", "SHARES", "COMMENT_SENTIMENT"],
-    PRODUCTION: ["MEDICAL_COMPLIANCE", "BRAND_COMPLIANCE", "EDUCATIONAL_ACCURACY", "ASSET_REUSABILITY"],
-    PUSH: ["WHATSAPP_CLICKS", "BOOKING_PAGE_CLICKS", "MAPS_CLICKS", "TOTAL_CTA_CLICKS"],
-  },
-} as const;
+import {
+  canonicalDerivedProjection,
+  resolveCanonicalCampaignReadiness,
+} from "./canonical-campaign-readiness.resolver";
 
 type DraftSection = Record<string, unknown>;
 type CanonicalDraftDefinition = {
@@ -79,7 +55,8 @@ function legacyObjective(
 function legacyVisibility(
   value: CanonicalCampaignWizardPayload["strategy"]["campaign_visibility"],
 ): UceVisibilityScope {
-  if (value === "ELIGIBLE_CREATORS_ONLY") return UceVisibilityScope.ELIGIBLE_ONLY;
+  if (value === "ELIGIBLE_CREATORS_ONLY")
+    return UceVisibilityScope.ELIGIBLE_ONLY;
   if (value === "INVITE_ONLY") return UceVisibilityScope.INVITED_ONLY;
   return UceVisibilityScope.EVERYONE;
 }
@@ -87,7 +64,8 @@ function legacyVisibility(
 function legacyApplicationScope(
   value: CanonicalCampaignWizardPayload["strategy"]["campaign_visibility"],
 ): UceApplicationScope {
-  if (value === "ELIGIBLE_CREATORS_ONLY") return UceApplicationScope.ELIGIBLE_ONLY;
+  if (value === "ELIGIBLE_CREATORS_ONLY")
+    return UceApplicationScope.ELIGIBLE_ONLY;
   if (value === "INVITE_ONLY") return UceApplicationScope.INVITED_ONLY;
   return UceApplicationScope.EVERYONE;
 }
@@ -125,8 +103,14 @@ function validateDraftCrossField(definition: CanonicalDraftDefinition) {
 
   const minAge = targeting.audience_age_min;
   const maxAge = targeting.audience_age_max;
-  if (typeof minAge === "number" && typeof maxAge === "number" && maxAge < minAge) {
-    throw new BadRequestException("audience_age_max must be >= audience_age_min.");
+  if (
+    typeof minAge === "number" &&
+    typeof maxAge === "number" &&
+    maxAge < minAge
+  ) {
+    throw new BadRequestException(
+      "audience_age_max must be >= audience_age_min.",
+    );
   }
 
   const publishFrom = strategy.publish_from;
@@ -136,13 +120,21 @@ function validateDraftCrossField(definition: CanonicalDraftDefinition) {
     typeof publishUntil === "string" &&
     new Date(publishUntil) < new Date(publishFrom)
   ) {
-    throw new BadRequestException("publish_until must be on or after publish_from.");
+    throw new BadRequestException(
+      "publish_until must be on or after publish_from.",
+    );
   }
 
   const offer = commercials.commercial_offer;
   const budget = commercials.total_campaign_budget;
-  if (typeof offer === "number" && typeof budget === "number" && budget < offer) {
-    throw new BadRequestException("total_campaign_budget must be >= commercial_offer.");
+  if (
+    typeof offer === "number" &&
+    typeof budget === "number" &&
+    budget < offer
+  ) {
+    throw new BadRequestException(
+      "total_campaign_budget must be >= commercial_offer.",
+    );
   }
 }
 
@@ -197,7 +189,9 @@ export class CanonicalCampaignCreateService {
     const patch = canonicalCampaignDraftPatchSchema.parse(input);
     const value = parseCanonicalDraftValue(patch.path, patch.value);
 
-    const rows = await this.prisma.$queryRaw<Array<{ canonical_definition: unknown }>>`
+    const rows = await this.prisma.$queryRaw<
+      Array<{ canonical_definition: unknown }>
+    >`
       SELECT "canonical_definition"
       FROM "uce_campaigns"
       WHERE "id" = ${campaignId}
@@ -218,11 +212,17 @@ export class CanonicalCampaignCreateService {
       [field]: value,
     };
 
-    if (patch.path === "strategy.publishing_schedule" && value === "EVERGREEN") {
+    if (
+      patch.path === "strategy.publishing_schedule" &&
+      value === "EVERGREEN"
+    ) {
       definition.draft.strategy.publish_from = null;
       definition.draft.strategy.publish_until = null;
     }
-    if (patch.path === "commercials.receives_brand_support" && value === false) {
+    if (
+      patch.path === "commercials.receives_brand_support" &&
+      value === false
+    ) {
       definition.draft.commercials.brand_support_type = null;
       definition.draft.commercials.brand_support_estimated_value = null;
     }
@@ -244,7 +244,11 @@ export class CanonicalCampaignCreateService {
       `;
     });
 
-    return { campaignId, savedPath: patch.path, savedAt: new Date().toISOString() };
+    return {
+      campaignId,
+      savedPath: patch.path,
+      savedAt: new Date().toISOString(),
+    };
   }
 
   async publishDraft(
@@ -276,13 +280,13 @@ export class CanonicalCampaignCreateService {
     });
     if (!brand) throw new BadRequestException("Brand profile not found");
 
-    const currency = (brand.countryCode ?? "").toUpperCase() === "IN" ? "INR" : "USD";
     const objective = payload.strategy.core_objective;
-    const supportingByIndustry = SUPPORTING_KPIS[
-      brand.industry as keyof typeof SUPPORTING_KPIS
-    ];
-    const supportingKpis = supportingByIndustry?.[objective] ?? [];
-    if (supportingKpis.length < 2) {
+    const readiness = resolveCanonicalCampaignReadiness(
+      objective,
+      brand.industry,
+      brand.countryCode,
+    );
+    if (readiness.status !== "READY") {
       throw new BadRequestException(
         "Supporting KPI resolution is unavailable for this Brand industry.",
       );
@@ -292,12 +296,7 @@ export class CanonicalCampaignCreateService {
       version: "1.2",
       creationSource: "MANUAL",
       ...payload,
-      derived: {
-        currency,
-        primaryKpi: PRIMARY_KPI[objective],
-        supportingKpis,
-        supportingKpiStatus: "READY",
-      },
+      derived: canonicalDerivedProjection(readiness),
     };
 
     const visibility = legacyVisibility(payload.strategy.campaign_visibility);
@@ -335,10 +334,14 @@ export class CanonicalCampaignCreateService {
       audienceAgeMin: payload.targeting.audience_age_min,
       audienceAgeMax: payload.targeting.audience_age_max,
       audienceGender: payload.targeting.audience_gender,
-      targetLocations: payload.targeting.audience_geographies.map((g) => JSON.stringify(g)),
+      targetLocations: payload.targeting.audience_geographies.map((g) =>
+        JSON.stringify(g),
+      ),
       disqualifyingKeywords: [],
       visibilityScopes: [visibility],
-      applicationScope: legacyApplicationScope(payload.strategy.campaign_visibility),
+      applicationScope: legacyApplicationScope(
+        payload.strategy.campaign_visibility,
+      ),
     };
 
     const commercialsData = {
@@ -361,19 +364,18 @@ export class CanonicalCampaignCreateService {
           status: UceCampaignStatus.PUBLISHED,
           performanceAggregate: { upsert: { create: {}, update: {} } },
           strategy: { upsert: { create: strategyData, update: strategyData } },
-          targeting: { upsert: { create: targetingData, update: targetingData } },
-          commercials: { upsert: { create: commercialsData, update: commercialsData } },
+          targeting: {
+            upsert: { create: targetingData, update: targetingData },
+          },
+          commercials: {
+            upsert: { create: commercialsData, update: commercialsData },
+          },
         },
       });
 
-      await tx.uceCampaignReportingSnapshot.upsert({
-        where: { campaignId },
-        create: {
+      await tx.uceCampaignReportingSnapshot.create({
+        data: {
           campaignId,
-          primaryObjective: legacyObjective(objective),
-          lastApiSyncTimestamp: new Date(),
-        },
-        update: {
           primaryObjective: legacyObjective(objective),
           lastApiSyncTimestamp: new Date(),
         },

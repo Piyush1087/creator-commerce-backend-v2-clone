@@ -17,6 +17,7 @@ import { CampaignCommandService } from "./services/campaign-command.service";
 import { CampaignQueryService } from "./services/campaign-query.service";
 import { CanonicalCampaignCreateService } from "./services/canonical-campaign-create.service";
 import { CanonicalCampaignDraftReadService } from "./services/canonical-campaign-draft-read.service";
+import { CanonicalCampaignReadinessService } from "./services/canonical-campaign-readiness.service";
 
 @Module({
   imports: [PrismaModule, AuthModule, BrandCentreModule, CollaborationModule],
@@ -33,6 +34,7 @@ import { CanonicalCampaignDraftReadService } from "./services/canonical-campaign
     CampaignCommandService,
     CanonicalCampaignCreateService,
     CanonicalCampaignDraftReadService,
+    CanonicalCampaignReadinessService,
   ],
   exports: [
     BrandUceCampaignService,
