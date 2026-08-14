@@ -123,4 +123,3 @@ export function assertComplianceNotVerified(
     throw new BadRequestException("Compliance is already verified for this collaboration.");
   }
 }
-

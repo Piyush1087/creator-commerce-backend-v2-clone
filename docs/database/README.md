@@ -61,6 +61,8 @@ is changed explicitly later.
 
 ## Domain notes
 
+- `20260813-collaboration-clone-foundation.md` — eight clone Collaboration
+  migrations applied locally; additive against campaign Phase 1–3.
 - `brand-discovery-and-users.md` — Step 1 discovery tables plus minimal
   `User` / `Organization` model and org-linkage rules.
 

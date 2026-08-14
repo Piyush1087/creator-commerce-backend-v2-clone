@@ -11,14 +11,23 @@ import type { AuthUser } from "../../auth/types/auth-user";
 export const COLLABORATION_THREAD_INCLUDE = {
   campaign: { select: { name: true, brandProfileId: true } },
   brief: { select: { internalTitle: true, creativeGuidelines: true } },
-  brandProfile: { select: { name: true, id: true } },
+  product: {
+    select: {
+      id: true,
+      productName: true,
+      assetType: true,
+      skuCode: true,
+      imageUrl: true,
+    },
+  },
+  brandProfile: { select: { name: true, id: true, countryCode: true } },
   creatorUser: {
     select: {
       id: true,
       name: true,
       email: true,
       creatorProfile: {
-        select: { displayName: true, instagramHandle: true },
+        select: { id: true, displayName: true, instagramHandle: true },
       },
     },
   },
@@ -26,6 +35,26 @@ export const COLLABORATION_THREAD_INCLUDE = {
   logistics: true,
   finalization: true,
   media: { orderBy: { createdAt: "desc" as const }, take: 5 },
+  snapshot: true,
+  commercialAgreement: true,
+  fulfillment: {
+    include: { issues: { orderBy: { sequence: "asc" as const } } },
+  },
+  financialResolution: true,
+  settlement: true,
+  feedbackWindow: true,
+  feedback: { orderBy: { submittedAt: "asc" as const } },
+  deliverables: {
+    orderBy: { displayOrder: "asc" as const },
+    include: {
+      publishing: {
+        include: {
+          evidenceHistory: { orderBy: { sequence: "asc" as const } },
+        },
+      },
+      submissions: { orderBy: { versionNumber: "asc" as const } },
+    },
+  },
 } as const;
 
 @Injectable()

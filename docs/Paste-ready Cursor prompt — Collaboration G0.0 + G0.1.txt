@@ -1,0 +1,518 @@
+You are the Product Readiness engineering agent for Creator Shop Collaboration.
+
+Your task is to begin Phase G for the Collaboration module.
+
+EXECUTE G0.0 + G0.1 ONLY.
+
+Do not implement UI changes.
+Do not redesign screens.
+Do not invoke Stitch.
+Do not modify backend runtime/schema/contracts.
+Do not invent product policy.
+Do not proceed to G0.2 or G1 after completing this task.
+
+==================================================
+1. VERIFY THE WORKSPACE BASELINES
+==================================================
+
+Three repositories are mounted in this Cursor workspace.
+
+CANONICAL / GOVERNANCE
+
+Repository:
+Piyush1087/dummy_tcs
+
+Required frozen SHA:
+b4ae5bd56388bf022190e5e416cdfc1da80ccd56
+
+
+FRONTEND IMPLEMENTATION BASELINE
+
+Repository:
+Piyush1087/creator-commerce-frontend-v2-clone
+
+Baseline branch:
+collaboration/frontend-production-reconciliation
+
+Frozen baseline SHA:
+39510031066c44f20d59d1375c01678f34e585f8
+
+Expected Phase G working branch:
+phase-g/collaboration-g0-audit
+
+The working branch must originate from exactly the frozen frontend SHA.
+
+
+BACKEND RUNTIME BASELINE
+
+Repository:
+Piyush1087/creator-commerce-backend-v2-clone
+
+Baseline branch:
+collaboration/final-backend-reconciliation
+
+Frozen SHA:
+13ce652f432560a91dde1f75ca9a21dfa76d054f
+
+
+For all three repositories inspect:
+
+git status --short
+git rev-parse HEAD
+git branch --show-current
+
+Confirm:
+- dummy_tcs is exactly at the frozen canonical SHA;
+- backend is exactly at the frozen backend SHA;
+- the frontend Phase G branch originates from the frozen frontend SHA;
+- there are no unrelated uncommitted implementation changes.
+
+If any baseline is incorrect, STOP and return:
+
+BASELINE_MISMATCH
+
+Do not continue the audit from an uncertain baseline.
+
+==================================================
+2. READ GOVERNANCE FIRST
+==================================================
+
+Read these before product/runtime code:
+
+dummy_tcs/AI_ENGINEERING_STANDARD.md
+
+dummy_tcs/docs/engineering/
+PHASE_G_PRODUCT_READINESS_STANDARD.md
+
+dummy_tcs/collaboration/phase_g/
+agent_context_manifest.md
+
+dummy_tcs/collaboration/phase_g/
+developer_bootstrap_package.md
+
+
+These documents define HOW Phase G is performed.
+
+G0 is investigation-first.
+
+Do not modify runtime source during this task.
+
+==================================================
+3. READ COLLABORATION CANONICAL AUTHORITY
+==================================================
+
+Read:
+
+dummy_tcs/collaboration/README.md
+dummy_tcs/collaboration/finalization_review.md
+dummy_tcs/collaboration/developer_handoff_manifest.md
+
+
+Then all five frozen Collaboration contracts:
+
+dummy_tcs/collaboration/contracts/
+collaboration_domain_contract.md
+
+dummy_tcs/collaboration/contracts/
+collaboration_runtime_contract.md
+
+dummy_tcs/collaboration/contracts/
+collaboration_workflow_state_contract.md
+
+dummy_tcs/collaboration/contracts/
+collaboration_commercial_resolution_contract.md
+
+dummy_tcs/collaboration/contracts/
+collaboration_integration_contract.md
+
+
+Then canonical frontend reference:
+
+dummy_tcs/frontend/collaboration/implementation_map.md
+dummy_tcs/frontend/collaboration/state_map.md
+dummy_tcs/frontend/collaboration/interaction_map.md
+dummy_tcs/frontend/collaboration/ui_domain_mapping.md
+dummy_tcs/frontend/collaboration/copy_contract.md
+dummy_tcs/frontend/collaboration/creator_context_contract.md
+dummy_tcs/frontend/collaboration/realtime_hydration_contract.md
+
+
+Use canonical backend contracts when required for traceability:
+
+dummy_tcs/collaboration/backend/collaboration_schema.prisma
+dummy_tcs/collaboration/backend/command_contract.md
+dummy_tcs/collaboration/backend/read_model_contract.md
+dummy_tcs/collaboration/backend/implementation_map.md
+dummy_tcs/backend/validation/collaboration/
+
+==================================================
+4. READ DETAILED PRODUCT REQUIREMENTS
+==================================================
+
+From the accepted backend repository read:
+
+docs/collaboration/product-docs/
+Brand- collaboration workflow.md
+
+docs/collaboration/product-docs/
+Creator- Collaboration Workflow.md
+
+docs/collaboration/product-docs/
+Unified collaboration document (brand+ creator).md
+
+docs/ai-collaboration/
+2026-06-04-collaboration-module-intake.md
+
+
+AUTHORITY RULE:
+
+The frozen dummy_tcs Collaboration package is the canonical
+implementation-semantics authority.
+
+The backend product-docs are detailed product/workflow requirements.
+
+The accepted frontend/backend repositories are implementation evidence.
+
+If applicable authoritative sources materially disagree and the
+existing authority hierarchy does not resolve the difference:
+
+DO NOT GUESS.
+
+Create a finding:
+
+classification = AUTHORITY_CONFLICT
+
+Identify the conflicting sources and set:
+
+Product decision required: YES
+
+==================================================
+5. INSPECT CURRENT FRONTEND REALITY
+==================================================
+
+Start with:
+
+docs/collaboration/IMPLEMENTATION.md
+
+docs/ai-collaboration/
+2026-06-04-collaboration-frontend-intake.md
+
+
+Then inspect the real frontend implementation:
+
+src/features/collaboration/
+
+src/pages/brand/collaboration/
+
+src/pages/brand/collaborations/
+
+src/pages/creator/collaborations/
+
+src/routes/app-routes.tsx
+
+
+Inspect actual design/platform primitives as required:
+
+DESIGN_SYSTEM.md
+LAYOUT_DIRECTIVES.md
+src/design-system/aurora/
+src/layouts/app-shell/
+src/styles/global.css
+
+
+Do not assume an existing component is canonical merely because it
+already exists.
+
+Do not redesign it yet.
+
+==================================================
+6. TRACE BACKEND AUTHORITY WHERE REQUIRED
+==================================================
+
+Backend is READ ONLY during this task.
+
+Inspect when required:
+
+src/features/collaboration/
+
+prisma/schema.prisma
+
+src/features/brand-escrow/
+
+src/features/brand-payouts/
+
+
+For material actions trace, where practical:
+
+UI Action
+→ frontend component/state
+→ frontend client/API
+→ endpoint
+→ backend command/service/guard
+→ canonical owner
+
+
+For material displayed information trace:
+
+canonical owner
+→ persisted/read model
+→ backend projection
+→ frontend mapping
+→ component
+
+
+Do not perform unnecessary exhaustive backend tracing for purely
+visual findings when authority is already clear.
+
+==================================================
+7. G0.0 — BASELINE FREEZE
+==================================================
+
+Create only:
+
+frontend repo:
+docs/collaboration/phase-g/00_baseline.md
+
+
+Record:
+
+- all three repository refs and SHAs;
+- frontend Phase G working branch;
+- working tree cleanliness;
+- Brand Collaboration route(s);
+- Creator Collaboration route(s);
+- API base path;
+- Brand/Creator actor/access model;
+- current accepted runtime-validation evidence;
+- Aurora/design-system authority;
+- actual production UI primitives;
+- realtime mechanism;
+- persisted-state reconstruction rule;
+- external/provider dependencies;
+- canonical authority hierarchy;
+- intentionally open dependencies;
+- authority conflicts identified before detailed UI audit;
+- environment required later for G1/G5.
+
+Historical validation evidence must be explicitly described as
+accepted-baseline evidence unless you rerun the check in this task.
+
+==================================================
+8. G0.1 — WHOLE-MODULE SURFACE REALITY AUDIT
+==================================================
+
+Create only:
+
+frontend repo:
+docs/collaboration/phase-g/01_g0_reality_audit.md
+
+
+Audit BOTH Brand and Creator surfaces.
+
+Cover at minimum:
+
+1. Collaboration list / inbox
+2. workspace shell
+3. Brand vs Creator presentation
+4. chat / messages
+5. About / Campaign / Brief / creator/brand context
+6. negotiation
+7. securement
+8. fulfillment
+9. fulfillment exceptions / blocked states
+10. production
+11. Deliverable submissions
+12. Brand review
+13. revisions
+14. auto-approval presentation
+15. publishing
+16. publication authorization
+17. compliance correction
+18. settlement / financial status
+19. terminal resolution
+20. completion
+21. feedback
+22. loading states
+23. empty states
+24. read/API errors
+25. command/action errors
+26. degraded realtime/provider states
+27. refresh/re-entry
+28. desktop navigation
+29. mobile navigation
+
+
+For every meaningful surface identify:
+
+- route / entry point;
+- exact frontend component/file;
+- what is currently rendered;
+- current copy and labels;
+- current actions;
+- frontend state source;
+- frontend API/client;
+- backend read/command authority;
+- canonical domain owner;
+- lifecycle dependency;
+- workflow/stage dependency;
+- Brand/Creator differences;
+- current local UI states;
+- missing material states;
+- legacy/compatibility dependency;
+- technical/debug artifacts exposed to users;
+- obvious functional UX defects;
+- obvious visual debt;
+- whether deeper G0.2 root-cause investigation is required.
+
+
+Explicitly check whether the current frontend incorrectly:
+
+- infers backend-owned actions from frontend stage/status labels;
+- treats Collaboration lifecycle and execution stage as one state;
+- requires transient WebSocket history for re-entry;
+- carries old UCE/Campaign Collaboration ownership into operational Collaboration;
+- uses Campaign × Creator as Collaboration identity;
+- exposes fixed 30/70 commercial semantics;
+- treats BARTER as a payment rail;
+- infers Fulfillment from industry;
+- uses one global revision count;
+- uses one Collaboration-level live-post/compliance state instead of Deliverable grain;
+- treats auto-approval as permission to publish;
+- directly couples compliance to payout execution;
+- treats Feedback as a workflow stage;
+- treats creator bank details as Collaboration-owned truth;
+- invents Pause/Resume;
+- silently defaults unresolved publishingRequired.
+
+==================================================
+9. FINDING CLASSIFICATION
+==================================================
+
+Use:
+
+LEGACY_PRESENTATION_DEBT
+LEGACY_CONTRACT_LEAKAGE
+FRONTEND_INTEGRATION_DEFECT
+RUNTIME_CONTRACT_DEFECT
+MISSING_UX_BEHAVIOR
+MISSING_FEATURE
+DEBUG_ACCEPTANCE_UI
+DEFERRED_OWNER
+ENVIRONMENT_DEPENDENCY
+VISUAL_DEBT
+AUTHORITY_CONFLICT
+
+
+VISUAL_DEBT means the underlying product/runtime authority is already
+correct and only the presentation is deficient.
+
+If root cause has not yet been proven:
+
+Root cause: INVESTIGATION REQUIRED
+
+Do not convert hypotheses into facts.
+
+==================================================
+10. REQUIRED FINDING FORMAT
+==================================================
+
+ID:
+Surface:
+Actor(s): BRAND / CREATOR / BOTH
+Observed behavior:
+Expected canonical behavior:
+Exact frontend component/file:
+Current frontend state/data source:
+Frontend API/client path:
+Backend endpoint/service/authority:
+Canonical owner:
+Legacy/compatibility dependency:
+Root cause or investigation hypothesis:
+Classification:
+Fix scope:
+Backend change required: YES / NO / UNKNOWN
+Stitch required: YES / NO / UNKNOWN
+Product decision required: YES / NO
+Priority: P0 / P1 / P2 / P3
+G0.2 investigation required: YES / NO
+
+Do not use generic findings such as “improve UX” without evidence.
+
+==================================================
+11. STRUCTURE 01_g0_reality_audit.md
+==================================================
+
+1. Executive reality summary
+2. Current route/workspace topology
+3. Current state/ownership topology
+4. Brand surface audit
+5. Creator surface audit
+6. Shared workspace/chat audit
+7. Stage/workflow surface audit
+8. Terminal/completion/feedback audit
+9. Cross-cutting state audit
+10. Mobile/responsive reality
+11. Finding register
+12. Authority conflict register
+13. Missing-state register
+14. Legacy/compatibility register
+15. G0.2 investigation clusters
+16. Environmental blockers/dependencies
+17. G0.1 completion assessment
+
+==================================================
+12. SOURCE MODIFICATION BOUNDARY
+==================================================
+
+During this task you may only create/update:
+
+docs/collaboration/phase-g/00_baseline.md
+
+docs/collaboration/phase-g/01_g0_reality_audit.md
+
+
+Do not modify:
+
+.ts
+.tsx
+.css
+Prisma
+migrations
+runtime/Zod contracts
+package manifests
+configuration
+Stitch files
+canonical/governance documentation
+
+Do not merge.
+Do not deploy.
+
+==================================================
+13. FINAL RESPONSE
+==================================================
+
+Return:
+
+G0.0 status: COMPLETE / BLOCKED
+G0.1 status: COMPLETE / BLOCKED
+
+Canonical SHA verified:
+Frontend baseline verified:
+Backend baseline verified:
+Frontend Phase G branch:
+
+Surfaces audited:
+Total findings:
+Findings by classification:
+P0/P1 findings:
+Authority conflicts:
+Missing-state clusters:
+Legacy/compatibility clusters:
+Likely G0.2 investigation clusters:
+Environmental blockers:
+Files created/modified:
+Final frontend commit SHA, if committed:
+
+DO NOT PROCEED TO G0.2.
+
+Stop and wait for Product review.
