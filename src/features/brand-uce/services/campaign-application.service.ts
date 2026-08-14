@@ -218,33 +218,9 @@ export class CampaignApplicationService {
       });
     });
 
-    // Explicit Collaboration handoff (downstream), not Applicant truth.
-    const collab = await this.prisma.uceCampaignCollaboration.findFirst({
-      where: {
-        campaignId,
-        instagramHandle: {
-          equals: application.campaignCreator.socialHandle,
-          mode: "insensitive",
-        },
-      },
-    });
-    if (collab) {
-      if (
-        collab.collabStatus === UceCollabStatus.APPLICANT_PENDING ||
-        collab.collabStatus === UceCollabStatus.APPLICANT_SHORTLISTED
-      ) {
-        await this.pipeline.approveApplicant(
-          brandProfileId,
-          campaignId,
-          collab.id,
-          {
-            product_id: application.campaignAssetId,
-          },
-          actorId,
-        );
-      }
-    }
-
+    // Application approval is Applicant truth only.
+    // Collaboration provision requires explicit deliverable_publishing_applicability
+    // via pipeline approve (clone contract) — do not invent or omit that mapping here.
     return { ok: true, applicationId, status: "APPROVED" as const };
   }
 

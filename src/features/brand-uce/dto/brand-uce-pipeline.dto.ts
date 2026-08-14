@@ -87,12 +87,11 @@ export class ApproveApplicantDto {
   @Min(0)
   total_quote?: number;
 
-  @IsOptional()
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => DeliverablePublishingApplicabilityDto)
-  deliverable_publishing_applicability?: DeliverablePublishingApplicabilityDto[];
+  deliverable_publishing_applicability!: DeliverablePublishingApplicabilityDto[];
 }
 
 export class AddTrackingDto {

@@ -496,26 +496,14 @@ export class BrandUcePipelineService {
       return application;
     });
 
-    const deliverables = await this.prisma.uceBriefDeliverable.findMany({
-      where: { briefId: collab.briefId },
-      orderBy: { displayOrder: "asc" },
-    });
-    const applicability =
-      dto.deliverable_publishing_applicability &&
-      dto.deliverable_publishing_applicability.length > 0
-        ? dto.deliverable_publishing_applicability.map((item) => ({
-            sourceBriefDeliverableId: item.source_brief_deliverable_id,
-            publishingRequired: item.publishing_required,
-          }))
-        : deliverables.map((item) => ({
-            sourceBriefDeliverableId: item.id,
-            publishingRequired: true,
-          }));
-
     const workflow =
       await this.collaborationProvision.provisionFromApprovedApplication({
         sourceApplicationId: sourceApplication.id,
-        deliverablePublishingApplicability: applicability,
+        deliverablePublishingApplicability:
+          dto.deliverable_publishing_applicability.map((item) => ({
+            sourceBriefDeliverableId: item.source_brief_deliverable_id,
+            publishingRequired: item.publishing_required,
+          })),
       });
 
     const row = mapCollaborationRow(updated);
