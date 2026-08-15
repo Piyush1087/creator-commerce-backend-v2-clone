@@ -279,6 +279,7 @@ export class BrandUceCampaignService {
         performanceAggregate: true,
         products: { orderBy: { createdAt: "asc" } },
         briefs: { orderBy: { createdAt: "asc" } },
+        applications: { select: { collaborationId: true } },
         assets: {
           orderBy: { createdAt: "asc" },
           include: {
@@ -309,6 +310,29 @@ export class BrandUceCampaignService {
         campaign.assets.length,
         campaign.products.length,
       );
+    const canonicalBriefCount = campaign.assets.reduce(
+      (count, asset) => count + asset.canonicalBriefs.length,
+      0,
+    );
+    const missingRequirements = [
+      ...(campaign.assets.length === 0 ? ["campaign_asset"] : []),
+      ...(canonicalBriefCount === 0 ? ["canonical_brief"] : []),
+      ...(campaign.commercials && decimalToNumber(campaign.commercials.totalCampaignBudgetPool) > 0
+        ? []
+        : ["campaign_budget"]),
+    ];
+    const isReady = !requiresAssetReconciliation && missingRequirements.length === 0;
+    const lifecycleCapabilities = {
+      can_edit: canEditEssentials && !isTerminal,
+      can_activate: campaign.status === UceCampaignStatus.DRAFT && isReady,
+      can_pause: campaign.status === UceCampaignStatus.ACTIVE,
+      can_resume: campaign.status === UceCampaignStatus.PAUSED && isReady,
+      can_archive:
+        campaign.status === UceCampaignStatus.ACTIVE ||
+        campaign.status === UceCampaignStatus.PAUSED ||
+        campaign.status === UceCampaignStatus.COMPLETED,
+      can_restore: false,
+    };
 
     return {
       campaign_id: campaign.id,
@@ -351,6 +375,20 @@ export class BrandUceCampaignService {
         can_create_canonical_brief:
           !requiresAssetReconciliation && !isTerminal && campaign.assets.length > 0,
         legacy_briefs_read_only: true,
+        ...lifecycleCapabilities,
+      },
+      readiness: {
+        ready: isReady,
+        missing_requirements: missingRequirements,
+        reconciliation_required: requiresAssetReconciliation,
+      },
+      workspace: {
+        items: [
+          { id: "discovery", visible: true, available: true, priority: 1, count: 0 },
+          { id: "applications", visible: true, available: true, priority: 2, count: campaign.applications.length },
+          { id: "collaborations", visible: true, available: true, priority: 3, count: campaign.applications.filter((a) => a.collaborationId).length },
+          { id: "reporting", visible: true, available: false, priority: 4, count: 0, unavailable_message: "Reporting is not available for this Campaign yet." },
+        ],
       },
       zone_1_master: campaign.strategy
         ? {
