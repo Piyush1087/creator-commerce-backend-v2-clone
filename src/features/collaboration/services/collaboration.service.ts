@@ -15,6 +15,8 @@ import {
   UserRole,
 } from "@prisma/client";
 
+import { commandConflict } from "../errors/collaboration-command.error";
+
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
 import { splitEscrowQuote } from "../../brand-uce/utils/uce-decimal.util";
@@ -46,6 +48,7 @@ import {
   logisticsIsDispatched,
 } from "../utils/collaboration-action-guards";
 import {
+  deriveAvailableActions,
   mapCollaborationDetail,
   mapCollaborationThreadRow,
   mapMessageRow,
@@ -137,7 +140,24 @@ export class CollaborationService {
     collaborationId: string,
     dto: PostCollaborationMessageDto,
   ) {
-    await this.access.assertThreadForUser(user, collaborationId);
+    const thread = await this.access.assertThreadForUser(user, collaborationId);
+    const viewerRole =
+      user.role === UserRole.BRAND
+        ? "BRAND"
+        : user.role === UserRole.CREATOR
+          ? "CREATOR"
+          : null;
+    if (
+      !viewerRole ||
+      !deriveAvailableActions(thread, viewerRole).includes(
+        "PostCollaborationMessage",
+      )
+    ) {
+      commandConflict(
+        "INVALID_STATE",
+        "Messaging is closed for this collaboration.",
+      );
+    }
 
     const msg = await this.prisma.$transaction(async (tx) => {
       const created = await tx.collaborationMessage.create({

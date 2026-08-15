@@ -282,7 +282,10 @@ export function deriveAvailableActions(
   row: CollaborationReadSource,
   viewerRole: CollaborationViewerRole,
 ): CollaborationAvailableAction[] {
-  const actions: CollaborationAvailableAction[] = ["PostCollaborationMessage"];
+  const actions: CollaborationAvailableAction[] = [];
+  if (effectiveLifecycle(row) === CollaborationLifecycle.ACTIVE) {
+    actions.push("PostCollaborationMessage");
+  }
   if (
     projectionSource(row) === "CANONICAL" &&
     row.lifecycle === CollaborationLifecycle.COMPLETED
