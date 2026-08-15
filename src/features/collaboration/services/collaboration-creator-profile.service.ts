@@ -3,15 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { CreatorBankVerificationStatus, UserRole } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
-import { isValidBankRoutingCode } from "../utils/bank-routing-validation.util";
-import type {
-  UpsertCreatorBankDetailsDto,
-  UpsertCreatorShippingAddressDto,
-} from "../dto/collaboration-actions.dto";
+import type { UpsertCreatorShippingAddressDto } from "../dto/collaboration-actions.dto";
 
 @Injectable()
 export class CollaborationCreatorProfileService {
@@ -33,40 +29,6 @@ export class CollaborationCreatorProfileService {
     return this.prisma.creatorProfile.create({
       data: { userId },
     });
-  }
-
-  async upsertBankDetails(user: AuthUser, dto: UpsertCreatorBankDetailsDto) {
-    this.assertCreator(user);
-    const profile = await this.ensureProfile(user.id);
-
-    await this.prisma.creatorBankDetails.updateMany({
-      where: { creatorProfileId: profile.id },
-      data: { isPrimary: false },
-    });
-
-    const verificationStatus = isValidBankRoutingCode(dto.ifsc_or_routing)
-      ? CreatorBankVerificationStatus.VERIFIED
-      : CreatorBankVerificationStatus.SUSPENDED;
-
-    const row = await this.prisma.creatorBankDetails.create({
-      data: {
-        creatorProfileId: profile.id,
-        accountHolder: dto.account_holder,
-        bankName: dto.bank_name,
-        accountNumber: dto.account_number,
-        ifscOrRouting: dto.ifsc_or_routing,
-        isPrimary: true,
-        verificationStatus,
-      },
-    });
-
-    return {
-      bank_details_id: row.id,
-      account_holder: row.accountHolder,
-      bank_name: row.bankName,
-      is_primary: row.isPrimary,
-      verification_status: row.verificationStatus,
-    };
   }
 
   async upsertShippingAddress(

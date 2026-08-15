@@ -20,7 +20,6 @@ import {
   ReviewCollaborationMediaDto,
   SubmitCollaborationMediaDto,
   SubmitLivePostDto,
-  UpsertCreatorBankDetailsDto,
   UpsertCreatorShippingAddressDto,
 } from "./dto/collaboration-actions.dto";
 import { ListCollaborationThreadsQueryDto } from "./dto/collaboration-query.dto";
@@ -362,14 +361,6 @@ export class CollaborationController {
   @Get("creator/profile")
   getCreatorProfile(@Req() req: RequestWithAuthUser) {
     return this.creatorProfile.getCreatorProfile(req.user);
-  }
-
-  @Post("creator/bank-details")
-  upsertBankDetails(
-    @Req() req: RequestWithAuthUser,
-    @Body() body: UpsertCreatorBankDetailsDto,
-  ) {
-    return this.creatorProfile.upsertBankDetails(req.user, body);
   }
 
   @Post("creator/shipping-address")
