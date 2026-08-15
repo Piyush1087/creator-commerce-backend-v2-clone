@@ -13,6 +13,7 @@ import { BrandUcePipelineService } from "./services/brand-uce-pipeline.service";
 import { BrandUceProductService } from "./services/brand-uce-product.service";
 import { BrandUceReportingService } from "./services/brand-uce-reporting.service";
 import { CanonicalCampaignBriefService } from "./services/canonical-campaign-brief.service";
+import { CampaignApplicationService } from "./services/campaign-application.service";
 
 @Module({
   imports: [PrismaModule, AuthModule, BrandCentreModule, CollaborationModule],
@@ -24,6 +25,7 @@ import { CanonicalCampaignBriefService } from "./services/canonical-campaign-bri
     BrandUceProductService,
     BrandUceBriefService,
     CanonicalCampaignBriefService,
+    CampaignApplicationService,
     BrandUcePipelineService,
     BrandUceReportingService,
   ],

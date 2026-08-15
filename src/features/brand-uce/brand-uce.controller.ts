@@ -1,5 +1,6 @@
 import {
   Body,
+  ConflictException,
   Controller,
   Delete,
   Get,
@@ -49,6 +50,7 @@ import { BrandUcePipelineService } from "./services/brand-uce-pipeline.service";
 import { BrandUceProductService } from "./services/brand-uce-product.service";
 import { BrandUceReportingService } from "./services/brand-uce-reporting.service";
 import { CanonicalCampaignBriefService } from "./services/canonical-campaign-brief.service";
+import { CampaignApplicationService } from "./services/campaign-application.service";
 
 @Controller("api/v1/brand-uce")
 @UseGuards(ThrottlerGuard, JwtAuthGuard)
@@ -60,9 +62,58 @@ export class BrandUceController {
     private readonly products: BrandUceProductService,
     private readonly briefs: BrandUceBriefService,
     private readonly canonicalBriefs: CanonicalCampaignBriefService,
+    private readonly applications: CampaignApplicationService,
     private readonly pipeline: BrandUcePipelineService,
     private readonly reporting: BrandUceReportingService,
   ) {}
+
+  @Get("campaigns/:campaignId/discovery")
+  async getDiscovery(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.applications.discovery(brandProfileId, campaignId);
+  }
+
+  @Get("campaigns/:campaignId/applications")
+  async listApplications(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.applications.list(brandProfileId, campaignId);
+  }
+
+  @Post("campaigns/:campaignId/applications/:applicationId/accept")
+  async acceptApplication(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Param("applicationId") applicationId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.applications.decide(
+      brandProfileId,
+      campaignId,
+      applicationId,
+      "ACCEPTED",
+    );
+  }
+
+  @Post("campaigns/:campaignId/applications/:applicationId/reject")
+  async rejectApplication(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Param("applicationId") applicationId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.applications.decide(
+      brandProfileId,
+      campaignId,
+      applicationId,
+      "REJECTED",
+    );
+  }
 
   @Get("campaigns/:campaignId/canonical-briefs")
   async listCanonicalBriefs(
@@ -331,6 +382,7 @@ export class BrandUceController {
     @Param("campaignId") campaignId: string,
     @Body() body: CreateProspectDto,
   ) {
+    throw this.legacyPipelineReadOnly();
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
     return this.pipeline.createApplicant(
       brandProfileId,
@@ -346,6 +398,7 @@ export class BrandUceController {
     @Param("campaignId") campaignId: string,
     @Body() body: CreateProspectDto,
   ) {
+    throw this.legacyPipelineReadOnly();
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
     return this.pipeline.createProspect(
       brandProfileId,
@@ -363,6 +416,7 @@ export class BrandUceController {
     @Param("collaborationId") collaborationId: string,
     @Body() body: InviteProspectDto,
   ) {
+    throw this.legacyPipelineReadOnly();
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
     return this.pipeline.inviteProspect(
       brandProfileId,
@@ -381,6 +435,7 @@ export class BrandUceController {
     @Param("collaborationId") collaborationId: string,
     @Body() body: ApproveApplicantDto,
   ) {
+    throw this.legacyPipelineReadOnly();
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
     return this.pipeline.approveApplicant(
       brandProfileId,
@@ -399,6 +454,7 @@ export class BrandUceController {
     @Param("collaborationId") collaborationId: string,
     @Body() body: RejectApplicantDto,
   ) {
+    throw this.legacyPipelineReadOnly();
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
     return this.pipeline.rejectApplicant(
       brandProfileId,
@@ -417,6 +473,7 @@ export class BrandUceController {
     @Param("collaborationId") collaborationId: string,
     @Body() body: AddTrackingDto,
   ) {
+    throw this.legacyPipelineReadOnly();
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
     return this.pipeline.addTracking(
       brandProfileId,
@@ -435,6 +492,7 @@ export class BrandUceController {
     @Param("collaborationId") collaborationId: string,
     @Body() body: SubmitContentDraftDto,
   ) {
+    throw this.legacyPipelineReadOnly();
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
     return this.pipeline.submitContentDraft(
       brandProfileId,
@@ -453,6 +511,7 @@ export class BrandUceController {
     @Param("collaborationId") collaborationId: string,
     @Body() body: ReviewContentDto,
   ) {
+    throw this.legacyPipelineReadOnly();
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
     return this.pipeline.reviewContent(
       brandProfileId,
@@ -471,6 +530,7 @@ export class BrandUceController {
     @Param("collaborationId") collaborationId: string,
     @Body() body: PublishLivePostDto,
   ) {
+    throw this.legacyPipelineReadOnly();
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
     return this.pipeline.publishLivePost(
       brandProfileId,
@@ -489,6 +549,7 @@ export class BrandUceController {
     @Param("collaborationId") collaborationId: string,
     @Body() body: RecordFulfillmentIssueDto,
   ) {
+    throw this.legacyPipelineReadOnly();
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
     return this.pipeline.recordFulfillmentIssue(
       brandProfileId,
@@ -496,6 +557,12 @@ export class BrandUceController {
       collaborationId,
       body,
       req.user.id,
+    );
+  }
+
+  private legacyPipelineReadOnly(): ConflictException {
+    return new ConflictException(
+      "This Campaign participation record is read-only. Use Applications and Collaborations for current work.",
     );
   }
 

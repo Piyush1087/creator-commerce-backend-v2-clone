@@ -668,6 +668,7 @@ model User {
   historicChatThreads HistoricChatThread[]
   metricPostPulses MetricPostPulse[]
   collaborationsAsCreator Collaboration[] @relation("CollaborationCreator")
+  campaignApplications CampaignApplication[] @relation("CampaignApplicationCreator")
   coPilotThreads CoPilotThread[]
   coPilotMessageFeedback CoPilotMessageFeedback[]
   creatorCoPilotThreadsAuthored CreatorCoPilotThread[] @relation("CreatorCoPilotThreadAuthor")
@@ -1229,6 +1230,7 @@ model UceCampaign {
   commercials          UceCampaignCommercials?
   products             UceCampaignProduct[]
   assets               UceCampaignAsset[]
+  applications         CampaignApplication[]
   briefs               UceCampaignBrief[]
   collaborations       UceCampaignCollaboration[]
   workflowCollaborations Collaboration[]
@@ -1274,9 +1276,37 @@ model CanonicalCampaignBrief {
   createdAt            DateTime                  @default(now()) @map("created_at")
   updatedAt            DateTime                  @updatedAt @map("updated_at")
   deliverables         CanonicalBriefDeliverable[]
+  applications         CampaignApplication[]
 
   @@index([campaignAssetId, isActive])
   @@map("campaign_briefs")
+}
+
+enum CampaignApplicationStatus {
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+
+  @@map("campaign_application_status_enum")
+}
+
+model CampaignApplication {
+  id                String                    @id @default(uuid()) @map("application_id")
+  campaignId        String                    @map("campaign_id")
+  campaign          UceCampaign               @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  canonicalBriefId  String                    @map("canonical_brief_id")
+  canonicalBrief    CanonicalCampaignBrief    @relation(fields: [canonicalBriefId], references: [id], onDelete: Restrict)
+  creatorUserId     String                    @map("creator_user_id")
+  creatorUser       User                      @relation("CampaignApplicationCreator", fields: [creatorUserId], references: [id], onDelete: Restrict)
+  status            CampaignApplicationStatus @default(SUBMITTED)
+  collaborationId   String?                   @unique @map("collaboration_id")
+  collaboration     Collaboration?            @relation("ApplicationCollaboration", fields: [collaborationId], references: [id], onDelete: SetNull)
+  createdAt         DateTime                  @default(now()) @map("created_at")
+  updatedAt         DateTime                  @updatedAt @map("updated_at")
+
+  @@unique([campaignId, creatorUserId])
+  @@index([campaignId, status])
+  @@map("campaign_applications")
 }
 
 model CanonicalBriefDeliverable {
@@ -2033,6 +2063,7 @@ model Collaboration {
   finalization   CollaborationFinalization?
   messages       CollaborationMessage[]
   escrowLock     CollaborationEscrowLock?
+  application    CampaignApplication? @relation("ApplicationCollaboration")
 
   @@unique([campaignId, creatorUserId])
   @@index([brandProfileId, currentStage])
