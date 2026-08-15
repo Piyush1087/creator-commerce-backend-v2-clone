@@ -278,6 +278,14 @@ export class BrandUceCampaignService {
         performanceAggregate: true,
         products: { orderBy: { createdAt: "asc" } },
         briefs: { orderBy: { createdAt: "asc" } },
+        assets: {
+          orderBy: { createdAt: "asc" },
+          include: {
+            brandProfile: { select: { name: true, logoUrl: true } },
+            offering: { select: { name: true, type: true, imageUrl: true } },
+            brandOffer: { select: { offerName: true } },
+          },
+        },
       },
     });
     if (!campaign) {
@@ -290,6 +298,12 @@ export class BrandUceCampaignService {
       (sum, product) => sum + product.inventoryCount,
       0,
     );
+    const { isTerminal, requiresAssetReconciliation } =
+      campaignAssetReconciliationState(
+        campaign.status,
+        campaign.assets.length,
+        campaign.products.length,
+      );
 
     return {
       campaign_id: campaign.id,
@@ -301,6 +315,35 @@ export class BrandUceCampaignService {
         campaign.status === UceCampaignStatus.PAUSED
           ? "Campaign Paused. Inbound application links are offline. Active collaboration workflows remain accessible for processing."
           : null,
+      campaign_assets: campaign.assets.map((asset) => ({
+        campaign_asset_id: asset.id,
+        kind: asset.kind,
+        status: asset.status,
+        entity_id:
+          asset.brandProfileId ?? asset.offeringId ?? asset.brandOfferId,
+        label:
+          asset.brandProfile?.name ??
+          asset.offering?.name ??
+          asset.brandOffer?.offerName ??
+          "Brand Centre Asset",
+        subtype: asset.offering?.type ?? null,
+        image_url:
+          asset.brandProfile?.logoUrl ?? asset.offering?.imageUrl ?? null,
+      })),
+      reconciliation: {
+        required: requiresAssetReconciliation,
+        title: requiresAssetReconciliation
+          ? "Campaign setup needs reconciliation"
+          : null,
+        message: requiresAssetReconciliation
+          ? "Link the correct Brand Centre Asset before continuing this Campaign."
+          : null,
+      },
+      capabilities: {
+        can_select_campaign_asset: !isTerminal,
+        can_execute_campaign: !requiresAssetReconciliation && !isTerminal,
+        legacy_products_read_only: isTerminal,
+      },
       zone_1_master: campaign.strategy
         ? {
             timeline_type: campaign.strategy.timelineType,
@@ -539,6 +582,14 @@ export class BrandUceCampaignService {
       ) {
         throw new BadRequestException(
           "Only PAUSED or DRAFT campaigns can be activated/resumed.",
+        );
+      }
+      const canonicalAssetCount = await this.prisma.uceCampaignAsset.count({
+        where: { campaignId, status: "ACTIVE" },
+      });
+      if (canonicalAssetCount === 0) {
+        throw new ConflictException(
+          "Link the correct Brand Centre Asset before continuing this Campaign.",
         );
       }
       const checklist = await this.buildActivationChecklist(campaignId);
@@ -961,4 +1012,24 @@ export class BrandUceCampaignService {
     });
     return blockingRows === 0;
   }
+}
+
+export function campaignAssetReconciliationState(
+  status: UceCampaignStatus,
+  canonicalAssetCount: number,
+  legacyProductCount: number,
+) {
+  const isTerminal =
+    status === UceCampaignStatus.COMPLETED ||
+    status === UceCampaignStatus.ARCHIVED;
+  const requiresAssetReconciliation =
+    !isTerminal &&
+    status !== UceCampaignStatus.DRAFT &&
+    canonicalAssetCount === 0 &&
+    legacyProductCount > 0;
+  return {
+    isTerminal,
+    requiresAssetReconciliation,
+    canExecuteCampaign: !isTerminal && !requiresAssetReconciliation,
+  };
 }

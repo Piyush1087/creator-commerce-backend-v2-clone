@@ -266,6 +266,17 @@ enum UceCampaignStatus {
   ARCHIVED
 }
 
+enum UceCampaignAssetKind {
+  BRAND
+  OFFERING
+  OFFER
+}
+
+enum UceCampaignAssetStatus {
+  ACTIVE
+  PAUSED
+}
+
 enum UceTimelineStructure {
   FIXED_DATES
   DYNAMIC_MILESTONES
@@ -892,6 +903,7 @@ model BrandProfile {
 
   // UCE (Universal Campaign Engine)
   uceCampaigns UceCampaign[]
+  campaignAssets UceCampaignAsset[] @relation("CampaignAssetBrandProfile")
 
   // Bridge ledger (Brand Centre → UCE)
   integrationBridgeSignals IntegrationBridgeSignalLedger[]
@@ -978,6 +990,7 @@ model Offering {
   doNotSay           String[]     @default([]) @map("do_not_say")
   createdAt          DateTime     @default(now()) @map("created_at")
   updatedAt          DateTime     @updatedAt @map("updated_at")
+  campaignAssets     UceCampaignAsset[] @relation("CampaignAssetOffering")
 
   @@map("offerings")
 }
@@ -1121,6 +1134,7 @@ model BrandOffer {
   isActive           Boolean      @default(true) @map("is_active")
   createdAt          DateTime     @default(now()) @map("created_at")
   updatedAt          DateTime     @updatedAt @map("updated_at")
+  campaignAssets     UceCampaignAsset[] @relation("CampaignAssetBrandOffer")
 
   @@unique([brandProfileId, promoCode])
   @@map("brand_offers")
@@ -1214,6 +1228,7 @@ model UceCampaign {
   targeting            UceCampaignTargeting?
   commercials          UceCampaignCommercials?
   products             UceCampaignProduct[]
+  assets               UceCampaignAsset[]
   briefs               UceCampaignBrief[]
   collaborations       UceCampaignCollaboration[]
   workflowCollaborations Collaboration[]
@@ -1224,6 +1239,28 @@ model UceCampaign {
 
   @@index([brandProfileId, status])
   @@map("uce_campaigns")
+}
+
+model UceCampaignAsset {
+  id             String                 @id @default(uuid()) @map("campaign_asset_id")
+  campaignId     String                 @map("campaign_id")
+  campaign       UceCampaign            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  kind           UceCampaignAssetKind
+  status         UceCampaignAssetStatus @default(ACTIVE)
+  brandProfileId String?                @map("brand_profile_id")
+  brandProfile   BrandProfile?          @relation("CampaignAssetBrandProfile", fields: [brandProfileId], references: [id], onDelete: Restrict)
+  offeringId     String?                @map("offering_id")
+  offering       Offering?              @relation("CampaignAssetOffering", fields: [offeringId], references: [id], onDelete: Restrict)
+  brandOfferId   String?                @map("brand_offer_id")
+  brandOffer     BrandOffer?            @relation("CampaignAssetBrandOffer", fields: [brandOfferId], references: [id], onDelete: Restrict)
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+
+  @@unique([campaignId, brandProfileId])
+  @@unique([campaignId, offeringId])
+  @@unique([campaignId, brandOfferId])
+  @@index([campaignId, status])
+  @@map("uce_campaign_assets")
 }
 
 model UceCampaignPerformanceAggregate {

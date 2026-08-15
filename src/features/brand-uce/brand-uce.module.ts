@@ -6,6 +6,7 @@ import { BrandCentreModule } from "../brand-centre/brand-centre.module";
 import { CollaborationModule } from "../collaboration/collaboration.module";
 import { BrandUceController } from "./brand-uce.controller";
 import { BrandUceAccessService } from "./services/brand-uce-access.service";
+import { BrandUceCampaignAssetService } from "./services/brand-uce-campaign-asset.service";
 import { BrandUceBriefService } from "./services/brand-uce-brief.service";
 import { BrandUceCampaignService } from "./services/brand-uce-campaign.service";
 import { BrandUcePipelineService } from "./services/brand-uce-pipeline.service";
@@ -17,6 +18,7 @@ import { BrandUceReportingService } from "./services/brand-uce-reporting.service
   controllers: [BrandUceController],
   providers: [
     BrandUceAccessService,
+    BrandUceCampaignAssetService,
     BrandUceCampaignService,
     BrandUceProductService,
     BrandUceBriefService,

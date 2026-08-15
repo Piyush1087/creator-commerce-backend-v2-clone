@@ -37,8 +37,10 @@ import {
   SubmitContentDraftDto,
 } from "./dto/brand-uce-pipeline.dto";
 import { UpdateCampaignProductDto } from "./dto/brand-uce-product.dto";
+import { CreateCampaignAssetDto } from "./dto/brand-uce-campaign-asset.dto";
 import { BrandUceBriefService } from "./services/brand-uce-brief.service";
 import { BrandUceCampaignService } from "./services/brand-uce-campaign.service";
+import { BrandUceCampaignAssetService } from "./services/brand-uce-campaign-asset.service";
 import { BrandUcePipelineService } from "./services/brand-uce-pipeline.service";
 import { BrandUceProductService } from "./services/brand-uce-product.service";
 import { BrandUceReportingService } from "./services/brand-uce-reporting.service";
@@ -49,11 +51,37 @@ export class BrandUceController {
   constructor(
     private readonly auth: BrandCentreAuthService,
     private readonly campaigns: BrandUceCampaignService,
+    private readonly assets: BrandUceCampaignAssetService,
     private readonly products: BrandUceProductService,
     private readonly briefs: BrandUceBriefService,
     private readonly pipeline: BrandUcePipelineService,
     private readonly reporting: BrandUceReportingService,
   ) {}
+
+  @Get("campaign-assets/selectable")
+  async listSelectableCampaignAssets(@Req() req: RequestWithAuthUser) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.assets.listSelectable(brandProfileId);
+  }
+
+  @Get("campaigns/:campaignId/assets")
+  async listCampaignAssets(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.assets.listForCampaign(brandProfileId, campaignId);
+  }
+
+  @Post("campaigns/:campaignId/assets")
+  async selectCampaignAsset(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Body() body: CreateCampaignAssetDto,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.assets.select(brandProfileId, campaignId, body);
+  }
 
   @Get("campaigns/aggregates")
   async listAggregates(@Req() req: RequestWithAuthUser) {
