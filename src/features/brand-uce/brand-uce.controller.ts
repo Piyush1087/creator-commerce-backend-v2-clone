@@ -38,12 +38,17 @@ import {
 } from "./dto/brand-uce-pipeline.dto";
 import { UpdateCampaignProductDto } from "./dto/brand-uce-product.dto";
 import { CreateCampaignAssetDto } from "./dto/brand-uce-campaign-asset.dto";
+import {
+  CreateCanonicalCampaignBriefDto,
+  UpdateCanonicalCampaignBriefDto,
+} from "./dto/canonical-campaign-brief.dto";
 import { BrandUceBriefService } from "./services/brand-uce-brief.service";
 import { BrandUceCampaignService } from "./services/brand-uce-campaign.service";
 import { BrandUceCampaignAssetService } from "./services/brand-uce-campaign-asset.service";
 import { BrandUcePipelineService } from "./services/brand-uce-pipeline.service";
 import { BrandUceProductService } from "./services/brand-uce-product.service";
 import { BrandUceReportingService } from "./services/brand-uce-reporting.service";
+import { CanonicalCampaignBriefService } from "./services/canonical-campaign-brief.service";
 
 @Controller("api/v1/brand-uce")
 @UseGuards(ThrottlerGuard, JwtAuthGuard)
@@ -54,9 +59,45 @@ export class BrandUceController {
     private readonly assets: BrandUceCampaignAssetService,
     private readonly products: BrandUceProductService,
     private readonly briefs: BrandUceBriefService,
+    private readonly canonicalBriefs: CanonicalCampaignBriefService,
     private readonly pipeline: BrandUcePipelineService,
     private readonly reporting: BrandUceReportingService,
   ) {}
+
+  @Get("campaigns/:campaignId/canonical-briefs")
+  async listCanonicalBriefs(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.canonicalBriefs.list(brandProfileId, campaignId);
+  }
+
+  @Post("campaigns/:campaignId/canonical-briefs")
+  async createCanonicalBrief(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Body() body: CreateCanonicalCampaignBriefDto,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.canonicalBriefs.create(brandProfileId, campaignId, body);
+  }
+
+  @Patch("campaigns/:campaignId/canonical-briefs/:briefId")
+  async updateCanonicalBrief(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Param("briefId") briefId: string,
+    @Body() body: UpdateCanonicalCampaignBriefDto,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.canonicalBriefs.update(
+      brandProfileId,
+      campaignId,
+      briefId,
+      body,
+    );
+  }
 
   @Get("campaign-assets/selectable")
   async listSelectableCampaignAssets(@Req() req: RequestWithAuthUser) {

@@ -8,6 +8,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "test:g1a": "vitest run src/features/brand-uce/services/brand-uce-campaign-asset.service.test.ts",
+    "test:g1b": "vitest run src/features/brand-uce/services/canonical-campaign-brief.service.test.ts",
     "dev": "nest start --watch",
     "start": "nest start",
     "start:dev": "nest start --watch",

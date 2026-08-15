@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import {
   Prisma,
+  UceCampaignAssetStatus,
   UceCampaignObjective,
   UceCampaignStatus,
   UceCollabStatus,
@@ -284,6 +285,10 @@ export class BrandUceCampaignService {
             brandProfile: { select: { name: true, logoUrl: true } },
             offering: { select: { name: true, type: true, imageUrl: true } },
             brandOffer: { select: { offerName: true } },
+            canonicalBriefs: {
+              orderBy: { createdAt: "asc" },
+              include: { deliverables: { orderBy: { createdAt: "asc" } } },
+            },
           },
         },
       },
@@ -343,6 +348,9 @@ export class BrandUceCampaignService {
         can_select_campaign_asset: !isTerminal,
         can_execute_campaign: !requiresAssetReconciliation && !isTerminal,
         legacy_products_read_only: isTerminal,
+        can_create_canonical_brief:
+          !requiresAssetReconciliation && !isTerminal && campaign.assets.length > 0,
+        legacy_briefs_read_only: true,
       },
       zone_1_master: campaign.strategy
         ? {
@@ -411,7 +419,32 @@ export class BrandUceCampaignService {
           content_guidance_matrix: b.contentGuidanceMatrix,
           parent_planner_logistics_snapshot: b.parentPlannerLogisticsSnapshot,
           created_at: b.createdAt.toISOString(),
+          read_only: true,
         })),
+        canonical_briefs: campaign.assets.flatMap((asset) =>
+          asset.canonicalBriefs.map((brief) => ({
+            brief_id: brief.id,
+            campaign_asset_id: asset.id,
+            title: brief.title,
+            creative_requirements: brief.creativeRequirements,
+            is_active: brief.isActive,
+            deliverables: brief.deliverables.map((deliverable) => ({
+              deliverable_id: deliverable.id,
+              format: deliverable.format,
+              quantity: deliverable.quantity,
+              creative_requirements: deliverable.creativeRequirements,
+              publishing_required: deliverable.publishingRequired,
+            })),
+            readiness: {
+              ready:
+                brief.isActive &&
+                brief.deliverables.length > 0 &&
+                brief.deliverables.every((item) => item.quantity > 0),
+              missing_requirements: [],
+            },
+            created_at: brief.createdAt.toISOString(),
+          })),
+        ),
       },
       performance_aggregate: campaign.performanceAggregate
         ? {
@@ -974,9 +1007,13 @@ export class BrandUceCampaignService {
   }
 
   private async buildActivationChecklist(campaignId: string) {
-    const [productCount, briefCount, commercials] = await Promise.all([
-      this.prisma.uceCampaignProduct.count({ where: { campaignId } }),
-      this.prisma.uceCampaignBrief.count({ where: { campaignId } }),
+    const [assetCount, briefCount, commercials] = await Promise.all([
+      this.prisma.uceCampaignAsset.count({
+        where: { campaignId, status: UceCampaignAssetStatus.ACTIVE },
+      }),
+      this.prisma.canonicalCampaignBrief.count({
+        where: { campaignAsset: { campaignId }, isActive: true },
+      }),
       this.prisma.uceCampaignCommercials.findUnique({ where: { campaignId } }),
     ]);
 
@@ -986,13 +1023,13 @@ export class BrandUceCampaignService {
 
     return [
       {
-        key: "product_sku",
-        label: "At least one product SKU",
-        satisfied: productCount >= 1,
+        key: "campaign_asset",
+        label: "At least one Campaign Asset",
+        satisfied: assetCount >= 1,
       },
       {
         key: "active_brief",
-        label: "At least one brief configuration",
+        label: "At least one ready Brief",
         satisfied: briefCount >= 1,
       },
       {

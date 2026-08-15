@@ -1255,12 +1255,43 @@ model UceCampaignAsset {
   brandOffer     BrandOffer?            @relation("CampaignAssetBrandOffer", fields: [brandOfferId], references: [id], onDelete: Restrict)
   createdAt      DateTime               @default(now()) @map("created_at")
   updatedAt      DateTime               @updatedAt @map("updated_at")
+  canonicalBriefs CanonicalCampaignBrief[]
 
   @@unique([campaignId, brandProfileId])
   @@unique([campaignId, offeringId])
   @@unique([campaignId, brandOfferId])
   @@index([campaignId, status])
   @@map("uce_campaign_assets")
+}
+
+model CanonicalCampaignBrief {
+  id                   String                    @id @default(uuid()) @map("brief_id")
+  campaignAssetId      String                    @map("campaign_asset_id")
+  campaignAsset        UceCampaignAsset          @relation(fields: [campaignAssetId], references: [id], onDelete: Restrict)
+  title                String                    @map("title")
+  creativeRequirements String                    @map("creative_requirements") @db.Text
+  isActive             Boolean                   @default(true) @map("is_active")
+  createdAt            DateTime                  @default(now()) @map("created_at")
+  updatedAt            DateTime                  @updatedAt @map("updated_at")
+  deliverables         CanonicalBriefDeliverable[]
+
+  @@index([campaignAssetId, isActive])
+  @@map("campaign_briefs")
+}
+
+model CanonicalBriefDeliverable {
+  id                    String                 @id @default(uuid()) @map("deliverable_id")
+  briefId               String                 @map("brief_id")
+  brief                 CanonicalCampaignBrief @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  format                String                 @map("format")
+  quantity              Int                    @map("quantity")
+  creativeRequirements  String                 @map("creative_requirements") @db.Text
+  publishingRequired    Boolean                @map("publishing_required")
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+
+  @@index([briefId])
+  @@map("campaign_brief_deliverables")
 }
 
 model UceCampaignPerformanceAggregate {
