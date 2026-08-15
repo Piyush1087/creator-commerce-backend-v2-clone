@@ -18,10 +18,7 @@ import { IntegratedCampaignWizardPayloadSchema } from "../schemas/uce-wizard.sch
 import { decimalToNumber } from "../utils/uce-decimal.util";
 import { BrandUceAccessService } from "./brand-uce-access.service";
 
-const PROSPECT_STATUSES = [
-  "PROSPECT_CURATED",
-  "PROSPECT_INVITED",
-] as const;
+const PROSPECT_STATUSES = ["PROSPECT_CURATED", "PROSPECT_INVITED"] as const;
 
 const APPLICANT_STATUSES = [
   "APPLICANT_PENDING",
@@ -160,9 +157,7 @@ export class BrandUceCampaignService {
         applicants_count: applicants,
         active_collabs_count: activeCollabs,
         total_spend_to_date: spend,
-        total_impressions: agg
-          ? agg.totalImpressionsCount.toString()
-          : "0",
+        total_impressions: agg ? agg.totalImpressionsCount.toString() : "0",
         budget_pool: budgetPool,
         created_at: c.createdAt.toISOString(),
         updated_at: c.updatedAt.toISOString(),
@@ -298,7 +293,9 @@ export class BrandUceCampaignService {
       throw new BadRequestException("Campaign not found");
     }
 
-    const activationChecklist = await this.buildActivationChecklist(campaign.id);
+    const activationChecklist = await this.buildActivationChecklist(
+      campaign.id,
+    );
     const canEditEssentials = await this.canEditCampaignEssentials(campaign.id);
     const totalInventoryAllocated = campaign.products.reduce(
       (sum, product) => sum + product.inventoryCount,
@@ -310,29 +307,29 @@ export class BrandUceCampaignService {
         campaign.assets.length,
         campaign.products.length,
       );
-    const canonicalBriefCount = campaign.assets.reduce(
+    const activeCanonicalAssets = campaign.assets.filter(
+      (asset) => asset.status === "ACTIVE",
+    );
+    const canonicalBriefCount = activeCanonicalAssets.reduce(
       (count, asset) => count + asset.canonicalBriefs.length,
       0,
     );
     const missingRequirements = [
-      ...(campaign.assets.length === 0 ? ["campaign_asset"] : []),
+      ...(activeCanonicalAssets.length === 0 ? ["campaign_asset"] : []),
       ...(canonicalBriefCount === 0 ? ["canonical_brief"] : []),
-      ...(campaign.commercials && decimalToNumber(campaign.commercials.totalCampaignBudgetPool) > 0
+      ...(campaign.commercials &&
+      decimalToNumber(campaign.commercials.totalCampaignBudgetPool) > 0
         ? []
         : ["campaign_budget"]),
     ];
-    const isReady = !requiresAssetReconciliation && missingRequirements.length === 0;
-    const lifecycleCapabilities = {
-      can_edit: canEditEssentials && !isTerminal,
-      can_activate: campaign.status === UceCampaignStatus.DRAFT && isReady,
-      can_pause: campaign.status === UceCampaignStatus.ACTIVE,
-      can_resume: campaign.status === UceCampaignStatus.PAUSED && isReady,
-      can_archive:
-        campaign.status === UceCampaignStatus.ACTIVE ||
-        campaign.status === UceCampaignStatus.PAUSED ||
-        campaign.status === UceCampaignStatus.COMPLETED,
-      can_restore: false,
-    };
+    const isReady =
+      !requiresAssetReconciliation && missingRequirements.length === 0;
+    const lifecycleCapabilities = campaignLifecycleProjection(
+      campaign.status,
+      isReady,
+      canEditEssentials,
+      isTerminal,
+    );
 
     return {
       campaign_id: campaign.id,
@@ -373,7 +370,9 @@ export class BrandUceCampaignService {
         can_execute_campaign: !requiresAssetReconciliation && !isTerminal,
         legacy_products_read_only: isTerminal,
         can_create_canonical_brief:
-          !requiresAssetReconciliation && !isTerminal && campaign.assets.length > 0,
+          !requiresAssetReconciliation &&
+          !isTerminal &&
+          campaign.assets.length > 0,
         legacy_briefs_read_only: true,
         ...lifecycleCapabilities,
       },
@@ -384,17 +383,46 @@ export class BrandUceCampaignService {
       },
       workspace: {
         items: [
-          { id: "discovery", visible: true, available: true, priority: 1, count: 0 },
-          { id: "applications", visible: true, available: true, priority: 2, count: campaign.applications.length },
-          { id: "collaborations", visible: true, available: true, priority: 3, count: campaign.applications.filter((a) => a.collaborationId).length },
-          { id: "reporting", visible: true, available: false, priority: 4, count: 0, unavailable_message: "Reporting is not available for this Campaign yet." },
+          {
+            id: "discovery",
+            visible: true,
+            available: true,
+            priority: 1,
+            count: 0,
+          },
+          {
+            id: "applications",
+            visible: true,
+            available: true,
+            priority: 2,
+            count: campaign.applications.length,
+          },
+          {
+            id: "collaborations",
+            visible: true,
+            available: true,
+            priority: 3,
+            count: campaign.applications.filter((a) => a.collaborationId)
+              .length,
+          },
+          {
+            id: "reporting",
+            visible: true,
+            available: false,
+            priority: 4,
+            count: 0,
+            unavailable_message:
+              "Reporting is not available for this Campaign yet.",
+          },
         ],
       },
       zone_1_master: campaign.strategy
         ? {
             timeline_type: campaign.strategy.timelineType,
-            fixed_start_date: campaign.strategy.fixedStartDate?.toISOString() ?? null,
-            fixed_end_date: campaign.strategy.fixedEndDate?.toISOString() ?? null,
+            fixed_start_date:
+              campaign.strategy.fixedStartDate?.toISOString() ?? null,
+            fixed_end_date:
+              campaign.strategy.fixedEndDate?.toISOString() ?? null,
             dynamic_days_limit: campaign.strategy.dynamicDaysLimit,
             core_objective: campaign.strategy.coreObjective,
             platform_deliverables: campaign.strategy.platformDeliverables,
@@ -418,9 +446,15 @@ export class BrandUceCampaignService {
       zone_1_commercials: campaign.commercials
         ? {
             compensation_type: campaign.commercials.compensationType,
-            fixed_fee_amount: decimalToNumber(campaign.commercials.fixedFeeAmount),
-            negotiable_min_fee: decimalToNumber(campaign.commercials.negotiableMinFee),
-            negotiable_max_fee: decimalToNumber(campaign.commercials.negotiableMaxFee),
+            fixed_fee_amount: decimalToNumber(
+              campaign.commercials.fixedFeeAmount,
+            ),
+            negotiable_min_fee: decimalToNumber(
+              campaign.commercials.negotiableMinFee,
+            ),
+            negotiable_max_fee: decimalToNumber(
+              campaign.commercials.negotiableMaxFee,
+            ),
             total_campaign_budget_pool: decimalToNumber(
               campaign.commercials.totalCampaignBudgetPool,
             ),
@@ -573,8 +607,13 @@ export class BrandUceCampaignService {
     if (!campaign) {
       throw new BadRequestException("Campaign not found");
     }
-    if (campaign.status === UceCampaignStatus.COMPLETED || campaign.status === UceCampaignStatus.ARCHIVED) {
-      throw new BadRequestException("Completed or archived campaigns cannot be edited.");
+    if (
+      campaign.status === UceCampaignStatus.COMPLETED ||
+      campaign.status === UceCampaignStatus.ARCHIVED
+    ) {
+      throw new BadRequestException(
+        "Completed or archived campaigns cannot be edited.",
+      );
     }
 
     const canEdit = await this.canEditCampaignEssentials(campaignId);
@@ -640,9 +679,7 @@ export class BrandUceCampaignService {
 
     if (status === UceCampaignStatus.PAUSED) {
       if (existing.status !== UceCampaignStatus.ACTIVE) {
-        throw new BadRequestException(
-          "Only ACTIVE campaigns can be paused.",
-        );
+        throw new BadRequestException("Only ACTIVE campaigns can be paused.");
       }
     }
 
@@ -667,7 +704,8 @@ export class BrandUceCampaignService {
       const blockers = checklist.filter((c) => !c.satisfied);
       if (blockers.length > 0) {
         throw new BadRequestException({
-          message: "Campaign cannot be activated until checklist criteria are met",
+          message:
+            "Campaign cannot be activated until checklist criteria are met",
           checklist,
         });
       }
@@ -805,9 +843,9 @@ export class BrandUceCampaignService {
 
   async getCampaignPerformance(brandProfileId: string, campaignId: string) {
     const shell = await this.getCampaignShell(brandProfileId, campaignId);
-    const listRow = (
-      await this.listCampaigns(brandProfileId, {})
-    ).find((c) => c.campaign_id === campaignId);
+    const listRow = (await this.listCampaigns(brandProfileId, {})).find(
+      (c) => c.campaign_id === campaignId,
+    );
 
     return {
       campaign_id: shell.campaign_id,
@@ -842,10 +880,7 @@ export class BrandUceCampaignService {
     return rows;
   }
 
-  async findCampaignByNameHint(
-    brandProfileId: string,
-    nameHint: string,
-  ) {
+  async findCampaignByNameHint(brandProfileId: string, nameHint: string) {
     const hint = nameHint.trim();
     if (!hint) {
       return null;
@@ -907,8 +942,8 @@ export class BrandUceCampaignService {
               fixedEndDate: source.strategy!.fixedEndDate,
               dynamicDaysLimit: source.strategy!.dynamicDaysLimit,
               coreObjective: source.strategy!.coreObjective,
-              platformDeliverables:
-                source.strategy!.platformDeliverables as Prisma.InputJsonValue,
+              platformDeliverables: source.strategy!
+                .platformDeliverables as Prisma.InputJsonValue,
             },
           },
           targeting: {
@@ -1078,7 +1113,9 @@ export class BrandUceCampaignService {
     ];
   }
 
-  private async canEditCampaignEssentials(campaignId: string): Promise<boolean> {
+  private async canEditCampaignEssentials(
+    campaignId: string,
+  ): Promise<boolean> {
     const blockingRows = await this.prisma.uceCampaignCollaboration.count({
       where: {
         campaignId,
@@ -1106,5 +1143,24 @@ export function campaignAssetReconciliationState(
     isTerminal,
     requiresAssetReconciliation,
     canExecuteCampaign: !isTerminal && !requiresAssetReconciliation,
+  };
+}
+
+export function campaignLifecycleProjection(
+  status: UceCampaignStatus,
+  ready: boolean,
+  canEdit: boolean,
+  isTerminal: boolean,
+) {
+  return {
+    can_edit: canEdit && !isTerminal,
+    can_activate: status === UceCampaignStatus.DRAFT && ready,
+    can_pause: status === UceCampaignStatus.ACTIVE,
+    can_resume: status === UceCampaignStatus.PAUSED && ready,
+    can_archive:
+      status === UceCampaignStatus.ACTIVE ||
+      status === UceCampaignStatus.PAUSED ||
+      status === UceCampaignStatus.COMPLETED,
+    can_restore: false,
   };
 }

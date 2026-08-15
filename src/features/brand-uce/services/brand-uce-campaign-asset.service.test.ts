@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { CampaignAssetSelectionKind } from "../dto/brand-uce-campaign-asset.dto";
 import { BrandUceCampaignAssetService } from "./brand-uce-campaign-asset.service";
-import { campaignAssetReconciliationState } from "./brand-uce-campaign.service";
+import {
+  campaignAssetReconciliationState,
+  campaignLifecycleProjection,
+} from "./brand-uce-campaign.service";
 
 function harness() {
   const prisma = {
@@ -38,6 +41,21 @@ function harness() {
 }
 
 describe("G1A Campaign Asset authority", () => {
+  it("keeps lifecycle state separate when live Campaign readiness is lost", () => {
+    expect(
+      campaignLifecycleProjection(UceCampaignStatus.ACTIVE, false, true, false),
+    ).toEqual(
+      expect.objectContaining({
+        can_pause: true,
+        can_activate: false,
+        can_resume: false,
+      }),
+    );
+    expect(
+      campaignLifecycleProjection(UceCampaignStatus.DRAFT, false, true, false)
+        .can_activate,
+    ).toBe(false);
+  });
   it.each([
     [CampaignAssetSelectionKind.BRAND, "brand-1", "brandProfileId"],
     [CampaignAssetSelectionKind.OFFERING, "offering-1", "offeringId"],

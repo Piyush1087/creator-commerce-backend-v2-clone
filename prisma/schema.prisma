@@ -1286,8 +1286,6 @@ enum CampaignApplicationStatus {
   SUBMITTED
   ACCEPTED
   REJECTED
-
-  @@map("campaign_application_status_enum")
 }
 
 model CampaignApplication {
