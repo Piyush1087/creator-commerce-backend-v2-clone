@@ -8,6 +8,7 @@ import { BrandUceController } from "./brand-uce.controller";
 import { CanonicalCampaignCreateController } from "./canonical-campaign-create.controller";
 import { BrandUceAccessService } from "./services/brand-uce-access.service";
 import { BrandUceBriefService } from "./services/brand-uce-brief.service";
+import { BrandUceCampaignAssetService } from "./services/brand-uce-campaign-asset.service";
 import { BrandUceCampaignService } from "./services/brand-uce-campaign.service";
 import { BrandUcePipelineService } from "./services/brand-uce-pipeline.service";
 import { BrandUceProductService } from "./services/brand-uce-product.service";
@@ -18,15 +19,18 @@ import { CampaignQueryService } from "./services/campaign-query.service";
 import { CanonicalCampaignCreateService } from "./services/canonical-campaign-create.service";
 import { CanonicalCampaignDraftReadService } from "./services/canonical-campaign-draft-read.service";
 import { CanonicalCampaignReadinessService } from "./services/canonical-campaign-readiness.service";
+import { CanonicalCampaignBriefService } from "./services/canonical-campaign-brief.service";
 
 @Module({
   imports: [PrismaModule, AuthModule, BrandCentreModule, CollaborationModule],
   controllers: [BrandUceController, CanonicalCampaignCreateController],
   providers: [
     BrandUceAccessService,
+    BrandUceCampaignAssetService,
     BrandUceCampaignService,
     BrandUceProductService,
     BrandUceBriefService,
+    CanonicalCampaignBriefService,
     BrandUcePipelineService,
     BrandUceReportingService,
     CampaignApplicationService,

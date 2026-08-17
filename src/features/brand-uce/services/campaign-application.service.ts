@@ -19,10 +19,7 @@ import {
 import { PrismaService } from "../../../prisma/prisma.service";
 import { buildPhaseSyncPatch } from "../../../shared/uce/uce-production-phase.util";
 import { CollaborationProvisionService } from "../../collaboration/services/collaboration-provision.service";
-import {
-  decimalToNumber,
-  splitEscrowQuote,
-} from "../utils/uce-decimal.util";
+import { decimalToNumber, splitEscrowQuote } from "../utils/uce-decimal.util";
 import {
   approveApplicationInputSchema,
   rejectApplicationInputSchema,
@@ -48,10 +45,10 @@ export class CampaignApplicationService {
   ) {}
 
   /**
-   * Ensure Application + CampaignCreator rows exist for legacy Collaboration
-   * applicant rows (backfill only; Applications remain decision truth).
+   * Explicit compatibility command. This is intentionally never invoked by a
+   * Campaign Page GET/read path; callers must opt into legacy reconciliation.
    */
-  async syncFromLegacyCollaborations(campaignId: string) {
+  async syncLegacyApplicantsCompatibilityCommand(campaignId: string) {
     const applicantRows = await this.prisma.uceCampaignCollaboration.findMany({
       where: {
         campaignId,
@@ -146,7 +143,6 @@ export class CampaignApplicationService {
 
   async listApplicants(brandProfileId: string, campaignId: string) {
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
-    await this.syncFromLegacyCollaborations(campaignId);
 
     const rows = await this.prisma.uceApplication.findMany({
       where: {
@@ -186,6 +182,11 @@ export class CampaignApplicationService {
           | "EXPIRED",
         source: row.source,
         appliedAt: row.appliedAt.toISOString(),
+        campaignAssetId: row.campaignAssetId,
+        briefId: row.briefId,
+        canonicalCampaignAssetId: null,
+        canonicalBriefId: null,
+        referenceAuthority: "LEGACY_COMPATIBILITY" as const,
         intelligenceStatus: "UNAVAILABLE" as const,
       })),
     };
@@ -210,7 +211,9 @@ export class CampaignApplicationService {
       });
       if (!application) throw new NotFoundException("Application not found");
       if (application.status !== UceApplicationStatus.PENDING) {
-        throw new BadRequestException("Only PENDING applications can be approved");
+        throw new BadRequestException(
+          "Only PENDING applications can be approved",
+        );
       }
       if (!application.campaignCreator.email?.trim()) {
         throw new BadRequestException(
@@ -428,7 +431,9 @@ export class CampaignApplicationService {
     });
     if (!application) throw new NotFoundException("Application not found");
     if (application.status !== UceApplicationStatus.PENDING) {
-      throw new BadRequestException("Only PENDING applications can be rejected");
+      throw new BadRequestException(
+        "Only PENDING applications can be rejected",
+      );
     }
 
     await this.prisma.uceApplication.update({

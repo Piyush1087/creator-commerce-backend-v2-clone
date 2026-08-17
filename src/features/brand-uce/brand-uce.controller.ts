@@ -23,6 +23,11 @@ import {
   PatchCampaignEssentialsDto,
   PatchDraftCampaignWizardDto,
 } from "./dto/brand-uce-campaign.dto";
+import { CreateCampaignAssetDto } from "./dto/brand-uce-campaign-asset.dto";
+import {
+  CreateCanonicalCampaignBriefDto,
+  UpdateCanonicalCampaignBriefDto,
+} from "./dto/canonical-campaign-brief.dto";
 import { UpdateCampaignBriefDto } from "./dto/brand-uce-brief.dto";
 import {
   AddTrackingDto,
@@ -38,6 +43,7 @@ import {
 } from "./dto/brand-uce-pipeline.dto";
 import { UpdateCampaignProductDto } from "./dto/brand-uce-product.dto";
 import { BrandUceBriefService } from "./services/brand-uce-brief.service";
+import { BrandUceCampaignAssetService } from "./services/brand-uce-campaign-asset.service";
 import { BrandUceCampaignService } from "./services/brand-uce-campaign.service";
 import { BrandUcePipelineService } from "./services/brand-uce-pipeline.service";
 import { BrandUceProductService } from "./services/brand-uce-product.service";
@@ -48,6 +54,7 @@ import {
   type ShareChannel,
 } from "./services/campaign-command.service";
 import { CampaignQueryService } from "./services/campaign-query.service";
+import { CanonicalCampaignBriefService } from "./services/canonical-campaign-brief.service";
 
 @Controller("api/v1/brand-uce")
 @UseGuards(ThrottlerGuard, JwtAuthGuard)
@@ -55,14 +62,76 @@ export class BrandUceController {
   constructor(
     private readonly auth: BrandCentreAuthService,
     private readonly campaigns: BrandUceCampaignService,
+    private readonly assets: BrandUceCampaignAssetService,
     private readonly products: BrandUceProductService,
     private readonly briefs: BrandUceBriefService,
+    private readonly canonicalBriefs: CanonicalCampaignBriefService,
     private readonly pipeline: BrandUcePipelineService,
     private readonly reporting: BrandUceReportingService,
     private readonly campaignQuery: CampaignQueryService,
     private readonly campaignCommands: CampaignCommandService,
     private readonly campaignApplications: CampaignApplicationService,
   ) {}
+
+  @Get("campaign-assets/selectable")
+  async listSelectableCampaignAssets(@Req() req: RequestWithAuthUser) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.assets.listSelectable(brandProfileId);
+  }
+
+  @Get("campaigns/:campaignId/assets")
+  async listCampaignAssets(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.assets.listForCampaign(brandProfileId, campaignId);
+  }
+
+  @Post("campaigns/:campaignId/assets")
+  async selectCampaignAsset(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Body() body: CreateCampaignAssetDto,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.assets.select(brandProfileId, campaignId, body);
+  }
+
+  @Get("campaigns/:campaignId/canonical-briefs")
+  async listCanonicalBriefs(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.canonicalBriefs.list(brandProfileId, campaignId);
+  }
+
+  @Post("campaigns/:campaignId/canonical-briefs")
+  async createCanonicalBrief(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Body() body: CreateCanonicalCampaignBriefDto,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.canonicalBriefs.create(brandProfileId, campaignId, body);
+  }
+
+  @Patch("campaigns/:campaignId/canonical-briefs/:briefId")
+  async updateCanonicalBrief(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Param("briefId") briefId: string,
+    @Body() body: UpdateCanonicalCampaignBriefDto,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.canonicalBriefs.update(
+      brandProfileId,
+      campaignId,
+      briefId,
+      body,
+    );
+  }
 
   @Get("campaigns/aggregates")
   async listAggregates(@Req() req: RequestWithAuthUser) {
@@ -118,11 +187,7 @@ export class BrandUceController {
     @Body() body: PatchCampaignStatusDto,
   ) {
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
-    return this.campaigns.patchStatus(
-      brandProfileId,
-      campaignId,
-      body.status,
-    );
+    return this.campaigns.patchStatus(brandProfileId, campaignId, body.status);
   }
 
   @Patch("campaigns/:campaignId/essentials")
@@ -313,7 +378,9 @@ export class BrandUceController {
     );
   }
 
-  @Post("campaigns/:campaignId/pipeline/collaborations/:collaborationId/approve")
+  @Post(
+    "campaigns/:campaignId/pipeline/collaborations/:collaborationId/approve",
+  )
   @HttpCode(200)
   async approveApplicant(
     @Req() req: RequestWithAuthUser,
@@ -349,7 +416,9 @@ export class BrandUceController {
     );
   }
 
-  @Post("campaigns/:campaignId/pipeline/collaborations/:collaborationId/tracking")
+  @Post(
+    "campaigns/:campaignId/pipeline/collaborations/:collaborationId/tracking",
+  )
   @HttpCode(200)
   async addTracking(
     @Req() req: RequestWithAuthUser,
@@ -367,7 +436,9 @@ export class BrandUceController {
     );
   }
 
-  @Post("campaigns/:campaignId/pipeline/collaborations/:collaborationId/content-draft")
+  @Post(
+    "campaigns/:campaignId/pipeline/collaborations/:collaborationId/content-draft",
+  )
   @HttpCode(200)
   async submitContentDraft(
     @Req() req: RequestWithAuthUser,
@@ -385,7 +456,9 @@ export class BrandUceController {
     );
   }
 
-  @Post("campaigns/:campaignId/pipeline/collaborations/:collaborationId/review-content")
+  @Post(
+    "campaigns/:campaignId/pipeline/collaborations/:collaborationId/review-content",
+  )
   @HttpCode(200)
   async reviewContent(
     @Req() req: RequestWithAuthUser,
@@ -403,7 +476,9 @@ export class BrandUceController {
     );
   }
 
-  @Post("campaigns/:campaignId/pipeline/collaborations/:collaborationId/publish")
+  @Post(
+    "campaigns/:campaignId/pipeline/collaborations/:collaborationId/publish",
+  )
   @HttpCode(200)
   async publishLive(
     @Req() req: RequestWithAuthUser,
@@ -421,7 +496,9 @@ export class BrandUceController {
     );
   }
 
-  @Post("campaigns/:campaignId/pipeline/collaborations/:collaborationId/fulfillment-issue")
+  @Post(
+    "campaigns/:campaignId/pipeline/collaborations/:collaborationId/fulfillment-issue",
+  )
   @HttpCode(200)
   async fulfillmentIssue(
     @Req() req: RequestWithAuthUser,
