@@ -21,6 +21,7 @@ import { CreatorOnboardingModule } from "./features/creator-onboarding/creator-o
 import { CreatorPayoutsModule } from "./features/creator-payouts/creator-payouts.module";
 import { CreatorSettingsModule } from "./features/creator-settings/creator-settings.module";
 import { CreatorUceModule } from "./features/creator-uce/creator-uce.module";
+import { DataExtractionModule } from "./features/data-extraction/data-extraction.module";
 import { InstagramModule } from "./features/instagram/instagram.module";
 import { NotificationsModule } from "./features/notifications/notifications.module";
 import { PublicBrandModule } from "./features/public-brand/public-brand.module";
@@ -45,6 +46,7 @@ import { S3Module } from "./shared/s3/s3.module";
     S3Module,
     HealthModule,
     AuthModule,
+    DataExtractionModule,
     BrandOnboardingModule,
     BrandCentreModule,
     BrandCentreUceBridgeModule,
