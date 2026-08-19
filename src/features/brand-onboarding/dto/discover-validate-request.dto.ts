@@ -1,5 +1,6 @@
 import { Transform } from "class-transformer";
 import {
+  Equals,
   IsBoolean,
   IsNotEmpty,
   IsString,
@@ -16,13 +17,16 @@ export class DiscoverValidateRequestDto {
   url!: string;
 
   @IsBoolean()
-  ownershipAuthorizationAttested!: boolean;
+  @Equals(true)
+  ownershipAuthorizationAttested!: true;
 
   @IsBoolean()
-  termsAccepted!: boolean;
+  @Equals(true)
+  termsAccepted!: true;
 
   @IsBoolean()
-  privacyPolicyAccepted!: boolean;
+  @Equals(true)
+  privacyPolicyAccepted!: true;
 
   @IsString()
   @IsNotEmpty()

@@ -10,6 +10,7 @@ import {
 import { JwtService } from "@nestjs/jwt";
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 
+import { DiscoverResolveRequestDto } from "./dto/discover-resolve-request.dto";
 import { DiscoverValidateRequestDto } from "./dto/discover-validate-request.dto";
 import { DiscoverWaitlistRequestDto } from "./dto/discover-waitlist-request.dto";
 import { BrandOnboardingService } from "./brand-onboarding.service";
@@ -28,7 +29,7 @@ export class BrandOnboardingController {
   @HttpCode(200)
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   resolve(
-    @Body() body: DiscoverValidateRequestDto,
+    @Body() body: DiscoverResolveRequestDto,
     @Ip() clientIp: string,
     @Headers("authorization") authorization?: string,
   ) {
