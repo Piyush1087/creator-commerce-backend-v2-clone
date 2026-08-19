@@ -43,7 +43,7 @@ CREATE TYPE "CollaborationPublicationAuthorizationState" AS ENUM ('NOT_REQUIRED'
 -- CreateEnum
 CREATE TYPE "CollaborationEventKind" AS ENUM ('DOMAIN', 'AUDIT', 'INTEGRATION');
 
-ALTER TYPE "UceApplicationSource" ADD VALUE IF NOT EXISTS 'LEGACY_PIPELINE';
+-- Moved to 20260811120000_uce_application_and_share (type created there)
 
 -- AlterTable
 ALTER TABLE "uce_campaign_commercials" ADD COLUMN     "brand_support_estimated_value" DECIMAL(12,2),
