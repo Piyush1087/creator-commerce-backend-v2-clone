@@ -15,8 +15,8 @@ export function logisticsIsDispatched(
   }
   return Boolean(
     logistics.trackingId?.trim() ||
-      logistics.digitalAccessCredentials?.trim() ||
-      logistics.redemptionCode?.trim(),
+    logistics.digitalAccessCredentials?.trim() ||
+    logistics.redemptionCode?.trim(),
   );
 }
 
@@ -48,7 +48,9 @@ export function assertEscrowNotFunded(
     status === CollaborationEscrowStatus.FUNDED ||
     status === CollaborationEscrowStatus.SETTLED
   ) {
-    throw new BadRequestException("Escrow is already funded for this collaboration.");
+    throw new BadRequestException(
+      "Escrow is already funded for this collaboration.",
+    );
   }
 }
 
@@ -71,10 +73,7 @@ export function assertCreatorCanSubmitQuote(
       "You already submitted a final offer. Wait for the brand to accept or decline.",
     );
   }
-  if (
-    negotiationRound >= 1 &&
-    commercials?.brandCounterOffer == null
-  ) {
+  if (negotiationRound >= 1 && commercials?.brandCounterOffer == null) {
     throw new BadRequestException(
       "Your quote is with the brand. Wait for their response before sending another.",
     );
@@ -96,9 +95,7 @@ export function assertBrandCanCounter(
   }
 }
 
-export function assertNoPendingMedia(
-  pendingCount: number,
-): void {
+export function assertNoPendingMedia(pendingCount: number): void {
   if (pendingCount > 0) {
     throw new BadRequestException(
       "A draft is already pending brand review. Wait for feedback before submitting again.",
@@ -120,7 +117,8 @@ export function assertComplianceNotVerified(
   finalization: CollaborationFinalization | null | undefined,
 ): void {
   if (finalization?.isComplianceVerified) {
-    throw new BadRequestException("Compliance is already verified for this collaboration.");
+    throw new BadRequestException(
+      "Compliance is already verified for this collaboration.",
+    );
   }
 }
-

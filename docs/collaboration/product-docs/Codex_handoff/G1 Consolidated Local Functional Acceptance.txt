@@ -1,0 +1,840 @@
+Continue Creator Shop Collaboration Phase G.
+
+Execute ONLY:
+
+G1 CONSOLIDATED LOCAL FUNCTIONAL ACCEPTANCE
+
+This is not a new implementation package.
+
+Objective:
+prove that the accepted G1R + G1A + G1B + G1C implementation works as one
+real local Brand/Creator Collaboration product before G2 visual/UX freeze.
+
+Do not begin G2.
+Do not invoke Stitch.
+Do not redesign.
+Do not merge.
+Do not deploy.
+Do not use production infrastructure.
+
+==================================================
+1. ACCEPTED SOURCE BASELINES
+==================================================
+
+FRONTEND
+
+Repository:
+creator-commerce-frontend-v2
+
+Accepted Phase-G branch tip:
+
+293a3c9b4254580b4a873131df804e38a24a10a6
+
+
+BACKEND
+
+Repository:
+creator-commerce-backend-v2
+
+Accepted Phase-G backend SHA:
+
+da6a185e88e330f51fa6d3f9345e9193c055f51c
+
+
+CANONICAL / GOVERNANCE
+
+Continue using the frozen Collaboration Phase-G authority already established
+in G0.
+
+Do not absorb later unrelated branch changes.
+
+Before runtime setup confirm:
+
+git status --short
+git rev-parse HEAD
+git branch --show-current
+
+If either implementation baseline is wrong:
+
+STOP with
+
+BASELINE_MISMATCH
+
+==================================================
+2. READ ACCEPTED G1 RECORDS
+==================================================
+
+Read:
+
+docs/collaboration/phase-g/
+06_g1r_backend_hotfix_acceptance.md
+
+docs/collaboration/phase-g/
+07_g1a_foundation_access_read_integrity_acceptance.md
+
+docs/collaboration/phase-g/
+08_g1b_interaction_authority_recovery_acceptance.md
+
+docs/collaboration/phase-g/
+09_g1c_ownership_context_acceptance.md
+
+Also read:
+
+05_g0_3_authority_freeze_g1_plan.md
+
+The Product freezes in those documents remain authoritative.
+
+==================================================
+3. ACCEPTANCE MODE
+==================================================
+
+This phase should preferably make NO product/runtime changes.
+
+It is an integrated verification phase.
+
+If runtime testing reveals a source defect:
+
+1. reproduce it;
+2. classify it;
+3. identify root cause;
+4. add the smallest regression test;
+5. make the smallest canonical correction;
+6. rerun the affected package checks;
+7. rerun the relevant consolidated runtime scenario.
+
+Do not opportunistically improve visual styling.
+
+Do not fix unrelated technical debt.
+
+==================================================
+4. LOCAL SAFETY BOUNDARY
+==================================================
+
+Use local/test infrastructure only.
+
+Required:
+
+- repository-compatible Node/npm;
+- Docker Desktop;
+- PostgreSQL 16 local container or equivalent isolated local PostgreSQL;
+- backend on localhost:3000;
+- frontend on localhost:5173;
+- local Socket.IO;
+- deterministic Brand QA identity;
+- deterministic Creator QA identity.
+
+Use an isolated DB, for example:
+
+creator_shop_collaboration_phase_g
+
+
+Required local policy:
+
+STAGE=local
+
+DATABASE_URL
+→ localhost only
+
+APP_FRONTEND_URL=http://localhost:5173
+
+CREATOR_VERIFICATION_USE_REAL_OTP=false
+
+BRAND_VERIFICATION_USE_REAL_OTP=false
+
+NOTIFICATIONS_DEV_EMIT_ENABLED=false
+
+VITE_STAGE=local
+
+
+Prefer the existing Vite `/api` proxy when appropriate.
+
+Do NOT use:
+
+- production RDS;
+- dev/shared RDS;
+- production Postmark;
+- live Razorpay;
+- production S3 writes;
+- real money movement;
+- real creator publishing;
+- production social-provider writes.
+
+==================================================
+5. LOCAL DATABASE PREPARATION
+==================================================
+
+Use repository-supported setup.
+
+At minimum:
+
+npm ci
+
+npm run prisma:generate
+
+npm run db:migrate:deploy
+
+Use existing deterministic seed scripts where appropriate, including:
+
+npm run db:seed:dev-creator
+
+Known local Creator QA identity may be used if still supported by the repo:
+
+test@creator.com
+
+OTP:
+
+123456
+
+
+Use a deterministic local Brand QA account.
+
+Do not connect runtime acceptance to a production identity.
+
+==================================================
+6. FIXTURE / SCENARIO REQUIREMENT
+==================================================
+
+Create or reuse deterministic local data sufficient to exercise the accepted
+Collaboration runtime.
+
+Do not manually mutate random database fields when an existing service,
+command or seed mechanism can create the state correctly.
+
+Prefer:
+
+seed/service/command
+→ persisted state
+→ real HTTP read
+→ real frontend presentation
+
+At minimum cover applicable scenarios for:
+
+1. ACTIVE Negotiation
+2. Securement
+3. Fulfillment required
+4. Fulfillment issue #1 / remediation
+5. Fulfillment issue #2 / hard-stop if practical
+6. Production awaiting Creator submission
+7. Production awaiting Brand review
+8. revision requested
+9. Publishing required
+10. Publishing not required
+11. Completed
+12. Cancelled / terminal
+13. Feedback state
+14. LEGACY_COMPATIBILITY fixture if local data can safely represent it
+
+Provider-dependent states may use deterministic local/test adapters or fixtures.
+
+Do not provision production providers simply to pass Phase G.
+
+==================================================
+7. G1A — ACCESS / ROUTING ACCEPTANCE
+==================================================
+
+Verify in running application:
+
+BRAND
+
+- can access `/brand/collaborations`;
+- cannot operate Creator Collaboration route as Creator;
+- sees only Brand-owned Collaborations.
+
+CREATOR
+
+- can access `/creator/collaborations`;
+- cannot operate Brand Collaboration route as Brand;
+- sees only Creator-owned Collaborations.
+
+ADMIN / unsupported / unresolved
+
+- never defaults to Brand workspace.
+
+Verify deep links:
+
+?thread=<owned-id>
+→ correct Collaboration
+
+?collaboration=<owned-id>
+→ compatibility still accepted
+
+invalid/non-owned ID
+→ does NOT silently select another row
+
+Expected copy:
+
+Collaboration unavailable
+
+This collaboration may no longer be available or you may not have access.
+
+Back to Collaborations
+
+
+Verify mobile owned deep link:
+→ lands in Chat step rather than Inbox.
+
+==================================================
+8. G1A — INBOX / READ INTEGRITY
+==================================================
+
+Verify inbox rows can distinguish similar Collaborations using:
+
+- counterpart;
+- handle where available;
+- Campaign;
+- Asset;
+- Brief.
+
+No internal IDs/debug fields should appear.
+
+Verify canonical malformed-read protection where safely testable.
+
+Specifically ensure the UI does not silently treat an unresolved/missing
+publishingRequired value as false.
+
+If practical, validate canonical vs compatibility read handling through
+deterministic fixtures.
+
+==================================================
+9. LEGACY_COMPATIBILITY ACCEPTANCE
+==================================================
+
+Where compatibility fixture exists:
+
+Expected Product boundary:
+
+Headline:
+Limited collaboration details
+
+Body:
+Some details and actions are unavailable because this collaboration was
+created using an earlier workflow.
+
+Verify:
+
+- available history/context remains readable;
+- unsupported canonical per-Deliverable execution is not fabricated;
+- debug metadata is not shown;
+- terms such as LEGACY_COMPATIBILITY / projectionSource / sourceApplicationId
+  are not exposed.
+
+If no safe deterministic local compatibility fixture exists:
+
+record:
+
+NOT EXECUTED — FIXTURE UNAVAILABLE
+
+Do not fabricate one by corrupting canonical production-like data.
+
+==================================================
+10. CHAT / MESSAGE AUTHORITY
+==================================================
+
+ACTIVE:
+
+- history visible;
+- composer enabled only because backend availableActions allows
+  PostCollaborationMessage;
+- send succeeds;
+- duplicate submission prevented;
+- resulting history persists after refresh/re-entry.
+
+PAUSED, if fixture exists:
+
+- history visible;
+- composer read-only.
+
+COMPLETED:
+
+- history visible;
+- composer read-only.
+
+CANCELLED:
+
+- history visible;
+- composer read-only.
+
+TERMINATED, if available:
+
+- history visible;
+- composer read-only.
+
+Expected copy:
+
+Messaging is closed for this collaboration.
+You can still view the conversation history.
+
+
+Also prove direct backend bypass is still rejected for non-ACTIVE message POST
+through existing automated coverage and, where practical, local HTTP smoke.
+
+==================================================
+11. ERROR / RECOVERY ACCEPTANCE
+==================================================
+
+Exercise realistic cases without intentionally damaging shared infrastructure.
+
+Verify:
+
+- unavailable 404;
+- stale 409 behavior where reproducible;
+- message-send failure where safely reproducible;
+- read/network failure where browser/dev tooling can simulate locally;
+- retained prior data after non-destructive read failure;
+- Retry/Refresh behavior;
+- no raw backend/debug payloads shown.
+
+Do not require every HTTP status to be artificially manufactured if doing so
+would require source mutation.
+
+Record:
+
+EXECUTED
+SOURCE-TEST-COVERED
+or
+NOT PRACTICALLY REPRODUCIBLE LOCALLY
+
+for each error family.
+
+==================================================
+12. REALTIME ACCEPTANCE
+==================================================
+
+Verify:
+
+CONNECTED
+→ normal realtime invalidation/refetch.
+
+DISCONNECTED/DEGRADED
+→ already-hydrated Collaboration remains usable.
+
+Expected:
+- degraded notice;
+- Manual Refresh available;
+- Refresh uses authoritative HTTP;
+- no polling.
+
+RECONNECTED
+→ authoritative refetch occurs.
+
+Confirm frontend never rebuilds workflow truth from historical socket payloads.
+
+==================================================
+13. CREATOR CANCELLATION
+==================================================
+
+Use a state where backend projects:
+
+CancelCollaborationByCreator
+
+Verify:
+
+Creator:
+- sees cancellation action;
+- confirmation required;
+- processing/busy state;
+- command succeeds;
+- authoritative refetch occurs;
+- Collaboration becomes canonical cancelled/resolution state.
+
+Brand:
+- never sees Creator cancellation presenter.
+
+Verify financial/resolution copy comes from backend state.
+
+Do not promise refund/payout behavior locally.
+
+==================================================
+14. FULFILLMENT ACCEPTANCE
+==================================================
+
+Creator issue form must:
+
+- have no user-facing issue category/taxonomy;
+- require description;
+- accept valid description;
+- preserve optional evidence behavior if implemented;
+- not expose transport issueCode.
+
+Verify persisted issue history.
+
+Where fixtures allow:
+
+Issue #1
+→ canonical remediation path
+
+Issue #2
+→ canonical hard-stop path
+
+No industry-inferred Fulfillment behavior.
+
+No legacy logistics taxonomy leakage into canonical row UI.
+
+==================================================
+15. COUNTERPART CONTEXT
+==================================================
+
+BRAND viewing CREATOR:
+
+Verify available:
+
+- Creator display name;
+- handle where available;
+- Campaign;
+- Asset;
+- Brief.
+
+CREATOR viewing BRAND:
+
+Verify:
+
+- Brand name;
+- Campaign;
+- Asset;
+- Brief.
+
+Verify absent:
+
+- endpoint/debug language;
+- fabricated relationship history;
+- invented Intelligence;
+- Trust score;
+- cross-Campaign analytics.
+
+Missing optional fields should simply remain absent.
+
+==================================================
+16. BANK OWNERSHIP / SECUREMENT
+==================================================
+
+This is a critical integrated G1C acceptance.
+
+Creator:
+
+1. Open Settings/Payout.
+2. Save/update bank details through the Settings/Payout API.
+3. Verify canonical bank write succeeds.
+4. Verify required CreatorSettlementProfile/readiness state is established.
+5. Return to Collaboration.
+6. Verify securement prerequisite reflects the updated canonical readiness.
+
+Confirm:
+
+- no frontend request uses `/collaboration/creator/bank-details`;
+- backend route is absent;
+- Collaboration only consumes payout readiness / links to Settings.
+
+Do not exercise real payout money movement.
+
+==================================================
+17. PRODUCTION / PUBLISHING REGRESSION SMOKE
+==================================================
+
+Even though G1 did not redesign these domains, verify G1 changes did not
+regress their accepted runtime.
+
+At minimum smoke:
+
+- Creator submission;
+- Brand review;
+- revision;
+- auto-approved presentation if fixture exists;
+- Publishing required;
+- Publishing not required;
+- explicit Brand publication authorization;
+- publication evidence/correction state.
+
+Confirm:
+
+auto-approval != authorization to publish.
+
+Do not use real social publishing.
+
+==================================================
+18. SETTLEMENT / COMPLETION / FEEDBACK
+==================================================
+
+Verify current truthful presentation only.
+
+Settlement:
+
+- entitlement state is not presented as proof of money movement;
+- pending/blocked/unavailable execution remains truthful.
+
+COL-G0-022 remains:
+
+DEFERRED_OWNER
+
+Do not implement Payout/Escrow adapter.
+
+Completion:
+
+- execution actions closed appropriately;
+- history remains readable.
+
+Feedback:
+
+- post-completion only;
+- double-blind behavior preserved;
+- do not treat Feedback as Stage 6.
+
+Provider/scheduler-dependent reveal behavior may remain source/test-covered if
+scheduler is not available locally.
+
+==================================================
+19. MOBILE FUNCTIONAL ACCEPTANCE
+==================================================
+
+Test at least representative narrow viewport and tablet-width behavior.
+
+Creator bottom navigation:
+
+Home
+Campaigns
+Collaborations
+Profile
+
+Verify:
+
+- Collaborations accessible;
+- Insights is not in the four-slot bottom nav;
+- Insights still exists in other legitimate navigation;
+- Inbox → Chat → Execution works;
+- Back behavior works;
+- selection remains stable;
+- deep link opens Chat;
+- context drawer usable;
+- Refresh available while degraded;
+- composer usable.
+
+Do not perform visual redesign.
+
+Record visual observations only for G2.
+
+==================================================
+20. REFRESH / RE-ENTRY
+==================================================
+
+For material lifecycle states:
+
+- refresh browser;
+- leave route and return;
+- reopen deep link.
+
+Verify persisted HTTP state reconstructs:
+
+- selected Collaboration;
+- lifecycle;
+- current execution state;
+- messages;
+- capability-driven actions.
+
+Socket history must not be required.
+
+==================================================
+21. AUTOMATED REGRESSION RE-RUN
+==================================================
+
+After runtime acceptance rerun the accepted source gates.
+
+FRONTEND:
+
+- all Vitest tests;
+- npm run typecheck;
+- scoped/full applicable lint;
+- npm run build.
+
+Expected current floor:
+33 frontend tests, unless additional regression tests are legitimately added.
+
+BACKEND:
+
+- all Collaboration regression tests;
+- backend typecheck;
+- scoped lint;
+- npm run build;
+- Prisma validate.
+
+Expected current floor:
+108 Collaboration tests, unless additional regression tests are legitimately
+added.
+
+Do not accept a reduction in coverage without explanation.
+
+==================================================
+22. G1R DEBT
+==================================================
+
+Carry forward explicitly:
+
+1. Prettier/ESLint formatting debt on the three Brand-UCE COL-G0-005 files.
+2. No dedicated Brand-UCE approve integration test.
+
+Do not fix these merely to clean the consolidated acceptance unless they block
+runtime verification.
+
+Their presence does not by itself block G2.
+
+==================================================
+23. DEFERRED OWNERS
+==================================================
+
+Retain as deferred:
+
+- COL-G0-022 Payout/Escrow settlement execution adapter;
+- relationship-history context;
+- richer Intelligence;
+- Fulfillment taxonomy productization;
+- external publishing/social provider;
+- scheduler/provider dependencies where previously frozen;
+- Pause/resume command surface.
+
+Do not turn deferred owner work into a G1 acceptance failure unless current
+MVP behavior falsely claims it exists.
+
+==================================================
+24. FINDING CLASSIFICATION DURING RUNTIME
+==================================================
+
+Any runtime finding must be classified:
+
+SOURCE_REGRESSION
+FIXTURE_DATA_DEFECT
+LOCAL_ENVIRONMENT
+PROVIDER_DEPENDENCY
+DEFERRED_OWNER
+VISUAL_DEBT
+ACCEPTANCE_GAP
+
+For SOURCE_REGRESSION:
+
+- reproduce;
+- root-cause;
+- fix narrowly;
+- add regression test where practical;
+- rerun affected checks;
+- record new final SHA.
+
+Do not defer a known source defect to G2 or staging.
+
+==================================================
+25. ACCEPTANCE RESULT
+==================================================
+
+Final G1 consolidated disposition must be one of:
+
+ACCEPTED
+
+ACCEPTED WITH DEBT
+
+BLOCKED BY ENVIRONMENT
+
+NOT ACCEPTED
+
+
+To enter G2:
+
+There must be no unresolved known functional SOURCE_REGRESSION.
+
+Deferred owners may remain.
+
+G1R engineering debt may remain.
+
+Pure visual debt may move to G2.
+
+==================================================
+26. OUTPUT DOCUMENT
+==================================================
+
+Create:
+
+docs/collaboration/phase-g/
+10_g1_consolidated_local_functional_acceptance.md
+
+Required structure:
+
+1. Final baselines
+2. Environment used
+3. Local database / fixture summary
+4. Brand acceptance matrix
+5. Creator acceptance matrix
+6. Access / deep-link acceptance
+7. Messaging lifecycle acceptance
+8. Error / recovery acceptance
+9. Realtime acceptance
+10. Creator cancellation acceptance
+11. Fulfillment acceptance
+12. Counterpart context acceptance
+13. Bank ownership / securement acceptance
+14. Production / Publishing regression smoke
+15. Settlement / Completion / Feedback
+16. Refresh / re-entry
+17. Mobile functional acceptance
+18. Automated regression results
+19. Runtime findings and corrections
+20. Deferred-owner register
+21. G1R debt register
+22. Visual observations for G2
+23. G2 entry decision
+24. Final disposition
+
+==================================================
+27. FINAL RESPONSE
+==================================================
+
+Return:
+
+G1 consolidated status:
+
+Starting frontend SHA:
+Final frontend SHA:
+
+Starting backend SHA:
+Final backend SHA:
+
+Local environment:
+Database:
+Brand QA:
+Creator QA:
+
+Brand scenarios passed:
+Creator scenarios passed:
+
+Access/deep-link:
+Messaging lifecycle:
+Error/recovery:
+Realtime:
+Creator cancellation:
+Fulfillment:
+Counterpart context:
+Bank/securement:
+Production/Publishing smoke:
+Completion/Feedback:
+Refresh/re-entry:
+Mobile:
+
+Frontend tests:
+Backend Collaboration tests:
+Frontend typecheck/lint/build:
+Backend typecheck/lint/build/Prisma:
+
+Source regressions found:
+Source regressions corrected:
+Environment blockers:
+Provider/deferred limitations:
+
+G1R debt carried:
+Deferred owners carried:
+Visual debt moved to G2:
+
+G2 entry:
+AUTHORIZED / NOT AUTHORIZED
+
+Final frontend Phase-G SHA:
+Final backend Phase-G SHA:
+
+Documentation commit SHA:
+
+STOP.
+
+Do not begin G2 or Stitch.

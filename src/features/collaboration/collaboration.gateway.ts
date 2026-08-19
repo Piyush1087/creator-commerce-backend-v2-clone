@@ -108,7 +108,10 @@ export class CollaborationGateway
       if (!payload?.sub || !payload.email || !payload.role) {
         return null;
       }
-      if (payload.role !== UserRole.BRAND && payload.role !== UserRole.CREATOR) {
+      if (
+        payload.role !== UserRole.BRAND &&
+        payload.role !== UserRole.CREATOR
+      ) {
         return null;
       }
       return {

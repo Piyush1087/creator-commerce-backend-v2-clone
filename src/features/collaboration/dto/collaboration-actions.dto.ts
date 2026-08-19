@@ -1,8 +1,4 @@
-import {
-  CollaborationMediaPhase,
-  CollaborationPayoutMode,
-  FulfillmentIssueType,
-} from "@prisma/client";
+import { CollaborationMediaPhase, FulfillmentIssueType } from "@prisma/client";
 import {
   IsBoolean,
   IsEnum,
@@ -12,45 +8,11 @@ import {
   IsOptional,
   IsString,
   IsUrl,
-  IsUUID,
   Max,
   MaxLength,
   Min,
   MinLength,
 } from "class-validator";
-
-export class CreateCollaborationThreadDto {
-  @IsUUID()
-  campaign_id!: string;
-
-  @IsUUID()
-  brief_id!: string;
-
-  @IsUUID()
-  creator_user_id!: string;
-
-  @IsOptional()
-  @IsUUID()
-  product_id?: string;
-
-  @IsOptional()
-  @IsUUID()
-  uce_pipeline_collaboration_id?: string;
-
-  @IsOptional()
-  @IsEnum(CollaborationPayoutMode)
-  payout_mode?: CollaborationPayoutMode;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  product_retail_value?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  initial_quote?: number;
-}
 
 export class PostCollaborationMessageDto {
   @IsString()
@@ -174,28 +136,6 @@ export class SubmitCollaborationReviewDto {
   @IsString()
   @MaxLength(2000)
   review_text?: string;
-}
-
-export class UpsertCreatorBankDetailsDto {
-  @IsString()
-  @MinLength(2)
-  @MaxLength(120)
-  account_holder!: string;
-
-  @IsString()
-  @MinLength(2)
-  @MaxLength(120)
-  bank_name!: string;
-
-  @IsString()
-  @MinLength(4)
-  @MaxLength(40)
-  account_number!: string;
-
-  @IsString()
-  @MinLength(4)
-  @MaxLength(20)
-  ifsc_or_routing!: string;
 }
 
 export class UpsertCreatorShippingAddressDto {

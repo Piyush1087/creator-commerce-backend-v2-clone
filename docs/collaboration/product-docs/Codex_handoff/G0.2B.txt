@@ -1,0 +1,284 @@
+Continue Creator Shop Collaboration Phase G.
+
+Execute G0.2B ONLY:
+OWNERSHIP & CROSS-MODULE BOUNDARY RECONCILIATION.
+
+Do not implement fixes.
+Do not redesign.
+Do not invoke Stitch.
+Do not merge or deploy.
+
+Use the accepted Phase G artifacts:
+
+docs/collaboration/phase-g/00_baseline.md
+docs/collaboration/phase-g/01_g0_reality_audit.md
+docs/collaboration/phase-g/02_g0_2_access_identity_read_integrity.md
+
+Maintain all previously frozen repository/canonical authorities.
+
+==================================================
+1. PRODUCT DECISIONS TO FREEZE
+==================================================
+
+ADMIN ACCESS
+
+Admin is not an operational Brand/Creator Collaboration actor for MVP.
+
+An Admin/unknown role must never default to Brand Collaboration.
+
+If an Admin-specific operational surface exists elsewhere, preserve that
+ownership. Otherwise Collaboration should show/route to an unsupported-access
+state.
+
+DEEP-LINK NO-ACCESS COPY
+
+Use one non-enumerating Product state because backend intentionally collapses
+missing and unauthorized Collaboration to 404:
+
+Headline:
+Collaboration unavailable
+
+Body:
+This collaboration may no longer be available or you may not have access.
+
+Recovery:
+Back to Collaborations
+
+Do not reveal whether the Collaboration exists for another user.
+
+INBOX IDENTITY
+
+Do not add a new appliedAt/application-date backend projection during G0/G1
+unless existing projected counterpart + Campaign + Asset + Brief context is
+proven insufficient.
+
+==================================================
+2. INVESTIGATE THESE OWNERSHIP FINDINGS
+==================================================
+
+COL-G0-009
+Fulfillment issue report / issue taxonomy
+
+COL-G0-010
+Counterpart context read model and privacy boundary
+
+COL-G0-012
+Creator bank-detail dual ownership
+
+Also validate the boundary represented by:
+
+COL-G0-022
+Settlement execution / Payout-Escrow ownership
+
+This last item is already classified DEFERRED_OWNER. Do not design or implement
+the external settlement adapter. Confirm only that Collaboration frontend and
+backend do not incorrectly take ownership while the adapter is unavailable.
+
+==================================================
+3. FULFILLMENT ISSUE BOUNDARY
+==================================================
+
+Trace:
+
+Campaign Brand Support configuration
+→ locked Collaboration Fulfillment snapshot
+→ Fulfillment issue command contract
+→ backend validation/service
+→ current frontend issue form
+
+Determine:
+
+- whether a canonical issue-code taxonomy actually exists;
+- whether issueCode is intentionally bounded free-string;
+- which values the backend currently recognizes semantically;
+- whether legacy Logistics enums are still executable or evidence-only;
+- whether any remediation behavior depends on a specific issue code;
+- what the smallest truthful Creator reporting UX can support;
+- whether description is mandatory/optional;
+- whether Brand sees exactly the same issue classification.
+
+Do not invent a new taxonomy.
+
+If Product must define categories because none exist, return the decision
+explicitly rather than creating values.
+
+==================================================
+4. COUNTERPART CONTEXT / PRIVACY
+==================================================
+
+Trace both directions separately.
+
+BRAND VIEWING CREATOR
+
+Determine which existing owners already expose:
+
+- Creator public identity
+- handle/avatar/location
+- creator profile facts
+- Campaign-relevant performance/context
+- Brand-scoped prior relationship/history
+
+CREATOR VIEWING BRAND
+
+Determine which existing owners already expose:
+
+- Brand identity
+- Campaign
+- Campaign Asset
+- Brief
+- relevant commercial/execution context
+
+Inspect existing Creator, Brand Centre, Campaign, Application and Collaboration
+read boundaries before proposing a new endpoint.
+
+Determine:
+
+- which information Collaboration should compose;
+- which information must remain owned by another module;
+- whether backend composition or frontend multi-fetch is architecturally
+  appropriate in the current codebase;
+- privacy/access constraints;
+- loading/error/partial-data behavior;
+- whether relationship-history data actually exists today;
+- which desired fields must therefore remain deferred.
+
+Do not fabricate Intelligence/profile/history information.
+
+==================================================
+5. CREATOR BANK OWNERSHIP
+==================================================
+
+Trace:
+
+Creator Payouts UI
+→ current Collaboration bank client
+→ Collaboration endpoint
+→ Settings/Payout endpoint(s)
+→ persisted bank table/model
+
+Confirm:
+
+- canonical write owner;
+- whether Settings/Payout already has a complete write/read API;
+- whether Collaboration's bank endpoint has any remaining legitimate
+  Collaboration-specific consumer;
+- whether both endpoints mutate identical persistence;
+- compatibility/deprecation impact of removing frontend use;
+- whether backend Collaboration endpoint can be retired now or must remain
+  temporarily for compatibility;
+- how Collaboration should consume only “payout details ready/not ready”
+  prerequisite state;
+- required regression/migration checks.
+
+Canonical direction remains:
+
+Settings/Payout owns Creator bank truth.
+Collaboration consumes prerequisite state or links to Settings/Payout.
+
+Do not move bank ownership into Collaboration.
+
+==================================================
+6. SETTLEMENT BOUNDARY
+==================================================
+
+Inspect current Collaboration settlement projection and Payout/Escrow gateway.
+
+Confirm:
+
+- Collaboration owns entitlement/resolution only;
+- Payout/Escrow owns money movement;
+- current unavailable adapter fails safely;
+- frontend does not imply money was paid merely because entitlement exists;
+- terminal/completed UI can truthfully represent pending/blocked execution;
+- no hidden fixed-tranche or payout arithmetic has leaked into the frontend.
+
+Do not implement the settlement adapter.
+
+Classify remaining work as DEFERRED_OWNER where appropriate.
+
+==================================================
+7. ALSO RECORD DIRECT-G1 FINDINGS
+==================================================
+
+Do not deeply reinvestigate these unless ownership evidence changes:
+
+COL-G0-008
+Creator cancellation
+→ known missing presenter; backend capability/client already exist.
+
+COL-G0-011
+Technical/debug counterpart-drawer copy
+→ known frontend copy defect.
+
+Record their expected G1 grouping so they do not get lost.
+
+==================================================
+8. REQUIRED OUTPUT FOR EACH INVESTIGATED FINDING
+==================================================
+
+For each finding provide:
+
+Finding ID
+Confirmed root cause
+Canonical owner
+Current owner(s)
+Ownership violation, if any
+Exact frontend files
+Exact backend files/services
+Existing reusable API/read model
+Frontend change required
+Backend change required
+Compatibility/deprecation impact
+Privacy/security considerations
+Required regression tests
+Deferred owner/dependency
+Remaining Product decision
+Recommended G1 scope
+Stitch relevance
+
+Replace UNKNOWN values wherever evidence permits.
+
+==================================================
+9. OUTPUT FILE
+==================================================
+
+Create only:
+
+docs/collaboration/phase-g/
+03_g0_2_ownership_cross_module_boundaries.md
+
+Include:
+
+1. Executive ownership summary
+2. Fulfillment issue boundary
+3. Brand → Creator context boundary
+4. Creator → Brand context boundary
+5. Creator bank ownership/cutover
+6. Settlement/Payout-Escrow boundary
+7. Direct-G1 findings register
+8. Remaining authority/Product decisions
+9. Recommended G1 grouping
+10. G0.2B completion assessment
+
+No runtime source changes.
+
+==================================================
+10. FINAL RESPONSE
+==================================================
+
+Return:
+
+G0.2B status:
+Findings investigated:
+Ownership violations confirmed:
+Frontend-only resolutions:
+Backend-required resolutions:
+Deferred-owner items:
+Product decisions remaining:
+Direct-G1 findings:
+Files created:
+Commit SHA:
+
+STOP.
+
+Do not proceed to G0.2C, G0.3 or G1.

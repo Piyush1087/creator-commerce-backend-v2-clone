@@ -16,6 +16,8 @@ agents, or teammate proposals before it becomes source code.
 
 ## Recent intakes
 
+- `2026-08-13-collaboration-clone-reconcile.md` — Canonical Collaboration from
+  frozen clone commit `13ce652` into developer backend-v2.
 - `2026-05-14-brand-onboarding-journey-intake.md` — Step 1 discovery API + schema
   extraction from the product onboarding markdown.
 

@@ -1,0 +1,355 @@
+Continue Creator Shop Collaboration Phase G.
+
+Execute G0.2C ONLY:
+INTERACTION, RECOVERY & FUNCTIONAL MOBILE STATE RECONCILIATION.
+
+Do not implement fixes.
+Do not redesign.
+Do not invoke Stitch.
+Do not merge or deploy.
+
+Use the accepted Phase G artifacts:
+
+docs/collaboration/phase-g/00_baseline.md
+docs/collaboration/phase-g/01_g0_reality_audit.md
+docs/collaboration/phase-g/02_g0_2_access_identity_read_integrity.md
+docs/collaboration/phase-g/03_g0_2_ownership_cross_module_boundaries.md
+
+All prior Product freezes remain in force.
+
+==================================================
+1. PRODUCT FREEZE — FULFILLMENT ISSUE UX
+==================================================
+
+For MVP:
+
+- do not expose a user-facing Fulfillment issue taxonomy;
+- the Creator reports the issue through a mandatory description-first form;
+- evidence/attachments remain optional where already supported;
+- do not invent category values;
+- if the existing API still requires issueCode, the existing technical value
+  may remain as an opaque transport/compatibility value temporarily;
+- the UI must not display or interpret that value as Product taxonomy;
+- remediation remains sequence-driven.
+
+Update COL-G0-009 accordingly for G1 planning.
+
+==================================================
+2. PRODUCT FREEZE — COUNTERPART CONTEXT MVP
+==================================================
+
+Do not introduce a new relationship-history/context backend endpoint as part
+of Phase G MVP.
+
+Brand viewing Creator:
+- creator display name;
+- handle when available;
+- Campaign;
+- Campaign Asset;
+- Brief.
+
+Creator viewing Brand:
+- Brand name;
+- Campaign;
+- Campaign Asset;
+- Brief.
+
+Use already-projected Collaboration detail.
+
+Do not fabricate:
+- prior relationship history;
+- performance Intelligence;
+- Trust scores;
+- Brand analytics;
+- cross-Campaign history.
+
+Keep detailed commercial/execution state primarily in the Execution Hub.
+
+Rich counterpart context remains a future owning-read-model capability.
+
+Update COL-G0-010 accordingly.
+
+==================================================
+3. INVESTIGATE THESE FINDINGS
+==================================================
+
+COL-G0-006
+Read/API error model and recovery
+
+COL-G0-007
+Chat action authority and lifecycle
+
+COL-G0-014
+Realtime degraded recovery
+
+COL-G0-016
+Loading / empty conversation / chat processing
+
+COL-G0-018
+Creator mobile Collaboration navigation
+
+Also functionally inspect COL-G0-019 only enough to establish:
+- breakpoint behavior;
+- overflow/navigation defects;
+- inaccessible/tiny interaction areas;
+- whether 768–1023px behavior is functionally usable.
+
+Do NOT redesign visual composition in G0.2C.
+Pure visual/Aurora debt stays for G2/G3/G4.
+
+==================================================
+4. MESSAGE LIFECYCLE POLICY
+==================================================
+
+Previously frozen Product rule:
+
+ACTIVE
+- history visible
+- send may be available
+
+PAUSED
+- history visible
+- send disabled
+
+COMPLETED
+- history visible
+- send disabled
+
+CANCELLED
+- history visible
+- send disabled
+
+TERMINATED
+- history visible
+- send disabled
+
+Backend availableActions remains executable authority.
+
+Investigate exact backend + frontend changes required to enforce this.
+
+Do not encode lifecycle checks independently in the frontend if
+availableActions can express the result.
+
+Determine:
+- mapper/action derivation change;
+- command-service rejection;
+- frontend composer gating;
+- copy/state when messaging becomes read-only;
+- stale/refetch implications;
+- regression tests.
+
+==================================================
+5. ERROR / RECOVERY MATRIX
+==================================================
+
+Trace current handling for:
+
+- 400 validation failure
+- 401 authentication/session expiry
+- 403 unsupported action/role
+- 404 Collaboration unavailable/no access
+- 409 stale aggregate/version conflict
+- 5xx/server failure
+- network failure
+- malformed read model
+- message-send failure
+- socket disconnected
+- socket reconnect
+- partial detail/messages read failure
+
+For each determine:
+
+- owning pane/surface;
+- whether already-loaded data should remain visible;
+- retry behavior;
+- whether automatic refetch is safe;
+- when user action is required;
+- exact technical data that must NOT appear in UI.
+
+Do not write final polished visual designs.
+Freeze functional state semantics only.
+
+==================================================
+6. LOADING / EMPTY / PROCESSING STATES
+==================================================
+
+Determine the correct state model for:
+
+INBOX
+- initial loading
+- empty
+- loaded
+
+SELECTION
+- no Collaboration selected
+- deep-link loading
+- Collaboration unavailable
+
+DETAIL
+- loading
+- loaded
+- failed while existing data exists
+- failed with no data
+
+MESSAGES
+- loading
+- zero messages
+- loaded
+- send in progress
+- send failed
+- read-only lifecycle
+
+EXECUTION HUB
+- loading/hydration
+- canonical
+- compatibility-bounded
+- blocked
+- terminal
+- completed
+- contract/read failure
+
+Do not decide visual styling beyond interaction requirements.
+
+==================================================
+7. REALTIME DEGRADED POLICY
+==================================================
+
+Persisted HTTP remains authority.
+
+Determine the smallest robust MVP behavior when Socket.IO is disconnected.
+
+Preferred functional direction:
+
+- keep already-hydrated state usable;
+- clearly indicate live updates are temporarily unavailable;
+- provide manual Refresh;
+- allow safe HTTP reads/actions where backend permits;
+- after reconnect, refetch authoritative detail/messages;
+- never reconstruct workflow state from socket history.
+
+Investigate whether bounded fallback polling is necessary.
+
+Do not add polling merely because realtime is disconnected if manual refresh +
+reconnect-refetch is sufficient.
+
+Return a recommendation with reasoning.
+
+==================================================
+8. MOBILE FUNCTIONAL ACCESS
+==================================================
+
+Trace:
+
+- Brand mobile entry to Collaborations;
+- Creator mobile entry to Collaborations;
+- Inbox → Chat → Execution flow;
+- Back behavior;
+- selected Collaboration preservation;
+- deep-link entry on mobile;
+- drawers/sheets;
+- sticky/primary execution actions;
+- long content overflow;
+- keyboard/composer usability where source evidence permits.
+
+Freeze:
+
+Creator must have a mobile shell entry to operational Collaborations.
+
+Determine the smallest shell/navigation change required.
+
+For viewport/breakpoint behavior:
+- identify actual functional problems;
+- separate them from visual preference.
+
+Do not redesign the workspace in G0.2C.
+
+==================================================
+9. DIRECT G1 STATE FINDINGS
+==================================================
+
+Carry forward without unnecessary reinvestigation:
+
+COL-G0-008
+Creator cancellation presenter
+
+COL-G0-011
+Counterpart drawer technical copy
+
+COL-G0-009
+Description-first Fulfillment issue UX
+
+COL-G0-010
+Existing-detail counterpart context composition
+
+These should appear in final G1 grouping.
+
+==================================================
+10. REQUIRED OUTPUT PER FINDING
+==================================================
+
+For each investigated finding provide:
+
+Finding ID
+Confirmed root cause
+Exact frontend files
+Exact backend files/services
+Canonical authority
+Functional state model
+Frontend change required
+Backend change required
+Automatic recovery behavior
+Manual recovery behavior
+Required copy/state semantics
+Required regression tests
+Mobile implications
+Remaining Product decision
+Recommended G1 scope
+Stitch relevance
+
+Replace UNKNOWN values wherever evidence permits.
+
+==================================================
+11. OUTPUT FILE
+==================================================
+
+Create only:
+
+docs/collaboration/phase-g/
+04_g0_2_interaction_recovery_mobile.md
+
+Structure:
+
+1. Executive interaction/recovery summary
+2. Message lifecycle enforcement
+3. Error/recovery matrix
+4. Loading/empty/processing state matrix
+5. Realtime degraded behavior
+6. Mobile functional navigation/access
+7. Breakpoint functional findings
+8. Direct-G1 carry-forward register
+9. Remaining Product decisions
+10. Recommended G1 grouping
+11. G0.2C completion assessment
+
+No runtime source changes.
+
+==================================================
+12. FINAL RESPONSE
+==================================================
+
+Return:
+
+G0.2C status:
+Findings investigated:
+Frontend-only resolutions:
+Backend-required resolutions:
+Product decisions remaining:
+Realtime recovery recommendation:
+Mobile functional blockers:
+Direct-G1 findings carried forward:
+Files created:
+Commit SHA:
+
+STOP.
+
+Do not proceed to G0.3 or G1.

@@ -1,0 +1,575 @@
+Continue Creator Shop Collaboration Phase G.
+
+Execute G1C ONLY:
+FULFILLMENT HONESTY, COUNTERPART CONTEXT & CREATOR BANK OWNERSHIP CUTOVER.
+
+Do not begin consolidated acceptance.
+Do not begin G2.
+Do not invoke Stitch.
+Do not redesign the Collaboration workspace.
+Do not merge.
+Do not deploy.
+
+==================================================
+1. ACCEPTED BASELINES
+==================================================
+
+FRONTEND
+
+Accepted Phase-G branch tip:
+
+70646fdc8996f6d2f497ccf47dca08a4656b128a
+
+Create a dedicated G1C branch from exactly this SHA:
+
+phase-g/collaboration-g1c-ownership-context
+
+
+BACKEND
+
+Accepted Phase-G backend SHA:
+
+c6e10aca0734587d9f637dbf42d59bdabe2a5671
+
+Create a dedicated backend G1C branch from exactly this SHA only if a backend
+change is required by the frozen G1C scope.
+
+Do not absorb unrelated backend movement.
+
+==================================================
+2. READ BEFORE IMPLEMENTING
+==================================================
+
+Read:
+
+docs/collaboration/phase-g/03_g0_2_ownership_cross_module_boundaries.md
+docs/collaboration/phase-g/04_g0_2_interaction_recovery_mobile.md
+docs/collaboration/phase-g/05_g0_3_authority_freeze_g1_plan.md
+docs/collaboration/phase-g/06_g1r_backend_hotfix_acceptance.md
+docs/collaboration/phase-g/07_g1a_foundation_access_read_integrity_acceptance.md
+docs/collaboration/phase-g/08_g1b_interaction_authority_recovery_acceptance.md
+
+Retain all frozen Phase-G Product decisions.
+
+==================================================
+3. G1C FINDINGS
+==================================================
+
+Implement only:
+
+COL-G0-009
+Fulfillment issue UX honesty
+
+COL-G0-010
+Counterpart context MVP composition
+
+COL-G0-011
+Remove technical/debug counterpart copy
+
+COL-G0-012
+Creator bank ownership cutover
+
+Do not implement:
+
+COL-G0-022 settlement adapter
+relationship-history API
+new Intelligence
+new Fulfillment taxonomy
+visual redesign
+G2/Aurora reconciliation
+
+==================================================
+4. FULFILLMENT ISSUE UX
+==================================================
+
+Frozen MVP behavior:
+
+- description-first;
+- description mandatory;
+- evidence/attachments optional where already supported;
+- NO user-facing issue taxonomy;
+- NO invented issue categories;
+- remediation remains sequence-driven;
+- issueCode must not be presented or interpreted as Product taxonomy.
+
+Current canonical backend command accepts a bounded free-string issueCode and
+description, but backend remediation behavior does not branch on issueCode.
+
+Frontend requirement:
+
+Remove the current one-option/disabled category presentation.
+
+User should primarily see:
+
+Describe the issue
+
+with the canonical description validation.
+
+If the current API still requires issueCode, preserve the smallest safe
+transport-compatible value internally.
+
+Requirements for any temporary transport code:
+
+- do not display it as a category;
+- do not allow Product behavior to depend on it;
+- do not introduce a new enum/taxonomy;
+- document the compatibility reason.
+
+If the backend command can already accept a neutral existing opaque code without
+semantic consequence, prefer FE-only implementation.
+
+Do not change backend merely to create a new taxonomy.
+
+==================================================
+5. FULFILLMENT VALIDATION / HISTORY
+==================================================
+
+Verify:
+
+- mandatory description follows backend min/max validation;
+- issue #1 still leads to remediation flow;
+- issue #2 still leads to canonical hard-stop behavior;
+- Brand sees truthful issue description/history;
+- frontend does not imply a semantic category that backend does not own;
+- legacy Logistics issue enums do not leak into canonical Application-origin
+  Collaboration UI.
+
+Do not change sequence/remediation rules.
+
+==================================================
+6. COUNTERPART CONTEXT — MVP
+==================================================
+
+Frozen MVP fields:
+
+BRAND VIEWING CREATOR
+
+- Creator display name;
+- handle when available;
+- Campaign;
+- Campaign Asset;
+- Brief.
+
+CREATOR VIEWING BRAND
+
+- Brand name;
+- Campaign;
+- Campaign Asset;
+- Brief.
+
+Use the already-hydrated Collaboration detail/sourceContext.
+
+Do NOT create:
+
+- relationship-history endpoint;
+- additional Creator public-profile fetch;
+- Brand analytics fetch;
+- Intelligence call;
+- Trust score;
+- cross-Campaign history;
+- performance inference.
+
+Do not duplicate full execution/commercial state in the drawer.
+
+Detailed execution belongs in Execution Hub.
+
+==================================================
+7. COUNTERPART COPY
+==================================================
+
+Remove all technical/debug acceptance copy such as:
+
+- “dedicated canonical endpoint”
+- “dedicated Brand-scoped endpoint”
+- endpoint availability/status wording
+- implementation TODO language
+
+The user-facing drawer must never describe missing backend architecture.
+
+Where a frozen MVP field is unavailable, omit the unavailable field cleanly or
+use neutral Product-facing absence only where needed.
+
+Do not invent profile/history content to fill space.
+
+==================================================
+8. COUNTERPART COMPATIBILITY
+==================================================
+
+For LEGACY_COMPATIBILITY rows:
+
+- show only truthful context fields actually available;
+- do not fabricate missing Campaign Asset/Brief information;
+- preserve the existing “Limited collaboration details” boundary from G1A;
+- do not expose projectionSource, sourceApplicationId, debug metadata or the
+  term “legacy”.
+
+No new migration policy in G1C.
+
+==================================================
+9. CREATOR BANK OWNERSHIP
+==================================================
+
+Frozen ownership:
+
+Settings/Payout owns Creator bank truth.
+
+Collaboration may:
+
+- consume payout-readiness state;
+- present securement prerequisite status;
+- link the Creator to Settings/Payout.
+
+Collaboration must not remain the canonical bank writer.
+
+Current G0 root cause:
+
+Creator Payouts frontend currently uses Collaboration client:
+
+POST /collaboration/creator/bank-details
+
+while Settings/Payout already has its own complete bank read/write API and
+writes the same underlying CreatorBankDetails domain with the correct
+settlement-profile behavior.
+
+Implement the ownership cutover.
+
+==================================================
+10. FRONTEND BANK CUTOVER
+==================================================
+
+Trace all consumers of the Collaboration bank mutation before changing it.
+
+At minimum inspect:
+
+- CreatorBankDetailsDrawer
+- creator-payouts feature
+- Collaboration client
+- Settings/Payout client
+- securement links/prerequisite presentation
+- any other imports of upsertCreatorBankDetails
+
+Then:
+
+- Creator Payouts must use the Settings/Payout bank API;
+- remove frontend dependency on Collaboration-owned bank mutation where no
+  legitimate Collaboration-specific consumer remains;
+- keep Collaboration securement directing users to Settings/Payout;
+- do not duplicate bank validation in Collaboration.
+
+Preserve existing masking/security behavior.
+
+==================================================
+11. BACKEND COLLABORATION BANK ENDPOINT
+==================================================
+
+After frontend cutover, search the whole repository for consumers of:
+
+POST /collaboration/creator/bank-details
+
+and its service method.
+
+If no legitimate current internal consumer remains:
+
+Prefer one of:
+
+A. safe deprecation/removal now, if compatibility evidence shows no supported
+   external/current client requires it;
+
+or
+
+B. temporary compatibility retention, explicitly marked non-canonical, if
+   removal risk cannot be proven safe.
+
+Do NOT remove blindly.
+
+If retained temporarily:
+
+- Settings/Payout remains the only canonical owner;
+- no new frontend code may use the Collaboration endpoint;
+- document compatibility debt and retirement condition.
+
+Do not introduce a second persistence model.
+
+==================================================
+12. BANK PREREQUISITE CORRECTNESS
+==================================================
+
+Verify the canonical flow:
+
+Creator saves bank/payout details through Settings/Payout
+→ Settings/Payout persists canonical bank truth
+→ required settlement/payout profile state exists
+→ Collaboration securement prerequisite reflects readiness correctly
+→ Collaboration does not mutate bank truth itself.
+
+Regression must specifically protect against the old skew where writing only
+through the Collaboration endpoint could leave securement stuck in
+AWAITING_PAYOUT_DETAILS.
+
+Do not alter financial terms, commission, escrow percentages or payout amounts.
+
+==================================================
+13. TESTING — FRONTEND
+==================================================
+
+Use the existing Vitest harness.
+
+Add deterministic coverage for at minimum:
+
+FULFILLMENT
+
+- issue form has no user-facing taxonomy/category selector;
+- mandatory description validation;
+- transport issueCode, if required, is opaque/internal only;
+- canonical issue submission payload remains valid.
+
+CONTEXT
+
+- Brand drawer renders Creator name/handle + Campaign/Asset/Brief when present;
+- Creator drawer renders Brand + Campaign/Asset/Brief;
+- technical endpoint/debug copy absent;
+- missing optional fields do not fabricate content;
+- compatibility rows remain bounded.
+
+BANK CUTOVER
+
+- Creator Payouts calls Settings/Payout client, not Collaboration client;
+- Collaboration securement still links to Settings/Payout;
+- no remaining frontend import/use of Collaboration bank writer.
+
+Use pure/helper/component tests as appropriate.
+Do not add Playwright solely for G1C.
+
+==================================================
+14. TESTING — BACKEND
+==================================================
+
+If backend code changes:
+
+Run at minimum:
+
+- targeted Settings/Payout bank tests;
+- Collaboration prerequisite/securement tests;
+- Collaboration regression suite;
+- applicable Creator Settings/Payout tests;
+- Prisma validate;
+- backend typecheck;
+- scoped lint;
+- production build.
+
+If the Collaboration bank endpoint is removed/deprecated, add regression
+coverage proving:
+
+- canonical Settings write establishes expected prerequisite state;
+- securement readiness consumes the correct state;
+- no canonical Collaboration path depends on bank mutation ownership.
+
+If backend remains unchanged, document why.
+
+==================================================
+15. SOURCE BOUNDARIES
+==================================================
+
+Allowed FE scope:
+
+- Fulfillment issue form/history presentation;
+- counterpart context drawers;
+- Creator Payouts bank API/client wiring;
+- Collaboration client cleanup;
+- focused tests;
+- Phase G acceptance docs.
+
+Allowed BE scope only if required:
+
+- Collaboration bank endpoint compatibility/deprecation;
+- Settings/Payout bank ownership/prerequisite alignment;
+- focused tests.
+
+Do not modify:
+
+- message lifecycle work from G1B;
+- Campaign behavior;
+- publishingRequired G1R files;
+- settlement adapter;
+- payout money-movement arithmetic;
+- Fulfillment sequence rules;
+- relationship-history models;
+- Intelligence;
+- Aurora/Stitch.
+
+==================================================
+16. VALIDATION
+==================================================
+
+Frontend:
+
+- all Vitest tests;
+- npm run typecheck;
+- scoped lint;
+- npm run build.
+
+Backend, if changed:
+
+- targeted tests;
+- Collaboration regression;
+- applicable Settings/Payout regression;
+- typecheck;
+- scoped lint;
+- production build;
+- Prisma validate.
+
+Also run repository search proving the old frontend Collaboration bank writer
+has no remaining canonical consumer.
+
+No PASS claim unless actually run.
+
+==================================================
+17. RUNTIME SMOKE
+==================================================
+
+If the local Brand/Creator environment is already ready, runtime-smoke the G1C
+flows.
+
+Creator:
+
+- open Collaborations;
+- view Brand/Campaign/Asset/Brief context;
+- Fulfillment report issue;
+- save/update bank details through Settings/Payout;
+- return to Collaboration and verify payout-readiness prerequisite behavior.
+
+Brand:
+
+- view Creator/Campaign/Asset/Brief context;
+- inspect Fulfillment issue/remediation history.
+
+If runtime environment is not yet ready:
+
+G1C may still be source/test/build accepted with debt:
+
+RUNTIME_ACCEPTANCE_PENDING_ENVIRONMENT
+
+Do not claim consolidated Collaboration functional acceptance.
+
+==================================================
+18. DEBT TO CARRY FORWARD
+==================================================
+
+G1A/G1B:
+
+- local Brand/Creator runtime smoke pending.
+
+G1R:
+
+- Prettier/ESLint formatting debt on the three Brand-UCE files;
+- no dedicated Brand-UCE approve integration test.
+
+G1C may add compatibility debt only if the old Collaboration bank endpoint
+must remain temporarily.
+
+Do not silently drop any debt.
+
+==================================================
+19. ACCEPTANCE DOCUMENT
+==================================================
+
+Create:
+
+docs/collaboration/phase-g/
+09_g1c_ownership_context_acceptance.md
+
+Required fields:
+
+Status:
+
+Starting frontend SHA:
+Starting backend SHA:
+Final frontend SHA:
+Final backend SHA:
+
+Findings closed:
+COL-G0-009
+COL-G0-010
+COL-G0-011
+COL-G0-012
+
+Frontend files changed:
+Backend files changed:
+
+Fulfillment taxonomy removed:
+Description validation verified:
+Counterpart MVP fields verified:
+Technical/debug copy removed:
+Creator Payouts owner:
+Collaboration bank endpoint disposition:
+
+Frontend tests:
+Backend targeted tests:
+Backend Collaboration regression:
+Frontend typecheck:
+Backend typecheck:
+Frontend lint:
+Backend lint:
+Frontend production build:
+Backend production build:
+Prisma validate:
+Runtime smoke:
+
+Environment blockers:
+G1A/G1B debt retained:
+G1R debt retained:
+New compatibility debt:
+Deferred owners retained:
+Unexpected Product/backend requirements:
+
+Merge status:
+Deployment status:
+
+Final disposition:
+
+ACCEPTED
+ACCEPTED WITH DEBT
+BLOCKED BY ENVIRONMENT
+NOT ACCEPTED
+
+==================================================
+20. FINAL RESPONSE
+==================================================
+
+Return:
+
+G1C status:
+Starting frontend SHA:
+Final frontend SHA:
+Starting backend SHA:
+Final backend SHA:
+
+Findings closed:
+
+Fulfillment UX:
+Counterpart context:
+Bank ownership cutover:
+Collaboration bank endpoint:
+
+Frontend tests:
+Backend tests:
+Frontend typecheck/lint/build:
+Backend typecheck/lint/build:
+Prisma:
+
+Runtime smoke:
+Environment blockers:
+
+G1A/G1B debt carried:
+G1R debt carried:
+New debt:
+Deferred owners:
+
+Phase-G frontend baseline updated: YES / NO
+Phase-G backend baseline updated: YES / NO
+
+Documentation commit SHA:
+
+STOP.
+
+Do not begin consolidated acceptance or G2.

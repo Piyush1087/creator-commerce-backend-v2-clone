@@ -17,6 +17,7 @@ import { BrandEscrowHardenedService } from "./services/brand-escrow-hardened.ser
 import { BrandEscrowInterlockService } from "./services/brand-escrow-interlock.service";
 import { BrandEscrowService } from "./services/brand-escrow.service";
 import { BrandEscrowWebhookService } from "./services/brand-escrow-webhook.service";
+import { CollaborationEscrowReserveService } from "./services/collaboration-escrow-reserve.service";
 import { EscrowComputationEngine } from "./services/escrow-computation.engine";
 import { EscrowSubscriptionContextService } from "./services/escrow-subscription-context.service";
 import { IdempotencyManager } from "./services/idempotency.manager";
@@ -38,6 +39,7 @@ import { RazorpayClient } from "./services/razorpay.client";
     BrandEscrowInterlockService,
     BrandEscrowHardenedService,
     BrandEscrowWebhookService,
+    CollaborationEscrowReserveService,
     EscrowComputationEngine,
     EscrowSubscriptionContextService,
     IdempotencyManager,
@@ -48,6 +50,7 @@ import { RazorpayClient } from "./services/razorpay.client";
     BrandEscrowComputationService,
     BrandEscrowInterlockService,
     BrandEscrowHardenedService,
+    CollaborationEscrowReserveService,
   ],
 })
 export class BrandEscrowModule {}

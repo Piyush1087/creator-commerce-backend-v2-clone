@@ -1,0 +1,248 @@
+Continue Creator Shop Collaboration Phase G.
+
+Execute G1R ONLY:
+BACKEND CANONICAL HOTFIX ACCEPTANCE.
+
+Do not begin G1A.
+Do not modify frontend runtime.
+Do not invoke Stitch.
+Do not merge.
+Do not deploy.
+Do not introduce unrelated backend changes.
+
+==================================================
+1. SCOPE
+==================================================
+
+Finding:
+
+COL-G0-005
+
+This is the publishingRequired / Application → Collaboration provisioning
+correction discovered during G0.
+
+The correction already exists.
+
+Backend repository:
+developer-owned creator-commerce-backend-v2
+
+Branch:
+feature/collab-clone-reconcile-be
+
+Pre-fix SHA:
+0385c8a06abed604402621c1a3e94ee1c4e6d0e6
+
+Candidate post-fix SHA:
+efffc2701a61bbd49748a28608d54f927ee44a4e
+
+The candidate is NOT yet an accepted Phase-G backend baseline.
+
+G1R must formally accept or reject this exact correction.
+
+==================================================
+2. CANONICAL REQUIREMENT
+==================================================
+
+The correction must preserve the frozen behavior:
+
+- publishingRequired must come from explicit Deliverable applicability;
+- missing applicability must NOT silently default to true;
+- missing applicability must NOT silently default to false;
+- pipeline approval requires an explicit non-empty
+  deliverable_publishing_applicability mapping;
+- only supplied explicit values are persisted/provisioned;
+- the developer-only Applications approval path must not bypass that
+  requirement by auto-provisioning Collaboration without applicability;
+- Collaboration provisioning remains tied to the approved canonical
+  Application/pipeline boundary.
+
+Use the frozen dummy_tcs Collaboration contracts and frozen backend clone
+13ce652f432560a91dde1f75ca9a21dfa76d054f as authority.
+
+Do not invent new Campaign/Brief authoring behavior in G1R.
+
+==================================================
+3. VERIFY THE CANDIDATE DIFF
+==================================================
+
+Inspect the exact diff:
+
+0385c8a06abed604402621c1a3e94ee1c4e6d0e6
+→
+efffc2701a61bbd49748a28608d54f927ee44a4e
+
+Expected changed files:
+
+src/features/brand-uce/dto/brand-uce-pipeline.dto.ts
+
+src/features/brand-uce/services/brand-uce-pipeline.service.ts
+
+src/features/brand-uce/services/campaign-application.service.ts
+
+Confirm:
+
+- no unrelated source changes;
+- no hidden schema/migration changes;
+- no financial/lifecycle behavior changed;
+- no unrelated Campaign behavior changed;
+- no new defaults were introduced elsewhere.
+
+If unrelated material changes exist, STOP and report:
+
+G1R_NOT_ACCEPTABLE_SCOPE
+
+==================================================
+4. REQUIRED FUNCTIONAL CHECKS
+==================================================
+
+Verify at minimum:
+
+A. Missing applicability mapping
+
+Approval/provisioning does NOT silently proceed by assigning
+publishingRequired=true or false.
+
+B. Empty applicability mapping
+
+Rejected safely.
+
+C. Explicit applicability
+
+Values map exactly as supplied.
+
+D. Multiple Deliverables
+
+Each Deliverable preserves its own publishingRequired value.
+
+E. Application approval boundary
+
+The developer Applications approval path does not create/provision a
+Collaboration by bypassing the explicit applicability requirement.
+
+F. Valid canonical pipeline approval
+
+Still provisions the expected Collaboration when all required inputs exist.
+
+G. Existing Collaboration runtime
+
+The correction does not regress canonical Collaboration read/command behavior.
+
+==================================================
+5. REQUIRED VALIDATION
+==================================================
+
+Run repository-appropriate checks.
+
+At minimum:
+
+- clean git status before acceptance work;
+- Prisma validate;
+- Prisma generate;
+- targeted tests for affected Brand-UCE / Application approval behavior,
+  if tests exist;
+- applicable Collaboration provisioning tests;
+- full existing Collaboration regression suite;
+- Nest production build.
+
+Run lint/type checks applicable to changed backend files where available.
+
+Do not claim PASS for a check that did not run.
+
+If a check is blocked by environment, distinguish:
+
+SOURCE FAILURE
+vs
+ENVIRONMENT BLOCKER
+
+Do not weaken the acceptance gate merely because a test is inconvenient.
+
+==================================================
+6. NO NEW IMPLEMENTATION BY DEFAULT
+==================================================
+
+This is primarily an ACCEPTANCE phase.
+
+If the exact candidate fails because the COL-G0-005 fix itself is incomplete:
+
+- make only the smallest correction necessary to satisfy the already-frozen
+  behavior;
+- explain why the existing candidate was insufficient;
+- rerun all affected acceptance checks;
+- return the new backend SHA.
+
+Do not fix unrelated findings.
+
+==================================================
+7. ACCEPTANCE RESULT
+==================================================
+
+Return exactly one of:
+
+ACCEPTED
+
+ACCEPTED WITH DEBT
+
+NOT ACCEPTED
+
+BLOCKED BY ENVIRONMENT
+
+
+ACCEPTED means the resulting backend SHA becomes the new Collaboration
+Phase-G backend baseline for G1A onward.
+
+==================================================
+8. DOCUMENTATION
+==================================================
+
+Create/update only the Phase G acceptance record:
+
+frontend Phase G branch:
+
+docs/collaboration/phase-g/
+06_g1r_backend_hotfix_acceptance.md
+
+The report must contain:
+
+Starting backend SHA:
+Candidate backend SHA:
+Final backend SHA:
+Canonical authority used:
+Files changed:
+Diff-scope result:
+Behavior verified:
+Tests/checks run:
+Prisma validate:
+Prisma generate:
+Targeted regression:
+Collaboration regression:
+Nest production build:
+Lint/type checks:
+Environment blockers:
+Compatibility debt:
+Merge status:
+Deployment status:
+Final G1R disposition:
+
+Do not modify frontend runtime source.
+
+==================================================
+9. FINAL RESPONSE
+==================================================
+
+Return:
+
+G1R status:
+Starting backend SHA:
+Candidate backend SHA:
+Accepted final backend SHA:
+Files changed:
+Checks passed:
+Checks failed:
+Environment blockers:
+Canonical behavior verified:
+Phase-G backend baseline updated: YES / NO
+Phase-G documentation commit SHA:
+
+STOP.
+
+Do not begin G1A.
