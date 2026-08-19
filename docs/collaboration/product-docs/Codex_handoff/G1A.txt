@@ -1,0 +1,613 @@
+Continue Creator Shop Collaboration Phase G.
+
+Execute G1A ONLY:
+FOUNDATION, ACCESS & READ INTEGRITY.
+
+This is the first runtime implementation package of Collaboration Phase G.
+
+Do not begin G1B or G1C.
+Do not invoke Stitch.
+Do not redesign the Collaboration workspace.
+Do not merge.
+Do not deploy.
+Do not modify backend runtime unless this prompt explicitly authorizes it.
+
+==================================================
+1. ACCEPTED BASELINES
+==================================================
+
+CANONICAL / GOVERNANCE
+
+dummy_tcs frozen Phase G authority:
+b4ae5bd56388bf022190e5e416cdfc1da80ccd56
+
+
+FRONTEND PHASE-G BASELINE
+
+Branch:
+phase-g/collaboration-g0-audit
+
+Latest accepted Phase-G documentation commit:
+44b201cea549376c240c4bef7a663dc2c04ebde2
+
+Create a dedicated implementation branch from this accepted frontend state:
+
+phase-g/collaboration-g1a-foundation-access-read-integrity
+
+
+BACKEND PHASE-G BASELINE
+
+Branch:
+feature/collab-clone-reconcile-be
+
+Accepted backend SHA:
+efffc2701a61bbd49748a28608d54f927ee44a4e
+
+Backend is READ ONLY in G1A.
+
+Do not absorb unrelated backend branch movement into this task.
+
+==================================================
+2. READ BEFORE IMPLEMENTING
+==================================================
+
+Read:
+
+docs/collaboration/phase-g/00_baseline.md
+docs/collaboration/phase-g/01_g0_reality_audit.md
+docs/collaboration/phase-g/02_g0_2_access_identity_read_integrity.md
+docs/collaboration/phase-g/03_g0_2_ownership_cross_module_boundaries.md
+docs/collaboration/phase-g/04_g0_2_interaction_recovery_mobile.md
+docs/collaboration/phase-g/05_g0_3_authority_freeze_g1_plan.md
+docs/collaboration/phase-g/06_g1r_backend_hotfix_acceptance.md
+
+Also retain the global authority from:
+
+dummy_tcs/AI_ENGINEERING_STANDARD.md
+dummy_tcs/docs/engineering/PHASE_G_PRODUCT_READINESS_STANDARD.md
+
+==================================================
+3. G1A FINDINGS
+==================================================
+
+Implement only:
+
+COL-G0-001
+Route / role integrity
+
+COL-G0-002
+Deep-link integrity
+
+COL-G0-003
+Inbox identity
+
+COL-G0-004
+Runtime read-model validation
+
+COL-G0-013
+LEGACY_COMPATIBILITY bounded presentation
+
+COL-G0-015
+Production API URL fail-fast
+
+COL-G0-018
+Creator mobile Collaboration navigation + deep-link mobile step
+
+COL-G0-020
+Minimum deterministic frontend test harness
+
+Do not implement unrelated G1B/G1C findings.
+
+==================================================
+4. PRODUCT FREEZES — ACCESS
+==================================================
+
+Operational routes:
+
+Brand:
+  /brand/collaborations
+
+Creator:
+  /creator/collaborations
+
+Admin is not an operational Collaboration actor for MVP.
+
+Unknown/unresolved role must NEVER default to Brand.
+
+Required behavior:
+
+BRAND visiting Brand route
+→ allow
+
+CREATOR visiting Creator route
+→ allow
+
+BRAND visiting Creator route
+→ redirect to /brand/collaborations
+
+CREATOR visiting Brand route
+→ redirect to /creator/collaborations
+
+ADMIN / unsupported role
+→ do not mount Brand/Creator Collaboration workspace
+→ show/route to unsupported-access behavior consistent with repository auth
+  architecture
+
+UNKNOWN / unresolved role
+→ never render Brand workspace
+→ prefer session resolution/re-auth-safe state over invented role
+
+Backend remains final data authorization authority.
+
+Do not duplicate backend ownership rules in frontend.
+
+==================================================
+5. DEEP-LINK INTEGRITY
+==================================================
+
+Canonical query parameter for new links:
+
+?thread=<collaborationId>
+
+Continue accepting legacy:
+
+?collaboration=<collaborationId>
+
+but normalize newly-created links to `thread`.
+
+When a URL contains a requested Collaboration ID:
+
+DO NOT determine validity from membership in the current inbox list.
+
+Resolve the requested detail directly.
+
+Cases:
+
+Owned valid Collaboration:
+→ show requested Collaboration
+
+Missing Collaboration:
+→ unavailable state
+
+Existing but unauthorized Collaboration:
+→ same unavailable state
+
+Collaboration absent from first inbox page/filter:
+→ still resolve detail correctly if owned
+
+Invalid/no-access state copy:
+
+Headline:
+Collaboration unavailable
+
+Body:
+This collaboration may no longer be available or you may not have access.
+
+Action:
+Back to Collaborations
+
+Never silently select `rows[0]`.
+
+Never reveal whether another user owns the Collaboration.
+
+On mobile:
+successful deep-link resolution must open the Chat step, not leave the user
+on Inbox.
+
+==================================================
+6. INBOX IDENTITY
+==================================================
+
+Use existing projected fields.
+
+Minimum useful identity hierarchy:
+
+- counterpart display name;
+- counterpart handle when available;
+- Campaign;
+- Campaign Asset name/type where available;
+- Brief title.
+
+Do not show:
+- sourceApplicationId;
+- internal UUIDs;
+- projectionSource;
+- debug metadata.
+
+Do not add backend appliedAt/application-date projection in G1A.
+
+If existing fields prove structurally unavailable in the frontend contract,
+stop and report evidence rather than extending backend casually.
+
+This is FUNCTIONAL distinguishability, not final visual redesign.
+
+Keep layout changes minimal.
+
+==================================================
+7. RUNTIME READ VALIDATION
+==================================================
+
+Current problem:
+Collaboration API JSON is asserted into TypeScript types.
+
+Implement an executable frontend read boundary.
+
+Use existing Zod dependency unless repository architecture provides a clearly
+better established mechanism.
+
+Validate at minimum:
+
+- thread/list response;
+- thread detail response;
+- messages response.
+
+Also validate command responses only if required by the smallest coherent
+architecture and already used for state assumptions.
+
+Requirements:
+
+CANONICAL rows/details:
+- required enums must be valid;
+- required booleans must be booleans;
+- publishingRequired MUST be strict boolean where canonical Publishing
+  execution exists;
+- never coerce missing publishingRequired to false;
+- never silently fill missing canonical state.
+
+Invalid canonical read:
+→ return an explicit contract/read failure to UI
+→ do not render guessed product state.
+
+Do not expose raw Zod errors, payloads or stack traces to users.
+
+Developer diagnostics may retain safe structured information outside
+user-facing copy.
+
+==================================================
+8. LEGACY_COMPATIBILITY
+==================================================
+
+Backend remains authority for identifying:
+
+projectionSource = LEGACY_COMPATIBILITY
+
+or equivalent compatibility metadata.
+
+Product behavior:
+
+Headline:
+Limited collaboration details
+
+Body:
+Some details and actions are unavailable because this collaboration was
+created using an earlier workflow.
+
+For compatibility rows:
+
+- history/context may remain visible where truthful;
+- do not pretend canonical per-Deliverable execution exists;
+- canonical per-Deliverable controls must be hidden/read-only when underlying
+  canonical data is unavailable;
+- do not expose the term “legacy” to users;
+- do not expose sourceApplicationId / projectionSource / internal debug fields.
+
+Read validation must support the documented compatibility shape explicitly.
+
+Do NOT make schemas so permissive that malformed canonical data gets treated
+as compatibility data.
+
+Canonical and compatibility parsing must remain distinguishable.
+
+==================================================
+9. PRODUCTION ENVIRONMENT HARDENING
+==================================================
+
+Current risk:
+A production build without VITE_API_URL can silently use
+http://localhost:3000.
+
+Required:
+
+DEV/local:
+- preserve current safe local behavior;
+- Vite `/api` proxy may remain;
+- localhost Socket.IO may remain where intended.
+
+PRODUCTION:
+- missing API URL must fail clearly;
+- malformed/unsafe API URL must fail clearly;
+- never silently embed localhost as production API/socket target.
+
+Standard SST dev/prod injection should continue to work.
+
+Do not change deployment architecture.
+
+Add deterministic validation/tests for the configuration behavior.
+
+==================================================
+10. CREATOR MOBILE NAVIGATION
+==================================================
+
+Frozen Creator mobile bottom-nav slots:
+
+Home
+Campaigns
+Collaborations
+Profile
+
+Remove Insights only from the four-slot mobile bottom navigation.
+
+Do NOT remove Insights from:
+- desktop/sidebar;
+- dashboards;
+- routes;
+- other legitimate surfaces.
+
+Label:
+Collaborations
+
+Route:
+ /creator/collaborations
+
+Preserve existing Brand mobile behavior unless a shared config refactor is the
+smallest correct implementation.
+
+Also implement:
+
+owned deep-link on mobile
+→ requested Collaboration resolves
+→ mobile workspace enters Chat step
+
+Do not redesign the stepped workspace.
+
+==================================================
+11. MINIMUM FRONTEND TEST HARNESS
+==================================================
+
+Introduce the smallest deterministic test architecture needed for Phase G.
+
+Preferred stack from G0.2A:
+
+Vitest
+
+Use Vite-aligned configuration.
+
+Add Testing Library only if DOM behavior cannot be adequately verified without
+it.
+
+Do NOT add Playwright in G1A.
+
+Avoid unnecessary testing dependencies.
+
+At minimum create tests for:
+
+A. role access
+- Brand route
+- Creator route
+- opposite-role redirect
+- Admin/unknown does not become Brand
+
+B. deep-link selection
+- valid owned deep link
+- invalid/no-access path does not fall back to first row
+- ID outside inbox rows can still resolve
+- legacy query param accepted
+- newly-generated links normalize to thread
+
+C. read validation
+- valid canonical list/detail/messages pass
+- malformed canonical read fails
+- missing publishingRequired fails canonical detail parsing
+- documented compatibility fixture passes compatibility branch
+
+D. compatibility presentation helper/state
+- canonical vs compatibility are distinguishable
+- compatibility never implies canonical deliverable execution
+
+E. environment
+- DEV missing API URL preserves expected local behavior
+- PROD missing API URL fails
+- PROD localhost URL is not silently accepted if prohibited by existing env
+  policy
+
+F. mobile/nav helper/config
+- Creator Collaborations item exists
+- Insights removed only from Creator bottom-nav slots
+- deep-link selects chat step
+
+Prefer extracting pure helpers/state resolution from large UI components where
+that creates reusable, testable logic.
+
+Do not perform unrelated component refactors.
+
+==================================================
+12. IMPLEMENTATION GUIDANCE
+==================================================
+
+Audit current reusable helpers/components before creating new ones.
+
+Likely acceptable additions include:
+
+- Collaboration route-role helper/guard;
+- deep-link/selection resolver;
+- Collaboration read Zod schemas;
+- canonical/compatibility parse discriminant;
+- environment validation helper;
+- focused test fixtures.
+
+Do not create a second Collaboration state architecture.
+
+CollaborationWorkspace remains the production workspace.
+
+Do not replace it with generated/rebuilt UI.
+
+==================================================
+13. ERROR STATE BOUNDARY IN G1A
+==================================================
+
+G1A implements only errors directly necessary for its findings:
+
+- unsupported actor;
+- Collaboration unavailable;
+- invalid/malformed authoritative read;
+- limited compatibility state.
+
+The broader pane-local error/recovery model remains G1B.
+
+Do not prematurely implement all COL-G0-006 behavior.
+
+==================================================
+14. BACKEND BOUNDARY
+==================================================
+
+Backend baseline is:
+
+efffc2701a61bbd49748a28608d54f927ee44a4e
+
+G1A should require no backend implementation according to G0.
+
+If implementation proves backend data is actually missing for an accepted G1A
+requirement:
+
+STOP that specific change.
+
+Return:
+
+UNEXPECTED_BACKEND_REQUIREMENT
+
+with:
+- exact requirement;
+- current endpoint shape;
+- missing field/behavior;
+- canonical authority.
+
+Do not modify backend automatically.
+
+==================================================
+15. VALIDATION
+==================================================
+
+Run at minimum:
+
+- new G1A Vitest suite;
+- all frontend tests;
+- npm run typecheck;
+- relevant lint for changed files;
+- npm run build.
+
+If full lint contains pre-existing unrelated failures:
+- run scoped lint;
+- document unrelated baseline debt separately.
+
+No check may be reported PASS unless actually run.
+
+Manual/source smoke should verify:
+
+- Brand route;
+- Creator route;
+- opposite-role behavior;
+- deep-link behavior;
+- inbox distinguishability;
+- Creator bottom-nav configuration.
+
+If local runtime environment is already ready, perform runtime smoke.
+
+If it is not yet ready, source/tests/build may still complete G1A implementation,
+but report:
+
+RUNTIME_ACCEPTANCE_PENDING_ENVIRONMENT
+
+G1 consolidated functional acceptance later must use the local environment
+frozen in G0.3.
+
+==================================================
+16. G1R DEBT — CARRY ONLY
+==================================================
+
+Do not modify backend G1R files in G1A.
+
+Carry forward:
+
+1. Prettier/ESLint formatting debt on the three COL-G0-005 Brand-UCE files.
+2. No dedicated Brand-UCE approve integration test.
+
+These do not block G1A and must not disappear from Phase G closure reporting.
+
+==================================================
+17. DOCUMENTATION
+==================================================
+
+Create/update:
+
+docs/collaboration/phase-g/
+07_g1a_foundation_access_read_integrity_acceptance.md
+
+Required report:
+
+Status:
+Starting frontend SHA:
+Starting backend SHA:
+Final frontend SHA:
+Final backend SHA:
+
+Findings closed:
+COL-G0-001
+COL-G0-002
+COL-G0-003
+COL-G0-004
+COL-G0-013
+COL-G0-015
+COL-G0-018
+COL-G0-020
+
+Files changed:
+Dependencies added:
+Test architecture:
+Tests added:
+Tests passed:
+Tests failed:
+Typecheck:
+Lint:
+Production build:
+Runtime smoke:
+Environment blockers:
+Compatibility debt retained:
+G1R debt retained:
+Unexpected backend requirements:
+Merge status:
+Deployment status:
+
+Final disposition must be one of:
+
+ACCEPTED
+ACCEPTED WITH DEBT
+BLOCKED BY ENVIRONMENT
+NOT ACCEPTED
+
+==================================================
+18. FINAL RESPONSE
+==================================================
+
+Return:
+
+G1A status:
+Starting frontend SHA:
+Final frontend SHA:
+Backend baseline:
+Findings closed:
+Dependencies added:
+Tests:
+Typecheck:
+Lint:
+Build:
+Runtime smoke:
+Environment blockers:
+Unexpected backend requirements:
+Compatibility debt:
+G1R debt carried:
+Phase-G frontend baseline updated: YES / NO
+Documentation commit SHA:
+
+STOP.
+
+Do not begin G1B.

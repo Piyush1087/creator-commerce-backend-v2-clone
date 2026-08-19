@@ -155,9 +155,11 @@ export class CollaborationExceptionService {
         ...resolution,
         reasonText: input.reasonText,
         resolutionEvidence: input.resolutionEvidence as
-          Prisma.InputJsonValue | undefined,
+          | Prisma.InputJsonValue
+          | undefined,
         residualObligations: input.residualObligations as
-          Prisma.InputJsonValue | undefined,
+          | Prisma.InputJsonValue
+          | undefined,
         decidedByActorClass: CollaborationActorClass.ADMIN,
         decidedByUserId: adminUserId,
         decidedAt: now,

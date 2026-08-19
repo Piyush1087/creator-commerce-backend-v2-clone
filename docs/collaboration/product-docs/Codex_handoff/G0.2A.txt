@@ -1,0 +1,291 @@
+Continue Creator Shop Collaboration Phase G.
+
+Execute G0.2A ONLY:
+ACCESS, IDENTITY & READ-INTEGRITY ROOT-CAUSE RECONCILIATION.
+
+Do not implement fixes.
+Do not redesign.
+Do not invoke Stitch.
+Do not merge or deploy.
+
+Use the already accepted G0 artifacts:
+
+docs/collaboration/phase-g/00_baseline.md
+docs/collaboration/phase-g/01_g0_reality_audit.md
+
+Keep the same canonical authority and repository baselines established in G0.
+
+==================================================
+1. FIRST RECORD COL-G0-005 TRACEABILITY
+==================================================
+
+A runtime correction was made during the G0 investigation for
+publishingRequired applicability.
+
+Do not modify it further.
+
+Record:
+
+Repository
+Branch
+Pre-fix SHA
+Post-fix SHA
+Files changed
+Exact behavior before
+Exact behavior after
+Canonical source that justified the correction
+Tests/checks run
+Current merge/deployment status
+
+Treat this as:
+
+G0-DISCOVERED CANONICAL HOTFIX — PENDING G1 ACCEPTANCE
+
+==================================================
+2. PRODUCT DECISION — BRAND ROUTE
+==================================================
+
+Freeze the following Product decision:
+
+Operational Brand Collaboration route:
+  /brand/collaborations
+
+Operational Creator Collaboration route:
+  /creator/collaborations
+
+/brand/collaboration-page is NOT another canonical operational
+Collaboration route.
+
+If it owns a separate public Brand preview/landing use case, preserve
+that ownership. Otherwise flag it for later retirement/redirect.
+
+Update COL-G0-017 accordingly.
+
+Do not rewire routes during G0.2.
+
+==================================================
+3. PRODUCT DECISION — MESSAGE LIFECYCLE
+==================================================
+
+Use this provisional Product decision unless existing higher-authority
+canonical material proves a contradiction:
+
+ACTIVE:
+- chat history visible
+- message sending may be available
+
+PAUSED:
+- history visible
+- sending disabled
+
+COMPLETED:
+- history visible
+- sending disabled
+
+CANCELLED:
+- history visible
+- sending disabled
+
+TERMINATED:
+- history visible
+- sending disabled
+
+Backend availableActions should ultimately remain the executable
+authority.
+
+If canonical frozen contracts explicitly contradict this rule, record
+AUTHORITY_CONFLICT and stop this decision rather than changing source.
+
+==================================================
+4. INVESTIGATE THESE FINDINGS
+==================================================
+
+COL-G0-001
+Route / role access and unresolved-role Brand fallback
+
+COL-G0-002
+Invalid/no-access deep-link fallback to another Collaboration
+
+COL-G0-003
+Inbox identity/cardinality for multiple Application-origin
+Collaborations
+
+COL-G0-004
+Runtime validation of Collaboration HTTP read models
+
+COL-G0-013
+Canonical vs LEGACY_COMPATIBILITY read projections
+
+COL-G0-015
+Production VITE_API_URL / Socket environment handling
+
+COL-G0-020
+Minimum deterministic frontend regression architecture
+
+Do not investigate unrelated visual debt.
+
+==================================================
+5. REQUIRED INVESTIGATION FOR EACH
+==================================================
+
+For each finding trace:
+
+canonical requirement
+→ backend persisted/read authority
+→ endpoint response
+→ frontend client contract
+→ frontend state mapping
+→ route/component presentation
+
+Determine:
+
+- proven root cause;
+- exact affected files;
+- whether backend change is actually required;
+- whether frontend-only resolution is sufficient;
+- compatibility/data implications;
+- migration implications where relevant;
+- safe failure behavior;
+- test coverage required;
+- whether any product decision is still open.
+
+Replace UNKNOWN values from G0.1 wherever evidence permits.
+
+==================================================
+6. SPECIFIC QUESTIONS
+==================================================
+
+A. RBAC
+
+Determine whether existing auth/session information already contains
+enough role authority for route gating.
+
+Determine the correct no-access behavior without duplicating backend
+authorization logic.
+
+B. Deep links
+
+Determine how a requested collaboration ID should behave when:
+
+- user owns it;
+- it exists but user does not own it;
+- it does not exist;
+- it is absent from current inbox pagination/filter;
+- legacy query parameter is used.
+
+The frontend must never silently open another Collaboration.
+
+C. Inbox identity
+
+Determine the minimum existing projected context needed to distinguish
+two Collaborations belonging to the same creator/campaign but different
+Application / Asset / Brief lineage.
+
+Do not expose internal IDs in product UI.
+
+D. Runtime read validation
+
+Inventory the Collaboration list/detail/message responses.
+
+Determine whether existing Zod schemas can be reused or whether a
+frontend read-schema layer is required.
+
+Explicitly examine required/nullable booleans and enums, especially
+publishingRequired.
+
+E. Legacy compatibility
+
+Determine:
+
+- when projectionSource=LEGACY_COMPATIBILITY can actually occur;
+- which canonical fields may be absent;
+- whether such rows are expected for production migration only;
+- what the frontend can safely render;
+- what must be unavailable;
+- how canonical and compatibility data remain distinguishable without
+  exposing debug terminology to users.
+
+Do not invent a migration-removal date.
+
+F. Environment
+
+Trace VITE_API_URL and socket URL from local → dev → production build.
+
+Determine whether deployment tooling guarantees injection today.
+
+A missing production API URL must not silently target localhost.
+
+G. Frontend regression architecture
+
+Determine the smallest useful deterministic test architecture for
+Collaboration.
+
+It must support future G1 tests for at least:
+
+- Brand vs Creator role;
+- owned vs invalid deep link;
+- canonical vs invalid read model;
+- lifecycle capability rendering;
+- stale aggregate/refetch;
+- legacy compatibility row;
+- terminal state;
+- realtime degraded state;
+- per-Deliverable Publishing behavior.
+
+Do not add a test framework during G0.2.
+Only recommend the minimum implementation consistent with the existing
+repository.
+
+==================================================
+7. OUTPUT
+==================================================
+
+Create:
+
+docs/collaboration/phase-g/
+02_g0_2_access_identity_read_integrity.md
+
+For each finding provide:
+
+Finding ID
+Confirmed root cause
+Exact files/components
+Canonical authority
+Frontend fix required
+Backend fix required
+Compatibility/migration impact
+Required regression tests
+Remaining product decision
+Recommended G1 scope
+Stitch relevance
+
+Include:
+
+- COL-G0-005 hotfix traceability
+- resolved COL-G0-017 route decision
+- message-policy authority assessment
+- P0 risk summary
+- recommended G1 grouping
+
+Do not modify runtime source.
+
+==================================================
+8. FINAL RESPONSE
+==================================================
+
+Return:
+
+G0.2A status:
+Findings investigated:
+Root causes confirmed:
+Frontend-only findings:
+Backend-required findings:
+Authority conflicts remaining:
+P0 findings remaining:
+COL-G0-005 correction SHA:
+Files created:
+Commit SHA:
+
+STOP.
+
+Do not proceed to G0.2B or G1.

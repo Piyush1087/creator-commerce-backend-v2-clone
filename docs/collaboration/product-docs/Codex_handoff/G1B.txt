@@ -1,0 +1,723 @@
+Continue Creator Shop Collaboration Phase G.
+
+Execute G1B ONLY:
+INTERACTION AUTHORITY, ERROR/RECOVERY & CREATOR CANCELLATION.
+
+Do not begin G1C.
+Do not invoke Stitch.
+Do not redesign the Collaboration workspace.
+Do not merge.
+Do not deploy.
+
+G1A runtime smoke debt may remain pending until consolidated local
+Collaboration acceptance after G1C.
+
+==================================================
+1. ACCEPTED BASELINES
+==================================================
+
+FRONTEND
+
+Accepted G1A SHA:
+eafa4c071ae0da49739b7f531f59e536978dae42
+
+Accepted status:
+ACCEPTED WITH DEBT
+
+Debt:
+local Brand/Creator runtime smoke pending.
+
+Create frontend implementation branch from exactly this SHA:
+
+phase-g/collaboration-g1b-interaction-recovery
+
+
+BACKEND
+
+Accepted Phase-G backend SHA:
+efffc2701a61bbd49748a28608d54f927ee44a4e
+
+Current accepted status:
+G1R ACCEPTED WITH DEBT
+
+Create a dedicated backend G1B branch from exactly this SHA:
+
+phase-g/collaboration-g1b-message-authority
+
+Do not include unrelated backend branch movement.
+
+==================================================
+2. FIRST — RECONCILE G1A DOCUMENT TRACEABILITY
+==================================================
+
+Before runtime changes, update only the stale traceability fields in:
+
+docs/collaboration/phase-g/
+07_g1a_foundation_access_read_integrity_acceptance.md
+
+The committed reality is:
+
+Final frontend SHA:
+eafa4c071ae0da49739b7f531f59e536978dae42
+
+Phase-G frontend baseline updated:
+YES
+
+Merge status:
+Not merged
+
+Deployment status:
+Not deployed
+
+Push/commit state:
+Committed and available on GitHub
+
+Do NOT change the G1A disposition.
+
+It remains:
+
+ACCEPTED WITH DEBT
+
+because runtime smoke remains pending.
+
+Do not reopen any G1A findings.
+
+==================================================
+3. READ ACCEPTED PHASE-G AUTHORITY
+==================================================
+
+Read:
+
+docs/collaboration/phase-g/05_g0_3_authority_freeze_g1_plan.md
+docs/collaboration/phase-g/06_g1r_backend_hotfix_acceptance.md
+docs/collaboration/phase-g/07_g1a_foundation_access_read_integrity_acceptance.md
+
+Also use the accepted G0.2C functional-state authority:
+
+docs/collaboration/phase-g/
+04_g0_2_interaction_recovery_mobile.md
+
+Frozen canonical/governance authority remains unchanged.
+
+==================================================
+4. G1B FINDINGS
+==================================================
+
+Implement only:
+
+COL-G0-006
+Error / recovery model
+
+COL-G0-007
+Messaging lifecycle authority
+
+COL-G0-008
+Creator cancellation presenter
+
+COL-G0-014
+Realtime degraded recovery
+
+COL-G0-016
+Loading / empty / chat processing states
+
+Do not implement G1C findings.
+
+==================================================
+5. MESSAGE LIFECYCLE — BACKEND AUTHORITY
+==================================================
+
+Frozen Product policy:
+
+ACTIVE
+→ conversation history visible
+→ PostCollaborationMessage may be available
+
+PAUSED
+→ history visible
+→ sending unavailable
+
+COMPLETED
+→ history visible
+→ sending unavailable
+
+CANCELLED
+→ history visible
+→ sending unavailable
+
+TERMINATED
+→ history visible
+→ sending unavailable
+
+
+Backend `availableActions` is executable authority.
+
+Implement backend first.
+
+A. AVAILABLE ACTIONS
+
+`PostCollaborationMessage` must only be projected when messaging is
+currently allowed.
+
+For current MVP lifecycle policy this means ACTIVE only.
+
+Do not expose PostCollaborationMessage for:
+
+PAUSED
+COMPLETED
+CANCELLED
+TERMINATED
+
+
+B. COMMAND ENFORCEMENT
+
+The message POST endpoint must independently enforce the same domain rule.
+
+A client must not be able to bypass the lifecycle rule by manually calling
+the endpoint.
+
+Reuse the repository's established Collaboration/domain command-error
+mechanism.
+
+Do not invent a second error architecture.
+
+Do not expose technical aggregate/version/internal-state detail to users.
+
+
+C. FRONTEND
+
+The composer must derive sendability from backend capability.
+
+Do NOT write frontend logic like:
+
+if lifecycle === ACTIVE
+
+Instead:
+
+availableActions
+→ mapped message capability
+→ composer enabled/disabled
+
+Frozen read-only copy:
+
+Messaging is closed for this collaboration.
+You can still view the conversation history.
+
+History remains visible.
+
+Remove or reconcile existing copy that implies messaging remains available
+after terminal/completed lifecycle.
+
+==================================================
+6. STALE / AUTHORITY TRANSITIONS
+==================================================
+
+After any lifecycle-changing command:
+
+→ authoritative HTTP refetch
+→ updated availableActions
+→ composer state changes automatically
+
+Do not maintain competing local lifecycle authority.
+
+For stale aggregate/version conflict:
+
+- preserve existing safe one-time authoritative refresh behavior;
+- retain usable context;
+- show Product-facing latest-state/retry behavior;
+- never expose commandId or aggregateVersion.
+
+==================================================
+7. ERROR MODEL
+==================================================
+
+Replace the single global Collaboration error string with functional
+ownership appropriate to each surface.
+
+At minimum distinguish:
+
+INBOX READ ERROR
+DETAIL READ ERROR
+MESSAGES READ ERROR
+MESSAGE SEND ERROR
+EXECUTION COMMAND ERROR
+CONTRACT/READ FAILURE
+SESSION/AUTH FAILURE
+COLLABORATION UNAVAILABLE
+REALTIME DEGRADED
+
+Do not build final visual design.
+Implement state ownership and recovery behavior.
+
+==================================================
+8. ERROR / RECOVERY BEHAVIOR
+==================================================
+
+Use the G0.2C frozen matrix.
+
+400 / INPUT VALIDATION
+
+- keep current hydrated context;
+- preserve user draft where applicable;
+- allow correction/retry;
+- no DTO/debug wording.
+
+401 / SESSION
+
+- do not fabricate Collaboration state;
+- hand off to established auth/session behavior;
+- no token/JWT information.
+
+403 / UNSUPPORTED ACTION
+
+- retain hydrated read state;
+- action becomes unavailable after authoritative refresh where appropriate;
+- use Product-facing action-unavailable behavior.
+
+404 / COLLABORATION UNAVAILABLE
+
+Use frozen copy:
+
+Headline:
+Collaboration unavailable
+
+Body:
+This collaboration may no longer be available or you may not have access.
+
+Action:
+Back to Collaborations
+
+Do not enumerate ownership.
+
+409 / STALE
+
+- one authoritative refresh;
+- retain usable data;
+- allow retry only against refreshed state;
+- no aggregateVersion/commandId UI.
+
+5XX / NETWORK FAILURE
+
+- retain last good data where available;
+- show pane-local failure;
+- expose Retry or Refresh;
+- no server/internal names.
+
+MALFORMED READ
+
+- use G1A contract-failure path;
+- never render guessed canonical state.
+
+MESSAGE SEND FAILURE
+
+- keep conversation history;
+- keep user's draft where practical;
+- unlock composer after failure;
+- allow explicit retry.
+
+==================================================
+9. LOADING / EMPTY / PROCESSING STATES
+==================================================
+
+Implement the functional states frozen in G0.2C.
+
+INBOX
+
+loading
+empty
+loaded
+failed
+
+On refetch failure:
+retain prior rows where possible.
+
+
+SELECTION
+
+none
+deep_link_resolving
+unavailable
+selected
+
+
+DETAIL
+
+loading
+loaded
+failed_with_data
+failed_no_data
+
+
+MESSAGES
+
+loading
+empty_zero
+loaded
+send_in_progress
+send_failed
+read_only
+
+
+EXECUTION HUB
+
+loading
+canonical_active
+compatibility_bounded
+blocked
+paused
+terminal
+completed
+contract_read_failure
+
+
+Do not introduce skeleton/art-direction work unless an existing Aurora
+component already provides it naturally.
+
+Text/spinner/Alert-level functional presentation is sufficient for G1.
+
+Final visual treatment belongs to G2/G4.
+
+==================================================
+10. EMPTY CONVERSATION
+==================================================
+
+Zero messages must not render as an unexplained blank pane.
+
+Use concise Product-facing empty state.
+
+Do not invent promotional copy.
+
+A minimal acceptable semantic is:
+
+No messages yet
+
+The composer remains available only if backend capability permits messaging.
+
+==================================================
+11. MESSAGE SEND PROCESSING
+==================================================
+
+While send is in progress:
+
+- prevent duplicate submits;
+- preserve the draft until request outcome is known where practical;
+- clearly disable/restrict repeated send;
+- on success clear the submitted draft;
+- on failure preserve/restorable draft and expose retry.
+
+Do not implement optimistic authoritative workflow state from message payloads.
+
+Persisted HTTP remains reconstruction authority.
+
+==================================================
+12. REALTIME DEGRADED RECOVERY
+==================================================
+
+Frozen MVP:
+
+- HTTP remains authority;
+- keep hydrated data visible;
+- show live-update degraded state;
+- expose Manual Refresh;
+- Socket.IO reconnect triggers authoritative refetch;
+- NO fallback polling.
+
+Implement Manual Refresh using the existing authoritative refresh path.
+
+Refresh must be accessible in desktop and stepped mobile states.
+
+Do not add intervals/background polling.
+
+Do not make socket payload history authoritative.
+
+==================================================
+13. CREATOR CANCELLATION
+==================================================
+
+Backend capability and client command already exist.
+
+Implement the missing Creator presenter.
+
+Authority:
+
+CancelCollaborationByCreator in `availableActions`
+
+The UI must render cancellation only when capability is present.
+
+Do not infer eligibility from stage/lifecycle locally.
+
+Required behavior:
+
+- Creator sees Cancel collaboration only when capability exists;
+- Brand does not see Creator cancellation action;
+- require explicit user confirmation;
+- send existing canonical command;
+- show processing state;
+- prevent duplicate submit;
+- on success refetch authoritative Collaboration;
+- on failure preserve current state and show action-level error.
+
+Use existing canonical copy/contracts where available.
+
+If no approved confirmation wording exists, keep copy neutral.
+
+Do NOT invent:
+- fault assignment;
+- refund promise;
+- penalty promise;
+- guaranteed payout outcome.
+
+Financial consequences must continue to come from backend resolution state.
+
+==================================================
+14. TESTING
+==================================================
+
+Use the existing G1A Vitest harness.
+
+Add deterministic tests for at minimum:
+
+BACKEND
+
+- ACTIVE projects PostCollaborationMessage when otherwise valid;
+- PAUSED does not project it;
+- COMPLETED does not project it;
+- CANCELLED does not project it;
+- TERMINATED does not project it;
+- direct POST message in non-ACTIVE lifecycle is rejected;
+- ACTIVE message POST still succeeds;
+- existing message history reads remain available terminally.
+
+FRONTEND
+
+- composer enabled from capability;
+- composer read-only when capability absent;
+- no frontend lifecycle re-implementation;
+- empty message state;
+- send busy prevents duplicate submission;
+- send failure recovery/draft behavior;
+- 404 unavailable state;
+- pane-local error ownership helpers/state;
+- manual Refresh while realtime degraded;
+- reconnect invokes authoritative refresh behavior where testable;
+- Creator cancellation shown only with capability;
+- Brand never receives Creator cancel presenter;
+- cancellation busy/failure behavior where practical.
+
+Add React Testing Library only if necessary for component interaction behavior.
+
+If pure/helper-level Vitest tests can provide adequate deterministic coverage,
+prefer the smaller stack.
+
+Do not add Playwright in G1B.
+
+==================================================
+15. BACKEND REGRESSION
+==================================================
+
+Because G1B changes backend messaging authority, run at minimum:
+
+- relevant new messaging lifecycle tests;
+- existing Collaboration regression suite;
+- Prisma validate/generate if backend build workflow requires it;
+- backend typecheck;
+- Nest production build;
+- scoped lint on changed backend files.
+
+G1R accepted SHA remains the start point.
+
+Do not modify COL-G0-005 Brand-UCE files.
+
+==================================================
+16. FRONTEND VALIDATION
+==================================================
+
+Run at minimum:
+
+- all frontend Vitest tests;
+- npm run typecheck;
+- scoped lint on changed G1B files;
+- npm run build.
+
+No PASS claim unless the command actually ran.
+
+==================================================
+17. RUNTIME SMOKE
+==================================================
+
+If the local Brand/Creator environment is now ready, run runtime smoke for
+G1A + G1B behavior.
+
+At minimum:
+
+Brand:
+- open Collaborations;
+- open conversation;
+- send in ACTIVE;
+- terminal/read-only conversation;
+- Refresh/degraded behavior where practical.
+
+Creator:
+- same messaging states;
+- cancellation when capability exists;
+- cancelled state after command.
+
+If environment remains unavailable:
+
+G1B may still achieve source/test/build acceptance, but report:
+
+RUNTIME_ACCEPTANCE_PENDING_ENVIRONMENT
+
+Do not claim final Collaboration functional acceptance.
+
+Consolidated local runtime acceptance remains mandatory after G1C and before
+G2.
+
+==================================================
+18. G1A / G1R DEBT — CARRY FORWARD
+==================================================
+
+G1A debt:
+
+- local Brand/Creator runtime smoke pending.
+
+G1R debt:
+
+- Prettier/ESLint formatting debt on three Brand-UCE files;
+- no dedicated Brand-UCE approve integration test.
+
+Do not silently remove these from reporting.
+
+Do not fix G1R debt inside G1B.
+
+==================================================
+19. SOURCE BOUNDARIES
+==================================================
+
+Allowed frontend scope:
+
+Collaboration workspace/chat/error/recovery components
+Collaboration capability helpers
+Creator cancellation presentation
+Realtime refresh integration
+focused tests
+Phase G documentation
+
+Allowed backend scope:
+
+Collaboration message action derivation
+Collaboration message command enforcement
+focused tests
+Phase G-supporting evidence only
+
+Do not modify:
+
+Campaign product semantics
+Brand-UCE COL-G0-005 files
+bank ownership
+Fulfillment taxonomy
+counterpart data model
+settlement adapter
+Aurora visual system
+Stitch assets
+
+==================================================
+20. ACCEPTANCE DOCUMENT
+==================================================
+
+Create:
+
+docs/collaboration/phase-g/
+08_g1b_interaction_authority_recovery_acceptance.md
+
+Required fields:
+
+Status:
+
+Starting frontend SHA:
+Starting backend SHA:
+Final frontend SHA:
+Final backend SHA:
+
+Findings closed:
+COL-G0-006
+COL-G0-007
+COL-G0-008
+COL-G0-014
+COL-G0-016
+
+Frontend files changed:
+Backend files changed:
+
+Tests added:
+Frontend tests:
+Backend targeted tests:
+Backend Collaboration regression:
+Frontend typecheck:
+Backend typecheck:
+Frontend lint:
+Backend lint:
+Frontend production build:
+Backend production build:
+Runtime smoke:
+
+Message lifecycle authority verified:
+Direct POST bypass prevented:
+Creator cancellation verified:
+Realtime Refresh verified:
+
+Environment blockers:
+G1A debt retained:
+G1R debt retained:
+New compatibility debt:
+Unexpected Product/backend requirements:
+
+Merge status:
+Deployment status:
+
+Final disposition:
+
+ACCEPTED
+ACCEPTED WITH DEBT
+BLOCKED BY ENVIRONMENT
+NOT ACCEPTED
+
+==================================================
+21. FINAL RESPONSE
+==================================================
+
+Return:
+
+G1B status:
+Starting frontend SHA:
+Final frontend SHA:
+Starting backend SHA:
+Final backend SHA:
+
+Findings closed:
+Frontend tests:
+Backend tests:
+Frontend typecheck:
+Backend typecheck:
+Frontend lint:
+Backend lint:
+Frontend build:
+Backend build:
+Runtime smoke:
+
+Message lifecycle authority:
+Creator cancellation:
+Realtime recovery:
+
+Environment blockers:
+G1A debt carried:
+G1R debt carried:
+New debt:
+
+Phase-G frontend baseline updated: YES / NO
+Phase-G backend baseline updated: YES / NO
+
+Documentation commit SHA:
+
+STOP.
+
+Do not begin G1C.

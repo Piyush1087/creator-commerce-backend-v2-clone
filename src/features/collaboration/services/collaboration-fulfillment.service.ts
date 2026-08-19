@@ -75,7 +75,8 @@ export class CollaborationFulfillmentService {
             redemptionCode: input.redemptionCode,
             serviceEvidenceRef: input.serviceEvidenceRef,
             genericFulfillmentEvidence: input.genericFulfillmentEvidence as
-              Prisma.InputJsonValue | undefined,
+              | Prisma.InputJsonValue
+              | undefined,
             brandFulfilledAt: now,
             state: CollaborationFulfillmentState.AWAITING_CREATOR_CONFIRMATION,
           },

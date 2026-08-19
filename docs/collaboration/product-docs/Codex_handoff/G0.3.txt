@@ -1,0 +1,627 @@
+Continue Creator Shop Collaboration Phase G.
+
+Execute G0.3 ONLY:
+FINAL AUTHORITY FREEZE + G1 IMPLEMENTATION DECOMPOSITION.
+
+Do not implement fixes.
+Do not invoke Stitch.
+Do not modify runtime source.
+Do not merge or deploy.
+
+Use all accepted Phase G artifacts:
+
+docs/collaboration/phase-g/00_baseline.md
+docs/collaboration/phase-g/01_g0_reality_audit.md
+docs/collaboration/phase-g/02_g0_2_access_identity_read_integrity.md
+docs/collaboration/phase-g/03_g0_2_ownership_cross_module_boundaries.md
+docs/collaboration/phase-g/04_g0_2_interaction_recovery_mobile.md
+
+This phase synthesizes G0.
+It does not reopen already-resolved investigations without evidence.
+
+==================================================
+1. FREEZE ALL PRIOR PRODUCT DECISIONS
+==================================================
+
+Operational routes:
+
+Brand:
+  /brand/collaborations
+
+Creator:
+  /creator/collaborations
+
+/brand/collaboration-page remains a separate Brand preview/page surface
+and is not another operational Collaboration workspace.
+
+
+ACTOR ACCESS
+
+BRAND → Brand Collaboration
+CREATOR → Creator Collaboration
+ADMIN → not an operational Collaboration actor for MVP
+UNKNOWN/UNRESOLVED → must never default to Brand
+
+
+DEEP LINK UNAVAILABLE
+
+Headline:
+Collaboration unavailable
+
+Body:
+This collaboration may no longer be available or you may not have access.
+
+Recovery:
+Back to Collaborations
+
+
+MESSAGE LIFECYCLE
+
+ACTIVE:
+- history visible
+- Send only when backend availableActions includes
+  PostCollaborationMessage
+
+PAUSED:
+- history visible
+- Send disabled
+
+COMPLETED:
+- history visible
+- Send disabled
+
+CANCELLED:
+- history visible
+- Send disabled
+
+TERMINATED:
+- history visible
+- Send disabled
+
+Frontend must consume capability authority rather than independently encode
+these lifecycle rules.
+
+Read-only messaging copy:
+
+Messaging is closed for this collaboration.
+You can still view the conversation history.
+
+
+FULFILLMENT ISSUE UX
+
+MVP is description-first.
+
+- mandatory description;
+- optional evidence where supported;
+- no user-facing issue taxonomy;
+- do not invent categories;
+- opaque issueCode may remain temporarily only if required by the transport;
+- UI must not interpret/display it as Product taxonomy;
+- remediation remains sequence-driven.
+
+
+COUNTERPART CONTEXT MVP
+
+Brand viewing Creator:
+- display name;
+- handle when available;
+- Campaign;
+- Campaign Asset;
+- Brief.
+
+Creator viewing Brand:
+- Brand name;
+- Campaign;
+- Campaign Asset;
+- Brief.
+
+Use existing Collaboration detail.
+
+No Phase G relationship-history endpoint.
+No fabricated Intelligence/history/Trust/analytics.
+Keep detailed workflow/commercial execution in Execution Hub.
+
+
+CREATOR BANK OWNERSHIP
+
+Settings/Payout owns Creator bank truth.
+
+Collaboration:
+- consumes payout-readiness prerequisite;
+- may link user to Settings/Payout;
+- must not remain the canonical bank writer.
+
+
+SETTLEMENT
+
+Collaboration owns:
+- entitlement;
+- financial resolution;
+- settlement projection.
+
+Payout/Escrow owns:
+- actual money movement.
+
+Settlement adapter remains DEFERRED_OWNER.
+
+
+INBOX IDENTITY
+
+Use existing projected:
+- counterpart;
+- Campaign;
+- Campaign Asset;
+- Brief.
+
+Do not add appliedAt/application-date unless later evidence proves these
+insufficient.
+
+
+CREATOR MOBILE BOTTOM NAV
+
+Freeze four primary slots as:
+
+Home
+Campaigns
+Collaborations
+Profile
+
+Remove Insights from the four-slot bottom navigation only.
+Do not remove the Insights capability from other navigation/surfaces.
+
+Product label:
+Collaborations
+
+
+REALTIME DEGRADED MVP
+
+- persisted HTTP remains authority;
+- retain hydrated data;
+- show live-updates-degraded state;
+- expose Manual Refresh;
+- Socket.IO reconnect triggers authoritative refetch;
+- NO fallback polling for MVP.
+
+
+LEGACY_COMPATIBILITY
+
+Rows explicitly projected as LEGACY_COMPATIBILITY must not be presented as
+fully canonical execution records.
+
+Default MVP behavior:
+
+- history/context may remain visible;
+- canonical per-Deliverable execution controls are read-only/unavailable;
+- do not expose “legacy”, sourceApplicationId, projectionSource or debug
+  metadata to users.
+
+Product copy:
+
+Headline:
+Limited collaboration details
+
+Body:
+Some details and actions are unavailable because this collaboration was
+created using an earlier workflow.
+
+If investigation evidence already gathered shows that active production
+Collaborations depend on executing legacy-only actions, flag:
+
+LEGACY_MIGRATION_BLOCKER
+
+Do not silently enable canonical controls.
+
+==================================================
+2. BUILD THE FINAL AUTHORITY MATRIX
+==================================================
+
+For every major Collaboration surface freeze:
+
+- purpose;
+- canonical owner;
+- persisted/read authority;
+- frontend presentation owner;
+- mutation authority;
+- capability authority;
+- actor applicability;
+- canonical/compatibility behavior;
+- loading state;
+- empty state;
+- error state;
+- read-only state;
+- terminal behavior;
+- mobile behavior;
+- deferred functionality.
+
+Cover:
+
+1. Collaboration Inbox
+2. Collaboration Workspace
+3. Chat/Messages
+4. Counterpart Context
+5. Negotiation
+6. Securement
+7. Fulfillment
+8. Production
+9. Publishing
+10. Compliance
+11. Settlement
+12. Resolution
+13. Completion
+14. Feedback
+15. Creator cancellation
+16. Realtime degraded state
+17. Legacy compatibility
+18. Mobile navigation
+
+==================================================
+3. CLOSE EVERY G0 FINDING
+==================================================
+
+Account for every finding COL-G0-001 through COL-G0-022.
+
+Assign each exactly one disposition:
+
+G1_IMPLEMENT
+G1_ACCEPT_EXISTING_HOTFIX
+G2_UX_VISUAL
+DEFERRED_OWNER
+RESOLVED_NO_CODE
+DOCUMENTATION_DEBT
+MIGRATION_BLOCKER
+
+No finding may disappear from the final plan.
+
+For each record:
+
+Finding ID
+Final disposition
+Owning module
+Frontend/backend/both
+Product decision status
+Implementation package
+Acceptance requirement
+
+==================================================
+4. FORMALIZE COL-G0-005
+==================================================
+
+COL-G0-005 is already corrected on backend reconcile branch:
+
+Pre-fix:
+0385c8a06abed604402621c1a3e94ee1c4e6d0e6
+
+Post-fix:
+efffc2701a61bbd49748a28608d54f927ee44a4e
+
+Do not modify it in G0.3.
+
+Disposition:
+
+G1_ACCEPT_EXISTING_HOTFIX
+
+Define the exact acceptance gate required before it becomes part of the
+Phase-G backend baseline.
+
+At minimum consider:
+
+- Prisma validate/generate where applicable;
+- Collaboration/Brand-UCE affected regression tests;
+- existing Collaboration backend regression suite;
+- Nest production build;
+- no silent publishingRequired default;
+- explicit mapping required;
+- Application → Collaboration provisioning behavior.
+
+==================================================
+5. FREEZE G1 IMPLEMENTATION PACKAGES
+==================================================
+
+Use the following target decomposition unless dependency evidence from G0
+requires a small adjustment.
+
+-----------------------------------------
+G1R — BACKEND CANONICAL HOTFIX ACCEPTANCE
+-----------------------------------------
+
+Scope:
+COL-G0-005 only.
+
+Objective:
+Formally accept or reject the already-existing publishingRequired/
+provisioning correction.
+
+No unrelated backend work.
+
+Exit:
+accepted backend SHA or rejected with reason.
+
+
+-----------------------------------------
+G1A — FOUNDATION, ACCESS & READ INTEGRITY
+-----------------------------------------
+
+Primary findings:
+
+COL-G0-001
+COL-G0-002
+COL-G0-003
+COL-G0-004
+COL-G0-013
+COL-G0-015
+COL-G0-018
+COL-G0-020
+
+Scope:
+
+- introduce minimum deterministic FE test harness;
+- Brand/Creator role-aware route handling;
+- no Admin/unknown → Brand fallback;
+- correct deep-link resolution;
+- unavailable state;
+- canonical Collaboration read validation;
+- strict publishingRequired;
+- bounded compatibility presentation;
+- inbox identity using existing fields;
+- production API URL fail-fast;
+- Creator mobile Collaborations entry;
+- deep-link → Chat mobile step.
+
+Prefer frontend-only changes unless G0 explicitly proved otherwise.
+
+Do not visually redesign workspace.
+
+
+-----------------------------------------
+G1B — INTERACTION AUTHORITY & RECOVERY
+-----------------------------------------
+
+Primary findings:
+
+COL-G0-006
+COL-G0-007
+COL-G0-008
+COL-G0-014
+COL-G0-016
+
+Scope:
+
+- backend message availableActions lifecycle alignment;
+- backend message POST lifecycle enforcement;
+- FE composer capability gating;
+- read-only conversation state;
+- pane-local errors;
+- loading/empty/processing states;
+- send busy/failure;
+- stale/refetch handling;
+- manual Refresh;
+- degraded realtime recovery;
+- Creator cancellation presenter.
+
+This package is cross-layer because COL-G0-007 requires BE + FE.
+
+Do not add polling.
+
+
+-----------------------------------------
+G1C — OWNERSHIP & CONTEXT CLEANUP
+-----------------------------------------
+
+Primary findings:
+
+COL-G0-009
+COL-G0-010
+COL-G0-011
+COL-G0-012
+
+Scope:
+
+- description-first Fulfillment issue UX;
+- remove invented taxonomy presentation;
+- compose MVP counterpart detail;
+- remove technical/debug drawer copy;
+- Creator Payouts → Settings/Payout bank API cutover;
+- determine safe deprecation of Collaboration bank write endpoint after
+  consumer search.
+
+Do not create relationship-history API.
+Do not create new Intelligence.
+Do not create settlement adapter.
+
+
+-----------------------------------------
+OUTSIDE G1
+-----------------------------------------
+
+COL-G0-019
+→ G2_UX_VISUAL
+Aurora/responsive/composition redesign.
+
+COL-G0-022
+→ DEFERRED_OWNER
+Payout/Escrow settlement adapter.
+
+COL-G0-021
+→ DOCUMENTATION_DEBT
+Reconcile/archive stale six-stage implementation tracker at an appropriate
+closure point.
+
+COL-G0-017
+→ RESOLVED_NO_CODE
+Operational route Product decision already frozen.
+
+Other resolved findings should be mapped explicitly.
+
+==================================================
+6. DEPENDENCY ORDER
+==================================================
+
+Determine and freeze safe execution order.
+
+Preferred:
+
+G1R
+  ↓
+G1A
+  ↓
+G1B
+  ↓
+G1C
+  ↓
+G1 consolidated local acceptance
+  ↓
+G2
+
+If G1B or G1C can safely run in parallel after G1A, document that, but do not
+optimize for parallelism at the expense of clean baselines.
+
+Each G1 package must start from the last accepted Phase G baseline, not from
+unreviewed parallel drift.
+
+==================================================
+7. G1 ACCEPTANCE STANDARD
+==================================================
+
+Define a standard acceptance report for each G1 package.
+
+At minimum:
+
+Starting frontend SHA
+Starting backend SHA
+Final frontend SHA
+Final backend SHA
+Files changed
+Findings closed
+Tests added
+Tests passed
+Typecheck
+Production build
+Applicable backend regression
+Runtime smoke where environment available
+Compatibility debt retained
+Deferred owners retained
+Environment blockers
+Product blockers
+Merge status
+Deployment status
+
+Use:
+
+ACCEPTED
+ACCEPTED WITH DEBT
+BLOCKED BY ENVIRONMENT
+NOT ACCEPTED
+
+Do not merge automatically.
+
+==================================================
+8. LOCAL RUNTIME READINESS BEFORE G1 ACCEPTANCE
+==================================================
+
+Freeze required local acceptance environment:
+
+- repository-compatible Node/npm;
+- Docker Desktop;
+- PostgreSQL 16;
+- isolated local Collaboration DB;
+- backend localhost:3000;
+- frontend localhost:5173;
+- deterministic Brand QA identity;
+- deterministic Creator QA identity;
+- Socket.IO local connectivity;
+- no production RDS;
+- no production Postmark;
+- no live Razorpay;
+- no production S3 writes;
+- no real publishing/fund movement.
+
+Determine whether the environment must be ready before G1A implementation or
+only before G1 consolidated runtime acceptance.
+
+Prefer not to block deterministic source/test work on environment setup, but
+environment must exist before Phase G functional acceptance is claimed.
+
+==================================================
+9. G2 ENTRY BOUNDARY
+==================================================
+
+G2 begins only after applicable G1 functional reconciliation is accepted.
+
+G2 owns:
+
+- final Collaboration information architecture;
+- visual hierarchy;
+- workspace composition;
+- Aurora reconciliation;
+- breakpoint/composition choices;
+- card density;
+- typography;
+- loading/empty/error visual treatment;
+- drawers/sheets visual composition;
+- Stitch-ready state matrix.
+
+G2 must not reopen:
+
+- lifecycle;
+- financial ownership;
+- bank ownership;
+- message authority;
+- Fulfillment taxonomy;
+- counterpart data ownership;
+- settlement ownership.
+
+Stitch remains prohibited until G2 freezes the UX authority matrix.
+
+==================================================
+10. OUTPUT
+==================================================
+
+Create only:
+
+docs/collaboration/phase-g/
+05_g0_3_authority_freeze_g1_plan.md
+
+Structure:
+
+1. G0 completion statement
+2. Frozen Product decisions
+3. Collaboration Authority Matrix
+4. Finding disposition matrix — COL-G0-001 through COL-G0-022
+5. Deferred-owner register
+6. Compatibility/migration policy
+7. G1R specification
+8. G1A specification
+9. G1B specification
+10. G1C specification
+11. Dependency/order map
+12. G1 acceptance template
+13. Local environment readiness
+14. G2 entry criteria
+15. Remaining blockers, if any
+16. G0.3 completion assessment
+
+No runtime source changes.
+
+==================================================
+11. FINAL RESPONSE
+==================================================
+
+Return:
+
+G0.3 status:
+All G0 findings accounted for: YES / NO
+Product decisions remaining:
+Migration blockers:
+G1R scope:
+G1A scope:
+G1B scope:
+G1C scope:
+Deferred owners:
+G2-deferred findings:
+Required environment before functional acceptance:
+Files created:
+Commit SHA:
+
+STOP.
+
+Do not begin G1R or G1A.

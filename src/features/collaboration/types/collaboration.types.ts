@@ -11,7 +11,8 @@ import {
 
 export type CollaborationViewerRole = "BRAND" | "CREATOR";
 export type CollaborationProjectionSource =
-  "CANONICAL" | "LEGACY_COMPATIBILITY";
+  | "CANONICAL"
+  | "LEGACY_COMPATIBILITY";
 
 export type CollaborationAvailableAction =
   | "PostCollaborationMessage"

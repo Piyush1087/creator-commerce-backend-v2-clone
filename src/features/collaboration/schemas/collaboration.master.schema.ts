@@ -12,11 +12,7 @@ export const WorkflowStageEnum = z.enum([
 
 export const PayoutModeEnum = z.enum(["ESCROW", "MANUAL", "BARTER"]);
 
-export const IndustryTypeEnum = z.enum([
-  "D2C",
-  "SAAS",
-  "HEALTHCARE",
-]);
+export const IndustryTypeEnum = z.enum(["D2C", "SAAS", "HEALTHCARE"]);
 
 export const MasterCollabSchema = z
   .object({
@@ -44,8 +40,7 @@ export const MasterCollabSchema = z
         (data) =>
           Math.abs(data.advance_30 + data.balance_70 - data.total_quote) < 0.01,
         {
-          message:
-            "Financial Split Mismatch: 30% + 70% must equal Total Quote",
+          message: "Financial Split Mismatch: 30% + 70% must equal Total Quote",
           path: ["total_quote"],
         },
       ),

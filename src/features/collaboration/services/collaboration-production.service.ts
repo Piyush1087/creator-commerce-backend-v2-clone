@@ -94,7 +94,8 @@ export class CollaborationProductionService {
             assetRef: input.assetRef,
             creatorNote: input.creatorNote,
             submissionMetadata: input.submissionMetadata as
-              Prisma.InputJsonValue | undefined,
+              | Prisma.InputJsonValue
+              | undefined,
             submittedByUserId: user.id,
             submittedAt,
             reviewDeadlineAt,

@@ -386,7 +386,8 @@ export class CollaborationPublishingService {
             platform: input.platform,
             creatorNote: input.creatorNote,
             evidenceMetadata: input.evidenceMetadata as
-              Prisma.InputJsonValue | undefined,
+              | Prisma.InputJsonValue
+              | undefined,
             submittedByUserId: user.id,
             submittedAt,
           },
