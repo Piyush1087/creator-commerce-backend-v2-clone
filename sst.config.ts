@@ -101,6 +101,7 @@ export default $config({
       DATABASE_URL,
       RUN_MIGRATIONS_ON_START: $app.stage === "dev" ? "true" : "false",
       RUN_SEED_COLLABORATION: $app.stage === "dev" ? "true" : "false",
+      PRISMA_MIGRATE_RESOLVE_ROLLED_BACK: "20260810180000_collaboration_phase_1_foundation",
       APP_BACKEND_URL:
         $app.stage === "prod"
           ? "https://api.thecreatorshop.in"
