@@ -29,6 +29,14 @@ import { GatekeeperService } from "./industry/gatekeeper.service";
 import { GeminiIndustryClassifier } from "./industry/gemini-industry-classifier.service";
 import { INDUSTRY_CLASSIFIER } from "./industry/industry-classifier.token";
 import { StubIndustryClassifier } from "./industry/stub-industry-classifier.service";
+import { GatekeeperAdmissionDecisionService } from "./gatekeeper/gatekeeper-admission-decision.service";
+import {
+  GATEKEEPER_ASSESSMENT_PROVIDER,
+  UnconfiguredGatekeeperAssessmentProvider,
+} from "./gatekeeper/gatekeeper-assessment-provider.token";
+import { GatekeeperFallbackOrchestratorService } from "./gatekeeper/gatekeeper-fallback-orchestrator.service";
+import { GatekeeperIndustryConfirmationService } from "./gatekeeper/gatekeeper-industry-confirmation.service";
+import { GatekeeperV1AdmissionService } from "./gatekeeper/gatekeeper-v1-admission.service";
 import { BRAND_SURFACE_SCAN_RUNNER } from "./surface-scan/brand-surface-scan.runner.token";
 import { BrandScanAssetMirrorService } from "./surface-scan/brand-scan-asset-mirror.service";
 import { HttpBrandSurfaceScanRunner } from "./surface-scan/http-brand-surface-scan.runner";
@@ -74,6 +82,15 @@ import { BrandVerificationService } from "./verification/brand-verification.serv
     BrandOnboardingPurgeService,
     BrandOnboardingPurgeScheduler,
     BrandOnboardingService,
+    GatekeeperV1AdmissionService,
+    GatekeeperAdmissionDecisionService,
+    GatekeeperFallbackOrchestratorService,
+    GatekeeperIndustryConfirmationService,
+    UnconfiguredGatekeeperAssessmentProvider,
+    {
+      provide: GATEKEEPER_ASSESSMENT_PROVIDER,
+      useExisting: UnconfiguredGatekeeperAssessmentProvider,
+    },
     BrandProfileService,
     BrandOfferingsService,
     BrandCompetitorsService,
@@ -83,7 +100,6 @@ import { BrandVerificationService } from "./verification/brand-verification.serv
     ParallelSearchClient,
     GeminiJsonClient,
     BrandScanAssetMirrorService,
-    // Legacy Parallel-backed runner retained for reactivation only.
     HttpBrandSurfaceScanRunner,
     UnconfiguredBrandSurfaceScanRunner,
     ZyteHomepageStrategy,
@@ -116,9 +132,6 @@ import { BrandVerificationService } from "./verification/brand-verification.serv
           (config.get<string>("PLAYWRIGHT_ENABLED", "true") ?? "true")
             .trim()
             .toLowerCase() !== "false";
-        // Legacy Parallel path kept for reactivation only:
-        // inject HttpBrandSurfaceScanRunner and return it when
-        // BRAND_SCAN_ACQUISITION === "parallel" && PARALLEL_API_KEY is set.
         if (hasZyte || playwrightEnabled) {
           return stage1a;
         }
@@ -132,7 +145,6 @@ import { BrandVerificationService } from "./verification/brand-verification.serv
     },
     StubIndustryClassifier,
     GatekeeperService,
-    // Legacy Parallel+Gemini classifier retained but not bound by default.
     GeminiIndustryClassifier,
     {
       provide: INDUSTRY_CLASSIFIER,

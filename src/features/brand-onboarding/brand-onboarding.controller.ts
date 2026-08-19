@@ -13,12 +13,14 @@ import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { DiscoverValidateRequestDto } from "./dto/discover-validate-request.dto";
 import { DiscoverWaitlistRequestDto } from "./dto/discover-waitlist-request.dto";
 import { BrandOnboardingService } from "./brand-onboarding.service";
+import { GatekeeperV1AdmissionService } from "./gatekeeper/gatekeeper-v1-admission.service";
 
 @Controller("api/v1/discovery")
 @UseGuards(ThrottlerGuard)
 export class BrandOnboardingController {
   constructor(
     private readonly brandOnboarding: BrandOnboardingService,
+    private readonly gatekeeperV1: GatekeeperV1AdmissionService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -43,10 +45,12 @@ export class BrandOnboardingController {
     @Body() body: DiscoverValidateRequestDto,
     @Ip() clientIp: string,
     @Headers("authorization") authorization?: string,
+    @Headers("x-session-id") sessionId?: string,
   ) {
-    return this.brandOnboarding.validateUrl(body.url, {
+    return this.gatekeeperV1.validate(body, {
       clientIp,
       authenticatedUserId: this.optionalUserId(authorization),
+      sessionId,
     });
   }
 
