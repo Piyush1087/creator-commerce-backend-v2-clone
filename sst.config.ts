@@ -146,7 +146,7 @@ export default $config({
             ? "false"
             : "true",
       PLAYWRIGHT_TIMEOUT_MS: process.env.PLAYWRIGHT_TIMEOUT_MS ?? "25000",
-      // Legacy Parallel surface-scan path (kept for reactivation)
+      // Parallel provider is reused by Data Extraction company_public_web_research.
       PARALLEL_API_KEY: process.env.PARALLEL_API_KEY ?? "",
       PARALLEL_EXTRACT_TIMEOUT_MS:
         process.env.PARALLEL_EXTRACT_TIMEOUT_MS ?? "300000",
@@ -170,6 +170,12 @@ export default $config({
         "gemini-2.5-flash",
       GEMINI_REQUEST_TIMEOUT_MS:
         process.env.GEMINI_REQUEST_TIMEOUT_MS ?? "120000",
+      // Data Extraction OpenAI runtime: model id is supplied by Intelligence at call time.
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? "",
+      OPENAI_REQUEST_TIMEOUT_MS:
+        process.env.OPENAI_REQUEST_TIMEOUT_MS ?? "120000",
+      DATA_EXTRACTION_PROVIDER_MAX_ATTEMPTS:
+        process.env.DATA_EXTRACTION_PROVIDER_MAX_ATTEMPTS ?? "3",
       INSTAGRAM_API_ID: process.env.INSTAGRAM_API_ID as string,
       INSTAGRAM_APP_SECRET: process.env.INSTAGRAM_APP_SECRET as string,
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? "",
