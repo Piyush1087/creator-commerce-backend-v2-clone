@@ -7,6 +7,10 @@
     "build": "nest build && node scripts/copy-prompt-assets.mjs",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "lint": "eslint \"{src,test}/**/*.ts\"",
+    "pretest": "npm run prisma:generate",
+    "test": "vitest run --config vitest.config.ts",
+    "pretest:campaign-readiness": "npm run prisma:generate",
+    "test:campaign-readiness": "vitest run --config vitest.config.ts src/features/brand-uce/services/canonical-campaign-readiness.resolver.test.ts src/features/brand-uce/services/canonical-campaign-readiness.service.test.ts src/features/brand-uce/canonical-campaign-create.controller.test.ts src/features/brand-uce/services/canonical-campaign-create.service.test.ts",
     "dev": "nest start --watch",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -73,6 +77,7 @@
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "2.1.9"
   }
 }

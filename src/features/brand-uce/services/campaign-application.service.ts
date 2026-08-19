@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -8,6 +9,7 @@ import {
   UceApplicationStatus,
   UceCampaignCreatorIngestionMethod,
   UceCampaignCreatorSource,
+  UceCampaignStatus,
   UceCollabStatus,
   UceMediaPlatform,
 } from "@prisma/client";
@@ -33,10 +35,10 @@ export class CampaignApplicationService {
   ) {}
 
   /**
-   * Ensure Application + CampaignCreator rows exist for legacy Collaboration
-   * applicant rows (backfill only; Applications remain decision truth).
+   * Explicit compatibility command. This is intentionally never invoked by a
+   * Campaign Page GET/read path; callers must opt into legacy reconciliation.
    */
-  async syncFromLegacyCollaborations(campaignId: string) {
+  async syncLegacyApplicantsCompatibilityCommand(campaignId: string) {
     const applicantRows = await this.prisma.uceCampaignCollaboration.findMany({
       where: {
         campaignId,
@@ -131,7 +133,6 @@ export class CampaignApplicationService {
 
   async listApplicants(brandProfileId: string, campaignId: string) {
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
-    await this.syncFromLegacyCollaborations(campaignId);
 
     const rows = await this.prisma.uceApplication.findMany({
       where: {
@@ -171,6 +172,11 @@ export class CampaignApplicationService {
           | "EXPIRED",
         source: row.source,
         appliedAt: row.appliedAt.toISOString(),
+        campaignAssetId: row.campaignAssetId,
+        briefId: row.briefId,
+        canonicalCampaignAssetId: null,
+        canonicalBriefId: null,
+        referenceAuthority: "LEGACY_COMPATIBILITY" as const,
         intelligenceStatus: "UNAVAILABLE" as const,
       })),
     };
@@ -188,21 +194,81 @@ export class CampaignApplicationService {
     }
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
 
-    const application = await this.prisma.uceApplication.findFirst({
-      where: { id: applicationId, campaignId },
-      include: { campaignCreator: true },
-    });
-    if (!application) throw new NotFoundException("Application not found");
-    if (application.status !== UceApplicationStatus.PENDING) {
-      throw new BadRequestException("Only PENDING applications can be approved");
-    }
-
-    const now = new Date();
     await this.prisma.$transaction(async (tx) => {
-      await tx.uceApplication.update({
-        where: { id: applicationId },
-        data: { status: UceApplicationStatus.APPROVED, approvedAt: now },
+      const application = await tx.uceApplication.findFirst({
+        where: { id: applicationId, campaignId },
+        include: { campaignCreator: true },
       });
+      if (!application) throw new NotFoundException("Application not found");
+      if (application.status !== UceApplicationStatus.PENDING) {
+        throw new BadRequestException(
+          "Only PENDING applications can be approved",
+        );
+      }
+      if (!application.campaignCreator.email?.trim()) {
+        throw new BadRequestException(
+          "Creator email is required before an Application can be approved",
+        );
+      }
+
+      const campaign = await tx.uceCampaign.findFirst({
+        where: { id: campaignId, brandProfileId },
+      });
+      if (!campaign) throw new NotFoundException("Campaign not found");
+      if (
+        campaign.status !== UceCampaignStatus.LIVE &&
+        campaign.status !== UceCampaignStatus.PAUSED
+      ) {
+        throw new BadRequestException(
+          "Applications can only be approved for LIVE or PAUSED Campaigns",
+        );
+      }
+
+      const product = await tx.uceCampaignProduct.findFirst({
+        where: {
+          id: application.campaignAssetId,
+          campaignId,
+          isActive: true,
+        },
+      });
+      if (!product) {
+        throw new BadRequestException(
+          "The Application Campaign Asset is no longer active",
+        );
+      }
+
+      const brief = await tx.uceCampaignBrief.findFirst({
+        where: {
+          id: application.briefId,
+          campaignId,
+          productId: application.campaignAssetId,
+          isActive: true,
+        },
+      });
+      if (!brief) {
+        throw new BadRequestException(
+          "The Application Brief is no longer active for this Campaign Asset",
+        );
+      }
+
+      const claimed = await tx.uceApplication.updateMany({
+        where: {
+          id: applicationId,
+          campaignId,
+          status: UceApplicationStatus.PENDING,
+        },
+        data: {
+          status: UceApplicationStatus.APPROVED,
+          approvedAt: new Date(),
+        },
+      });
+      if (claimed.count !== 1) {
+        throw new ConflictException(
+          "Application approval was already resolved by another request",
+        );
+      }
+
+      const now = new Date();
       await tx.uceApplication.updateMany({
         where: {
           campaignId,
@@ -216,6 +282,7 @@ export class CampaignApplicationService {
           supersededAt: now,
         },
       });
+
     });
 
     // Application approval is Applicant truth only.
@@ -243,7 +310,9 @@ export class CampaignApplicationService {
     });
     if (!application) throw new NotFoundException("Application not found");
     if (application.status !== UceApplicationStatus.PENDING) {
-      throw new BadRequestException("Only PENDING applications can be rejected");
+      throw new BadRequestException(
+        "Only PENDING applications can be rejected",
+      );
     }
 
     await this.prisma.uceApplication.update({
