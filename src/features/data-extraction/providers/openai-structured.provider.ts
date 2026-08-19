@@ -39,7 +39,9 @@ function parseRetryAfter(value: string | null): number | undefined {
   const seconds = Number(value);
   if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
   const timestamp = Date.parse(value);
-  return Number.isNaN(timestamp) ? undefined : Math.max(0, timestamp - Date.now());
+  return Number.isNaN(timestamp)
+    ? undefined
+    : Math.max(0, timestamp - Date.now());
 }
 
 function extractOutputText(response: OpenAIResponsePayload): string {

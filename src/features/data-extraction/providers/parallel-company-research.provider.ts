@@ -26,6 +26,43 @@ export type CompanyPublicWebResearchPayload = {
   warnings?: unknown;
 };
 
+function hasValidParallelEnvelope(value: unknown): value is {
+  search_id: string;
+  session_id: string;
+  results: Array<{
+    url: string;
+    title?: string;
+    publish_date?: string | null;
+    excerpts?: string[];
+  }>;
+  warnings?: unknown;
+  usage?: unknown;
+} {
+  if (!value || typeof value !== "object") return false;
+  const response = value as Record<string, unknown>;
+  if (
+    typeof response.search_id !== "string" ||
+    typeof response.session_id !== "string" ||
+    !Array.isArray(response.results)
+  ) {
+    return false;
+  }
+  return response.results.every((row) => {
+    if (!row || typeof row !== "object") return false;
+    const result = row as Record<string, unknown>;
+    return (
+      typeof result.url === "string" &&
+      (result.title === undefined || typeof result.title === "string") &&
+      (result.publish_date === undefined ||
+        result.publish_date === null ||
+        typeof result.publish_date === "string") &&
+      (result.excerpts === undefined ||
+        (Array.isArray(result.excerpts) &&
+          result.excerpts.every((excerpt) => typeof excerpt === "string")))
+    );
+  });
+}
+
 @Injectable()
 export class ParallelCompanyResearchProvider {
   constructor(
@@ -98,6 +135,17 @@ export class ParallelCompanyResearchProvider {
         },
       });
       attemptCount = execution.attemptCount;
+      if (!hasValidParallelEnvelope(execution.value)) {
+        throw new DataExtractionProviderError({
+          code: "INVALID_PROVIDER_RESPONSE",
+          provider: "PARALLEL_AI",
+          capabilityId: CAPABILITY_ID,
+          message: "Parallel returned an invalid search response envelope",
+          retryable: false,
+          attemptCount,
+          acquisitionRunId: args.acquisitionRunId,
+        });
+      }
       const acquiredAt = new Date().toISOString();
       const results = (execution.value.results ?? []).map((row) => ({
         url: row.url,

@@ -76,9 +76,7 @@ export type ProviderExecutionError = {
 };
 
 export class DataExtractionProviderError extends Error {
-  constructor(
-    readonly detail: Omit<ProviderExecutionError, "occurredAt">,
-  ) {
+  constructor(readonly detail: Omit<ProviderExecutionError, "occurredAt">) {
     super(detail.message);
     this.name = "DataExtractionProviderError";
   }
