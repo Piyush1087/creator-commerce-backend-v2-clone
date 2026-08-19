@@ -14,10 +14,5 @@ if [ "${RUN_MIGRATIONS_ON_START}" = "true" ]; then
   echo "[entrypoint] prisma migrate deploy complete"
 fi
 
-if [ "${RUN_SEED_COLLABORATION}" = "true" ]; then
-  echo "[entrypoint] RUN_SEED_COLLABORATION=true — seeding collaboration data"
-  npx ts-node -r dotenv/config scripts/seed-dev-collaboration.ts
-  echo "[entrypoint] seed-dev-collaboration complete"
-fi
 
 exec "$@"
