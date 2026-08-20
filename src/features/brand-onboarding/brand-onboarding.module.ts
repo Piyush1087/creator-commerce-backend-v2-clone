@@ -8,6 +8,7 @@ import { InstagramModule } from "../instagram/instagram.module";
 import { MailModule } from "../../mail/mail.module";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { S3Module } from "../../shared/s3/s3.module";
+import { DataExtractionModule } from "../data-extraction/data-extraction.module";
 import { BrandSocialSyncController } from "./social-sync/brand-social-sync.controller";
 import { BrandSocialSyncService } from "./social-sync/brand-social-sync.service";
 import { BrandOnboardingPurgeScheduler } from "./brand-onboarding-purge.scheduler";
@@ -51,6 +52,17 @@ import { IntelligenceStatusService } from "./surface-scan/intelligence-status.se
 import { BrandAuditExportService } from "./surface-scan/brand-audit-export.service";
 import { Checkpoint2Service } from "./surface-scan/checkpoint2/checkpoint2.service";
 import { BrandVerificationService } from "./verification/brand-verification.service";
+import { GatekeeperAdmissionDecisionService } from "./gatekeeper/gatekeeper-admission-decision.service";
+import { GatekeeperIndustryConfirmationService } from "./gatekeeper/gatekeeper-industry-confirmation.service";
+import { GatekeeperPersistenceService } from "./gatekeeper/gatekeeper-persistence.service";
+import { GatekeeperPolicyVersionService } from "./gatekeeper/gatekeeper-policy-version.service";
+import { GatekeeperV1AdmissionService } from "./gatekeeper/gatekeeper-v1-admission.service";
+import { GATEKEEPER_CAPABILITY_PORT } from "./gatekeeper/runtime/gatekeeper-capability.port";
+import { DataExtractionGatekeeperAdapter } from "./gatekeeper/runtime/data-extraction-gatekeeper.adapter";
+import { GatekeeperArtifactLoader } from "./gatekeeper/runtime/gatekeeper-artifact.loader";
+import { GatekeeperPromptService } from "./gatekeeper/runtime/gatekeeper-prompt.service";
+import { GatekeeperRuntimeOrchestratorService } from "./gatekeeper/runtime/gatekeeper-runtime-orchestrator.service";
+import { GatekeeperTelemetryService } from "./gatekeeper/runtime/gatekeeper-telemetry.service";
 
 @Module({
   imports: [
@@ -61,6 +73,7 @@ import { BrandVerificationService } from "./verification/brand-verification.serv
     S3Module,
     BrandCentreModule,
     InstagramModule,
+    DataExtractionModule,
   ],
   controllers: [
     BrandOnboardingController,
@@ -74,6 +87,20 @@ import { BrandVerificationService } from "./verification/brand-verification.serv
     BrandOnboardingPurgeService,
     BrandOnboardingPurgeScheduler,
     BrandOnboardingService,
+    GatekeeperV1AdmissionService,
+    GatekeeperAdmissionDecisionService,
+    GatekeeperIndustryConfirmationService,
+    GatekeeperPersistenceService,
+    GatekeeperPolicyVersionService,
+    GatekeeperArtifactLoader,
+    GatekeeperPromptService,
+    GatekeeperRuntimeOrchestratorService,
+    GatekeeperTelemetryService,
+    DataExtractionGatekeeperAdapter,
+    {
+      provide: GATEKEEPER_CAPABILITY_PORT,
+      useExisting: DataExtractionGatekeeperAdapter,
+    },
     BrandProfileService,
     BrandOfferingsService,
     BrandCompetitorsService,

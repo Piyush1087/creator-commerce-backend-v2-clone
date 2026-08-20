@@ -4,21 +4,28 @@ import {
   Headers,
   HttpCode,
   Ip,
+  Param,
   Post,
   UseGuards,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 
+import { ConfirmGatekeeperIndustryDto } from "./dto/confirm-gatekeeper-industry.dto";
+import { DiscoverResolveRequestDto } from "./dto/discover-resolve-request.dto";
 import { DiscoverValidateRequestDto } from "./dto/discover-validate-request.dto";
 import { DiscoverWaitlistRequestDto } from "./dto/discover-waitlist-request.dto";
 import { BrandOnboardingService } from "./brand-onboarding.service";
+import { GatekeeperIndustryConfirmationService } from "./gatekeeper/gatekeeper-industry-confirmation.service";
+import { GatekeeperV1AdmissionService } from "./gatekeeper/gatekeeper-v1-admission.service";
 
 @Controller("api/v1/discovery")
 @UseGuards(ThrottlerGuard)
 export class BrandOnboardingController {
   constructor(
     private readonly brandOnboarding: BrandOnboardingService,
+    private readonly gatekeeperV1: GatekeeperV1AdmissionService,
+    private readonly gatekeeperConfirmation: GatekeeperIndustryConfirmationService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -26,7 +33,7 @@ export class BrandOnboardingController {
   @HttpCode(200)
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   resolve(
-    @Body() body: DiscoverValidateRequestDto,
+    @Body() body: DiscoverResolveRequestDto,
     @Ip() clientIp: string,
     @Headers("authorization") authorization?: string,
   ) {
@@ -43,11 +50,23 @@ export class BrandOnboardingController {
     @Body() body: DiscoverValidateRequestDto,
     @Ip() clientIp: string,
     @Headers("authorization") authorization?: string,
+    @Headers("x-session-id") sessionId?: string,
   ) {
-    return this.brandOnboarding.validateUrl(body.url, {
+    return this.gatekeeperV1.validate(body, {
       clientIp,
       authenticatedUserId: this.optionalUserId(authorization),
+      sessionId,
     });
+  }
+
+  @Post(":leadId/confirm-industry")
+  @HttpCode(200)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  confirmIndustry(
+    @Param("leadId") leadId: string,
+    @Body() body: ConfirmGatekeeperIndustryDto,
+  ) {
+    return this.gatekeeperConfirmation.confirm(leadId, body);
   }
 
   @Post("waitlist")
