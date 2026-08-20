@@ -2,13 +2,13 @@ import type { ConfigService } from "@nestjs/config";
 import { z } from "zod";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { generateContent } = vi.hoisted(() => ({
-  generateContent: vi.fn(),
+const { createInteraction } = vi.hoisted(() => ({
+  createInteraction: vi.fn(),
 }));
 
 vi.mock("@google/genai", () => ({
   GoogleGenAI: class {
-    readonly models = { generateContent };
+    readonly interactions = { create: createInteraction };
   },
 }));
 
@@ -30,7 +30,7 @@ function execute(
 ) {
   return provider.execute({
     acquisitionRunId: "gemini-test-run",
-    modelId: "gemini-2.5-flash",
+    modelId: "gemini-3.6-flash",
     ownedUrl: "https://example.com",
     instruction: "Return a harmless test result.",
     outputSchema,
@@ -38,41 +38,50 @@ function execute(
   });
 }
 
-function response(args: { owned?: boolean; search?: boolean } = {}) {
+function response(
+  args: { owned?: boolean; search?: boolean; text?: string } = {},
+) {
   return {
-    text: JSON.stringify({ ok: true }),
-    candidates: [
+    steps: [
+      ...(args.owned
+        ? [
+            {
+              type: "url_context_result",
+              result: [{ url: "https://example.com", status: "success" }],
+            },
+          ]
+        : []),
+      ...(args.search
+        ? [
+            {
+              type: "google_search_result",
+              result: [
+                {
+                  search_suggestions:
+                    '<a href="https://www.google.com/search?q=public+source">Search source</a>',
+                },
+              ],
+            },
+          ]
+        : []),
       {
-        urlContextMetadata: args.owned
-          ? {
-              urlMetadata: [
-                {
-                  retrievedUrl: "https://example.com",
-                  urlRetrievalStatus: "URL_RETRIEVAL_STATUS_SUCCESS",
-                },
-              ],
-            }
-          : undefined,
-        groundingMetadata: args.search
-          ? {
-              groundingChunks: [
-                {
-                  web: {
-                    uri: "https://example.org/source",
-                    title: "Public source",
-                  },
-                },
-              ],
-            }
-          : undefined,
+        type: "model_output",
+        content: [
+          {
+            type: "text",
+            text: args.text ?? JSON.stringify({ ok: true }),
+            annotations: [],
+          },
+        ],
       },
     ],
+    usage: { input_tokens: 1, output_tokens: 1 },
   };
 }
 
 describe("GeminiGatekeeperProvider", () => {
   beforeEach(() => {
-    generateContent.mockReset();
+    createInteraction.mockReset();
   });
 
   it("returns CONFIGURATION_ERROR without attempting a request when the credential is missing", async () => {
@@ -81,11 +90,11 @@ describe("GeminiGatekeeperProvider", () => {
     await expect(execute(provider)).rejects.toMatchObject({
       detail: { code: "CONFIGURATION_ERROR", attemptCount: 0 },
     });
-    expect(generateContent).not.toHaveBeenCalled();
+    expect(createInteraction).not.toHaveBeenCalled();
   });
 
   it("normalizes malformed JSON as STRUCTURED_OUTPUT_INVALID without retrying", async () => {
-    generateContent.mockResolvedValue({ text: "{not-json" });
+    createInteraction.mockResolvedValue(response({ text: "{not-json" }));
     const provider = new GeminiGatekeeperProvider(
       config({ GEMINI_API_KEY: "test-key" }),
     );
@@ -93,11 +102,13 @@ describe("GeminiGatekeeperProvider", () => {
     await expect(execute(provider)).rejects.toMatchObject({
       detail: { code: "STRUCTURED_OUTPUT_INVALID", attemptCount: 1 },
     });
-    expect(generateContent).toHaveBeenCalledTimes(1);
+    expect(createInteraction).toHaveBeenCalledTimes(1);
   });
 
   it("normalizes schema failure as STRUCTURED_OUTPUT_INVALID without retrying", async () => {
-    generateContent.mockResolvedValue({ text: JSON.stringify({ ok: "yes" }) });
+    createInteraction.mockResolvedValue(
+      response({ text: JSON.stringify({ ok: "yes" }) }),
+    );
     const provider = new GeminiGatekeeperProvider(
       config({ GEMINI_API_KEY: "test-key" }),
     );
@@ -105,7 +116,7 @@ describe("GeminiGatekeeperProvider", () => {
     await expect(execute(provider)).rejects.toMatchObject({
       detail: { code: "STRUCTURED_OUTPUT_INVALID", attemptCount: 1 },
     });
-    expect(generateContent).toHaveBeenCalledTimes(1);
+    expect(createInteraction).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -155,7 +166,7 @@ describe("GeminiGatekeeperProvider", () => {
       availability,
       quality,
     }) => {
-      generateContent.mockResolvedValue(response({ owned, search }));
+      createInteraction.mockResolvedValue(response({ owned, search }));
       const provider = new GeminiGatekeeperProvider(
         config({ GEMINI_API_KEY: "test-key" }),
       );
@@ -170,7 +181,7 @@ describe("GeminiGatekeeperProvider", () => {
   );
 
   it("normalizes timeout exhaustion as REQUEST_TIMEOUT within Gemini", async () => {
-    generateContent.mockRejectedValue(new Error("Gemini request timed out"));
+    createInteraction.mockRejectedValue(new Error("Gemini request timed out"));
     const provider = new GeminiGatekeeperProvider(
       config({
         GEMINI_API_KEY: "test-key",
@@ -185,6 +196,69 @@ describe("GeminiGatekeeperProvider", () => {
         attemptCount: 2,
       },
     });
-    expect(generateContent).toHaveBeenCalledTimes(2);
+    expect(createInteraction).toHaveBeenCalledTimes(2);
+  });
+
+  it("normalizes a confirmed model-unavailable 404 without retrying", async () => {
+    const error = new Error(
+      '{"error":{"code":404,"message":"This model models/unavailable-gatekeeper-model is no longer available.","status":"NOT_FOUND"}}',
+    ) as Error & { status: number };
+    error.status = 404;
+    createInteraction.mockRejectedValue(error);
+    const provider = new GeminiGatekeeperProvider(
+      config({ GEMINI_API_KEY: "test-key" }),
+    );
+
+    await expect(execute(provider)).rejects.toMatchObject({
+      detail: {
+        code: "MODEL_NOT_AVAILABLE",
+        providerStatusCode: 404,
+        attemptCount: 1,
+      },
+    });
+    expect(createInteraction).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps an unrelated 404 normalized as PROVIDER_ERROR", async () => {
+    const error = new Error("The requested endpoint was not found") as Error & {
+      status: number;
+    };
+    error.status = 404;
+    createInteraction.mockRejectedValue(error);
+    const provider = new GeminiGatekeeperProvider(
+      config({ GEMINI_API_KEY: "test-key" }),
+    );
+
+    await expect(execute(provider)).rejects.toMatchObject({
+      detail: {
+        code: "PROVIDER_ERROR",
+        providerStatusCode: 404,
+        attemptCount: 1,
+      },
+    });
+    expect(createInteraction).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the caller model with combined Interactions tools and JSON output", async () => {
+    createInteraction.mockResolvedValue(
+      response({ owned: true, search: true }),
+    );
+    const provider = new GeminiGatekeeperProvider(
+      config({ GEMINI_API_KEY: "test-key" }),
+    );
+
+    await execute(provider);
+
+    expect(createInteraction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "gemini-3.6-flash",
+        store: false,
+        tools: [{ type: "url_context" }, { type: "google_search" }],
+        response_format: expect.objectContaining({
+          type: "text",
+          mime_type: "application/json",
+        }),
+      }),
+    );
   });
 });

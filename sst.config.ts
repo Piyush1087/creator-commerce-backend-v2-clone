@@ -159,7 +159,7 @@ export default $config({
       GATEKEEPER_GEMINI_MODEL:
         process.env.GATEKEEPER_GEMINI_MODEL ??
         process.env.GEMINI_MODEL ??
-        "gemini-2.5-flash",
+        "gemini-3.6-flash",
       MCP_PLANNER_GEMINI_MODEL:
         process.env.MCP_PLANNER_GEMINI_MODEL ??
         process.env.GEMINI_MODEL ??
