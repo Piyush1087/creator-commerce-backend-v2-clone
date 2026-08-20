@@ -56,6 +56,8 @@ import { GatekeeperAdmissionDecisionService } from "./gatekeeper/gatekeeper-admi
 import { GatekeeperIndustryConfirmationService } from "./gatekeeper/gatekeeper-industry-confirmation.service";
 import { GatekeeperPersistenceService } from "./gatekeeper/gatekeeper-persistence.service";
 import { GatekeeperPolicyVersionService } from "./gatekeeper/gatekeeper-policy-version.service";
+import { GatekeeperRecoveryService } from "./gatekeeper/gatekeeper-recovery.service";
+import { GatekeeperSupportService } from "./gatekeeper/gatekeeper-support.service";
 import { GatekeeperV1AdmissionService } from "./gatekeeper/gatekeeper-v1-admission.service";
 import { GATEKEEPER_CAPABILITY_PORT } from "./gatekeeper/runtime/gatekeeper-capability.port";
 import { DataExtractionGatekeeperAdapter } from "./gatekeeper/runtime/data-extraction-gatekeeper.adapter";
@@ -92,6 +94,8 @@ import { GatekeeperTelemetryService } from "./gatekeeper/runtime/gatekeeper-tele
     GatekeeperIndustryConfirmationService,
     GatekeeperPersistenceService,
     GatekeeperPolicyVersionService,
+    GatekeeperRecoveryService,
+    GatekeeperSupportService,
     GatekeeperArtifactLoader,
     GatekeeperPromptService,
     GatekeeperRuntimeOrchestratorService,

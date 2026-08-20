@@ -88,6 +88,11 @@ enum WaitlistReason {
   PARKED_DOMAIN
 }
 
+enum GatekeeperRecoveryRequestType {
+  REQUEST_ORG_ACCESS
+  REQUEST_CLASSIFICATION_REVIEW
+}
+
 enum OfferingType {
   PRODUCT
   MODULE
@@ -631,6 +636,7 @@ model Organization {
 
   users        User[]
   brandProfile BrandProfile?
+  gatekeeperRecoveryRequests GatekeeperRecoveryRequest[]
 
   @@map("organizations")
 }
@@ -664,6 +670,7 @@ model User {
   brandTeamMemberships BrandTeamMember[]
   triggeredNotifications Notification[] @relation("NotificationTriggerUser")
   notificationRecipients NotificationRecipient[]
+  gatekeeperRecoveryRequests GatekeeperRecoveryRequest[]
 
   @@index([organizationId])
   @@index([role])
@@ -697,6 +704,7 @@ model DiscoveryLead {
   waitlistLeads          WaitlistLead[]
   brandIntelligenceScan  BrandIntelligenceScan?
   intelligenceJobs       BrandIntelligenceJob[]
+  gatekeeperRecoveryRequests GatekeeperRecoveryRequest[]
 
   @@index([createdAt])
   @@index([userId])
@@ -726,6 +734,33 @@ model GatekeeperSubmissionAudit {
   @@index([userId])
   @@index([createdAt])
   @@map("gatekeeper_submission_audits")
+}
+
+/// Explicit user-initiated Gatekeeper recovery requests. These records do not
+/// grant organization access or change Gatekeeper admission/classification.
+model GatekeeperRecoveryRequest {
+  id                   String                         @id @default(uuid())
+  requestType          GatekeeperRecoveryRequestType @map("request_type")
+  discoveryLeadId      String?                        @map("discovery_lead_id")
+  discoveryLead        DiscoveryLead?                 @relation(fields: [discoveryLeadId], references: [id], onDelete: SetNull)
+  normalizedDomain     String                         @map("normalized_domain") @db.VarChar(255)
+  requesterEmail       String                         @map("requester_email") @db.VarChar(320)
+  requesterName        String?                        @map("requester_name") @db.VarChar(120)
+  requesterNote        String?                        @map("requester_note") @db.VarChar(1000)
+  requesterUserId      String?                        @map("requester_user_id")
+  requesterUser        User?                          @relation(fields: [requesterUserId], references: [id], onDelete: SetNull)
+  targetOrganizationId String?                        @map("target_organization_id")
+  targetOrganization   Organization?                  @relation(fields: [targetOrganizationId], references: [id], onDelete: SetNull)
+  sessionReference     String?                        @map("session_reference") @db.VarChar(255)
+  contextVersion       String                         @default("gatekeeper_recovery_context_v1") @map("context_version") @db.VarChar(64)
+  gatekeeperContext    Json                           @map("gatekeeper_context")
+  createdAt            DateTime                       @default(now()) @map("created_at")
+
+  @@unique([requestType, discoveryLeadId, requesterEmail], map: "uq_gatekeeper_recovery_request_actor")
+  @@index([requestType, createdAt])
+  @@index([targetOrganizationId, createdAt])
+  @@index([requesterUserId])
+  @@map("gatekeeper_recovery_requests")
 }
 
 /// Brand Intelligence pipeline state (Checkpoint 1 → Stage 1B → Brand DNA).
