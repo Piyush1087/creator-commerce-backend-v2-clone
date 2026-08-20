@@ -228,4 +228,3 @@ notes:
   - Existing /discovery/resolve and /discovery/validate contracts remain frontend-facing admission APIs unless later product authority changes them.
   - Provider connectivity, credentials and bounded technical retry remain Data Extraction responsibilities.
   - The legacy Identity gatekeeper validator must not require controlled taxonomy membership for provisional Gatekeeper Sub-industry.
-

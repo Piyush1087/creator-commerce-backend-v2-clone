@@ -62,4 +62,3 @@ forbidden_fields:
   - latency
 
 partial_output_allowed: false
-

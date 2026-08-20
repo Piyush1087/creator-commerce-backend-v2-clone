@@ -65,4 +65,3 @@ admission_resolution_invariants:
   - HARD_BLOCKED cannot expose ordinary self-service classification-review bypass.
   - CLASSIFICATION_UNCERTAIN represents semantic uncertainty, not provider/connection failure.
   - TECHNICAL_FAILURE represents exhausted technical execution, not semantic ambiguity.
-

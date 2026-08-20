@@ -133,4 +133,3 @@ gatekeeper_v1_readiness:
   rule: Do not resolve an OpenAI model until separately approved; Data Extraction must require Intelligence to supply it.
 
 non_goals: [Prompt construction, Global or processor-specific reasoning instructions, Evidence acquisition or normalization, Processor output schemas, Intelligence persistence mapping, Trigger policy, Provider secret storage]
-

@@ -48,4 +48,3 @@ boundary:
   final_admission_outcome: NOT_OWNED_BY_THIS_PROCESSOR
   recovery_actions: NOT_OWNED_BY_THIS_PROCESSOR
   manual_review_eligibility: NOT_OWNED_BY_THIS_PROCESSOR
-

@@ -24,4 +24,3 @@ prompt_builder_behavior:
   include_when: executor == ai
   placement: global_instruction_layer
   active_output_contract_required: true
-

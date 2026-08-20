@@ -126,4 +126,3 @@ migration_from_identity_test_taxonomy:
   D2C: D2C
   HEALTHCARE: HEALTHCARE
   note: identity_test used temporary Intelligence naming. Production Gatekeeper artifacts use IndustryVertical vocabulary; the legacy Identity Gatekeeper validator must not be applied to provisional Gatekeeper Sub-industry.
-

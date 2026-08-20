@@ -66,4 +66,3 @@ failure_policy:
   unknown_admission_critical_classification: semantic_uncertainty_signal_to_execution_profile
   insufficient_grounding: semantic_uncertainty_signal_to_execution_profile
   rule: The processor never manufactures a confident admission classification to avoid fallback or review.
-

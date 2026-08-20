@@ -24,4 +24,3 @@ prompt_builder_behavior:
   include_when: executor == ai
   placement: global_instruction_layer
   must_not_duplicate_processor_reasoning: true
-
