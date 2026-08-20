@@ -9,9 +9,19 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const pairs = [
-  ["src/features/brand-onboarding/prompts", "dist/features/brand-onboarding/prompts"],
+  [
+    "src/features/brand-onboarding/prompts",
+    "dist/features/brand-onboarding/prompts",
+  ],
   ["src/features/brand-centre/prompts", "dist/features/brand-centre/prompts"],
-  ["src/features/creator-onboarding/prompts", "dist/features/creator-onboarding/prompts"],
+  [
+    "src/features/creator-onboarding/prompts",
+    "dist/features/creator-onboarding/prompts",
+  ],
+  [
+    "src/features/brand-onboarding/gatekeeper/runtime/artifacts",
+    "dist/features/brand-onboarding/gatekeeper/runtime/artifacts",
+  ],
 ];
 
 const required = [
@@ -28,6 +38,12 @@ const required = [
   // Creator onboarding AI
   "dist/features/creator-onboarding/prompts/welcome-insight.prompt.md",
   "dist/features/creator-onboarding/prompts/handle-eligibility.prompt.md",
+  "dist/features/brand-onboarding/gatekeeper/runtime/artifacts/gatekeeper_scan.yaml",
+  "dist/features/brand-onboarding/gatekeeper/runtime/artifacts/gatekeeper_site_assessment/processor.yaml",
+  "dist/features/brand-onboarding/gatekeeper/runtime/artifacts/gatekeeper_site_assessment/reasoning.yaml",
+  "dist/features/brand-onboarding/gatekeeper/runtime/artifacts/gatekeeper_site_assessment/rules.yaml",
+  "dist/features/brand-onboarding/gatekeeper/runtime/artifacts/gatekeeper_site_assessment/output_contract.yaml",
+  "dist/features/brand-onboarding/gatekeeper/runtime/artifacts/taxonomy_contract.yaml",
 ];
 
 for (const [fromRel, toRel] of pairs) {
@@ -43,7 +59,9 @@ for (const [fromRel, toRel] of pairs) {
 
 for (const rel of required) {
   if (!existsSync(join(root, rel))) {
-    throw new Error(`copy-prompt-assets: required file missing after copy: ${rel}`);
+    throw new Error(
+      `copy-prompt-assets: required file missing after copy: ${rel}`,
+    );
   }
 }
 

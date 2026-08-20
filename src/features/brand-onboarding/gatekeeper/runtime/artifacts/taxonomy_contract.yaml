@@ -1,0 +1,129 @@
+id: admission_industry_taxonomy
+version: 1.2-frozen
+status: FROZEN
+scope: gatekeeper_and_onboarding_admission
+product_authority: intelligence/product_authority/gatekeeper_v1_product_execution_authority.md
+product_authority_amendment: intelligence/product_authority/gatekeeper_v1_industry_confirmation_amendment.md
+
+purpose: Align Creator Shop admission and Intelligence runtime with the production backend IndustryVertical enum without introducing another persisted Industry enum or forcing downstream Sub-industry taxonomy into Gatekeeper.
+
+source_of_truth:
+  backend_enum: IndustryVertical
+  production_repo_reference: creator-commerce-backend-v2-clone
+  prisma_path: prisma/schema.prisma
+  rule: Industry values used at application/admission boundaries must use IndustryVertical names exactly.
+
+industry_vertical_values:
+  supported: [D2C, SAAS_AI, HEALTHCARE, OFFLINE_SERVICES]
+  unsupported_waitlist_or_regret: [REAL_ESTATE, B2B_AGENCY, MEDIA, EDUCATION, ENTERTAINMENT, UNKNOWN]
+  hard_blocked: [GAMBLING, ADULT, FRAUDULENT_HIGH_RISK]
+
+legacy_application_enums:
+  BrandRoutingType:
+    role: legacy_or_specialized_application_routing
+    values: [D2C_SKINCARE, SAAS_PRODUCT, HEALTHCARE_TREATMENT, OFFLINE_EXPERIENCE]
+    rule: Do not use as Gatekeeper or Intelligence canonical Industry.
+  CollaborationIndustryType:
+    role: collaboration_domain_contract
+    values: [D2C_ECOMMERCE, HEALTHCARE_CLINICAL, AI_SAAS, OFFLINE_EXPERIENCES]
+    rule: Keep inside collaboration/UCE boundaries; translate from IndustryVertical where required by existing application code.
+
+alias_acceptance_at_ai_boundary:
+  AI_SAAS: SAAS_AI
+  SAAS: SAAS_AI
+  D2C_ECOMMERCE: D2C
+  ECOMMERCE: D2C
+  OFFLINE_EXPERIENCES: OFFLINE_SERVICES
+  OFFLINE_EXPERIENCE: OFFLINE_SERVICES
+  rule: Aliases may be accepted/normalized at provider boundaries, but canonical runtime/application output is always IndustryVertical.
+
+gatekeeper_industry:
+  field: provisional_industry
+  provenance_alias: assessed_industry
+  type: IndustryVertical|null
+  authority: PROVISIONAL_ADMISSION_CLASSIFICATION
+  rule: A Gatekeeper-produced Industry does not become reusable Brand Intelligence until the required confirmation boundary succeeds.
+
+gatekeeper_sub_industry:
+  field: provisional_sub_industry
+  type: provisional_free_text
+  admission_critical: false
+  max_role: explanatory_or_optional_downstream_hint
+  rule: Failure to fit a controlled Sub-industry must never reject an otherwise supported Industry.
+
+industry_confirmation:
+  supported_values: [D2C, SAAS_AI, HEALTHCARE, OFFLINE_SERVICES]
+  same_supported:
+    confirmation_source: AI_ASSESSED_ACCEPTED
+    disagreement_flag: false
+    surface_eligible: true
+  different_supported:
+    allowed_after_explicit_confirmation: true
+    confirmation_source: USER_CONFIRMED_OVERRIDE
+    disagreement_flag: true
+    operational_review_may_follow: true
+    manual_review_eligible_implied: false
+    request_classification_review_implied: false
+    surface_eligible: true
+    rule: This is not a Gatekeeper bypass; Gatekeeper already admitted the business into the supported serviceability set.
+  unsupported_or_coming_soon:
+    confirmation_source: USER_CONFIRMED_UNSUPPORTED
+    authoritative_outcome: UNSUPPORTED
+    surface_eligible: false
+    rule: Persist assessed and confirmed values for traceability; frontend must consume backend authority and must not manufacture UNSUPPORTED locally.
+
+confirmed_industry:
+  type: IndustryVertical
+  applies_after: gatekeeper_admission_and_required_confirmation
+  authority: USER_CONFIRMED_INDUSTRY_AUTHORITY
+  persistence_rule: Persist any explicit confirmation for traceability.
+  downstream_rule: Only a confirmed supported IndustryVertical becomes reusable Brand Intelligence and passes into Surface.
+
+review_concepts:
+  industry_disagreement_flag:
+    role: operational_marker
+    definition: true only when a different supported Industry is explicitly confirmed
+    blocks_surface: false
+  manual_review_eligible:
+    role: gatekeeper_recovery_property
+    definition: current admission outcome permits user-requested classification review
+    auto_queue: false
+  REQUEST_CLASSIFICATION_REVIEW:
+    role: explicit_user_recovery_action
+    implied_by_disagreement: false
+
+intelligence_sub_industry:
+  type: controlled_supported_industry_taxonomy
+  applies_after: supported_industry_admission_and_confirmation
+  purpose: stable downstream filtering, editing, matching and reporting
+  fallback_rule: Use parent-specific OTHER when no defined Sub-industry is a defensible fit.
+  expansion_rule: Expand taxonomy from observed OTHER/failure patterns without changing IndustryVertical.
+
+industry_niche:
+  type: evidence_grounded_free_text
+  admission_critical: false
+  rule: Carries useful specificity that should not be forced into the controlled Sub-industry taxonomy.
+
+validation:
+  gatekeeper:
+    provisional_industry_must_normalize_to_industry_vertical_when_non_null: true
+    supported_decision_derived_from_industry_vertical_bucket: true
+    provisional_sub_industry_taxonomy_membership_required: false
+  confirmation:
+    selected_industry_must_be_industry_vertical: true
+    supported_override_allowed_after_explicit_confirmation: true
+    supported_override_sets_industry_disagreement_flag: true
+    unsupported_confirmation_resolves_to_unsupported: true
+    unsupported_confirmation_blocks_surface: true
+  downstream_intelligence:
+    confirmed_industry_must_be_supported_industry_vertical: true
+    controlled_sub_industry_must_belong_to_confirmed_industry: true
+    industry_niche_may_be_null: true
+
+migration_from_identity_test_taxonomy:
+  AI_SAAS: SAAS_AI
+  OFFLINE_EXPERIENCES: OFFLINE_SERVICES
+  D2C: D2C
+  HEALTHCARE: HEALTHCARE
+  note: identity_test used temporary Intelligence naming. Production Gatekeeper artifacts use IndustryVertical vocabulary; the legacy Identity Gatekeeper validator must not be applied to provisional Gatekeeper Sub-industry.
+
