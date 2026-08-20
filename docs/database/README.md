@@ -105,6 +105,17 @@ Prompt A Brand DNA:
 Apply locally with `npm run db:migrate:dev` (name suggestion:
 `brand_intelligence_scans`). Deploy with `npm run db:migrate:deploy`.
 
+## Migration: `20260821120000_gatekeeper_recovery_requests`
+
+Adds the append-only `gatekeeper_recovery_requests` table for explicit
+`REQUEST_ORG_ACCESS` and `REQUEST_CLASSIFICATION_REVIEW` submissions. The table
+stores requester contact, normalized domain, optional user/session and target
+organization references, plus a versioned Gatekeeper decision snapshot.
+
+Retries are idempotent per request type, Discovery Lead and normalized
+requester email. Deleting a transient Discovery Lead sets its foreign key to
+null so the operational request and captured Gatekeeper context remain durable.
+
 ## Migration: `20260704120000_command_center_phase_alignment`
 
 - Command-center workspace phases on `uce_campaign_collaborations` (`current_phase`, `action_required_by_role`, `production_deadline_at`, `creator_profile_id`, `content_format_type`).

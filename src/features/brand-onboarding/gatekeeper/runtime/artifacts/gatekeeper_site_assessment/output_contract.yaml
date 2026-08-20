@@ -1,0 +1,64 @@
+id: gatekeeper_site_assessment_output_contract
+version: 1.0-frozen
+status: FROZEN
+processor: gatekeeper_site_assessment
+strict: true
+additional_properties: false
+
+fields:
+  provisional_industry:
+    type: IndustryVertical|null
+    nullable: true
+    semantic_meaning: Provisional Gatekeeper Industry classification used for admission routing and later confirmation; not reusable Brand Intelligence until confirmed.
+    authority_category: REUSABLE_INTELLIGENCE_CANDIDATE
+  provisional_sub_industry:
+    type: string|null
+    nullable: true
+    semantic_meaning: Short grounded free-form explanatory hint; never controlled downstream Sub-industry authority.
+    authority_category: EVIDENCE_DERIVED_SIGNAL
+  entity_category:
+    type: enum
+    values: [BRAND, MARKETPLACE, CREATOR_MARKETING_PLATFORM, NON_COMMERCIAL_ENTITY, UNKNOWN]
+    nullable: false
+    semantic_meaning: Minimal entity category required for Gatekeeper serviceability reasoning.
+    authority_category: EVIDENCE_DERIVED_SIGNAL
+  english_evidence_status:
+    type: enum
+    values: [SUFFICIENT, INSUFFICIENT, UNCERTAIN]
+    nullable: false
+    semantic_meaning: Whether sufficient English Evidence exists to support automated Intelligence onboarding.
+    authority_category: EVIDENCE_DERIVED_SIGNAL
+  creator_marketing_applicability:
+    type: enum
+    values: [APPLICABLE, NOT_APPLICABLE, UNCERTAIN]
+    nullable: false
+    semantic_meaning: Whether creator-led discovery, trust, consideration, or acquisition can meaningfully support this business.
+    authority_category: EVIDENCE_DERIVED_SIGNAL
+  commercial_destination_types:
+    type: array
+    nullable: false
+    min_items: 0
+    unique_items: true
+    item_enum: [WEBSITE, APP_STORE, PLAY_STORE, DIRECT_APK, LEAD_GENERATION, BOOKING, OFFLINE_LOCATION, SALES_CONTACT, MULTI_DESTINATION]
+    semantic_meaning: Externally evidenced commercial or conversion destination modes relevant to serviceability; empty only when unresolved.
+    authority_category: EVIDENCE_DERIVED_SIGNAL
+  assessment_confidence:
+    type: enum
+    values: [HIGH, MEDIUM, LOW]
+    nullable: false
+    semantic_meaning: Semantic confidence in the Gatekeeper site assessment, interpreted according to reasoning/rules rather than numeric thresholds.
+    authority_category: ADMISSION_METADATA
+
+forbidden_fields:
+  - admission_outcome
+  - outcome
+  - reason_code
+  - recovery_actions
+  - manual_review_eligible
+  - manual_review_required
+  - provider
+  - model
+  - token_usage
+  - latency
+
+partial_output_allowed: false
