@@ -9,9 +9,9 @@ CREATE TYPE "BrandPreviewPhase" AS ENUM ('UNDERSTANDING_BRAND', 'LEARNING_AUDIEN
 
 -- CreateTable
 CREATE TABLE "brand_preview_runs" (
-    "brand_preview_run_id" UUID NOT NULL,
-    "discovery_lead_id" UUID NOT NULL,
-    "brand_profile_id" UUID,
+    "brand_preview_run_id" TEXT NOT NULL,
+    "discovery_lead_id" TEXT NOT NULL,
+    "brand_profile_id" TEXT,
     "attempt" INTEGER NOT NULL DEFAULT 1,
     "state" "BrandPreviewRuntimeState" NOT NULL DEFAULT 'ANALYSIS_ACTIVE',
     "phase" "BrandPreviewPhase",
@@ -37,4 +37,4 @@ CREATE INDEX "brand_preview_runs_state_lease_expires_at_idx" ON "brand_preview_r
 CREATE INDEX "brand_preview_runs_brand_profile_id_idx" ON "brand_preview_runs"("brand_profile_id");
 
 ALTER TABLE "brand_preview_runs" ADD CONSTRAINT "brand_preview_runs_discovery_lead_id_fkey" FOREIGN KEY ("discovery_lead_id") REFERENCES "discovery_leads"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "brand_preview_runs" ADD CONSTRAINT "brand_preview_runs_brand_profile_id_fkey" FOREIGN KEY ("brand_profile_id") REFERENCES "brand_profiles"("brand_profile_id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "brand_preview_runs" ADD CONSTRAINT "brand_preview_runs_brand_profile_id_fkey" FOREIGN KEY ("brand_profile_id") REFERENCES "brand_profiles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
