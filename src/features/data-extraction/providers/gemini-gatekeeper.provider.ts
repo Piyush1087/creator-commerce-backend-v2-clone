@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { ZodType } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -12,6 +12,10 @@ import {
 import { withBoundedTechnicalRetry } from "../utils/provider-retry.util";
 
 const CAPABILITY_ID = "gatekeeper_primary_web_assessment";
+/** Max chars of model text kept in diagnostic logs (no full payload dump). */
+const SAFE_RAW_PREVIEW_CHARS = 96;
+/** Cap Zod issue rows so logs stay readable. */
+const SAFE_ZOD_ISSUE_LIMIT = 20;
 
 type GeminiInteractionStep = {
   type?: string;
@@ -23,6 +27,7 @@ type GeminiInteractionStep = {
   }>;
   content?: Array<{
     type?: string;
+    mime_type?: string;
     text?: string;
     annotations?: Array<{
       type?: string;
@@ -70,6 +75,87 @@ function interactionOutputText(response: GeminiInteractionLike): string {
   );
 }
 
+function interactionStepSummary(response: GeminiInteractionLike): {
+  stepCount: number;
+  stepTypes: string[];
+  modelOutputTextBlocks: number;
+  urlContextErrors: number;
+  searchErrors: number;
+} {
+  const steps = response.steps ?? [];
+  return {
+    stepCount: steps.length,
+    stepTypes: steps.map((step) => step.type ?? "unknown"),
+    modelOutputTextBlocks: steps
+      .filter((step) => step.type === "model_output")
+      .flatMap((step) => step.content ?? [])
+      .filter((content) => content.type === "text" && Boolean(content.text?.trim()))
+      .length,
+    urlContextErrors: steps.filter(
+      (step) => step.type === "url_context_result" && step.is_error,
+    ).length,
+    searchErrors: steps.filter(
+      (step) => step.type === "google_search_result" && step.is_error,
+    ).length,
+  };
+}
+
+/** Safe preview for diagnosing STRUCTURED_OUTPUT_INVALID — never logs secrets or full body. */
+function safeRawTextDiagnostics(rawText: string): {
+  rawLength: number;
+  startsWithJson: boolean;
+  looksLikeMarkdownFence: boolean;
+  preview: string;
+} {
+  const trimmed = rawText.trim();
+  return {
+    rawLength: rawText.length,
+    startsWithJson: trimmed.startsWith("{") || trimmed.startsWith("["),
+    looksLikeMarkdownFence: trimmed.startsWith("```"),
+    preview: trimmed.slice(0, SAFE_RAW_PREVIEW_CHARS).replace(/\s+/g, " "),
+  };
+}
+
+/**
+ * Gemini sometimes wraps structured output in ```json ... ``` fences.
+ * Strip a single leading/trailing fence so JSON.parse can succeed.
+ */
+function stripMarkdownJsonFence(rawText: string): {
+  text: string;
+  strippedFence: boolean;
+} {
+  const trimmed = rawText.trim();
+  const fenced = trimmed.match(/^```(?:json|JSON)?\s*\r?\n?([\s\S]*?)\r?\n?```\s*$/);
+  if (fenced?.[1] !== undefined) {
+    return { text: fenced[1].trim(), strippedFence: true };
+  }
+  // Partial / messy fence: drop opening ```json line and closing ``` if present.
+  if (trimmed.startsWith("```")) {
+    const withoutOpen = trimmed.replace(/^```(?:json|JSON)?\s*\r?\n?/, "");
+    const withoutClose = withoutOpen.replace(/\r?\n?```\s*$/, "");
+    if (withoutClose !== trimmed) {
+      return { text: withoutClose.trim(), strippedFence: true };
+    }
+  }
+  return { text: trimmed, strippedFence: false };
+}
+
+function safeZodIssueDiagnostics(error: {
+  issues: Array<{ path: PropertyKey[]; code: string; message: string }>;
+}): Array<{ path: string; code: string; message: string }> {
+  return error.issues.slice(0, SAFE_ZOD_ISSUE_LIMIT).map((issue) => ({
+    path: issue.path.map(String).join(".") || "(root)",
+    code: issue.code,
+    // Truncate — Zod messages can embed received values.
+    message: issue.message.slice(0, 160),
+  }));
+}
+
+function topLevelKeys(value: unknown): string[] | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return Object.keys(value as Record<string, unknown>).slice(0, 40);
+}
+
 function comparableUrl(value: string): string {
   try {
     const url = new URL(value);
@@ -88,6 +174,8 @@ function searchSuggestionUrls(value: string): string[] {
 
 @Injectable()
 export class GeminiGatekeeperProvider {
+  private readonly logger = new Logger(GeminiGatekeeperProvider.name);
+
   constructor(private readonly config: ConfigService) {}
 
   async execute<T>(args: {
@@ -177,8 +265,17 @@ export class GeminiGatekeeperProvider {
       });
 
       attemptCount = execution.attemptCount;
+      const stepSummary = interactionStepSummary(execution.value);
       const rawText = interactionOutputText(execution.value);
       if (!rawText) {
+        this.logger.warn({
+          msg: "gatekeeper.gemini.structured_output_diagnostic",
+          failureKind: "EMPTY_MODEL_TEXT",
+          acquisitionRunId: args.acquisitionRunId,
+          modelId: args.modelId,
+          attemptCount,
+          ...stepSummary,
+        });
         throw new DataExtractionProviderError({
           code: "EMPTY_RESULT",
           provider: "GOOGLE_GEMINI",
@@ -191,10 +288,38 @@ export class GeminiGatekeeperProvider {
         });
       }
 
+      const { text: jsonText, strippedFence } = stripMarkdownJsonFence(rawText);
+      if (strippedFence) {
+        this.logger.warn({
+          msg: "gatekeeper.gemini.structured_output_diagnostic",
+          failureKind: "MARKDOWN_FENCE_STRIPPED",
+          acquisitionRunId: args.acquisitionRunId,
+          modelId: args.modelId,
+          attemptCount,
+          ...safeRawTextDiagnostics(rawText),
+          strippedLength: jsonText.length,
+          ...stepSummary,
+        });
+      }
+
       let parsed: unknown;
       try {
-        parsed = JSON.parse(rawText);
-      } catch {
+        parsed = JSON.parse(jsonText);
+      } catch (parseError) {
+        this.logger.warn({
+          msg: "gatekeeper.gemini.structured_output_diagnostic",
+          failureKind: "JSON_PARSE",
+          acquisitionRunId: args.acquisitionRunId,
+          modelId: args.modelId,
+          attemptCount,
+          strippedFence,
+          parseError:
+            parseError instanceof Error
+              ? parseError.message.slice(0, 160)
+              : "unknown",
+          ...safeRawTextDiagnostics(rawText),
+          ...stepSummary,
+        });
         throw new DataExtractionProviderError({
           code: "STRUCTURED_OUTPUT_INVALID",
           provider: "GOOGLE_GEMINI",
@@ -209,6 +334,18 @@ export class GeminiGatekeeperProvider {
 
       const validated = args.outputSchema.safeParse(parsed);
       if (!validated.success) {
+        this.logger.warn({
+          msg: "gatekeeper.gemini.structured_output_diagnostic",
+          failureKind: "SCHEMA_VALIDATION",
+          acquisitionRunId: args.acquisitionRunId,
+          modelId: args.modelId,
+          attemptCount,
+          topLevelKeys: topLevelKeys(parsed),
+          issueCount: validated.error.issues.length,
+          issues: safeZodIssueDiagnostics(validated.error),
+          ...safeRawTextDiagnostics(rawText),
+          ...stepSummary,
+        });
         throw new DataExtractionProviderError({
           code: "STRUCTURED_OUTPUT_INVALID",
           provider: "GOOGLE_GEMINI",

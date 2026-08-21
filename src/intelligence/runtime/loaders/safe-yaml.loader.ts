@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import YAML from "yaml";
+import { parse as parseYaml } from "yaml";
 
 export class RuntimeConfigError extends Error {
   constructor(
@@ -38,7 +38,7 @@ export class SafeYamlLoader {
   async load<T = unknown>(relativePath: string): Promise<T> {
     try {
       const text = await fs.readFile(this.resolve(relativePath), "utf8");
-      return YAML.parse(text) as T;
+      return parseYaml(text) as T;
     } catch (error) {
       if (error instanceof RuntimeConfigError) throw error;
       throw new RuntimeConfigError(

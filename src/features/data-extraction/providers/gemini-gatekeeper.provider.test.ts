@@ -105,6 +105,23 @@ describe("GeminiGatekeeperProvider", () => {
     expect(createInteraction).toHaveBeenCalledTimes(1);
   });
 
+  it("parses structured output wrapped in a markdown json fence", async () => {
+    createInteraction.mockResolvedValue(
+      response({
+        owned: true,
+        search: true,
+        text: "```json\n{\"ok\":true}\n```",
+      }),
+    );
+    const provider = new GeminiGatekeeperProvider(
+      config({ GEMINI_API_KEY: "test-key" }),
+    );
+
+    const result = await execute(provider);
+    expect(result.payload).toEqual({ ok: true });
+    expect(createInteraction).toHaveBeenCalledTimes(1);
+  });
+
   it("normalizes schema failure as STRUCTURED_OUTPUT_INVALID without retrying", async () => {
     createInteraction.mockResolvedValue(
       response({ text: JSON.stringify({ ok: "yes" }) }),

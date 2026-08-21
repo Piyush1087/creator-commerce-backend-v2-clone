@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
 import {
@@ -65,6 +65,7 @@ function evidenceRefs(provenance: EvidenceProvenance[]): string[] {
 
 @Injectable()
 export class GatekeeperRuntimeOrchestratorService {
+  private readonly logger = new Logger(GatekeeperRuntimeOrchestratorService.name);
   private readonly telemetry: GatekeeperTelemetryPort;
 
   constructor(
@@ -230,6 +231,19 @@ export class GatekeeperRuntimeOrchestratorService {
             result.payload,
           );
           if (!structural.success) {
+            this.logger.warn({
+              msg: "gatekeeper.orchestrator.structured_output_diagnostic",
+              failureKind: "ORCHESTRATOR_SCHEMA_VALIDATION",
+              stage: args.stage,
+              executionId: args.executionId,
+              modelId: args.modelId,
+              issueCount: structural.error.issues.length,
+              issues: structural.error.issues.slice(0, 20).map((issue) => ({
+                path: issue.path.map(String).join(".") || "(root)",
+                code: issue.code,
+                message: issue.message.slice(0, 160),
+              })),
+            });
             captured = {
               assessment: null,
               state: "TECHNICAL_FAILURE",
@@ -276,6 +290,23 @@ export class GatekeeperRuntimeOrchestratorService {
             error instanceof DataExtractionProviderError
               ? error.detail
               : { code: "PROVIDER_ERROR", message: String(error) };
+          if (
+            detail.code === "STRUCTURED_OUTPUT_INVALID" ||
+            detail.code === "EMPTY_RESULT"
+          ) {
+            this.logger.warn({
+              msg: "gatekeeper.orchestrator.structured_output_diagnostic",
+              failureKind: "PROVIDER_THREW",
+              stage: args.stage,
+              executionId: args.executionId,
+              modelId: args.modelId,
+              providerCode: detail.code,
+              providerMessage:
+                typeof detail.message === "string"
+                  ? detail.message.slice(0, 200)
+                  : "unknown",
+            });
+          }
           captured = {
             assessment: null,
             state: "TECHNICAL_FAILURE",
