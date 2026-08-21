@@ -97,13 +97,16 @@ export class GeminiGatekeeperProvider {
     instruction: string;
     outputSchema: ZodType<T>;
     timeoutMs?: number;
+    capabilityId?: string;
+    maxAttempts?: number;
   }): Promise<ProviderEvidenceResult<T>> {
+    const capabilityId = args.capabilityId ?? CAPABILITY_ID;
     const apiKey = this.config.get<string>("GEMINI_API_KEY", "").trim();
     if (!apiKey) {
       throw new DataExtractionProviderError({
         code: "CONFIGURATION_ERROR",
         provider: "GOOGLE_GEMINI",
-        capabilityId: CAPABILITY_ID,
+        capabilityId,
         modelId: args.modelId,
         message: "GEMINI_API_KEY is not configured",
         retryable: false,
@@ -117,10 +120,9 @@ export class GeminiGatekeeperProvider {
     const timeoutMs =
       args.timeoutMs ??
       this.config.get<number>("GEMINI_REQUEST_TIMEOUT_MS", 120_000);
-    const maxAttempts = this.config.get<number>(
-      "DATA_EXTRACTION_PROVIDER_MAX_ATTEMPTS",
-      3,
-    );
+    const maxAttempts =
+      args.maxAttempts ??
+      this.config.get<number>("DATA_EXTRACTION_PROVIDER_MAX_ATTEMPTS", 3);
     const client = new GoogleGenAI({ apiKey });
     const jsonSchema = zodToJsonSchema(args.outputSchema, {
       target: "openApi3",
@@ -182,7 +184,7 @@ export class GeminiGatekeeperProvider {
         throw new DataExtractionProviderError({
           code: "EMPTY_RESULT",
           provider: "GOOGLE_GEMINI",
-          capabilityId: CAPABILITY_ID,
+          capabilityId,
           modelId: args.modelId,
           message: "Gemini returned an empty assessment",
           retryable: false,
@@ -198,7 +200,7 @@ export class GeminiGatekeeperProvider {
         throw new DataExtractionProviderError({
           code: "STRUCTURED_OUTPUT_INVALID",
           provider: "GOOGLE_GEMINI",
-          capabilityId: CAPABILITY_ID,
+          capabilityId,
           modelId: args.modelId,
           message: "Gemini grounded assessment was not valid JSON",
           retryable: false,
@@ -212,7 +214,7 @@ export class GeminiGatekeeperProvider {
         throw new DataExtractionProviderError({
           code: "STRUCTURED_OUTPUT_INVALID",
           provider: "GOOGLE_GEMINI",
-          capabilityId: CAPABILITY_ID,
+          capabilityId,
           modelId: args.modelId,
           message: "Gemini grounded assessment failed structural validation",
           retryable: false,
@@ -293,7 +295,7 @@ export class GeminiGatekeeperProvider {
       const completed = Date.now();
 
       return {
-        capabilityId: CAPABILITY_ID,
+        capabilityId,
         acquisitionRunId: args.acquisitionRunId,
         availability: complete ? "AVAILABLE" : "PARTIALLY_AVAILABLE",
         quality: complete ? "VALID" : "DEGRADED",
@@ -303,7 +305,7 @@ export class GeminiGatekeeperProvider {
         connectionState: complete ? "CONNECTED" : "DEGRADED",
         telemetry: {
           acquisitionRunId: args.acquisitionRunId,
-          capabilityId: CAPABILITY_ID,
+          capabilityId,
           provider: "GOOGLE_GEMINI",
           modelId: args.modelId,
           startedAt,
@@ -331,7 +333,7 @@ export class GeminiGatekeeperProvider {
       throw new DataExtractionProviderError({
         code,
         provider: "GOOGLE_GEMINI",
-        capabilityId: CAPABILITY_ID,
+        capabilityId,
         modelId: args.modelId,
         message: `Gemini capability execution failed (${code})`,
         retryable: false,

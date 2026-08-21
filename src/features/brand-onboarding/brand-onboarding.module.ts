@@ -65,6 +65,18 @@ import { GatekeeperArtifactLoader } from "./gatekeeper/runtime/gatekeeper-artifa
 import { GatekeeperPromptService } from "./gatekeeper/runtime/gatekeeper-prompt.service";
 import { GatekeeperRuntimeOrchestratorService } from "./gatekeeper/runtime/gatekeeper-runtime-orchestrator.service";
 import { GatekeeperTelemetryService } from "./gatekeeper/runtime/gatekeeper-telemetry.service";
+import { BrandPreviewRunService } from "./brand-preview/brand-preview-run.service";
+import { BrandPreviewWebsiteEvidenceService } from "./brand-preview/data-extraction/brand-preview-evidence.service";
+import { BrandPreviewPublicWebEnrichmentService } from "./brand-preview/data-extraction/brand-preview-enrichment.service";
+import { BrandPreviewArtifactLoader } from "./brand-preview/runtime/brand-preview-artifact.loader";
+import { BrandPreviewPromptService } from "./brand-preview/runtime/brand-preview-prompt.service";
+import { BrandPreviewSynthesisService } from "./brand-preview/runtime/brand-preview-synthesis.service";
+import { BrandPreviewRuntimeService } from "./brand-preview/runtime/brand-preview-runtime.service";
+import { BrandPreviewWorkerService } from "./brand-preview/runtime/brand-preview-worker.service";
+import {
+  BRAND_PREVIEW_PUBLIC_WEB_ENRICHMENT,
+  BRAND_PREVIEW_WEBSITE_EVIDENCE,
+} from "./brand-preview/data-extraction/brand-preview-evidence.port";
 
 @Module({
   imports: [
@@ -100,6 +112,22 @@ import { GatekeeperTelemetryService } from "./gatekeeper/runtime/gatekeeper-tele
     GatekeeperPromptService,
     GatekeeperRuntimeOrchestratorService,
     GatekeeperTelemetryService,
+    BrandPreviewRunService,
+    BrandPreviewWebsiteEvidenceService,
+    BrandPreviewPublicWebEnrichmentService,
+    {
+      provide: BRAND_PREVIEW_WEBSITE_EVIDENCE,
+      useExisting: BrandPreviewWebsiteEvidenceService,
+    },
+    {
+      provide: BRAND_PREVIEW_PUBLIC_WEB_ENRICHMENT,
+      useExisting: BrandPreviewPublicWebEnrichmentService,
+    },
+    BrandPreviewArtifactLoader,
+    BrandPreviewPromptService,
+    BrandPreviewSynthesisService,
+    BrandPreviewRuntimeService,
+    BrandPreviewWorkerService,
     DataExtractionGatekeeperAdapter,
     {
       provide: GATEKEEPER_CAPABILITY_PORT,

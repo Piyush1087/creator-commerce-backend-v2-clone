@@ -1,0 +1,223 @@
+id: brand_preview_synthesis_output_contract
+version: 1.0-frozen
+status: FROZEN
+processor: brand_preview_synthesis
+strict: true
+additional_properties: false
+minimum_output_authority: intelligence/engines/brand_intelligence/brand_preview_minimum_output_contract.yaml
+
+fields:
+  brand_descriptor:
+    type: string|null
+    nullable: true
+    required: true
+    semantic_class: DERIVED_PRESENTATION_OUTPUT
+    constraints:
+      max_words: 14
+      max_characters: 90
+    null_rule: null is valid when no concise descriptor can be grounded.
+
+  brand_understanding_narrative:
+    type: string
+    nullable: false
+    required: true
+    semantic_class: DERIVED_PRESENTATION_OUTPUT
+    constraints:
+      minimum_words: 30
+      maximum_words: 90
+      sentences_min: 2
+      sentences_max: 3
+      paragraphs: 1
+    grounding_required: true
+
+  internal_trace:
+    type: object
+    required: true
+    ui_exposed: false
+    additional_properties: false
+    fields:
+      brand_descriptor:
+        type: object|null
+        nullable: true
+        required: true
+        null_when: brand_descriptor == null
+        fields:
+          internal_grounding_refs:
+            type: array
+            required: true
+            min_items: 1
+            unique_items: true
+            item_type: string
+          internal_confidence:
+            type: enum
+            required: true
+            values: [HIGH, MEDIUM, LOW]
+      brand_understanding_narrative:
+        type: object
+        required: true
+        fields:
+          internal_grounding_refs:
+            type: array
+            required: true
+            min_items: 1
+            unique_items: true
+            item_type: string
+          internal_confidence:
+            type: enum
+            required: true
+            values: [HIGH, MEDIUM, LOW]
+
+  audience_groups:
+    type: array
+    nullable: false
+    required: true
+    min_items: 1
+    max_items: 3
+    unique_by: id
+    semantic_class: DERIVED_PRESENTATION_OUTPUT
+    item:
+      additional_properties: false
+      fields:
+        id: {type: string, required: true, min_length: 1, max_length: 80}
+        label:
+          type: string
+          required: true
+          max_characters: 38
+        why_it_matters:
+          type: string
+          required: true
+          max_words: 40
+          max_characters: 240
+          sentences_max: 2
+        internal_grounding_refs:
+          type: array
+          required: true
+          min_items: 1
+          unique_items: true
+          item_type: string
+        internal_confidence:
+          type: enum
+          required: true
+          values: [HIGH, MEDIUM, LOW]
+
+  creator_marketing_opportunities:
+    type: array
+    nullable: false
+    required: true
+    min_items: 1
+    max_items: 3
+    semantic_class: DERIVED_PRESENTATION_OUTPUT
+    item:
+      additional_properties: false
+      fields:
+        title:
+          type: string
+          required: true
+          max_characters: 55
+        why_it_matters:
+          type: string
+          required: true
+          max_words: 48
+          max_characters: 290
+          sentences_max: 2
+        internal_grounding_refs:
+          type: array
+          required: true
+          min_items: 1
+          unique_items: true
+          item_type: string
+        internal_confidence:
+          type: enum
+          required: true
+          values: [HIGH, MEDIUM, LOW]
+
+  creator_archetype_recommendations:
+    type: array
+    nullable: false
+    required: true
+    min_items: 1
+    max_items: 4
+    unique_by: archetype_id
+    semantic_class: DERIVED_PRESENTATION_OUTPUT
+    item:
+      additional_properties: false
+      fields:
+        archetype_id:
+          type: canonical_creator_archetype_id
+          required: true
+          candidate_source: campaign/canonical/creator_archetypes.yaml
+        rationale:
+          type: string
+          required: true
+          max_words: 34
+          max_characters: 220
+          sentences: 1
+        internal_grounding_refs:
+          type: array
+          required: true
+          min_items: 1
+          unique_items: true
+          item_type: string
+        internal_confidence:
+          type: enum
+          required: true
+          values: [HIGH, MEDIUM, LOW]
+
+forbidden_output_fields:
+  - confirmed_industry_reclassification
+  - archetype_label
+  - campaign_name
+  - deliverables
+  - budget
+  - creator_count
+  - follower_tier
+  - channel_plan
+  - confidence_percentage
+  - provider
+  - model
+  - chain_of_thought
+
+structural_validation:
+  malformed_json: INVALID
+  missing_required_field: INVALID
+  invalid_type: INVALID
+  excess_cardinality: INVALID
+  additional_property: INVALID
+  empty_required_grounding_refs: INVALID
+
+semantic_validation:
+  confirmed_industry_may_be_overwritten: false
+  audience_must_be_grounded_hypothesis: true
+  opportunities_must_not_be_campaign_configuration: true
+  archetype_id_must_exist_and_be_active: true
+  archetype_ids_unique: true
+  unsupported_claims_forbidden: true
+  duplicate_or_materially_overlapping_items_forbidden: true
+  healthcare_treatment_or_outcome_promises_forbidden: true
+  grounding_refs_must_resolve_to_runtime_evidence: true
+  descriptor_trace_required_when_descriptor_present: true
+  narrative_trace_required: true
+
+post_validation_projection:
+  archetype_label:
+    source: campaign/canonical/creator_archetypes.yaml
+    derivation: deterministic_from_archetype_id
+    model_supplied_label_accepted: false
+
+item_pruning:
+  allowed: true
+  only_when:
+    - individual_list_item_semantically_invalid
+    - individual_list_item_duplicate
+    - individual_list_item_ungrounded
+  prohibited_behavior: replace_dropped_item_with_filler
+  required_followup: deterministic_readiness_evaluation
+
+readiness_floor_after_pruning:
+  brand_understanding_narrative: 1
+  audience_groups: 1
+  creator_marketing_opportunities: 1
+  creator_archetype_recommendations: 1
+
+producer_constraint_rule: >-
+  Every valid output must already satisfy the frozen frontend length/cardinality limits. Frontend truncation or rewriting is not part of the validity path.

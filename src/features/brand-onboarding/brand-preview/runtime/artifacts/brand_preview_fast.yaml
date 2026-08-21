@@ -1,0 +1,281 @@
+id: brand_preview_fast
+version: 1.0-frozen
+status: FROZEN
+scope: post_gatekeeper_preverification_brand_preview
+owner: intelligence_engine
+
+purpose: >-
+  Execute the minimum Fast Brand Analysis required to produce a truthful Brand Preview after Gatekeeper admission and confirmed supported Industry, without waiting for downstream Intelligence domains.
+
+authority:
+  product: intelligence/product_authority/brand_onboarding_v1_product_authority.md
+  minimum_output: intelligence/engines/brand_intelligence/brand_preview_minimum_output_contract.yaml
+  evidence_design: data_extraction/brand_preview_fast_evidence_acquisition_design.md
+  synthesis_processor: intelligence/engines/brand_intelligence/processors/brand_preview_synthesis/processor.yaml
+
+preconditions:
+  gatekeeper_outcome: ADMITTED
+  confirmed_industry_in: [D2C, SAAS_AI, HEALTHCARE, OFFLINE_SERVICES]
+  identity_required: [brand_name, website_url]
+  terminal_if_precondition_lost: PREVIEW_NOT_READY
+
+shared_runtime:
+  compiler: REUSE
+  prompt_builder: REUSE
+  model_registry_resolver: REUSE
+  artifact_loader: REUSE
+  evidence_boundary: REUSE
+  structural_validation: REUSE
+  semantic_validation: REUSE
+  telemetry: REUSE
+  execution_profile_handling: REUSE
+  brand_preview_specific_runtime_stack: forbidden
+
+stages:
+  - id: preview_precheck
+    kind: DETERMINISTIC
+    required: true
+    responsibilities:
+      - verify Gatekeeper ADMITTED
+      - verify confirmed supported Industry
+      - verify required Identity inputs
+    terminal_failure: PREVIEW_NOT_READY
+
+  - id: request_first_party_preview_evidence
+    kind: EVIDENCE_REQUEST
+    requested_capability: brand_preview.website_evidence
+    required: true
+    dependencies: [preview_precheck]
+    provider_selection_owner: DATA_EXTRACTION
+    intelligence_forbidden_mechanics: [DIRECT_HTTP, CHEERIO, ZYTE_HTTP, ZYTE_RENDERED]
+
+  - id: evaluate_evidence_attempt_gate
+    kind: DETERMINISTIC
+    required: true
+    dependencies: [request_first_party_preview_evidence]
+    input: brand_preview.website_evidence.sufficient_for_preview_synthesis_attempt
+    when_false: evaluate_semantic_enrichment_eligibility_before_first_synthesis
+
+  - id: synthesize_preview
+    kind: AI
+    processor_id: brand_preview_synthesis
+    required: true
+    dependencies: [evaluate_evidence_attempt_gate]
+    model_profile: brand_preview_fast_reasoning
+    output_contract: intelligence/engines/brand_intelligence/processors/brand_preview_synthesis/output_contract.yaml
+
+  - id: validate_and_prune_preview
+    kind: DETERMINISTIC_VALIDATION
+    required: true
+    dependencies: [synthesize_preview]
+    order:
+      - structural_validation
+      - semantic_validation
+      - drop_individually_invalid_duplicate_or_ungrounded_optional_list_items_when_safe
+      - deterministic_archetype_label_resolution
+    invalid_output_persistable: false
+
+  - id: evaluate_preview_readiness
+    kind: DETERMINISTIC_READINESS
+    required: true
+    dependencies: [validate_and_prune_preview]
+    authority: intelligence/engines/brand_intelligence/brand_preview_minimum_output_contract.yaml#readiness_contract
+    outcomes:
+      - {state: PREVIEW_READY, completeness: NORMAL}
+      - {state: PREVIEW_READY, completeness: PARTIAL}
+      - {state: PREVIEW_NOT_READY, completeness: null}
+      - {state: PREVIEW_FAILED_RECOVERABLE, completeness: null}
+
+  - id: request_bounded_public_web_enrichment
+    kind: EVIDENCE_REQUEST
+    requested_capability: brand_preview.public_web_enrichment
+    required: false
+    run_when: semantic_insufficiency_is_enrichment_eligible
+    max_runs_per_preview_run: 1
+    provider_execution_owner: DATA_EXTRACTION
+
+  - id: resynthesize_after_enrichment
+    kind: AI
+    processor_id: brand_preview_synthesis
+    required: false
+    run_when: request_bounded_public_web_enrichment_succeeded
+    max_runs_per_preview_run: 1
+    model_profile: brand_preview_fast_reasoning
+    required_followup: [validate_and_prune_preview, evaluate_preview_readiness]
+
+readiness_evaluator:
+  id: deterministic_brand_preview_readiness
+  owner: INTELLIGENCE_ENGINE_SEMANTICS
+  implementation_kind: DETERMINISTIC
+  backend_may_redefine: false
+  ready_requirements:
+    gatekeeper_outcome: ADMITTED
+    confirmed_supported_industry: true
+    identity:
+      brand_name: required
+      website_url: required
+      display_domain: derivable
+      confirmed_industry: required
+    synthesis:
+      valid_grounded_brand_understanding_narrative: required
+      valid_audience_groups_min: 1
+      valid_creator_marketing_opportunities_min: 1
+      valid_canonical_archetype_recommendations_min: 1
+      producer_constraints_pass: true
+      required_internal_grounding_pass: true
+  completeness:
+    NORMAL:
+      output: {state: PREVIEW_READY, completeness: NORMAL}
+      indicative:
+        brand_descriptor_present: true
+        audience_groups: [2, 3]
+        creator_marketing_opportunities: [2, 3]
+        creator_archetype_recommendations: [2, 4]
+    PARTIAL:
+      output: {state: PREVIEW_READY, completeness: PARTIAL}
+      rule: All hard minimums pass but optional output or normal target density is missing.
+  not_ready:
+    output: {state: PREVIEW_NOT_READY, completeness: null}
+    use_for: semantic insufficiency or lost/non-satisfied mandatory Preview meaning when no eligible enrichment remains.
+  failed_recoverable:
+    output: {state: PREVIEW_FAILED_RECOVERABLE, completeness: null}
+    use_for: exhausted recoverable technical/runtime failure while semantic eligibility remains otherwise valid.
+
+semantic_enrichment_policy:
+  capability_id: brand_preview.public_web_enrichment
+  conceptual_provider_capability: Gemini_URL_Context_plus_public_web
+  separate_from_website_evidence: true
+  automatic_data_extraction_fallback: false
+  eligibility_all:
+    - gatekeeper_admitted_and_confirmed_industry_still_valid
+    - first_party_preview_evidence_path_completed
+    - at_least_one_mandatory_semantic_output_cannot_be_grounded_or_evidence_attempt_gate_is_false
+    - weakness_plausibly_caused_by_missing_external_context
+    - no_admission_critical_contradictory_evidence_requiring_other_resolution
+    - enrichment_not_previously_attempted_for_current_preview_run
+  examples:
+    - app_first_brand_with_sparse_site
+    - legitimate_thin_website
+    - relevant_public_company_offering_or_use_context_exists
+  forbidden_reasons:
+    - increase_audience_count_from_1_to_3
+    - increase_opportunity_count_from_1_to_3
+    - maximize_archetype_count
+    - override_confirmed_industry
+    - complete_Product_Competitor_Instagram_Performance_or_Campaign_Intelligence
+  max_enrichment_rounds: 1
+  max_resynthesis_after_enrichment: 1
+
+technical_failure_policy:
+  applies_to: synthesis_model_execution
+  distinction: Technical failure is timeout, provider unavailable, malformed provider response or equivalent runtime failure; it is not semantic insufficiency.
+  primary_profile: brand_preview_fast_reasoning
+  primary_attempt_policy:
+    max_attempts_total: 2
+    meaning: initial_attempt_plus_at_most_one_bounded_technical_retry_when_shared_runtime_marks_retryable
+  approved_technical_fallback_profile: brand_preview_fast_reasoning_fallback
+  fallback_attempts_total: 1
+  on_exhaustion: PREVIEW_FAILED_RECOVERABLE
+  provider_switching_owner: INTELLIGENCE_EXECUTION_PROFILE
+  data_extraction_may_silently_switch_synthesis_model: false
+
+semantic_insufficiency_policy:
+  definition: Structurally valid synthesis cannot ground one or more mandatory Preview semantic blocks after safe item pruning.
+  provider_failure: false
+  sequence:
+    - evaluate_specific_evidence_gap
+    - request_one_bounded_public_web_enrichment_if_eligible_and_not_attempted
+    - rerun_brand_preview_synthesis_once
+    - validate_and_prune_again
+    - deterministic_readiness_again
+    - PREVIEW_NOT_READY_if_floor_still_missing
+  indefinite_loops: forbidden
+
+malformed_output_policy:
+  validation_layers:
+    - provider_structured_output
+    - structural_validation
+    - semantic_validation
+    - readiness_validation
+  structural_invalidity:
+    examples: [malformed_json, missing_required_fields, invalid_types, excess_cardinality]
+    handling: technical_repair_retry_or_approved_technical_fallback
+  semantic_invalidity:
+    examples:
+      - unsupported_claim
+      - duplicate_item
+      - ungrounded_item
+      - invalid_archetype_id
+      - campaign_like_recommendation
+      - missing_grounding_ref
+    handling: drop_individual_invalid_list_items_when_safe_then_recheck_readiness
+  never_silently_persist_invalid_output: true
+  filler_repair_forbidden: true
+
+runtime_phase_projection:
+  principle: Phases are presentation projections of observable runtime checkpoints, never timers and never private model-reasoning states.
+  generic_fallback: "Building your Brand Preview…"
+  UNDERSTANDING_BRAND:
+    emit_when: first_party_preview_evidence_request_is_observably_active_or_evidence_coverage_for_brand_proposition_is_being_resolved
+    otherwise_emit: generic_fallback
+  LEARNING_AUDIENCE:
+    emit_when: observable_evidence_checkpoint_shows_brand_proposition_resolved_but_customer_use_context_is_still_being_acquired_or_enriched
+    note: Do not emit merely because the model is internally reasoning about Audience.
+    otherwise_emit: generic_fallback
+  FINDING_CREATOR_OPPORTUNITIES:
+    emit_when: first_synthesis_validation_has_valid_brand_understanding_and_audience_floor_but_creator_opportunity_or_archetype_floor_is_missing_and_bounded_enrichment_resynthesis_is_active
+    otherwise_emit: generic_fallback
+  PREPARING_PREVIEW:
+    emit_when: all_mandatory_semantic_output_exists_and_structural_semantic_readiness_validation_or_final_projection_is_running
+    otherwise_emit: generic_fallback
+
+persistence_semantics:
+  owner: APPLICATION_BACKEND_IMPLEMENTATION_LATER
+  intelligence_authority: VERSIONED_PREVIEW_RUN_SNAPSHOT
+  one_durable_run_record_per_discovery_lead_allowed: true
+  snapshot_may_include:
+    - runtime_state
+    - evidence_refs_or_evidence_snapshot_reference
+    - preview_output_snapshot
+    - readiness_result
+    - retry_and_error_metadata
+    - created_at
+    - completed_at
+  permanent_canonical_brand_columns_for_preview_outputs: false
+  do_not_promote:
+    - brand_descriptor
+    - audience_groups
+    - creator_marketing_opportunities
+    - creator_archetype_recommendations
+
+not_preview_ready_prerequisites:
+  - Product_Intelligence
+  - Competitor_Intelligence
+  - Instagram_Intelligence
+  - Performance_Intelligence
+  - Campaign_Intelligence
+  - full_Brand_DNA
+
+telemetry_requirements:
+  - execution_id
+  - processor_execution_id
+  - execution_profile_version
+  - model_profile_and_resolved_model
+  - prompt_build_id
+  - evidence_capability_runs
+  - evidence_refs
+  - structural_validation_result
+  - semantic_validation_result
+  - pruned_item_counts_and_reasons
+  - readiness_result
+  - technical_retry_count
+  - technical_fallback_used
+  - semantic_enrichment_used
+  - terminal_state
+
+legacy_exclusions:
+  canonical_runtime_semantics_from:
+    - NOT_Stage1bCoordinatorService
+    - NOT_BrandDnaEngineService
+    - NOT_legacy_Surface_progression
+    - NOT_legacy_Brand_DNA_schemas

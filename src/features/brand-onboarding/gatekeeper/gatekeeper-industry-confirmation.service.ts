@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, Optional } from "@nestjs/common";
 import { IndustryVertical } from "@prisma/client";
 
 import type { ConfirmGatekeeperIndustryDto } from "../dto/confirm-gatekeeper-industry.dto";
+import { BrandPreviewRunService } from "../brand-preview/brand-preview-run.service";
 import { GatekeeperPersistenceService } from "./gatekeeper-persistence.service";
 import {
   SUPPORTED_MVP_INDUSTRIES,
@@ -13,7 +14,10 @@ const SUPPORTED = new Set<IndustryVertical>(SUPPORTED_MVP_INDUSTRIES);
 
 @Injectable()
 export class GatekeeperIndustryConfirmationService {
-  constructor(private readonly persistence: GatekeeperPersistenceService) {}
+  constructor(
+    private readonly persistence: GatekeeperPersistenceService,
+    @Optional() private readonly brandPreview?: BrandPreviewRunService,
+  ) {}
 
   async confirm(
     leadId: string,
@@ -93,10 +97,15 @@ export class GatekeeperIndustryConfirmationService {
       : null;
 
     await this.persistence.persistConfirmation(leadId, gatekeeper);
+    const preview =
+      selectedSupported && this.brandPreview
+        ? await this.brandPreview.startOrResume(leadId)
+        : undefined;
     return {
       leadId,
       gatekeeper_result: gatekeeper,
       surface_handoff: surfaceHandoff,
+      ...(preview ? { brand_preview: preview } : {}),
     };
   }
 }

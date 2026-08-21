@@ -67,13 +67,17 @@ export class OpenAIStructuredProvider {
     evidenceRefs: string[];
     outputSchema: ZodType<T>;
     timeoutMs?: number;
+    maxAttempts?: number;
+    capabilityId?: string;
+    schemaName?: string;
   }): Promise<ProviderEvidenceResult<T>> {
+    const capabilityId = args.capabilityId ?? CAPABILITY_ID;
     const apiKey = this.config.get<string>("OPENAI_API_KEY", "").trim();
     if (!apiKey) {
       throw new DataExtractionProviderError({
         code: "CONFIGURATION_ERROR",
         provider: "OPENAI",
-        capabilityId: CAPABILITY_ID,
+        capabilityId,
         modelId: args.modelId,
         message: "OPENAI_API_KEY is not configured",
         retryable: false,
@@ -85,7 +89,7 @@ export class OpenAIStructuredProvider {
       throw new DataExtractionProviderError({
         code: "MODEL_NOT_AVAILABLE",
         provider: "OPENAI",
-        capabilityId: CAPABILITY_ID,
+        capabilityId,
         message: "Intelligence must supply an OpenAI model id",
         retryable: false,
         attemptCount: 0,
@@ -98,10 +102,9 @@ export class OpenAIStructuredProvider {
     const timeoutMs =
       args.timeoutMs ??
       this.config.get<number>("OPENAI_REQUEST_TIMEOUT_MS", 120_000);
-    const maxAttempts = this.config.get<number>(
-      "DATA_EXTRACTION_PROVIDER_MAX_ATTEMPTS",
-      3,
-    );
+    const maxAttempts =
+      args.maxAttempts ??
+      this.config.get<number>("DATA_EXTRACTION_PROVIDER_MAX_ATTEMPTS", 3);
     const schema = zodToJsonSchema(args.outputSchema, {
       target: "openApi3",
       $refStrategy: "none",
@@ -145,7 +148,7 @@ export class OpenAIStructuredProvider {
                 text: {
                   format: {
                     type: "json_schema",
-                    name: "gatekeeper_assessment",
+                    name: args.schemaName ?? "gatekeeper_assessment",
                     strict: true,
                     schema,
                   },
@@ -184,7 +187,7 @@ export class OpenAIStructuredProvider {
         throw new DataExtractionProviderError({
           code: "EMPTY_RESULT",
           provider: "OPENAI",
-          capabilityId: CAPABILITY_ID,
+          capabilityId,
           modelId: args.modelId,
           message: "OpenAI returned no structured assessment text",
           retryable: false,
@@ -200,7 +203,7 @@ export class OpenAIStructuredProvider {
         throw new DataExtractionProviderError({
           code: "STRUCTURED_OUTPUT_INVALID",
           provider: "OPENAI",
-          capabilityId: CAPABILITY_ID,
+          capabilityId,
           modelId: args.modelId,
           message: "OpenAI structured assessment was not valid JSON",
           retryable: false,
@@ -213,7 +216,7 @@ export class OpenAIStructuredProvider {
         throw new DataExtractionProviderError({
           code: "STRUCTURED_OUTPUT_INVALID",
           provider: "OPENAI",
-          capabilityId: CAPABILITY_ID,
+          capabilityId,
           modelId: args.modelId,
           message: "OpenAI structured assessment failed structural validation",
           retryable: false,
@@ -224,7 +227,7 @@ export class OpenAIStructuredProvider {
 
       const completed = Date.now();
       return {
-        capabilityId: CAPABILITY_ID,
+        capabilityId,
         acquisitionRunId: args.acquisitionRunId,
         availability: "AVAILABLE",
         quality: "VALID",
@@ -238,7 +241,7 @@ export class OpenAIStructuredProvider {
         connectionState: "CONNECTED",
         telemetry: {
           acquisitionRunId: args.acquisitionRunId,
-          capabilityId: CAPABILITY_ID,
+          capabilityId,
           provider: "OPENAI",
           modelId: args.modelId,
           startedAt,
@@ -266,7 +269,7 @@ export class OpenAIStructuredProvider {
         throw new DataExtractionProviderError({
           code,
           provider: "OPENAI",
-          capabilityId: CAPABILITY_ID,
+          capabilityId,
           modelId: args.modelId,
           message: `OpenAI structured assessment failed (${code})`,
           retryable: false,
@@ -279,7 +282,7 @@ export class OpenAIStructuredProvider {
       throw new DataExtractionProviderError({
         code: "PROVIDER_ERROR",
         provider: "OPENAI",
-        capabilityId: CAPABILITY_ID,
+        capabilityId,
         modelId: args.modelId,
         message: "OpenAI structured assessment failed",
         retryable: false,

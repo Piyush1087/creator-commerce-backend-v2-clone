@@ -1,0 +1,364 @@
+version: "1.0-frozen"
+status: "FROZEN — PRODUCT APPROVED"
+contract: brand_preview_minimum_output
+scope: continuous_fast_brand_analysis_to_brand_preview
+owner: intelligence_engine
+product_authority: intelligence/product_authority/brand_onboarding_v1_product_authority.md
+consumer_copy_contract: frontend/brand-onboarding/brand_preview_ux_copy_contract.md
+assignment: docs/organization/prompts/brand_preview_intelligence_contract_assignment.md
+
+purpose: >-
+  Define the minimum grounded semantic output required to render Brand Preview quickly and truthfully after Gatekeeper admission and confirmed supported Industry, without waiting for deeper Intelligence domains.
+
+governing_principles:
+  - Brand Preview is a bounded early synthesis, not a miniature Brand Centre.
+  - Consumer copy length and cardinality limits are semantic output constraints; producers must return UI-safe content rather than expecting frontend trimming or rewriting.
+  - Prefer smaller truthful output over filler, duplicated items, invented precision or generic richness.
+  - Preview output must remain traceable to internal Evidence/provenance and semantic confidence, but confidence percentages are never required by the UI contract.
+  - The schema is common across D2C, SAAS_AI, HEALTHCARE and OFFLINE_SERVICES; vocabulary/content adapts to Industry without creating four incompatible contracts.
+  - Gatekeeper authority ends at admitted serviceability plus confirmed supported Industry; Preview must not reinterpret or overwrite confirmed Industry.
+  - This contract defines semantics only. It does not define processors, Evidence/provider sequence, runtime wiring, persistence migrations, backend routes, frontend implementation or Stitch.
+
+supported_industries: [D2C, SAAS_AI, HEALTHCARE, OFFLINE_SERVICES]
+
+field_classification:
+  brand_name:
+    classification: REUSE_EXISTING_OBJECT
+    canonical_source: intelligence/engines/brand_intelligence/branches/identity/objects.yaml#brand_name
+    required_for_preview: true
+  brand_logo:
+    classification: REUSE_EXISTING_OBJECT
+    canonical_source: intelligence/engines/brand_intelligence/branches/identity/objects.yaml#brand_logo
+    required_for_preview: false
+  website_url:
+    classification: REUSE_EXISTING_OBJECT
+    canonical_source: intelligence/engines/brand_intelligence/branches/identity/objects.yaml#website_url
+    required_for_preview: true
+  display_domain:
+    classification: DERIVED_PRESENTATION_OUTPUT
+    derives_from: website_url
+    required_for_preview: true
+    rule: Normalize for human display only; never create a second canonical website/domain fact.
+  confirmed_industry:
+    classification: REUSE_EXISTING_OBJECT
+    canonical_source: intelligence/engines/brand_intelligence/branches/identity/objects.yaml#industry
+    authority_source: frozen Gatekeeper confirmation boundary
+    required_for_preview: true
+    rule: Must already be a user-confirmed supported IndustryVertical before Fast Brand Analysis may satisfy PREVIEW_READY.
+  tagline:
+    classification: NOT_NEEDED
+    reason: Brand Preview does not require an explicit brand tagline and must not substitute tagline for the Preview descriptor or understanding narrative.
+  industry_niche:
+    classification: NOT_NEEDED
+    reason: May be useful context later but is not required to render Brand Preview.
+  markets_served:
+    classification: NOT_NEEDED
+    reason: May enrich later Audience reasoning but is not a Preview-ready prerequisite.
+  brand_descriptor:
+    classification: DERIVED_PRESENTATION_OUTPUT
+    required_for_preview: false
+    lifecycle: bounded_preview_synthesis
+    definition: A concise evidence-grounded noun phrase describing what the brand fundamentally offers and, where useful, the customer/use context.
+    canonical_promotion_note: May be reconsidered for canonical promotion later if the same semantic becomes reusable across Brand Centre, Chat or Campaign Intelligence.
+    type: string|null
+    constraints:
+      target_words: [5, 10]
+      max_words: 14
+      max_characters: 90
+      prose_form: third_person_noun_phrase
+      omit_when_not_grounded: true
+    prohibited: [generic_praise, unsupported_superlative, slogan_copy, performance_claim, creator_recommendation]
+  brand_understanding_narrative:
+    classification: DERIVED_PRESENTATION_OUTPUT
+    required_for_preview: true
+    semantic_purpose: Concise synthesis of the brand's apparent proposition/positioning/customer context and why that context matters for creator marketing.
+    type: string
+    constraints:
+      minimum_words: 30
+      target_words: [45, 75]
+      maximum_words: 90
+      sentences: [2, 3]
+      paragraphs: 1
+    required_semantic_coverage:
+      minimum_of:
+        count: 2
+        dimensions: [what_brand_offers, need_or_context_served, apparent_positioning_or_experience, creator_relevance]
+    prohibited:
+      - generic_praise
+      - unsupported_market_leadership
+      - unsupported_customer_sentiment
+      - unsupported_performance_metrics
+      - unsupported_clinical_or_health_outcomes
+      - guaranteed_creator_marketing_outcomes
+      - invented_differentiation
+    rule: Generate within the consumer limit. Frontend must not truncate or rewrite the narrative to make it fit.
+  audience_groups:
+    classification: DERIVED_PRESENTATION_OUTPUT
+    object_semantics: early_audience_hypothesis_set
+    authority_lifecycle: intelligence_hypothesis_not_customer_confirmed_truth
+    maturation_rule: Mature Brand Audience Intelligence may later define canonical Audience Objects and reconcile or supersede these Preview outputs.
+    type: array
+    cardinality:
+      minimum_when_preview_ready: 1
+      normal_target: [2, 3]
+      maximum: 3
+    no_filler_rule: Return fewer than the normal target whenever additional groups are not credibly distinct and grounded.
+    item:
+      id:
+        type: string
+        semantic: Stable within the generated Preview result for traceability; not a global persona taxonomy ID.
+      label:
+        type: string
+        required: true
+        target_words: [2, 5]
+        max_characters: 38
+        prohibited: [fake_persona_name, sensitive_targeting_label, unsupported_demographic_precision, stereotype]
+      why_it_matters:
+        type: string
+        required: true
+        target_words: [18, 32]
+        max_words: 40
+        max_characters: 240
+        sentences_max: 2
+        semantic: Connect a grounded brand need to the group's decision context, concern or motivation and creator-marketing relevance.
+      internal_grounding:
+        type: INTERNAL_TRACE
+        required: true
+        ui_exposed: false
+      internal_confidence:
+        type: SEMANTIC_LEVEL
+        allowed: [HIGH, MEDIUM, LOW]
+        required: true
+        ui_exposed: false
+    sensitive_inference_rule: Do not infer or expose sensitive audience attributes unless explicitly permitted by a later canonical policy; Preview labels must remain commercially useful without sensitive profiling.
+  creator_marketing_opportunities:
+    classification: DERIVED_PRESENTATION_OUTPUT
+    semantic_type: bounded_strategic_opportunity_set
+    required_for_preview: true
+    authority_lifecycle: early_strategy_synthesis_not_campaign_recommendation
+    type: array
+    cardinality:
+      minimum_when_preview_ready: 1
+      normal_target: [2, 3]
+      maximum: 3
+    no_filler_rule: If only one opportunity is defensible, return one.
+    item:
+      title:
+        type: string
+        required: true
+        target_words: [3, 7]
+        max_characters: 55
+      why_it_matters:
+        type: string
+        required: true
+        target_words: [22, 38]
+        max_words: 48
+        max_characters: 290
+        sentences_max: 2
+        semantic: Connect the creator role to an observed brand/customer barrier such as explanation, trust, demonstration, aspiration, proof, relevance, trial confidence or local discovery.
+      internal_grounding:
+        type: INTERNAL_TRACE
+        required: true
+        ui_exposed: false
+      internal_confidence:
+        type: SEMANTIC_LEVEL
+        allowed: [HIGH, MEDIUM, LOW]
+        required: true
+        ui_exposed: false
+    prohibited: [campaign_name, deliverables, budget, guaranteed_outcome, creator_count, final_channel_plan]
+  creator_archetype_recommendations:
+    classification: DERIVED_PRESENTATION_OUTPUT
+    semantic_type: bounded_preview_recommendation_set
+    required_for_preview: true
+    authority_lifecycle: descriptive_preview_recommendation_not_campaign_targeting_authority
+    canonical_taxonomy: campaign/canonical/creator_archetypes.yaml
+    type: array
+    cardinality:
+      minimum_when_preview_ready: 1
+      normal_target: 3
+      preferred_range: [2, 4]
+      maximum: 4
+    no_filler_rule: Return one when Evidence is genuinely narrow; never invent or pad an archetype to satisfy layout.
+    item:
+      archetype_id:
+        type: canonical_creator_archetype_id
+        required: true
+        rule: Must reference an active canonical ID from campaign/canonical/creator_archetypes.yaml; custom Preview archetype IDs are forbidden.
+      label:
+        type: string
+        required: true
+        source: canonical_archetype_label
+        max_characters: 40
+        rule: Use the canonical label; frontend may not replace it with a competing archetype taxonomy.
+      rationale:
+        type: string
+        required: true
+        target_words: [16, 28]
+        max_words: 34
+        max_characters: 220
+        sentences: 1
+        semantic: Tie the archetype's communication strength to the brand context and/or Preview opportunity.
+      internal_grounding:
+        type: INTERNAL_TRACE
+        required: true
+        ui_exposed: false
+      internal_confidence:
+        type: SEMANTIC_LEVEL
+        allowed: [HIGH, MEDIUM, LOW]
+        required: true
+        ui_exposed: false
+    prohibited: [individual_creator_name, follower_tier_as_default, unsupported_demographic_restriction, hard_campaign_targeting]
+  confidence_percentage:
+    classification: NOT_NEEDED
+    reason: Internal uncertainty is represented semantically and through provenance; Brand Preview UI must not expose numeric confidence percentages.
+  product_catalogue:
+    classification: NOT_NEEDED
+  competitor_list:
+    classification: NOT_NEEDED
+  instagram_intelligence:
+    classification: NOT_NEEDED
+  performance_scores:
+    classification: NOT_NEEDED
+  campaign_configuration:
+    classification: NOT_NEEDED
+
+minimum_internal_trace_contract:
+  applies_to: [brand_descriptor, brand_understanding_narrative, audience_groups, creator_marketing_opportunities, creator_archetype_recommendations]
+  required_per_generated_block_or_item:
+    - source_or_dependency_refs
+    - generated_at
+    - semantic_confidence_level
+  semantic_confidence_allowed: [HIGH, MEDIUM, LOW]
+  ui_exposure:
+    confidence_percentage: false
+    raw_evidence_refs: false
+    internal_reasoning: false
+  readiness_rule: LOW confidence content may be omitted rather than fabricated; low-confidence content must not be required merely to satisfy count targets.
+
+preview_payload:
+  identity:
+    brand_name: REUSE:brand_name
+    brand_logo: REUSE_OPTIONAL:brand_logo
+    website_url: REUSE:website_url
+    display_domain: DERIVED:website_url
+    confirmed_industry: REUSE:industry
+    brand_descriptor: DERIVED_OPTIONAL:brand_descriptor
+  understanding:
+    narrative: DERIVED_REQUIRED:brand_understanding_narrative
+  audiences:
+    groups: DERIVED_REQUIRED:audience_groups
+  opportunities:
+    items: DERIVED_REQUIRED:creator_marketing_opportunities
+  creator_starting_point:
+    archetypes: DERIVED_REQUIRED:creator_archetype_recommendations
+
+readiness_contract:
+  states: [PREVIEW_READY, PREVIEW_NOT_READY, PREVIEW_FAILED_RECOVERABLE]
+  PREVIEW_READY:
+    display_eligible: true
+    definition: Minimum credible Brand Preview exists; completeness may be NORMAL or PARTIAL without changing display eligibility.
+    hard_preconditions:
+      gatekeeper_outcome: ADMITTED
+      confirmed_industry_in: [D2C, SAAS_AI, HEALTHCARE, OFFLINE_SERVICES]
+      identity_required:
+        - brand_name
+        - website_url
+        - display_domain
+        - confirmed_industry
+      understanding_required:
+        - brand_understanding_narrative
+      audiences_minimum: 1
+      opportunities_minimum: 1
+      archetypes_minimum: 1
+      generated_required_fields_must_pass_consumer_constraints: true
+      all_required_generated_blocks_have_internal_grounding: true
+    completeness:
+      NORMAL:
+        description: Normal Preview density is available.
+        indicative_conditions:
+          brand_descriptor_present: true
+          audience_groups: [2, 3]
+          creator_marketing_opportunities: [2, 3]
+          creator_archetypes: [2, 4]
+          archetype_normal_target: 3
+      PARTIAL:
+        description: The minimum credible Preview exists but optional recognition/enrichment or normal collection density is unavailable.
+        allowed_examples:
+          - brand_logo_missing
+          - brand_descriptor_missing
+          - exactly_one_audience_group
+          - exactly_one_creator_marketing_opportunity
+          - exactly_one_creator_archetype
+        rule: Partial readiness must result in omission or smaller collections, never placeholders or generic filler.
+  PREVIEW_NOT_READY:
+    display_eligible: false
+    definition: Analysis is incomplete or evidence is insufficient for at least one mandatory Preview semantic block.
+    examples:
+      - gatekeeper_not_admitted_or_industry_not_confirmed
+      - brand_identity_recognition_not_reliable
+      - brand_understanding_narrative_not_grounded
+      - zero_credible_audience_groups
+      - zero_credible_creator_marketing_opportunities
+      - zero_credible_creator_archetypes
+    behavior_boundary: Remain on continuous analysis or move to a truthful non-ready state; do not manufacture missing content.
+  PREVIEW_FAILED_RECOVERABLE:
+    display_eligible: false
+    definition: A recoverable execution/evidence failure prevents satisfying PREVIEW_READY despite an otherwise eligible brand.
+    behavior_boundary: Expose recovery semantics through the later runtime contract; do not generate fallback filler.
+
+explicit_preview_ready_boundary:
+  statement: >-
+    The user may leave Continuous Fast Brand Analysis and see Brand Preview as soon as Gatekeeper is ADMITTED with a confirmed supported Industry, brand_name and website_url/domain are reliable, one bounded 30-90 word brand-understanding narrative is grounded, and at least one credible Audience group, one creator-marketing opportunity and one canonical creator-archetype recommendation with rationale exist. Brand logo and Brand descriptor are optional. Counts above one are enrichment, not blockers.
+  must_not_wait_for:
+    - full Product_or_Offering_Intelligence
+    - Competitor_Intelligence
+    - Instagram_Intelligence
+    - Performance_Intelligence
+    - Campaign_Intelligence
+    - complete_markets_served
+    - complete_industry_niche
+    - full_Brand_DNA
+    - maximum_preview_collection_counts
+  may_continue_or_enrich_later:
+    - product_or_offering_understanding
+    - competitor_understanding
+    - instagram_grounding
+    - mature_audience_intelligence
+    - mature_brand_strategy
+    - Brand_Centre_intelligence
+
+industry_variance:
+  schema_common_across_supported_industries: true
+  invariant_fields: [identity, understanding, audiences, opportunities, creator_archetypes]
+  terminology_rule: Use Industry-appropriate concepts such as offering, capability, treatment, consultation, experience or service; do not force D2C product language onto other Industries.
+  unsupported_specialization_rule: Do not add Industry-specific fields to Brand Preview merely because later domain Intelligence may need them.
+
+non_authority_rules:
+  audience_groups: Preview Audience groups are evidence-grounded hypotheses and do not become customer-confirmed audience truth merely because they were displayed; mature Brand Audience Intelligence may later define canonical Audience Objects and reconcile or supersede these Preview outputs.
+  creator_marketing_opportunities: Preview opportunities are early strategic synthesis and are not final Campaign recommendations or campaign configuration.
+  creator_archetypes: Preview archetype recommendations reference the canonical archetype taxonomy but do not become Campaign creator-strategy targeting authority merely because they were displayed.
+  preview_lifecycle: Preview outputs may be superseded or enriched by later Brand, Product, Competitor, Instagram, Creator or Campaign Intelligence.
+
+product_review_register:
+  frozen_inputs:
+    - Brand onboarding v1 Product Authority
+    - Brand Preview UX Copy Contract v1.1
+    - Identity Object semantics
+    - Gatekeeper confirmed supported Industry boundary
+    - canonical creator archetype taxonomy
+  frozen_semantic_decisions:
+    - brand_descriptor remains a bounded optional derived Preview output; canonical promotion may be reconsidered later only if the same semantic proves reusable across Brand Centre, Chat or Campaign Intelligence.
+    - audience_groups remain bounded derived early hypotheses and non-authoritative customer truth; mature Brand Audience Intelligence may later define canonical Audience Objects and reconcile or supersede them.
+    - brand-understanding narrative, creator opportunities and initial archetype recommendations remain bounded derived Preview outputs rather than new canonical Objects.
+    - PREVIEW_READY uses one credible item as the hard floor for each bounded collection; normal target density remains enrichment only.
+  open_product_questions: []
+
+deferred_after_review:
+  - processor_boundaries
+  - Evidence_capability_contracts
+  - provider_or_model_sequence
+  - runtime_execution_profile
+  - persistence_mapping
+  - backend_API_contract
+  - frontend_state_implementation
+  - Stitch_design

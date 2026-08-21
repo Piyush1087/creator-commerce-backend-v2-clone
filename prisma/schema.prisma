@@ -81,6 +81,25 @@ enum BrandIntelligenceJobStatus {
   FAILED
 }
 
+enum BrandPreviewRuntimeState {
+  ANALYSIS_ACTIVE
+  PREVIEW_READY
+  PREVIEW_FAILED_RECOVERABLE
+  PREVIEW_NOT_READY
+}
+
+enum BrandPreviewCompleteness {
+  NORMAL
+  PARTIAL
+}
+
+enum BrandPreviewPhase {
+  UNDERSTANDING_BRAND
+  LEARNING_AUDIENCE
+  FINDING_CREATOR_OPPORTUNITIES
+  PREPARING_PREVIEW
+}
+
 enum WaitlistReason {
   UNSUPPORTED_INDUSTRY
   FOREIGN_LANGUAGE
@@ -759,6 +778,7 @@ model DiscoveryLead {
   waitlistLeads          WaitlistLead[]
   brandIntelligenceScan  BrandIntelligenceScan?
   intelligenceJobs       BrandIntelligenceJob[]
+  brandPreviewRun        BrandPreviewRun?
   gatekeeperRecoveryRequests GatekeeperRecoveryRequest[]
 
   @@index([createdAt])
@@ -864,6 +884,36 @@ model BrandIntelligenceJob {
   @@index([status, queuedAt])
   @@index([discoveryLeadId])
   @@map("brand_intelligence_jobs")
+}
+
+/// Durable, versioned Brand Preview execution snapshot. Preview-derived
+/// semantics stay in JSON snapshots and are not promoted to BrandProfile.
+model BrandPreviewRun {
+  id                      String                     @id @default(uuid()) @map("brand_preview_run_id")
+  discoveryLeadId         String                     @unique @map("discovery_lead_id")
+  discoveryLead           DiscoveryLead              @relation(fields: [discoveryLeadId], references: [id], onDelete: Cascade)
+  brandProfileId          String?                    @map("brand_profile_id")
+  brandProfile            BrandProfile?              @relation(fields: [brandProfileId], references: [id], onDelete: SetNull)
+  attempt                 Int                        @default(1)
+  state                   BrandPreviewRuntimeState   @default(ANALYSIS_ACTIVE)
+  phase                   BrandPreviewPhase?
+  completeness            BrandPreviewCompleteness?
+  evidenceSnapshot        Json?                      @map("evidence_snapshot")
+  previewOutputSnapshot   Json?                      @map("preview_output_snapshot")
+  processorMetadata       Json?                      @map("processor_metadata")
+  retryAllowed            Boolean                    @default(false) @map("retry_allowed")
+  errorCode               String?                    @map("error_code") @db.VarChar(100)
+  enrichmentAttempted     Boolean                    @default(false) @map("enrichment_attempted")
+  leaseToken              String?                    @map("lease_token") @db.VarChar(64)
+  leaseExpiresAt          DateTime?                  @map("lease_expires_at")
+  startedAt               DateTime                   @default(now()) @map("started_at")
+  completedAt             DateTime?                  @map("completed_at")
+  createdAt               DateTime                   @default(now()) @map("created_at")
+  updatedAt               DateTime                   @updatedAt @map("updated_at")
+
+  @@index([state, leaseExpiresAt])
+  @@index([brandProfileId])
+  @@map("brand_preview_runs")
 }
 
 model MarketIntelligenceLog {
@@ -1003,6 +1053,7 @@ model BrandProfile {
   performanceLeaks       BrandPerformanceLeak[]
   plannerCards           BrandPlannerCard[]
   brandIntelligenceScans BrandIntelligenceScan[]
+  brandPreviewRuns       BrandPreviewRun[]
 
   // UCE (Universal Campaign Engine)
   uceCampaigns UceCampaign[]

@@ -18,6 +18,10 @@ providers:
     adapter: gemini
     credential_ref: env.GEMINI_API_KEY
     enabled_environments: [development, test, production]
+  openai:
+    adapter: openai
+    credential_ref: env.OPENAI_API_KEY
+    enabled_environments: [development, test, production]
 
 model_aliases:
   gemini_gatekeeper_v1:
@@ -37,6 +41,12 @@ model_aliases:
     model_id: gemini-3.5-flash
     lifecycle: CURRENT
     intended_use: evidence-grounded tasks requiring comparison, conflict resolution, or multi-signal reasoning
+
+  brand_preview_openai_fast_fallback:
+    provider: openai
+    model_id: gpt-5.6-luna
+    lifecycle: APPROVED_TECHNICAL_FALLBACK
+    intended_use: Cross-provider structured-output fallback for bounded Brand Preview synthesis when the primary model path is technically exhausted.
 
 model_profiles:
   gatekeeper_v1_primary:
@@ -64,6 +74,19 @@ model_profiles:
     runtime: {temperature: 0, structured_output: true, timeout_ms: 30000, max_attempts: 2}
     intended_processors: [market_geography]
 
+  brand_preview_fast_reasoning:
+    description: Low-latency evidence-grounded structured synthesis for bounded Brand Preview output.
+    model_alias: gemini_reasoning_current
+    runtime: {temperature: 0, structured_output: true, timeout_ms: 25000, max_attempts: 2}
+    intended_processors: [brand_preview_synthesis]
+
+  brand_preview_fast_reasoning_fallback:
+    description: Approved cross-provider technical fallback for Brand Preview synthesis after the primary model path is technically exhausted.
+    model_alias: brand_preview_openai_fast_fallback
+    runtime: {temperature: 0, structured_output: true, timeout_ms: 30000, max_attempts: 1}
+    intended_processors: [brand_preview_synthesis]
+    fallback_only: true
+
 processor_model_bindings:
   gatekeeper_site_assessment:
     default: {model_profile: gatekeeper_v1_primary, access_mode: normalized_evidence}
@@ -74,6 +97,11 @@ processor_model_bindings:
     default: {model_profile: grounded_extraction, access_mode: normalized_evidence}
   market_geography:
     default: {model_profile: grounded_geography, access_mode: normalized_evidence}
+  brand_preview_synthesis:
+    default:
+      model_profile: brand_preview_fast_reasoning
+      technical_fallback_profile: brand_preview_fast_reasoning_fallback
+      access_mode: normalized_evidence
 
 runtime_defaults:
   default_model_alias: gemini_reasoning_current
