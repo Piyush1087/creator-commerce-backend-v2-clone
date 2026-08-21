@@ -16,6 +16,10 @@
       {
         "include": "features/creator-onboarding/prompts/**/*.md",
         "watchAssets": true
+      },
+      {
+        "include": "features/brand-onboarding/gatekeeper/runtime/artifacts/**/*.yaml",
+        "watchAssets": true
       }
     ]
   }

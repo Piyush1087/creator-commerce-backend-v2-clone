@@ -15,8 +15,7 @@ const DEFAULT_CORS_ORIGINS = [
   "https://dashboard.thecreatorshop.in",
 ] as const;
 
-const LOCAL_DEV_ORIGIN =
-  /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+const LOCAL_DEV_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
 
 /** ngrok and similar tunnels used for local Meta OAuth */
 const NGROK_ORIGIN =
@@ -91,6 +90,7 @@ async function bootstrap() {
       "Origin",
       "X-Requested-With",
       "x-idempotency-key",
+      "x-session-id",
     ],
   });
 

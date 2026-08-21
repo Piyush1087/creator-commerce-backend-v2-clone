@@ -60,3 +60,9 @@ Return **JSON only** (no markdown fences):
   "confidence": 78
 }
 ```
+# LEGACY REFERENCE — NOT GATEKEEPER V1 PRODUCTION AUTHORITY
+
+Production `POST /api/v1/discovery/validate` composes the frozen YAML artifacts
+under `gatekeeper/runtime/artifacts/` through the shared Intelligence Prompt
+Builder. This file remains only for the isolated legacy classifier used by
+older, non-canonical code paths.

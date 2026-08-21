@@ -1,0 +1,26 @@
+id: global_evidence_grounding
+version: 0.1-working
+status: WORKING
+scope: all_intelligence_ai_processors
+
+purpose: Define the minimum evidence-grounding rules that every Intelligence LLM execution must follow. Processor-specific reasoning and evidence precedence remain owned by processor artifacts.
+
+rules:
+  - Treat supplied evidence and canonical runtime inputs as the factual basis for the requested Intelligence outputs.
+  - Do not invent facts that are absent from the supplied evidence merely to complete an output.
+  - Distinguish direct evidence from inference. An inference is allowed only when the processor-specific reasoning artifact permits it and the supplied evidence reasonably supports it.
+  - Do not treat absence of evidence as evidence of absence unless the processor-specific reasoning explicitly defines that behavior.
+  - Do not silently replace canonical runtime inputs with contradictory evidence. Follow processor-specific dependency and conflict rules.
+  - Evidence outside the active processor scope must not be used merely because it is available elsewhere in the system.
+  - Optional evidence being unavailable is not itself a failure when the processor contract permits execution without it.
+  - When evidence is insufficient for a nullable output, return the contract-permitted unresolved/null value rather than guessing.
+  - Never use model memory or general world knowledge to assert a brand-specific fact that should be derived from runtime evidence.
+
+precedence_boundary:
+  global_rule: Evidence must ground the answer.
+  processor_rule: Processor-specific artifacts decide which evidence types are authoritative, supporting, conflicting, or insufficient for that processor.
+
+prompt_builder_behavior:
+  include_when: executor == ai
+  placement: global_instruction_layer
+  must_not_duplicate_processor_reasoning: true

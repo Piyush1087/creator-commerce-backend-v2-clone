@@ -1,0 +1,26 @@
+id: global_output_discipline
+version: 0.1-working
+status: WORKING
+scope: all_intelligence_ai_processors
+
+purpose: Ensure every Intelligence LLM execution returns only machine-valid output for the active processor scope and never fabricates values to satisfy schema shape.
+
+rules:
+  - Return only the outputs included in the active output scope supplied by the Prompt Builder.
+  - Follow the active processor output contract exactly, including field names, data types, enum values, structures, nullability, and cardinality.
+  - Do not add commentary, markdown, explanations, alternative answers, or fields not permitted by the output contract.
+  - Do not return an inactive output merely because the processor is capable of producing it in another execution scope.
+  - A required schema field and a factually resolvable field are different concepts: where the contract permits null/unresolved, use it when evidence is insufficient.
+  - Never manufacture a value solely to make the response appear complete.
+  - Preserve canonical enum/value nomenclature exactly as defined by the active taxonomy or output contract.
+  - Do not silently coerce an unsupported value into the closest allowed enum unless processor-specific reasoning explicitly defines that mapping.
+
+validation_boundary:
+  llm_responsibility: Produce contract-conforming structured output.
+  runtime_responsibility: Parse and validate the response before any Intelligence persistence.
+  on_validation_failure: Runtime marks the processor execution FAILED_VALIDATION; invalid output is not persisted.
+
+prompt_builder_behavior:
+  include_when: executor == ai
+  placement: global_instruction_layer
+  active_output_contract_required: true

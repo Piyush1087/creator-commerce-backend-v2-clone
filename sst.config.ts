@@ -76,9 +76,8 @@ export default $config({
         ? "https://dashboard.thecreatorshop.in"
         : "http://localhost:5173,https://dashboard.dev.thecreatorshop.in,https://dashboard.thecreatorshop.in";
 
-    const { buildNotificationPostmarkTemplateEnv } = await import(
-      "./src/features/notifications/config/notification-postmark-env"
-    );
+    const { buildNotificationPostmarkTemplateEnv } =
+      await import("./src/features/notifications/config/notification-postmark-env");
 
     const filesBucket = new sst.aws.Bucket("files-v2", {
       access: "public",
@@ -111,8 +110,7 @@ export default $config({
       POSTMARK_SERVER_TOKEN: process.env.POSTMARK_SERVER_TOKEN as string,
       POSTMARK_OTP_TEMPLATE_ID: process.env.POSTMARK_OTP_TEMPLATE_ID as string,
       POSTMARK_NOTIFICATION_FROM:
-        process.env.POSTMARK_NOTIFICATION_FROM ??
-        "no-reply@thecreatorshop.in",
+        process.env.POSTMARK_NOTIFICATION_FROM ?? "no-reply@thecreatorshop.in",
       POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID:
         process.env.POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID ??
         process.env.POSTMARK_OTP_TEMPLATE_ID ??
@@ -123,10 +121,10 @@ export default $config({
           : (process.env.NOTIFICATIONS_DEV_EMIT_ENABLED ?? "false"),
       APP_FRONTEND_URL:
         $app.stage === "prod"
-          ? (process.env.APP_FRONTEND_URL_PROD?.trim() || defaultFrontendUrl)
+          ? process.env.APP_FRONTEND_URL_PROD?.trim() || defaultFrontendUrl
           : $app.stage === "dev"
-            ? (process.env.APP_FRONTEND_URL_DEV?.trim() || defaultFrontendUrl)
-            : (process.env.APP_FRONTEND_URL?.trim() || defaultFrontendUrl),
+            ? process.env.APP_FRONTEND_URL_DEV?.trim() || defaultFrontendUrl
+            : process.env.APP_FRONTEND_URL?.trim() || defaultFrontendUrl,
       ...buildNotificationPostmarkTemplateEnv(process.env),
       // Brand onboarding Stage 1A — Zyte + Playwright (Parallel is legacy only)
       BRAND_SCAN_ACQUISITION:
@@ -134,19 +132,18 @@ export default $config({
       ZYTE_API_KEY: process.env.ZYTE_API_KEY as string,
       ZYTE_API_URL:
         process.env.ZYTE_API_URL?.trim() || "https://api.zyte.com/v1/extract",
-      ZYTE_REQUEST_TIMEOUT_MS:
-        process.env.ZYTE_REQUEST_TIMEOUT_MS ?? "15000",
+      ZYTE_REQUEST_TIMEOUT_MS: process.env.ZYTE_REQUEST_TIMEOUT_MS ?? "15000",
       // Stage 1A: Zyte + Playwright on deployed stages. Local follows .env (default off).
       // To disable PW on ECS intentionally, set PLAYWRIGHT_ENABLED=false and
       // PLAYWRIGHT_FORCE_OFF=true in the deploy .env.
       PLAYWRIGHT_ENABLED:
         $app.stage === "local"
-          ? (process.env.PLAYWRIGHT_ENABLED?.trim() || "false")
+          ? process.env.PLAYWRIGHT_ENABLED?.trim() || "false"
           : process.env.PLAYWRIGHT_FORCE_OFF === "true"
             ? "false"
             : "true",
       PLAYWRIGHT_TIMEOUT_MS: process.env.PLAYWRIGHT_TIMEOUT_MS ?? "25000",
-      // Legacy Parallel surface-scan path (kept for reactivation)
+      // Parallel provider is reused by Data Extraction company_public_web_research.
       PARALLEL_API_KEY: process.env.PARALLEL_API_KEY ?? "",
       PARALLEL_EXTRACT_TIMEOUT_MS:
         process.env.PARALLEL_EXTRACT_TIMEOUT_MS ?? "300000",
@@ -159,7 +156,7 @@ export default $config({
       GATEKEEPER_GEMINI_MODEL:
         process.env.GATEKEEPER_GEMINI_MODEL ??
         process.env.GEMINI_MODEL ??
-        "gemini-2.5-flash",
+        "gemini-3.6-flash",
       MCP_PLANNER_GEMINI_MODEL:
         process.env.MCP_PLANNER_GEMINI_MODEL ??
         process.env.GEMINI_MODEL ??
@@ -170,6 +167,12 @@ export default $config({
         "gemini-2.5-flash",
       GEMINI_REQUEST_TIMEOUT_MS:
         process.env.GEMINI_REQUEST_TIMEOUT_MS ?? "120000",
+      // Data Extraction OpenAI runtime: model id is supplied by Intelligence at call time.
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? "",
+      OPENAI_REQUEST_TIMEOUT_MS:
+        process.env.OPENAI_REQUEST_TIMEOUT_MS ?? "120000",
+      DATA_EXTRACTION_PROVIDER_MAX_ATTEMPTS:
+        process.env.DATA_EXTRACTION_PROVIDER_MAX_ATTEMPTS ?? "3",
       INSTAGRAM_API_ID: process.env.INSTAGRAM_API_ID as string,
       INSTAGRAM_APP_SECRET: process.env.INSTAGRAM_APP_SECRET as string,
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? "",
@@ -190,15 +193,13 @@ export default $config({
       BRAND_SCAN_LIMITS_ENABLED:
         process.env.BRAND_SCAN_LIMITS_ENABLED ??
         ($app.stage === "local" ? "false" : "true"),
-      BRAND_SCAN_FORCE_REFRESH:
-        process.env.BRAND_SCAN_FORCE_REFRESH ?? "false",
+      BRAND_SCAN_FORCE_REFRESH: process.env.BRAND_SCAN_FORCE_REFRESH ?? "false",
       RAZORPAY_API_KEY_ID: process.env.RAZORPAY_API_KEY_ID as string,
       RAZORPAY_API_KEY_SECRET: process.env.RAZORPAY_API_KEY_SECRET as string,
       RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET as string,
-      SETTINGS_FIELD_ENCRYPTION_KEY:
-        process.env.SETTINGS_FIELD_ENCRYPTION_KEY as string,
-      EXTERNAL_API_TIMEOUT_MS:
-        process.env.EXTERNAL_API_TIMEOUT_MS ?? "10000",
+      SETTINGS_FIELD_ENCRYPTION_KEY: process.env
+        .SETTINGS_FIELD_ENCRYPTION_KEY as string,
+      EXTERNAL_API_TIMEOUT_MS: process.env.EXTERNAL_API_TIMEOUT_MS ?? "10000",
     };
 
     cluster.addService("api", {

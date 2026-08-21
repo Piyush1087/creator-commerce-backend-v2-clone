@@ -1,0 +1,68 @@
+id: gatekeeper_site_assessment
+version: 1.0-frozen
+status: FROZEN
+scope: admission_specific_ai_reasoning
+product_authority: intelligence/product_authority/gatekeeper_v1_product_execution_authority.md
+
+dedicated_intelligence_branch: false
+
+purpose: Assess only the semantic facts required to determine whether a submitted business is serviceable for Creator Shop automated onboarding. This processor does not emit the final Gatekeeper outcome.
+
+executor: AI_REASONING
+
+outputs:
+  - provisional_industry
+  - provisional_sub_industry
+  - entity_category
+  - english_evidence_status
+  - creator_marketing_applicability
+  - commercial_destination_types
+  - assessment_confidence
+
+intelligence_dependencies: []
+
+inputs:
+  required:
+    - normalized_url
+    - normalized_domain
+    - evidence.gatekeeper_primary_web_assessment
+  optional:
+    - evidence.company_public_web_research
+
+input_policy:
+  required_means: The primary semantic assessment cannot run without this capability or a profile-approved fallback capability that supplies equivalent admissible grounding.
+  optional_means: Deeper public research is requested only when the execution profile determines that admission-critical uncertainty remains.
+
+evidence_requirements:
+  gatekeeper_primary_web_assessment:
+    semantic_capability: owned URL context plus public search grounding suitable for Gatekeeper serviceability assessment
+    provenance_required:
+      - OWNED_DOMAIN
+      - PUBLIC_WEB_SEARCH
+    combined_provider_capability_allowed: true
+    rule: A single provider capability may satisfy owned URL context and Google Search grounding together. Preserve evidence provenance; do not split acquisition into separate orchestration solely because provenance types differ.
+  company_public_web_research:
+    semantic_capability: deeper external public company/web research for unresolved or ambiguous admission-critical questions
+    provenance_required: true
+    use: semantic escalation only when requested by gatekeeper_scan
+
+execution:
+  can_run_independently: true
+  partial_output_supported: false
+  no_silent_default: true
+  provider_order_owned_by: gatekeeper_scan
+  provider_connection_owned_by: DATA_EXTRACTION_ENGINE
+
+artifacts:
+  reasoning: intelligence/runtime/admission/gatekeeper_site_assessment/reasoning.yaml
+  rules: intelligence/runtime/admission/gatekeeper_site_assessment/rules.yaml
+  output_contract: intelligence/runtime/admission/gatekeeper_site_assessment/output_contract.yaml
+  taxonomy: intelligence/runtime/admission/taxonomy_contract.yaml
+
+failure_policy:
+  structural_invalid: technical_failure_signal_to_execution_profile
+  semantic_low_confidence: semantic_uncertainty_signal_to_execution_profile
+  conflicting_admission_critical_evidence: semantic_uncertainty_signal_to_execution_profile
+  unknown_admission_critical_classification: semantic_uncertainty_signal_to_execution_profile
+  insufficient_grounding: semantic_uncertainty_signal_to_execution_profile
+  rule: The processor never manufactures a confident admission classification to avoid fallback or review.
