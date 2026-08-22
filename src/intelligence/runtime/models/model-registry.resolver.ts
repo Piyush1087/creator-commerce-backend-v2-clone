@@ -11,7 +11,7 @@ export class ModelRegistryResolver {
     private readonly environment: Environment,
   ) {}
 
-  async resolve(processorId: string) {
+  async resolve(processorId: string, requestedProfile?: string) {
     const registry =
       await this.yaml.load<Record<string, unknown>>("models.yaml");
     const bindings = registry.processor_model_bindings as
@@ -20,8 +20,15 @@ export class ModelRegistryResolver {
           { default?: { model_profile?: string; access_mode?: string } }
         >
       | undefined;
-    const binding = bindings?.[processorId]?.default;
-    if (!binding?.model_profile) {
+    const binding = bindings?.[processorId]?.default as
+      | {
+          model_profile?: string;
+          access_mode?: string;
+          technical_fallback_profile?: string;
+        }
+      | undefined;
+    const modelProfile = requestedProfile ?? binding?.model_profile;
+    if (!modelProfile) {
       throw new RuntimeConfigError(
         "MODEL_PROFILE_NOT_CONFIGURED",
         `No model binding for ${processorId}`,
@@ -33,11 +40,11 @@ export class ModelRegistryResolver {
           { model_alias?: string; runtime?: Record<string, unknown> }
         >
       | undefined;
-    const profile = profiles?.[binding.model_profile];
+    const profile = profiles?.[modelProfile];
     if (!profile?.model_alias) {
       throw new RuntimeConfigError(
         "MODEL_PROFILE_NOT_CONFIGURED",
-        `Unknown model profile '${binding.model_profile}'`,
+        `Unknown model profile '${modelProfile}'`,
       );
     }
     const aliases = registry.model_aliases as
@@ -77,13 +84,30 @@ export class ModelRegistryResolver {
     }
 
     return Object.freeze({
-      model_profile: binding.model_profile,
+      model_profile: modelProfile,
       model_alias: profile.model_alias,
       provider: alias.provider,
       provider_adapter: provider.adapter,
       model_id: alias.model_id,
-      access_mode: binding.access_mode ?? "normalized_evidence",
+      access_mode: binding?.access_mode ?? "normalized_evidence",
       runtime: profile.runtime ?? {},
     });
+  }
+
+  async resolveTechnicalFallback(processorId: string) {
+    const registry =
+      await this.yaml.load<Record<string, unknown>>("models.yaml");
+    const bindings = registry.processor_model_bindings as
+      | Record<string, { default?: { technical_fallback_profile?: string } }>
+      | undefined;
+    const fallback =
+      bindings?.[processorId]?.default?.technical_fallback_profile;
+    if (!fallback) {
+      throw new RuntimeConfigError(
+        "MODEL_PROFILE_NOT_CONFIGURED",
+        `No technical fallback model binding for ${processorId}`,
+      );
+    }
+    return this.resolve(processorId, fallback);
   }
 }

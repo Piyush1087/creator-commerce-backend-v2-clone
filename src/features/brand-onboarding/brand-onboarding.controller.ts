@@ -23,6 +23,7 @@ import { GatekeeperIndustryConfirmationService } from "./gatekeeper/gatekeeper-i
 import { GatekeeperRecoveryService } from "./gatekeeper/gatekeeper-recovery.service";
 import { GatekeeperSupportService } from "./gatekeeper/gatekeeper-support.service";
 import { GatekeeperV1AdmissionService } from "./gatekeeper/gatekeeper-v1-admission.service";
+import { BrandPreviewRunService } from "./brand-preview/brand-preview-run.service";
 
 @Controller("api/v1/discovery")
 @UseGuards(ThrottlerGuard)
@@ -33,6 +34,7 @@ export class BrandOnboardingController {
     private readonly gatekeeperConfirmation: GatekeeperIndustryConfirmationService,
     private readonly gatekeeperRecovery: GatekeeperRecoveryService,
     private readonly gatekeeperSupport: GatekeeperSupportService,
+    private readonly brandPreview: BrandPreviewRunService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -48,6 +50,23 @@ export class BrandOnboardingController {
       clientIp,
       authenticatedUserId: this.optionalUserId(authorization),
     });
+  }
+
+  @Get(":leadId/brand-preview")
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  getBrandPreview(
+    @Param("leadId", new ParseUUIDPipe({ version: "4" })) leadId: string,
+  ) {
+    return this.brandPreview.getOrStartEligible(leadId);
+  }
+
+  @Post(":leadId/brand-preview/retry")
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  retryBrandPreview(
+    @Param("leadId", new ParseUUIDPipe({ version: "4" })) leadId: string,
+  ) {
+    return this.brandPreview.retry(leadId);
   }
 
   @Post("validate")

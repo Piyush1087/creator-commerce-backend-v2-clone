@@ -156,4 +156,16 @@ export type GatekeeperConfirmationResult = {
   leadId: string;
   gatekeeper_result: GatekeeperStructuredResult;
   surface_handoff: GatekeeperSurfaceHandoff | null;
+  brand_preview?: {
+    runId: string;
+    state:
+      | "ANALYSIS_ACTIVE"
+      | "PREVIEW_READY"
+      | "PREVIEW_FAILED_RECOVERABLE"
+      | "PREVIEW_NOT_READY";
+    phase?: string;
+    completeness?: "NORMAL" | "PARTIAL";
+    retryAllowed: boolean;
+    verificationContext: { brandProfileId: string | null };
+  };
 };

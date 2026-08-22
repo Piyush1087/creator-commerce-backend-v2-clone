@@ -22,6 +22,10 @@ const pairs = [
     "src/features/brand-onboarding/gatekeeper/runtime/artifacts",
     "dist/features/brand-onboarding/gatekeeper/runtime/artifacts",
   ],
+  [
+    "src/features/brand-onboarding/brand-preview/runtime/artifacts",
+    "dist/features/brand-onboarding/brand-preview/runtime/artifacts",
+  ],
 ];
 
 const required = [
@@ -44,6 +48,13 @@ const required = [
   "dist/features/brand-onboarding/gatekeeper/runtime/artifacts/gatekeeper_site_assessment/rules.yaml",
   "dist/features/brand-onboarding/gatekeeper/runtime/artifacts/gatekeeper_site_assessment/output_contract.yaml",
   "dist/features/brand-onboarding/gatekeeper/runtime/artifacts/taxonomy_contract.yaml",
+  "dist/features/brand-onboarding/brand-preview/runtime/artifacts/brand_preview_fast.yaml",
+  "dist/features/brand-onboarding/brand-preview/runtime/artifacts/brand_preview_minimum_output_contract.yaml",
+  "dist/features/brand-onboarding/brand-preview/runtime/artifacts/brand_preview_synthesis/processor.yaml",
+  "dist/features/brand-onboarding/brand-preview/runtime/artifacts/brand_preview_synthesis/reasoning.yaml",
+  "dist/features/brand-onboarding/brand-preview/runtime/artifacts/brand_preview_synthesis/output_contract.yaml",
+  "dist/features/brand-onboarding/brand-preview/runtime/artifacts/brand_preview_archetype_reasoning.yaml",
+  "dist/features/brand-onboarding/brand-preview/runtime/artifacts/creator_archetypes.yaml",
 ];
 
 for (const [fromRel, toRel] of pairs) {

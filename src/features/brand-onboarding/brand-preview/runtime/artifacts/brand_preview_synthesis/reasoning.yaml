@@ -1,0 +1,122 @@
+id: brand_preview_synthesis_reasoning
+version: 1.0-frozen
+status: FROZEN
+processor: brand_preview_synthesis
+
+reasoning_sequence:
+  - establish_grounded_brand_proposition_and_context
+  - identify_smallest_defensible_audience_hypothesis_set
+  - identify_creator_communication_opportunities
+  - map_needs_to_canonical_creator_archetypes
+  - generate_bounded_preview_output
+  - remove_unsupported_duplicate_or_weak_items_without_padding
+
+confirmed_industry_policy:
+  authoritative_input: true
+  reclassification_allowed: false
+  rule: Confirmed Industry is an upstream authority input. The processor may adapt terminology to it but must never infer a replacement Industry.
+
+brand_understanding_policy:
+  objective: Explain the apparent proposition, customer/use context and why creator communication may matter.
+  grounding_required: true
+  unsupported_claims_forbidden:
+    - market_leadership
+    - customer_sentiment
+    - growth_or_conversion_performance
+    - reputation_or_quality_superiority
+    - invented_differentiation
+    - guaranteed_creator_marketing_outcomes
+  healthcare_additional_forbidden:
+    - treatment_guarantees
+    - efficacy_claims_not_explicitly_supported
+    - promised_health_outcomes
+    - diagnostic_or_medical_advice
+
+audience_policy:
+  authority: EARLY_EVIDENCE_GROUNDED_HYPOTHESIS
+  customer_confirmed_truth: false
+  cardinality: {min_for_ready: 1, max: 3, normal_target: [2, 3]}
+  construction_rule: Prefer decision context, need, motivation or use situation over invented demographic precision.
+  sensitive_inference_rule: Do not infer sensitive traits merely to make an audience label more specific.
+  distinctness_rule: Each group must represent a materially distinct decision/use context; overlapping restatements are duplicates.
+  filler_forbidden: true
+
+creator_opportunity_policy:
+  authority: EARLY_STRATEGIC_SYNTHESIS
+  campaign_recommendation: false
+  cardinality: {min_for_ready: 1, max: 3, normal_target: [2, 3]}
+  valid_roles:
+    - explanation
+    - simplification
+    - trust
+    - proof
+    - demonstration
+    - aspiration
+    - relevance
+    - discovery
+    - relatability
+    - community
+  rule: Tie the creator role to an observed Brand/customer barrier or decision context.
+  prohibited:
+    - campaign_name
+    - deliverables
+    - budget
+    - creator_count
+    - follower_tier
+    - final_channel_plan
+    - guaranteed_business_outcome
+  filler_forbidden: true
+
+archetype_policy:
+  authority: DESCRIPTIVE_PREVIEW_RECOMMENDATION
+  campaign_targeting_authority: false
+  canonical_candidate_source: campaign/canonical/creator_archetypes.yaml
+  reasoning_metadata: intelligence/engines/brand_intelligence/brand_preview_archetype_reasoning.yaml
+  cardinality: {min_for_ready: 1, max: 4, normal_target: 3}
+  valid_candidate_rule: Recommend only active canonical IDs supplied in runtime candidate context.
+  label_generation_by_model: forbidden
+  selection_rule: Choose the smallest set whose communication strengths materially fit the grounded opportunities and Brand context.
+  duplicate_ids_forbidden: true
+  invented_archetype_forbidden: true
+  filler_forbidden: true
+
+cross_block_coherence:
+  - Audience hypotheses must be compatible with the Brand proposition/use context.
+  - Opportunities must address a grounded audience/Brand communication need.
+  - Archetype rationales must connect to at least one grounded opportunity or Brand communication need.
+  - Do not introduce a stronger factual claim in a later block than the Evidence supports in the Brand-understanding block.
+
+consumer_constraints:
+  source: intelligence/engines/brand_intelligence/brand_preview_minimum_output_contract.yaml
+  rule: Length and cardinality maximums are producer constraints. Do not rely on frontend truncation, rewriting or item dropping for normal valid output.
+
+internal_grounding_policy:
+  required_for:
+    - brand_descriptor_when_present
+    - brand_understanding_narrative
+    - every_audience_group
+    - every_creator_marketing_opportunity
+    - every_creator_archetype_recommendation
+  reference_semantics: Use traceable Evidence/dependency refs supplied by runtime; never fabricate a source reference.
+  minimum_refs_per_required_item: 1
+
+internal_confidence_policy:
+  allowed: [HIGH, MEDIUM, LOW]
+  numeric_confidence_forbidden: true
+  ui_exposed: false
+  rule: LOW-confidence optional/list items should normally be omitted if they cannot be defended. Confidence does not permit unsupported claims.
+
+item_quality_policy:
+  unsupported_item: DROP
+  duplicate_item: DROP
+  weak_redundant_item: DROP
+  invalid_archetype_id: DROP_AND_FAIL_SEMANTIC_VALIDATION_FOR_ITEM
+  replacement_with_generic_filler: forbidden
+  after_drop: Run deterministic readiness; do not auto-regenerate merely to restore preferred counts.
+
+uncertainty_language:
+  rule: Use bounded inferential language only where materially required; do not hedge every statement or expose internal confidence labels.
+
+private_reasoning_boundary:
+  chain_of_thought_output_required: false
+  retain_only: [structured_output, evidence_refs, semantic_confidence, runtime_provenance]

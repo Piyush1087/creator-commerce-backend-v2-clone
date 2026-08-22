@@ -1,0 +1,42 @@
+version: "1.0"
+status: FROZEN
+library: creator_archetypes
+
+rules:
+  canonical_ids_only: true
+  custom_entries_allowed: false
+  campaign_selection_min: 1
+  campaign_selection_max: 5
+  recommendation_engine_may_invent_archetype: false
+
+archetypes:
+  - {id: TRENDSETTER, label: "Trendsetter", is_active: true}
+  - {id: ENTERTAINER, label: "Entertainer", is_active: true}
+  - {id: VIRAL_CREATOR, label: "Viral Creator", is_active: true}
+  - {id: CHALLENGER, label: "Challenger", is_active: true}
+  - {id: LIFESTYLE_INTEGRATOR, label: "Lifestyle Integrator", is_active: true}
+  - {id: STORYTELLER, label: "Storyteller", is_active: true}
+  - {id: EDUCATOR, label: "Educator", is_active: true}
+  - {id: INDUSTRY_EXPERT, label: "Industry Expert", is_active: true}
+  - {id: DEEP_DIVER, label: "Deep Diver", is_active: true}
+  - {id: MYTH_BUSTER, label: "Myth Buster", is_active: true}
+  - {id: RELATABLE_PEER, label: "Relatable Peer", is_active: true}
+  - {id: COMMUNITY_BUILDER, label: "Community Builder", is_active: true}
+  - {id: LOCAL_GUIDE, label: "Local Guide", is_active: true}
+  - {id: CONVERSATION_STARTER, label: "Conversation Starter", is_active: true}
+  - {id: ADVOCATE, label: "Advocate", is_active: true}
+  - {id: PROBLEM_SOLVER, label: "Problem Solver", is_active: true}
+  - {id: PRODUCT_REVIEWER, label: "Product Reviewer", is_active: true}
+  - {id: DEAL_HUNTER, label: "Deal Hunter", is_active: true}
+  - {id: COMPARISON_CREATOR, label: "Comparison Creator", is_active: true}
+  - {id: CURATED_COLLECTOR, label: "Curated Collector", is_active: true}
+  - {id: VISUAL_ARTIST, label: "Visual Artist", is_active: true}
+  - {id: UGC_CREATOR, label: "UGC Creator", is_active: true}
+  - {id: CINEMATIC_CREATOR, label: "Cinematic Creator", is_active: true}
+  - {id: CREATIVE_DIRECTOR, label: "Creative Director", is_active: true}
+  - {id: AESTHETIC_MINIMALIST, label: "Aesthetic Minimalist", is_active: true}
+  - {id: FOUNDER_VOICE, label: "Founder Voice", is_active: true}
+  - {id: COACH, label: "Coach", is_active: true}
+  - {id: RESEARCHER, label: "Researcher", is_active: true}
+  - {id: THOUGHT_LEADER, label: "Thought Leader", is_active: true}
+  - {id: DEMONSTRATOR, label: "Demonstrator", is_active: true}
