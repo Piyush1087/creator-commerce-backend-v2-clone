@@ -8,6 +8,26 @@ import type {
 
 const PARALLEL_SEARCH_URL = "https://api.parallel.ai/v1/search";
 
+function retryAfterMs(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) return undefined;
+  return Math.max(0, timestamp - Date.now());
+}
+
+export class ParallelSearchError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+    readonly retryAfterMs?: number,
+  ) {
+    super(message);
+    this.name = "ParallelSearchError";
+  }
+}
+
 @Injectable()
 export class ParallelSearchClient {
   private readonly logger = new Logger(ParallelSearchClient.name);
@@ -17,18 +37,27 @@ export class ParallelSearchClient {
   async search(
     request: ParallelSearchRequest,
   ): Promise<ParallelSearchResponse | null> {
+    try {
+      return await this.searchOrThrow(request);
+    } catch (err) {
+      this.logger.warn(`Parallel search error err=${String(err)}`);
+      return null;
+    }
+  }
+
+  async searchOrThrow(
+    request: ParallelSearchRequest,
+  ): Promise<ParallelSearchResponse> {
     const apiKey = this.config.get<string>("PARALLEL_API_KEY", "");
     if (!apiKey) {
-      this.logger.warn("Parallel search skipped: PARALLEL_API_KEY not set");
-      return null;
+      throw new ParallelSearchError("PARALLEL_API_KEY is not configured");
     }
 
     if (
       !request.search_queries?.length ||
       !request.search_queries.some((q) => q.trim().length > 0)
     ) {
-      this.logger.warn("Parallel search skipped: empty search_queries");
-      return null;
+      throw new ParallelSearchError("Parallel search requires search_queries");
     }
 
     const body: ParallelSearchRequest = {
@@ -66,15 +95,23 @@ export class ParallelSearchClient {
       });
       const text = await response.text();
       if (!response.ok) {
-        this.logger.warn(
-          `Parallel search failed status=${response.status} body=${text.slice(0, 500)}`,
+        throw new ParallelSearchError(
+          `Parallel search failed (${response.status})`,
+          response.status,
+          retryAfterMs(response.headers.get("retry-after")),
         );
-        return null;
       }
-      return JSON.parse(text) as ParallelSearchResponse;
+      try {
+        return JSON.parse(text) as ParallelSearchResponse;
+      } catch {
+        throw new ParallelSearchError("Parallel search returned invalid JSON");
+      }
     } catch (err) {
-      this.logger.warn(`Parallel search error err=${String(err)}`);
-      return null;
+      if (err instanceof ParallelSearchError) throw err;
+      if (err instanceof Error && err.name === "AbortError") {
+        throw new ParallelSearchError("Parallel search timed out");
+      }
+      throw new ParallelSearchError("Parallel search connection failed");
     } finally {
       clearTimeout(timer);
     }

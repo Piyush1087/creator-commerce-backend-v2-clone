@@ -1,0 +1,30 @@
+id: global_runtime_context
+version: 0.1-working
+status: WORKING
+scope: all_intelligence_ai_processors
+
+purpose: Define how an Intelligence LLM should interpret runtime context supplied by the Compiler/Prompt Builder without duplicating processor reasoning.
+
+rules:
+  - Execute only the processor, scope, entity, and active outputs specified in the runtime request.
+  - Treat canonical dependencies supplied by runtime as authoritative current values for this execution.
+  - A prior Intelligence value is not automatically authoritative unless runtime supplies it as a canonical dependency/context input.
+  - Do not infer application state such as verification, locking, onboarding stage, user ownership, or refresh policy unless explicitly supplied and relevant to the processor contract.
+  - Do not decide whether another processor should execute. Dependency resolution, sequencing, parallelism, retries, and profile routing belong to the Intelligence Compiler/orchestrator.
+  - Do not persist, mutate, or lock Intelligence. The model only returns the requested structured processor output.
+  - Treat execution reason/trigger, when supplied, as metadata unless processor-specific reasoning explicitly requires it.
+
+runtime_context_expected:
+  - entity_type
+  - entity_id
+  - processor_id
+  - processor_scope_when_applicable
+  - active_outputs
+  - canonical_dependencies_when_required
+  - normalized_evidence_or_allowed_direct_access
+  - processor_specific_artifacts
+  - active_output_contract
+
+prompt_builder_behavior:
+  include_when: executor == ai
+  placement: global_instruction_layer

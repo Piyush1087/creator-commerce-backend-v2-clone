@@ -1,0 +1,67 @@
+id: gatekeeper_site_assessment_rules
+version: 1.0-frozen
+status: FROZEN
+processor: gatekeeper_site_assessment
+
+industry_policy:
+  taxonomy_contract: intelligence/runtime/admission/taxonomy_contract.yaml
+  provisional_only_until_confirmation: true
+  controlled_sub_industry_membership_required: false
+
+language_policy:
+  supported_intelligence_languages: [en]
+  eligibility_rule: sufficient English Evidence is required; country must never be used as a proxy for language.
+
+entity_policy:
+  allowed_categories: [BRAND, MARKETPLACE, CREATOR_MARKETING_PLATFORM, NON_COMMERCIAL_ENTITY, UNKNOWN]
+  exhaustive_ontology: false
+  extension_rule: add a category only when a distinct product/admission behavior requires it.
+
+commercial_destination_policy:
+  allowed_values: [WEBSITE, APP_STORE, PLAY_STORE, DIRECT_APK, LEAD_GENERATION, BOOKING, OFFLINE_LOCATION, SALES_CONTACT, MULTI_DESTINATION]
+  transactional_website_required: false
+  app_first_negative_signal: false
+  inaccessible_product_inference_allowed: false
+
+creator_marketing_policy:
+  question: Can creator-led discovery, trust, consideration, or acquisition meaningfully support this business?
+  ecommerce_required: false
+
+hard_block_policy:
+  rule: Only explicit Creator Shop hard blocks may produce a hard-block signal. Regulation or advertising-policy sensitivity alone is not a Gatekeeper hard block.
+
+similarweb_policy:
+  allowed: false
+  downstream_only: true
+
+confidence_policy:
+  allowed_values: [HIGH, MEDIUM, LOW]
+  numeric_thresholds: DEFERRED
+  high: may resolve automatically when no admission-critical conflict remains
+  medium: selectively corroborate only when the uncertainty is admission-critical
+  low: further Evidence/fallback required before automatic resolution
+
+semantic_validation:
+  - id: canonical_industry
+    rule: provisional_industry must be null or normalize to IndustryVertical; legacy routing/collaboration enums are invalid canonical outputs.
+  - id: free_form_gatekeeper_sub_industry
+    rule: provisional_sub_industry must never fail semantic validation solely because it is absent from controlled downstream Sub-industry taxonomy.
+  - id: country_not_language_proxy
+    rule: english_evidence_status may not be derived from country/geography alone.
+  - id: app_first_serviceability
+    rule: APP_STORE, PLAY_STORE, or DIRECT_APK presence must not itself reduce serviceability or force UNSUPPORTED.
+  - id: ecommerce_not_required
+    rule: absence of PDP/ecommerce Evidence must not imply creator_marketing_applicability=NOT_APPLICABLE when another valid conversion journey is evidenced.
+  - id: confidence_no_numeric_substitution
+    rule: assessment_confidence must be HIGH, MEDIUM, or LOW; numeric confidence is invalid in Gatekeeper v1.
+  - id: low_not_auto_admit
+    rule: LOW admission-critical confidence cannot be treated as sufficient for automatic admission.
+  - id: evidence_conflict_preserved
+    rule: admission-critical conflicting Evidence must be surfaced to execution policy rather than silently resolved by source order.
+
+admission_resolution_invariants:
+  - ADMITTED requires supported provisional Industry, sufficient English Evidence, creator-marketing applicability not NOT_APPLICABLE, no hard block, and no unresolved admission-critical conflict; Industry still requires the separate confirmation boundary before reusable Brand Intelligence/Surface handoff.
+  - UNSUPPORTED_LANGUAGE requires english_evidence_status=INSUFFICIENT.
+  - HARD_BLOCKED cannot expose ordinary self-service classification-review bypass.
+  - CLASSIFICATION_UNCERTAIN represents semantic uncertainty, not provider/connection failure.
+  - TECHNICAL_FAILURE represents exhausted technical execution, not semantic ambiguity.

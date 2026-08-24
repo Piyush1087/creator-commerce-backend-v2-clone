@@ -1,0 +1,112 @@
+id: brand_preview_synthesis
+version: 1.0-frozen
+status: FROZEN
+engine: brand_intelligence
+scope: onboarding_brand_preview
+processor_type: AI_REASONING
+
+purpose: >-
+  Produce one coherent, bounded Brand Preview synthesis after Gatekeeper admission and confirmed supported Industry, using provider-neutral Brand Preview Evidence and canonical creator-archetype candidates.
+
+authority:
+  product: intelligence/product_authority/brand_onboarding_v1_product_authority.md
+  minimum_output: intelligence/engines/brand_intelligence/brand_preview_minimum_output_contract.yaml
+  evidence_design: data_extraction/brand_preview_fast_evidence_acquisition_design.md
+  archetype_taxonomy: campaign/canonical/creator_archetypes.yaml
+  campaign_recommendation_boundary: campaign/create_campaign/archetype_recommendation_contract.yaml
+
+outputs:
+  - brand_descriptor
+  - brand_understanding_narrative
+  - audience_groups
+  - creator_marketing_opportunities
+  - creator_archetype_recommendations
+
+output_authority:
+  class: DERIVED_PRESENTATION_OUTPUT
+  canonical_brand_objects_created: false
+  rule: Preview outputs remain a versioned run synthesis and do not become permanent canonical Brand Intelligence Objects merely because they are displayed.
+
+inputs:
+  required:
+    - brand_name
+    - website_url
+    - confirmed_industry
+    - brand_preview.website_evidence
+  optional:
+    - brand_logo
+    - same_run_gatekeeper_evidence_refs
+    - same_run_gatekeeper_provenance
+    - brand_preview.public_web_enrichment
+
+preconditions:
+  gatekeeper_outcome: ADMITTED
+  confirmed_industry_in: [D2C, SAAS_AI, HEALTHCARE, OFFLINE_SERVICES]
+  confirmed_industry_authoritative: true
+  evidence_attempt_gate: brand_preview.website_evidence.sufficient_for_preview_synthesis_attempt == true
+
+processor_boundary:
+  single_coherent_synthesis_call: preferred_and_frozen
+  split_sequential_llm_calls: false
+  reason: Brand, Audience, opportunity and archetype outputs share substantially the same Evidence; one bounded call minimizes latency and cross-call inconsistency.
+  readiness_evaluation_inside_ai_processor: false
+
+model_profile:
+  primary: brand_preview_fast_reasoning
+  technical_fallback: brand_preview_fast_reasoning_fallback
+  registry: intelligence/runtime/models.yaml
+
+artifacts:
+  reasoning: intelligence/engines/brand_intelligence/processors/brand_preview_synthesis/reasoning.yaml
+  output_contract: intelligence/engines/brand_intelligence/processors/brand_preview_synthesis/output_contract.yaml
+  archetype_reasoning: intelligence/engines/brand_intelligence/brand_preview_archetype_reasoning.yaml
+
+prompt_builder:
+  use_shared_prompt_builder: true
+  composition_requires:
+    - shared_runtime_boundary
+    - shared_evidence_grounding
+    - shared_output_discipline
+    - this_processor_definition
+    - reasoning
+    - canonical_archetype_candidate_context
+    - normalized_evidence_context
+    - output_contract
+  hand_written_parallel_prompt_authority_allowed: false
+
+evidence_boundary:
+  primary_capability: brand_preview.website_evidence
+  optional_enrichment_capability: brand_preview.public_web_enrichment
+  provider_mechanics_forbidden_in_processor: [DIRECT_HTTP, CHEERIO, ZYTE_HTTP, ZYTE_RENDERED]
+  same_run_gatekeeper_evidence_reuse_allowed: true
+  downstream_domains_not_required:
+    - Product_Intelligence
+    - Competitor_Intelligence
+    - Instagram_Intelligence
+    - Performance_Intelligence
+    - Campaign_Intelligence
+
+post_processing:
+  deterministic_archetype_label_resolution: true
+  archetype_label_source: campaign/canonical/creator_archetypes.yaml
+  invalid_optional_or_list_items_may_be_dropped: true
+  drop_rule: Drop only invalid/duplicate/ungrounded items; never replace dropped items with filler.
+  readiness_after_post_processing: deterministic_brand_preview_readiness
+
+failure_policy:
+  required_input_missing: FAIL_PRECHECK
+  structural_invalidity: FAIL_VALIDATION_THEN_TECHNICAL_REPAIR_POLICY
+  semantic_invalidity: PRUNE_WHERE_SAFE_THEN_READINESS_EVALUATION
+  semantic_insufficiency_is_provider_failure: false
+  invalid_output_may_persist: false
+
+non_goals:
+  - full Brand Strategy architecture
+  - mature Audience Intelligence
+  - Product Intelligence
+  - Competitor Intelligence
+  - Instagram Intelligence
+  - Performance Intelligence
+  - Campaign recommendations
+  - backend application routing
+  - persistence schema implementation

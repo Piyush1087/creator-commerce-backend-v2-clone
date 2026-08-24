@@ -1,5 +1,12 @@
 import { Transform } from "class-transformer";
-import { IsNotEmpty, IsString, MaxLength, MinLength } from "class-validator";
+import {
+  Equals,
+  IsBoolean,
+  IsNotEmpty,
+  IsString,
+  MaxLength,
+  MinLength,
+} from "class-validator";
 
 export class DiscoverValidateRequestDto {
   @IsString()
@@ -8,4 +15,16 @@ export class DiscoverValidateRequestDto {
   @MaxLength(2048)
   @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   url!: string;
+
+  @IsBoolean()
+  @Equals(true)
+  ownershipAuthorizationAttested!: true;
+
+  @IsBoolean()
+  @Equals(true)
+  termsAccepted!: true;
+
+  @IsBoolean()
+  @Equals(true)
+  privacyPolicyAccepted!: true;
 }

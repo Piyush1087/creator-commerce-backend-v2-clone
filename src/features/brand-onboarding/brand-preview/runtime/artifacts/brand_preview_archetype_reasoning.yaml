@@ -1,0 +1,61 @@
+id: brand_preview_archetype_reasoning
+version: 1.0-frozen
+status: FROZEN
+owner: intelligence_engine
+canonical_taxonomy: campaign/canonical/creator_archetypes.yaml
+purpose: >-
+  Provide bounded Intelligence-owned communication-strength metadata used to reason over the canonical creator-archetype candidate set for Brand Preview. This file does not create IDs, labels, ranking scores or a competing taxonomy.
+
+rules:
+  canonical_ids_only: true
+  canonical_labels_owned_elsewhere: true
+  custom_archetypes_allowed: false
+  campaign_scoring_contract_unchanged: true
+  metadata_is_explanatory_not_taxonomic: true
+  recommendation_must_connect_to_grounded_preview_need: true
+
+communication_strengths:
+  TRENDSETTER: [novelty, aspiration, cultural_relevance]
+  ENTERTAINER: [attention, memorability, emotional_engagement]
+  VIRAL_CREATOR: [attention, shareability, cultural_momentum]
+  CHALLENGER: [provocation, comparison, reframing]
+  LIFESTYLE_INTEGRATOR: [contextual_relevance, everyday_integration, aspiration]
+  STORYTELLER: [narrative_connection, lived_experience, relatability]
+  EDUCATOR: [explanation, simplification, knowledge_transfer]
+  INDUSTRY_EXPERT: [authority, explanation, trust]
+  DEEP_DIVER: [depth, evaluation, explanation]
+  MYTH_BUSTER: [clarification, objection_handling, trust]
+  RELATABLE_PEER: [relatability, lived_experience, social_proof]
+  COMMUNITY_BUILDER: [community, trust, participation]
+  LOCAL_GUIDE: [local_discovery, relevance, practical_context]
+  CONVERSATION_STARTER: [discussion, awareness, consideration]
+  ADVOCATE: [belief, trust, mission_alignment]
+  PROBLEM_SOLVER: [utility, demonstration, practical_explanation]
+  PRODUCT_REVIEWER: [evaluation, proof, demonstration]
+  DEAL_HUNTER: [value_discovery, offer_relevance, action]
+  COMPARISON_CREATOR: [comparison, decision_support, proof]
+  CURATED_COLLECTOR: [discovery, curation, taste]
+  VISUAL_ARTIST: [visual_expression, aspiration, memorability]
+  UGC_CREATOR: [demonstration, relatability, everyday_proof]
+  CINEMATIC_CREATOR: [storytelling, aspiration, visual_impact]
+  CREATIVE_DIRECTOR: [concept_translation, visual_storytelling, brand_expression]
+  AESTHETIC_MINIMALIST: [clarity, visual_consistency, premium_context_without_claim]
+  FOUNDER_VOICE: [origin_story, authority, trust]
+  COACH: [guidance, motivation, practical_application]
+  RESEARCHER: [evidence_translation, depth, comparison]
+  THOUGHT_LEADER: [authority, reframing, category_education]
+  DEMONSTRATOR: [demonstration, how_to, product_or_service_clarity]
+
+selection_guidance:
+  - Prefer archetypes whose strengths directly address a grounded creator-marketing opportunity.
+  - Prefer fewer archetypes when multiple IDs solve essentially the same communication job.
+  - Do not recommend an archetype only because it is common in the confirmed Industry.
+  - Do not infer follower tier, audience demographics or individual creators from archetype metadata.
+  - Healthcare recommendations requiring authority must still avoid diagnosis, treatment promises or unsupported efficacy claims.
+
+validation:
+  runtime_must_resolve_candidate_against_canonical_taxonomy: true
+  runtime_must_require_active: true
+  duplicate_ids_invalid: true
+  unknown_id_invalid: true
+  invalid_id_conversion_or_aliasing: forbidden

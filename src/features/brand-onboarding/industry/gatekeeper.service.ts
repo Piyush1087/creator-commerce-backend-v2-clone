@@ -45,7 +45,7 @@ export class GatekeeperService implements IndustryClassifier {
     try {
       const modelId =
         this.config.get<string>("GATEKEEPER_GEMINI_MODEL")?.trim() ||
-        this.config.get<string>("GEMINI_MODEL", "gemini-2.5-flash");
+        this.config.get<string>("GEMINI_MODEL", "gemini-3.6-flash");
       const systemInstruction = loadPromptMarkdown("gatekeeper.prompt.md");
       const userText = [
         `CANONICAL_SITE_URL: ${gated.normalizedUrl}`,

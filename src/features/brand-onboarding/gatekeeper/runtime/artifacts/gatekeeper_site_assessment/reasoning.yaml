@@ -1,0 +1,50 @@
+id: gatekeeper_site_assessment_reasoning
+version: 1.0-frozen
+status: FROZEN
+processor: gatekeeper_site_assessment
+
+objective: Determine only the semantic assessment signals needed for Gatekeeper v1 admission/serviceability. Do not build full Brand, Product, Competitor, Instagram, geography, regulatory, or campaign Intelligence.
+
+grounding_principles:
+  - Ground conclusions in supplied public Evidence and preserve uncertainty when Evidence is insufficient.
+  - Treat owned-domain and public-search Evidence as distinguishable provenance even when one provider capability supplies both.
+  - Do not infer language eligibility from country.
+  - Do not require a transactional ecommerce website.
+  - Treat app-first, booking, lead-generation, offline, SaaS-signup and sales-contact journeys as potentially valid commercial businesses.
+  - Do not infer inaccessible in-app products or internal catalogues.
+  - Do not reject regulated or advertising-sensitive businesses unless an explicit Gatekeeper hard block applies.
+  - Similarweb is not Gatekeeper Evidence.
+
+assessment_tasks:
+  provisional_industry:
+    instruction: Select the best supported canonical IndustryVertical classification when Evidence is sufficient; otherwise use UNKNOWN or null according to the output contract. This remains provisional until the required confirmation boundary.
+  provisional_sub_industry:
+    instruction: Provide a short grounded free-form hint when useful. Do not force controlled downstream Sub-industry membership and do not use failure to fit a taxonomy as an admission-negative signal.
+  entity_category:
+    instruction: Use only the minimal admission categories defined by the output contract. Choose UNKNOWN when reliable classification is not possible.
+  english_evidence_status:
+    instruction: Judge whether sufficient English commercial/business Evidence exists for automated onboarding. A non-English-majority country is irrelevant to this determination.
+  creator_marketing_applicability:
+    instruction: Assess whether creator-led discovery, trust, consideration, or acquisition can meaningfully support the business. Ecommerce PDPs are not required.
+  commercial_destination_types:
+    instruction: Identify only externally evidenced commercial/conversion destinations. Recognize app stores, direct APK, booking, lead generation, offline location, sales contact, website, or multi-destination journeys without inventing inaccessible offerings.
+  assessment_confidence:
+    instruction: Emit HIGH, MEDIUM, or LOW based on admission-critical certainty and Evidence agreement. Do not use arbitrary numeric thresholds.
+
+confidence_semantics:
+  HIGH: Admission-critical assessment is well grounded and materially consistent across available Evidence.
+  MEDIUM: Some uncertainty exists, but it may be non-admission-critical. The execution profile decides whether selective corroboration is required.
+  LOW: Admission-critical uncertainty, insufficiency, or conflict remains and further Evidence/fallback is required.
+
+uncertainty_rules:
+  - MEDIUM overall confidence does not automatically require fallback.
+  - If MEDIUM uncertainty concerns only provisional sub-industry or another non-admission-critical detail, preserve the assessment without escalation solely for that reason.
+  - If MEDIUM uncertainty could change supported vs unsupported Industry, English sufficiency, entity/serviceability, creator-marketing applicability, or another admission outcome, flag it for corroboration through the execution profile.
+  - LOW admission-critical confidence must not auto-admit.
+  - Conflicting admission-critical Evidence must not be hidden by a single confident source.
+  - Insufficient Evidence must remain unresolved rather than being converted to a plausible guess.
+
+boundary:
+  final_admission_outcome: NOT_OWNED_BY_THIS_PROCESSOR
+  recovery_actions: NOT_OWNED_BY_THIS_PROCESSOR
+  manual_review_eligibility: NOT_OWNED_BY_THIS_PROCESSOR

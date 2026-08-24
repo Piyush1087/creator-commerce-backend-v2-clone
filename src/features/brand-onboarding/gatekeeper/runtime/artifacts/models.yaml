@@ -1,0 +1,163 @@
+version: 0.3-working
+status: WORKING
+
+purpose: Central registry for AI model selection and runtime defaults used by the Intelligence Compiler. Processors reference stable model profiles; provider model IDs and tunable runtime settings are resolved here so model changes do not require rewriting processor definitions or reasoning artifacts.
+
+principles:
+  - Processor definitions must not hardcode provider model IDs.
+  - A processor/scope requests a stable model_profile based on the job it performs.
+  - model_profile resolves to a provider model alias and runtime settings.
+  - Provider credentials and secrets live only in environment/secret configuration and never in this file.
+  - Model Registry controls execution configuration; it does not contain reasoning, taxonomy, evidence, or output-contract instructions.
+  - Processor-specific runtime overrides should be rare and explicit.
+  - Exact provider model IDs may change without changing processor identity, artifacts, Intelligence Objects, or Execution Profiles unless the model itself is frozen product/execution authority.
+  - When Data Extraction owns provider execution, Intelligence still resolves the requested provider/model and passes that request across the capability boundary; Intelligence does not consume provider credentials directly.
+
+providers:
+  google_gemini:
+    adapter: gemini
+    credential_ref: env.GEMINI_API_KEY
+    enabled_environments: [development, test, production]
+  openai:
+    adapter: openai
+    credential_ref: env.OPENAI_API_KEY
+    enabled_environments: [development, test, production]
+
+model_aliases:
+  gemini_gatekeeper_v1:
+    provider: google_gemini
+    model_id: gemini-2.5-flash
+    lifecycle: FROZEN_GATEKEEPER_V1
+    intended_use: Gatekeeper v1 primary grounded site assessment requested through Data Extraction capability gatekeeper_primary_web_assessment
+
+  gemini_fast_current:
+    provider: google_gemini
+    model_id: gemini-3.5-flash
+    lifecycle: CURRENT
+    intended_use: low-latency classification and straightforward structured extraction outside frozen Gatekeeper v1
+
+  gemini_reasoning_current:
+    provider: google_gemini
+    model_id: gemini-3.5-flash
+    lifecycle: CURRENT
+    intended_use: evidence-grounded tasks requiring comparison, conflict resolution, or multi-signal reasoning
+
+  brand_preview_openai_fast_fallback:
+    provider: openai
+    model_id: gpt-5.6-luna
+    lifecycle: APPROVED_TECHNICAL_FALLBACK
+    intended_use: Cross-provider structured-output fallback for bounded Brand Preview synthesis when the primary model path is technically exhausted.
+
+model_profiles:
+  gatekeeper_v1_primary:
+    description: Frozen Gatekeeper v1 primary model selection. Provider execution occurs through Data Extraction gatekeeper_primary_web_assessment with URL Context and Google Search grounding.
+    model_alias: gemini_gatekeeper_v1
+    runtime: {temperature: 0, structured_output: true, timeout_ms: 120000, max_attempts: 1}
+    intended_processors: [gatekeeper_site_assessment]
+    retry_ownership: DATA_EXTRACTION_BOUNDED_TECHNICAL_RETRY
+
+  fast_classification:
+    description: Low-latency constrained classification against controlled taxonomies.
+    model_alias: gemini_fast_current
+    runtime: {temperature: 0, structured_output: true, timeout_ms: 15000, max_attempts: 2}
+    intended_processors: [industry_classification.gatekeeper]
+
+  grounded_extraction:
+    description: Evidence-grounded structured extraction where multiple website signals may need to be reconciled.
+    model_alias: gemini_reasoning_current
+    runtime: {temperature: 0, structured_output: true, timeout_ms: 30000, max_attempts: 2}
+    intended_processors: [identity_core, industry_classification.industry_niche]
+
+  grounded_geography:
+    description: Evidence-grounded geographic reasoning across website and optional external geography evidence.
+    model_alias: gemini_reasoning_current
+    runtime: {temperature: 0, structured_output: true, timeout_ms: 30000, max_attempts: 2}
+    intended_processors: [market_geography]
+
+  brand_preview_fast_reasoning:
+    description: Low-latency evidence-grounded structured synthesis for bounded Brand Preview output.
+    model_alias: gemini_reasoning_current
+    runtime: {temperature: 0, structured_output: true, timeout_ms: 25000, max_attempts: 2}
+    intended_processors: [brand_preview_synthesis]
+
+  brand_preview_fast_reasoning_fallback:
+    description: Approved cross-provider technical fallback for Brand Preview synthesis after the primary model path is technically exhausted.
+    model_alias: brand_preview_openai_fast_fallback
+    runtime: {temperature: 0, structured_output: true, timeout_ms: 30000, max_attempts: 1}
+    intended_processors: [brand_preview_synthesis]
+    fallback_only: true
+
+processor_model_bindings:
+  gatekeeper_site_assessment:
+    default: {model_profile: gatekeeper_v1_primary, access_mode: normalized_evidence}
+  industry_classification:
+    gatekeeper: {model_profile: fast_classification, access_mode: website_direct}
+    industry_niche: {model_profile: grounded_extraction, access_mode: normalized_evidence}
+  identity_core:
+    default: {model_profile: grounded_extraction, access_mode: normalized_evidence}
+  market_geography:
+    default: {model_profile: grounded_geography, access_mode: normalized_evidence}
+  brand_preview_synthesis:
+    default:
+      model_profile: brand_preview_fast_reasoning
+      technical_fallback_profile: brand_preview_fast_reasoning_fallback
+      access_mode: normalized_evidence
+
+runtime_defaults:
+  default_model_alias: gemini_reasoning_current
+  structured_output: true
+  temperature: 0
+  timeout_ms: 30000
+  max_attempts: 2
+  retry_on: [provider_timeout, provider_rate_limit, transient_provider_error]
+  do_not_retry_on: [invalid_required_input, unsupported_business_outcome, deterministic_output_contract_violation_after_successful_provider_response]
+  retry_backoff: {strategy: exponential, initial_delay_ms: 500, max_delay_ms: 4000}
+  output_behavior:
+    parse_structured_response: true
+    validate_before_persistence: true
+    persist_raw_provider_response: false
+    retain_response_for_runtime_debugging: implementation_policy_to_define
+
+resolution_order: [processor_scope_binding, processor_default_binding, explicit_authorized_execution_override, runtime_default]
+
+execution_override_policy:
+  allowed_for: [development, test, admin_debug]
+  production_default: false
+  allowed_fields: [model_profile, timeout_ms]
+  forbidden_without_runtime_code_change: [disable_output_validation, disable_evidence_grounding, inject_provider_credentials]
+
+compiler_resolution_contract:
+  input: [processor_id, processor_scope_when_applicable, environment]
+  steps:
+    - Resolve processor/scope to model_profile through processor_model_bindings.
+    - Resolve model_profile to model_alias and runtime settings.
+    - Resolve model_alias to provider and concrete model_id.
+    - When provider execution is Intelligence-owned, resolve provider credentials/configuration from environment secrets.
+    - When provider execution is Data Extraction-owned, pass the resolved provider/model request across the capability boundary without exposing credentials to Intelligence.
+    - Merge permitted runtime defaults and authorized overrides.
+    - Return an immutable resolved_model_runtime snapshot for the Processor Execution.
+
+telemetry_requirements:
+  record_per_processor_execution: [model_profile, model_alias, provider, model_id, runtime_settings_effective, attempt_count, input_tokens_when_available, output_tokens_when_available, provider_cost_when_available, provider_latency_when_available]
+
+failure_policy:
+  missing_processor_binding: {action: FAIL_PRECHECK, code: MODEL_PROFILE_NOT_CONFIGURED}
+  missing_model_alias: {action: FAIL_PRECHECK, code: MODEL_ALIAS_NOT_FOUND}
+  model_id_not_configured: {action: FAIL_PRECHECK, code: MODEL_ID_NOT_CONFIGURED}
+  provider_credentials_missing: {action: FAIL_PRECHECK_WHEN_INTELLIGENCE_OWNS_PROVIDER_CONNECTION, code: PROVIDER_CREDENTIALS_MISSING}
+  provider_unavailable: {action: DATA_EXTRACTION_BOUNDED_RETRY_THEN_RETURN_TECHNICAL_FAILURE_WHEN_DE_OWNS_EXECUTION, code: PROVIDER_UNAVAILABLE}
+  provider_timeout: {action: DATA_EXTRACTION_BOUNDED_RETRY_THEN_RETURN_TECHNICAL_FAILURE_WHEN_DE_OWNS_EXECUTION, code: PROVIDER_TIMEOUT}
+
+identity_test_readiness:
+  default_model_decision: Gemini 3.5 Flash for Identity AI processor profiles for MVP; optimize/split later based on observed latency, quality and cost.
+  note: The legacy Identity gatekeeper test profile is not the Gatekeeper v1 production model authority.
+
+gatekeeper_v1_readiness:
+  primary_model: gemini-2.5-flash
+  primary_capability: gatekeeper_primary_web_assessment
+  parallel_capability: company_public_web_research
+  openai_capability: openai_structured_assessment
+  openai_model: DEFERRED_IE_SELECTION
+  rule: Do not resolve an OpenAI model until separately approved; Data Extraction must require Intelligence to supply it.
+
+non_goals: [Prompt construction, Global or processor-specific reasoning instructions, Evidence acquisition or normalization, Processor output schemas, Intelligence persistence mapping, Trigger policy, Provider secret storage]
