@@ -200,6 +200,12 @@ export default $config({
       SETTINGS_FIELD_ENCRYPTION_KEY: process.env
         .SETTINGS_FIELD_ENCRYPTION_KEY as string,
       EXTERNAL_API_TIMEOUT_MS: process.env.EXTERNAL_API_TIMEOUT_MS ?? "10000",
+      // Gatekeeper v1 — required for support URL, legal version headers, and OpenAI fallback slot
+      GATEKEEPER_SUPPORT_URL: process.env.GATEKEEPER_SUPPORT_URL ?? "",
+      GATEKEEPER_TERMS_VERSION: process.env.GATEKEEPER_TERMS_VERSION ?? "",
+      GATEKEEPER_PRIVACY_POLICY_VERSION:
+        process.env.GATEKEEPER_PRIVACY_POLICY_VERSION ?? "",
+      GATEKEEPER_OPENAI_MODEL_ID: process.env.GATEKEEPER_OPENAI_MODEL_ID ?? "",
     };
 
     cluster.addService("api", {
