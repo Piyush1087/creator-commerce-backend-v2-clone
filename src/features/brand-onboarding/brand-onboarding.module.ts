@@ -77,6 +77,8 @@ import {
   BRAND_PREVIEW_PUBLIC_WEB_ENRICHMENT,
   BRAND_PREVIEW_WEBSITE_EVIDENCE,
 } from "./brand-preview/data-extraction/brand-preview-evidence.port";
+import { BrandStateReadTelemetryService } from "./canonical-brand-state/brand-state-read-telemetry.service";
+import { CanonicalBrandStateService } from "./canonical-brand-state/canonical-brand-state.service";
 
 @Module({
   imports: [
@@ -112,6 +114,8 @@ import {
     GatekeeperPromptService,
     GatekeeperRuntimeOrchestratorService,
     GatekeeperTelemetryService,
+    CanonicalBrandStateService,
+    BrandStateReadTelemetryService,
     BrandPreviewRunService,
     BrandPreviewWebsiteEvidenceService,
     BrandPreviewPublicWebEnrichmentService,

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { PrismaService } from "../../../../prisma/prisma.service";
 import type { GatekeeperPersistenceService } from "../../gatekeeper/gatekeeper-persistence.service";
+import type { CanonicalBrandStateService } from "../../canonical-brand-state/canonical-brand-state.service";
 import type { BrandPreviewPublicWebEnrichmentService } from "../data-extraction/brand-preview-enrichment.service";
 import type { BrandPreviewWebsiteEvidenceService } from "../data-extraction/brand-preview-evidence.service";
 import type { BrandPreviewEvidence } from "../brand-preview.types";
@@ -95,6 +96,13 @@ function synthesis(archetypeId = "EDUCATOR") {
 function harness(args: {
   evidence: BrandPreviewEvidence;
   synthesisResults?: unknown[];
+  runBrandProfileId?: string | null;
+  postAnchors?: {
+    brandName?: string;
+    websiteUrl?: string;
+    confirmedIndustry?: string;
+    logoUrl?: string | null;
+  };
 }) {
   const updates: Array<Record<string, unknown>> = [];
   const prisma = {
@@ -104,6 +112,7 @@ function harness(args: {
         discoveryLeadId: "lead-1",
         leaseToken: "lease-1",
         state: BrandPreviewRuntimeState.ANALYSIS_ACTIVE,
+        brandProfileId: args.runBrandProfileId ?? null,
         discoveryLead: { temporaryPayload: {} },
       }),
       updateMany: vi.fn().mockImplementation(({ data }) => {
@@ -130,11 +139,42 @@ function harness(args: {
   for (const result of args.synthesisResults ?? [synthesis()]) {
     synthesize.mockResolvedValueOnce(result);
   }
+  const readSnapshot = vi
+    .fn()
+    .mockImplementation(
+      ({ lifecycleMode }: { lifecycleMode: "PRE_PROFILE" | "POST_PROFILE" }) =>
+        Promise.resolve(
+          lifecycleMode === "PRE_PROFILE"
+            ? {
+                lifecycle_mode: "PRE_PROFILE",
+                website_url: { value: "https://example.com/" },
+                brand_name: { value: null },
+                industry: { value: IndustryVertical.D2C },
+              }
+            : {
+                lifecycle_mode: "POST_PROFILE",
+                website_url: {
+                  value: args.postAnchors?.websiteUrl ?? "example.com",
+                },
+                brand_name: {
+                  value: args.postAnchors?.brandName ?? "Example",
+                },
+                brand_logo: {
+                  value: args.postAnchors?.logoUrl ?? args.evidence.logoUrl,
+                },
+                industry: {
+                  value:
+                    args.postAnchors?.confirmedIndustry ?? IndustryVertical.D2C,
+                },
+              },
+        ),
+    );
   const service = new BrandPreviewRuntimeService(
     prisma as unknown as PrismaService,
     {
       getGatekeeperResult: vi.fn().mockResolvedValue(gatekeeper),
     } as unknown as GatekeeperPersistenceService,
+    { readSnapshot } as unknown as CanonicalBrandStateService,
     {
       acquire: vi.fn().mockResolvedValue(args.evidence),
     } as unknown as BrandPreviewWebsiteEvidenceService,
@@ -151,7 +191,14 @@ function harness(args: {
         ]),
     } as unknown as BrandPreviewArtifactLoader,
   );
-  return { service, updates, enrichment, synthesize };
+  return {
+    service,
+    updates,
+    enrichment,
+    synthesize,
+    readSnapshot,
+    prisma,
+  };
 }
 
 describe("BrandPreviewRuntimeService", () => {
@@ -196,5 +243,78 @@ describe("BrandPreviewRuntimeService", () => {
       retryAllowed: true,
       phase: null,
     });
+  });
+
+  it("uses canonical post-profile anchors when later Preview name and logo candidates conflict", async () => {
+    const candidate = {
+      ...evidence(true),
+      brandName: "Later Scan Name",
+      logoUrl: "https://example.com/later-logo.png",
+    };
+    const harnessed = harness({
+      evidence: candidate,
+      postAnchors: {
+        brandName: "Settings Name",
+        websiteUrl: "canonical.example",
+        confirmedIndustry: IndustryVertical.HEALTHCARE,
+        logoUrl: "https://cdn.example.com/settings-logo.png",
+      },
+    });
+    await harnessed.service.execute("run-1", "lease-1");
+
+    expect(harnessed.readSnapshot.mock.calls.map(([call]) => call)).toEqual([
+      expect.objectContaining({ lifecycleMode: "PRE_PROFILE" }),
+      expect.objectContaining({
+        lifecycleMode: "POST_PROFILE",
+        brandProfileId: "profile-stable",
+        candidates: expect.objectContaining({
+          brandName: "Later Scan Name",
+          brandLogo: "https://example.com/later-logo.png",
+        }),
+      }),
+    ]);
+    expect(harnessed.synthesize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        brandName: "Settings Name",
+        websiteUrl: "canonical.example",
+        confirmedIndustry: IndustryVertical.HEALTHCARE,
+        evidence: expect.objectContaining({
+          brandName: "Settings Name",
+          logoUrl: "https://cdn.example.com/settings-logo.png",
+        }),
+      }),
+    );
+    expect(harnessed.updates.at(-1)?.previewOutputSnapshot).toMatchObject({
+      identity: {
+        brand_name: "Settings Name",
+        website_url: "canonical.example",
+        confirmed_industry: IndustryVertical.HEALTHCARE,
+        logo_url: "https://cdn.example.com/settings-logo.png",
+      },
+    });
+  });
+
+  it("starts a retry linked to a BrandProfile in POST_PROFILE without creating another profile", async () => {
+    const harnessed = harness({
+      evidence: evidence(true),
+      runBrandProfileId: "profile-existing",
+      postAnchors: {
+        brandName: "Existing Canonical Name",
+        websiteUrl: "existing.example",
+      },
+    });
+    await harnessed.service.execute("run-1", "lease-1");
+
+    expect(harnessed.readSnapshot.mock.calls[0]?.[0]).toMatchObject({
+      lifecycleMode: "POST_PROFILE",
+      brandProfileId: "profile-existing",
+    });
+    expect(harnessed.prisma.brandProfile.upsert).not.toHaveBeenCalled();
+    expect(harnessed.synthesize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        brandName: "Existing Canonical Name",
+        websiteUrl: "existing.example",
+      }),
+    );
   });
 });
