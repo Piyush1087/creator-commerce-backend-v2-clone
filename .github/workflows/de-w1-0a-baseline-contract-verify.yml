@@ -1,0 +1,19 @@
+name: DE W1.0A Baseline Contract Verify
+
+on:
+  push:
+    branches:
+      - temp/de-w1-0a-baseline-contract-verify-a7c8f3a8
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run intelligence:contracts:verify
