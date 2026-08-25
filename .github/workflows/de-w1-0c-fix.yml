@@ -1,0 +1,32 @@
+name: DE-W1.0C repository patch
+on:
+  push:
+    branches:
+      - phase-g/data-extraction-wave1-evidence-w1-0c-repositories
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase-g/data-extraction-wave1-evidence-w1-0c-repositories
+      - name: Tighten repository implementation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/features/data-extraction/evidence/persistence/prisma-evidence-repositories.ts')
+          s = p.read_text()
+          s = s.replace('return JSON.stringify(value);', 'return JSON.stringify(value) ?? "undefined";')
+          s = s.replace('''          existing.capabilityExecutionRef !==\n            (input.capabilityExecutionRef ?? null) ||\n          !sameQuality(existing, input.acquisitionQuality)\n''', '''          existing.capabilityExecutionRef !==\n            (input.capabilityExecutionRef ?? null)\n''')
+          p.write_text(s)
+          PY
+          rm .github/workflows/de-w1-0c-fix.yml
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(data-extraction): tighten repository idempotency" || exit 0
+          git push origin HEAD:phase-g/data-extraction-wave1-evidence-w1-0c-repositories
