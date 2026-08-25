@@ -1,6 +1,7 @@
 import type {
   BrandId,
   CapabilityExecutionRef,
+  CaptureRef,
   EvidenceRef,
   ResourceRef,
 } from "../domain/evidence-identities";
@@ -43,19 +44,27 @@ export interface DataExtractionEvidenceQueryPortV1 {
 export interface DataExtractionCapabilityAcquisitionRequestV1 {
   readonly brandId: BrandId;
   readonly capabilityId: EvidenceCapabilityId;
-  readonly resourceScope: readonly ResourceRef[];
+  /** Optional pre-resolved scope retained for W1.0A compatibility. D resolves actual pages itself. */
+  readonly resourceScope?: readonly ResourceRef[];
   readonly freshnessIntent: EvidenceFreshnessIntent;
   readonly sourceRevisionRef?: string;
   readonly normalizationContractVersion: string;
-  readonly correlationRef: string;
+  /** Caller-owned DE acquisition idempotency key. Not a processor identity. */
+  readonly requestKey: string;
+  /** Canonical PUBLIC_OWNED_SITE root used to resolve durable Resources. */
+  readonly ownedWebsiteRoot: string;
+  readonly correlationRef?: string;
 }
 
 export interface DataExtractionCapabilityAcquisitionResultV1 {
   readonly capabilityExecutionRef: CapabilityExecutionRef;
+  /** D deliberately emits no semantic Evidence; this remains empty until E. */
   readonly evidenceRefs: readonly EvidenceRef[];
+  readonly resourceRefs?: readonly ResourceRef[];
+  readonly captureRefs?: readonly CaptureRef[];
 }
 
-/** Separate acquisition/refresh command boundary; DE-W1.0A defines only the contract. */
+/** Separate acquisition/refresh command boundary. It must never be used by readExisting(). */
 export interface DataExtractionCapabilityAcquisitionPortV1 {
   request(
     request: DataExtractionCapabilityAcquisitionRequestV1,
