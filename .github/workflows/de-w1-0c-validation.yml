@@ -1,0 +1,88 @@
+name: DE-W1.0C validation
+on:
+  push:
+    branches:
+      - phase-g/data-extraction-wave1-evidence-w1-0c-repositories
+permissions:
+  contents: write
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: validation
+          POSTGRES_PASSWORD: validation
+          POSTGRES_DB: validation
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U validation -d validation"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
+      DE_W1_0B_DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
+      DE_W1_0C_DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
+      BASE_SHA: a1af9c068d8f3eb11129484750fdc948d731f028
+      TARGET_BRANCH: phase-g/data-extraction-wave1-evidence-w1-0c-repositories
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase-g/data-extraction-wave1-evidence-w1-0c-repositories
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: npm ci
+        run: npm ci
+      - name: Prisma generate
+        run: npm run prisma:generate
+      - name: Prisma validate
+        run: npx prisma validate
+      - name: Apply all migrations
+        run: npx prisma migrate deploy
+      - name: Reset and reapply all migrations
+        run: npx prisma migrate reset --force --skip-seed
+      - name: DE-W1.0C repository and transaction tests
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/evidence-repositories.postgres.test.ts src/features/data-extraction/evidence/evidence-repositories.architecture.test.ts
+      - name: DE-W1.0B persistence regression
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/evidence-persistence.postgres.test.ts src/features/data-extraction/evidence/evidence-persistence.architecture.test.ts
+      - name: DE-W1.0A regression
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/evidence-runtime-contracts.test.ts src/features/data-extraction/evidence/evidence-runtime.architecture.test.ts
+      - name: W1.0E compatibility
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/evidence-w1-0e-compatibility.test.ts src/features/brand-intelligence/input/evidence/evidence-input.test.ts src/features/brand-intelligence/input/dependency/processor-dependency-preparation.test.ts
+      - name: W1.0F projection
+        run: npx vitest run --config vitest.config.ts src/features/brand-intelligence/brand-intelligence.current-projection.architecture.test.ts src/features/brand-intelligence/projection
+      - name: Nest build
+        run: npm run build
+      - name: Scoped lint
+        run: npx eslint "src/features/data-extraction/evidence/**/*.ts" "src/features/data-extraction/data-extraction.module.ts"
+      - name: Full suite
+        run: npm test
+      - name: Confirm no schema or migration change
+        run: git diff --exit-code "$BASE_SHA"..HEAD -- prisma/schema.prisma prisma/migrations
+      - name: Confirm real processors remain disabled
+        run: |
+          node <<'NODE'
+          const registry = require('./src/features/brand-intelligence/generated/contract-bundles/registry.json');
+          for (const id of ['brand_communication', 'brand_meaning']) {
+            const row = registry.registrations.find((entry) => entry.processorId === id);
+            if (!row || row.bundled !== true || row.registered !== true || row.executionEnabled !== false) {
+              throw new Error(`${id} processor state changed`);
+            }
+          }
+          NODE
+      - name: Diff check
+        run: git diff --check "$BASE_SHA"..HEAD
+      - name: Remove temporary validation workflow after success
+        run: |
+          rm .github/workflows/de-w1-0c-validation.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "test(data-extraction): validate Wave 1 repository foundation"
+          git push origin HEAD:${TARGET_BRANCH}
