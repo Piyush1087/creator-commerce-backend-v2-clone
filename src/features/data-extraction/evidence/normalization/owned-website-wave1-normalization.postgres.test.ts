@@ -19,12 +19,31 @@ const describePostgres = databaseUrl ? describe : describe.skip;
 
 class Wave1FakeMechanics implements OwnedWebsitePageAcquisitionMechanics {
   readonly calls: string[] = [];
+  failRoot = false;
 
   constructor(private readonly constrained = true) {}
 
   async acquire(url: string): Promise<OwnedWebsitePageAcquisition> {
     this.calls.push(url);
     const path = new URL(url).pathname;
+    if (this.failRoot && path === "/") {
+      return {
+        url,
+        internalLinks: [],
+        quality: {
+          state: "UNAVAILABLE",
+          failureCategories: ["RESOURCE_UNAVAILABLE"],
+          detailCodes: ["FAKE_FAILURE"],
+        },
+        attempts: [
+          {
+            providerExecutionRef: `provider-execution:${randomUUID()}`,
+            attemptRole: "PRIMARY",
+          },
+        ],
+        reasonCodes: ["NO_USABLE_CONTENT"],
+      };
+    }
     const links =
       path === "/"
         ? [
@@ -118,6 +137,13 @@ describePostgres("DE-W1.0E durable normalization", () => {
         "owned_website.brand_messaging",
       ),
     );
+    const prepared =
+      await prisma.dataExtractionCapabilityExecution.findUniqueOrThrow({
+        where: { capabilityExecutionRef: acquired.capabilityExecutionRef },
+      });
+    expect(prepared.completedAt).toBeNull();
+    expect(prepared.availability).toBe("NOT_REQUESTED");
+
     const first = await normalization.normalize({
       brandId,
       capabilityExecutionRef: acquired.capabilityExecutionRef,
@@ -125,6 +151,17 @@ describePostgres("DE-W1.0E durable normalization", () => {
 
     expect(first.availability).toBe("AVAILABLE");
     expect(first.evidenceRefs.length).toBeGreaterThan(0);
+    const terminal =
+      await prisma.dataExtractionCapabilityExecution.findUniqueOrThrow({
+        where: { capabilityExecutionRef: acquired.capabilityExecutionRef },
+      });
+    expect(terminal.capabilityExecutionRef).toBe(
+      acquired.capabilityExecutionRef,
+    );
+    expect(terminal.completedAt).not.toBeNull();
+    expect(terminal.availability).toBe("AVAILABLE");
+    expect(terminal.retryability).toBe("NOT_APPLICABLE");
+    expect(terminal.acquisitionQuality).toBe("COMPLETE");
     expect(
       await prisma.dataExtractionCapabilityEvidence.count({
         where: {
@@ -145,6 +182,30 @@ describePostgres("DE-W1.0E durable normalization", () => {
     const supportCount = await prisma.dataExtractionObservationSupport.count({
       where: { brandId },
     });
+    const callsAfterNormalization = mechanics.calls.length;
+    const dReplay = await acquisition.request({
+      ...request(
+        brandId,
+        "https://wave-one.example/",
+        "owned_website.brand_messaging",
+      ),
+      requestKey: (
+        await prisma.dataExtractionCapabilityExecution.findUniqueOrThrow({
+          where: { capabilityExecutionRef: acquired.capabilityExecutionRef },
+        })
+      ).requestKey,
+    });
+    expect(dReplay.capabilityExecutionRef).toBe(
+      acquired.capabilityExecutionRef,
+    );
+    expect(mechanics.calls.length).toBe(callsAfterNormalization);
+    expect(
+      (
+        await prisma.dataExtractionCapabilityExecution.findUniqueOrThrow({
+          where: { capabilityExecutionRef: acquired.capabilityExecutionRef },
+        })
+      ).completedAt?.toISOString(),
+    ).toBe(terminal.completedAt?.toISOString());
     const second = await normalization.normalize({
       brandId,
       capabilityExecutionRef: acquired.capabilityExecutionRef,
@@ -233,6 +294,109 @@ describePostgres("DE-W1.0E durable normalization", () => {
     });
     expect(result.availability).toBe("AVAILABLE");
     expect(result.evidenceRefs).toEqual([]);
+    const terminal =
+      await prisma.dataExtractionCapabilityExecution.findUniqueOrThrow({
+        where: { capabilityExecutionRef: constraint.capabilityExecutionRef },
+      });
+    expect(terminal.availability).toBe("AVAILABLE");
+    expect(terminal.completedAt).not.toBeNull();
+    expect(
+      await prisma.dataExtractionCapabilityEvidence.count({
+        where: {
+          brandId,
+          capabilityExecutionRef: constraint.capabilityExecutionRef,
+        },
+      }),
+    ).toBe(0);
+  });
+
+  it("returns D-terminal UNAVAILABLE without reopening it or creating Evidence", async () => {
+    const brandId = await brand("unavailable");
+    const mechanics = new Wave1FakeMechanics();
+    mechanics.failRoot = true;
+    const acquisition = new OwnedWebsiteWave1AcquisitionService(
+      persistence,
+      mechanics as never,
+    );
+    const normalization = new OwnedWebsiteWave1NormalizationService(
+      persistence,
+      prisma,
+    );
+    const acquired = await acquisition.request(
+      request(
+        brandId,
+        "https://unavailable-wave.example/",
+        "owned_website.brand_messaging",
+      ),
+    );
+    const before =
+      await prisma.dataExtractionCapabilityExecution.findUniqueOrThrow({
+        where: { capabilityExecutionRef: acquired.capabilityExecutionRef },
+      });
+    expect(before.availability).toBe("UNAVAILABLE");
+    expect(before.completedAt).not.toBeNull();
+
+    const result = await normalization.normalize({
+      brandId,
+      capabilityExecutionRef: acquired.capabilityExecutionRef,
+    });
+    const after =
+      await prisma.dataExtractionCapabilityExecution.findUniqueOrThrow({
+        where: { capabilityExecutionRef: acquired.capabilityExecutionRef },
+      });
+    expect(result.availability).toBe("UNAVAILABLE");
+    expect(result.evidenceRefs).toEqual([]);
+    expect(after.completedAt?.toISOString()).toBe(
+      before.completedAt?.toISOString(),
+    );
+    expect(
+      await prisma.dataExtractionEvidenceItem.count({ where: { brandId } }),
+    ).toBe(0);
+  });
+
+  it("projects derived Evidence as SYSTEM_DERIVATION_INPUT without rewriting its owned-site Resource", async () => {
+    const brandId = await brand("derived-source-class");
+    const mechanics = new Wave1FakeMechanics(true);
+    const acquisition = new OwnedWebsiteWave1AcquisitionService(
+      persistence,
+      mechanics as never,
+    );
+    const normalization = new OwnedWebsiteWave1NormalizationService(
+      persistence,
+      prisma,
+    );
+    const root = "https://derived-source-class.example/";
+    const messaging = await acquisition.request(
+      request(brandId, root, "owned_website.brand_messaging"),
+    );
+    const ordinaryResult = await normalization.normalize({
+      brandId,
+      capabilityExecutionRef: messaging.capabilityExecutionRef,
+    });
+    const ordinary = await persistence
+      .repositories()
+      .evidenceItems.findByRef(brandId, ordinaryResult.evidenceRefs[0]!);
+    expect(ordinary?.sourceClass).toBe("OWNED_WEBSITE");
+
+    const derived = await acquisition.request(
+      request(brandId, root, "derived_communication_constraint_evidence"),
+    );
+    const derivedResult = await normalization.normalize({
+      brandId,
+      capabilityExecutionRef: derived.capabilityExecutionRef,
+    });
+    expect(derivedResult.evidenceRefs.length).toBeGreaterThan(0);
+    const derivedEvidence = await persistence
+      .repositories()
+      .evidenceItems.findByRef(brandId, derivedResult.evidenceRefs[0]!);
+    const resource = await prisma.dataExtractionResource.findUniqueOrThrow({
+      where: { resourceRef: derivedEvidence!.resourceRef },
+    });
+    expect(resource.sourceClass).toBe("OWNED_WEBSITE");
+    expect(derivedEvidence?.sourceClass).toBe("SYSTEM_DERIVATION_INPUT");
+    expect(derivedEvidence?.provenance.captureMethodClass).toBe(
+      "DETERMINISTIC_DERIVATION",
+    );
   });
 
   it("rolls back the whole E semantic write if its caller-owned transaction fails", async () => {
@@ -282,6 +446,12 @@ describePostgres("DE-W1.0E durable normalization", () => {
         where: { brandId },
       }),
     ).toBe(0);
+    const execution =
+      await prisma.dataExtractionCapabilityExecution.findUniqueOrThrow({
+        where: { capabilityExecutionRef: acquired.capabilityExecutionRef },
+      });
+    expect(execution.completedAt).toBeNull();
+    expect(execution.availability).toBe("NOT_REQUESTED");
   });
 
   it("rejects cross-Brand normalization of another Brand's execution", async () => {

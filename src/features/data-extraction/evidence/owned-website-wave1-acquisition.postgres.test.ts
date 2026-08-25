@@ -147,6 +147,10 @@ describePostgres("DE-W1.0D durable owned-site acquisition", () => {
       await prisma.dataExtractionSemanticObservation.findMany({
         where: { brandId },
       });
+    const execution =
+      await prisma.dataExtractionCapabilityExecution.findUniqueOrThrow({
+        where: { capabilityExecutionRef: result.capabilityExecutionRef },
+      });
 
     expect(resources.some((row) => row.pageRole === "HOMEPAGE")).toBe(true);
     expect(captures.every((row) => row.status === "COMPLETED")).toBe(true);
@@ -158,9 +162,11 @@ describePostgres("DE-W1.0D durable owned-site acquisition", () => {
     expect(scope.length).toBe(resources.length);
     expect(evidence).toHaveLength(0);
     expect(observations).toHaveLength(0);
+    expect(execution.completedAt).toBeNull();
+    expect(execution.availability).toBe("NOT_REQUESTED");
   });
 
-  it("same request key replays terminal lineage without duplicate captures or provider attempts", async () => {
+  it("same request key replays prepared lineage without duplicate captures or provider attempts", async () => {
     const brandId = await brand("idempotent");
     const mechanics = new FakeMechanics();
     const service = new OwnedWebsiteWave1AcquisitionService(
@@ -287,6 +293,7 @@ describePostgres("DE-W1.0D durable owned-site acquisition", () => {
       });
     expect(capture.status).toBe("FAILED");
     expect(execution.availability).toBe("UNAVAILABLE");
+    expect(execution.completedAt).not.toBeNull();
     expect(providerLinks).toBe(1);
     expect(result.evidenceRefs).toEqual([]);
   });

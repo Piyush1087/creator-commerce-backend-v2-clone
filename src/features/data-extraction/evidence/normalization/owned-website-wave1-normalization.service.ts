@@ -19,10 +19,13 @@ import type {
 import type {
   CapabilityAvailability,
   EvidenceAcquisitionQuality,
+  EvidenceCoverage,
+  EvidenceRetryability,
 } from "../domain/evidence-vocabulary";
 import { persistenceError } from "../persistence/evidence-persistence.errors";
 import { DataExtractionPersistenceService } from "../persistence/prisma-evidence-repositories";
 import {
+  conservativeQuality,
   normalizerFor,
   type DataExtractionNormalizationSource,
   type NormalizedEvidenceDraft,
@@ -62,13 +65,20 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
       request.capabilityExecutionRef,
     );
     if (!execution) throw persistenceError("CAPABILITY_EXECUTION_NOT_FOUND");
-    if (!execution.completedAt) {
-      throw new Error(
-        "DE_NORMALIZATION_REQUIRES_TERMINAL_ACQUISITION_EXECUTION",
-      );
+    if (execution.completedAt) {
+      return {
+        capabilityExecutionRef: execution.capabilityExecutionRef,
+        availability: execution.availability,
+        evidenceRefs: execution.evidenceRefs,
+        reasonCodes: execution.reasonCodes,
+      };
     }
 
-    const sources = await this.loadExplicitSources(execution);
+    const normalizationStartedAt = new Date();
+    const sources = await this.loadExplicitSources(
+      execution,
+      normalizationStartedAt,
+    );
     const parentEvidence = await this.loadParentEvidence(request.brandId);
     const normalizer = normalizerFor(execution.capabilityId);
     const normalized = normalizer.normalize({
@@ -80,9 +90,15 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
     const evidenceRecords = normalized.drafts.map((draft) =>
       this.toEvidenceRecord(execution, draft),
     );
+    const completion = this.semanticCompletion(
+      execution,
+      sources,
+      evidenceRecords.length,
+      normalized.reasonCodes,
+      normalizationStartedAt.toISOString(),
+    );
 
-    const persisted = await this.persistence.withTransaction(async (tx) => {
-      const records: DataExtractionEvidenceItemRecord[] = [];
+    const completed = await this.persistence.withTransaction(async (tx) => {
       for (const record of evidenceRecords) {
         const item = await tx.evidenceItems.insertOrGetExact(record);
         await tx.capabilityEvidence.attach(
@@ -102,7 +118,6 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
             item.evidenceRef,
           );
         }
-        records.push(item);
       }
 
       await this.persistConflicts(
@@ -110,35 +125,31 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
         request.brandId,
         normalized.drafts,
       );
-      return records;
-    });
-
-    const evidenceRefs =
-      await repositories.capabilityEvidence.listEvidenceForExecution(
+      const terminalExecution = await tx.capabilityExecutions.complete(
         request.brandId,
         execution.capabilityExecutionRef,
+        completion,
       );
+      return terminalExecution;
+    });
 
     return {
       capabilityExecutionRef: execution.capabilityExecutionRef,
-      availability: this.normalizationAvailability(
-        execution,
-        sources.length,
-        persisted.length,
-      ),
-      evidenceRefs,
-      reasonCodes: normalized.reasonCodes,
+      availability: completed.availability,
+      evidenceRefs: completed.evidenceRefs,
+      reasonCodes: completed.reasonCodes,
     };
   }
 
   private async loadExplicitSources(
     execution: DataExtractionCapabilityExecutionRecord,
+    normalizationStartedAt: Date,
   ): Promise<readonly DataExtractionNormalizationSource[]> {
     const rows = await this.prisma.dataExtractionCapture.findMany({
       where: {
         brandId: execution.brandId,
         resourceRef: { in: [...execution.resourceScope] },
-        capturedAt: { not: null, lte: new Date(execution.completedAt!) },
+        capturedAt: { not: null, lte: normalizationStartedAt },
         status: "COMPLETED",
       },
       orderBy: [{ capturedAt: "desc" }, { createdAt: "desc" }],
@@ -303,7 +314,10 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
       normalizationContractVersion: execution.normalizationContractVersion,
       resourceRef: draft.source.resource.resourceRef,
       captureRef: draft.source.capture.captureRef,
-      sourceClass: draft.source.resource.sourceClass,
+      sourceClass:
+        execution.capabilityId === "derived_communication_constraint_evidence"
+          ? "SYSTEM_DERIVATION_INPUT"
+          : draft.source.resource.sourceClass,
       resourceType: draft.source.resource.resourceType,
       ...(draft.source.resource.pageRole
         ? { pageRole: draft.source.resource.pageRole }
@@ -379,23 +393,90 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
     }
   }
 
+  private semanticCompletion(
+    execution: DataExtractionCapabilityExecutionRecord,
+    sources: readonly DataExtractionNormalizationSource[],
+    evidenceCount: number,
+    reasonCodes: readonly string[],
+    completedAt: string,
+  ): {
+    readonly availability: CapabilityAvailability;
+    readonly retryability: EvidenceRetryability;
+    readonly reasonCodes: readonly string[];
+    readonly coverage: EvidenceCoverage;
+    readonly acquisitionQuality: EvidenceAcquisitionQuality;
+    readonly completedAt: string;
+  } {
+    const availability = this.normalizationAvailability(
+      execution,
+      sources,
+      evidenceCount,
+    );
+    return {
+      availability,
+      retryability:
+        availability === "UNAVAILABLE" ? "RETRYABLE" : "NOT_APPLICABLE",
+      reasonCodes:
+        sources.length === 0
+          ? [...new Set([...reasonCodes, "NO_DURABLE_NORMALIZATION_SOURCE"])]
+          : [...reasonCodes],
+      coverage: coverageForSourceCount(sources.length),
+      acquisitionQuality: conservativeQuality(sources),
+      completedAt,
+    };
+  }
+
   private normalizationAvailability(
     execution: DataExtractionCapabilityExecutionRecord,
-    sourceCount: number,
+    sources: readonly DataExtractionNormalizationSource[],
     evidenceCount: number,
   ): CapabilityAvailability {
-    if (sourceCount === 0) return "UNAVAILABLE";
+    if (sources.length === 0) return "UNAVAILABLE";
     if (
       execution.capabilityId === "derived_communication_constraint_evidence" &&
       evidenceCount === 0
     ) {
       return "AVAILABLE";
     }
-    if (execution.availability === "UNAVAILABLE") return "UNAVAILABLE";
-    if (execution.availability === "DEGRADED") return "DEGRADED";
-    if (execution.availability === "PARTIAL") return "PARTIAL";
+    if (
+      execution.capabilityId === "owned_website.brand_company_context" &&
+      !sources.some((source) =>
+        [
+          "ABOUT_COMPANY",
+          "BRAND_STORY",
+          "MISSION_VALUES",
+          "COMPANY_OVERVIEW",
+        ].includes(source.resource.pageRole ?? "OTHER"),
+      )
+    ) {
+      return "PARTIAL";
+    }
+    if (
+      execution.capabilityId === "owned_website.offering_context" &&
+      !sources.some((source) =>
+        [
+          "PORTFOLIO_OVERVIEW",
+          "CATEGORY_OVERVIEW",
+          "SERVICE_OVERVIEW",
+          "SOLUTIONS_OVERVIEW",
+          "PRICING_PLANS",
+          "OFFERING_DETAIL",
+        ].includes(source.resource.pageRole ?? "OTHER"),
+      )
+    ) {
+      return "PARTIAL";
+    }
+    const quality = conservativeQuality(sources).state;
+    if (quality === "DEGRADED") return "DEGRADED";
+    if (quality === "PARTIAL") return "PARTIAL";
     return "AVAILABLE";
   }
+}
+
+function coverageForSourceCount(count: number): EvidenceCoverage {
+  if (count <= 1) return "SINGLE_RESOURCE";
+  if (count === 2) return "MULTI_RESOURCE_PARTIAL";
+  return "MULTI_RESOURCE_BROAD";
 }
 
 function conservativeEvidenceQuality(

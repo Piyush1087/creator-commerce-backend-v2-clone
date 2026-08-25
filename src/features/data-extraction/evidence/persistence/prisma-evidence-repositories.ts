@@ -42,7 +42,7 @@ import type {
 } from "../domain/evidence-records";
 import type {
   EvidenceCapabilityId,
-  EvidenceSourceClass,
+  EvidenceObservedSourceClass,
 } from "../domain/evidence-vocabulary";
 import type {
   CapabilityEvidenceRepository,
@@ -145,6 +145,15 @@ function toResource(row: PrismaResource): DataExtractionResourceRecord {
     ...(row.pageRole ? { pageRole: row.pageRole } : {}),
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+function evidenceSourceClass(
+  capabilityId: string,
+  observedSourceClass: EvidenceObservedSourceClass,
+): DataExtractionEvidenceItemRecord["sourceClass"] {
+  return capabilityId === "derived_communication_constraint_evidence"
+    ? "SYSTEM_DERIVATION_INPUT"
+    : observedSourceClass;
 }
 
 function toCapture(row: CaptureRow): DataExtractionCaptureRecord {
@@ -468,7 +477,10 @@ async function toEvidence(
     normalizationContractVersion: row.normalizationContractVersion,
     resourceRef: asResourceRef(row.resourceRef),
     captureRef: asCaptureRef(row.captureRef),
-    sourceClass: row.resource.sourceClass,
+    sourceClass: evidenceSourceClass(
+      row.capabilityId,
+      row.resource.sourceClass,
+    ),
     resourceType: row.resource.resourceType,
     ...(row.resource.pageRole ? { pageRole: row.resource.pageRole } : {}),
     capturedAt: row.capture.capturedAt.toISOString(),
@@ -592,7 +604,7 @@ export class PrismaResourceRepository implements ResourceRepository {
 
   async findByCanonicalIdentity(
     brandId: BrandId,
-    sourceClass: EvidenceSourceClass,
+    sourceClass: EvidenceObservedSourceClass,
     canonicalResourceKey: string,
   ): Promise<DataExtractionResourceRecord | null> {
     return withPersistenceErrorMapping(async () => {
@@ -1158,7 +1170,8 @@ export class PrismaEvidenceItemRepository implements EvidenceItemRepository {
         throw persistenceError("PERSISTENCE_INVARIANT");
       }
       if (
-        resource.sourceClass !== record.sourceClass ||
+        evidenceSourceClass(record.capabilityId, resource.sourceClass) !==
+          record.sourceClass ||
         resource.resourceType !== record.resourceType ||
         resource.pageRole !== (record.pageRole ?? null)
       ) {

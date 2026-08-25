@@ -42,7 +42,10 @@ export type EvidencePolarity =
   | "RESTRICTION"
   | "NEUTRAL";
 
-export type EvidenceSourceClass = "OWNED_WEBSITE";
+export type EvidenceObservedSourceClass = "OWNED_WEBSITE";
+export type EvidenceSourceClass =
+  | EvidenceObservedSourceClass
+  | "SYSTEM_DERIVATION_INPUT";
 export type EvidenceResourceType = "OWNED_WEB_PAGE" | "OWNED_WEB_FRAGMENT";
 
 export type EvidencePageRole =

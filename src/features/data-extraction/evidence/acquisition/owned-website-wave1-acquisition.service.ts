@@ -334,11 +334,6 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
       acquired.push(prepared);
     }
 
-    await this.completeExecution(
-      request,
-      execution.capabilityExecutionRef,
-      acquired,
-    );
     return {
       capabilityExecutionRef: execution.capabilityExecutionRef,
       evidenceRefs: [],

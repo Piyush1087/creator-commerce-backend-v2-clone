@@ -25,16 +25,16 @@ import type {
   EvidenceCapabilityId,
   EvidenceCoverage,
   EvidenceFreshnessIntent,
+  EvidenceObservedSourceClass,
   EvidencePageRole,
   EvidenceResourceType,
   EvidenceRetryability,
-  EvidenceSourceClass,
 } from "../domain/evidence-vocabulary";
 
 export interface CreateOrGetResourceInput {
   readonly brandId: BrandId;
   readonly resourceRef: ResourceRef;
-  readonly sourceClass: EvidenceSourceClass;
+  readonly sourceClass: EvidenceObservedSourceClass;
   readonly resourceType: EvidenceResourceType;
   readonly canonicalResourceKey: string;
   readonly canonicalUrl: string;
@@ -102,7 +102,7 @@ export interface ResourceRepository {
   ): Promise<DataExtractionResourceRecord | null>;
   findByCanonicalIdentity(
     brandId: BrandId,
-    sourceClass: EvidenceSourceClass,
+    sourceClass: EvidenceObservedSourceClass,
     canonicalResourceKey: string,
   ): Promise<DataExtractionResourceRecord | null>;
   findByCanonicalKey(

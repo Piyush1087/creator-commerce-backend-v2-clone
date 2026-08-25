@@ -15,6 +15,7 @@ import type {
   EvidenceCoverage,
   EvidenceFreshness,
   EvidenceFreshnessIntent,
+  EvidenceObservedSourceClass,
   EvidencePageRole,
   EvidencePolarity,
   EvidenceRepresentativeness,
@@ -26,7 +27,7 @@ import type {
 export interface DataExtractionResourceRecord {
   readonly brandId: BrandId;
   readonly resourceRef: ResourceRef;
-  readonly sourceClass: EvidenceSourceClass;
+  readonly sourceClass: EvidenceObservedSourceClass;
   readonly resourceType: EvidenceResourceType;
   readonly canonicalResourceKey: string;
   readonly canonicalUrl: string;
