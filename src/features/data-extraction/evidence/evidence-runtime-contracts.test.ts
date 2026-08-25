@@ -156,7 +156,9 @@ describe("DE-W1.0A runtime contracts", () => {
     };
     const acquisitionPort: DataExtractionCapabilityAcquisitionPortV1 = {
       request: async () => ({
-        capabilityExecutionRef: asCapabilityExecutionRef("capability-execution:2"),
+        capabilityExecutionRef: asCapabilityExecutionRef(
+          "capability-execution:2",
+        ),
         evidenceRefs: [],
       }),
     };
