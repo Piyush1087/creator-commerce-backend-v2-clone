@@ -6,6 +6,19 @@ import { ContractRuntimeRegistry } from "./contracts/registry/contract-runtime.r
 import { PersistenceTransitionValidator } from "./contracts/validation/persistence-transition.validator";
 import { SemanticValidator } from "./contracts/validation/semantic.validator";
 import { StructuralValidator } from "./contracts/validation/structural.validator";
+import { ExecutionAggregationService } from "./execution/execution-aggregation.service";
+import { IntelligenceExecutionService } from "./execution/intelligence-execution.service";
+import { ProcessorExecutionRepository } from "./execution/processor-execution.repository";
+import { ProcessorFinalizationService } from "./execution/processor-finalization.service";
+import {
+  NoopProcessorSuccessPersistenceHook,
+  PROCESSOR_SUCCESS_PERSISTENCE_HOOK,
+} from "./execution/processor-persistence.hook";
+import { ProcessorWorkerService } from "./execution/processor-worker.service";
+import { ProcessorExecutorRegistry } from "./execution/executor/processor-executor.registry";
+import { SyntheticProcessorExecutor } from "./execution/executor/synthetic-processor.executor";
+import { RetryBackoffPolicy } from "./execution/policy/retry-backoff.policy";
+import { ExecutionContractGate } from "./execution/registry/execution-contract.gate";
 import { IntelligenceActionRepository } from "./persistence/intelligence-action.repository";
 import { IntelligenceCandidateRepository } from "./persistence/intelligence-candidate.repository";
 import { IntelligenceCurrentStateRepository } from "./persistence/intelligence-current-state.repository";
@@ -21,6 +34,19 @@ const internalProviders = [
   ContractRuntimeRegistry,
   BundlePathOwnershipRegistry,
   PersistenceTransitionValidator,
+  RetryBackoffPolicy,
+  ExecutionAggregationService,
+  SyntheticProcessorExecutor,
+  ProcessorExecutorRegistry,
+  ExecutionContractGate,
+  IntelligenceExecutionService,
+  ProcessorExecutionRepository,
+  ProcessorFinalizationService,
+  ProcessorWorkerService,
+  {
+    provide: PROCESSOR_SUCCESS_PERSISTENCE_HOOK,
+    useClass: NoopProcessorSuccessPersistenceHook,
+  },
   IntelligenceGenerationRepository,
   IntelligenceCurrentStateRepository,
   IntelligenceCandidateRepository,
