@@ -56,6 +56,6 @@ export async function withPersistenceErrorMapping<T>(
   try {
     return await operation();
   } catch (error) {
-    mapPrismaPersistenceError(error);
+    return mapPrismaPersistenceError(error);
   }
 }
