@@ -122,7 +122,9 @@ export interface DataExtractionEvidenceItemRecord {
   readonly relationshipRefs: readonly SemanticObservationKey[];
 }
 
-export type SemanticObservationRelationType = "EQUIVALENT_TO" | "CONFLICTS_WITH";
+export type SemanticObservationRelationType =
+  | "EQUIVALENT_TO"
+  | "CONFLICTS_WITH";
 
 export interface DataExtractionSemanticObservationRecord {
   readonly brandId: BrandId;
