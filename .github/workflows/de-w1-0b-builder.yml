@@ -1,0 +1,922 @@
+name: DE W1.0B Builder
+
+on:
+  push:
+    branches:
+      - temp/de-w1-0b-builder
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: validation
+          POSTGRES_PASSWORD: validation
+          POSTGRES_DB: validation
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U validation -d validation"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TARGET_BRANCH: phase-g/data-extraction-wave1-evidence-w1-0b-persistence
+      DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
+      DE_W1_0B_DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Implement bounded persistence schema and tests
+        shell: bash
+        run: |
+          cp prisma/schema.prisma /tmp/de-w1-0b-schema-before.prisma
+          python3 <<'PY'
+          from pathlib import Path
+          from textwrap import dedent
+
+          schema_path = Path('prisma/schema.prisma')
+          schema = schema_path.read_text()
+          assert 'model DataExtractionResource {' not in schema
+          assert 'enum DataExtractionFreshness {' not in schema
+
+          enum_marker = '// ============================================================================\n// CORE MODELS (Organization & User)\n// ============================================================================'
+          enums = dedent('''
+          // ============================================================================
+          // DATA EXTRACTION WAVE 1 PERSISTENCE ENUMS (DE-W1.0B)
+          // ============================================================================
+
+          enum DataExtractionSourceClass {
+            OWNED_WEBSITE
+          }
+
+          enum DataExtractionResourceType {
+            OWNED_WEB_PAGE
+            OWNED_WEB_FRAGMENT
+          }
+
+          enum DataExtractionPageRole {
+            HOMEPAGE
+            ABOUT_COMPANY
+            BRAND_STORY
+            MISSION_VALUES
+            COMPANY_OVERVIEW
+            PORTFOLIO_OVERVIEW
+            CATEGORY_OVERVIEW
+            SERVICE_OVERVIEW
+            SOLUTIONS_OVERVIEW
+            PRICING_PLANS
+            OFFERING_DETAIL
+            CAMPAIGN_LANDING
+            POLICY
+            LEGAL
+            TESTIMONIAL
+            SUPPORT
+            FAQ_HELP
+            LOCALIZED_VARIANT
+            OTHER
+          }
+
+          enum DataExtractionAcquisitionQuality {
+            COMPLETE
+            PARTIAL
+            DEGRADED
+            UNAVAILABLE
+          }
+
+          enum DataExtractionCaptureStatus {
+            RUNNING
+            COMPLETED
+            FAILED
+          }
+
+          enum DataExtractionContentArtifactKind {
+            ACQUIRED_SOURCE_BODY
+            NORMALIZED_TEXT
+            STRUCTURED_SOURCE_FRAGMENT
+          }
+
+          enum DataExtractionCapabilityAvailability {
+            AVAILABLE
+            PARTIAL
+            DEGRADED
+            UNAVAILABLE
+            NOT_REQUESTED
+          }
+
+          enum DataExtractionRetryability {
+            RETRYABLE
+            NON_RETRYABLE
+            NOT_APPLICABLE
+          }
+
+          enum DataExtractionCoverage {
+            SINGLE_RESOURCE
+            MULTI_RESOURCE_PARTIAL
+            MULTI_RESOURCE_BROAD
+            SITE_WIDE_BOUNDED
+          }
+
+          enum DataExtractionRepresentativeness {
+            PERSISTENT_BRAND_LEVEL
+            REPEATED_REPRESENTATIVE
+            CONTEXT_SPECIFIC
+            OFFERING_SPECIFIC
+            INCIDENTAL
+          }
+
+          enum DataExtractionPolarity {
+            AFFIRMATIVE
+            EXPLICIT_NEGATIVE
+            RESTRICTION
+            NEUTRAL
+          }
+
+          enum DataExtractionFreshness {
+            CURRENT
+            POSSIBLY_STALE
+            UNKNOWN
+          }
+
+          enum DataExtractionFreshnessIntent {
+            REUSE_ALLOWED
+            REFRESH_IF_NOT_CURRENT
+            FORCE_RECAPTURE
+          }
+
+          enum DataExtractionFreshnessTargetType {
+            RESOURCE
+            CAPTURE
+            EVIDENCE
+          }
+
+          enum DataExtractionSemanticObservationRelationType {
+            EQUIVALENT_TO
+            CONFLICTS_WITH
+          }
+
+          ''')
+          assert enum_marker in schema
+          schema = schema.replace(enum_marker, enums + enum_marker, 1)
+
+          brand_anchor = '  intelligenceComponentTransitions    IntelligenceComponentTransition[]\n'
+          brand_relations = dedent('''
+            dataExtractionResources                 DataExtractionResource[]
+            dataExtractionCaptures                  DataExtractionCapture[]
+            dataExtractionContentArtifacts          DataExtractionContentArtifact[]
+            dataExtractionCapabilityExecutions      DataExtractionCapabilityExecution[]
+            dataExtractionEvidenceItems             DataExtractionEvidenceItem[]
+            dataExtractionSemanticObservations      DataExtractionSemanticObservation[]
+            dataExtractionFreshnessAssessments      DataExtractionFreshnessAssessment[]
+            dataExtractionProviderExecutionLinks    DataExtractionProviderExecutionLink[]
+          ''')
+          assert brand_anchor in schema
+          schema = schema.replace(brand_anchor, brand_anchor + '\n' + brand_relations, 1)
+
+          models = dedent('''
+
+          // ============================================================================
+          // DATA EXTRACTION WAVE 1 PERSISTENCE (DE-W1.0B)
+          // ============================================================================
+
+          model DataExtractionResource {
+            id                       String                    @id @default(uuid())
+            resourceRef              String                    @unique @map("resource_ref")
+            brandId                  String                    @map("brand_id")
+            brandProfile             BrandProfile              @relation(fields: [brandId], references: [id], onDelete: Cascade)
+            sourceClass              DataExtractionSourceClass @default(OWNED_WEBSITE) @map("source_class")
+            resourceType             DataExtractionResourceType @map("resource_type")
+            pageRole                 DataExtractionPageRole?    @map("page_role")
+            canonicalResourceKey     String                    @map("canonical_resource_key") @db.Text
+            canonicalResourceKeyHash String                    @map("canonical_resource_key_hash") @db.VarChar(64)
+            canonicalUrl             String                    @map("canonical_url") @db.Text
+            createdAt                DateTime                  @default(now()) @map("created_at")
+
+            captures           DataExtractionCapture[]
+            evidenceItems      DataExtractionEvidenceItem[]
+            capabilityScopes   DataExtractionCapabilityResource[]
+
+            @@unique([brandId, resourceRef], map: "uq_de_resource_brand_ref")
+            @@unique([brandId, sourceClass, canonicalResourceKeyHash], map: "uq_de_resource_identity")
+            @@index([brandId, resourceRef], map: "idx_de_resource_brand_ref")
+            @@map("data_extraction_resources")
+          }
+
+          model DataExtractionCapture {
+            id                       String                           @id @default(uuid())
+            captureRef               String                           @unique @map("capture_ref")
+            brandId                  String                           @map("brand_id")
+            brandProfile             BrandProfile                     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+            resourceRef              String                           @map("resource_ref")
+            resource                 DataExtractionResource            @relation(fields: [brandId, resourceRef], references: [brandId, resourceRef], onDelete: Cascade)
+            capabilityExecutionRef   String?                          @map("capability_execution_ref")
+            capabilityExecution      DataExtractionCapabilityExecution? @relation(fields: [brandId, capabilityExecutionRef], references: [brandId, capabilityExecutionRef], onDelete: Restrict)
+            acquisitionRequestKey    String                           @map("acquisition_request_key") @db.VarChar(255)
+            status                   DataExtractionCaptureStatus       @default(RUNNING)
+            startedAt                DateTime                         @map("started_at")
+            capturedAt               DateTime?                        @map("captured_at")
+            observedAt               DateTime?                        @map("observed_at")
+            sourceRevisionRef        String?                          @map("source_revision_ref") @db.VarChar(255)
+            sourceContentHash        String?                          @map("source_content_hash") @db.VarChar(128)
+            acquisitionQuality       DataExtractionAcquisitionQuality @map("acquisition_quality")
+            qualityFailureCategories String[]                         @default([]) @map("quality_failure_categories")
+            qualityDetailCodes       String[]                         @default([]) @map("quality_detail_codes")
+            createdAt                DateTime                         @default(now()) @map("created_at")
+
+            contentArtifacts      DataExtractionContentArtifact[]
+            evidenceItems         DataExtractionEvidenceItem[]
+            providerExecutionLinks DataExtractionProviderExecutionLink[]
+            priorFreshnessAssessments DataExtractionFreshnessAssessment[] @relation("DataExtractionFreshnessPriorCapture")
+
+            @@unique([brandId, captureRef], map: "uq_de_capture_brand_ref")
+            @@unique([brandId, captureRef, resourceRef], map: "uq_de_capture_brand_ref_resource")
+            @@unique([brandId, acquisitionRequestKey], map: "uq_de_capture_request")
+            @@index([resourceRef, capturedAt], map: "idx_de_capture_resource_time")
+            @@index([brandId, captureRef], map: "idx_de_capture_brand_ref")
+            @@map("data_extraction_captures")
+          }
+
+          model DataExtractionContentArtifact {
+            id                           String                            @id @default(uuid())
+            contentArtifactRef           String                            @unique @map("content_artifact_ref")
+            brandId                      String                            @map("brand_id")
+            brandProfile                 BrandProfile                      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+            captureRef                   String                            @map("capture_ref")
+            capture                      DataExtractionCapture              @relation(fields: [brandId, captureRef], references: [brandId, captureRef], onDelete: Cascade)
+            kind                         DataExtractionContentArtifactKind
+            mediaType                    String                            @map("media_type") @db.VarChar(255)
+            contentHash                  String                            @map("content_hash") @db.VarChar(128)
+            byteLength                   Int                               @map("byte_length")
+            inlineContent                String?                           @map("inline_content") @db.Text
+            objectStoreRef               String?                           @map("object_store_ref") @db.Text
+            normalizationContractVersion String?                           @map("normalization_contract_version") @db.VarChar(100)
+            createdAt                    DateTime                          @default(now()) @map("created_at")
+
+            evidenceItems DataExtractionEvidenceItem[]
+
+            @@unique([brandId, contentArtifactRef], map: "uq_de_content_brand_ref")
+            @@index([brandId, captureRef], map: "idx_de_content_capture")
+            @@map("data_extraction_content_artifacts")
+          }
+
+          model DataExtractionCapabilityExecution {
+            id                           String                               @id @default(uuid())
+            capabilityExecutionRef       String                               @unique @map("capability_execution_ref")
+            brandId                      String                               @map("brand_id")
+            brandProfile                 BrandProfile                         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+            capabilityId                 String                               @map("capability_id") @db.VarChar(100)
+            normalizationContractVersion String                               @map("normalization_contract_version") @db.VarChar(100)
+            resourceScopeHash            String                               @map("resource_scope_hash") @db.VarChar(128)
+            freshnessIntent              DataExtractionFreshnessIntent        @map("freshness_intent")
+            sourceRevisionRef            String?                              @map("source_revision_ref") @db.VarChar(255)
+            requestKey                   String                               @map("request_key") @db.VarChar(255)
+            availability                 DataExtractionCapabilityAvailability
+            retryability                 DataExtractionRetryability
+            reasonCodes                  String[]                             @default([]) @map("reason_codes")
+            coverage                     DataExtractionCoverage
+            acquisitionQuality           DataExtractionAcquisitionQuality      @map("acquisition_quality")
+            qualityFailureCategories     String[]                             @default([]) @map("quality_failure_categories")
+            qualityDetailCodes           String[]                             @default([]) @map("quality_detail_codes")
+            createdAt                    DateTime                             @default(now()) @map("created_at")
+            completedAt                  DateTime?                            @map("completed_at")
+
+            captures               DataExtractionCapture[]
+            resourceScope          DataExtractionCapabilityResource[]
+            evidenceMemberships    DataExtractionCapabilityEvidence[]
+            providerExecutionLinks DataExtractionProviderExecutionLink[]
+
+            @@unique([brandId, capabilityExecutionRef], map: "uq_de_capexec_brand_ref")
+            @@unique([brandId, capabilityExecutionRef, capabilityId], map: "uq_de_capexec_brand_ref_capability")
+            @@unique([brandId, requestKey], map: "uq_de_capexec_request")
+            @@index([brandId, capabilityId], map: "idx_de_capexec_brand_capability")
+            @@map("data_extraction_capability_executions")
+          }
+
+          model DataExtractionCapabilityResource {
+            brandId                String                          @map("brand_id")
+            capabilityExecutionRef String                          @map("capability_execution_ref")
+            capabilityId           String                          @map("capability_id") @db.VarChar(100)
+            resourceRef            String                          @map("resource_ref")
+            capabilityExecution    DataExtractionCapabilityExecution @relation(fields: [brandId, capabilityExecutionRef, capabilityId], references: [brandId, capabilityExecutionRef, capabilityId], onDelete: Cascade)
+            resource               DataExtractionResource          @relation(fields: [brandId, resourceRef], references: [brandId, resourceRef], onDelete: Restrict)
+            createdAt              DateTime                        @default(now()) @map("created_at")
+
+            @@id([brandId, capabilityExecutionRef, resourceRef])
+            @@index([brandId, resourceRef], map: "idx_de_capresource_brand_resource")
+            @@map("data_extraction_capability_resources")
+          }
+
+          model DataExtractionEvidenceItem {
+            id                           String                              @id @default(uuid())
+            evidenceRef                  String                              @unique @map("evidence_ref")
+            brandId                      String                              @map("brand_id")
+            brandProfile                 BrandProfile                        @relation(fields: [brandId], references: [id], onDelete: Cascade)
+            capabilityId                 String                              @map("capability_id") @db.VarChar(100)
+            normalizationContractVersion String                              @map("normalization_contract_version") @db.VarChar(100)
+            resourceRef                  String                              @map("resource_ref")
+            resource                     DataExtractionResource               @relation(fields: [brandId, resourceRef], references: [brandId, resourceRef], onDelete: Restrict)
+            captureRef                   String                              @map("capture_ref")
+            capture                      DataExtractionCapture                @relation(fields: [brandId, captureRef, resourceRef], references: [brandId, captureRef, resourceRef], onDelete: Restrict)
+            contentArtifactRef           String?                             @map("content_artifact_ref")
+            contentArtifact              DataExtractionContentArtifact?       @relation(fields: [brandId, contentArtifactRef], references: [brandId, contentArtifactRef], onDelete: Restrict)
+            boundedPayload               Json?                               @map("bounded_payload")
+            contentHash                  String                              @map("content_hash") @db.VarChar(128)
+            polarity                     DataExtractionPolarity?
+            representativeness           DataExtractionRepresentativeness
+            coverageSnapshot             DataExtractionCoverage              @map("coverage_snapshot")
+            freshnessAtEmission          DataExtractionFreshness             @map("freshness_at_emission")
+            freshnessBasis               String                              @map("freshness_basis") @db.Text
+            freshnessEvaluatedAt         DateTime                            @map("freshness_evaluated_at")
+            freshnessPriorCaptureRef     String?                             @map("freshness_prior_capture_ref")
+            freshnessSourceRevisionRef   String?                             @map("freshness_source_revision_ref") @db.VarChar(255)
+            qualitySnapshot              DataExtractionAcquisitionQuality     @map("quality_snapshot")
+            qualityFailureCategories     String[]                            @default([]) @map("quality_failure_categories")
+            qualityDetailCodes           String[]                            @default([]) @map("quality_detail_codes")
+            itemFingerprint              String                              @map("item_fingerprint") @db.VarChar(128)
+            semanticObservationKey       String?                             @map("semantic_observation_key") @db.VarChar(255)
+            createdAt                    DateTime                            @default(now()) @map("created_at")
+
+            capabilityMemberships DataExtractionCapabilityEvidence[]
+            observationSupports   DataExtractionObservationSupport[]
+
+            @@unique([brandId, evidenceRef], map: "uq_de_evidence_brand_ref")
+            @@unique([brandId, evidenceRef, capabilityId], map: "uq_de_evidence_brand_ref_capability")
+            @@unique([brandId, captureRef, capabilityId, normalizationContractVersion, itemFingerprint], map: "uq_de_evidence_idempotency")
+            @@index([brandId, capabilityId], map: "idx_de_evidence_brand_capability")
+            @@index([brandId, evidenceRef], map: "idx_de_evidence_brand_ref")
+            @@index([captureRef], map: "idx_de_evidence_capture_ref")
+            @@index([semanticObservationKey], map: "idx_de_evidence_observation_key")
+            @@map("data_extraction_evidence_items")
+          }
+
+          model DataExtractionCapabilityEvidence {
+            brandId                String                           @map("brand_id")
+            capabilityExecutionRef String                           @map("capability_execution_ref")
+            capabilityId           String                           @map("capability_id") @db.VarChar(100)
+            evidenceRef            String                           @map("evidence_ref")
+            capabilityExecution    DataExtractionCapabilityExecution @relation(fields: [brandId, capabilityExecutionRef, capabilityId], references: [brandId, capabilityExecutionRef, capabilityId], onDelete: Cascade)
+            evidence               DataExtractionEvidenceItem        @relation(fields: [brandId, evidenceRef, capabilityId], references: [brandId, evidenceRef, capabilityId], onDelete: Restrict)
+            createdAt              DateTime                         @default(now()) @map("created_at")
+
+            @@id([brandId, capabilityExecutionRef, evidenceRef])
+            @@index([evidenceRef], map: "idx_de_capevidence_evidence_ref")
+            @@map("data_extraction_capability_evidence")
+          }
+
+          model DataExtractionSemanticObservation {
+            id                     String                           @id @default(uuid())
+            semanticObservationKey String                           @map("semantic_observation_key") @db.VarChar(255)
+            brandId                String                           @map("brand_id")
+            brandProfile           BrandProfile                     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+            capabilityId           String                           @map("capability_id") @db.VarChar(100)
+            repetitionCount        Int                              @default(1) @map("repetition_count")
+            createdAt              DateTime                         @default(now()) @map("created_at")
+
+            supports          DataExtractionObservationSupport[]
+            outgoingRelations DataExtractionObservationRelation[] @relation("DataExtractionObservationRelationSource")
+            incomingRelations DataExtractionObservationRelation[] @relation("DataExtractionObservationRelationTarget")
+
+            @@unique([brandId, semanticObservationKey], map: "uq_de_observation_brand_key")
+            @@unique([brandId, semanticObservationKey, capabilityId], map: "uq_de_observation_brand_key_capability")
+            @@index([brandId, capabilityId], map: "idx_de_observation_brand_capability")
+            @@map("data_extraction_semantic_observations")
+          }
+
+          model DataExtractionObservationSupport {
+            brandId                String                            @map("brand_id")
+            semanticObservationKey String                            @map("semantic_observation_key") @db.VarChar(255)
+            capabilityId           String                            @map("capability_id") @db.VarChar(100)
+            evidenceRef            String                            @map("evidence_ref")
+            observation            DataExtractionSemanticObservation @relation(fields: [brandId, semanticObservationKey, capabilityId], references: [brandId, semanticObservationKey, capabilityId], onDelete: Cascade)
+            evidence               DataExtractionEvidenceItem         @relation(fields: [brandId, evidenceRef, capabilityId], references: [brandId, evidenceRef, capabilityId], onDelete: Restrict)
+            createdAt              DateTime                           @default(now()) @map("created_at")
+
+            @@id([brandId, semanticObservationKey, evidenceRef])
+            @@map("data_extraction_observation_support")
+          }
+
+          model DataExtractionObservationRelation {
+            brandId                  String                                      @map("brand_id")
+            sourceObservationKey      String                                      @map("source_observation_key") @db.VarChar(255)
+            targetObservationKey      String                                      @map("target_observation_key") @db.VarChar(255)
+            capabilityId              String                                      @map("capability_id") @db.VarChar(100)
+            relationType              DataExtractionSemanticObservationRelationType @map("relation_type")
+            sourceObservation         DataExtractionSemanticObservation           @relation("DataExtractionObservationRelationSource", fields: [brandId, sourceObservationKey, capabilityId], references: [brandId, semanticObservationKey, capabilityId], onDelete: Cascade)
+            targetObservation         DataExtractionSemanticObservation           @relation("DataExtractionObservationRelationTarget", fields: [brandId, targetObservationKey, capabilityId], references: [brandId, semanticObservationKey, capabilityId], onDelete: Cascade)
+            createdAt                 DateTime                                    @default(now()) @map("created_at")
+
+            @@id([brandId, sourceObservationKey, targetObservationKey, relationType])
+            @@index([brandId, capabilityId], map: "idx_de_observation_relation_capability")
+            @@map("data_extraction_observation_relations")
+          }
+
+          model DataExtractionFreshnessAssessment {
+            id                String                            @id @default(uuid())
+            brandId           String                            @map("brand_id")
+            brandProfile      BrandProfile                      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+            targetType        DataExtractionFreshnessTargetType @map("target_type")
+            targetRef         String                            @map("target_ref") @db.VarChar(255)
+            state             DataExtractionFreshness
+            evaluatedAt       DateTime                          @map("evaluated_at")
+            basis             String                            @db.Text
+            priorCaptureRef   String?                           @map("prior_capture_ref")
+            priorCapture      DataExtractionCapture?            @relation("DataExtractionFreshnessPriorCapture", fields: [brandId, priorCaptureRef], references: [brandId, captureRef], onDelete: Restrict)
+            sourceRevisionRef String?                           @map("source_revision_ref") @db.VarChar(255)
+            invalidatingRef   String?                           @map("invalidating_ref") @db.VarChar(255)
+            createdAt         DateTime                          @default(now()) @map("created_at")
+
+            @@index([brandId, targetType, targetRef, evaluatedAt], map: "idx_de_freshness_target")
+            @@map("data_extraction_freshness_assessments")
+          }
+
+          model DataExtractionProviderExecutionLink {
+            id                     String                           @id @default(uuid())
+            brandId                String                           @map("brand_id")
+            brandProfile           BrandProfile                     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+            captureRef             String?                          @map("capture_ref")
+            capture                DataExtractionCapture?            @relation(fields: [brandId, captureRef], references: [brandId, captureRef], onDelete: Restrict)
+            capabilityExecutionRef String?                          @map("capability_execution_ref")
+            capabilityExecution    DataExtractionCapabilityExecution? @relation(fields: [brandId, capabilityExecutionRef], references: [brandId, capabilityExecutionRef], onDelete: Restrict)
+            providerExecutionRef   String                           @map("provider_execution_ref") @db.VarChar(255)
+            attemptRole            String                           @map("attempt_role") @db.VarChar(100)
+            createdAt              DateTime                         @default(now()) @map("created_at")
+
+            @@index([brandId, providerExecutionRef], map: "idx_de_provider_link_provider_ref")
+            @@index([captureRef], map: "idx_de_provider_link_capture_ref")
+            @@index([capabilityExecutionRef], map: "idx_de_provider_link_capexec_ref")
+            @@map("data_extraction_provider_execution_links")
+          }
+          ''')
+          schema = schema.rstrip() + models + '\n'
+          schema_path.write_text(schema)
+
+          test_path = Path('src/features/data-extraction/evidence/evidence-persistence.postgres.test.ts')
+          test_path.write_text(dedent(r'''
+          import { randomUUID } from "node:crypto";
+          import { PrismaClient } from "@prisma/client";
+          import { describe, expect, it, beforeAll, afterAll } from "vitest";
+
+          const databaseUrl = process.env.DE_W1_0B_DATABASE_URL;
+          const describePostgres = databaseUrl ? describe : describe.skip;
+
+          describePostgres("DE-W1.0B durable Evidence persistence invariants", () => {
+            const prisma = new PrismaClient();
+
+            beforeAll(async () => {
+              await prisma.$connect();
+            });
+
+            afterAll(async () => {
+              await prisma.$disconnect();
+            });
+
+            async function brand(suffix: string) {
+              return prisma.brandProfile.create({
+                data: {
+                  domain: `de-w1-0b-${suffix}-${randomUUID()}.example`,
+                  name: `DE ${suffix}`,
+                  industry: "D2C",
+                  brandValues: [],
+                  policyFlags: [],
+                },
+              });
+            }
+
+            async function resource(brandId: string, key = randomUUID()) {
+              return prisma.dataExtractionResource.create({
+                data: {
+                  resourceRef: `resource:${randomUUID()}`,
+                  brandId,
+                  sourceClass: "OWNED_WEBSITE",
+                  resourceType: "OWNED_WEB_PAGE",
+                  pageRole: "HOMEPAGE",
+                  canonicalResourceKey: `https://example.com/${key}`,
+                  canonicalResourceKeyHash: key.replaceAll("-", "").slice(0, 64),
+                  canonicalUrl: `https://example.com/${key}`,
+                },
+              });
+            }
+
+            async function capture(brandId: string, resourceRef: string) {
+              return prisma.dataExtractionCapture.create({
+                data: {
+                  captureRef: `capture:${randomUUID()}`,
+                  brandId,
+                  resourceRef,
+                  acquisitionRequestKey: `request:${randomUUID()}`,
+                  status: "COMPLETED",
+                  startedAt: new Date(),
+                  capturedAt: new Date(),
+                  acquisitionQuality: "COMPLETE",
+                },
+              });
+            }
+
+            async function execution(brandId: string, availability = "AVAILABLE" as const) {
+              return prisma.dataExtractionCapabilityExecution.create({
+                data: {
+                  capabilityExecutionRef: `capability-execution:${randomUUID()}`,
+                  brandId,
+                  capabilityId: "owned_website.brand_messaging",
+                  normalizationContractVersion: "1.0",
+                  resourceScopeHash: randomUUID().replaceAll("-", ""),
+                  freshnessIntent: "REUSE_ALLOWED",
+                  requestKey: `capability-request:${randomUUID()}`,
+                  availability,
+                  retryability: "NOT_APPLICABLE",
+                  coverage: "SINGLE_RESOURCE",
+                  acquisitionQuality: "COMPLETE",
+                },
+              });
+            }
+
+            async function evidence(brandId: string, resourceRef: string, captureRef: string, fingerprint = randomUUID()) {
+              return prisma.dataExtractionEvidenceItem.create({
+                data: {
+                  evidenceRef: `evidence:${randomUUID()}`,
+                  brandId,
+                  capabilityId: "owned_website.brand_messaging",
+                  normalizationContractVersion: "1.0",
+                  resourceRef,
+                  captureRef,
+                  boundedPayload: { excerpt: "grounded brand message" },
+                  contentHash: randomUUID().replaceAll("-", ""),
+                  polarity: "AFFIRMATIVE",
+                  representativeness: "CONTEXT_SPECIFIC",
+                  coverageSnapshot: "SINGLE_RESOURCE",
+                  freshnessAtEmission: "CURRENT",
+                  freshnessBasis: "fresh capture",
+                  freshnessEvaluatedAt: new Date(),
+                  qualitySnapshot: "COMPLETE",
+                  itemFingerprint: fingerprint,
+                },
+              });
+            }
+
+            it("database-enforces same-Brand resource/capture/evidence/capability lineage", async () => {
+              const a = await brand("a");
+              const b = await brand("b");
+              const aResource = await resource(a.id);
+
+              await expect(
+                prisma.dataExtractionCapture.create({
+                  data: {
+                    captureRef: `capture:${randomUUID()}`,
+                    brandId: b.id,
+                    resourceRef: aResource.resourceRef,
+                    acquisitionRequestKey: `request:${randomUUID()}`,
+                    status: "COMPLETED",
+                    startedAt: new Date(),
+                    capturedAt: new Date(),
+                    acquisitionQuality: "COMPLETE",
+                  },
+                }),
+              ).rejects.toBeTruthy();
+
+              const aCapture = await capture(a.id, aResource.resourceRef);
+              await expect(
+                evidence(b.id, aResource.resourceRef, aCapture.captureRef),
+              ).rejects.toBeTruthy();
+
+              const aEvidence = await evidence(a.id, aResource.resourceRef, aCapture.captureRef);
+              const bExecution = await execution(b.id);
+              await expect(
+                prisma.dataExtractionCapabilityEvidence.create({
+                  data: {
+                    brandId: b.id,
+                    capabilityExecutionRef: bExecution.capabilityExecutionRef,
+                    capabilityId: bExecution.capabilityId,
+                    evidenceRef: aEvidence.evidenceRef,
+                  },
+                }),
+              ).rejects.toBeTruthy();
+            });
+
+            it("rejects duplicate resource identity and duplicate Evidence idempotency", async () => {
+              const currentBrand = await brand("unique");
+              const key = randomUUID();
+              const first = await resource(currentBrand.id, key);
+              await expect(resource(currentBrand.id, key)).rejects.toBeTruthy();
+
+              const currentCapture = await capture(currentBrand.id, first.resourceRef);
+              const fingerprint = `fingerprint:${randomUUID()}`;
+              await evidence(currentBrand.id, first.resourceRef, currentCapture.captureRef, fingerprint);
+              await expect(
+                evidence(currentBrand.id, first.resourceRef, currentCapture.captureRef, fingerprint),
+              ).rejects.toBeTruthy();
+            });
+
+            it("persists AVAILABLE with zero Evidence membership rows", async () => {
+              const currentBrand = await brand("empty");
+              const currentExecution = await execution(currentBrand.id, "AVAILABLE");
+              const memberships = await prisma.dataExtractionCapabilityEvidence.count({
+                where: {
+                  brandId: currentBrand.id,
+                  capabilityExecutionRef: currentExecution.capabilityExecutionRef,
+                },
+              });
+              expect(memberships).toBe(0);
+              expect(currentExecution.availability).toBe("AVAILABLE");
+            });
+
+            it("rejects duplicate capability/Evidence membership", async () => {
+              const currentBrand = await brand("membership");
+              const currentResource = await resource(currentBrand.id);
+              const currentCapture = await capture(currentBrand.id, currentResource.resourceRef);
+              const currentEvidence = await evidence(currentBrand.id, currentResource.resourceRef, currentCapture.captureRef);
+              const currentExecution = await execution(currentBrand.id);
+              const data = {
+                brandId: currentBrand.id,
+                capabilityExecutionRef: currentExecution.capabilityExecutionRef,
+                capabilityId: currentExecution.capabilityId,
+                evidenceRef: currentEvidence.evidenceRef,
+              };
+              await prisma.dataExtractionCapabilityEvidence.create({ data });
+              await expect(prisma.dataExtractionCapabilityEvidence.create({ data })).rejects.toBeTruthy();
+            });
+
+            it("accepts POSSIBLY_STALE and rejects the non-DE STALE vocabulary", async () => {
+              const currentBrand = await brand("freshness");
+              const currentResource = await resource(currentBrand.id);
+              const assessment = await prisma.dataExtractionFreshnessAssessment.create({
+                data: {
+                  brandId: currentBrand.id,
+                  targetType: "RESOURCE",
+                  targetRef: currentResource.resourceRef,
+                  state: "POSSIBLY_STALE",
+                  evaluatedAt: new Date(),
+                  basis: "bounded age threshold",
+                },
+              });
+              expect(assessment.state).toBe("POSSIBLY_STALE");
+
+              await expect(
+                prisma.$executeRawUnsafe(
+                  `INSERT INTO "data_extraction_freshness_assessments" ("id", "brand_id", "target_type", "target_ref", "state", "evaluated_at", "basis", "created_at") VALUES ($1, $2, 'RESOURCE', $3, 'STALE', NOW(), 'invalid', NOW())`,
+                  randomUUID(),
+                  currentBrand.id,
+                  currentResource.resourceRef,
+                ),
+              ).rejects.toBeTruthy();
+            });
+
+            it("keeps Evidence provider-neutral and leaves IntelligenceEvidenceReference storage untouched", async () => {
+              const evidenceColumns = await prisma.$queryRawUnsafe<Array<{ column_name: string }>>(
+                `SELECT column_name FROM information_schema.columns WHERE table_name = 'data_extraction_evidence_items' ORDER BY column_name`,
+              );
+              const names = evidenceColumns.map((row) => row.column_name);
+              expect(names).not.toContain("provider_execution_ref");
+              expect(names).not.toContain("provider_id");
+              expect(names).not.toContain("model_id");
+
+              const intelligenceTable = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(
+                `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'intelligence_evidence_references') AS exists`,
+              );
+              expect(intelligenceTable[0]?.exists).toBe(true);
+            });
+
+            it("preserves conflicts without a winner field", async () => {
+              const currentBrand = await brand("conflict");
+              const first = await prisma.dataExtractionSemanticObservation.create({
+                data: {
+                  brandId: currentBrand.id,
+                  semanticObservationKey: `observation:${randomUUID()}`,
+                  capabilityId: "owned_website.brand_messaging",
+                },
+              });
+              const second = await prisma.dataExtractionSemanticObservation.create({
+                data: {
+                  brandId: currentBrand.id,
+                  semanticObservationKey: `observation:${randomUUID()}`,
+                  capabilityId: "owned_website.brand_messaging",
+                },
+              });
+              const conflict = await prisma.dataExtractionObservationRelation.create({
+                data: {
+                  brandId: currentBrand.id,
+                  sourceObservationKey: first.semanticObservationKey,
+                  targetObservationKey: second.semanticObservationKey,
+                  capabilityId: first.capabilityId,
+                  relationType: "CONFLICTS_WITH",
+                },
+              });
+              expect(conflict.relationType).toBe("CONFLICTS_WITH");
+
+              const columns = await prisma.$queryRawUnsafe<Array<{ column_name: string }>>(
+                `SELECT column_name FROM information_schema.columns WHERE table_name = 'data_extraction_observation_relations'`,
+              );
+              expect(columns.map((row) => row.column_name).some((name) => name.includes("winner"))).toBe(false);
+            });
+          });
+          ''').lstrip())
+
+          architecture_path = Path('src/features/data-extraction/evidence/evidence-persistence.architecture.test.ts')
+          architecture_path.write_text(dedent(r'''
+          import { readFileSync } from "node:fs";
+          import { join } from "node:path";
+          import { describe, expect, it } from "vitest";
+
+          const schema = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+          const marker = "// DATA EXTRACTION WAVE 1 PERSISTENCE (DE-W1.0B)";
+          const deSchema = schema.slice(schema.indexOf(marker));
+          const migration = readFileSync(
+            join(
+              process.cwd(),
+              "prisma",
+              "migrations",
+              "20260825181500_add_data_extraction_wave1_evidence_persistence",
+              "migration.sql",
+            ),
+            "utf8",
+          );
+
+          describe("DE-W1.0B persistence architecture boundary", () => {
+            it("is additive and does not alter legacy or Brand Intelligence persistence", () => {
+              expect(migration).not.toMatch(/DROP TABLE|DROP COLUMN|RENAME COLUMN|TRUNCATE/i);
+              for (const table of [
+                "intelligence_evidence_references",
+                "intelligence_executions",
+                "brand_preview_runs",
+                "brand_intelligence_scans",
+              ]) {
+                expect(migration).not.toContain(`ALTER TABLE "${table}"`);
+              }
+            });
+
+            it("contains no Intelligence authority/current/readiness or provider-model persistence", () => {
+              for (const forbidden of [
+                "IntelligenceAuthority",
+                "IntelligenceReadiness",
+                "IntelligenceCurrent",
+                "providerId",
+                "modelId",
+                "@Controller",
+                "@Resolver",
+                "frontend",
+              ]) {
+                expect(deSchema).not.toContain(forbidden);
+              }
+            });
+
+            it("persists exactly the five Wave 1 capability IDs and no provider-specific capability enum", () => {
+              for (const capability of [
+                "owned_website.brand_messaging",
+                "owned_website.brand_company_context",
+                "owned_website.offering_context",
+                "observed_brand_communication_language_signals",
+                "derived_communication_constraint_evidence",
+              ]) {
+                expect(migration).toContain(capability);
+              }
+              expect(deSchema).not.toMatch(/Gemini|OpenAI|Zyte|Playwright/i);
+            });
+          });
+          ''').lstrip())
+          PY
+
+          npx prisma format
+          npx prisma validate
+          mkdir -p prisma/migrations/20260825181500_add_data_extraction_wave1_evidence_persistence
+          npx prisma migrate diff \
+            --from-schema-datamodel /tmp/de-w1-0b-schema-before.prisma \
+            --to-schema-datamodel prisma/schema.prisma \
+            --script > prisma/migrations/20260825181500_add_data_extraction_wave1_evidence_persistence/migration.sql
+          cat >> prisma/migrations/20260825181500_add_data_extraction_wave1_evidence_persistence/migration.sql <<'SQL'
+
+          -- DE-W1.0B bounded database invariants that Prisma cannot model directly.
+          ALTER TABLE "data_extraction_content_artifacts"
+            ADD CONSTRAINT "ck_de_content_storage_shape"
+            CHECK ("inline_content" IS NOT NULL OR "object_store_ref" IS NOT NULL),
+            ADD CONSTRAINT "ck_de_content_byte_length_nonnegative"
+            CHECK ("byte_length" >= 0);
+
+          ALTER TABLE "data_extraction_provider_execution_links"
+            ADD CONSTRAINT "ck_de_provider_link_target"
+            CHECK ("capture_ref" IS NOT NULL OR "capability_execution_ref" IS NOT NULL);
+
+          ALTER TABLE "data_extraction_semantic_observations"
+            ADD CONSTRAINT "ck_de_observation_repetition_positive"
+            CHECK ("repetition_count" >= 1);
+
+          ALTER TABLE "data_extraction_observation_relations"
+            ADD CONSTRAINT "ck_de_observation_relation_not_self"
+            CHECK ("source_observation_key" <> "target_observation_key");
+
+          ALTER TABLE "data_extraction_capability_executions"
+            ADD CONSTRAINT "ck_de_capexec_wave1_capability"
+            CHECK ("capability_id" IN (
+              'owned_website.brand_messaging',
+              'owned_website.brand_company_context',
+              'owned_website.offering_context',
+              'observed_brand_communication_language_signals',
+              'derived_communication_constraint_evidence'
+            ));
+
+          ALTER TABLE "data_extraction_capability_resources"
+            ADD CONSTRAINT "ck_de_capresource_wave1_capability"
+            CHECK ("capability_id" IN (
+              'owned_website.brand_messaging',
+              'owned_website.brand_company_context',
+              'owned_website.offering_context',
+              'observed_brand_communication_language_signals',
+              'derived_communication_constraint_evidence'
+            ));
+
+          ALTER TABLE "data_extraction_evidence_items"
+            ADD CONSTRAINT "ck_de_evidence_wave1_capability"
+            CHECK ("capability_id" IN (
+              'owned_website.brand_messaging',
+              'owned_website.brand_company_context',
+              'owned_website.offering_context',
+              'observed_brand_communication_language_signals',
+              'derived_communication_constraint_evidence'
+            ));
+
+          ALTER TABLE "data_extraction_capability_evidence"
+            ADD CONSTRAINT "ck_de_capevidence_wave1_capability"
+            CHECK ("capability_id" IN (
+              'owned_website.brand_messaging',
+              'owned_website.brand_company_context',
+              'owned_website.offering_context',
+              'observed_brand_communication_language_signals',
+              'derived_communication_constraint_evidence'
+            ));
+
+          ALTER TABLE "data_extraction_semantic_observations"
+            ADD CONSTRAINT "ck_de_observation_wave1_capability"
+            CHECK ("capability_id" IN (
+              'owned_website.brand_messaging',
+              'owned_website.brand_company_context',
+              'owned_website.offering_context',
+              'observed_brand_communication_language_signals',
+              'derived_communication_constraint_evidence'
+            ));
+
+          ALTER TABLE "data_extraction_observation_support"
+            ADD CONSTRAINT "ck_de_obs_support_wave1_capability"
+            CHECK ("capability_id" IN (
+              'owned_website.brand_messaging',
+              'owned_website.brand_company_context',
+              'owned_website.offering_context',
+              'observed_brand_communication_language_signals',
+              'derived_communication_constraint_evidence'
+            ));
+
+          ALTER TABLE "data_extraction_observation_relations"
+            ADD CONSTRAINT "ck_de_obs_relation_wave1_capability"
+            CHECK ("capability_id" IN (
+              'owned_website.brand_messaging',
+              'owned_website.brand_company_context',
+              'owned_website.offering_context',
+              'observed_brand_communication_language_signals',
+              'derived_communication_constraint_evidence'
+            ));
+          SQL
+
+          npx prettier --write \
+            src/features/data-extraction/evidence/evidence-persistence.postgres.test.ts \
+            src/features/data-extraction/evidence/evidence-persistence.architecture.test.ts
+      - name: Prisma generate
+        run: npm run prisma:generate
+      - name: Prisma validate
+        run: npx prisma validate
+      - name: Apply all migrations on disposable PostgreSQL
+        run: npx prisma migrate deploy
+      - name: Reset and reapply all migrations
+        run: npx prisma migrate reset --force --skip-seed
+      - name: DE-W1.0B database invariants
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/evidence-persistence.postgres.test.ts src/features/data-extraction/evidence/evidence-persistence.architecture.test.ts
+      - name: Nest build
+        run: npm run build
+      - name: DE-W1.0A regression tests
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/evidence-runtime-contracts.test.ts src/features/data-extraction/evidence/evidence-runtime.architecture.test.ts
+      - name: W1.0E compatibility tests
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/evidence-w1-0e-compatibility.test.ts src/features/brand-intelligence/input/evidence/evidence-input.test.ts src/features/brand-intelligence/input/dependency/processor-dependency-preparation.test.ts
+      - name: W1.0F projection tests
+        run: npx vitest run --config vitest.config.ts src/features/brand-intelligence/brand-intelligence.current-projection.architecture.test.ts src/features/brand-intelligence/projection
+      - name: Scoped lint
+        run: npx eslint "src/features/data-extraction/evidence/**/*.ts"
+      - name: Full suite
+        run: npm test
+      - name: Diff check
+        run: git diff --check 4f1964035047b3470fa038bd0c9d9e1470fea414..HEAD
+      - name: Commit implementation
+        run: |
+          git config user.name "Piyush1087"
+          git config user.email "piyush.p1087@gmail.com"
+          git add prisma/schema.prisma prisma/migrations/20260825181500_add_data_extraction_wave1_evidence_persistence/migration.sql src/features/data-extraction/evidence/evidence-persistence.postgres.test.ts src/features/data-extraction/evidence/evidence-persistence.architecture.test.ts
+          git commit -m "feat(data-extraction): add Wave 1 durable Evidence persistence"
+          git push origin HEAD:${TARGET_BRANCH}
