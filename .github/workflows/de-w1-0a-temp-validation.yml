@@ -9,6 +9,8 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
     steps:
       - uses: actions/checkout@v4
         with:
