@@ -25,7 +25,9 @@ describe("DE-W1.0A W1.0E compatibility", () => {
     const brandId = asBrandId("brand-a");
     const execution: DataExtractionCapabilityExecutionRecord = {
       brandId,
-      capabilityExecutionRef: asCapabilityExecutionRef("capability-execution:1"),
+      capabilityExecutionRef: asCapabilityExecutionRef(
+        "capability-execution:1",
+      ),
       capabilityId: "owned_website.brand_messaging",
       resourceScope: [asResourceRef("resource:home")],
       freshnessIntent: "REUSE_ALLOWED",
