@@ -19,9 +19,7 @@ import type {
   DataExtractionContentArtifactRecord,
   DataExtractionEvidenceItemRecord,
 } from "./domain/evidence-records";
-import {
-  DataExtractionPersistenceError,
-} from "./persistence/evidence-persistence.errors";
+import { DataExtractionPersistenceError } from "./persistence/evidence-persistence.errors";
 import {
   DataExtractionPersistenceService,
   type DataExtractionRepositorySet,
@@ -277,7 +275,11 @@ describePostgres("DE-W1.0C durable Evidence repositories", () => {
     const brandId = await brand("capture-conflict");
     const repositories = persistence.repositories();
     const firstResource = await createResource(repositories, brandId, "first");
-    const secondResource = await createResource(repositories, brandId, "second");
+    const secondResource = await createResource(
+      repositories,
+      brandId,
+      "second",
+    );
     const requestKey = `capture-request:${randomUUID()}`;
     await repositories.captures.create({
       brandId,
@@ -361,7 +363,8 @@ describePostgres("DE-W1.0C durable Evidence repositories", () => {
       requestKey: `capability-request:${randomUUID()}`,
       coverage: "SINGLE_RESOURCE" as const,
     };
-    const execution = await repositories.capabilityExecutions.createOrGet(input);
+    const execution =
+      await repositories.capabilityExecutions.createOrGet(input);
     const completed = await repositories.capabilityExecutions.complete(
       brandId,
       execution.capabilityExecutionRef,
@@ -388,7 +391,9 @@ describePostgres("DE-W1.0C durable Evidence repositories", () => {
         `capability-execution:${randomUUID()}`,
       ),
     });
-    expect(replay.capabilityExecutionRef).toBe(execution.capabilityExecutionRef);
+    expect(replay.capabilityExecutionRef).toBe(
+      execution.capabilityExecutionRef,
+    );
     expect(replay.availability).toBe("AVAILABLE");
   });
 
@@ -415,7 +420,10 @@ describePostgres("DE-W1.0C durable Evidence repositories", () => {
     });
     expect(replay.evidenceRef).toBe(first.evidenceRef);
     expect(
-      await repositories.evidenceItems.listByCapture(brandId, capture.captureRef),
+      await repositories.evidenceItems.listByCapture(
+        brandId,
+        capture.captureRef,
+      ),
     ).toHaveLength(1);
 
     await expectCode(
@@ -595,7 +603,9 @@ describePostgres("DE-W1.0C durable Evidence repositories", () => {
       firstKey,
     );
     expect(
-      await prisma.dataExtractionSemanticObservation.count({ where: { brandId } }),
+      await prisma.dataExtractionSemanticObservation.count({
+        where: { brandId },
+      }),
     ).toBe(2);
     expect(
       await prisma.dataExtractionObservationRelation.count({
@@ -654,7 +664,9 @@ describePostgres("DE-W1.0C durable Evidence repositories", () => {
       resource.resourceRef,
     );
     const execution = await createExecution(repositories, brandId);
-    const providerRef = asProviderExecutionRef(`provider-execution:${randomUUID()}`);
+    const providerRef = asProviderExecutionRef(
+      `provider-execution:${randomUUID()}`,
+    );
     await repositories.providerExecutionLinks.attachToCapture(
       brandId,
       capture.captureRef,
@@ -667,10 +679,11 @@ describePostgres("DE-W1.0C durable Evidence repositories", () => {
       providerRef,
       "NORMALIZATION_INPUT",
     );
-    const captureLinks = await repositories.providerExecutionLinks.listForCapture(
-      brandId,
-      capture.captureRef,
-    );
+    const captureLinks =
+      await repositories.providerExecutionLinks.listForCapture(
+        brandId,
+        capture.captureRef,
+      );
     expect(captureLinks[0]?.providerExecutionRef).toBe(providerRef);
     expect(captureLinks[0]).not.toHaveProperty("providerPayload");
     expect(captureLinks[0]).not.toHaveProperty("modelId");
@@ -720,7 +733,9 @@ describePostgres("DE-W1.0C durable Evidence repositories", () => {
       "PERSISTENCE_INVARIANT",
     );
     expect(
-      await persistence.repositories().resources.findByRef(brandId, resourceRef),
+      await persistence
+        .repositories()
+        .resources.findByRef(brandId, resourceRef),
     ).toBeNull();
   });
 
@@ -737,7 +752,9 @@ describePostgres("DE-W1.0C durable Evidence repositories", () => {
       `capability-execution:${randomUUID()}`,
     );
     const evidenceRef = asEvidenceRef(`evidence:${randomUUID()}`);
-    const observationKey = asSemanticObservationKey(`observation:${randomUUID()}`);
+    const observationKey = asSemanticObservationKey(
+      `observation:${randomUUID()}`,
+    );
 
     await expectCode(
       persistence.withTransaction(async (repositories) => {

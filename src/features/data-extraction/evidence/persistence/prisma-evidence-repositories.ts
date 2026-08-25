@@ -75,9 +75,10 @@ type CaptureRow = Prisma.DataExtractionCaptureGetPayload<{
   include: { providerExecutionLinks: true };
 }>;
 
-type CapabilityExecutionRow = Prisma.DataExtractionCapabilityExecutionGetPayload<{
-  include: { resourceScope: true; evidenceMemberships: true };
-}>;
+type CapabilityExecutionRow =
+  Prisma.DataExtractionCapabilityExecutionGetPayload<{
+    include: { resourceScope: true; evidenceMemberships: true };
+  }>;
 
 type ObservationRow = Prisma.DataExtractionSemanticObservationGetPayload<{
   include: {
@@ -206,7 +207,9 @@ function toCapabilityExecution(
 ): DataExtractionCapabilityExecutionRecord {
   return {
     brandId: asBrandId(row.brandId),
-    capabilityExecutionRef: asCapabilityExecutionRef(row.capabilityExecutionRef),
+    capabilityExecutionRef: asCapabilityExecutionRef(
+      row.capabilityExecutionRef,
+    ),
     capabilityId: row.capabilityId as EvidenceCapabilityId,
     resourceScope: row.resourceScope.map((membership) =>
       asResourceRef(membership.resourceRef),
@@ -371,13 +374,12 @@ async function findObservationRow(
   });
 }
 
-function toObservation(row: ObservationRow): DataExtractionSemanticObservationRecord {
+function toObservation(
+  row: ObservationRow,
+): DataExtractionSemanticObservationRecord {
   const equivalent = new Set<string>();
   const conflicts = new Set<string>();
-  for (const relation of [
-    ...row.outgoingRelations,
-    ...row.incomingRelations,
-  ]) {
+  for (const relation of [...row.outgoingRelations, ...row.incomingRelations]) {
     const counterpart =
       relation.sourceObservationKey === row.semanticObservationKey
         ? relation.targetObservationKey
@@ -390,7 +392,9 @@ function toObservation(row: ObservationRow): DataExtractionSemanticObservationRe
   }
   return {
     brandId: asBrandId(row.brandId),
-    semanticObservationKey: asSemanticObservationKey(row.semanticObservationKey),
+    semanticObservationKey: asSemanticObservationKey(
+      row.semanticObservationKey,
+    ),
     capabilityId: row.capabilityId as EvidenceCapabilityId,
     supportingEvidenceRefs: row.supports.map((support) =>
       asEvidenceRef(support.evidenceRef),
@@ -449,7 +453,8 @@ async function toEvidence(
   }
 
   const providerLink = row.capture.providerExecutionLinks[0];
-  const capabilityExecutionRef = row.capabilityMemberships[0]?.capabilityExecutionRef;
+  const capabilityExecutionRef =
+    row.capabilityMemberships[0]?.capabilityExecutionRef;
   const captureMethodClass = row.capabilityId.startsWith("derived_")
     ? "DETERMINISTIC_DERIVATION"
     : providerLink
@@ -595,9 +600,8 @@ export class PrismaResourceRepository implements ResourceRepository {
         where: {
           brandId,
           sourceClass,
-          canonicalResourceKeyHash: canonicalResourceKeyHash(
-            canonicalResourceKey,
-          ),
+          canonicalResourceKeyHash:
+            canonicalResourceKeyHash(canonicalResourceKey),
         },
       });
       return row ? toResource(row) : null;
@@ -644,7 +648,9 @@ export class PrismaResourceRepository implements ResourceRepository {
 export class PrismaCaptureRepository implements CaptureRepository {
   constructor(private readonly db: DataExtractionDb) {}
 
-  async create(input: CreateCaptureInput): Promise<DataExtractionCaptureRecord> {
+  async create(
+    input: CreateCaptureInput,
+  ): Promise<DataExtractionCaptureRecord> {
     return withPersistenceErrorMapping(async () => {
       await ownedResource(this.db, input.brandId, input.resourceRef);
       if (input.capabilityExecutionRef) {
@@ -683,7 +689,9 @@ export class PrismaCaptureRepository implements CaptureRepository {
           status: "RUNNING",
           startedAt: new Date(input.startedAt),
           acquisitionQuality: input.acquisitionQuality.state,
-          qualityFailureCategories: [...input.acquisitionQuality.failureCategories],
+          qualityFailureCategories: [
+            ...input.acquisitionQuality.failureCategories,
+          ],
           qualityDetailCodes: [...input.acquisitionQuality.detailCodes],
         },
         include: { providerExecutionLinks: true },
@@ -770,7 +778,9 @@ export class PrismaCaptureRepository implements CaptureRepository {
           sourceRevisionRef: result.sourceRevisionRef,
           sourceContentHash: result.sourceContentHash,
           acquisitionQuality: result.acquisitionQuality.state,
-          qualityFailureCategories: [...result.acquisitionQuality.failureCategories],
+          qualityFailureCategories: [
+            ...result.acquisitionQuality.failureCategories,
+          ],
           qualityDetailCodes: [...result.acquisitionQuality.detailCodes],
         },
         include: { providerExecutionLinks: true },
@@ -810,9 +820,7 @@ export class PrismaCaptureRepository implements CaptureRepository {
   }
 }
 
-export class PrismaContentArtifactRepository
-  implements ContentArtifactRepository
-{
+export class PrismaContentArtifactRepository implements ContentArtifactRepository {
   constructor(private readonly db: DataExtractionDb) {}
 
   async findByRef(
@@ -897,19 +905,18 @@ export class PrismaContentArtifactRepository
   }
 }
 
-export class PrismaCapabilityExecutionRepository
-  implements CapabilityExecutionRepository
-{
+export class PrismaCapabilityExecutionRepository implements CapabilityExecutionRepository {
   constructor(private readonly db: DataExtractionDb) {}
 
   async createOrGet(
     input: CreateCapabilityExecutionInput,
   ): Promise<DataExtractionCapabilityExecutionRecord> {
     return withPersistenceErrorMapping(async () => {
-      const existing = await this.db.dataExtractionCapabilityExecution.findFirst({
-        where: { brandId: input.brandId, requestKey: input.requestKey },
-        include: { resourceScope: true, evidenceMemberships: true },
-      });
+      const existing =
+        await this.db.dataExtractionCapabilityExecution.findFirst({
+          where: { brandId: input.brandId, requestKey: input.requestKey },
+          include: { resourceScope: true, evidenceMemberships: true },
+        });
       if (existing) {
         if (
           existing.capabilityId !== input.capabilityId ||
@@ -1023,7 +1030,9 @@ export class PrismaCapabilityExecutionRepository
           reasonCodes: [...result.reasonCodes],
           coverage: result.coverage,
           acquisitionQuality: result.acquisitionQuality.state,
-          qualityFailureCategories: [...result.acquisitionQuality.failureCategories],
+          qualityFailureCategories: [
+            ...result.acquisitionQuality.failureCategories,
+          ],
           qualityDetailCodes: [...result.acquisitionQuality.detailCodes],
           completedAt: new Date(result.completedAt),
         },
@@ -1065,9 +1074,7 @@ export class PrismaCapabilityExecutionRepository
   }
 }
 
-export class PrismaCapabilityResourceRepository
-  implements CapabilityResourceRepository
-{
+export class PrismaCapabilityResourceRepository implements CapabilityResourceRepository {
   constructor(private readonly db: DataExtractionDb) {}
 
   async attach(
@@ -1082,9 +1089,11 @@ export class PrismaCapabilityResourceRepository
         capabilityExecutionRef,
       );
       await ownedResource(this.db, brandId, resourceRef);
-      const existing = await this.db.dataExtractionCapabilityResource.findFirst({
-        where: { brandId, capabilityExecutionRef, resourceRef },
-      });
+      const existing = await this.db.dataExtractionCapabilityResource.findFirst(
+        {
+          where: { brandId, capabilityExecutionRef, resourceRef },
+        },
+      );
       if (existing) return;
       await this.db.dataExtractionCapabilityResource.create({
         data: {
@@ -1116,7 +1125,9 @@ export class PrismaCapabilityResourceRepository
 export class PrismaEvidenceItemRepository implements EvidenceItemRepository {
   constructor(private readonly db: DataExtractionDb) {}
 
-  private async hydrate(row: PrismaEvidenceItem): Promise<DataExtractionEvidenceItemRecord> {
+  private async hydrate(
+    row: PrismaEvidenceItem,
+  ): Promise<DataExtractionEvidenceItemRecord> {
     const full = await this.db.dataExtractionEvidenceItem.findUnique({
       where: { evidenceRef: row.evidenceRef },
       include: {
@@ -1154,9 +1165,11 @@ export class PrismaEvidenceItemRepository implements EvidenceItemRepository {
         throw persistenceError("PERSISTENCE_INVARIANT");
       }
       if (record.normalizedContentRef) {
-        const artifact = await this.db.dataExtractionContentArtifact.findUnique({
-          where: { contentArtifactRef: record.normalizedContentRef },
-        });
+        const artifact = await this.db.dataExtractionContentArtifact.findUnique(
+          {
+            where: { contentArtifactRef: record.normalizedContentRef },
+          },
+        );
         if (!artifact) throw persistenceError("PERSISTENCE_INVARIANT");
         if (artifact.brandId !== record.brandId) {
           throw persistenceError("TENANCY_VIOLATION");
@@ -1178,7 +1191,8 @@ export class PrismaEvidenceItemRepository implements EvidenceItemRepository {
       if (existing) {
         const exact =
           existing.resourceRef === record.resourceRef &&
-          existing.contentArtifactRef === (record.normalizedContentRef ?? null) &&
+          existing.contentArtifactRef ===
+            (record.normalizedContentRef ?? null) &&
           canonicalJson(existing.boundedPayload) ===
             canonicalJson(record.boundedNormalizedPayload ?? null) &&
           existing.contentHash === record.contentHash &&
@@ -1198,7 +1212,10 @@ export class PrismaEvidenceItemRepository implements EvidenceItemRepository {
             existing.qualityFailureCategories,
             record.qualitySnapshot.failureCategories,
           ) &&
-          sameStrings(existing.qualityDetailCodes, record.qualitySnapshot.detailCodes) &&
+          sameStrings(
+            existing.qualityDetailCodes,
+            record.qualitySnapshot.detailCodes,
+          ) &&
           existing.semanticObservationKey ===
             (record.semanticObservationKey ?? null);
         if (!exact) throw persistenceError("IDEMPOTENCY_CONFLICT");
@@ -1223,12 +1240,16 @@ export class PrismaEvidenceItemRepository implements EvidenceItemRepository {
           coverageSnapshot: record.coverageSnapshot,
           freshnessAtEmission: record.freshnessAtEmission.state,
           freshnessBasis: record.freshnessAtEmission.basis,
-          freshnessEvaluatedAt: new Date(record.freshnessAtEmission.evaluatedAt),
+          freshnessEvaluatedAt: new Date(
+            record.freshnessAtEmission.evaluatedAt,
+          ),
           freshnessPriorCaptureRef: record.freshnessAtEmission.priorCaptureRef,
           freshnessSourceRevisionRef:
             record.freshnessAtEmission.sourceRevisionRef,
           qualitySnapshot: record.qualitySnapshot.state,
-          qualityFailureCategories: [...record.qualitySnapshot.failureCategories],
+          qualityFailureCategories: [
+            ...record.qualitySnapshot.failureCategories,
+          ],
           qualityDetailCodes: [...record.qualitySnapshot.detailCodes],
           itemFingerprint: record.deduplication.itemFingerprint,
           semanticObservationKey: record.semanticObservationKey,
@@ -1291,9 +1312,7 @@ export class PrismaEvidenceItemRepository implements EvidenceItemRepository {
   }
 }
 
-export class PrismaCapabilityEvidenceRepository
-  implements CapabilityEvidenceRepository
-{
+export class PrismaCapabilityEvidenceRepository implements CapabilityEvidenceRepository {
   constructor(private readonly db: DataExtractionDb) {}
 
   async attach(
@@ -1311,9 +1330,11 @@ export class PrismaCapabilityEvidenceRepository
       if (execution.capabilityId !== evidence.capabilityId) {
         throw persistenceError("PERSISTENCE_INVARIANT");
       }
-      const existing = await this.db.dataExtractionCapabilityEvidence.findFirst({
-        where: { brandId, capabilityExecutionRef, evidenceRef },
-      });
+      const existing = await this.db.dataExtractionCapabilityEvidence.findFirst(
+        {
+          where: { brandId, capabilityExecutionRef, evidenceRef },
+        },
+      );
       if (existing) return;
       await this.db.dataExtractionCapabilityEvidence.create({
         data: {
@@ -1342,9 +1363,7 @@ export class PrismaCapabilityEvidenceRepository
   }
 }
 
-export class PrismaSemanticObservationRepository
-  implements SemanticObservationRepository
-{
+export class PrismaSemanticObservationRepository implements SemanticObservationRepository {
   constructor(private readonly db: DataExtractionDb) {}
 
   async createOrGet(
@@ -1481,14 +1500,15 @@ export class PrismaSemanticObservationRepository
         sourceKey.localeCompare(targetKey) <= 0
           ? [sourceKey, targetKey]
           : [targetKey, sourceKey];
-      const existing = await this.db.dataExtractionObservationRelation.findFirst({
-        where: {
-          brandId,
-          sourceObservationKey: left,
-          targetObservationKey: right,
-          relationType,
-        },
-      });
+      const existing =
+        await this.db.dataExtractionObservationRelation.findFirst({
+          where: {
+            brandId,
+            sourceObservationKey: left,
+            targetObservationKey: right,
+            relationType,
+          },
+        });
       if (existing) return;
       await this.db.dataExtractionObservationRelation.create({
         data: {
@@ -1557,19 +1577,29 @@ export class PrismaSemanticObservationRepository
   }
 }
 
-export class PrismaFreshnessAssessmentRepository
-  implements FreshnessAssessmentRepository
-{
+export class PrismaFreshnessAssessmentRepository implements FreshnessAssessmentRepository {
   constructor(private readonly db: DataExtractionDb) {}
 
   async record(input: RecordFreshnessAssessmentInput): Promise<void> {
     await withPersistenceErrorMapping(async () => {
       if (input.targetType === "RESOURCE") {
-        await ownedResource(this.db, input.brandId, input.targetRef as ResourceRef);
+        await ownedResource(
+          this.db,
+          input.brandId,
+          input.targetRef as ResourceRef,
+        );
       } else if (input.targetType === "CAPTURE") {
-        await ownedCapture(this.db, input.brandId, input.targetRef as CaptureRef);
+        await ownedCapture(
+          this.db,
+          input.brandId,
+          input.targetRef as CaptureRef,
+        );
       } else {
-        await ownedEvidence(this.db, input.brandId, input.targetRef as EvidenceRef);
+        await ownedEvidence(
+          this.db,
+          input.brandId,
+          input.targetRef as EvidenceRef,
+        );
       }
       if (input.priorCaptureRef) {
         await ownedCapture(this.db, input.brandId, input.priorCaptureRef);
@@ -1620,12 +1650,12 @@ export class PrismaFreshnessAssessmentRepository
   }
 }
 
-export class PrismaProviderExecutionLinkRepository
-  implements ProviderExecutionLinkRepository
-{
+export class PrismaProviderExecutionLinkRepository implements ProviderExecutionLinkRepository {
   constructor(private readonly db: DataExtractionDb) {}
 
-  private async attach(link: DataExtractionProviderExecutionLink): Promise<void> {
+  private async attach(
+    link: DataExtractionProviderExecutionLink,
+  ): Promise<void> {
     await withPersistenceErrorMapping(async () => {
       if (link.captureRef) {
         await ownedCapture(this.db, link.brandId, link.captureRef);
@@ -1640,15 +1670,16 @@ export class PrismaProviderExecutionLinkRepository
       if (!link.captureRef && !link.capabilityExecutionRef) {
         throw persistenceError("PERSISTENCE_INVARIANT");
       }
-      const existing = await this.db.dataExtractionProviderExecutionLink.findFirst({
-        where: {
-          brandId: link.brandId,
-          captureRef: link.captureRef ?? null,
-          capabilityExecutionRef: link.capabilityExecutionRef ?? null,
-          providerExecutionRef: link.providerExecutionRef,
-          attemptRole: link.attemptRole,
-        },
-      });
+      const existing =
+        await this.db.dataExtractionProviderExecutionLink.findFirst({
+          where: {
+            brandId: link.brandId,
+            captureRef: link.captureRef ?? null,
+            capabilityExecutionRef: link.capabilityExecutionRef ?? null,
+            providerExecutionRef: link.providerExecutionRef,
+            attemptRole: link.attemptRole,
+          },
+        });
       if (existing) return;
       await this.db.dataExtractionProviderExecutionLink.create({
         data: {

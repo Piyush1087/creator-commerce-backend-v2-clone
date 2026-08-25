@@ -39,7 +39,9 @@ describe("DE-W1.0C repository architecture guards", () => {
     expect(persistenceSources).toContain("implements ResourceRepository");
     expect(persistenceSources).toContain("implements CaptureRepository");
     expect(persistenceSources).toContain("implements EvidenceItemRepository");
-    expect(persistenceSources).toContain("implements CapabilityExecutionRepository");
+    expect(persistenceSources).toContain(
+      "implements CapabilityExecutionRepository",
+    );
     expect(persistenceSources).not.toContain("export type PrismaResource");
     expect(persistenceSources).not.toContain("export type PrismaCapture");
   });
@@ -55,7 +57,9 @@ describe("DE-W1.0C repository architecture guards", () => {
   it("exposes a caller-owned transaction boundary instead of per-call forced transactions", () => {
     expect(persistenceSources).toContain("withTransaction<T>");
     expect(persistenceSources).toContain("Prisma.TransactionClient");
-    expect(persistenceSources).toContain("createDataExtractionRepositorySet(tx)");
+    expect(persistenceSources).toContain(
+      "createDataExtractionRepositorySet(tx)",
+    );
   });
 
   it("keeps conflict/equivalence bounded and winner-free", () => {

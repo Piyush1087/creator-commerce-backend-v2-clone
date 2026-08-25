@@ -88,14 +88,14 @@ export interface CompleteCapabilityExecutionInput {
   readonly completedAt: string;
 }
 
-export interface RecordFreshnessAssessmentInput
-  extends DataExtractionFreshnessAssessment {}
+export interface RecordFreshnessAssessmentInput extends DataExtractionFreshnessAssessment {}
 
-export interface AttachProviderExecutionLinkInput
-  extends DataExtractionProviderExecutionLink {}
+export interface AttachProviderExecutionLinkInput extends DataExtractionProviderExecutionLink {}
 
 export interface ResourceRepository {
-  createOrGet(input: CreateOrGetResourceInput): Promise<DataExtractionResourceRecord>;
+  createOrGet(
+    input: CreateOrGetResourceInput,
+  ): Promise<DataExtractionResourceRecord>;
   findByRef(
     brandId: BrandId,
     resourceRef: ResourceRef,
@@ -109,7 +109,9 @@ export interface ResourceRepository {
     brandId: BrandId,
     canonicalResourceKey: string,
   ): Promise<DataExtractionResourceRecord | null>;
-  listForBrand(brandId: BrandId): Promise<readonly DataExtractionResourceRecord[]>;
+  listForBrand(
+    brandId: BrandId,
+  ): Promise<readonly DataExtractionResourceRecord[]>;
   insert(record: DataExtractionResourceRecord): Promise<void>;
 }
 
