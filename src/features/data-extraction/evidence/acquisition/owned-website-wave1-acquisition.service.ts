@@ -76,15 +76,12 @@ const quality = (
   detailCodes: readonly string[] = [],
 ): EvidenceAcquisitionQuality => ({
   state,
-  failureCategories:
-    state === "UNAVAILABLE" ? ["RESOURCE_UNAVAILABLE"] : [],
+  failureCategories: state === "UNAVAILABLE" ? ["RESOURCE_UNAVAILABLE"] : [],
   detailCodes,
 });
 
 @Injectable()
-export class ExistingOwnedWebsiteAcquisitionMechanics
-  implements OwnedWebsitePageAcquisitionMechanics
-{
+export class ExistingOwnedWebsiteAcquisitionMechanics implements OwnedWebsitePageAcquisitionMechanics {
   constructor(
     private readonly contextBuilder: TextContextBuilderService,
     private readonly zyte: ZyteHomepageStrategy,
@@ -109,7 +106,10 @@ export class ExistingOwnedWebsiteAcquisitionMechanics
 
     if (this.zyte.isConfigured()) {
       const fallbackRef = `provider-execution:${randomUUID()}`;
-      attempts.push({ providerExecutionRef: fallbackRef, attemptRole: "FALLBACK" });
+      attempts.push({
+        providerExecutionRef: fallbackRef,
+        attemptRole: "FALLBACK",
+      });
       try {
         const fallbackBody = await this.zyte.fetchHtml(url);
         if (fallbackBody.trim().length >= 40) {
@@ -197,7 +197,10 @@ export class ExistingOwnedWebsiteAcquisitionMechanics
     attempts: readonly OwnedWebsiteAcquisitionAttempt[],
     reasonCodes: readonly string[],
   ): OwnedWebsitePageAcquisition {
-    const boundedHtml = html.slice(0, OWNED_WEBSITE_WAVE1_BOUNDS.maximumSourceBodyChars);
+    const boundedHtml = html.slice(
+      0,
+      OWNED_WEBSITE_WAVE1_BOUNDS.maximumSourceBodyChars,
+    );
     const built = this.contextBuilder.build([{ url, html: boundedHtml }])[0];
     return {
       url,
@@ -218,9 +221,7 @@ export class ExistingOwnedWebsiteAcquisitionMechanics
 }
 
 @Injectable()
-export class OwnedWebsiteWave1AcquisitionService
-  implements DataExtractionCapabilityAcquisitionPortV1
-{
+export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabilityAcquisitionPortV1 {
   constructor(
     private readonly persistence: DataExtractionPersistenceService,
     private readonly mechanics: ExistingOwnedWebsiteAcquisitionMechanics,
@@ -292,7 +293,11 @@ export class OwnedWebsiteWave1AcquisitionService
     acquired.push(root);
 
     if (root.acquisitionQuality.state === "UNAVAILABLE") {
-      await this.completeExecution(request, execution.capabilityExecutionRef, acquired);
+      await this.completeExecution(
+        request,
+        execution.capabilityExecutionRef,
+        acquired,
+      );
       return {
         capabilityExecutionRef: execution.capabilityExecutionRef,
         evidenceRefs: [],
@@ -306,10 +311,13 @@ export class OwnedWebsiteWave1AcquisitionService
       root.captureRef,
     );
     const rootHtml =
-      rootArtifacts.find((artifact) => artifact.artifactKind === "ACQUIRED_SOURCE_BODY")
-        ?.inlineContent ?? "";
+      rootArtifacts.find(
+        (artifact) => artifact.artifactKind === "ACQUIRED_SOURCE_BODY",
+      )?.inlineContent ?? "";
     const rootContext = rootHtml
-      ? new TextContextBuilderService().build([{ url: rootUrl, html: rootHtml }])[0]
+      ? new TextContextBuilderService().build([
+          { url: rootUrl, html: rootHtml },
+        ])[0]
       : undefined;
     const selected = selectSecondaryUrls(
       rootContext?.internal_links ?? [],
@@ -326,7 +334,11 @@ export class OwnedWebsiteWave1AcquisitionService
       acquired.push(prepared);
     }
 
-    await this.completeExecution(request, execution.capabilityExecutionRef, acquired);
+    await this.completeExecution(
+      request,
+      execution.capabilityExecutionRef,
+      acquired,
+    );
     return {
       capabilityExecutionRef: execution.capabilityExecutionRef,
       evidenceRefs: [],
@@ -500,7 +512,11 @@ export class OwnedWebsiteWave1AcquisitionService
       brandId,
       resourceRef,
     );
-    if (!latest || !latest.capturedAt || latest.acquisitionQuality.state === "UNAVAILABLE") {
+    if (
+      !latest ||
+      !latest.capturedAt ||
+      latest.acquisitionQuality.state === "UNAVAILABLE"
+    ) {
       return null;
     }
     const artifacts = await repositories.contentArtifacts.listForCapture(
@@ -520,7 +536,7 @@ export class OwnedWebsiteWave1AcquisitionService
   private async completeExecution(
     request: DataExtractionCapabilityAcquisitionRequestV1,
     capabilityExecutionRef: ReturnType<typeof asCapabilityExecutionRef>,
-    acquired: readonly Array<{
+    acquired: ReadonlyArray<{
       acquisitionQuality: EvidenceAcquisitionQuality;
       reasonCodes: readonly string[];
       pageRole: EvidencePageRole;
@@ -530,8 +546,12 @@ export class OwnedWebsiteWave1AcquisitionService
     const availableCount = acquired.filter(
       (entry) => entry.acquisitionQuality.state !== "UNAVAILABLE",
     ).length;
-    const reasonCodes = [...new Set(acquired.flatMap((entry) => entry.reasonCodes))];
-    const aggregate = aggregateQuality(acquired.map((entry) => entry.acquisitionQuality));
+    const reasonCodes = [
+      ...new Set(acquired.flatMap((entry) => entry.reasonCodes)),
+    ];
+    const aggregate = aggregateQuality(
+      acquired.map((entry) => entry.acquisitionQuality),
+    );
     const coverage = coverageForCount(availableCount);
     const availability = capabilityAvailability(
       request.capabilityId,
@@ -540,18 +560,19 @@ export class OwnedWebsiteWave1AcquisitionService
     );
     const retryability = retryabilityFor(availability, reasonCodes);
 
-    await this.persistence.repositories().capabilityExecutions.complete(
-      request.brandId,
-      capabilityExecutionRef,
-      {
-        availability: root?.acquisitionQuality.state === "UNAVAILABLE" ? "UNAVAILABLE" : availability,
+    await this.persistence
+      .repositories()
+      .capabilityExecutions.complete(request.brandId, capabilityExecutionRef, {
+        availability:
+          root?.acquisitionQuality.state === "UNAVAILABLE"
+            ? "UNAVAILABLE"
+            : availability,
         retryability,
         reasonCodes,
         coverage,
         acquisitionQuality: aggregate,
         completedAt: new Date().toISOString(),
-      },
-    );
+      });
   }
 
   private async assertReplayMatches(
@@ -568,16 +589,21 @@ export class OwnedWebsiteWave1AcquisitionService
       !existing ||
       existing.capabilityId !== request.capabilityId ||
       existing.freshnessIntent !== request.freshnessIntent ||
-      existing.normalizationContractVersion !== request.normalizationContractVersion
+      existing.normalizationContractVersion !==
+        request.normalizationContractVersion
     ) {
       throw persistenceError("IDEMPOTENCY_CONFLICT");
     }
     if (resourceScope.length > 0) {
       const resources = await Promise.all(
-        resourceScope.map((ref) => repositories.resources.findByRef(request.brandId, ref)),
+        resourceScope.map((ref) =>
+          repositories.resources.findByRef(request.brandId, ref),
+        ),
       );
       const rootMatches = resources.some(
-        (resource) => resource?.pageRole === "HOMEPAGE" && resource.canonicalUrl === rootUrl,
+        (resource) =>
+          resource?.pageRole === "HOMEPAGE" &&
+          resource.canonicalUrl === rootUrl,
       );
       if (!rootMatches) throw persistenceError("IDEMPOTENCY_CONFLICT");
     }
@@ -593,7 +619,9 @@ export class OwnedWebsiteWave1AcquisitionService
         repositories.captures.findLatestForResource(brandId, resourceRef),
       ),
     );
-    return captures.filter((value): value is NonNullable<typeof value> => Boolean(value)).map((value) => value.captureRef);
+    return captures
+      .filter((value): value is NonNullable<typeof value> => Boolean(value))
+      .map((value) => value.captureRef);
   }
 
   private assertRequest(request: DataExtractionCapabilityAcquisitionRequestV1) {
@@ -652,13 +680,19 @@ function selectSecondaryUrls(
   const scored = unique
     .map((url) => ({ url, pageRole: inferPageRole(url) }))
     .filter((entry) => entry.pageRole !== "HOMEPAGE")
-    .map((entry) => ({ ...entry, score: pageScore(capabilityId, entry.pageRole) }))
+    .map((entry) => ({
+      ...entry,
+      score: pageScore(capabilityId, entry.pageRole),
+    }))
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score || a.url.localeCompare(b.url));
   return scored;
 }
 
-function pageScore(capabilityId: EvidenceCapabilityId, role: EvidencePageRole): number {
+function pageScore(
+  capabilityId: EvidenceCapabilityId,
+  role: EvidencePageRole,
+): number {
   const company = new Set<EvidencePageRole>([
     "ABOUT_COMPANY",
     "BRAND_STORY",
@@ -673,10 +707,14 @@ function pageScore(capabilityId: EvidenceCapabilityId, role: EvidencePageRole): 
     "PRICING_PLANS",
     "OFFERING_DETAIL",
   ]);
-  if (capabilityId === "owned_website.brand_company_context") return company.has(role) ? 3 : 0;
-  if (capabilityId === "owned_website.offering_context") return offering.has(role) ? 3 : 0;
-  if (capabilityId === "owned_website.brand_messaging") return company.has(role) ? 3 : offering.has(role) ? 1 : 0;
-  if (capabilityId === "observed_brand_communication_language_signals") return company.has(role) || offering.has(role) ? 2 : 0;
+  if (capabilityId === "owned_website.brand_company_context")
+    return company.has(role) ? 3 : 0;
+  if (capabilityId === "owned_website.offering_context")
+    return offering.has(role) ? 3 : 0;
+  if (capabilityId === "owned_website.brand_messaging")
+    return company.has(role) ? 3 : offering.has(role) ? 1 : 0;
+  if (capabilityId === "observed_brand_communication_language_signals")
+    return company.has(role) || offering.has(role) ? 2 : 0;
   return company.has(role) || offering.has(role) ? 1 : 0;
 }
 
@@ -702,31 +740,56 @@ export function inferPageRole(value: string): EvidencePageRole {
 
 function capabilityAvailability(
   capabilityId: EvidenceCapabilityId,
-  acquired: readonly Array<{ pageRole: EvidencePageRole }>,
+  acquired: ReadonlyArray<{ pageRole: EvidencePageRole }>,
   availableCount: number,
 ): CapabilityAvailability {
   if (availableCount === 0) return "UNAVAILABLE";
   if (
     capabilityId === "owned_website.brand_company_context" &&
-    !acquired.some((entry) => ["ABOUT_COMPANY", "BRAND_STORY", "MISSION_VALUES", "COMPANY_OVERVIEW"].includes(entry.pageRole))
+    !acquired.some((entry) =>
+      [
+        "ABOUT_COMPANY",
+        "BRAND_STORY",
+        "MISSION_VALUES",
+        "COMPANY_OVERVIEW",
+      ].includes(entry.pageRole),
+    )
   ) {
     return "PARTIAL";
   }
   if (
     capabilityId === "owned_website.offering_context" &&
-    !acquired.some((entry) => ["PORTFOLIO_OVERVIEW", "CATEGORY_OVERVIEW", "SERVICE_OVERVIEW", "SOLUTIONS_OVERVIEW", "PRICING_PLANS", "OFFERING_DETAIL"].includes(entry.pageRole))
+    !acquired.some((entry) =>
+      [
+        "PORTFOLIO_OVERVIEW",
+        "CATEGORY_OVERVIEW",
+        "SERVICE_OVERVIEW",
+        "SOLUTIONS_OVERVIEW",
+        "PRICING_PLANS",
+        "OFFERING_DETAIL",
+      ].includes(entry.pageRole),
+    )
   ) {
     return "PARTIAL";
   }
   return "AVAILABLE";
 }
 
-function aggregateQuality(values: readonly EvidenceAcquisitionQuality[]): EvidenceAcquisitionQuality {
-  if (values.length === 0) return quality("UNAVAILABLE", ["PAGE_SELECTION_EMPTY"]);
+function aggregateQuality(
+  values: readonly EvidenceAcquisitionQuality[],
+): EvidenceAcquisitionQuality {
+  if (values.length === 0)
+    return quality("UNAVAILABLE", ["PAGE_SELECTION_EMPTY"]);
   const available = values.filter((value) => value.state !== "UNAVAILABLE");
-  if (available.length === 0) return quality("UNAVAILABLE", ["NO_USABLE_CONTENT"]);
-  if (values.some((value) => value.state === "DEGRADED")) return quality("DEGRADED", ["ONE_OR_MORE_PROVIDER_FALLBACKS"]);
-  if (values.some((value) => value.state === "PARTIAL") || available.length < values.length) return quality("PARTIAL", ["ONE_OR_MORE_PAGES_PARTIAL"]);
+  if (available.length === 0)
+    return quality("UNAVAILABLE", ["NO_USABLE_CONTENT"]);
+  if (values.some((value) => value.state === "DEGRADED"))
+    return quality("DEGRADED", ["ONE_OR_MORE_PROVIDER_FALLBACKS"]);
+  if (
+    values.some((value) => value.state === "PARTIAL") ||
+    available.length < values.length
+  )
+    return quality("PARTIAL", ["ONE_OR_MORE_PAGES_PARTIAL"]);
   return quality("COMPLETE");
 }
 

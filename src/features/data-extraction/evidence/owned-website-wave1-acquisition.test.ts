@@ -7,7 +7,9 @@ import {
   inferPageRole,
 } from "./acquisition/owned-website-wave1-acquisition.service";
 
-function html(body = "Representative brand content for customers and products. ".repeat(30)) {
+function html(
+  body = "Representative brand content for customers and products. ".repeat(30),
+) {
   return `<html><head><title>Brand</title></head><body><main>${body}</main><a href="/about">About</a></body></html>`;
 }
 
@@ -47,7 +49,9 @@ describe("DE-W1.0D owned-site provider reuse", () => {
   it("calls the existing Zyte fallback only when direct acquisition is unusable", async () => {
     const zyte = {
       isConfigured: () => true,
-      fetchHtml: vi.fn(async () => html("fallback representative content ".repeat(40))),
+      fetchHtml: vi.fn(async () =>
+        html("fallback representative content ".repeat(40)),
+      ),
     };
     vi.stubGlobal(
       "fetch",
@@ -121,9 +125,13 @@ describe("DE-W1.0D owned-site provider reuse", () => {
     expect(inferPageRole("https://example.com/")).toBe("HOMEPAGE");
     expect(inferPageRole("https://example.com/about-us")).toBe("ABOUT_COMPANY");
     expect(inferPageRole("https://example.com/our-story")).toBe("BRAND_STORY");
-    expect(inferPageRole("https://example.com/mission-values")).toBe("MISSION_VALUES");
+    expect(inferPageRole("https://example.com/mission-values")).toBe(
+      "MISSION_VALUES",
+    );
     expect(inferPageRole("https://example.com/pricing")).toBe("PRICING_PLANS");
-    expect(inferPageRole("https://example.com/solutions")).toBe("SOLUTIONS_OVERVIEW");
+    expect(inferPageRole("https://example.com/solutions")).toBe(
+      "SOLUTIONS_OVERVIEW",
+    );
     expect(inferPageRole("https://example.com/unclassified")).toBe("OTHER");
   });
 

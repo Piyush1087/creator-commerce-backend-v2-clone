@@ -42,8 +42,12 @@ describe("DE-W1.0D owned-site acquisition architecture", () => {
     expect(runtimePorts).toContain("readExisting(");
     expect(runtimePorts).toContain("request(");
     const readSection = runtimePorts.slice(
-      runtimePorts.indexOf("export interface DataExtractionEvidenceQueryPortV1"),
-      runtimePorts.indexOf("export interface DataExtractionCapabilityAcquisitionRequestV1"),
+      runtimePorts.indexOf(
+        "export interface DataExtractionEvidenceQueryPortV1",
+      ),
+      runtimePorts.indexOf(
+        "export interface DataExtractionCapabilityAcquisitionRequestV1",
+      ),
     );
     expect(readSection).not.toContain("request(");
   });
