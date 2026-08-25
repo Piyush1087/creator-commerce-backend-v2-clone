@@ -28,9 +28,7 @@ export const asCapabilityExecutionRef = (
 export const asSemanticObservationKey = (
   value: string,
 ): SemanticObservationKey => value as SemanticObservationKey;
-export const asNormalizedContentRef = (
-  value: string,
-): NormalizedContentRef => value as NormalizedContentRef;
-export const asProviderExecutionRef = (
-  value: string,
-): ProviderExecutionRef => value as ProviderExecutionRef;
+export const asNormalizedContentRef = (value: string): NormalizedContentRef =>
+  value as NormalizedContentRef;
+export const asProviderExecutionRef = (value: string): ProviderExecutionRef =>
+  value as ProviderExecutionRef;
