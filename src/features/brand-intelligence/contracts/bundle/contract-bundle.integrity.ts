@@ -41,7 +41,7 @@ export interface GeneratedContractRegistration {
   readonly persistenceValidatorId: string;
   readonly bundled: true;
   readonly registered: true;
-  readonly executionEnabled: false;
+  readonly executionEnabled: boolean;
 }
 
 interface GeneratedContractRegistry {
@@ -203,14 +203,16 @@ export class ContractBundleIntegrityVerifier {
           );
         }
       }
+      const expectedExecutionEnabled =
+        registration.processorId === "brand_communication";
       if (
         registration.bundled !== true ||
         registration.registered !== true ||
-        registration.executionEnabled !== false
+        registration.executionEnabled !== expectedExecutionEnabled
       ) {
         configuration(
           "EXECUTION_FLAG_MISMATCH",
-          "W1.0C registrations must be bundled, registered, and execution-disabled",
+          "Registration execution state does not match the compiled processor allow-list",
         );
       }
 

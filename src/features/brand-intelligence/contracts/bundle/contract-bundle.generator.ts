@@ -454,7 +454,7 @@ export function generateContractBundles(options: GenerateOptions): void {
       persistenceValidatorId: "intelligence_persistence_transition_v1",
       bundled: true,
       registered: true,
-      executionEnabled: false,
+      executionEnabled: manifest.processorId === "brand_communication",
     };
   });
   const registry = {

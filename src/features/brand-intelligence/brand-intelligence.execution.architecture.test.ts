@@ -47,7 +47,7 @@ describe("W1.0D architecture boundary", () => {
     expect(registry).not.toContain("brand_meaning");
   });
 
-  it("retains both real bundles as registered but execution-disabled", () => {
+  it("activates only brand_communication while retaining brand_meaning disabled", () => {
     const registry = JSON.parse(
       readFileSync(
         join(__dirname, "generated", "contract-bundles", "registry.json"),
@@ -73,7 +73,7 @@ describe("W1.0D architecture boundary", () => {
         processorId: "brand_communication",
         bundled: true,
         registered: true,
-        executionEnabled: false,
+        executionEnabled: true,
       },
       {
         processorId: "brand_meaning",

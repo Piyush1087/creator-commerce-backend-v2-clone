@@ -19,6 +19,7 @@ import { ExecutionAggregationService } from "./execution-aggregation.service";
 import type { ProcessorSuccessPersistenceHook } from "./processor-persistence.hook";
 import { ProcessorExecutionRepository } from "./processor-execution.repository";
 import { RetryBackoffPolicy } from "./policy/retry-backoff.policy";
+import { ProcessorExecutorFailure } from "./executor/processor-executor";
 
 @Injectable()
 export class ProcessorFinalizationService {
@@ -73,6 +74,7 @@ export class ProcessorFinalizationService {
           return completed;
         }),
       "Processor completion failed a persistence invariant",
+      (error) => error instanceof ProcessorExecutorFailure,
     );
   }
 

@@ -1,16 +1,30 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
 
 import { IntelligenceExecutionError } from "../domain/intelligence-execution.error";
 import { SYNTHETIC_PROCESSOR_ID } from "../domain/intelligence-execution.types";
 import type { ProcessorExecutor } from "./processor-executor";
 import { SyntheticProcessorExecutor } from "./synthetic-processor.executor";
+import { BrandCommunicationProcessorExecutor } from "../../processors/brand-communication/brand-communication-processor.executor";
 
 @Injectable()
 export class ProcessorExecutorRegistry {
   private readonly executors: ReadonlyMap<string, ProcessorExecutor>;
 
-  constructor(syntheticExecutor: SyntheticProcessorExecutor) {
-    this.executors = new Map([[SYNTHETIC_PROCESSOR_ID, syntheticExecutor]]);
+  constructor(
+    syntheticExecutor: SyntheticProcessorExecutor,
+    @Optional()
+    brandCommunicationExecutor?: BrandCommunicationProcessorExecutor,
+  ) {
+    const executors: [string, ProcessorExecutor][] = [
+      [SYNTHETIC_PROCESSOR_ID, syntheticExecutor],
+    ];
+    if (brandCommunicationExecutor) {
+      executors.push([
+        brandCommunicationExecutor.processorId,
+        brandCommunicationExecutor,
+      ]);
+    }
+    this.executors = new Map(executors);
   }
 
   has(processorId: string): boolean {

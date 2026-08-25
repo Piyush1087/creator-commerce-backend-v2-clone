@@ -79,6 +79,8 @@ export interface LeaseIdentity {
 export interface ProcessorExecutionResult {
   readonly readiness: IntelligenceReadiness;
   readonly telemetry?: Readonly<Record<string, string | number | boolean>>;
+  /** Transient validated material consumed by the success hook in the lease transaction. */
+  readonly persistencePayload?: unknown;
 }
 
 export interface ProcessorFailure {

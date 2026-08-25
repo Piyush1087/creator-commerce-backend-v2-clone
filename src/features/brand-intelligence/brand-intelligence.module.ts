@@ -12,10 +12,7 @@ import { ExecutionAggregationService } from "./execution/execution-aggregation.s
 import { IntelligenceExecutionService } from "./execution/intelligence-execution.service";
 import { ProcessorExecutionRepository } from "./execution/processor-execution.repository";
 import { ProcessorFinalizationService } from "./execution/processor-finalization.service";
-import {
-  NoopProcessorSuccessPersistenceHook,
-  PROCESSOR_SUCCESS_PERSISTENCE_HOOK,
-} from "./execution/processor-persistence.hook";
+import { PROCESSOR_SUCCESS_PERSISTENCE_HOOK } from "./execution/processor-persistence.hook";
 import { ProcessorWorkerService } from "./execution/processor-worker.service";
 import { ProcessorExecutorRegistry } from "./execution/executor/processor-executor.registry";
 import { SyntheticProcessorExecutor } from "./execution/executor/synthetic-processor.executor";
@@ -40,6 +37,12 @@ import { IntelligenceCurrentProjectionService } from "./projection/intelligence-
 import { IntelligenceObjectAssembler } from "./projection/intelligence-object-assembler";
 import { ComponentPathCodec } from "./semantic-path/component-path.codec";
 import { IntelligenceTransitionService } from "./transitions/intelligence-transition.service";
+import {
+  BRAND_COMMUNICATION_MODEL_PROVIDER,
+  StructuredBrandCommunicationModelProvider,
+} from "./processors/brand-communication/brand-communication-model.provider";
+import { BrandCommunicationPersistenceHook } from "./processors/brand-communication/brand-communication-persistence.hook";
+import { BrandCommunicationProcessorExecutor } from "./processors/brand-communication/brand-communication-processor.executor";
 
 const internalProviders = [
   ComponentPathCodec,
@@ -52,6 +55,7 @@ const internalProviders = [
   RetryBackoffPolicy,
   ExecutionAggregationService,
   SyntheticProcessorExecutor,
+  BrandCommunicationProcessorExecutor,
   ProcessorExecutorRegistry,
   ExecutionContractGate,
   IntelligenceExecutionService,
@@ -74,7 +78,11 @@ const internalProviders = [
   },
   {
     provide: PROCESSOR_SUCCESS_PERSISTENCE_HOOK,
-    useClass: NoopProcessorSuccessPersistenceHook,
+    useClass: BrandCommunicationPersistenceHook,
+  },
+  {
+    provide: BRAND_COMMUNICATION_MODEL_PROVIDER,
+    useClass: StructuredBrandCommunicationModelProvider,
   },
   IntelligenceGenerationRepository,
   IntelligenceCurrentStateRepository,

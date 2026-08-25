@@ -34,7 +34,7 @@ describe("W1.0E input-port architecture", () => {
     }
   });
 
-  it("keeps both real processors registered but execution-disabled", () => {
+  it("keeps input ports bounded while only brand_communication is executable", () => {
     expect(
       registry.registrations.map((registration) => ({
         processorId: registration.processorId,
@@ -47,7 +47,7 @@ describe("W1.0E input-port architecture", () => {
         processorId: "brand_communication",
         bundled: true,
         registered: true,
-        executionEnabled: false,
+        executionEnabled: true,
       },
       {
         processorId: "brand_meaning",

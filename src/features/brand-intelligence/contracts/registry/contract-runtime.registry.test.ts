@@ -63,14 +63,19 @@ afterEach(() => {
 });
 
 describe("contract runtime registry and startup integrity", () => {
-  it("returns only verified exact allow-listed keys with execution disabled", () => {
+  it("returns only verified exact allow-listed keys with bounded activation", () => {
     const runtime = registry();
     runtime.verifyAtRoot(GENERATED_ROOT);
     expect(runtime.isReady()).toBe(true);
     expect(runtime.registrations()).toHaveLength(2);
     expect(
-      runtime.registrations().every((entry) => !entry.executionEnabled),
-    ).toBe(true);
+      runtime
+        .registrations()
+        .map((entry) => [entry.processorId, entry.executionEnabled]),
+    ).toEqual([
+      ["brand_communication", true],
+      ["brand_meaning", false],
+    ]);
     expect(
       runtime.getVerifiedBundle({
         processorId: "brand_communication",
