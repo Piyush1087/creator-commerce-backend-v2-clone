@@ -4,7 +4,7 @@ on:
     branches:
       - phase-g/data-extraction-wave1-evidence-w1-0e-normalizers
 permissions:
-  contents: read
+  contents: write
 jobs:
   validate:
     runs-on: ubuntu-24.04
@@ -29,6 +29,7 @@ jobs:
       DE_W1_0D_DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
       DE_W1_0E_DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
       BASE_SHA: 4639cce9db2bc6935cd3df3e13e2460506595194
+      TARGET_BRANCH: phase-g/data-extraction-wave1-evidence-w1-0e-normalizers
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,6 +40,15 @@ jobs:
           cache: npm
       - name: npm ci
         run: npm ci
+      - name: Format E files
+        run: |
+          npx prettier --write \
+            src/features/data-extraction/data-extraction.module.ts \
+            src/features/data-extraction/evidence/normalization/owned-website-wave1-normalizers.ts \
+            src/features/data-extraction/evidence/normalization/owned-website-wave1-normalization.service.ts \
+            src/features/data-extraction/evidence/normalization/owned-website-wave1-normalizers.test.ts \
+            src/features/data-extraction/evidence/normalization/owned-website-wave1-normalization.architecture.test.ts \
+            src/features/data-extraction/evidence/normalization/owned-website-wave1-normalization.postgres.test.ts
       - name: Prisma generate
         run: npm run prisma:generate
       - name: Prisma validate
@@ -90,3 +100,11 @@ jobs:
           ! grep -R "DataExtractionIntelligenceEvidenceAdapter" src/features/data-extraction/evidence/normalization -n
       - name: Diff check
         run: git diff --check "$BASE_SHA"
+      - name: Commit formatted implementation and remove temporary workflow
+        run: |
+          rm .github/workflows/de-w1-0e-validation.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "test(data-extraction): validate Wave 1 normalizers"
+          git push origin HEAD:${TARGET_BRANCH}
