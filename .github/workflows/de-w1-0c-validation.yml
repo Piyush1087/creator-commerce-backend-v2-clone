@@ -1,3 +1,4 @@
+# validation rerun after repository-standard formatting
 name: DE-W1.0C validation
 on:
   push:
