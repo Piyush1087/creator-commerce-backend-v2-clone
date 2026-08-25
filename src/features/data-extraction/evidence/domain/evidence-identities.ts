@@ -17,9 +17,11 @@ export type ProviderExecutionRef = string & {
 };
 
 export const asBrandId = (value: string): BrandId => value as BrandId;
-export const asResourceRef = (value: string): ResourceRef => value as ResourceRef;
+export const asResourceRef = (value: string): ResourceRef =>
+  value as ResourceRef;
 export const asCaptureRef = (value: string): CaptureRef => value as CaptureRef;
-export const asEvidenceRef = (value: string): EvidenceRef => value as EvidenceRef;
+export const asEvidenceRef = (value: string): EvidenceRef =>
+  value as EvidenceRef;
 export const asCapabilityExecutionRef = (
   value: string,
 ): CapabilityExecutionRef => value as CapabilityExecutionRef;
