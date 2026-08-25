@@ -21,6 +21,8 @@ import {
   ARCHITECTURE_REPOSITORY,
   CONTRACT_SOURCE_SPECS,
   PINNED_ARCHITECTURE_COMMIT,
+  PROCESSOR_ARCHITECTURE_COMMITS,
+  EXECUTABLE_CONTRACT_PROCESSORS,
 } from "./contract-source.spec";
 
 export interface GeneratedContractRegistration {
@@ -203,8 +205,9 @@ export class ContractBundleIntegrityVerifier {
           );
         }
       }
-      const expectedExecutionEnabled =
-        registration.processorId === "brand_communication";
+      const expectedExecutionEnabled = EXECUTABLE_CONTRACT_PROCESSORS.has(
+        registration.processorId,
+      );
       if (
         registration.bundled !== true ||
         registration.registered !== true ||
@@ -382,7 +385,8 @@ export class ContractBundleIntegrityVerifier {
       manifest.generatedNotice !== "GENERATED — DO NOT EDIT" ||
       manifest.generatorVersion !== CONTRACT_BUNDLE_GENERATOR_VERSION ||
       manifest.architectureRepository !== ARCHITECTURE_REPOSITORY ||
-      manifest.architectureCommitSha !== PINNED_ARCHITECTURE_COMMIT ||
+      manifest.architectureCommitSha !==
+        PROCESSOR_ARCHITECTURE_COMMITS[registration.processorId] ||
       manifest.ownerEngine !== spec.ownerEngine ||
       manifest.owningBranch !== spec.owningBranch ||
       manifest.processorId !== registration.processorId ||

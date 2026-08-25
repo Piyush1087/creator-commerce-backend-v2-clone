@@ -63,6 +63,23 @@ afterEach(() => {
 });
 
 describe("contract runtime registry and startup integrity", () => {
+  it("fails closed when meaning's source pin or execution flag drifts", () => {
+    const root = copiedRoot();
+    mutateJson(join(root, "brand_meaning", "1.0", "manifest.json"), (value) => {
+      value.architectureCommitSha = "017dbceac494f0861ec9a6bea7af3129b70fa5cb";
+    });
+    expect(() => registry().verifyAtRoot(root)).toThrow();
+    const flags = copiedRoot();
+    mutateJson(join(flags, "registry.json"), (value) => {
+      const registrations = value.registrations as Array<
+        Record<string, unknown>
+      >;
+      registrations.find(
+        (entry) => entry.processorId === "brand_meaning",
+      )!.executionEnabled = false;
+    });
+    expect(() => registry().verifyAtRoot(flags)).toThrow();
+  });
   it("returns only verified exact allow-listed keys with bounded activation", () => {
     const runtime = registry();
     runtime.verifyAtRoot(GENERATED_ROOT);
@@ -74,7 +91,7 @@ describe("contract runtime registry and startup integrity", () => {
         .map((entry) => [entry.processorId, entry.executionEnabled]),
     ).toEqual([
       ["brand_communication", true],
-      ["brand_meaning", false],
+      ["brand_meaning", true],
     ]);
     expect(
       runtime.getVerifiedBundle({

@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 
 import type { VerifiedContractBundle } from "../../contracts/bundle/contract-bundle.types";
+import { PROCESSOR_ARCHITECTURE_COMMITS } from "../../contracts/bundle/contract-source.spec";
 import type { CanonicalBrandStateSemantic } from "../canonical-state/canonical-brand-state.port";
 import { InputDependencyError } from "../domain/input-dependency.error";
 import type { NormalizedEvidenceCapabilityId } from "../evidence/intelligence-evidence.port";
@@ -23,7 +24,6 @@ export interface ProcessorDependencyProfile {
 }
 
 const ARCHITECTURE_REPOSITORY = "Piyush1087/dummy_tcs";
-const ARCHITECTURE_COMMIT = "017dbceac494f0861ec9a6bea7af3129b70fa5cb";
 
 const PROFILES: readonly ProcessorDependencyProfile[] = [
   {
@@ -90,7 +90,8 @@ export class ProcessorDependencyProfileRegistry {
       !profile ||
       bundle.manifest.evidenceContractId !== profile.evidenceContractId ||
       bundle.manifest.architectureRepository !== ARCHITECTURE_REPOSITORY ||
-      bundle.manifest.architectureCommitSha !== ARCHITECTURE_COMMIT
+      bundle.manifest.architectureCommitSha !==
+        PROCESSOR_ARCHITECTURE_COMMITS[profile.processorId]
     ) {
       throw new InputDependencyError(
         "CONFIGURATION_DRIFT",

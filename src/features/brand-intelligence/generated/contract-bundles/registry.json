@@ -2,7 +2,7 @@
   "generatedNotice": "GENERATED — DO NOT EDIT",
   "generatorVersion": "1.0.0",
   "architectureRepository": "Piyush1087/dummy_tcs",
-  "architectureCommitSha": "017dbceac494f0861ec9a6bea7af3129b70fa5cb",
+  "architectureCommitSha": "2e13fa40235094d127f72b38f43c510232e38be4",
   "registrations": [
     {
       "processorId": "brand_communication",
@@ -51,7 +51,7 @@
       "outputContractVersion": "1.0",
       "bundleId": "brand_intelligence.brand_meaning",
       "bundleVersion": "1.0",
-      "bundleContentHash": "9f125020170a08354c3429b583080e95014b02696cbb58f6116c048a735af9e8",
+      "bundleContentHash": "77d40718947b3b7a4d3994c8db04ae9b5fc68a4419a157a7a2e3c523437d2c14",
       "ownedObjectSemanticIds": [
         "brand_description",
         "positioning",
@@ -76,7 +76,7 @@
       "persistenceValidatorId": "intelligence_persistence_transition_v1",
       "bundled": true,
       "registered": true,
-      "executionEnabled": false
+      "executionEnabled": true
     }
   ]
 }

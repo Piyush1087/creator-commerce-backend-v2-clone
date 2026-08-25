@@ -26,6 +26,9 @@ export interface EvidenceManifestEntry {
   readonly capabilityId: string;
   readonly semanticId: string;
   readonly revisionIdentity: string;
+  /** Transient semantic validation context, not the persisted Evidence manifest. */
+  readonly representativeness?: string;
+  readonly generalizationScope?: string;
 }
 
 export interface BusinessStateManifestEntry {

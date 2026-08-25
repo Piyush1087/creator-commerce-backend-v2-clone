@@ -29,6 +29,8 @@ import {
   ARCHITECTURE_REPOSITORY,
   CONTRACT_SOURCE_SPECS,
   PINNED_ARCHITECTURE_COMMIT,
+  PROCESSOR_ARCHITECTURE_COMMITS,
+  EXECUTABLE_CONTRACT_PROCESSORS,
 } from "./contract-source.spec";
 
 const COMMIT_SHA = /^[0-9a-f]{40}$/u;
@@ -47,6 +49,7 @@ interface GenerateOptions {
   readonly architectureRepository?: string;
   readonly specs?: readonly ContractSourceSpec[];
   readonly verifyOnly?: boolean;
+  readonly processorCommitShas?: Readonly<Record<string, string>>;
 }
 
 interface GeneratedFile {
@@ -428,9 +431,19 @@ export function generateContractBundles(options: GenerateOptions): void {
   const specs = options.specs ?? CONTRACT_SOURCE_SPECS;
   assertExactCleanSource(sourceRoot, options.commitSha);
 
-  const bundleFiles = specs.map((spec) =>
-    buildBundle(sourceRoot, options.commitSha, architectureRepository, spec),
-  );
+  const processorPins =
+    options.processorCommitShas ??
+    (options.commitSha === PINNED_ARCHITECTURE_COMMIT
+      ? PROCESSOR_ARCHITECTURE_COMMITS
+      : undefined);
+  const bundleFiles = specs.map((spec) => {
+    const commit = processorPins?.[spec.processorId] ?? options.commitSha;
+    if (!COMMIT_SHA.test(commit))
+      throw new Error("Invalid processor architecture pin");
+    // Every per-processor source must belong to the clean canonical history.
+    git(sourceRoot, ["merge-base", "--is-ancestor", commit, options.commitSha]);
+    return buildBundle(sourceRoot, commit, architectureRepository, spec);
+  });
   const registrations = bundleFiles.map((files) => {
     const manifestFile = files.find((file) =>
       file.relativePath.endsWith("manifest.json"),
@@ -454,7 +467,9 @@ export function generateContractBundles(options: GenerateOptions): void {
       persistenceValidatorId: "intelligence_persistence_transition_v1",
       bundled: true,
       registered: true,
-      executionEnabled: manifest.processorId === "brand_communication",
+      executionEnabled: EXECUTABLE_CONTRACT_PROCESSORS.has(
+        manifest.processorId,
+      ),
     };
   });
   const registry = {
@@ -522,6 +537,7 @@ function cli(): void {
     commitSha,
     outputRoot: join(process.cwd(), GENERATED_DIRECTORY),
     verifyOnly: args.includes("--verify"),
+    processorCommitShas: PROCESSOR_ARCHITECTURE_COMMITS,
   });
   process.stdout.write(
     `${args.includes("--verify") ? "verified" : "generated"} contract bundles from ${commitSha}\n`,

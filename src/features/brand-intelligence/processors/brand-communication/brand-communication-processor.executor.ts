@@ -26,7 +26,7 @@ import {
   BRAND_COMMUNICATION_PROMPT_VERSION,
   BRAND_COMMUNICATION_SYSTEM_INSTRUCTION,
 } from "./brand-communication-prompt";
-import { verifiedOutputZodSchema } from "./verified-output-zod-schema";
+import { verifiedOutputZodSchema } from "../../contracts/validation/verified-output-zod-schema";
 
 export const BRAND_COMMUNICATION_PROCESSOR_ID = "brand_communication" as const;
 export const BRAND_COMMUNICATION_PROCESSOR_VERSION = "1.0" as const;

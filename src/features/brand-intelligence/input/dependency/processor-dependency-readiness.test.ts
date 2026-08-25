@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { VerifiedContractBundle } from "../../contracts/bundle/contract-bundle.types";
+import { PROCESSOR_ARCHITECTURE_COMMITS } from "../../contracts/bundle/contract-source.spec";
 import { assembleCanonicalBrandStateSnapshot } from "../canonical-state/m1-canonical-brand-state.adapter";
 import type {
   NormalizedEvidenceCapabilityId,
@@ -28,7 +29,7 @@ function profile(processorId: "brand_communication" | "brand_meaning") {
       outputContractVersion: "1.0",
       evidenceContractId: `${processorId}_evidence`,
       architectureRepository: "Piyush1087/dummy_tcs",
-      architectureCommitSha: "017dbceac494f0861ec9a6bea7af3129b70fa5cb",
+      architectureCommitSha: PROCESSOR_ARCHITECTURE_COMMITS[processorId],
       bundleId: `brand_intelligence.${processorId}`,
       bundleVersion: "1.0",
       bundleContentHash: communication ? "communication" : "meaning",

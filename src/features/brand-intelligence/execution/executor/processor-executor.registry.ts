@@ -5,6 +5,7 @@ import { SYNTHETIC_PROCESSOR_ID } from "../domain/intelligence-execution.types";
 import type { ProcessorExecutor } from "./processor-executor";
 import { SyntheticProcessorExecutor } from "./synthetic-processor.executor";
 import { BrandCommunicationProcessorExecutor } from "../../processors/brand-communication/brand-communication-processor.executor";
+import { BrandMeaningProcessorExecutor } from "../../processors/brand-meaning/brand-meaning-processor.executor";
 
 @Injectable()
 export class ProcessorExecutorRegistry {
@@ -14,6 +15,8 @@ export class ProcessorExecutorRegistry {
     syntheticExecutor: SyntheticProcessorExecutor,
     @Optional()
     brandCommunicationExecutor?: BrandCommunicationProcessorExecutor,
+    @Optional()
+    brandMeaningExecutor?: BrandMeaningProcessorExecutor,
   ) {
     const executors: [string, ProcessorExecutor][] = [
       [SYNTHETIC_PROCESSOR_ID, syntheticExecutor],
@@ -24,6 +27,8 @@ export class ProcessorExecutorRegistry {
         brandCommunicationExecutor,
       ]);
     }
+    if (brandMeaningExecutor)
+      executors.push([brandMeaningExecutor.processorId, brandMeaningExecutor]);
     this.executors = new Map(executors);
   }
 

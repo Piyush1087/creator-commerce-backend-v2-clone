@@ -5,7 +5,19 @@ const ROOT =
 
 export const ARCHITECTURE_REPOSITORY = "Piyush1087/dummy_tcs";
 export const PINNED_ARCHITECTURE_COMMIT =
-  "017dbceac494f0861ec9a6bea7af3129b70fa5cb";
+  "2e13fa40235094d127f72b38f43c510232e38be4";
+
+// Independent immutable bundles: the amendment does not repin communication.
+export const PROCESSOR_ARCHITECTURE_COMMITS: Readonly<Record<string, string>> =
+  {
+    brand_communication: "017dbceac494f0861ec9a6bea7af3129b70fa5cb",
+    brand_meaning: PINNED_ARCHITECTURE_COMMIT,
+  };
+
+export const EXECUTABLE_CONTRACT_PROCESSORS: ReadonlySet<string> = new Set([
+  "brand_communication",
+  "brand_meaning",
+]);
 
 export const CONTRACT_SOURCE_SPECS: readonly ContractSourceSpec[] = [
   {

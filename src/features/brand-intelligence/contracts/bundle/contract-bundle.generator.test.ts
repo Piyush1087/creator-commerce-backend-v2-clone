@@ -91,7 +91,7 @@ function files(root: string, base = root): readonly string[] {
 
 function snapshot(root: string): Readonly<Record<string, string>> {
   return Object.fromEntries(
-    files(root)
+    [...files(root)]
       .sort()
       .map((path) => [path, readFileSync(join(root, path)).toString("base64")]),
   );
@@ -110,6 +110,47 @@ afterEach(() => {
 });
 
 describe("deterministic contract bundle generator", () => {
+  it("repins one processor while preserving the other bundle byte-for-byte", () => {
+    const source = createArchitectureFixture();
+    const first = outputRoot();
+    generateContractBundles({
+      sourceRoot: source.root,
+      outputRoot: first,
+      commitSha: source.sha,
+    });
+    const artifact = CONTRACT_SOURCE_SPECS[1].artifactPaths.EVIDENCE_CONTRACT;
+    writeFileSync(
+      join(source.root, artifact),
+      readFileSync(join(source.root, artifact), "utf8") + "\n",
+    );
+    command(source.root, "add", artifact);
+    command(source.root, "commit", "-m", "bounded meaning amendment");
+    const amended = command(source.root, "rev-parse", "HEAD");
+    const second = outputRoot();
+    const options = {
+      sourceRoot: source.root,
+      outputRoot: second,
+      commitSha: amended,
+      processorCommitShas: {
+        brand_communication: source.sha,
+        brand_meaning: amended,
+      },
+    };
+    generateContractBundles(options);
+    generateContractBundles({ ...options, verifyOnly: true });
+    expect(snapshot(join(first, "brand_communication"))).toEqual(
+      snapshot(join(second, "brand_communication")),
+    );
+    expect(snapshot(join(first, "brand_meaning"))).not.toEqual(
+      snapshot(join(second, "brand_meaning")),
+    );
+    expect(() =>
+      generateContractBundles({
+        ...options,
+        processorCommitShas: { brand_meaning: "not-a-sha" },
+      }),
+    ).toThrow("Invalid processor architecture pin");
+  });
   it("produces byte-identical manifests and bundle hashes from canonical inputs", () => {
     const source = createArchitectureFixture();
     const first = outputRoot();

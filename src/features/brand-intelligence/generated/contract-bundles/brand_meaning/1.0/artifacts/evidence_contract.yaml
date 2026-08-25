@@ -57,10 +57,12 @@ capabilities:
       - canonical_offering_facts_remain_externally_owned
       - Brand_level_generalization_requires_representative_or_explicit_support
   brand_user_input_and_confirmations:
-    required_for_processor: true
+    required_for_processor: false
+    optional_for_mvp: true
     source_class: BRAND_USER_INPUT
     item_semantics: [USER_AUTHORED_BRAND_DESCRIPTION_INPUT, USER_AUTHORED_POSITIONING_INPUT, USER_AUTHORED_VALUE_PROPOSITION_INPUT, USER_SUPPLIED_BRAND_CONTEXT]
     rules:
+      - absence_does_not_block_processor_execution
       - unconfirmed_user_input_is_evidence_not_processor_emitted_brand_confirmed
       - protected_brand_confirmed_state_is_separate_authority_context
 
@@ -88,5 +90,6 @@ validation_invariants:
   - campaign_testimonial_boilerplate_seo_cannot_establish_durable_brand_meaning_alone
   - brand_confirmed_state_separate_from_observed_evidence
   - missing_evidence_does_not_force_filler
+  - optional_user_input_absence_does_not_block_mvp_execution
   - preview_outputs_not_evidence_for_direct_promotion
   - every_item_has_evidence_ref

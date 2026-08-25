@@ -1,6 +1,6 @@
 import { z, type ZodType } from "zod";
 
-import type { VerifiedContractBundle } from "../../contracts/bundle/contract-bundle.types";
+import type { VerifiedContractBundle } from "../bundle/contract-bundle.types";
 
 type ContractNode = Readonly<Record<string, unknown>>;
 
@@ -17,7 +17,11 @@ function nodeSchema(
   if (typeof node.schema === "string") {
     const referenced = record(contract[node.schema]);
     if (!referenced) throw new Error("UNKNOWN_FROZEN_OUTPUT_SCHEMA_REFERENCE");
-    return nodeSchema(referenced, contract);
+    const schema = nodeSchema(referenced, contract);
+    return node.nullable === true ||
+      (Array.isArray(node.type) && node.type.includes("null"))
+      ? schema.nullable()
+      : schema;
   }
 
   const declared = Array.isArray(node.type)

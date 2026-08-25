@@ -37,17 +37,19 @@ describe("W1.0D architecture boundary", () => {
     }
   });
 
-  it("keeps the compiled executor allow-list synthetic-only in W1.0D", () => {
+  it("uses only the synthetic executor and two explicitly compiled real executors", () => {
     const registry = readFileSync(
       join(executionRoot, "executor", "processor-executor.registry.ts"),
       "utf8",
     );
     expect(registry).toContain("SYNTHETIC_PROCESSOR_ID");
+    expect(registry).toContain("BrandCommunicationProcessorExecutor");
+    expect(registry).toContain("BrandMeaningProcessorExecutor");
     expect(registry).not.toContain("brand_communication");
     expect(registry).not.toContain("brand_meaning");
   });
 
-  it("activates only brand_communication while retaining brand_meaning disabled", () => {
+  it("activates exactly the two accepted Brand processors", () => {
     const registry = JSON.parse(
       readFileSync(
         join(__dirname, "generated", "contract-bundles", "registry.json"),
@@ -79,7 +81,7 @@ describe("W1.0D architecture boundary", () => {
         processorId: "brand_meaning",
         bundled: true,
         registered: true,
-        executionEnabled: false,
+        executionEnabled: true,
       },
     ]);
   });

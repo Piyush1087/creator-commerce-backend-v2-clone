@@ -79,7 +79,10 @@ function capabilityIds(bundle: VerifiedContractBundle): Set<string> {
 class BrandMeaningSemanticValidator implements ProcessorSemanticValidator {
   readonly validatorId = "brand_meaning";
 
-  validate(output: JsonRecord): readonly ValidationIssue[] {
+  validate(
+    output: JsonRecord,
+    context: SemanticValidationContext,
+  ): readonly ValidationIssue[] {
     const issues: ValidationIssue[] = [];
     const metadata = record(output.output_metadata) ?? {};
     const values: string[] = [];
@@ -102,6 +105,43 @@ class BrandMeaningSemanticValidator implements ProcessorSemanticValidator {
       if (typeof value === "string") {
         values.push(value.trim().toLocaleLowerCase());
         const refs = metadataRefs(record(meta));
+        const support = context.evidenceManifest.filter((item) =>
+          refs.evidenceRefs.includes(item.evidenceRef),
+        );
+        if (
+          support.length > 0 &&
+          support.every(
+            (item) =>
+              item.capabilityId === "owned_website.offering_context" &&
+              (item.generalizationScope === "SINGLE_OFFERING" ||
+                (![
+                  "PERSISTENT_BRAND_LEVEL",
+                  "REPEATED_REPRESENTATIVE",
+                ].includes(item.representativeness ?? "") &&
+                  item.generalizationScope !== "BRAND_LEVEL_PORTFOLIO")),
+          )
+        ) {
+          issues.push(
+            semanticIssue(
+              "OFFERING_NOT_BRAND_TRUTH",
+              "Single-offering support cannot establish universal Brand meaning",
+              `$/f/${objectId}`,
+            ),
+          );
+        }
+        if (
+          /\b(market share|market leader|category leader|ranked #?1|best in class|guaranteed (results|outcomes)|clinically proven|cures? disease)\b/iu.test(
+            value,
+          )
+        ) {
+          issues.push(
+            semanticIssue(
+              "UNSUPPORTED_BRAND_CLAIM",
+              "Unsupported ranking, market, efficacy or guaranteed-outcome assertion",
+              `$/f/${objectId}`,
+            ),
+          );
+        }
         if (refs.evidenceRefs.length + refs.businessStateRefs.length === 0) {
           issues.push(
             semanticIssue(
