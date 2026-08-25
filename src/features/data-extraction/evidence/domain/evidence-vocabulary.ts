@@ -44,7 +44,9 @@ export type EvidencePolarity =
   | "NEUTRAL";
 
 export type EvidenceSourceClass = "OWNED_WEBSITE";
-export type EvidenceResourceType = "OWNED_WEB_PAGE" | "OWNED_WEB_FRAGMENT";
+export type EvidenceResourceType =
+  | "OWNED_WEB_PAGE"
+  | "OWNED_WEB_FRAGMENT";
 
 export type EvidencePageRole =
   | "HOMEPAGE"
