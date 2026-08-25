@@ -19,6 +19,15 @@ import { ProcessorExecutorRegistry } from "./execution/executor/processor-execut
 import { SyntheticProcessorExecutor } from "./execution/executor/synthetic-processor.executor";
 import { RetryBackoffPolicy } from "./execution/policy/retry-backoff.policy";
 import { ExecutionContractGate } from "./execution/registry/execution-contract.gate";
+import { CANONICAL_BRAND_STATE_READER } from "./input/canonical-state/canonical-brand-state.port";
+import { CanonicalStateManifestBuilder } from "./input/canonical-state/canonical-state-manifest";
+import { M1CanonicalBrandStateAdapter } from "./input/canonical-state/m1-canonical-brand-state.adapter";
+import { ProcessorDependencyPreparationService } from "./input/dependency/processor-dependency-preparation.service";
+import { ProcessorDependencyProfileRegistry } from "./input/dependency/processor-dependency-profile.registry";
+import { ProcessorDependencyReadinessEvaluator } from "./input/dependency/processor-dependency-readiness.evaluator";
+import { EvidenceManifestBuilder } from "./input/evidence/evidence-manifest";
+import { INTELLIGENCE_EVIDENCE_READER } from "./input/evidence/intelligence-evidence.port";
+import { MissingDataExtractionEvidenceAdapter } from "./input/evidence/missing-data-extraction-evidence.adapter";
 import { IntelligenceActionRepository } from "./persistence/intelligence-action.repository";
 import { IntelligenceCandidateRepository } from "./persistence/intelligence-candidate.repository";
 import { IntelligenceCurrentStateRepository } from "./persistence/intelligence-current-state.repository";
@@ -43,6 +52,19 @@ const internalProviders = [
   ProcessorExecutionRepository,
   ProcessorFinalizationService,
   ProcessorWorkerService,
+  CanonicalStateManifestBuilder,
+  EvidenceManifestBuilder,
+  ProcessorDependencyProfileRegistry,
+  ProcessorDependencyReadinessEvaluator,
+  ProcessorDependencyPreparationService,
+  {
+    provide: CANONICAL_BRAND_STATE_READER,
+    useClass: M1CanonicalBrandStateAdapter,
+  },
+  {
+    provide: INTELLIGENCE_EVIDENCE_READER,
+    useClass: MissingDataExtractionEvidenceAdapter,
+  },
   {
     provide: PROCESSOR_SUCCESS_PERSISTENCE_HOOK,
     useClass: NoopProcessorSuccessPersistenceHook,
