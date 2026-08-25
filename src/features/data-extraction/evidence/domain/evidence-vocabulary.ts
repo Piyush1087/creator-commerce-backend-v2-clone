@@ -6,8 +6,7 @@ export const WAVE1_EVIDENCE_CAPABILITIES = [
   "derived_communication_constraint_evidence",
 ] as const;
 
-export type EvidenceCapabilityId =
-  (typeof WAVE1_EVIDENCE_CAPABILITIES)[number];
+export type EvidenceCapabilityId = (typeof WAVE1_EVIDENCE_CAPABILITIES)[number];
 
 export type CapabilityAvailability =
   | "AVAILABLE"
@@ -44,9 +43,7 @@ export type EvidencePolarity =
   | "NEUTRAL";
 
 export type EvidenceSourceClass = "OWNED_WEBSITE";
-export type EvidenceResourceType =
-  | "OWNED_WEB_PAGE"
-  | "OWNED_WEB_FRAGMENT";
+export type EvidenceResourceType = "OWNED_WEB_PAGE" | "OWNED_WEB_FRAGMENT";
 
 export type EvidencePageRole =
   | "HOMEPAGE"
