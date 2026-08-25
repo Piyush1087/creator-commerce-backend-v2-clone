@@ -104,6 +104,7 @@ function evidence(
 ): NormalizedEvidenceSet {
   const capabilityResults: NormalizedEvidenceCapabilityResult[] =
     currentProfile.capabilityIds.map((capabilityId) => ({
+      capabilityExecutionRef: `capability-execution:${capabilityId}:1`,
       capabilityId,
       normalizationContractVersion: "1.0",
       status: "AVAILABLE",
