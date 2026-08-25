@@ -101,7 +101,7 @@ function canonicalResourceKeyHash(canonicalResourceKey: string): string {
 
 function canonicalJson(value: unknown): string {
   if (value === null || typeof value !== "object") {
-    return JSON.stringify(value);
+    return JSON.stringify(value) ?? "undefined";
   }
   if (Array.isArray(value)) {
     return `[${value.map(canonicalJson).join(",")}]`;
@@ -666,8 +666,7 @@ export class PrismaCaptureRepository implements CaptureRepository {
         if (
           existing.resourceRef !== input.resourceRef ||
           existing.capabilityExecutionRef !==
-            (input.capabilityExecutionRef ?? null) ||
-          !sameQuality(existing, input.acquisitionQuality)
+            (input.capabilityExecutionRef ?? null)
         ) {
           throw persistenceError("IDEMPOTENCY_CONFLICT");
         }
