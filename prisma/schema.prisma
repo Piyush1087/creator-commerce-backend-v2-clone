@@ -722,6 +722,12 @@ enum IntelligenceFreshness {
   UNKNOWN
 }
 
+enum IntelligenceEvidenceFreshness {
+  CURRENT
+  POSSIBLY_STALE
+  UNKNOWN
+}
+
 enum IntelligenceProtectionState {
   UNPROTECTED
   BRAND_CONFIRMED
@@ -3321,7 +3327,7 @@ model IntelligenceEvidenceReference {
   captureVersion        String                       @map("capture_version") @db.VarChar(80)
   sourceClass           String                       @map("source_class") @db.VarChar(100)
   capturedAt            DateTime                     @map("captured_at")
-  observedFreshness     IntelligenceFreshness?       @map("observed_freshness")
+  observedFreshness     IntelligenceEvidenceFreshness? @map("observed_freshness")
   evidenceManifestRef   String?                      @map("evidence_manifest_ref") @db.VarChar(255)
   evidenceManifestHash  String                       @map("evidence_manifest_hash") @db.Char(64)
   createdAt             DateTime                     @default(now()) @map("created_at")

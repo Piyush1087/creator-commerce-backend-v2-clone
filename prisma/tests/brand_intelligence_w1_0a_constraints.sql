@@ -256,16 +256,66 @@ EXCEPTION WHEN foreign_key_violation THEN
   NULL;
 END $$;
 
+DO $$
+DECLARE
+  intelligence_values text[];
+  evidence_values text[];
+BEGIN
+  SELECT array_agg(enum_value ORDER BY sort_order) INTO intelligence_values
+  FROM (
+    SELECT enumlabel::text AS enum_value, enumsortorder AS sort_order
+    FROM pg_enum
+    WHERE enumtypid = '"IntelligenceFreshness"'::regtype
+  ) values_in_order;
+
+  SELECT array_agg(enum_value ORDER BY sort_order) INTO evidence_values
+  FROM (
+    SELECT enumlabel::text AS enum_value, enumsortorder AS sort_order
+    FROM pg_enum
+    WHERE enumtypid = '"IntelligenceEvidenceFreshness"'::regtype
+  ) values_in_order;
+
+  IF intelligence_values <> ARRAY['CURRENT', 'STALE', 'UNKNOWN'] THEN
+    RAISE EXCEPTION 'unexpected permanent Intelligence freshness vocabulary: %', intelligence_values;
+  END IF;
+  IF evidence_values <> ARRAY['CURRENT', 'POSSIBLY_STALE', 'UNKNOWN'] THEN
+    RAISE EXCEPTION 'unexpected normalized Evidence freshness vocabulary: %', evidence_values;
+  END IF;
+END $$;
+
 INSERT INTO "intelligence_evidence_references" (
   "evidence_reference_id", "brand_id", "object_generation_id", "component_semantic_path",
   "evidence_ref", "capability_id", "capture_id", "capture_version", "source_class",
-  "captured_at", "evidence_manifest_hash"
+  "captured_at", "observed_freshness", "evidence_manifest_hash"
 )
-VALUES (
-  '90000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000000a',
-  '50000000-0000-4000-8000-000000000001', '$', 'evidence:test:1', 'PUBLIC_WEBSITE',
-  'capture-1', '1', 'OWNED_WEBSITE', CURRENT_TIMESTAMP, repeat('d', 64)
-);
+VALUES
+  ('90000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000000a',
+   '50000000-0000-4000-8000-000000000001', '$', 'evidence:test:current', 'PUBLIC_WEBSITE',
+   'capture-current', '1', 'OWNED_WEBSITE', CURRENT_TIMESTAMP, 'CURRENT', repeat('d', 64)),
+  ('90000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-00000000000a',
+   '50000000-0000-4000-8000-000000000001', '$', 'evidence:test:possibly-stale', 'PUBLIC_WEBSITE',
+   'capture-possibly-stale', '1', 'OWNED_WEBSITE', CURRENT_TIMESTAMP, 'POSSIBLY_STALE', repeat('d', 64)),
+  ('90000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-00000000000a',
+   '50000000-0000-4000-8000-000000000001', '$', 'evidence:test:unknown', 'PUBLIC_WEBSITE',
+   'capture-unknown', '1', 'OWNED_WEBSITE', CURRENT_TIMESTAMP, 'UNKNOWN', repeat('d', 64));
+
+DO $$
+BEGIN
+  EXECUTE $sql$
+    INSERT INTO "intelligence_evidence_references" (
+      "evidence_reference_id", "brand_id", "object_generation_id", "component_semantic_path",
+      "evidence_ref", "capability_id", "capture_id", "capture_version", "source_class",
+      "captured_at", "observed_freshness", "evidence_manifest_hash"
+    ) VALUES (
+      '90000000-0000-4000-8000-000000000005', '00000000-0000-4000-8000-00000000000a',
+      '50000000-0000-4000-8000-000000000001', '$', 'evidence:test:stale', 'PUBLIC_WEBSITE',
+      'capture-stale', '1', 'OWNED_WEBSITE', CURRENT_TIMESTAMP, 'STALE', repeat('d', 64)
+    )
+  $sql$;
+  RAISE EXCEPTION 'expected Evidence freshness STALE to be rejected';
+EXCEPTION WHEN invalid_text_representation THEN
+  NULL;
+END $$;
 
 DO $$
 BEGIN
@@ -274,9 +324,9 @@ BEGIN
     "evidence_ref", "capability_id", "capture_id", "capture_version", "source_class",
     "captured_at", "evidence_manifest_hash"
   ) VALUES (
-    '90000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-00000000000b',
-    '50000000-0000-4000-8000-000000000001', '$', 'evidence:test:2', 'PUBLIC_WEBSITE',
-    'capture-2', '1', 'OWNED_WEBSITE', CURRENT_TIMESTAMP, repeat('d', 64)
+    '90000000-0000-4000-8000-000000000004', '00000000-0000-4000-8000-00000000000b',
+    '50000000-0000-4000-8000-000000000001', '$', 'evidence:test:cross-brand', 'PUBLIC_WEBSITE',
+    'capture-cross-brand', '1', 'OWNED_WEBSITE', CURRENT_TIMESTAMP, repeat('d', 64)
   );
   RAISE EXCEPTION 'expected cross-Brand Evidence-generation relation to fail';
 EXCEPTION WHEN foreign_key_violation THEN

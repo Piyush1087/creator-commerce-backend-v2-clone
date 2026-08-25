@@ -8,6 +8,9 @@ CREATE TYPE "IntelligenceReadiness" AS ENUM ('READY', 'PARTIAL', 'NOT_READY');
 CREATE TYPE "IntelligenceFreshness" AS ENUM ('CURRENT', 'STALE', 'UNKNOWN');
 
 -- CreateEnum
+CREATE TYPE "IntelligenceEvidenceFreshness" AS ENUM ('CURRENT', 'POSSIBLY_STALE', 'UNKNOWN');
+
+-- CreateEnum
 CREATE TYPE "IntelligenceProtectionState" AS ENUM ('UNPROTECTED', 'BRAND_CONFIRMED', 'SUPPORT_CONTROLLED');
 
 -- CreateEnum
@@ -269,7 +272,7 @@ CREATE TABLE "intelligence_evidence_references" (
     "capture_version" VARCHAR(80) NOT NULL,
     "source_class" VARCHAR(100) NOT NULL,
     "captured_at" TIMESTAMP(3) NOT NULL,
-    "observed_freshness" "IntelligenceFreshness",
+    "observed_freshness" "IntelligenceEvidenceFreshness",
     "evidence_manifest_ref" VARCHAR(255),
     "evidence_manifest_hash" CHAR(64) NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
