@@ -7,6 +7,7 @@ import {
   ExistingOwnedWebsiteAcquisitionMechanics,
   OwnedWebsiteWave1AcquisitionService,
 } from "./evidence/acquisition/owned-website-wave1-acquisition.service";
+import { OwnedWebsiteWave1NormalizationService } from "./evidence/normalization/owned-website-wave1-normalization.service";
 import { DataExtractionPersistenceService } from "./evidence/persistence/prisma-evidence-repositories";
 import { GeminiGatekeeperProvider } from "./providers/gemini-gatekeeper.provider";
 import { GeminiStructuredProvider } from "./providers/gemini-structured.provider";
@@ -27,6 +28,7 @@ import { StructuredEvidenceExecutionService } from "./services/structured-eviden
     ZyteHomepageStrategy,
     ExistingOwnedWebsiteAcquisitionMechanics,
     OwnedWebsiteWave1AcquisitionService,
+    OwnedWebsiteWave1NormalizationService,
   ],
   exports: [
     GeminiGatekeeperProvider,
@@ -34,8 +36,8 @@ import { StructuredEvidenceExecutionService } from "./services/structured-eviden
     ParallelCompanyResearchProvider,
     OpenAIStructuredProvider,
     StructuredEvidenceExecutionService,
-    // Export only the acquisition command boundary needed by the next DE layer.
     OwnedWebsiteWave1AcquisitionService,
+    OwnedWebsiteWave1NormalizationService,
   ],
 })
 export class DataExtractionModule {}
