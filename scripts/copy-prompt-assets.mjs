@@ -26,6 +26,10 @@ const pairs = [
     "src/features/brand-onboarding/brand-preview/runtime/artifacts",
     "dist/features/brand-onboarding/brand-preview/runtime/artifacts",
   ],
+  [
+    "src/features/brand-intelligence/generated/contract-bundles",
+    "dist/features/brand-intelligence/generated/contract-bundles",
+  ],
 ];
 
 const required = [
@@ -55,6 +59,9 @@ const required = [
   "dist/features/brand-onboarding/brand-preview/runtime/artifacts/brand_preview_synthesis/output_contract.yaml",
   "dist/features/brand-onboarding/brand-preview/runtime/artifacts/brand_preview_archetype_reasoning.yaml",
   "dist/features/brand-onboarding/brand-preview/runtime/artifacts/creator_archetypes.yaml",
+  "dist/features/brand-intelligence/generated/contract-bundles/registry.json",
+  "dist/features/brand-intelligence/generated/contract-bundles/brand_communication/1.0/manifest.json",
+  "dist/features/brand-intelligence/generated/contract-bundles/brand_meaning/1.0/manifest.json",
 ];
 
 for (const [fromRel, toRel] of pairs) {

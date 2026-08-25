@@ -1,0 +1,92 @@
+id: brand_meaning_evidence
+version: "1.0"
+status: FROZEN
+owner_engine: brand_intelligence
+owning_branch: brand_expression
+processor: brand_meaning
+processor_definition: intelligence/engines/brand_intelligence/branches/brand_expression/processors/brand_meaning.yaml
+reasoning_authority: intelligence/engines/brand_intelligence/branches/brand_expression/artifacts/brand_meaning/reasoning.yaml
+output_contract_authority: intelligence/engines/brand_intelligence/branches/brand_expression/artifacts/brand_meaning/output_contract.yaml
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define provider-neutral Evidence for Brand-level meaning while separating representative Brand context from
+  Offering-specific truth, Campaign copy, legal boilerplate, testimonials, and generic SEO metadata.
+
+boundary:
+  data_extraction_role: acquire_and_normalize
+  intelligence_role: judge_representativeness_and_brand_level_applicability
+  canonical_business_state_is_observed_evidence: false
+  provider_or_endpoint_names_in_evidence_ids: forbidden
+
+shared_evidence_item:
+  required_fields: [evidence_ref, evidence_semantic, source_class, source_resource_ref, captured_at, freshness, provenance]
+  fields:
+    evidence_ref: {type: string, identity_model: capture_scoped_normalized_evidence_item}
+    evidence_semantic: {type: string, provider_neutral: true}
+    source_class: {allowed: [OWNED_WEBSITE, BRAND_USER_INPUT, MULTI_SOURCE]}
+    source_resource_ref: {type: string}
+    captured_at: {type: timestamp}
+    freshness: {allowed: [CURRENT, STALE, UNKNOWN]}
+    representativeness: {allowed: [PERSISTENT_BRAND_LEVEL, REPEATED_REPRESENTATIVE, OFFERING_SPECIFIC, CONTEXT_SPECIFIC, INCIDENTAL]}
+    evidence_strength: {allowed: [EXPLICIT_BRAND_STATEMENT, DIRECT_FIRST_PARTY_FACT, REPEATED_PATTERN, CONTEXTUAL_SUPPORT, INCIDENTAL], optional: true}
+    provenance: {required: [acquisition_or_normalization_run_ref], optional: [parent_evidence_refs, normalization_version]}
+
+capabilities:
+  owned_website.brand_company_context:
+    required_for_processor: true
+    source_class: OWNED_WEBSITE
+    qualifies: [about_company_description, mission_purpose, brand_authored_company_story, explicit_business_category_context, persistent_company_capability]
+    excludes_as_primary: [legal_boilerplate, third_party_testimonial, isolated_campaign_landing_copy, invisible_generic_seo_metadata]
+    output_roles: {brand_description: PRIMARY, positioning: PRIMARY, value_proposition: SUPPORTING}
+  owned_website.brand_messaging:
+    required_for_processor: true
+    source_class: OWNED_WEBSITE
+    qualifies: [persistent_homepage_proposition, brand_positioning_statement, representative_customer_value_messaging, persistent_category_framing]
+    excludes_or_downweights: [isolated_campaign_copy, temporary_sale_banner, legal_boilerplate, third_party_testimonial, generic_seo_metadata]
+    output_roles: {brand_description: SUPPORTING, positioning: PRIMARY, value_proposition: PRIMARY}
+  owned_website.offering_context:
+    required_for_processor: true
+    source_class: OWNED_WEBSITE
+    item_semantic: offering_context_observation
+    fields:
+      offering_ref: {type: [string, "null"], nullable: true}
+      generalization_scope: {allowed: [SINGLE_OFFERING, MULTIPLE_OFFERINGS, BRAND_LEVEL_PORTFOLIO]}
+    rules:
+      - SINGLE_OFFERING_evidence_is_not_universal_brand_truth
+      - canonical_offering_facts_remain_externally_owned
+      - Brand_level_generalization_requires_representative_or_explicit_support
+  brand_user_input_and_confirmations:
+    required_for_processor: true
+    source_class: BRAND_USER_INPUT
+    item_semantics: [USER_AUTHORED_BRAND_DESCRIPTION_INPUT, USER_AUTHORED_POSITIONING_INPUT, USER_AUTHORED_VALUE_PROPOSITION_INPUT, USER_SUPPLIED_BRAND_CONTEXT]
+    rules:
+      - unconfirmed_user_input_is_evidence_not_processor_emitted_brand_confirmed
+      - protected_brand_confirmed_state_is_separate_authority_context
+
+non_establishing_or_weak_context:
+  - isolated_campaign_copy
+  - product_only_copy_without_brand_generalization
+  - legal_boilerplate
+  - third_party_testimonial
+  - customer_review
+  - generic_seo_metadata
+
+protected_current_authority_context:
+  classification: CANONICAL_BUSINESS_STATE_INPUT
+  ordinary_evidence_for_replacement: false
+  behavior: [compare_new_evidence, preserve_brand_confirmed_state, record_discrepancy_without_overwrite]
+
+missing_evidence:
+  processor_failure_required: false
+  rules: [independent_null_outputs_allowed, positioning_may_be_null, value_proposition_may_be_null, no_filler, no_preview_promotion]
+
+validation_invariants:
+  - provider_neutral_evidence_ids
+  - brand_level_context_distinct_from_offering_truth
+  - no_offering_truth_duplication
+  - campaign_testimonial_boilerplate_seo_cannot_establish_durable_brand_meaning_alone
+  - brand_confirmed_state_separate_from_observed_evidence
+  - missing_evidence_does_not_force_filler
+  - preview_outputs_not_evidence_for_direct_promotion
+  - every_item_has_evidence_ref

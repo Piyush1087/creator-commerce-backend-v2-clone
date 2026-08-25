@@ -1,0 +1,97 @@
+version: '1.0'
+status: FROZEN
+owner_engine: brand_intelligence
+shared_runtime_dependencies:
+- Compiler
+- Prompt Builder
+- Model Registry
+- provider port
+- Safe YAML loader
+- telemetry
+- generic persistence adapter
+shared_authority_rules:
+  processors_may_emit:
+  - OBSERVED
+  - CREATOR_SHOP_DERIVED
+  - SYSTEM_DERIVED
+  processors_must_not_emit:
+  - BRAND_CONFIRMED
+  - SUPPORT_CONTROLLED
+  brand_confirmation_transition_owner: authorized_application_or_business_state_action
+  protected_current_authoritative_state:
+    ordinary_derivation_dependency: false
+    silent_overwrite: forbidden
+    new_evidence_behavior: compare_or_surface_discrepancy_without_automatic_replacement
+shared_readiness_rules:
+  partial_valid_output_supported: true
+  no_brand_preview_gate: true
+  no_verification_gate: true
+  no_home_gate: true
+  no_filler_to_force_ready: true
+  consumer_scoped_readiness: true
+shared_invalidation_rules:
+  directed_only: true
+  whole_brand_intelligence_recompute: forbidden
+id: brand_meaning
+owning_branch: brand_expression
+processor_type: AI_REASONING
+purpose: Produce the reusable Brand-level meaning needed to explain what the Brand is, where it seeks to stand, and the principal customer value it provides, without creating Offering-specific, competitive, Campaign, or Preview presentation semantics.
+outputs:
+- brand_description
+- positioning
+- value_proposition
+canonical_inputs:
+- brand_name
+- website_url
+- confirmed_industry
+- confirmed_sub_industry_or_category
+evidence_requirements:
+- owned_website.brand_company_context
+- owned_website.brand_messaging
+- owned_website.offering_context
+- brand_user_input_and_confirmations
+optional_enrichment: []
+authority_behavior:
+  default_output_authority: CREATOR_SHOP_DERIVED
+  observed_output_allowed_when_semantically_direct: true
+  aggregate_brand_confirmation_emitted_by_processor: false
+partial_output_behavior:
+  independent_nullable_outputs: true
+  valid_run_requires_all_outputs: false
+  example:
+    brand_description: valid
+    positioning: null
+    value_proposition: valid
+readiness_contribution:
+  Brand_Centre: PARTIAL_ALLOWED
+  Chat: PARTIAL_ALLOWED
+  Creator_Strategy: IMPORTANT_CONTEXT_WHEN_AVAILABLE
+  Campaign_Brief: IMPORTANT_CONTEXT_WHEN_AVAILABLE
+refresh_triggers:
+- material Brand proposition change
+- confirmed Brand category or sub-category change
+- material owned Brand messaging change
+- material owned Offering-context change
+- explicit Brand edit affecting owned outputs
+invalidation_rules:
+  affected_outputs_only: true
+  unrelated_brand_processors_not_automatically_invalidated: true
+model_profile_requirement_class: structured_grounded_reasoning
+validation_responsibility:
+- validate active output types/nullability
+- reject unsupported factual or efficacy claims
+- reject competitor ranking/market-share semantics
+- reject Campaign-specific positioning
+- reject Preview brand_descriptor or brand_understanding_narrative as direct output semantics
+- enforce no-filler partial output
+persistence_boundary: Processor defines semantic outputs only; persistence mapping is deferred to later backend/persistence reconciliation.
+non_owned_scope:
+- Offering-specific description or positioning
+- competitor ranking or market position
+- Campaign positioning
+- Brand Preview brand_descriptor
+- Brand Preview brand_understanding_narrative
+- canonical Brand business-state fields
+migration_relevance:
+  legacy_identity_dependency: none_direct
+  identity_core_retirement: does_not_by_itself_make_identity_core_retireable

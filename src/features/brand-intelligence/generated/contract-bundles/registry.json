@@ -1,0 +1,82 @@
+{
+  "generatedNotice": "GENERATED — DO NOT EDIT",
+  "generatorVersion": "1.0.0",
+  "architectureRepository": "Piyush1087/dummy_tcs",
+  "architectureCommitSha": "017dbceac494f0861ec9a6bea7af3129b70fa5cb",
+  "registrations": [
+    {
+      "processorId": "brand_communication",
+      "processorVersion": "1.0",
+      "outputContractId": "brand_communication_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "brand_intelligence.brand_communication",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "5d50cb31390ba1f26a038e7492af46f28ca563b729ebc5d82f2396b2bc8be4b2",
+      "ownedObjectSemanticIds": [
+        "communication_profile"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "communication_profile",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "communication_profile",
+          "componentPathPattern": "$/f/tone_traits/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "communication_profile",
+          "componentPathPattern": "$/f/free_text_guidance"
+        },
+        {
+          "objectSemanticId": "communication_profile",
+          "componentPathPattern": "$/f/communication_constraints/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "communication_profile",
+          "componentPathPattern": "$/f/primary_language"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "brand_communication",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": false
+    },
+    {
+      "processorId": "brand_meaning",
+      "processorVersion": "1.0",
+      "outputContractId": "brand_meaning_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "brand_intelligence.brand_meaning",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "9f125020170a08354c3429b583080e95014b02696cbb58f6116c048a735af9e8",
+      "ownedObjectSemanticIds": [
+        "brand_description",
+        "positioning",
+        "value_proposition"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "brand_description",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "positioning",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "value_proposition",
+          "componentPathPattern": "$"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "brand_meaning",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": false
+    }
+  ]
+}
