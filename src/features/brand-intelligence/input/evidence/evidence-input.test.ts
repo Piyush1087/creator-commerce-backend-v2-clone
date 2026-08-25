@@ -64,6 +64,7 @@ function capability(
   overrides: Partial<NormalizedEvidenceCapabilityResult> = {},
 ): NormalizedEvidenceCapabilityResult {
   return {
+    capabilityExecutionRef: `capability-execution:${capabilityId}:1`,
     capabilityId,
     normalizationContractVersion: "1.0",
     status: "AVAILABLE",
@@ -88,6 +89,28 @@ function evidenceSet(
 
 describe("W1.0E normalized Evidence boundary", () => {
   const builder = new EvidenceManifestBuilder();
+
+  it("requires and preserves durable capability execution lineage", () => {
+    const built = builder.build(
+      evidenceSet([capability(messaging, [item()])]),
+      [messaging],
+    );
+    expect(built.manifest.capabilities[0]).toMatchObject({
+      capabilityExecutionRef:
+        "capability-execution:owned_website.brand_messaging:1",
+      capabilityId: messaging,
+    });
+
+    const withoutLineage = {
+      ...capability(messaging, []),
+      capabilityExecutionRef: undefined,
+    } as unknown as NormalizedEvidenceCapabilityResult;
+    expect(() =>
+      builder.build(evidenceSet([withoutLineage]), [messaging]),
+    ).toThrowError(
+      expect.objectContaining({ code: "EVIDENCE_REFERENCE_INVALID" }),
+    );
+  });
 
   it("accepts same-Brand references and preserves Gate B freshness", () => {
     const built = builder.build(
@@ -128,7 +151,7 @@ describe("W1.0E normalized Evidence boundary", () => {
     );
   });
 
-  it("accepts AVAILABLE with zero items as absence, not negative Evidence", () => {
+  it("accepts AVAILABLE with zero items and preserves its execution lineage", () => {
     const absence = builder.build(evidenceSet([capability(messaging, [])]), [
       messaging,
     ]);
@@ -139,6 +162,8 @@ describe("W1.0E normalized Evidence boundary", () => {
       [messaging],
     );
     expect(absence.manifest.capabilities[0]).toMatchObject({
+      capabilityExecutionRef:
+        "capability-execution:owned_website.brand_messaging:1",
       status: "AVAILABLE",
       evidence: [],
     });
@@ -148,7 +173,7 @@ describe("W1.0E normalized Evidence boundary", () => {
     expect(negative.hash).not.toBe(absence.hash);
   });
 
-  it("preserves conflict groups and deterministically ignores read ordering", () => {
+  it("keeps the same hash for one execution ref and reordered Evidence", () => {
     const first = item({
       evidenceRef: "evidence:message:a",
       conflictGroupRef: "conflict:group:1",
@@ -168,11 +193,30 @@ describe("W1.0E normalized Evidence boundary", () => {
       [messaging],
     );
     expect(left.hash).toBe(right.hash);
+    expect(left.manifest.capabilities[0].capabilityExecutionRef).toBe(
+      "capability-execution:owned_website.brand_messaging:1",
+    );
     expect(left.manifest.capabilities[0].evidence).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ conflictGroupRef: "conflict:group:1" }),
       ]),
     );
+  });
+
+  it("changes the hash when only capability execution lineage changes, including zero items", () => {
+    const original = builder.build(evidenceSet([capability(messaging, [])]), [
+      messaging,
+    ]);
+    const changed = builder.build(
+      evidenceSet([
+        capability(messaging, [], {
+          capabilityExecutionRef:
+            "capability-execution:owned_website.brand_messaging:2",
+        }),
+      ]),
+      [messaging],
+    );
+    expect(changed.hash).not.toBe(original.hash);
   });
 
   it("changes the manifest for a new capture/version", () => {
@@ -189,6 +233,28 @@ describe("W1.0E normalized Evidence boundary", () => {
       [messaging],
     );
     expect(changed.hash).not.toBe(original.hash);
+  });
+
+  it("excludes bounded payload and provider execution lineage from the hash", () => {
+    const original = builder.build(
+      evidenceSet([capability(messaging, [item()])]),
+      [messaging],
+    );
+    const reread = builder.build(
+      evidenceSet([
+        capability(messaging, [
+          item({
+            boundedNormalizedPayload: { message: "Changed transient value" },
+            provenance: {
+              ...item().provenance,
+              providerExecutionRef: "different-provider-execution",
+            },
+          }),
+        ]),
+      ]),
+      [messaging],
+    );
+    expect(reread.hash).toBe(original.hash);
   });
 
   it("does not change identity for a freshness re-evaluation with unchanged state and basis", () => {

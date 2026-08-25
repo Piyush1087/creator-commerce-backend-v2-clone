@@ -102,6 +102,7 @@ describe("W1.0E dependency preparation boundary", () => {
       read: vi.fn(async (request) => ({
         brandId,
         capabilityResults: request.capabilityIds.map((capabilityId) => ({
+          capabilityExecutionRef: `capability-execution:${capabilityId}:1`,
           capabilityId,
           normalizationContractVersion: "1.0",
           status: "AVAILABLE" as const,
