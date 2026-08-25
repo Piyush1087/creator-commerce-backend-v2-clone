@@ -32,6 +32,10 @@ import { IntelligenceActionRepository } from "./persistence/intelligence-action.
 import { IntelligenceCandidateRepository } from "./persistence/intelligence-candidate.repository";
 import { IntelligenceCurrentStateRepository } from "./persistence/intelligence-current-state.repository";
 import { IntelligenceGenerationRepository } from "./persistence/intelligence-generation.repository";
+import { IntelligenceCurrentContractScopeService } from "./projection/intelligence-current-contract-scope.service";
+import { IntelligenceCurrentProjectionRepository } from "./projection/intelligence-current-projection.repository";
+import { IntelligenceCurrentProjectionService } from "./projection/intelligence-current-projection.service";
+import { IntelligenceObjectAssembler } from "./projection/intelligence-object-assembler";
 import { ComponentPathCodec } from "./semantic-path/component-path.codec";
 import { IntelligenceTransitionService } from "./transitions/intelligence-transition.service";
 
@@ -74,6 +78,10 @@ const internalProviders = [
   IntelligenceCandidateRepository,
   IntelligenceActionRepository,
   IntelligenceTransitionService,
+  IntelligenceCurrentProjectionRepository,
+  IntelligenceCurrentContractScopeService,
+  IntelligenceObjectAssembler,
+  IntelligenceCurrentProjectionService,
 ];
 
 @Module({
