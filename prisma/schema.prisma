@@ -826,6 +826,119 @@ enum IntelligenceComponentTransitionOutcome {
 }
 
 // ============================================================================
+// DATA EXTRACTION WAVE 1 PERSISTENCE ENUMS (DE-W1.0B)
+// ============================================================================
+
+enum DataExtractionSourceClass {
+  OWNED_WEBSITE
+}
+
+enum DataExtractionResourceType {
+  OWNED_WEB_PAGE
+  OWNED_WEB_FRAGMENT
+}
+
+enum DataExtractionPageRole {
+  HOMEPAGE
+  ABOUT_COMPANY
+  BRAND_STORY
+  MISSION_VALUES
+  COMPANY_OVERVIEW
+  PORTFOLIO_OVERVIEW
+  CATEGORY_OVERVIEW
+  SERVICE_OVERVIEW
+  SOLUTIONS_OVERVIEW
+  PRICING_PLANS
+  OFFERING_DETAIL
+  CAMPAIGN_LANDING
+  POLICY
+  LEGAL
+  TESTIMONIAL
+  SUPPORT
+  FAQ_HELP
+  LOCALIZED_VARIANT
+  OTHER
+}
+
+enum DataExtractionAcquisitionQuality {
+  COMPLETE
+  PARTIAL
+  DEGRADED
+  UNAVAILABLE
+}
+
+enum DataExtractionCaptureStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum DataExtractionContentArtifactKind {
+  ACQUIRED_SOURCE_BODY
+  NORMALIZED_TEXT
+  STRUCTURED_SOURCE_FRAGMENT
+}
+
+enum DataExtractionCapabilityAvailability {
+  AVAILABLE
+  PARTIAL
+  DEGRADED
+  UNAVAILABLE
+  NOT_REQUESTED
+}
+
+enum DataExtractionRetryability {
+  RETRYABLE
+  NON_RETRYABLE
+  NOT_APPLICABLE
+}
+
+enum DataExtractionCoverage {
+  SINGLE_RESOURCE
+  MULTI_RESOURCE_PARTIAL
+  MULTI_RESOURCE_BROAD
+  SITE_WIDE_BOUNDED
+}
+
+enum DataExtractionRepresentativeness {
+  PERSISTENT_BRAND_LEVEL
+  REPEATED_REPRESENTATIVE
+  CONTEXT_SPECIFIC
+  OFFERING_SPECIFIC
+  INCIDENTAL
+}
+
+enum DataExtractionPolarity {
+  AFFIRMATIVE
+  EXPLICIT_NEGATIVE
+  RESTRICTION
+  NEUTRAL
+}
+
+enum DataExtractionFreshness {
+  CURRENT
+  POSSIBLY_STALE
+  UNKNOWN
+}
+
+enum DataExtractionFreshnessIntent {
+  REUSE_ALLOWED
+  REFRESH_IF_NOT_CURRENT
+  FORCE_RECAPTURE
+}
+
+enum DataExtractionFreshnessTargetType {
+  RESOURCE
+  CAPTURE
+  EVIDENCE
+}
+
+enum DataExtractionSemanticObservationRelationType {
+  EQUIVALENT_TO
+  CONFLICTS_WITH
+}
+
+// ============================================================================
 // CORE MODELS (Organization & User)
 // ============================================================================
 
@@ -835,43 +948,43 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  users        User[]
-  brandProfile BrandProfile?
+  users                      User[]
+  brandProfile               BrandProfile?
   gatekeeperRecoveryRequests GatekeeperRecoveryRequest[]
 
   @@map("organizations")
 }
 
 model User {
-  id             String          @id @default(uuid())
-  email          String          @unique
+  id                            String                          @id @default(uuid())
+  email                         String                          @unique
   /// Display name; brand onboarding sets local-part of work email.
-  name           String?
+  name                          String?
   /// Scrypt hash for creator email/password signup.
-  hashedPassword String?         @map("hashed_password")
+  hashedPassword                String?                         @map("hashed_password")
   /// Google OAuth subject (`sub` claim) for creator Google signup/sign-in.
-  googleSubjectId String?        @unique @map("google_subject_id")
-  emailVerifiedAt DateTime?      @map("email_verified_at")
-  role           UserRole
-  organizationId String?         @map("organization_id")
-  organization   Organization?   @relation(fields: [organizationId], references: [id])
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-  discoveryLeads DiscoveryLead[]
-  creatorProfile CreatorProfile?
-  creatorOnboardingTrack CreatorOnboardingTrack?
-  userProfile UserProfile?
-  historicChatThreads HistoricChatThread[]
-  metricPostPulses MetricPostPulse[]
-  collaborationsAsCreator Collaboration[] @relation("CollaborationCreator")
-  coPilotThreads CoPilotThread[]
-  coPilotMessageFeedback CoPilotMessageFeedback[]
-  creatorCoPilotThreadsAuthored CreatorCoPilotThread[] @relation("CreatorCoPilotThreadAuthor")
+  googleSubjectId               String?                         @unique @map("google_subject_id")
+  emailVerifiedAt               DateTime?                       @map("email_verified_at")
+  role                          UserRole
+  organizationId                String?                         @map("organization_id")
+  organization                  Organization?                   @relation(fields: [organizationId], references: [id])
+  createdAt                     DateTime                        @default(now()) @map("created_at")
+  updatedAt                     DateTime                        @updatedAt @map("updated_at")
+  discoveryLeads                DiscoveryLead[]
+  creatorProfile                CreatorProfile?
+  creatorOnboardingTrack        CreatorOnboardingTrack?
+  userProfile                   UserProfile?
+  historicChatThreads           HistoricChatThread[]
+  metricPostPulses              MetricPostPulse[]
+  collaborationsAsCreator       Collaboration[]                 @relation("CollaborationCreator")
+  coPilotThreads                CoPilotThread[]
+  coPilotMessageFeedback        CoPilotMessageFeedback[]
+  creatorCoPilotThreadsAuthored CreatorCoPilotThread[]          @relation("CreatorCoPilotThreadAuthor")
   creatorCoPilotMessageFeedback CreatorCoPilotMessageFeedback[]
-  brandTeamMemberships BrandTeamMember[]
-  triggeredNotifications Notification[] @relation("NotificationTriggerUser")
-  notificationRecipients NotificationRecipient[]
-  gatekeeperRecoveryRequests GatekeeperRecoveryRequest[]
+  brandTeamMemberships          BrandTeamMember[]
+  triggeredNotifications        Notification[]                  @relation("NotificationTriggerUser")
+  notificationRecipients        NotificationRecipient[]
+  gatekeeperRecoveryRequests    GatekeeperRecoveryRequest[]
 
   @@index([organizationId])
   @@index([role])
@@ -883,29 +996,29 @@ model User {
 // ============================================================================
 
 model DiscoveryLead {
-  id            String              @id @default(uuid())
-  rawUrl        String              @map("raw_url")
-  normalizedUrl String              @unique @map("normalized_url")
-  status        DiscoveryLeadStatus @default(PENDING)
-  isSupported   Boolean             @default(false) @map("is_supported")
-  industry      IndustryVertical?
-  subIndustry   String?             @map("sub_industry")
-  industryNiche String?             @map("industry_niche")
-  securityScore Int                 @default(0) @map("security_score")
-  metaHandshake Boolean             @default(false) @map("meta_handshake")
+  id                         String                      @id @default(uuid())
+  rawUrl                     String                      @map("raw_url")
+  normalizedUrl              String                      @unique @map("normalized_url")
+  status                     DiscoveryLeadStatus         @default(PENDING)
+  isSupported                Boolean                     @default(false) @map("is_supported")
+  industry                   IndustryVertical?
+  subIndustry                String?                     @map("sub_industry")
+  industryNiche              String?                     @map("industry_niche")
+  securityScore              Int                         @default(0) @map("security_score")
+  metaHandshake              Boolean                     @default(false) @map("meta_handshake")
   /// Step 1 session cache payload (AI classification output — populated when Neika/Invuet pipeline ships).
-  temporaryPayload       Json?     @map("temporary_payload")
+  temporaryPayload           Json?                       @map("temporary_payload")
   /// TTL for unverified Step 1 cache rows (change doc: 7-day horizon).
-  expiresAt              DateTime? @map("expires_at")
-  signupCompleted        Boolean   @default(false) @map("signup_completed")
-  classificationEvidence String?   @map("classification_evidence") @db.VarChar(250)
-  userId        String?             @map("user_id")
-  user          User?               @relation(fields: [userId], references: [id])
-  createdAt     DateTime            @default(now()) @map("created_at")
-  waitlistLeads          WaitlistLead[]
-  brandIntelligenceScan  BrandIntelligenceScan?
-  intelligenceJobs       BrandIntelligenceJob[]
-  brandPreviewRun        BrandPreviewRun?
+  expiresAt                  DateTime?                   @map("expires_at")
+  signupCompleted            Boolean                     @default(false) @map("signup_completed")
+  classificationEvidence     String?                     @map("classification_evidence") @db.VarChar(250)
+  userId                     String?                     @map("user_id")
+  user                       User?                       @relation(fields: [userId], references: [id])
+  createdAt                  DateTime                    @default(now()) @map("created_at")
+  waitlistLeads              WaitlistLead[]
+  brandIntelligenceScan      BrandIntelligenceScan?
+  intelligenceJobs           BrandIntelligenceJob[]
+  brandPreviewRun            BrandPreviewRun?
   gatekeeperRecoveryRequests GatekeeperRecoveryRequest[]
 
   @@index([createdAt])
@@ -941,22 +1054,22 @@ model GatekeeperSubmissionAudit {
 /// Explicit user-initiated Gatekeeper recovery requests. These records do not
 /// grant organization access or change Gatekeeper admission/classification.
 model GatekeeperRecoveryRequest {
-  id                   String                         @id @default(uuid())
+  id                   String                        @id @default(uuid())
   requestType          GatekeeperRecoveryRequestType @map("request_type")
-  discoveryLeadId      String?                        @map("discovery_lead_id")
-  discoveryLead        DiscoveryLead?                 @relation(fields: [discoveryLeadId], references: [id], onDelete: SetNull)
-  normalizedDomain     String                         @map("normalized_domain") @db.VarChar(255)
-  requesterEmail       String                         @map("requester_email") @db.VarChar(320)
-  requesterName        String?                        @map("requester_name") @db.VarChar(120)
-  requesterNote        String?                        @map("requester_note") @db.VarChar(1000)
-  requesterUserId      String?                        @map("requester_user_id")
-  requesterUser        User?                          @relation(fields: [requesterUserId], references: [id], onDelete: SetNull)
-  targetOrganizationId String?                        @map("target_organization_id")
-  targetOrganization   Organization?                  @relation(fields: [targetOrganizationId], references: [id], onDelete: SetNull)
-  sessionReference     String?                        @map("session_reference") @db.VarChar(255)
-  contextVersion       String                         @default("gatekeeper_recovery_context_v1") @map("context_version") @db.VarChar(64)
-  gatekeeperContext    Json                           @map("gatekeeper_context")
-  createdAt            DateTime                       @default(now()) @map("created_at")
+  discoveryLeadId      String?                       @map("discovery_lead_id")
+  discoveryLead        DiscoveryLead?                @relation(fields: [discoveryLeadId], references: [id], onDelete: SetNull)
+  normalizedDomain     String                        @map("normalized_domain") @db.VarChar(255)
+  requesterEmail       String                        @map("requester_email") @db.VarChar(320)
+  requesterName        String?                       @map("requester_name") @db.VarChar(120)
+  requesterNote        String?                       @map("requester_note") @db.VarChar(1000)
+  requesterUserId      String?                       @map("requester_user_id")
+  requesterUser        User?                         @relation(fields: [requesterUserId], references: [id], onDelete: SetNull)
+  targetOrganizationId String?                       @map("target_organization_id")
+  targetOrganization   Organization?                 @relation(fields: [targetOrganizationId], references: [id], onDelete: SetNull)
+  sessionReference     String?                       @map("session_reference") @db.VarChar(255)
+  contextVersion       String                        @default("gatekeeper_recovery_context_v1") @map("context_version") @db.VarChar(64)
+  gatekeeperContext    Json                          @map("gatekeeper_context")
+  createdAt            DateTime                      @default(now()) @map("created_at")
 
   @@unique([requestType, discoveryLeadId, requesterEmail], map: "uq_gatekeeper_recovery_request_actor")
   @@index([requestType, createdAt])
@@ -1016,27 +1129,27 @@ model BrandIntelligenceJob {
 /// Durable, versioned Brand Preview execution snapshot. Preview-derived
 /// semantics stay in JSON snapshots and are not promoted to BrandProfile.
 model BrandPreviewRun {
-  id                      String                     @id @default(uuid()) @map("brand_preview_run_id")
-  discoveryLeadId         String                     @unique @map("discovery_lead_id")
-  discoveryLead           DiscoveryLead              @relation(fields: [discoveryLeadId], references: [id], onDelete: Cascade)
-  brandProfileId          String?                    @map("brand_profile_id")
-  brandProfile            BrandProfile?              @relation(fields: [brandProfileId], references: [id], onDelete: SetNull)
-  attempt                 Int                        @default(1)
-  state                   BrandPreviewRuntimeState   @default(ANALYSIS_ACTIVE)
-  phase                   BrandPreviewPhase?
-  completeness            BrandPreviewCompleteness?
-  evidenceSnapshot        Json?                      @map("evidence_snapshot")
-  previewOutputSnapshot   Json?                      @map("preview_output_snapshot")
-  processorMetadata       Json?                      @map("processor_metadata")
-  retryAllowed            Boolean                    @default(false) @map("retry_allowed")
-  errorCode               String?                    @map("error_code") @db.VarChar(100)
-  enrichmentAttempted     Boolean                    @default(false) @map("enrichment_attempted")
-  leaseToken              String?                    @map("lease_token") @db.VarChar(64)
-  leaseExpiresAt          DateTime?                  @map("lease_expires_at")
-  startedAt               DateTime                   @default(now()) @map("started_at")
-  completedAt             DateTime?                  @map("completed_at")
-  createdAt               DateTime                   @default(now()) @map("created_at")
-  updatedAt               DateTime                   @updatedAt @map("updated_at")
+  id                    String                    @id @default(uuid()) @map("brand_preview_run_id")
+  discoveryLeadId       String                    @unique @map("discovery_lead_id")
+  discoveryLead         DiscoveryLead             @relation(fields: [discoveryLeadId], references: [id], onDelete: Cascade)
+  brandProfileId        String?                   @map("brand_profile_id")
+  brandProfile          BrandProfile?             @relation(fields: [brandProfileId], references: [id], onDelete: SetNull)
+  attempt               Int                       @default(1)
+  state                 BrandPreviewRuntimeState  @default(ANALYSIS_ACTIVE)
+  phase                 BrandPreviewPhase?
+  completeness          BrandPreviewCompleteness?
+  evidenceSnapshot      Json?                     @map("evidence_snapshot")
+  previewOutputSnapshot Json?                     @map("preview_output_snapshot")
+  processorMetadata     Json?                     @map("processor_metadata")
+  retryAllowed          Boolean                   @default(false) @map("retry_allowed")
+  errorCode             String?                   @map("error_code") @db.VarChar(100)
+  enrichmentAttempted   Boolean                   @default(false) @map("enrichment_attempted")
+  leaseToken            String?                   @map("lease_token") @db.VarChar(64)
+  leaseExpiresAt        DateTime?                 @map("lease_expires_at")
+  startedAt             DateTime                  @default(now()) @map("started_at")
+  completedAt           DateTime?                 @map("completed_at")
+  createdAt             DateTime                  @default(now()) @map("created_at")
+  updatedAt             DateTime                  @updatedAt @map("updated_at")
 
   @@index([state, leaseExpiresAt])
   @@index([brandProfileId])
@@ -1058,18 +1171,18 @@ model MarketIntelligenceLog {
 }
 
 model WaitlistLead {
-  id                      String                 @id @default(uuid())
+  id                      String                  @id @default(uuid())
   email                   String
-  industryInterest        IndustryVertical       @map("industry_interest")
-  domain                  String?                @db.VarChar(255)
-  reason                  WaitlistReason?        @map("reason")
-  isNotified              Boolean                @default(false) @map("is_notified")
-  discoveryLeadId         String?                @map("discovery_lead_id")
-  discoveryLead           DiscoveryLead?         @relation(fields: [discoveryLeadId], references: [id])
-  marketIntelligenceLogId String?                @map("market_intelligence_log_id")
-  marketIntelligenceLog   MarketIntelligenceLog? @relation(fields: [marketIntelligenceLogId], references: [id])
+  industryInterest        IndustryVertical        @map("industry_interest")
+  domain                  String?                 @db.VarChar(255)
+  reason                  WaitlistReason?         @map("reason")
+  isNotified              Boolean                 @default(false) @map("is_notified")
+  discoveryLeadId         String?                 @map("discovery_lead_id")
+  discoveryLead           DiscoveryLead?          @relation(fields: [discoveryLeadId], references: [id])
+  marketIntelligenceLogId String?                 @map("market_intelligence_log_id")
+  marketIntelligenceLog   MarketIntelligenceLog?  @relation(fields: [marketIntelligenceLogId], references: [id])
   creatorOnboardingTrack  CreatorOnboardingTrack?
-  createdAt               DateTime               @default(now()) @map("created_at")
+  createdAt               DateTime                @default(now()) @map("created_at")
 
   @@index([email])
   @@index([domain])
@@ -1122,9 +1235,9 @@ model BrandProfile {
   targetAudience          Json?            @map("target_audience")
 
   // Step 6: Verification (isVerified flips only after password gate)
-  isVerified        Boolean   @default(false) @map("is_verified")
-  verifiedAt        DateTime? @map("verified_at")
-  verificationEmail String?   @map("verification_email")
+  isVerified          Boolean   @default(false) @map("is_verified")
+  verifiedAt          DateTime? @map("verified_at")
+  verificationEmail   String?   @map("verification_email")
   /// Set when OTP/Google identity succeeds; password step still required for isVerified.
   identityConfirmedAt DateTime? @map("identity_confirmed_at")
 
@@ -1194,26 +1307,35 @@ model BrandProfile {
   intelligenceActions                 IntelligenceAction[]
   intelligenceComponentTransitions    IntelligenceComponentTransition[]
 
+  dataExtractionResources              DataExtractionResource[]
+  dataExtractionCaptures               DataExtractionCapture[]
+  dataExtractionContentArtifacts       DataExtractionContentArtifact[]
+  dataExtractionCapabilityExecutions   DataExtractionCapabilityExecution[]
+  dataExtractionEvidenceItems          DataExtractionEvidenceItem[]
+  dataExtractionSemanticObservations   DataExtractionSemanticObservation[]
+  dataExtractionFreshnessAssessments   DataExtractionFreshnessAssessment[]
+  dataExtractionProviderExecutionLinks DataExtractionProviderExecutionLink[]
+
   // UCE (Universal Campaign Engine)
-  uceCampaigns UceCampaign[]
+  uceCampaigns   UceCampaign[]
   campaignAssets UceCampaignAsset[] @relation("CampaignAssetBrandProfile")
 
   // Bridge ledger (Brand Centre → UCE)
   integrationBridgeSignals IntegrationBridgeSignalLedger[]
 
-  collaborations    Collaboration[]
-  escrowVault       BrandEscrowVault?
-  brandSubscription BrandSubscription?
-  coPilotThreads           CoPilotThread[]
-  coPilotInteractionLogs   CoPilotInteractionLog[]
-  coPilotMessageFeedback   CoPilotMessageFeedback[]
+  collaborations         Collaboration[]
+  escrowVault            BrandEscrowVault?
+  brandSubscription      BrandSubscription?
+  coPilotThreads         CoPilotThread[]
+  coPilotInteractionLogs CoPilotInteractionLog[]
+  coPilotMessageFeedback CoPilotMessageFeedback[]
 
-  teamMembers          BrandTeamMember[]
-  billingProfile       BrandBillingProfile?
-  withdrawalAccounts   BrandWithdrawalAccount[]
-  notificationSettings BrandNotificationSetting[]
-  notifications        Notification[]
-  integrations         BrandIntegration[]
+  teamMembers              BrandTeamMember[]
+  billingProfile           BrandBillingProfile?
+  withdrawalAccounts       BrandWithdrawalAccount[]
+  notificationSettings     BrandNotificationSetting[]
+  notifications            Notification[]
+  integrations             BrandIntegration[]
   instagramSyncInvitations InstagramSyncInvitation[]
 
   @@map("brand_profiles")
@@ -1221,20 +1343,20 @@ model BrandProfile {
 
 /// Brand OAuth connections (Instagram Login + optional Meta Business Suite in Settings).
 model BrandIntegration {
-  id                     String                  @id @default(uuid()) @map("integration_id")
-  brandProfileId         String                  @map("brand_id")
-  brandProfile           BrandProfile            @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  provider               BrandIntegrationProvider
-  status                 BrandIntegrationStatus  @default(DISCONNECTED)
-  currentPlatformHandle  String                  @map("current_platform_handle") @db.VarChar(255)
-  inboundOauthHandle     String?                 @map("inbound_oauth_handle") @db.VarChar(255)
-  accessTokenEncrypted   String?                 @map("access_token_encrypted") @db.Text
-  refreshTokenEncrypted  String?                 @map("refresh_token_encrypted") @db.Text
-  grantedScopes          BrandIntegrationScope[] @default([]) @map("granted_scopes")
-  tokenExpiresAt         DateTime?               @map("token_expires_at")
-  isActive               Boolean                 @default(true) @map("is_active")
-  createdAt              DateTime                @default(now()) @map("created_at")
-  updatedAt              DateTime                @updatedAt @map("updated_at")
+  id                    String                   @id @default(uuid()) @map("integration_id")
+  brandProfileId        String                   @map("brand_id")
+  brandProfile          BrandProfile             @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  provider              BrandIntegrationProvider
+  status                BrandIntegrationStatus   @default(DISCONNECTED)
+  currentPlatformHandle String                   @map("current_platform_handle") @db.VarChar(255)
+  inboundOauthHandle    String?                  @map("inbound_oauth_handle") @db.VarChar(255)
+  accessTokenEncrypted  String?                  @map("access_token_encrypted") @db.Text
+  refreshTokenEncrypted String?                  @map("refresh_token_encrypted") @db.Text
+  grantedScopes         BrandIntegrationScope[]  @default([]) @map("granted_scopes")
+  tokenExpiresAt        DateTime?                @map("token_expires_at")
+  isActive              Boolean                  @default(true) @map("is_active")
+  createdAt             DateTime                 @default(now()) @map("created_at")
+  updatedAt             DateTime                 @updatedAt @map("updated_at")
 
   @@unique([brandProfileId, provider], map: "uq_brand_provider_pair")
   @@index([brandProfileId, provider, status], map: "idx_brand_integrations_lookup")
@@ -1244,16 +1366,16 @@ model BrandIntegration {
 
 /// Temporary agent invites for onboarding Instagram sync (no permanent User).
 model InstagramSyncInvitation {
-  id            String                       @id @default(uuid())
-  email         String
-  status        InstagramSyncInvitationStatus @default(PENDING)
-  token         String                       @unique
-  otpCode       String?                      @map("otp_code")
-  otpExpiresAt  DateTime?                    @map("otp_expires_at")
-  brandProfileId String                      @map("brand_id")
-  brandProfile  BrandProfile                 @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  createdAt     DateTime                     @default(now()) @map("created_at")
-  expiresAt     DateTime                     @map("expires_at")
+  id             String                        @id @default(uuid())
+  email          String
+  status         InstagramSyncInvitationStatus @default(PENDING)
+  token          String                        @unique
+  otpCode        String?                       @map("otp_code")
+  otpExpiresAt   DateTime?                     @map("otp_expires_at")
+  brandProfileId String                        @map("brand_id")
+  brandProfile   BrandProfile                  @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  createdAt      DateTime                      @default(now()) @map("created_at")
+  expiresAt      DateTime                      @map("expires_at")
 
   @@index([token])
   @@index([brandProfileId])
@@ -1261,28 +1383,28 @@ model InstagramSyncInvitation {
 }
 
 model Offering {
-  id                 String       @id @default(uuid())
-  brandProfileId     String       @map("brand_profile_id")
-  brandProfile       BrandProfile @relation(fields: [brandProfileId], references: [id])
+  id                 String             @id @default(uuid())
+  brandProfileId     String             @map("brand_profile_id")
+  brandProfile       BrandProfile       @relation(fields: [brandProfileId], references: [id])
   type               OfferingType
   name               String
   description        String?
-  imageUrl           String?      @map("image_url")
-  url                String       @map("offering_url")
+  imageUrl           String?            @map("image_url")
+  url                String             @map("offering_url")
   /// Collection or healthcare specialty label from list pages (product Prompt 2).
-  categoryTag        String?      @map("category_tag")
+  categoryTag        String?            @map("category_tag")
   /// Human-visible starting price from list view, before deep scan parses `priceAmount`.
-  startingPriceLabel String?      @map("starting_price_label")
-  priceAmount        Decimal?     @map("price_amount")
-  currency           String       @default("USD")
-  locationIds        String[]     @map("location_ids")
-  isActive           Boolean      @default(true) @map("is_active")
-  isDeepScanned      Boolean      @default(false) @map("is_deep_scanned")
-  isUserEdited       Boolean      @default(false) @map("is_user_edited")
-  sellingPoints      String[]     @default([]) @map("selling_points")
-  doNotSay           String[]     @default([]) @map("do_not_say")
-  createdAt          DateTime     @default(now()) @map("created_at")
-  updatedAt          DateTime     @updatedAt @map("updated_at")
+  startingPriceLabel String?            @map("starting_price_label")
+  priceAmount        Decimal?           @map("price_amount")
+  currency           String             @default("USD")
+  locationIds        String[]           @map("location_ids")
+  isActive           Boolean            @default(true) @map("is_active")
+  isDeepScanned      Boolean            @default(false) @map("is_deep_scanned")
+  isUserEdited       Boolean            @default(false) @map("is_user_edited")
+  sellingPoints      String[]           @default([]) @map("selling_points")
+  doNotSay           String[]           @default([]) @map("do_not_say")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
   campaignAssets     UceCampaignAsset[] @relation("CampaignAssetOffering")
 
   @@map("offerings")
@@ -1413,20 +1535,20 @@ model BrandAudiencePersona {
 }
 
 model BrandOffer {
-  id                 String       @id @default(uuid())
-  brandProfileId     String       @map("brand_profile_id")
-  brandProfile       BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  offerName          String       @map("offer_name")
-  promoCode          String       @map("promo_code")
-  applicabilityScope String       @map("applicability_scope")
-  validityStart      DateTime     @map("validity_start")
-  validityEnd        DateTime     @map("validity_end")
+  id                 String             @id @default(uuid())
+  brandProfileId     String             @map("brand_profile_id")
+  brandProfile       BrandProfile       @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  offerName          String             @map("offer_name")
+  promoCode          String             @map("promo_code")
+  applicabilityScope String             @map("applicability_scope")
+  validityStart      DateTime           @map("validity_start")
+  validityEnd        DateTime           @map("validity_end")
   description        String?
-  entityLink         String?      @map("entity_link")
-  termsText          String?      @map("terms_text")
-  isActive           Boolean      @default(true) @map("is_active")
-  createdAt          DateTime     @default(now()) @map("created_at")
-  updatedAt          DateTime     @updatedAt @map("updated_at")
+  entityLink         String?            @map("entity_link")
+  termsText          String?            @map("terms_text")
+  isActive           Boolean            @default(true) @map("is_active")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
   campaignAssets     UceCampaignAsset[] @relation("CampaignAssetBrandOffer")
 
   @@unique([brandProfileId, promoCode])
@@ -1516,22 +1638,22 @@ model UceCampaign {
   createdAt      DateTime          @default(now()) @map("created_at")
   updatedAt      DateTime          @updatedAt @map("updated_at")
 
-  performanceAggregate UceCampaignPerformanceAggregate?
-  strategy             UceCampaignStrategy?
-  targeting            UceCampaignTargeting?
-  commercials          UceCampaignCommercials?
-  products             UceCampaignProduct[]
-  assets               UceCampaignAsset[]
-  briefs               UceCampaignBrief[]
-  collaborations       UceCampaignCollaboration[]
-  campaignCreators     UceCampaignCreator[]
-  applications         UceApplication[]
-  shares               UceCampaignShare[]
+  performanceAggregate   UceCampaignPerformanceAggregate?
+  strategy               UceCampaignStrategy?
+  targeting              UceCampaignTargeting?
+  commercials            UceCampaignCommercials?
+  products               UceCampaignProduct[]
+  assets                 UceCampaignAsset[]
+  briefs                 UceCampaignBrief[]
+  collaborations         UceCampaignCollaboration[]
+  campaignCreators       UceCampaignCreator[]
+  applications           UceApplication[]
+  shares                 UceCampaignShare[]
   workflowCollaborations Collaboration[]
-  reportingSnapshots   UceCampaignReportingSnapshot[]
-  reportingTimeseries  UceCampaignReportingTimeseriesHourly[]
-  reportingAssets      UceCampaignReportingAssetGallery[]
-  bridgeSignals        IntegrationBridgeSignalLedger[]
+  reportingSnapshots     UceCampaignReportingSnapshot[]
+  reportingTimeseries    UceCampaignReportingTimeseriesHourly[]
+  reportingAssets        UceCampaignReportingAssetGallery[]
+  bridgeSignals          IntegrationBridgeSignalLedger[]
 
   @@index([brandProfileId, status])
   @@map("uce_campaigns")
@@ -1540,19 +1662,19 @@ model UceCampaign {
 /// Canonical read-only Campaign reference to a Brand Centre-owned entity.
 /// Legacy UceCampaignProduct records remain a separate compatibility surface.
 model UceCampaignAsset {
-  id             String                 @id @default(uuid()) @map("campaign_asset_id")
-  campaignId     String                 @map("campaign_id")
-  campaign       UceCampaign            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  kind           UceCampaignAssetKind
-  status         UceCampaignAssetStatus @default(ACTIVE)
-  brandProfileId String?                @map("brand_profile_id")
-  brandProfile   BrandProfile?          @relation("CampaignAssetBrandProfile", fields: [brandProfileId], references: [id], onDelete: Restrict)
-  offeringId     String?                @map("offering_id")
-  offering       Offering?              @relation("CampaignAssetOffering", fields: [offeringId], references: [id], onDelete: Restrict)
-  brandOfferId   String?                @map("brand_offer_id")
-  brandOffer     BrandOffer?            @relation("CampaignAssetBrandOffer", fields: [brandOfferId], references: [id], onDelete: Restrict)
-  createdAt      DateTime               @default(now()) @map("created_at")
-  updatedAt      DateTime               @updatedAt @map("updated_at")
+  id              String                   @id @default(uuid()) @map("campaign_asset_id")
+  campaignId      String                   @map("campaign_id")
+  campaign        UceCampaign              @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  kind            UceCampaignAssetKind
+  status          UceCampaignAssetStatus   @default(ACTIVE)
+  brandProfileId  String?                  @map("brand_profile_id")
+  brandProfile    BrandProfile?            @relation("CampaignAssetBrandProfile", fields: [brandProfileId], references: [id], onDelete: Restrict)
+  offeringId      String?                  @map("offering_id")
+  offering        Offering?                @relation("CampaignAssetOffering", fields: [offeringId], references: [id], onDelete: Restrict)
+  brandOfferId    String?                  @map("brand_offer_id")
+  brandOffer      BrandOffer?              @relation("CampaignAssetBrandOffer", fields: [brandOfferId], references: [id], onDelete: Restrict)
+  createdAt       DateTime                 @default(now()) @map("created_at")
+  updatedAt       DateTime                 @updatedAt @map("updated_at")
   canonicalBriefs CanonicalCampaignBrief[]
 
   @@unique([campaignId, brandProfileId])
@@ -1564,14 +1686,14 @@ model UceCampaignAsset {
 
 /// Canonical Brief; ownership is always nested beneath a Campaign Asset.
 model CanonicalCampaignBrief {
-  id                   String                    @id @default(uuid()) @map("brief_id")
-  campaignAssetId      String                    @map("campaign_asset_id")
-  campaignAsset        UceCampaignAsset          @relation(fields: [campaignAssetId], references: [id], onDelete: Restrict)
+  id                   String                      @id @default(uuid()) @map("brief_id")
+  campaignAssetId      String                      @map("campaign_asset_id")
+  campaignAsset        UceCampaignAsset            @relation(fields: [campaignAssetId], references: [id], onDelete: Restrict)
   title                String
-  creativeRequirements String                    @map("creative_requirements") @db.Text
-  isActive             Boolean                   @default(true) @map("is_active")
-  createdAt            DateTime                  @default(now()) @map("created_at")
-  updatedAt            DateTime                  @updatedAt @map("updated_at")
+  creativeRequirements String                      @map("creative_requirements") @db.Text
+  isActive             Boolean                     @default(true) @map("is_active")
+  createdAt            DateTime                    @default(now()) @map("created_at")
+  updatedAt            DateTime                    @updatedAt @map("updated_at")
   deliverables         CanonicalBriefDeliverable[]
 
   @@index([campaignAssetId, isActive])
@@ -1595,22 +1717,22 @@ model CanonicalBriefDeliverable {
 
 /// Durable Campaign↔creator bridge used by Discovery/Applicants/Outreach.
 model UceCampaignCreator {
-  id                     String                           @id @default(uuid())
-  campaignId             String                           @map("campaign_id")
-  campaign               UceCampaign                      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  creatorProfileId       String?                          @map("creator_profile_id")
-  creatorProfile         CreatorProfile?                  @relation(fields: [creatorProfileId], references: [id], onDelete: SetNull)
-  platform               UceMediaPlatform                 @default(INSTAGRAM)
-  socialHandle           String                           @map("social_handle")
-  normalizedSocialHandle String                           @map("normalized_social_handle")
+  id                     String                            @id @default(uuid())
+  campaignId             String                            @map("campaign_id")
+  campaign               UceCampaign                       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creatorProfileId       String?                           @map("creator_profile_id")
+  creatorProfile         CreatorProfile?                   @relation(fields: [creatorProfileId], references: [id], onDelete: SetNull)
+  platform               UceMediaPlatform                  @default(INSTAGRAM)
+  socialHandle           String                            @map("social_handle")
+  normalizedSocialHandle String                            @map("normalized_social_handle")
   email                  String?
-  source                 UceCampaignCreatorSource         @default(MANUAL)
+  source                 UceCampaignCreatorSource          @default(MANUAL)
   ingestionMethod        UceCampaignCreatorIngestionMethod @default(MANUAL_SINGLE) @map("ingestion_method")
-  reviewState            UceCampaignCreatorReviewState    @default(PENDING_REVIEW) @map("review_state")
+  reviewState            UceCampaignCreatorReviewState     @default(PENDING_REVIEW) @map("review_state")
   applications           UceApplication[]
-  archivedAt             DateTime?                        @map("archived_at")
-  createdAt              DateTime                         @default(now()) @map("created_at")
-  updatedAt              DateTime                         @updatedAt @map("updated_at")
+  archivedAt             DateTime?                         @map("archived_at")
+  createdAt              DateTime                          @default(now()) @map("created_at")
+  updatedAt              DateTime                          @updatedAt @map("updated_at")
 
   @@unique([campaignId, platform, normalizedSocialHandle])
   @@index([campaignId, reviewState])
@@ -1619,31 +1741,31 @@ model UceCampaignCreator {
 
 /// Campaign-owned Application decision record (Applicants truth).
 model UceApplication {
-  id                        String               @id @default(uuid())
-  requestId                 String               @unique @map("request_id")
-  campaignId                String               @map("campaign_id")
-  campaign                  UceCampaign          @relation(fields: [campaignId], references: [id], onDelete: Restrict)
-  campaignCreatorId         String               @map("campaign_creator_id")
-  campaignCreator           UceCampaignCreator   @relation(fields: [campaignCreatorId], references: [id], onDelete: Restrict)
+  id                        String                  @id @default(uuid())
+  requestId                 String                  @unique @map("request_id")
+  campaignId                String                  @map("campaign_id")
+  campaign                  UceCampaign             @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  campaignCreatorId         String                  @map("campaign_creator_id")
+  campaignCreator           UceCampaignCreator      @relation(fields: [campaignCreatorId], references: [id], onDelete: Restrict)
   /// Maps to current product persistence until Asset rename is approved.
-  campaignAssetId           String               @map("campaign_asset_id")
-  campaignAsset             UceCampaignProduct   @relation(fields: [campaignAssetId], references: [id], onDelete: Restrict)
-  briefId                   String               @map("brief_id")
-  brief                     UceCampaignBrief     @relation(fields: [briefId], references: [id], onDelete: Restrict)
-  status                    UceApplicationStatus @default(PENDING)
-  source                    UceApplicationSource @default(DIRECT)
-  supersededByApplicationId String?              @map("superseded_by_application_id")
-  supersededByApplication   UceApplication?      @relation("ApplicationSupersession", fields: [supersededByApplicationId], references: [id], onDelete: Restrict)
-  supersededApplications    UceApplication[]     @relation("ApplicationSupersession")
+  campaignAssetId           String                  @map("campaign_asset_id")
+  campaignAsset             UceCampaignProduct      @relation(fields: [campaignAssetId], references: [id], onDelete: Restrict)
+  briefId                   String                  @map("brief_id")
+  brief                     UceCampaignBrief        @relation(fields: [briefId], references: [id], onDelete: Restrict)
+  status                    UceApplicationStatus    @default(PENDING)
+  source                    UceApplicationSource    @default(DIRECT)
+  supersededByApplicationId String?                 @map("superseded_by_application_id")
+  supersededByApplication   UceApplication?         @relation("ApplicationSupersession", fields: [supersededByApplicationId], references: [id], onDelete: Restrict)
+  supersededApplications    UceApplication[]        @relation("ApplicationSupersession")
   snapshot                  UceApplicationSnapshot?
-  appliedAt                 DateTime             @default(now()) @map("applied_at")
-  approvedAt                DateTime?            @map("approved_at")
-  rejectedAt                DateTime?            @map("rejected_at")
-  withdrawnAt               DateTime?            @map("withdrawn_at")
-  expiredAt                 DateTime?            @map("expired_at")
-  supersededAt              DateTime?            @map("superseded_at")
-  createdAt                 DateTime             @default(now()) @map("created_at")
-  updatedAt                 DateTime             @updatedAt @map("updated_at")
+  appliedAt                 DateTime                @default(now()) @map("applied_at")
+  approvedAt                DateTime?               @map("approved_at")
+  rejectedAt                DateTime?               @map("rejected_at")
+  withdrawnAt               DateTime?               @map("withdrawn_at")
+  expiredAt                 DateTime?               @map("expired_at")
+  supersededAt              DateTime?               @map("superseded_at")
+  createdAt                 DateTime                @default(now()) @map("created_at")
+  updatedAt                 DateTime                @updatedAt @map("updated_at")
 
   @@index([campaignId, status])
   @@index([campaignCreatorId, status])
@@ -1652,41 +1774,41 @@ model UceApplication {
 }
 
 model UceApplicationSnapshot {
-  id                   String        @id @default(uuid())
-  applicationId        String        @unique @map("application_id")
+  id                   String         @id @default(uuid())
+  applicationId        String         @unique @map("application_id")
   application          UceApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  campaignContext      Json          @map("campaign_context")
-  campaignAssetContext Json          @map("campaign_asset_context")
-  briefContext         Json          @map("brief_context")
-  commercialContext    Json          @map("commercial_context")
-  creatorIdentity      Json          @map("creator_identity")
-  createdAt            DateTime      @default(now()) @map("created_at")
+  campaignContext      Json           @map("campaign_context")
+  campaignAssetContext Json           @map("campaign_asset_context")
+  briefContext         Json           @map("brief_context")
+  commercialContext    Json           @map("commercial_context")
+  creatorIdentity      Json           @map("creator_identity")
+  createdAt            DateTime       @default(now()) @map("created_at")
 
   @@map("uce_application_snapshots")
 }
 
 model UceCampaignShare {
-  id             String                        @id @default(uuid())
-  requestId      String                        @unique @map("request_id")
-  campaignId     String                        @map("campaign_id")
-  campaign       UceCampaign                   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  id             String                          @id @default(uuid())
+  requestId      String                          @unique @map("request_id")
+  campaignId     String                          @map("campaign_id")
+  campaign       UceCampaign                     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   channel        UceCampaignShareChannel
-  trackingToken  String                        @unique @map("tracking_token")
+  trackingToken  String                          @unique @map("tracking_token")
   trackingEvents UceCampaignShareTrackingEvent[]
-  initiatedAt    DateTime                      @default(now()) @map("initiated_at")
-  createdAt      DateTime                      @default(now()) @map("created_at")
+  initiatedAt    DateTime                        @default(now()) @map("initiated_at")
+  createdAt      DateTime                        @default(now()) @map("created_at")
 
   @@index([campaignId, initiatedAt])
   @@map("uce_campaign_shares")
 }
 
 model UceCampaignShareTrackingEvent {
-  id         String                           @id @default(uuid())
-  shareId    String                           @map("share_id")
-  share      UceCampaignShare                 @relation(fields: [shareId], references: [id], onDelete: Cascade)
+  id         String                            @id @default(uuid())
+  shareId    String                            @map("share_id")
+  share      UceCampaignShare                  @relation(fields: [shareId], references: [id], onDelete: Cascade)
   type       UceCampaignShareTrackingEventType
-  occurredAt DateTime                         @default(now()) @map("occurred_at")
-  createdAt  DateTime                         @default(now()) @map("created_at")
+  occurredAt DateTime                          @default(now()) @map("occurred_at")
+  createdAt  DateTime                          @default(now()) @map("created_at")
 
   @@index([shareId, occurredAt])
   @@map("uce_campaign_share_tracking_events")
@@ -1721,18 +1843,18 @@ model UceCampaignStrategy {
 }
 
 model UceCampaignTargeting {
-  campaignId            String                @id @map("campaign_id")
-  campaign              UceCampaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  industryVertical      String                @map("industry_vertical")
-  creatorArchetypes     String[]              @default([]) @map("creator_archetypes")
-  followerTiers         String[]              @default([]) @map("follower_tiers")
-  audienceAgeMin        Int                   @default(18) @map("audience_age_min")
-  audienceAgeMax        Int                   @default(65) @map("audience_age_max")
-  audienceGender        String                @default("ALL") @map("audience_gender")
-  targetLocations       String[]              @default([]) @map("target_locations")
-  disqualifyingKeywords String[]              @default([]) @map("disqualifying_keywords")
-  visibilityScopes      UceVisibilityScope[]  @default([EVERYONE]) @map("visibility_scopes")
-  applicationScope      UceApplicationScope   @default(EVERYONE) @map("application_scope")
+  campaignId            String               @id @map("campaign_id")
+  campaign              UceCampaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  industryVertical      String               @map("industry_vertical")
+  creatorArchetypes     String[]             @default([]) @map("creator_archetypes")
+  followerTiers         String[]             @default([]) @map("follower_tiers")
+  audienceAgeMin        Int                  @default(18) @map("audience_age_min")
+  audienceAgeMax        Int                  @default(65) @map("audience_age_max")
+  audienceGender        String               @default("ALL") @map("audience_gender")
+  targetLocations       String[]             @default([]) @map("target_locations")
+  disqualifyingKeywords String[]             @default([]) @map("disqualifying_keywords")
+  visibilityScopes      UceVisibilityScope[] @default([EVERYONE]) @map("visibility_scopes")
+  applicationScope      UceApplicationScope  @default(EVERYONE) @map("application_scope")
 
   @@map("uce_campaign_targeting")
 }
@@ -1768,24 +1890,24 @@ enum UceBriefStrategyMode {
 }
 
 model UceCampaignProduct {
-  id             String              @id @default(uuid()) @map("product_id")
-  campaignId     String              @map("campaign_id")
-  campaign       UceCampaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  id             String               @id @default(uuid()) @map("product_id")
+  campaignId     String               @map("campaign_id")
+  campaign       UceCampaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   assetType      UceCampaignAssetType @default(INDIVIDUAL_PRODUCT_SKU) @map("asset_type")
-  skuCode        String?             @map("sku_code")
-  productName    String              @map("product_name")
-  isActive       Boolean             @default(true) @map("is_active")
+  skuCode        String?              @map("sku_code")
+  productName    String               @map("product_name")
+  isActive       Boolean              @default(true) @map("is_active")
   /// Stock is managed via essentials/inventory patch — not on Add Asset create.
-  inventoryCount Int                 @default(0) @map("inventory_count")
-  costPerUnit    Decimal             @default(0) @map("cost_per_unit") @db.Decimal(10, 2)
-  imageUrl       String?             @map("image_url")
+  inventoryCount Int                  @default(0) @map("inventory_count")
+  costPerUnit    Decimal              @default(0) @map("cost_per_unit") @db.Decimal(10, 2)
+  imageUrl       String?              @map("image_url")
   /// Validated MasterAddAssetDrawer payload (minus campaign_id).
-  assetPayload   Json                @default("{}") @map("asset_payload")
-  createdAt      DateTime            @default(now()) @map("created_at")
+  assetPayload   Json                 @default("{}") @map("asset_payload")
+  createdAt      DateTime             @default(now()) @map("created_at")
 
-  briefs         UceCampaignBrief[]
-  collaborations UceCampaignCollaboration[]
-  applications   UceApplication[]
+  briefs                 UceCampaignBrief[]
+  collaborations         UceCampaignCollaboration[]
+  applications           UceApplication[]
   workflowCollaborations Collaboration[]
 
   @@unique([campaignId, skuCode])
@@ -1795,28 +1917,28 @@ model UceCampaignProduct {
 }
 
 model UceCampaignBrief {
-  id                           String               @id @default(uuid()) @map("brief_id")
-  campaignId                   String               @map("campaign_id")
-  campaign                     UceCampaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  productId                    String?              @map("product_id")
-  product                      UceCampaignProduct?  @relation(fields: [productId], references: [id], onDelete: SetNull)
-  internalTitle                String               @map("internal_title")
-  creativeGuidelines           String               @map("creative_guidelines") @db.Text
-  isActive                     Boolean              @default(true) @map("is_active")
-  requiredPlatforms            UceMediaPlatform[]   @map("required_platforms")
-  deliverableFormatTags        String[]             @default([]) @map("deliverable_format_tags")
-  briefType                    UceBriefStrategyMode? @map("brief_type")
-  purpose                      String?              @map("purpose") @db.Text
-  objective                    String?              @map("objective") @db.Text
-  targetInfluencerArchetype    String?              @map("target_influencer_archetype")
-  mandatoryCreatorRequirements String?              @map("mandatory_creator_requirements") @db.Text
-  deliverablesInventory        Json?                @map("deliverables_inventory")
-  contentGuidanceMatrix        Json?                @map("content_guidance_matrix")
-  parentPlannerLogisticsSnapshot Json?              @map("parent_planner_logistics_snapshot")
-  createdAt                    DateTime             @default(now()) @map("created_at")
+  id                             String                @id @default(uuid()) @map("brief_id")
+  campaignId                     String                @map("campaign_id")
+  campaign                       UceCampaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  productId                      String?               @map("product_id")
+  product                        UceCampaignProduct?   @relation(fields: [productId], references: [id], onDelete: SetNull)
+  internalTitle                  String                @map("internal_title")
+  creativeGuidelines             String                @map("creative_guidelines") @db.Text
+  isActive                       Boolean               @default(true) @map("is_active")
+  requiredPlatforms              UceMediaPlatform[]    @map("required_platforms")
+  deliverableFormatTags          String[]              @default([]) @map("deliverable_format_tags")
+  briefType                      UceBriefStrategyMode? @map("brief_type")
+  purpose                        String?               @map("purpose") @db.Text
+  objective                      String?               @map("objective") @db.Text
+  targetInfluencerArchetype      String?               @map("target_influencer_archetype")
+  mandatoryCreatorRequirements   String?               @map("mandatory_creator_requirements") @db.Text
+  deliverablesInventory          Json?                 @map("deliverables_inventory")
+  contentGuidanceMatrix          Json?                 @map("content_guidance_matrix")
+  parentPlannerLogisticsSnapshot Json?                 @map("parent_planner_logistics_snapshot")
+  createdAt                      DateTime              @default(now()) @map("created_at")
 
-  collaborations UceCampaignCollaboration[]
-  applications   UceApplication[]
+  collaborations         UceCampaignCollaboration[]
+  applications           UceApplication[]
   workflowCollaborations Collaboration[]
 
   @@index([campaignId])
@@ -1842,18 +1964,18 @@ enum BridgeSyncStatus {
 }
 
 model IntegrationBridgeSignalLedger {
-  id                  String           @id @default(uuid()) @map("signal_id")
-  brandProfileId      String           @map("brand_profile_id")
-  brandProfile        BrandProfile     @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  campaignId          String?          @map("campaign_id")
-  campaign            UceCampaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  signalType          PlannerSignalType @map("signal_type")
-  syncStatus          BridgeSyncStatus @default(RECEIVED) @map("sync_status")
-  rawPayloadSnapshot  Json             @map("raw_payload_snapshot")
-  executionErrorLogs  String?          @map("execution_error_logs") @db.Text
-  synchronizedAt      DateTime?        @map("synchronized_at")
-  createdAt           DateTime         @default(now()) @map("created_at")
-  updatedAt           DateTime         @updatedAt @map("updated_at")
+  id                 String            @id @default(uuid()) @map("signal_id")
+  brandProfileId     String            @map("brand_profile_id")
+  brandProfile       BrandProfile      @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  campaignId         String?           @map("campaign_id")
+  campaign           UceCampaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  signalType         PlannerSignalType @map("signal_type")
+  syncStatus         BridgeSyncStatus  @default(RECEIVED) @map("sync_status")
+  rawPayloadSnapshot Json              @map("raw_payload_snapshot")
+  executionErrorLogs String?           @map("execution_error_logs") @db.Text
+  synchronizedAt     DateTime?         @map("synchronized_at")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
 
   @@index([syncStatus, signalType])
   @@index([brandProfileId, createdAt])
@@ -1872,18 +1994,18 @@ model UceCampaignCollaboration {
   creatorProfileId String?         @map("creator_profile_id")
   creatorProfile   CreatorProfile? @relation(fields: [creatorProfileId], references: [id], onDelete: SetNull)
 
-  instagramHandle String  @map("instagram_handle")
-  creatorEmail    String  @map("creator_email")
-  matchScore      Decimal @default(0) @map("match_score") @db.Decimal(5, 2)
+  instagramHandle   String  @map("instagram_handle")
+  creatorEmail      String  @map("creator_email")
+  matchScore        Decimal @default(0) @map("match_score") @db.Decimal(5, 2)
   contentFormatType String? @map("content_format_type") @db.VarChar(50)
-  vettingRemark   String? @map("vetting_remark")
-  rejectionReason String? @map("rejection_reason")
+  vettingRemark     String? @map("vetting_remark")
+  rejectionReason   String? @map("rejection_reason")
 
-  collabStatus     UceCollabStatus         @default(PROSPECT_CURATED) @map("collab_status")
-  currentPhase     UceProductionPhase      @default(APPLICATION_REVIEW) @map("current_phase")
-  actionRequiredByRole UceWorkflowActionRole @default(BRAND) @map("action_required_by_role")
-  currentMilestone UceMilestoneStage       @default(STAGE_1_NEGOTIATION) @map("current_milestone")
-  pipelineHealth   UcePipelineHealthStatus @default(ON_TRACK) @map("pipeline_health")
+  collabStatus         UceCollabStatus         @default(PROSPECT_CURATED) @map("collab_status")
+  currentPhase         UceProductionPhase      @default(APPLICATION_REVIEW) @map("current_phase")
+  actionRequiredByRole UceWorkflowActionRole   @default(BRAND) @map("action_required_by_role")
+  currentMilestone     UceMilestoneStage       @default(STAGE_1_NEGOTIATION) @map("current_milestone")
+  pipelineHealth       UcePipelineHealthStatus @default(ON_TRACK) @map("pipeline_health")
 
   negotiationState UceNegotiationSubState? @map("negotiation_state")
   securementState  UceSecurementSubState?  @map("securement_state")
@@ -1915,12 +2037,12 @@ model UceCampaignCollaboration {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  auditLogs       UceCollaborationAuditLog[]
-  reportingAssets UceCampaignReportingAssetGallery[]
+  auditLogs             UceCollaborationAuditLog[]
+  reportingAssets       UceCampaignReportingAssetGallery[]
   workflowCollaboration Collaboration?
-  logisticsRegistry UceCollaborationLogistics?
-  contentDrafts     UceCollaborationContentDraft[]
-  liveTelemetry     UceCollaborationLiveTelemetry?
+  logisticsRegistry     UceCollaborationLogistics?
+  contentDrafts         UceCollaborationContentDraft[]
+  liveTelemetry         UceCollaborationLiveTelemetry?
 
   @@unique([campaignId, instagramHandle])
   @@index([campaignId, collabStatus, currentMilestone])
@@ -1931,17 +2053,17 @@ model UceCampaignCollaboration {
 }
 
 model UceCollaborationLogistics {
-  id              String                   @id @default(uuid())
-  collaborationId String                   @unique @map("collaboration_id")
-  collaboration   UceCampaignCollaboration @relation(fields: [collaborationId], references: [id], onDelete: Restrict)
-  carrierName     String                   @map("carrier_name") @db.VarChar(100)
-  trackingId      String                   @map("tracking_id") @db.VarChar(100)
-  estimatedDeliveryAt DateTime?            @map("estimated_delivery_at")
-  actualDeliveredAt   DateTime?            @map("actual_delivered_at")
-  isReceivedByCreator Boolean              @default(false) @map("is_received_by_creator")
-  isPackageDamaged    Boolean              @default(false) @map("is_package_damaged")
-  createdAt       DateTime                 @default(now()) @map("created_at")
-  updatedAt       DateTime                 @updatedAt @map("updated_at")
+  id                  String                   @id @default(uuid())
+  collaborationId     String                   @unique @map("collaboration_id")
+  collaboration       UceCampaignCollaboration @relation(fields: [collaborationId], references: [id], onDelete: Restrict)
+  carrierName         String                   @map("carrier_name") @db.VarChar(100)
+  trackingId          String                   @map("tracking_id") @db.VarChar(100)
+  estimatedDeliveryAt DateTime?                @map("estimated_delivery_at")
+  actualDeliveredAt   DateTime?                @map("actual_delivered_at")
+  isReceivedByCreator Boolean                  @default(false) @map("is_received_by_creator")
+  isPackageDamaged    Boolean                  @default(false) @map("is_package_damaged")
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  updatedAt           DateTime                 @updatedAt @map("updated_at")
 
   @@map("uce_collaboration_logistics")
 }
@@ -2061,29 +2183,29 @@ model UceCampaignReportingAssetGallery {
 // ============================================================================
 
 model CreatorProfile {
-  id                        String   @id @default(uuid())
-  userId                    String   @unique @map("user_id")
-  user                      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  displayName               String?  @map("display_name")
-  instagramHandle           String?  @map("instagram_handle")
+  id                         String   @id @default(uuid())
+  userId                     String   @unique @map("user_id")
+  user                       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName                String?  @map("display_name")
+  instagramHandle            String?  @map("instagram_handle")
   /// Public media-kit URL slug (e.g. chef-insights from @chef_insights).
-  publicSlug                String?  @unique @map("public_slug")
-  isMediaKitPublic          Boolean  @default(true) @map("is_media_kit_public")
-  tiktokHandle              String?  @map("tiktok_handle")
-  avatarUrl                 String?  @map("avatar_url")
-  primaryRegion             String   @default("US") @map("primary_region")
-  followerCount             Int      @default(0) @map("follower_count")
-  audienceDemographicsMatrix Json  @default("{}") @map("audience_demographics_matrix")
-  createdAt                 DateTime @default(now()) @map("created_at")
-  updatedAt                 DateTime @updatedAt @map("updated_at")
+  publicSlug                 String?  @unique @map("public_slug")
+  isMediaKitPublic           Boolean  @default(true) @map("is_media_kit_public")
+  tiktokHandle               String?  @map("tiktok_handle")
+  avatarUrl                  String?  @map("avatar_url")
+  primaryRegion              String   @default("US") @map("primary_region")
+  followerCount              Int      @default(0) @map("follower_count")
+  audienceDemographicsMatrix Json     @default("{}") @map("audience_demographics_matrix")
+  createdAt                  DateTime @default(now()) @map("created_at")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
 
-  bankDetails       CreatorBankDetails[]
-  shippingAddresses CreatorShippingAddress[]
-  settlementProfile CreatorSettlementProfile?
-  ownedWorkspaces   CreatorWorkspace[]         @relation("CreatorWorkspaceOwner")
-  workspaceSeats    CreatorWorkspaceMember[]   @relation("CreatorWorkspaceMemberProfile")
-  socialIntegrations CreatorSocialIntegration[]
-  coPilotThreads    CreatorCoPilotThread[]
+  bankDetails            CreatorBankDetails[]
+  shippingAddresses      CreatorShippingAddress[]
+  settlementProfile      CreatorSettlementProfile?
+  ownedWorkspaces        CreatorWorkspace[]              @relation("CreatorWorkspaceOwner")
+  workspaceSeats         CreatorWorkspaceMember[]        @relation("CreatorWorkspaceMemberProfile")
+  socialIntegrations     CreatorSocialIntegration[]
+  coPilotThreads         CreatorCoPilotThread[]
   coPilotMessageFeedback CreatorCoPilotMessageFeedback[]
   coPilotInteractionLogs CreatorCoPilotInteractionLog[]
   uceCollaborations      UceCampaignCollaboration[]
@@ -2093,17 +2215,17 @@ model CreatorProfile {
 }
 
 model CreatorBankDetails {
-  id               String         @id @default(uuid())
-  creatorProfileId String         @map("creator_profile_id")
-  creatorProfile   CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
-  accountHolder    String         @map("account_holder")
-  bankName         String         @map("bank_name")
-  accountNumber    String         @map("account_number")
-  ifscOrRouting    String         @map("ifsc_or_routing")
-  isPrimary        Boolean        @default(true) @map("is_primary")
+  id                 String                        @id @default(uuid())
+  creatorProfileId   String                        @map("creator_profile_id")
+  creatorProfile     CreatorProfile                @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  accountHolder      String                        @map("account_holder")
+  bankName           String                        @map("bank_name")
+  accountNumber      String                        @map("account_number")
+  ifscOrRouting      String                        @map("ifsc_or_routing")
+  isPrimary          Boolean                       @default(true) @map("is_primary")
   verificationStatus CreatorBankVerificationStatus @default(VERIFIED) @map("verification_status")
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime       @updatedAt @map("updated_at")
+  createdAt          DateTime                      @default(now()) @map("created_at")
+  updatedAt          DateTime                      @updatedAt @map("updated_at")
 
   commercialPayoutLinks CollaborationCommercial[]
 
@@ -2112,21 +2234,21 @@ model CreatorBankDetails {
 }
 
 model CreatorShippingAddress {
-  id               String         @id @default(uuid())
-  creatorProfileId String         @map("creator_profile_id")
-  creatorProfile   CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
-  recipientName    String         @map("recipient_name")
-  addressLine1     String         @map("address_line_1")
-  addressLine2     String?        @map("address_line_2")
-  city             String
-  stateRegion      String?        @map("state_region")
-  postalCode       String         @map("postal_code")
-  countryCode      String         @default("IN") @map("country_code")
+  id                            String         @id @default(uuid())
+  creatorProfileId              String         @map("creator_profile_id")
+  creatorProfile                CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  recipientName                 String         @map("recipient_name")
+  addressLine1                  String         @map("address_line_1")
+  addressLine2                  String?        @map("address_line_2")
+  city                          String
+  stateRegion                   String?        @map("state_region")
+  postalCode                    String         @map("postal_code")
+  countryCode                   String         @default("IN") @map("country_code")
   phone                         String?
-  deliveryInstructionsNarrative String?  @map("delivery_instructions_narrative") @db.Text
-  isDefault                     Boolean  @default(true) @map("is_default")
-  createdAt                     DateTime @default(now()) @map("created_at")
-  updatedAt                     DateTime @updatedAt @map("updated_at")
+  deliveryInstructionsNarrative String?        @map("delivery_instructions_narrative") @db.Text
+  isDefault                     Boolean        @default(true) @map("is_default")
+  createdAt                     DateTime       @default(now()) @map("created_at")
+  updatedAt                     DateTime       @updatedAt @map("updated_at")
 
   @@index([creatorProfileId, isDefault], map: "creator_shipping_addresses_profile_default_idx")
   @@map("creator_shipping_addresses")
@@ -2245,24 +2367,24 @@ model CreatorWorkspaceInvitation {
 }
 
 model CreatorSocialIntegration {
-  id                         String                @id @default(uuid())
-  creatorProfileId           String                @map("creator_profile_id")
-  creatorProfile             CreatorProfile        @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
-  platformNetwork            SocialNetworkProvider @map("platform_network")
-  nativePlatformUserId       String                @map("native_platform_user_id") @db.VarChar(100)
-  channelHandleString        String                @map("channel_handle_string") @db.VarChar(100)
-  channelDisplayTitle        String?               @map("channel_display_title") @db.VarChar(255)
-  verifiedAvatarUrl          String?               @map("verified_avatar_url") @db.Text
-  oauthAccessTokenEncrypted  String                @map("oauth_access_token_encrypted") @db.Text
-  oauthRefreshTokenEncrypted String?               @map("oauth_refresh_token_encrypted") @db.Text
-  tokenScopePermissions      String[]              @default([]) @map("token_scope_permissions")
-  tokenStateCondition        OAuthTokenStatus      @default(ACTIVE) @map("token_state_condition")
-  tokenExpiresAt             DateTime?             @map("token_expires_at")
-  lastMetadataSyncAt         DateTime?             @map("last_metadata_sync_at")
+  id                         String                            @id @default(uuid())
+  creatorProfileId           String                            @map("creator_profile_id")
+  creatorProfile             CreatorProfile                    @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  platformNetwork            SocialNetworkProvider             @map("platform_network")
+  nativePlatformUserId       String                            @map("native_platform_user_id") @db.VarChar(100)
+  channelHandleString        String                            @map("channel_handle_string") @db.VarChar(100)
+  channelDisplayTitle        String?                           @map("channel_display_title") @db.VarChar(255)
+  verifiedAvatarUrl          String?                           @map("verified_avatar_url") @db.Text
+  oauthAccessTokenEncrypted  String                            @map("oauth_access_token_encrypted") @db.Text
+  oauthRefreshTokenEncrypted String?                           @map("oauth_refresh_token_encrypted") @db.Text
+  tokenScopePermissions      String[]                          @default([]) @map("token_scope_permissions")
+  tokenStateCondition        OAuthTokenStatus                  @default(ACTIVE) @map("token_state_condition")
+  tokenExpiresAt             DateTime?                         @map("token_expires_at")
+  lastMetadataSyncAt         DateTime?                         @map("last_metadata_sync_at")
   professionalAccountType    InstagramProfessionalAccountType? @map("professional_account_type")
-  mediaCountCache            Int?                  @map("media_count_cache")
-  createdAt                  DateTime              @default(now()) @map("created_at")
-  updatedAt                  DateTime              @updatedAt @map("updated_at")
+  mediaCountCache            Int?                              @map("media_count_cache")
+  createdAt                  DateTime                          @default(now()) @map("created_at")
+  updatedAt                  DateTime                          @updatedAt @map("updated_at")
 
   @@unique([creatorProfileId, platformNetwork], map: "creator_social_integrations_profile_platform_key")
   @@unique([platformNetwork, nativePlatformUserId], map: "creator_social_integrations_platform_native_user_key")
@@ -2275,24 +2397,24 @@ model CreatorSocialIntegration {
 // ============================================================================
 
 model CreatorOnboardingTrack {
-  id                  String             @id @default(uuid())
-  instagramHandle     String             @map("instagram_handle") @db.VarChar(150)
-  instagramMetaId     String?            @unique @map("instagram_meta_id") @db.VarChar(100)
-  status              OnboardingStatus   @default(HANDLE_INPUTTED)
-  eligibilityScore    Int                @default(0) @map("eligibility_score")
-  percentileRank      Decimal?           @map("percentile_rank") @db.Decimal(5, 2)
-  isApproved          Boolean            @default(false) @map("is_approved")
-  detectedVertical    IndustryVertical   @default(UNKNOWN) @map("detected_vertical")
-  isExistingUserRoute Boolean            @default(false) @map("is_existing_user_route")
-  stagedModules       ActivatedModule[]  @default([]) @map("staged_modules")
-  clientIp            String             @map("client_ip") @db.VarChar(100)
-  userAgent           String?            @map("user_agent") @db.Text
-  userId              String?            @unique @map("user_id")
-  user                User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  waitlistLeadId      String?            @unique @map("waitlist_lead_id")
-  waitlistLead        WaitlistLead?      @relation(fields: [waitlistLeadId], references: [id], onDelete: SetNull)
-  createdAt           DateTime           @default(now()) @map("created_at")
-  updatedAt           DateTime           @updatedAt @map("updated_at")
+  id                  String            @id @default(uuid())
+  instagramHandle     String            @map("instagram_handle") @db.VarChar(150)
+  instagramMetaId     String?           @unique @map("instagram_meta_id") @db.VarChar(100)
+  status              OnboardingStatus  @default(HANDLE_INPUTTED)
+  eligibilityScore    Int               @default(0) @map("eligibility_score")
+  percentileRank      Decimal?          @map("percentile_rank") @db.Decimal(5, 2)
+  isApproved          Boolean           @default(false) @map("is_approved")
+  detectedVertical    IndustryVertical  @default(UNKNOWN) @map("detected_vertical")
+  isExistingUserRoute Boolean           @default(false) @map("is_existing_user_route")
+  stagedModules       ActivatedModule[] @default([]) @map("staged_modules")
+  clientIp            String            @map("client_ip") @db.VarChar(100)
+  userAgent           String?           @map("user_agent") @db.Text
+  userId              String?           @unique @map("user_id")
+  user                User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  waitlistLeadId      String?           @unique @map("waitlist_lead_id")
+  waitlistLead        WaitlistLead?     @relation(fields: [waitlistLeadId], references: [id], onDelete: SetNull)
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
 
   @@index([instagramHandle])
   @@index([status])
@@ -2328,25 +2450,25 @@ model EmailOtpVerification {
 // ============================================================================
 
 model UserProfile {
-  id                   String      @id @default(uuid())
-  userId               String      @unique @map("user_id")
-  user                 User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  displayName          String?     @map("display_name") @db.VarChar(150)
-  totalReachCache      Int         @default(0) @map("total_reach_cache")
-  engagementRateCache  Decimal     @default(0.00) @map("engagement_rate_cache") @db.Decimal(5, 2)
-  topLocationCache     String?     @map("top_location_cache") @db.VarChar(100)
-  showTotalReach       Boolean     @default(true) @map("show_total_reach")
-  showEngagementRate   Boolean     @default(true) @map("show_engagement_rate")
-  showViewsMetric      Boolean     @default(true) @map("show_views_metric")
-  showRatesColumn      Boolean     @default(true) @map("show_rates_column")
-  activeTheme          DesignTheme @default(MINIMAL_STARK) @map("active_theme")
-  aiGeneratedTagline   String?     @map("ai_generated_tagline") @db.Text
-  customBioOverride    String?     @map("custom_bio_override") @db.Text
-  shortFormVideoRate   Decimal     @default(0.00) @map("short_form_video_rate") @db.Decimal(12, 2)
-  storyBundleRate      Decimal     @default(0.00) @map("story_bundle_rate") @db.Decimal(12, 2)
-  pastBrandLogos       String[]    @default([]) @map("past_brand_logos")
-  createdAt            DateTime    @default(now()) @map("created_at")
-  updatedAt            DateTime    @updatedAt @map("updated_at")
+  id                  String      @id @default(uuid())
+  userId              String      @unique @map("user_id")
+  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName         String?     @map("display_name") @db.VarChar(150)
+  totalReachCache     Int         @default(0) @map("total_reach_cache")
+  engagementRateCache Decimal     @default(0.00) @map("engagement_rate_cache") @db.Decimal(5, 2)
+  topLocationCache    String?     @map("top_location_cache") @db.VarChar(100)
+  showTotalReach      Boolean     @default(true) @map("show_total_reach")
+  showEngagementRate  Boolean     @default(true) @map("show_engagement_rate")
+  showViewsMetric     Boolean     @default(true) @map("show_views_metric")
+  showRatesColumn     Boolean     @default(true) @map("show_rates_column")
+  activeTheme         DesignTheme @default(MINIMAL_STARK) @map("active_theme")
+  aiGeneratedTagline  String?     @map("ai_generated_tagline") @db.Text
+  customBioOverride   String?     @map("custom_bio_override") @db.Text
+  shortFormVideoRate  Decimal     @default(0.00) @map("short_form_video_rate") @db.Decimal(12, 2)
+  storyBundleRate     Decimal     @default(0.00) @map("story_bundle_rate") @db.Decimal(12, 2)
+  pastBrandLogos      String[]    @default([]) @map("past_brand_logos")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
 
   @@map("user_profiles")
 }
@@ -2394,46 +2516,46 @@ model MetricPostPulse {
 // ============================================================================
 
 model Collaboration {
-  id             String       @id @default(uuid())
-  brandProfileId String       @map("brand_id")
-  brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  creatorUserId  String       @map("creator_id")
-  creatorUser    User         @relation("CollaborationCreator", fields: [creatorUserId], references: [id], onDelete: Restrict)
-  campaignId     String       @map("campaign_id")
-  campaign       UceCampaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  briefId        String       @map("brief_id")
-  brief          UceCampaignBrief @relation(fields: [briefId], references: [id], onDelete: Restrict)
-  productId      String?      @map("product_id")
+  id             String              @id @default(uuid())
+  brandProfileId String              @map("brand_id")
+  brandProfile   BrandProfile        @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  creatorUserId  String              @map("creator_id")
+  creatorUser    User                @relation("CollaborationCreator", fields: [creatorUserId], references: [id], onDelete: Restrict)
+  campaignId     String              @map("campaign_id")
+  campaign       UceCampaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  briefId        String              @map("brief_id")
+  brief          UceCampaignBrief    @relation(fields: [briefId], references: [id], onDelete: Restrict)
+  productId      String?             @map("product_id")
   product        UceCampaignProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
-  ucePipelineCollaborationId String?                  @unique @map("uce_pipeline_collaboration_id")
+  ucePipelineCollaborationId String?                   @unique @map("uce_pipeline_collaboration_id")
   ucePipelineCollaboration   UceCampaignCollaboration? @relation(fields: [ucePipelineCollaborationId], references: [id], onDelete: SetNull)
 
-  currentStage UceMilestoneStage       @default(STAGE_1_NEGOTIATION) @map("current_stage")
-  payoutMode   CollaborationPayoutMode @default(ESCROW) @map("payout_mode")
+  currentStage UceMilestoneStage         @default(STAGE_1_NEGOTIATION) @map("current_stage")
+  payoutMode   CollaborationPayoutMode   @default(ESCROW) @map("payout_mode")
   industry     CollaborationIndustryType
 
   negotiationRound      Int @default(0) @map("negotiation_round")
   fulfillmentIssueCount Int @default(0) @map("fulfillment_issue_count")
   revisionCount         Int @default(0) @map("revision_count")
 
-  unreadCountBrand   Int     @default(0) @map("unread_count_brand")
-  unreadCountCreator Int     @default(0) @map("unread_count_creator")
-  lastMessageSnippet String? @map("last_message_snippet")
+  unreadCountBrand   Int       @default(0) @map("unread_count_brand")
+  unreadCountCreator Int       @default(0) @map("unread_count_creator")
+  lastMessageSnippet String?   @map("last_message_snippet")
   lastMessageAt      DateTime? @map("last_message_at")
-  stageUpdatedAt     DateTime @default(now()) @map("stage_updated_at")
+  stageUpdatedAt     DateTime  @default(now()) @map("stage_updated_at")
 
-  isPaused      Boolean @default(false) @map("is_paused")
-  isTerminated  Boolean @default(false) @map("is_terminated")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  isPaused     Boolean  @default(false) @map("is_paused")
+  isTerminated Boolean  @default(false) @map("is_terminated")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  commercials    CollaborationCommercial?
-  logistics      CollaborationLogistics?
-  media          CollaborationMedia[]
-  finalization   CollaborationFinalization?
-  messages       CollaborationMessage[]
-  escrowLock     CollaborationEscrowLock?
+  commercials  CollaborationCommercial?
+  logistics    CollaborationLogistics?
+  media        CollaborationMedia[]
+  finalization CollaborationFinalization?
+  messages     CollaborationMessage[]
+  escrowLock   CollaborationEscrowLock?
 
   @@unique([campaignId, creatorUserId])
   @@index([brandProfileId, currentStage])
@@ -2443,9 +2565,9 @@ model Collaboration {
 }
 
 model CollaborationCommercial {
-  id               String        @id @default(uuid())
-  collaborationId  String        @unique @map("collaboration_id")
-  collaboration    Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  id              String        @id @default(uuid())
+  collaborationId String        @unique @map("collaboration_id")
+  collaboration   Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
 
   initialQuote       Decimal? @map("initial_quote") @db.Decimal(12, 2)
   brandCounterOffer  Decimal? @map("brand_counter_offer") @db.Decimal(12, 2)
@@ -2456,13 +2578,13 @@ model CollaborationCommercial {
   advance30Amount Decimal @default(0) @map("advance_30_amount") @db.Decimal(12, 2)
   balance70Amount Decimal @default(0) @map("balance_70_amount") @db.Decimal(12, 2)
 
-  creatorBankDetailsId String?            @map("creator_bank_details_id")
-  creatorBankDetails   CreatorBankDetails? @relation(fields: [creatorBankDetailsId], references: [id], onDelete: SetNull)
-  escrowVaultId        String?            @map("escrow_vault_id")
+  creatorBankDetailsId String?                    @map("creator_bank_details_id")
+  creatorBankDetails   CreatorBankDetails?        @relation(fields: [creatorBankDetailsId], references: [id], onDelete: SetNull)
+  escrowVaultId        String?                    @map("escrow_vault_id")
   escrowStatus         CollaborationEscrowStatus? @map("escrow_status")
-  advanceReceiptUrl    String?            @map("advance_receipt_url") @db.Text
-  finalReceiptUrl      String?            @map("final_receipt_url") @db.Text
-  agreementPdfUrl      String?            @map("agreement_pdf_url") @db.Text
+  advanceReceiptUrl    String?                    @map("advance_receipt_url") @db.Text
+  finalReceiptUrl      String?                    @map("final_receipt_url") @db.Text
+  agreementPdfUrl      String?                    @map("agreement_pdf_url") @db.Text
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -2475,15 +2597,15 @@ model CollaborationLogistics {
   collaborationId String        @unique @map("collaboration_id")
   collaboration   Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
 
-  trackingId               String?              @map("tracking_id")
-  courierName              String?              @map("courier_name")
-  digitalAccessCredentials String?              @map("digital_access_credentials") @db.Text
-  redemptionCode           String?              @map("redemption_code")
+  trackingId               String? @map("tracking_id")
+  courierName              String? @map("courier_name")
+  digitalAccessCredentials String? @map("digital_access_credentials") @db.Text
+  redemptionCode           String? @map("redemption_code")
 
-  isReceivedConfirmed Boolean              @default(false) @map("is_received_confirmed")
-  confirmedAt         DateTime?            @map("confirmed_at")
+  isReceivedConfirmed Boolean               @default(false) @map("is_received_confirmed")
+  confirmedAt         DateTime?             @map("confirmed_at")
   lastReportedIssue   FulfillmentIssueType? @map("last_reported_issue")
-  issueDescription    String?              @map("issue_description") @db.Text
+  issueDescription    String?               @map("issue_description") @db.Text
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -2496,16 +2618,16 @@ model CollaborationMedia {
   collaborationId String        @map("collaboration_id")
   collaboration   Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
 
-  phase                  CollaborationMediaPhase        @map("phase")
-  versionNumber          Int                            @default(1) @map("version_number")
-  mediaUrl               String                         @map("media_url") @db.Text
-  deliverableType        String?                        @map("deliverable_type")
-  status                 CollaborationMediaReviewStatus @default(PENDING)
-  brandFeedback          String?                        @map("brand_feedback") @db.Text
-  isAspectRatioVerified  Boolean                        @default(false) @map("is_aspect_ratio_verified")
-  autoApprovalDeadline DateTime?                      @map("auto_approval_deadline")
-  createdAt              DateTime                       @default(now()) @map("created_at")
-  updatedAt              DateTime                       @updatedAt @map("updated_at")
+  phase                 CollaborationMediaPhase        @map("phase")
+  versionNumber         Int                            @default(1) @map("version_number")
+  mediaUrl              String                         @map("media_url") @db.Text
+  deliverableType       String?                        @map("deliverable_type")
+  status                CollaborationMediaReviewStatus @default(PENDING)
+  brandFeedback         String?                        @map("brand_feedback") @db.Text
+  isAspectRatioVerified Boolean                        @default(false) @map("is_aspect_ratio_verified")
+  autoApprovalDeadline  DateTime?                      @map("auto_approval_deadline")
+  createdAt             DateTime                       @default(now()) @map("created_at")
+  updatedAt             DateTime                       @updatedAt @map("updated_at")
 
   @@index([collaborationId, phase, versionNumber])
   @@map("collaboration_media")
@@ -2516,16 +2638,16 @@ model CollaborationFinalization {
   collaborationId String        @unique @map("collaboration_id")
   collaboration   Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
 
-  livePostUrl              String?  @map("live_post_url") @db.Text
-  partnershipAdCode        String?  @map("partnership_ad_code")
-  isComplianceVerified       Boolean  @default(false) @map("is_compliance_verified")
-  isFinalPayoutReleased    Boolean  @default(false) @map("is_final_payout_released")
+  livePostUrl           String? @map("live_post_url") @db.Text
+  partnershipAdCode     String? @map("partnership_ad_code")
+  isComplianceVerified  Boolean @default(false) @map("is_compliance_verified")
+  isFinalPayoutReleased Boolean @default(false) @map("is_final_payout_released")
 
-  creatorRating      Int?    @map("creator_rating")
-  creatorReviewText  String? @map("creator_review_text") @db.Text
-  brandRating        Int?    @map("brand_rating")
-  brandReviewText    String? @map("brand_review_text") @db.Text
-  reviewsVisible     Boolean @default(false) @map("reviews_visible")
+  creatorRating     Int?    @map("creator_rating")
+  creatorReviewText String? @map("creator_review_text") @db.Text
+  brandRating       Int?    @map("brand_rating")
+  brandReviewText   String? @map("brand_review_text") @db.Text
+  reviewsVisible    Boolean @default(false) @map("reviews_visible")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -2552,21 +2674,21 @@ model CollaborationMessage {
 // ============================================================================
 
 model BrandEscrowVault {
-  id                       String   @id @default(uuid()) @map("vault_id")
-  brandProfileId           String   @unique @map("brand_id")
+  id                       String       @id @default(uuid()) @map("vault_id")
+  brandProfileId           String       @unique @map("brand_id")
   brandProfile             BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
-  razorpayVirtualAccountId String   @unique @map("razorpay_virtual_account_id")
-  virtualAccountNumber     String   @unique @map("virtual_account_number")
-  ifscCode                 String   @map("ifsc_code")
-  upiVpa                   String?  @map("upi_vpa")
-  bankName                 String   @default("RBL Bank (Razorpay Escrow Partner Node)") @map("bank_name")
-  currency                 String   @default("INR") @db.VarChar(3)
-  totalPooledBalance       Decimal  @default(0) @map("total_pooled_balance") @db.Decimal(15, 4)
-  lockedCampaignFunds      Decimal  @default(0) @map("locked_campaign_funds") @db.Decimal(15, 4)
-  availableBalance         Decimal  @default(0) @map("available_balance") @db.Decimal(15, 4)
-  tdsBufferBalance         Decimal  @default(0) @map("tds_buffer_balance") @db.Decimal(15, 4)
-  createdAt                DateTime @default(now()) @map("created_at")
-  updatedAt                DateTime @updatedAt @map("updated_at")
+  razorpayVirtualAccountId String       @unique @map("razorpay_virtual_account_id")
+  virtualAccountNumber     String       @unique @map("virtual_account_number")
+  ifscCode                 String       @map("ifsc_code")
+  upiVpa                   String?      @map("upi_vpa")
+  bankName                 String       @default("RBL Bank (Razorpay Escrow Partner Node)") @map("bank_name")
+  currency                 String       @default("INR") @db.VarChar(3)
+  totalPooledBalance       Decimal      @default(0) @map("total_pooled_balance") @db.Decimal(15, 4)
+  lockedCampaignFunds      Decimal      @default(0) @map("locked_campaign_funds") @db.Decimal(15, 4)
+  availableBalance         Decimal      @default(0) @map("available_balance") @db.Decimal(15, 4)
+  tdsBufferBalance         Decimal      @default(0) @map("tds_buffer_balance") @db.Decimal(15, 4)
+  createdAt                DateTime     @default(now()) @map("created_at")
+  updatedAt                DateTime     @updatedAt @map("updated_at")
 
   ledgerEntries EscrowTransactionLedger[]
 
@@ -2581,7 +2703,7 @@ model CollaborationEscrowLock {
   brandProfileId          String        @map("brand_id")
   grossCreatorQuote       Decimal       @map("gross_creator_quote") @db.Decimal(15, 4)
   platformCommissionFee   Decimal       @map("platform_commission_fee") @db.Decimal(15, 4)
-  platformCommissionGst     Decimal       @default(0) @map("platform_commission_gst") @db.Decimal(15, 4)
+  platformCommissionGst   Decimal       @default(0) @map("platform_commission_gst") @db.Decimal(15, 4)
   totalEscrowLockedAmount Decimal       @map("total_escrow_locked_amount") @db.Decimal(15, 4)
   expectedTdsPercentage   Decimal       @default(0) @map("expected_tds_percentage") @db.Decimal(4, 2)
   calculatedTdsDeduction  Decimal       @default(0) @map("calculated_tds_deduction") @db.Decimal(15, 4)
@@ -2622,18 +2744,18 @@ model EscrowTransactionLedger {
 }
 
 model CreatorSettlementProfile {
-  id                    String         @id @default(uuid()) @map("settlement_profile_id")
-  creatorProfileId      String         @unique @map("creator_profile_id")
-  creatorProfile        CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
-  accountHolderName     String         @map("account_holder_name")
-  bankAccountNumber     String         @map("bank_account_number")
-  ifscCode              String         @map("ifsc_code")
-  panNumber             String?        @map("pan_number") @db.VarChar(10)
-  isPanVerified         Boolean        @default(false) @map("is_pan_verified")
-  razorpayFundAccountId String?        @unique @map("razorpay_fund_account_id")
-  isSettlementRouteActive Boolean      @default(false) @map("is_settlement_route_active")
-  createdAt             DateTime       @default(now()) @map("created_at")
-  updatedAt             DateTime       @updatedAt @map("updated_at")
+  id                      String         @id @default(uuid()) @map("settlement_profile_id")
+  creatorProfileId        String         @unique @map("creator_profile_id")
+  creatorProfile          CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  accountHolderName       String         @map("account_holder_name")
+  bankAccountNumber       String         @map("bank_account_number")
+  ifscCode                String         @map("ifsc_code")
+  panNumber               String?        @map("pan_number") @db.VarChar(10)
+  isPanVerified           Boolean        @default(false) @map("is_pan_verified")
+  razorpayFundAccountId   String?        @unique @map("razorpay_fund_account_id")
+  isSettlementRouteActive Boolean        @default(false) @map("is_settlement_route_active")
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
 
   @@index([creatorProfileId])
   @@map("creator_settlement_profiles")
@@ -2741,7 +2863,7 @@ model CoPilotThread {
   messages        CoPilotMessage[]
   messageFeedback CoPilotMessageFeedback[]
   slotSession     CoPilotSlotSession?
-  interactionLogs CoPilotInteractionLog[] @relation("CoPilotThreadLogs")
+  interactionLogs CoPilotInteractionLog[]  @relation("CoPilotThreadLogs")
 
   @@index([brandProfileId, lastMessageAt(sort: Desc)])
   @@index([brandProfileId, archivedAt])
@@ -2754,14 +2876,14 @@ enum CoPilotFeedbackRating {
 }
 
 model CoPilotMessage {
-  id          String              @id @default(uuid())
-  threadId    String              @map("thread_id")
-  thread      CoPilotThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  id          String                  @id @default(uuid())
+  threadId    String                  @map("thread_id")
+  thread      CoPilotThread           @relation(fields: [threadId], references: [id], onDelete: Cascade)
   role        CoPilotMessageRole
-  textContent String?             @map("text_content") @db.Text
-  payloadJson Json?               @map("payload_json")
-  formatType  CoPilotFormatType?  @map("format_type")
-  createdAt   DateTime            @default(now()) @map("created_at")
+  textContent String?                 @map("text_content") @db.Text
+  payloadJson Json?                   @map("payload_json")
+  formatType  CoPilotFormatType?      @map("format_type")
+  createdAt   DateTime                @default(now()) @map("created_at")
   feedback    CoPilotMessageFeedback?
 
   @@index([threadId, createdAt])
@@ -2830,24 +2952,24 @@ model CoPilotInteractionLog {
 // ============================================================================
 
 model CreatorCoPilotThread {
-  id               String                       @id @default(uuid())
-  creatorProfileId String                       @map("creator_profile_id")
-  creatorProfile   CreatorProfile               @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
-  createdByUserId  String                       @map("created_by_user_id")
-  createdByUser    User                         @relation("CreatorCoPilotThreadAuthor", fields: [createdByUserId], references: [id])
+  id               String                         @id @default(uuid())
+  creatorProfileId String                         @map("creator_profile_id")
+  creatorProfile   CreatorProfile                 @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  createdByUserId  String                         @map("created_by_user_id")
+  createdByUser    User                           @relation("CreatorCoPilotThreadAuthor", fields: [createdByUserId], references: [id])
   title            String
-  scopeContext     CreatorCoPilotScopeContext   @default(COMMAND_CENTER) @map("scope_context")
+  scopeContext     CreatorCoPilotScopeContext     @default(COMMAND_CENTER) @map("scope_context")
   linkedEntityType CreatorCoPilotLinkedEntityType @default(NONE) @map("linked_entity_type")
-  linkedEntityId   String?                      @map("linked_entity_id")
-  archivedAt       DateTime?                    @map("archived_at")
-  lastMessageAt    DateTime                     @map("last_message_at")
-  createdAt        DateTime                     @default(now()) @map("created_at")
-  updatedAt        DateTime                     @updatedAt @map("updated_at")
+  linkedEntityId   String?                        @map("linked_entity_id")
+  archivedAt       DateTime?                      @map("archived_at")
+  lastMessageAt    DateTime                       @map("last_message_at")
+  createdAt        DateTime                       @default(now()) @map("created_at")
+  updatedAt        DateTime                       @updatedAt @map("updated_at")
 
   messages        CreatorCoPilotMessage[]
   messageFeedback CreatorCoPilotMessageFeedback[]
   slotSession     CreatorCoPilotSlotSession?
-  interactionLogs CreatorCoPilotInteractionLog[] @relation("CreatorCoPilotThreadLogs")
+  interactionLogs CreatorCoPilotInteractionLog[]  @relation("CreatorCoPilotThreadLogs")
 
   @@index([creatorProfileId, lastMessageAt(sort: Desc)])
   @@index([creatorProfileId, archivedAt])
@@ -2855,14 +2977,14 @@ model CreatorCoPilotThread {
 }
 
 model CreatorCoPilotMessage {
-  id          String              @id @default(uuid())
-  threadId    String              @map("thread_id")
-  thread      CreatorCoPilotThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  id          String                         @id @default(uuid())
+  threadId    String                         @map("thread_id")
+  thread      CreatorCoPilotThread           @relation(fields: [threadId], references: [id], onDelete: Cascade)
   role        CoPilotMessageRole
-  textContent String?             @map("text_content") @db.Text
-  payloadJson Json?               @map("payload_json")
-  formatType  CoPilotFormatType?  @map("format_type")
-  createdAt   DateTime            @default(now()) @map("created_at")
+  textContent String?                        @map("text_content") @db.Text
+  payloadJson Json?                          @map("payload_json")
+  formatType  CoPilotFormatType?             @map("format_type")
+  createdAt   DateTime                       @default(now()) @map("created_at")
   feedback    CreatorCoPilotMessageFeedback?
 
   @@index([threadId, createdAt])
@@ -3108,7 +3230,7 @@ model IntelligenceAction {
   brandId                  String                          @map("brand_id")
   brand                    BrandProfile                    @relation(fields: [brandId], references: [id], onDelete: Restrict)
   actionType               String                          @map("action_type") @db.VarChar(100)
-  actorType                IntelligenceActionActorType         @map("actor_type")
+  actorType                IntelligenceActionActorType     @map("actor_type")
   actorRef                 String                          @map("actor_ref") @db.VarChar(255)
   authorizationDecisionRef String?                         @map("authorization_decision_ref") @db.VarChar(255)
   requestIdempotencyKey    String                          @map("request_idempotency_key") @db.VarChar(255)
@@ -3153,26 +3275,26 @@ model IntelligenceObjectGeneration {
   successfulAttemptId          String?                         @map("successful_attempt_id")
   successfulAttempt            IntelligenceProcessorAttempt?   @relation("SuccessfulProcessorAttempt", fields: [successfulAttemptId, processorExecutionId, brandId], references: [id, processorExecutionId, brandId], onDelete: Restrict)
   actionId                     String?                         @map("action_id")
-  action                       IntelligenceAction?              @relation(fields: [actionId, brandId], references: [id, brandId], onDelete: Restrict)
-  valueState                   IntelligenceValueState           @map("value_state")
-  valuePayload                 Json?                             @map("value_payload")
-  valueHash                    String                            @map("value_hash") @db.Char(64)
-  objectMetadataPayload        Json                              @map("object_metadata_payload")
+  action                       IntelligenceAction?             @relation(fields: [actionId, brandId], references: [id, brandId], onDelete: Restrict)
+  valueState                   IntelligenceValueState          @map("value_state")
+  valuePayload                 Json?                           @map("value_payload")
+  valueHash                    String                          @map("value_hash") @db.Char(64)
+  objectMetadataPayload        Json                            @map("object_metadata_payload")
   readiness                    IntelligenceReadiness
-  freshnessAtGeneration        IntelligenceFreshness            @map("freshness_at_generation")
-  activeScope                  Json                              @map("active_scope")
-  activeScopeHash              String                            @map("active_scope_hash") @db.Char(64)
-  basedOnObjectGenerationId    String?                           @map("based_on_object_generation_id")
-  basedOnObjectGeneration      IntelligenceObjectGeneration?    @relation("ObjectGenerationBasis", fields: [basedOnObjectGenerationId, brandId, objectSemanticId], references: [id, brandId, objectSemanticId], onDelete: Restrict)
-  dependentObjectGenerations   IntelligenceObjectGeneration[]   @relation("ObjectGenerationBasis")
-  supersedesObjectGenerationId String?                           @map("supersedes_object_generation_id")
-  supersedesObjectGeneration   IntelligenceObjectGeneration?    @relation("ObjectGenerationSupersession", fields: [supersedesObjectGenerationId, brandId, objectSemanticId], references: [id, brandId, objectSemanticId], onDelete: Restrict)
-  supersededByObjectGeneration IntelligenceObjectGeneration?    @relation("ObjectGenerationSupersession")
-  generationOrdinal            Int                               @default(1) @map("generation_ordinal")
-  createdAt                    DateTime                          @default(now()) @map("created_at")
+  freshnessAtGeneration        IntelligenceFreshness           @map("freshness_at_generation")
+  activeScope                  Json                            @map("active_scope")
+  activeScopeHash              String                          @map("active_scope_hash") @db.Char(64)
+  basedOnObjectGenerationId    String?                         @map("based_on_object_generation_id")
+  basedOnObjectGeneration      IntelligenceObjectGeneration?   @relation("ObjectGenerationBasis", fields: [basedOnObjectGenerationId, brandId, objectSemanticId], references: [id, brandId, objectSemanticId], onDelete: Restrict)
+  dependentObjectGenerations   IntelligenceObjectGeneration[]  @relation("ObjectGenerationBasis")
+  supersedesObjectGenerationId String?                         @map("supersedes_object_generation_id")
+  supersedesObjectGeneration   IntelligenceObjectGeneration?   @relation("ObjectGenerationSupersession", fields: [supersedesObjectGenerationId, brandId, objectSemanticId], references: [id, brandId, objectSemanticId], onDelete: Restrict)
+  supersededByObjectGeneration IntelligenceObjectGeneration?   @relation("ObjectGenerationSupersession")
+  generationOrdinal            Int                             @default(1) @map("generation_ordinal")
+  createdAt                    DateTime                        @default(now()) @map("created_at")
 
-  componentGenerations   IntelligenceComponentGeneration[]
-  evidenceReferences     IntelligenceEvidenceReference[]
+  componentGenerations    IntelligenceComponentGeneration[]
+  evidenceReferences      IntelligenceEvidenceReference[]
   businessStateReferences IntelligenceBusinessStateReference[]
 
   @@unique([id, brandId], map: "uq_intelligence_object_generation_id_brand")
@@ -3196,24 +3318,24 @@ model IntelligenceComponentGeneration {
   objectGeneration                IntelligenceObjectGeneration     @relation(fields: [objectGenerationId, brandId, objectSemanticId], references: [id, brandId, objectSemanticId], onDelete: Restrict)
   pathSchemeVersion               Int                              @default(1) @map("path_scheme_version")
   componentSemanticPath           String                           @map("component_semantic_path") @db.Text
-  nodeKind                        IntelligenceNodeKind              @map("node_kind")
+  nodeKind                        IntelligenceNodeKind             @map("node_kind")
   componentContractId             String                           @map("component_contract_id") @db.VarChar(160)
   componentContractVersion        String                           @map("component_contract_version") @db.VarChar(80)
-  valueState                      IntelligenceValueState            @map("value_state")
-  valuePayload                    Json?                             @map("value_payload")
-  valueHash                       String                            @map("value_hash") @db.Char(64)
+  valueState                      IntelligenceValueState           @map("value_state")
+  valuePayload                    Json?                            @map("value_payload")
+  valueHash                       String                           @map("value_hash") @db.Char(64)
   authority                       IntelligenceAuthority
-  sourceClass                     String                            @map("source_class") @db.VarChar(100)
+  sourceClass                     String                           @map("source_class") @db.VarChar(100)
   readiness                       IntelligenceReadiness
-  freshnessAtGeneration           IntelligenceFreshness             @map("freshness_at_generation")
-  metadataPayload                 Json                              @map("metadata_payload")
-  confidence                      String?                           @db.VarChar(40)
-  evidenceStrength                String?                           @map("evidence_strength") @db.VarChar(80)
-  presentationOrder               Int?                              @map("presentation_order")
-  supersedesComponentGenerationId String?                           @map("supersedes_component_generation_id")
+  freshnessAtGeneration           IntelligenceFreshness            @map("freshness_at_generation")
+  metadataPayload                 Json                             @map("metadata_payload")
+  confidence                      String?                          @db.VarChar(40)
+  evidenceStrength                String?                          @map("evidence_strength") @db.VarChar(80)
+  presentationOrder               Int?                             @map("presentation_order")
+  supersedesComponentGenerationId String?                          @map("supersedes_component_generation_id")
   supersedesComponentGeneration   IntelligenceComponentGeneration? @relation("ComponentGenerationSupersession", fields: [supersedesComponentGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
   supersededByComponentGeneration IntelligenceComponentGeneration? @relation("ComponentGenerationSupersession")
-  createdAt                       DateTime                          @default(now()) @map("created_at")
+  createdAt                       DateTime                         @default(now()) @map("created_at")
 
   currentForComponents          IntelligenceCurrentComponent[]    @relation("CurrentComponentGeneration")
   candidateForCandidates        IntelligenceComponentCandidate[]  @relation("CandidateComponentGeneration")
@@ -3285,23 +3407,23 @@ model IntelligenceComponentCandidate {
   objectSemanticId                  String                               @map("object_semantic_id") @db.VarChar(160)
   pathSchemeVersion                 Int                                  @map("path_scheme_version")
   componentSemanticPath             String                               @map("component_semantic_path") @db.Text
-  currentComponent                  IntelligenceCurrentComponent          @relation(fields: [currentComponentId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  currentComponent                  IntelligenceCurrentComponent         @relation(fields: [currentComponentId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
   candidateComponentGenerationId    String                               @unique(map: "uq_intelligence_candidate_generation") @map("candidate_component_generation_id")
-  candidateComponentGeneration      IntelligenceComponentGeneration       @relation("CandidateComponentGeneration", fields: [candidateComponentGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  candidateComponentGeneration      IntelligenceComponentGeneration      @relation("CandidateComponentGeneration", fields: [candidateComponentGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
   basisCurrentComponentGenerationId String                               @map("basis_current_component_generation_id")
-  basisCurrentComponentGeneration   IntelligenceComponentGeneration       @relation("CandidateBasisGeneration", fields: [basisCurrentComponentGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  basisCurrentComponentGeneration   IntelligenceComponentGeneration      @relation("CandidateBasisGeneration", fields: [basisCurrentComponentGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
   basisCurrentRevision              BigInt                               @map("basis_current_revision")
   candidateValueHash                String                               @map("candidate_value_hash") @db.Char(64)
   discrepancyCode                   String                               @map("discrepancy_code") @db.VarChar(160)
   producerExecutionId               String?                              @map("producer_execution_id")
-  producerExecution                 IntelligenceProcessorExecution?       @relation("CandidateProducerExecution", fields: [producerExecutionId, brandId], references: [id, brandId], onDelete: Restrict)
+  producerExecution                 IntelligenceProcessorExecution?      @relation("CandidateProducerExecution", fields: [producerExecutionId, brandId], references: [id, brandId], onDelete: Restrict)
   producerActionId                  String?                              @map("producer_action_id")
-  producerAction                    IntelligenceAction?                   @relation("CandidateProducerAction", fields: [producerActionId, brandId], references: [id, brandId], onDelete: Restrict)
+  producerAction                    IntelligenceAction?                  @relation("CandidateProducerAction", fields: [producerActionId, brandId], references: [id, brandId], onDelete: Restrict)
   status                            IntelligenceComponentCandidateStatus @default(PENDING)
   createdAt                         DateTime                             @default(now()) @map("created_at")
   resolvedAt                        DateTime?                            @map("resolved_at")
   resolutionActionId                String?                              @map("resolution_action_id")
-  resolutionAction                  IntelligenceAction?                   @relation("CandidateResolutionAction", fields: [resolutionActionId, brandId], references: [id, brandId], onDelete: Restrict)
+  resolutionAction                  IntelligenceAction?                  @relation("CandidateResolutionAction", fields: [resolutionActionId, brandId], references: [id, brandId], onDelete: Restrict)
 
   transitions IntelligenceComponentTransition[]
 
@@ -3315,22 +3437,22 @@ model IntelligenceComponentCandidate {
 /// Reference-only lineage to normalized Evidence owned by Data Extraction.
 /// This table intentionally has no raw/provider payload columns.
 model IntelligenceEvidenceReference {
-  id                    String                       @id @default(uuid()) @map("evidence_reference_id")
-  brandId               String                       @map("brand_id")
-  brand                 BrandProfile                 @relation(fields: [brandId], references: [id], onDelete: Restrict)
-  objectGenerationId    String                       @map("object_generation_id")
-  objectGeneration      IntelligenceObjectGeneration @relation(fields: [objectGenerationId, brandId], references: [id, brandId], onDelete: Restrict)
-  componentSemanticPath String                       @map("component_semantic_path") @db.Text
-  evidenceRef           String                       @map("evidence_ref") @db.VarChar(255)
-  capabilityId          String                       @map("capability_id") @db.VarChar(160)
-  captureId             String                       @map("capture_id") @db.VarChar(255)
-  captureVersion        String                       @map("capture_version") @db.VarChar(80)
-  sourceClass           String                       @map("source_class") @db.VarChar(100)
-  capturedAt            DateTime                     @map("captured_at")
+  id                    String                         @id @default(uuid()) @map("evidence_reference_id")
+  brandId               String                         @map("brand_id")
+  brand                 BrandProfile                   @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  objectGenerationId    String                         @map("object_generation_id")
+  objectGeneration      IntelligenceObjectGeneration   @relation(fields: [objectGenerationId, brandId], references: [id, brandId], onDelete: Restrict)
+  componentSemanticPath String                         @map("component_semantic_path") @db.Text
+  evidenceRef           String                         @map("evidence_ref") @db.VarChar(255)
+  capabilityId          String                         @map("capability_id") @db.VarChar(160)
+  captureId             String                         @map("capture_id") @db.VarChar(255)
+  captureVersion        String                         @map("capture_version") @db.VarChar(80)
+  sourceClass           String                         @map("source_class") @db.VarChar(100)
+  capturedAt            DateTime                       @map("captured_at")
   observedFreshness     IntelligenceEvidenceFreshness? @map("observed_freshness")
-  evidenceManifestRef   String?                      @map("evidence_manifest_ref") @db.VarChar(255)
-  evidenceManifestHash  String                       @map("evidence_manifest_hash") @db.Char(64)
-  createdAt             DateTime                     @default(now()) @map("created_at")
+  evidenceManifestRef   String?                        @map("evidence_manifest_ref") @db.VarChar(255)
+  evidenceManifestHash  String                         @map("evidence_manifest_hash") @db.Char(64)
+  createdAt             DateTime                       @default(now()) @map("created_at")
 
   @@unique([objectGenerationId, componentSemanticPath, evidenceRef, capabilityId], map: "uq_intelligence_evidence_lineage")
   @@index([brandId, evidenceRef], map: "idx_intelligence_evidence_ref")
@@ -3366,40 +3488,312 @@ model IntelligenceBusinessStateReference {
 
 /// Immutable audit of a proposed and actual current/candidate/freshness change.
 model IntelligenceComponentTransition {
-  id                    String                                  @id @default(uuid()) @map("component_transition_id")
-  brandId               String                                  @map("brand_id")
-  brand                 BrandProfile                            @relation(fields: [brandId], references: [id], onDelete: Restrict)
-  actionId              String                                  @map("action_id")
-  action                IntelligenceAction                      @relation(fields: [actionId, brandId], references: [id, brandId], onDelete: Restrict)
-  currentComponentId    String?                                 @map("current_component_id")
-  objectSemanticId      String                                  @map("object_semantic_id") @db.VarChar(160)
-  pathSchemeVersion     Int                                     @map("path_scheme_version")
-  componentSemanticPath String                                  @map("component_semantic_path") @db.Text
-  currentComponent      IntelligenceCurrentComponent?           @relation(fields: [currentComponentId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
-  fromGenerationId      String?                                 @map("from_generation_id")
-  fromGeneration        IntelligenceComponentGeneration?        @relation("TransitionFromGeneration", fields: [fromGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
-  expectedExists        Boolean                                 @map("expected_exists")
-  expectedRevision      BigInt?                                 @map("expected_revision")
-  expectedGenerationId  String?                                 @map("expected_generation_id")
-  expectedGeneration    IntelligenceComponentGeneration?        @relation("TransitionExpectedGeneration", fields: [expectedGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
-  observedRevision      BigInt?                                 @map("observed_revision")
-  observedGenerationId  String?                                 @map("observed_generation_id")
-  observedGeneration    IntelligenceComponentGeneration?        @relation("TransitionObservedGeneration", fields: [observedGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
-  proposedGenerationId  String?                                 @map("proposed_generation_id")
-  proposedGeneration    IntelligenceComponentGeneration?        @relation("TransitionProposedGeneration", fields: [proposedGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
-  toGenerationId        String?                                 @map("to_generation_id")
-  toGeneration          IntelligenceComponentGeneration?        @relation("TransitionToGeneration", fields: [toGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
-  candidateId           String?                                 @map("candidate_id")
-  candidate             IntelligenceComponentCandidate?         @relation(fields: [candidateId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
-  transitionType        String                                  @map("transition_type") @db.VarChar(100)
+  id                    String                                 @id @default(uuid()) @map("component_transition_id")
+  brandId               String                                 @map("brand_id")
+  brand                 BrandProfile                           @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  actionId              String                                 @map("action_id")
+  action                IntelligenceAction                     @relation(fields: [actionId, brandId], references: [id, brandId], onDelete: Restrict)
+  currentComponentId    String?                                @map("current_component_id")
+  objectSemanticId      String                                 @map("object_semantic_id") @db.VarChar(160)
+  pathSchemeVersion     Int                                    @map("path_scheme_version")
+  componentSemanticPath String                                 @map("component_semantic_path") @db.Text
+  currentComponent      IntelligenceCurrentComponent?          @relation(fields: [currentComponentId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  fromGenerationId      String?                                @map("from_generation_id")
+  fromGeneration        IntelligenceComponentGeneration?       @relation("TransitionFromGeneration", fields: [fromGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  expectedExists        Boolean                                @map("expected_exists")
+  expectedRevision      BigInt?                                @map("expected_revision")
+  expectedGenerationId  String?                                @map("expected_generation_id")
+  expectedGeneration    IntelligenceComponentGeneration?       @relation("TransitionExpectedGeneration", fields: [expectedGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  observedRevision      BigInt?                                @map("observed_revision")
+  observedGenerationId  String?                                @map("observed_generation_id")
+  observedGeneration    IntelligenceComponentGeneration?       @relation("TransitionObservedGeneration", fields: [observedGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  proposedGenerationId  String?                                @map("proposed_generation_id")
+  proposedGeneration    IntelligenceComponentGeneration?       @relation("TransitionProposedGeneration", fields: [proposedGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  toGenerationId        String?                                @map("to_generation_id")
+  toGeneration          IntelligenceComponentGeneration?       @relation("TransitionToGeneration", fields: [toGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  candidateId           String?                                @map("candidate_id")
+  candidate             IntelligenceComponentCandidate?        @relation(fields: [candidateId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  transitionType        String                                 @map("transition_type") @db.VarChar(100)
   outcome               IntelligenceComponentTransitionOutcome
-  reasonCode            String                                  @map("reason_code") @db.VarChar(160)
-  resultingRevision     BigInt?                                 @map("resulting_revision")
-  createdAt             DateTime                                @default(now()) @map("created_at")
+  reasonCode            String                                 @map("reason_code") @db.VarChar(160)
+  resultingRevision     BigInt?                                @map("resulting_revision")
+  createdAt             DateTime                               @default(now()) @map("created_at")
 
   @@unique([actionId, objectSemanticId, componentSemanticPath], map: "uq_intelligence_component_transition_action_path")
   @@index([currentComponentId, createdAt], map: "idx_intelligence_component_transition_current")
   @@index([actionId], map: "idx_intelligence_component_transition_action")
   @@index([outcome, reasonCode], map: "idx_intelligence_component_transition_outcome")
   @@map("intelligence_component_transitions")
+}
+
+// ============================================================================
+// DATA EXTRACTION WAVE 1 PERSISTENCE (DE-W1.0B)
+// ============================================================================
+
+model DataExtractionResource {
+  id                       String                     @id @default(uuid())
+  resourceRef              String                     @unique @map("resource_ref")
+  brandId                  String                     @map("brand_id")
+  brandProfile             BrandProfile               @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  sourceClass              DataExtractionSourceClass  @default(OWNED_WEBSITE) @map("source_class")
+  resourceType             DataExtractionResourceType @map("resource_type")
+  pageRole                 DataExtractionPageRole?    @map("page_role")
+  canonicalResourceKey     String                     @map("canonical_resource_key") @db.Text
+  canonicalResourceKeyHash String                     @map("canonical_resource_key_hash") @db.VarChar(64)
+  canonicalUrl             String                     @map("canonical_url") @db.Text
+  createdAt                DateTime                   @default(now()) @map("created_at")
+
+  captures         DataExtractionCapture[]
+  evidenceItems    DataExtractionEvidenceItem[]
+  capabilityScopes DataExtractionCapabilityResource[]
+
+  @@unique([brandId, resourceRef], map: "uq_de_resource_brand_ref")
+  @@unique([brandId, sourceClass, canonicalResourceKeyHash], map: "uq_de_resource_identity")
+  @@index([brandId, resourceRef], map: "idx_de_resource_brand_ref")
+  @@map("data_extraction_resources")
+}
+
+model DataExtractionCapture {
+  id                       String                             @id @default(uuid())
+  captureRef               String                             @unique @map("capture_ref")
+  brandId                  String                             @map("brand_id")
+  brandProfile             BrandProfile                       @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  resourceRef              String                             @map("resource_ref")
+  resource                 DataExtractionResource             @relation(fields: [brandId, resourceRef], references: [brandId, resourceRef], onDelete: Cascade)
+  capabilityExecutionRef   String?                            @map("capability_execution_ref")
+  capabilityExecution      DataExtractionCapabilityExecution? @relation(fields: [brandId, capabilityExecutionRef], references: [brandId, capabilityExecutionRef], onDelete: Restrict)
+  acquisitionRequestKey    String                             @map("acquisition_request_key") @db.VarChar(255)
+  status                   DataExtractionCaptureStatus        @default(RUNNING)
+  startedAt                DateTime                           @map("started_at")
+  capturedAt               DateTime?                          @map("captured_at")
+  observedAt               DateTime?                          @map("observed_at")
+  sourceRevisionRef        String?                            @map("source_revision_ref") @db.VarChar(255)
+  sourceContentHash        String?                            @map("source_content_hash") @db.VarChar(128)
+  acquisitionQuality       DataExtractionAcquisitionQuality   @map("acquisition_quality")
+  qualityFailureCategories String[]                           @default([]) @map("quality_failure_categories")
+  qualityDetailCodes       String[]                           @default([]) @map("quality_detail_codes")
+  createdAt                DateTime                           @default(now()) @map("created_at")
+
+  contentArtifacts          DataExtractionContentArtifact[]
+  evidenceItems             DataExtractionEvidenceItem[]
+  providerExecutionLinks    DataExtractionProviderExecutionLink[]
+  priorFreshnessAssessments DataExtractionFreshnessAssessment[]   @relation("DataExtractionFreshnessPriorCapture")
+
+  @@unique([brandId, captureRef], map: "uq_de_capture_brand_ref")
+  @@unique([brandId, captureRef, resourceRef], map: "uq_de_capture_brand_ref_resource")
+  @@unique([brandId, acquisitionRequestKey], map: "uq_de_capture_request")
+  @@index([resourceRef, capturedAt], map: "idx_de_capture_resource_time")
+  @@index([brandId, captureRef], map: "idx_de_capture_brand_ref")
+  @@map("data_extraction_captures")
+}
+
+model DataExtractionContentArtifact {
+  id                           String                            @id @default(uuid())
+  contentArtifactRef           String                            @unique @map("content_artifact_ref")
+  brandId                      String                            @map("brand_id")
+  brandProfile                 BrandProfile                      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  captureRef                   String                            @map("capture_ref")
+  capture                      DataExtractionCapture             @relation(fields: [brandId, captureRef], references: [brandId, captureRef], onDelete: Cascade)
+  kind                         DataExtractionContentArtifactKind
+  mediaType                    String                            @map("media_type") @db.VarChar(255)
+  contentHash                  String                            @map("content_hash") @db.VarChar(128)
+  byteLength                   Int                               @map("byte_length")
+  inlineContent                String?                           @map("inline_content") @db.Text
+  objectStoreRef               String?                           @map("object_store_ref") @db.Text
+  normalizationContractVersion String?                           @map("normalization_contract_version") @db.VarChar(100)
+  createdAt                    DateTime                          @default(now()) @map("created_at")
+
+  evidenceItems DataExtractionEvidenceItem[]
+
+  @@unique([brandId, contentArtifactRef], map: "uq_de_content_brand_ref")
+  @@index([brandId, captureRef], map: "idx_de_content_capture")
+  @@map("data_extraction_content_artifacts")
+}
+
+model DataExtractionCapabilityExecution {
+  id                           String                               @id @default(uuid())
+  capabilityExecutionRef       String                               @unique @map("capability_execution_ref")
+  brandId                      String                               @map("brand_id")
+  brandProfile                 BrandProfile                         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  capabilityId                 String                               @map("capability_id") @db.VarChar(100)
+  normalizationContractVersion String                               @map("normalization_contract_version") @db.VarChar(100)
+  resourceScopeHash            String                               @map("resource_scope_hash") @db.VarChar(128)
+  freshnessIntent              DataExtractionFreshnessIntent        @map("freshness_intent")
+  sourceRevisionRef            String?                              @map("source_revision_ref") @db.VarChar(255)
+  requestKey                   String                               @map("request_key") @db.VarChar(255)
+  availability                 DataExtractionCapabilityAvailability
+  retryability                 DataExtractionRetryability
+  reasonCodes                  String[]                             @default([]) @map("reason_codes")
+  coverage                     DataExtractionCoverage
+  acquisitionQuality           DataExtractionAcquisitionQuality     @map("acquisition_quality")
+  qualityFailureCategories     String[]                             @default([]) @map("quality_failure_categories")
+  qualityDetailCodes           String[]                             @default([]) @map("quality_detail_codes")
+  createdAt                    DateTime                             @default(now()) @map("created_at")
+  completedAt                  DateTime?                            @map("completed_at")
+
+  captures               DataExtractionCapture[]
+  resourceScope          DataExtractionCapabilityResource[]
+  evidenceMemberships    DataExtractionCapabilityEvidence[]
+  providerExecutionLinks DataExtractionProviderExecutionLink[]
+
+  @@unique([brandId, capabilityExecutionRef], map: "uq_de_capexec_brand_ref")
+  @@unique([brandId, capabilityExecutionRef, capabilityId], map: "uq_de_capexec_brand_ref_capability")
+  @@unique([brandId, requestKey], map: "uq_de_capexec_request")
+  @@index([brandId, capabilityId], map: "idx_de_capexec_brand_capability")
+  @@map("data_extraction_capability_executions")
+}
+
+model DataExtractionCapabilityResource {
+  brandId                String                            @map("brand_id")
+  capabilityExecutionRef String                            @map("capability_execution_ref")
+  capabilityId           String                            @map("capability_id") @db.VarChar(100)
+  resourceRef            String                            @map("resource_ref")
+  capabilityExecution    DataExtractionCapabilityExecution @relation(fields: [brandId, capabilityExecutionRef, capabilityId], references: [brandId, capabilityExecutionRef, capabilityId], onDelete: Cascade)
+  resource               DataExtractionResource            @relation(fields: [brandId, resourceRef], references: [brandId, resourceRef], onDelete: Restrict)
+  createdAt              DateTime                          @default(now()) @map("created_at")
+
+  @@id([brandId, capabilityExecutionRef, resourceRef])
+  @@index([brandId, resourceRef], map: "idx_de_capresource_brand_resource")
+  @@map("data_extraction_capability_resources")
+}
+
+model DataExtractionEvidenceItem {
+  id                           String                           @id @default(uuid())
+  evidenceRef                  String                           @unique @map("evidence_ref")
+  brandId                      String                           @map("brand_id")
+  brandProfile                 BrandProfile                     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  capabilityId                 String                           @map("capability_id") @db.VarChar(100)
+  normalizationContractVersion String                           @map("normalization_contract_version") @db.VarChar(100)
+  resourceRef                  String                           @map("resource_ref")
+  resource                     DataExtractionResource           @relation(fields: [brandId, resourceRef], references: [brandId, resourceRef], onDelete: Restrict)
+  captureRef                   String                           @map("capture_ref")
+  capture                      DataExtractionCapture            @relation(fields: [brandId, captureRef, resourceRef], references: [brandId, captureRef, resourceRef], onDelete: Restrict)
+  contentArtifactRef           String?                          @map("content_artifact_ref")
+  contentArtifact              DataExtractionContentArtifact?   @relation(fields: [brandId, contentArtifactRef], references: [brandId, contentArtifactRef], onDelete: Restrict)
+  boundedPayload               Json?                            @map("bounded_payload")
+  contentHash                  String                           @map("content_hash") @db.VarChar(128)
+  polarity                     DataExtractionPolarity?
+  representativeness           DataExtractionRepresentativeness
+  coverageSnapshot             DataExtractionCoverage           @map("coverage_snapshot")
+  freshnessAtEmission          DataExtractionFreshness          @map("freshness_at_emission")
+  freshnessBasis               String                           @map("freshness_basis") @db.Text
+  freshnessEvaluatedAt         DateTime                         @map("freshness_evaluated_at")
+  freshnessPriorCaptureRef     String?                          @map("freshness_prior_capture_ref")
+  freshnessSourceRevisionRef   String?                          @map("freshness_source_revision_ref") @db.VarChar(255)
+  qualitySnapshot              DataExtractionAcquisitionQuality @map("quality_snapshot")
+  qualityFailureCategories     String[]                         @default([]) @map("quality_failure_categories")
+  qualityDetailCodes           String[]                         @default([]) @map("quality_detail_codes")
+  itemFingerprint              String                           @map("item_fingerprint") @db.VarChar(128)
+  semanticObservationKey       String?                          @map("semantic_observation_key") @db.VarChar(255)
+  createdAt                    DateTime                         @default(now()) @map("created_at")
+
+  capabilityMemberships DataExtractionCapabilityEvidence[]
+  observationSupports   DataExtractionObservationSupport[]
+
+  @@unique([brandId, evidenceRef], map: "uq_de_evidence_brand_ref")
+  @@unique([brandId, evidenceRef, capabilityId], map: "uq_de_evidence_brand_ref_capability")
+  @@unique([brandId, captureRef, capabilityId, normalizationContractVersion, itemFingerprint], map: "uq_de_evidence_idempotency")
+  @@index([brandId, capabilityId], map: "idx_de_evidence_brand_capability")
+  @@index([brandId, evidenceRef], map: "idx_de_evidence_brand_ref")
+  @@index([captureRef], map: "idx_de_evidence_capture_ref")
+  @@index([semanticObservationKey], map: "idx_de_evidence_observation_key")
+  @@map("data_extraction_evidence_items")
+}
+
+model DataExtractionCapabilityEvidence {
+  brandId                String                            @map("brand_id")
+  capabilityExecutionRef String                            @map("capability_execution_ref")
+  capabilityId           String                            @map("capability_id") @db.VarChar(100)
+  evidenceRef            String                            @map("evidence_ref")
+  capabilityExecution    DataExtractionCapabilityExecution @relation(fields: [brandId, capabilityExecutionRef, capabilityId], references: [brandId, capabilityExecutionRef, capabilityId], onDelete: Cascade)
+  evidence               DataExtractionEvidenceItem        @relation(fields: [brandId, evidenceRef, capabilityId], references: [brandId, evidenceRef, capabilityId], onDelete: Restrict)
+  createdAt              DateTime                          @default(now()) @map("created_at")
+
+  @@id([brandId, capabilityExecutionRef, evidenceRef])
+  @@index([evidenceRef], map: "idx_de_capevidence_evidence_ref")
+  @@map("data_extraction_capability_evidence")
+}
+
+model DataExtractionSemanticObservation {
+  id                     String       @id @default(uuid())
+  semanticObservationKey String       @map("semantic_observation_key") @db.VarChar(255)
+  brandId                String       @map("brand_id")
+  brandProfile           BrandProfile @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  capabilityId           String       @map("capability_id") @db.VarChar(100)
+  repetitionCount        Int          @default(1) @map("repetition_count")
+  createdAt              DateTime     @default(now()) @map("created_at")
+
+  supports          DataExtractionObservationSupport[]
+  outgoingRelations DataExtractionObservationRelation[] @relation("DataExtractionObservationRelationSource")
+  incomingRelations DataExtractionObservationRelation[] @relation("DataExtractionObservationRelationTarget")
+
+  @@unique([brandId, semanticObservationKey], map: "uq_de_observation_brand_key")
+  @@unique([brandId, semanticObservationKey, capabilityId], map: "uq_de_observation_brand_key_capability")
+  @@index([brandId, capabilityId], map: "idx_de_observation_brand_capability")
+  @@map("data_extraction_semantic_observations")
+}
+
+model DataExtractionObservationSupport {
+  brandId                String                            @map("brand_id")
+  semanticObservationKey String                            @map("semantic_observation_key") @db.VarChar(255)
+  capabilityId           String                            @map("capability_id") @db.VarChar(100)
+  evidenceRef            String                            @map("evidence_ref")
+  observation            DataExtractionSemanticObservation @relation(fields: [brandId, semanticObservationKey, capabilityId], references: [brandId, semanticObservationKey, capabilityId], onDelete: Cascade)
+  evidence               DataExtractionEvidenceItem        @relation(fields: [brandId, evidenceRef, capabilityId], references: [brandId, evidenceRef, capabilityId], onDelete: Restrict)
+  createdAt              DateTime                          @default(now()) @map("created_at")
+
+  @@id([brandId, semanticObservationKey, evidenceRef])
+  @@map("data_extraction_observation_support")
+}
+
+model DataExtractionObservationRelation {
+  brandId              String                                        @map("brand_id")
+  sourceObservationKey String                                        @map("source_observation_key") @db.VarChar(255)
+  targetObservationKey String                                        @map("target_observation_key") @db.VarChar(255)
+  capabilityId         String                                        @map("capability_id") @db.VarChar(100)
+  relationType         DataExtractionSemanticObservationRelationType @map("relation_type")
+  sourceObservation    DataExtractionSemanticObservation             @relation("DataExtractionObservationRelationSource", fields: [brandId, sourceObservationKey, capabilityId], references: [brandId, semanticObservationKey, capabilityId], onDelete: Cascade)
+  targetObservation    DataExtractionSemanticObservation             @relation("DataExtractionObservationRelationTarget", fields: [brandId, targetObservationKey, capabilityId], references: [brandId, semanticObservationKey, capabilityId], onDelete: Cascade)
+  createdAt            DateTime                                      @default(now()) @map("created_at")
+
+  @@id([brandId, sourceObservationKey, targetObservationKey, relationType])
+  @@index([brandId, capabilityId], map: "idx_de_observation_relation_capability")
+  @@map("data_extraction_observation_relations")
+}
+
+model DataExtractionFreshnessAssessment {
+  id                String                            @id @default(uuid())
+  brandId           String                            @map("brand_id")
+  brandProfile      BrandProfile                      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  targetType        DataExtractionFreshnessTargetType @map("target_type")
+  targetRef         String                            @map("target_ref") @db.VarChar(255)
+  state             DataExtractionFreshness
+  evaluatedAt       DateTime                          @map("evaluated_at")
+  basis             String                            @db.Text
+  priorCaptureRef   String?                           @map("prior_capture_ref")
+  priorCapture      DataExtractionCapture?            @relation("DataExtractionFreshnessPriorCapture", fields: [brandId, priorCaptureRef], references: [brandId, captureRef], onDelete: Restrict)
+  sourceRevisionRef String?                           @map("source_revision_ref") @db.VarChar(255)
+  invalidatingRef   String?                           @map("invalidating_ref") @db.VarChar(255)
+  createdAt         DateTime                          @default(now()) @map("created_at")
+
+  @@index([brandId, targetType, targetRef, evaluatedAt], map: "idx_de_freshness_target")
+  @@map("data_extraction_freshness_assessments")
+}
+
+model DataExtractionProviderExecutionLink {
+  id                     String                             @id @default(uuid())
+  brandId                String                             @map("brand_id")
+  brandProfile           BrandProfile                       @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  captureRef             String?                            @map("capture_ref")
+  capture                DataExtractionCapture?             @relation(fields: [brandId, captureRef], references: [brandId, captureRef], onDelete: Restrict)
+  capabilityExecutionRef String?                            @map("capability_execution_ref")
+  capabilityExecution    DataExtractionCapabilityExecution? @relation(fields: [brandId, capabilityExecutionRef], references: [brandId, capabilityExecutionRef], onDelete: Restrict)
+  providerExecutionRef   String                             @map("provider_execution_ref") @db.VarChar(255)
+  attemptRole            String                             @map("attempt_role") @db.VarChar(100)
+  createdAt              DateTime                           @default(now()) @map("created_at")
+
+  @@index([brandId, providerExecutionRef], map: "idx_de_provider_link_provider_ref")
+  @@index([captureRef], map: "idx_de_provider_link_capture_ref")
+  @@index([capabilityExecutionRef], map: "idx_de_provider_link_capexec_ref")
+  @@map("data_extraction_provider_execution_links")
 }
