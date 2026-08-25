@@ -8,7 +8,10 @@ import {
   OwnedWebsiteWave1AcquisitionService,
 } from "./evidence/acquisition/owned-website-wave1-acquisition.service";
 import { OwnedWebsiteWave1NormalizationService } from "./evidence/normalization/owned-website-wave1-normalization.service";
+import { DataExtractionIntelligenceEvidenceAdapter } from "./evidence/intelligence/data-extraction-intelligence-evidence.adapter";
 import { DataExtractionPersistenceService } from "./evidence/persistence/prisma-evidence-repositories";
+import { DATA_EXTRACTION_EVIDENCE_QUERY_PORT_V1 } from "./evidence/ports/evidence-runtime.ports";
+import { DataExtractionEvidenceQueryService } from "./evidence/query/data-extraction-evidence-query.service";
 import { GeminiGatekeeperProvider } from "./providers/gemini-gatekeeper.provider";
 import { GeminiStructuredProvider } from "./providers/gemini-structured.provider";
 import { OpenAIStructuredProvider } from "./providers/openai-structured.provider";
@@ -29,6 +32,12 @@ import { StructuredEvidenceExecutionService } from "./services/structured-eviden
     ExistingOwnedWebsiteAcquisitionMechanics,
     OwnedWebsiteWave1AcquisitionService,
     OwnedWebsiteWave1NormalizationService,
+    DataExtractionEvidenceQueryService,
+    {
+      provide: DATA_EXTRACTION_EVIDENCE_QUERY_PORT_V1,
+      useExisting: DataExtractionEvidenceQueryService,
+    },
+    DataExtractionIntelligenceEvidenceAdapter,
   ],
   exports: [
     GeminiGatekeeperProvider,
@@ -38,6 +47,8 @@ import { StructuredEvidenceExecutionService } from "./services/structured-eviden
     StructuredEvidenceExecutionService,
     OwnedWebsiteWave1AcquisitionService,
     OwnedWebsiteWave1NormalizationService,
+    DATA_EXTRACTION_EVIDENCE_QUERY_PORT_V1,
+    DataExtractionIntelligenceEvidenceAdapter,
   ],
 })
 export class DataExtractionModule {}

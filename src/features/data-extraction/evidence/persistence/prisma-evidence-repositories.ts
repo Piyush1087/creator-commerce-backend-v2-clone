@@ -415,6 +415,21 @@ function toObservation(
   };
 }
 
+function parentEvidenceRefsFromPayload(
+  payload: Prisma.JsonValue | null,
+): EvidenceRef[] {
+  if (!payload || Array.isArray(payload) || typeof payload !== "object") {
+    return [];
+  }
+  const refs = payload.supporting_evidence_refs;
+  if (!Array.isArray(refs)) return [];
+  return [
+    ...new Set(refs.filter((ref): ref is string => typeof ref === "string")),
+  ]
+    .sort()
+    .map(asEvidenceRef);
+}
+
 async function toEvidence(
   db: DataExtractionDb,
   row: EvidenceRow,
@@ -469,6 +484,7 @@ async function toEvidence(
     : providerLink
       ? "PROVIDER_MEDIATED_FETCH"
       : "DIRECT_FETCH";
+  const parentEvidenceRefs = parentEvidenceRefsFromPayload(row.boundedPayload);
 
   return {
     brandId: asBrandId(row.brandId),
@@ -507,8 +523,8 @@ async function toEvidence(
         capabilityExecutionRef ?? row.captureRef,
       captureMethodClass,
       normalizationContractVersion: row.normalizationContractVersion,
-      parentEvidenceRefs: [],
-      parentCaptureRefs: [],
+      parentEvidenceRefs,
+      parentCaptureRefs: [asCaptureRef(row.captureRef)],
       ...(providerLink
         ? {
             providerExecutionRef: asProviderExecutionRef(
@@ -1009,6 +1025,28 @@ export class PrismaCapabilityExecutionRepository implements CapabilityExecutionR
           availability: { in: ["AVAILABLE", "PARTIAL", "DEGRADED"] },
         },
         orderBy: { completedAt: "desc" },
+        include: { resourceScope: true, evidenceMemberships: true },
+      });
+      return row ? toCapabilityExecution(row) : null;
+    });
+  }
+
+  async findLatestCompleted(
+    brandId: BrandId,
+    capabilityId: EvidenceCapabilityId,
+  ): Promise<DataExtractionCapabilityExecutionRecord | null> {
+    return withPersistenceErrorMapping(async () => {
+      const row = await this.db.dataExtractionCapabilityExecution.findFirst({
+        where: {
+          brandId,
+          capabilityId,
+          completedAt: { not: null },
+        },
+        orderBy: [
+          { completedAt: "desc" },
+          { createdAt: "desc" },
+          { capabilityExecutionRef: "asc" },
+        ],
         include: { resourceScope: true, evidenceMemberships: true },
       });
       return row ? toCapabilityExecution(row) : null;

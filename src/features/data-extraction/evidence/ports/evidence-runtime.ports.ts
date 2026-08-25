@@ -14,6 +14,10 @@ import type {
   EvidenceFreshnessIntent,
 } from "../domain/evidence-vocabulary";
 
+export const DATA_EXTRACTION_EVIDENCE_QUERY_PORT_V1 = Symbol(
+  "DATA_EXTRACTION_EVIDENCE_QUERY_PORT_V1",
+);
+
 export interface DataExtractionEvidenceQueryRequestV1 {
   readonly brandId: BrandId;
   readonly capabilityIds: readonly EvidenceCapabilityId[];

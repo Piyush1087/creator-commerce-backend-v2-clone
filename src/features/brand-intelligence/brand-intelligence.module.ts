@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
 
+import { DataExtractionModule } from "../data-extraction/data-extraction.module";
+import { DataExtractionIntelligenceEvidenceAdapter } from "../data-extraction/evidence/intelligence/data-extraction-intelligence-evidence.adapter";
 import { ContractBundleIntegrityVerifier } from "./contracts/bundle/contract-bundle.integrity";
 import { BundlePathOwnershipRegistry } from "./contracts/registry/bundle-path-ownership.registry";
 import { ContractRuntimeRegistry } from "./contracts/registry/contract-runtime.registry";
@@ -61,13 +63,14 @@ const internalProviders = [
   ProcessorDependencyProfileRegistry,
   ProcessorDependencyReadinessEvaluator,
   ProcessorDependencyPreparationService,
+  MissingDataExtractionEvidenceAdapter,
   {
     provide: CANONICAL_BRAND_STATE_READER,
     useClass: M1CanonicalBrandStateAdapter,
   },
   {
     provide: INTELLIGENCE_EVIDENCE_READER,
-    useClass: MissingDataExtractionEvidenceAdapter,
+    useExisting: DataExtractionIntelligenceEvidenceAdapter,
   },
   {
     provide: PROCESSOR_SUCCESS_PERSISTENCE_HOOK,
@@ -85,6 +88,7 @@ const internalProviders = [
 ];
 
 @Module({
+  imports: [DataExtractionModule],
   providers: internalProviders,
   exports: internalProviders,
 })

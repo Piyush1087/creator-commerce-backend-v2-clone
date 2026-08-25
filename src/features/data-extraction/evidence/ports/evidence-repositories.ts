@@ -239,6 +239,10 @@ export interface CapabilityExecutionRepository {
     brandId: BrandId,
     capabilityId: EvidenceCapabilityId,
   ): Promise<DataExtractionCapabilityExecutionRecord | null>;
+  findLatestCompleted(
+    brandId: BrandId,
+    capabilityId: EvidenceCapabilityId,
+  ): Promise<DataExtractionCapabilityExecutionRecord | null>;
   complete(
     brandId: BrandId,
     ref: CapabilityExecutionRef,
