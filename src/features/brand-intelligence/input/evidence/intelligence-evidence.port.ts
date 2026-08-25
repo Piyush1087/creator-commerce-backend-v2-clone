@@ -122,6 +122,8 @@ export interface NormalizedEvidenceReference {
 }
 
 export interface NormalizedEvidenceCapabilityResult {
+  /** Durable Data Extraction capability execution lineage for this result. */
+  readonly capabilityExecutionRef: string;
   readonly capabilityId: NormalizedEvidenceCapabilityId;
   readonly normalizationContractVersion: string;
   readonly status: EvidenceCapabilityStatus;
