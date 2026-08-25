@@ -12,6 +12,7 @@ export interface EvidenceDependencyManifest {
   readonly brandId: string;
   readonly requestedCapabilities: readonly NormalizedEvidenceCapabilityId[];
   readonly capabilities: readonly Readonly<{
+    capabilityExecutionRef: string;
     capabilityId: NormalizedEvidenceCapabilityId;
     normalizationContractVersion: string;
     status: string;
@@ -209,6 +210,7 @@ export class EvidenceManifestBuilder {
         );
       }
       return {
+        capabilityExecutionRef: result.capabilityExecutionRef,
         capabilityId,
         normalizationContractVersion: result.normalizationContractVersion,
         status: result.status,
