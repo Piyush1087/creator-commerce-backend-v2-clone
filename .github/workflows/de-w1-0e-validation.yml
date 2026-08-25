@@ -1,0 +1,44 @@
+name: DE-W1.0E validation
+on:
+  push:
+    branches:
+      - phase-g/data-extraction-wave1-evidence-w1-0e-normalizers
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: validation
+          POSTGRES_PASSWORD: validation
+          POSTGRES_DB: validation
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U validation -d validation"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
+      DE_W1_0B_DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
+      DE_W1_0C_DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
+      DE_W1_0D_DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
+      DE_W1_0E_DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run prisma:generate
+      - run: npx prisma validate
+      - run: npx prisma migrate deploy
+      - name: E unit tests
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/normalization/owned-website-wave1-normalizers.test.ts
+      - name: Build
+        run: npm run build
