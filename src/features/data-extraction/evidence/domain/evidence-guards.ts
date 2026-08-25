@@ -7,9 +7,6 @@ export class DataExtractionTenancyError extends Error {
   }
 }
 
-export function assertSameBrand(
-  expected: BrandId,
-  actual: BrandId,
-): void {
+export function assertSameBrand(expected: BrandId, actual: BrandId): void {
   if (expected !== actual) throw new DataExtractionTenancyError();
 }
