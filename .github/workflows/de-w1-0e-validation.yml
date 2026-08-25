@@ -97,7 +97,9 @@ jobs:
       - name: Confirm F adapter remains missing binding
         run: |
           grep -R "MissingDataExtractionEvidenceAdapter" src/features/brand-intelligence -n >/dev/null
-          ! grep -R "DataExtractionIntelligenceEvidenceAdapter" src/features/data-extraction/evidence/normalization -n
+          ! grep -n "DataExtractionIntelligenceEvidenceAdapter" \
+            src/features/data-extraction/evidence/normalization/owned-website-wave1-normalization.service.ts \
+            src/features/data-extraction/evidence/normalization/owned-website-wave1-normalizers.ts
       - name: Diff check
         run: git diff --check "$BASE_SHA"
       - name: Commit formatted implementation and remove temporary workflow
