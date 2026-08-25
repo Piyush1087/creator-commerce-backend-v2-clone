@@ -12,7 +12,7 @@ export interface EvidenceDependencyManifest {
   readonly brandId: string;
   readonly requestedCapabilities: readonly NormalizedEvidenceCapabilityId[];
   readonly capabilities: readonly Readonly<{
-    capabilityExecutionRef: string;
+    capabilityExecutionRef: string | null;
     capabilityId: NormalizedEvidenceCapabilityId;
     normalizationContractVersion: string;
     status: string;
@@ -104,13 +104,18 @@ export class EvidenceManifestBuilder {
 
     const capabilities = requested.map((capabilityId) => {
       const result = byCapability.get(capabilityId)!;
+      const hasDurableExecutionRef =
+        typeof result.capabilityExecutionRef === "string" &&
+        result.capabilityExecutionRef.trim().length > 0;
       if (
-        typeof result.capabilityExecutionRef !== "string" ||
-        result.capabilityExecutionRef.trim().length === 0
+        (result.status === "NOT_REQUESTED" &&
+          (result.capabilityExecutionRef !== null ||
+            result.evidence.length !== 0)) ||
+        (result.status !== "NOT_REQUESTED" && !hasDurableExecutionRef)
       ) {
         throw new InputDependencyError(
           "EVIDENCE_REFERENCE_INVALID",
-          "Evidence capability results require durable capability execution lineage",
+          "Evidence capability lineage must be null only for NOT_REQUESTED results",
           { capabilityId },
         );
       }

@@ -118,7 +118,9 @@ function adapterFor(
 ) {
   const readExisting = vi.fn(async () => ({
     brandId,
-    capabilityResults: [{ capabilityExecution, evidence: rows }],
+    capabilityResults: [
+      { state: "COMPLETED" as const, capabilityExecution, evidence: rows },
+    ],
   }));
   return {
     adapter: new DataExtractionIntelligenceEvidenceAdapter({
@@ -145,7 +147,11 @@ describe("DE-W1.0F Intelligence Evidence adapter", () => {
     const readExisting = vi.fn(async () => ({
       brandId,
       capabilityResults: [
-        { capabilityExecution: derivedExecution, evidence: [derived] },
+        {
+          state: "COMPLETED" as const,
+          capabilityExecution: derivedExecution,
+          evidence: [derived],
+        },
       ],
     }));
     const adapter = new DataExtractionIntelligenceEvidenceAdapter({
@@ -200,6 +206,43 @@ describe("DE-W1.0F Intelligence Evidence adapter", () => {
     expect(
       result.capabilityResults[0]?.evidence.map((item) => item.evidenceRef),
     ).toEqual([a.evidenceRef, b.evidenceRef]);
+  });
+
+  it("maps explicit query absence to NOT_REQUESTED with null lineage", async () => {
+    const readExisting = vi.fn(async () => ({
+      brandId,
+      capabilityResults: [
+        {
+          state: "NOT_REQUESTED" as const,
+          capabilityId,
+          evidence: [] as const,
+        },
+      ],
+    }));
+    const adapter = new DataExtractionIntelligenceEvidenceAdapter({
+      readExisting,
+    });
+
+    const result = await adapter.read(request());
+
+    expect(result.capabilityResults[0]).toEqual({
+      capabilityExecutionRef: null,
+      capabilityId,
+      normalizationContractVersion: "1.0",
+      status: "NOT_REQUESTED",
+      retryability: "NOT_APPLICABLE",
+      reasonCodes: ["NO_COMPLETED_SEMANTIC_EXECUTION"],
+      coverage: "SINGLE_RESOURCE",
+      acquisitionQuality: {
+        state: "UNAVAILABLE",
+        failureCategories: [],
+        detailCodes: ["NOT_REQUESTED"],
+      },
+      evidence: [],
+    });
+    expect(JSON.stringify(result)).not.toContain(
+      "capability-execution:not-requested",
+    );
   });
 
   it("keeps manifest hash stable under query reordering and excludes provider trace/payload", async () => {

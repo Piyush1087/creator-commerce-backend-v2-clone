@@ -37,7 +37,9 @@ export class DataExtractionIntelligenceEvidenceAdapter implements IntelligenceEv
     });
     const byCapability = new Map(
       result.capabilityResults.map((capability) => [
-        capability.capabilityExecution.capabilityId,
+        capability.state === "COMPLETED"
+          ? capability.capabilityExecution.capabilityId
+          : capability.capabilityId,
         capability,
       ]),
     );
@@ -54,6 +56,25 @@ export class DataExtractionIntelligenceEvidenceAdapter implements IntelligenceEv
   private projectCapability(
     result: DataExtractionCapabilityReadResultV1,
   ): NormalizedEvidenceCapabilityResult {
+    if (result.state === "NOT_REQUESTED") {
+      // The frozen Intelligence envelope has no absent version/coverage enum;
+      // these are result defaults, not manufactured execution lineage.
+      return {
+        capabilityExecutionRef: null,
+        capabilityId: result.capabilityId,
+        normalizationContractVersion: "1.0",
+        status: "NOT_REQUESTED",
+        retryability: "NOT_APPLICABLE",
+        reasonCodes: ["NO_COMPLETED_SEMANTIC_EXECUTION"],
+        coverage: "SINGLE_RESOURCE",
+        acquisitionQuality: {
+          state: "UNAVAILABLE",
+          failureCategories: [],
+          detailCodes: ["NOT_REQUESTED"],
+        },
+        evidence: [],
+      };
+    }
     const execution = result.capabilityExecution;
     return {
       capabilityExecutionRef: execution.capabilityExecutionRef,

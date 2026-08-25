@@ -90,7 +90,7 @@ function evidenceSet(
 describe("W1.0E normalized Evidence boundary", () => {
   const builder = new EvidenceManifestBuilder();
 
-  it("requires and preserves durable capability execution lineage", () => {
+  it("requires and preserves durable lineage for completed results", () => {
     const built = builder.build(
       evidenceSet([capability(messaging, [item()])]),
       [messaging],
@@ -107,6 +107,44 @@ describe("W1.0E normalized Evidence boundary", () => {
     } as unknown as NormalizedEvidenceCapabilityResult;
     expect(() =>
       builder.build(evidenceSet([withoutLineage]), [messaging]),
+    ).toThrowError(
+      expect.objectContaining({ code: "EVIDENCE_REFERENCE_INVALID" }),
+    );
+  });
+
+  it("represents NOT_REQUESTED deterministically with null lineage", () => {
+    const notRequested = capability(messaging, [], {
+      capabilityExecutionRef: null,
+      status: "NOT_REQUESTED",
+      retryability: "NOT_APPLICABLE",
+      reasonCodes: ["NO_COMPLETED_SEMANTIC_EXECUTION"],
+      acquisitionQuality: {
+        state: "UNAVAILABLE",
+        failureCategories: [],
+        detailCodes: ["NOT_REQUESTED"],
+      },
+    });
+    const first = builder.build(evidenceSet([notRequested]), [messaging]);
+    const second = builder.build(evidenceSet([{ ...notRequested }]), [
+      messaging,
+    ]);
+
+    expect(first.manifest.capabilities[0]).toMatchObject({
+      capabilityExecutionRef: null,
+      status: "NOT_REQUESTED",
+      evidence: [],
+    });
+    expect(first.hash).toBe(second.hash);
+    expect(() =>
+      builder.build(
+        evidenceSet([
+          {
+            ...notRequested,
+            capabilityExecutionRef: "capability-execution:not-requested:fake",
+          },
+        ]),
+        [messaging],
+      ),
     ).toThrowError(
       expect.objectContaining({ code: "EVIDENCE_REFERENCE_INVALID" }),
     );

@@ -3,12 +3,10 @@ import { createHash } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 
 import {
-  asCapabilityExecutionRef,
   type BrandId,
   type SemanticObservationKey,
 } from "../domain/evidence-identities";
 import type {
-  DataExtractionCapabilityExecutionRecord,
   DataExtractionEvidenceItemRecord,
   DataExtractionSemanticObservationRecord,
 } from "../domain/evidence-records";
@@ -24,8 +22,6 @@ import type {
   DataExtractionEvidenceQueryRequestV1,
   DataExtractionEvidenceQueryResultV1,
 } from "../ports/evidence-runtime.ports";
-
-const MISSING_RESULT_TIMESTAMP = "1970-01-01T00:00:00.000Z";
 
 @Injectable()
 export class DataExtractionEvidenceQueryService implements DataExtractionEvidenceQueryPortV1 {
@@ -57,7 +53,8 @@ export class DataExtractionEvidenceQueryService implements DataExtractionEvidenc
       );
     if (!execution) {
       return {
-        capabilityExecution: missingCapabilityExecution(brandId, capabilityId),
+        state: "NOT_REQUESTED",
+        capabilityId,
         evidence: [],
       };
     }
@@ -87,6 +84,7 @@ export class DataExtractionEvidenceQueryService implements DataExtractionEvidenc
       ),
     );
     return {
+      state: "COMPLETED",
       capabilityExecution: execution,
       evidence: (evidence as DataExtractionEvidenceItemRecord[])
         .map((item) => {
@@ -111,34 +109,6 @@ export class DataExtractionEvidenceQueryService implements DataExtractionEvidenc
       throw persistenceError("PERSISTENCE_INVARIANT");
     }
   }
-}
-
-function missingCapabilityExecution(
-  brandId: BrandId,
-  capabilityId: EvidenceCapabilityId,
-): DataExtractionCapabilityExecutionRecord {
-  const refHash = hash(`${brandId}|${capabilityId}`).slice(0, 32);
-  return {
-    brandId,
-    capabilityExecutionRef: asCapabilityExecutionRef(
-      `capability-execution:not-requested:${refHash}`,
-    ),
-    capabilityId,
-    resourceScope: [],
-    freshnessIntent: "REUSE_ALLOWED",
-    normalizationContractVersion: "1.0",
-    availability: "NOT_REQUESTED",
-    retryability: "NOT_APPLICABLE",
-    reasonCodes: ["NO_COMPLETED_SEMANTIC_EXECUTION"],
-    coverage: "SINGLE_RESOURCE",
-    acquisitionQuality: {
-      state: "UNAVAILABLE",
-      failureCategories: [],
-      detailCodes: ["NOT_REQUESTED"],
-    },
-    evidenceRefs: [],
-    createdAt: MISSING_RESULT_TIMESTAMP,
-  };
 }
 
 function conflictGroupRefs(

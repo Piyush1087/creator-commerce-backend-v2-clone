@@ -28,10 +28,21 @@ export interface DataExtractionEvidenceQueryRequestV1 {
   readonly correlationRef?: string;
 }
 
-export interface DataExtractionCapabilityReadResultV1 {
+export interface DataExtractionCompletedCapabilityReadResultV1 {
+  readonly state: "COMPLETED";
   readonly capabilityExecution: DataExtractionCapabilityExecutionRecord;
   readonly evidence: readonly DataExtractionEvidenceItemRecord[];
 }
+
+export interface DataExtractionNotRequestedCapabilityReadResultV1 {
+  readonly state: "NOT_REQUESTED";
+  readonly capabilityId: EvidenceCapabilityId;
+  readonly evidence: readonly [];
+}
+
+export type DataExtractionCapabilityReadResultV1 =
+  | DataExtractionCompletedCapabilityReadResultV1
+  | DataExtractionNotRequestedCapabilityReadResultV1;
 
 export interface DataExtractionEvidenceQueryResultV1 {
   readonly brandId: BrandId;

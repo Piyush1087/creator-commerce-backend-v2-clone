@@ -145,6 +145,36 @@ describe("W1.0E processor-specific dependency readiness", () => {
     ).toBe("WAITING_FOR_EVIDENCE");
   });
 
+  it("keeps NOT_REQUESTED + null lineage waiting for Evidence", () => {
+    const currentProfile = profile("brand_communication");
+    const notRequested: NormalizedEvidenceSet = {
+      brandId,
+      capabilityResults: evidence(currentProfile, []).capabilityResults.map(
+        (capability) => ({
+          ...capability,
+          capabilityExecutionRef: null,
+          status: "NOT_REQUESTED",
+          acquisitionQuality: {
+            state: "UNAVAILABLE",
+            failureCategories: [],
+            detailCodes: ["NOT_REQUESTED"],
+          },
+        }),
+      ),
+    };
+
+    expect(
+      evaluator.evaluate(
+        currentProfile,
+        canonical(currentProfile),
+        notRequested,
+      ),
+    ).toEqual({
+      readiness: "WAITING_FOR_EVIDENCE",
+      reasonCodes: ["REPRESENTATIVE_EVIDENCE_NOT_AVAILABLE"],
+    });
+  });
+
   it("blocks only a conflict explicitly declared blocking by the profile", () => {
     const currentProfile = profile("brand_communication");
     const conflicted = canonical(currentProfile, {

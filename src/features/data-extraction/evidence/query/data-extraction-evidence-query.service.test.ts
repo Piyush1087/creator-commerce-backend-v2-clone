@@ -173,6 +173,7 @@ describe("DE-W1.0F durable Evidence query", () => {
     });
     expect(result.capabilityResults).toEqual([
       expect.objectContaining({
+        state: "COMPLETED",
         capabilityExecution: completed,
         evidence: [expect.objectContaining({ evidenceRef })],
       }),
@@ -200,13 +201,17 @@ describe("DE-W1.0F durable Evidence query", () => {
     const { query } = service({ executions });
     const result = await query.readExisting({ brandId, capabilityIds: order });
     expect(
-      result.capabilityResults.map(
-        (entry) => entry.capabilityExecution.capabilityId,
+      result.capabilityResults.map((entry) =>
+        entry.state === "COMPLETED"
+          ? entry.capabilityExecution.capabilityId
+          : entry.capabilityId,
       ),
     ).toEqual(order);
     expect(
-      result.capabilityResults.map(
-        (entry) => entry.capabilityExecution.availability,
+      result.capabilityResults.map((entry) =>
+        entry.state === "COMPLETED"
+          ? entry.capabilityExecution.availability
+          : entry.state,
       ),
     ).toEqual([
       "DEGRADED",
@@ -216,14 +221,16 @@ describe("DE-W1.0F durable Evidence query", () => {
       "NOT_REQUESTED",
     ]);
     expect(result.capabilityResults[4]).toMatchObject({
-      capabilityExecution: {
-        capabilityExecutionRef: expect.stringMatching(
-          /^capability-execution:not-requested:/,
-        ),
-        reasonCodes: ["NO_COMPLETED_SEMANTIC_EXECUTION"],
-      },
+      state: "NOT_REQUESTED",
+      capabilityId: "derived_communication_constraint_evidence",
       evidence: [],
     });
+    expect(result.capabilityResults[4]).not.toHaveProperty(
+      "capabilityExecution",
+    );
+    expect(result.capabilityResults[4]).not.toHaveProperty(
+      "capabilityExecutionRef",
+    );
   });
 
   it("preserves AVAILABLE + [] without reinterpretation", async () => {
@@ -239,6 +246,7 @@ describe("DE-W1.0F durable Evidence query", () => {
       capabilityIds: [completed.capabilityId],
     });
     expect(result.capabilityResults[0]).toMatchObject({
+      state: "COMPLETED",
       capabilityExecution: {
         capabilityExecutionRef: completed.capabilityExecutionRef,
         availability: "AVAILABLE",

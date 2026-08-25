@@ -256,10 +256,54 @@ describePostgres("DE-W1.0F production Intelligence adapter PostgreSQL", () => {
       capabilityIds: ["owned_website.brand_messaging"],
     });
     expect(isolated.capabilityResults[0]).toMatchObject({
-      capabilityExecutionRef: expect.stringMatching(
-        /^capability-execution:not-requested:/,
-      ),
+      capabilityExecutionRef: null,
       status: "NOT_REQUESTED",
+      evidence: [],
+    });
+  });
+
+  it("preserves durable lineage for a real completed UNAVAILABLE execution", async () => {
+    const brandId = await brand("unavailable");
+    const repositories = persistence.repositories();
+    const ref = asCapabilityExecutionRef(
+      `capability-execution:${randomUUID()}`,
+    );
+    await repositories.capabilityExecutions.createOrGet({
+      brandId,
+      capabilityExecutionRef: ref,
+      capabilityId: "owned_website.brand_messaging",
+      normalizationContractVersion: "1.0",
+      resourceScopeHash: `scope:${randomUUID()}`,
+      freshnessIntent: "REUSE_ALLOWED",
+      requestKey: `request:${randomUUID()}`,
+      coverage: "SINGLE_RESOURCE",
+    });
+    await repositories.capabilityExecutions.complete(brandId, ref, {
+      availability: "UNAVAILABLE",
+      retryability: "RETRYABLE",
+      reasonCodes: ["NO_USABLE_SOURCE"],
+      coverage: "SINGLE_RESOURCE",
+      acquisitionQuality: {
+        state: "UNAVAILABLE",
+        failureCategories: ["SOURCE_UNAVAILABLE"],
+        detailCodes: [],
+      },
+      completedAt: "2026-08-26T10:00:00.000Z",
+    });
+    const adapter = new DataExtractionIntelligenceEvidenceAdapter(
+      new DataExtractionEvidenceQueryService(persistence),
+    );
+
+    const result = await adapter.read({
+      brandId,
+      processorId: "brand_communication",
+      processorVersion: "1.0",
+      capabilityIds: ["owned_website.brand_messaging"],
+    });
+
+    expect(result.capabilityResults[0]).toMatchObject({
+      capabilityExecutionRef: ref,
+      status: "UNAVAILABLE",
       evidence: [],
     });
   });

@@ -84,6 +84,8 @@ describe("DE-W1.0F production reader architecture", () => {
     }
     expect(querySource).toContain("findLatestCompleted");
     expect(querySource).toContain("evidenceItems.findByRef");
+    expect(querySource).not.toContain("capability-execution:not-requested");
+    expect(querySource).not.toContain("MISSING_RESULT_TIMESTAMP");
   });
 
   it("does not use IntelligenceEvidenceReference or any legacy source as the DE store", () => {
