@@ -1,0 +1,55 @@
+name: DE W1.0A Final Validation
+
+on:
+  push:
+    branches:
+      - temp/de-w1-0a-validation-final-a7c8f3a8
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Prisma generate
+        if: always()
+        run: npm run prisma:generate
+      - name: Prisma validate
+        if: always()
+        run: npx prisma validate
+      - name: Verify Intelligence contracts
+        if: always()
+        run: npm run intelligence:contracts:verify
+      - name: Nest build
+        if: always()
+        run: npm run build
+      - name: DE-W1.0A focused tests
+        if: always()
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/evidence-runtime-contracts.test.ts
+      - name: DE architecture tests
+        if: always()
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/evidence-runtime.architecture.test.ts
+      - name: W1.0E compatibility tests
+        if: always()
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/evidence-w1-0e-compatibility.test.ts src/features/brand-intelligence/input/evidence/evidence-input.test.ts src/features/brand-intelligence/input/dependency/processor-dependency-preparation.test.ts
+      - name: W1.0F focused tests
+        if: always()
+        run: npx vitest run --config vitest.config.ts src/features/brand-intelligence/brand-intelligence.current-projection.architecture.test.ts src/features/brand-intelligence/projection
+      - name: Scoped lint
+        if: always()
+        run: npx eslint "src/features/data-extraction/evidence/**/*.ts"
+      - name: Full test suite
+        if: always()
+        run: npm test
+      - name: Diff check
+        if: always()
+        run: git diff --check a7c8f3a8e4f1abeb460aa5dbae1c3348ad0ca758..HEAD
