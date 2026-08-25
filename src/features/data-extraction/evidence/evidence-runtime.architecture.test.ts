@@ -13,7 +13,13 @@ const root = join(
 function productionFiles(path: string): string[] {
   return readdirSync(path).flatMap((name) => {
     const current = join(path, name);
-    if (statSync(current).isDirectory()) return productionFiles(current);
+    if (statSync(current).isDirectory()) {
+      // DE-W1.0A freezes provider-neutral Evidence domain/contracts. DE-W1.0D
+      // adds an acquisition adapter beneath the DE boundary; it has its own
+      // architecture guard and must not weaken the provider-neutral core.
+      if (path === root && name === "acquisition") return [];
+      return productionFiles(current);
+    }
     return current.endsWith(".ts") && !current.endsWith(".test.ts")
       ? [current]
       : [];
