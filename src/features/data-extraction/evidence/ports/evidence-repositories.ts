@@ -18,32 +18,62 @@ import type {
 import type { EvidenceCapabilityId } from "../domain/evidence-vocabulary";
 
 export interface ResourceRepository {
-  findByRef(brandId: BrandId, resourceRef: ResourceRef): Promise<DataExtractionResourceRecord | null>;
-  findByCanonicalKey(brandId: BrandId, canonicalResourceKey: string): Promise<DataExtractionResourceRecord | null>;
+  findByRef(
+    brandId: BrandId,
+    resourceRef: ResourceRef,
+  ): Promise<DataExtractionResourceRecord | null>;
+  findByCanonicalKey(
+    brandId: BrandId,
+    canonicalResourceKey: string,
+  ): Promise<DataExtractionResourceRecord | null>;
   insert(record: DataExtractionResourceRecord): Promise<void>;
 }
 
 export interface CaptureRepository {
-  findByRef(brandId: BrandId, captureRef: CaptureRef): Promise<DataExtractionCaptureRecord | null>;
-  findLatestForResource(brandId: BrandId, resourceRef: ResourceRef): Promise<DataExtractionCaptureRecord | null>;
+  findByRef(
+    brandId: BrandId,
+    captureRef: CaptureRef,
+  ): Promise<DataExtractionCaptureRecord | null>;
+  findLatestForResource(
+    brandId: BrandId,
+    resourceRef: ResourceRef,
+  ): Promise<DataExtractionCaptureRecord | null>;
   insert(record: DataExtractionCaptureRecord): Promise<void>;
 }
 
 export interface ContentArtifactRepository {
-  findByRef(brandId: BrandId, contentRef: NormalizedContentRef): Promise<DataExtractionContentArtifactRecord | null>;
-  findForCapture(brandId: BrandId, captureRef: CaptureRef): Promise<readonly DataExtractionContentArtifactRecord[]>;
+  findByRef(
+    brandId: BrandId,
+    contentRef: NormalizedContentRef,
+  ): Promise<DataExtractionContentArtifactRecord | null>;
+  findForCapture(
+    brandId: BrandId,
+    captureRef: CaptureRef,
+  ): Promise<readonly DataExtractionContentArtifactRecord[]>;
   insert(record: DataExtractionContentArtifactRecord): Promise<void>;
 }
 
 export interface EvidenceItemRepository {
-  findByRef(brandId: BrandId, evidenceRef: EvidenceRef): Promise<DataExtractionEvidenceItemRecord | null>;
-  findByCapability(brandId: BrandId, capabilityId: EvidenceCapabilityId): Promise<readonly DataExtractionEvidenceItemRecord[]>;
+  findByRef(
+    brandId: BrandId,
+    evidenceRef: EvidenceRef,
+  ): Promise<DataExtractionEvidenceItemRecord | null>;
+  findByCapability(
+    brandId: BrandId,
+    capabilityId: EvidenceCapabilityId,
+  ): Promise<readonly DataExtractionEvidenceItemRecord[]>;
   insert(record: DataExtractionEvidenceItemRecord): Promise<void>;
 }
 
 export interface SemanticObservationRepository {
-  findByKey(brandId: BrandId, key: SemanticObservationKey): Promise<DataExtractionSemanticObservationRecord | null>;
-  findByCapability(brandId: BrandId, capabilityId: EvidenceCapabilityId): Promise<readonly DataExtractionSemanticObservationRecord[]>;
+  findByKey(
+    brandId: BrandId,
+    key: SemanticObservationKey,
+  ): Promise<DataExtractionSemanticObservationRecord | null>;
+  findByCapability(
+    brandId: BrandId,
+    capabilityId: EvidenceCapabilityId,
+  ): Promise<readonly DataExtractionSemanticObservationRecord[]>;
   insert(record: DataExtractionSemanticObservationRecord): Promise<void>;
 }
 
