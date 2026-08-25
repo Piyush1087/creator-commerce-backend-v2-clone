@@ -11,6 +11,15 @@ function html(body = "Representative brand content for customers and products. "
   return `<html><head><title>Brand</title></head><body><main>${body}</main><a href="/about">About</a></body></html>`;
 }
 
+function directResponse(url: string, body: string, status = 200): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    url,
+    text: async () => body,
+  } as Response;
+}
+
 describe("DE-W1.0D owned-site provider reuse", () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -21,12 +30,7 @@ describe("DE-W1.0D owned-site provider reuse", () => {
     };
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(html(), {
-          status: 200,
-          headers: { "content-type": "text/html" },
-        }),
-      ),
+      vi.fn(async () => directResponse("https://example.com/", html())),
     );
     const mechanics = new ExistingOwnedWebsiteAcquisitionMechanics(
       new TextContextBuilderService(),
@@ -45,7 +49,10 @@ describe("DE-W1.0D owned-site provider reuse", () => {
       isConfigured: () => true,
       fetchHtml: vi.fn(async () => html("fallback representative content ".repeat(40))),
     };
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("no", { status: 503 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => directResponse("https://example.com/", "no", 503)),
+    );
     const mechanics = new ExistingOwnedWebsiteAcquisitionMechanics(
       new TextContextBuilderService(),
       zyte as never,
@@ -67,7 +74,10 @@ describe("DE-W1.0D owned-site provider reuse", () => {
         throw new Error("provider failed");
       }),
     };
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("no", { status: 503 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => directResponse("https://example.com/", "no", 503)),
+    );
     const mechanics = new ExistingOwnedWebsiteAcquisitionMechanics(
       new TextContextBuilderService(),
       zyte as never,
@@ -87,7 +97,9 @@ describe("DE-W1.0D owned-site provider reuse", () => {
     const zyte = { isConfigured: () => false, fetchHtml: vi.fn() };
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response(html("x".repeat(100_000)), { status: 200 })),
+      vi.fn(async () =>
+        directResponse("https://example.com/", html("x".repeat(100_000))),
+      ),
     );
     const mechanics = new ExistingOwnedWebsiteAcquisitionMechanics(
       new TextContextBuilderService(),
