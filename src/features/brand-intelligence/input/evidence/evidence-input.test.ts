@@ -64,6 +64,7 @@ function capability(
   overrides: Partial<NormalizedEvidenceCapabilityResult> = {},
 ): NormalizedEvidenceCapabilityResult {
   return {
+    capabilityExecutionRef: `capability-execution:${capabilityId}:1`,
     capabilityId,
     normalizationContractVersion: "1.0",
     status: "AVAILABLE",
@@ -88,6 +89,18 @@ function evidenceSet(
 
 describe("W1.0E normalized Evidence boundary", () => {
   const builder = new EvidenceManifestBuilder();
+
+  it("requires and preserves capability execution lineage", () => {
+    const built = builder.build(
+      evidenceSet([capability(messaging, [item()])]),
+      [messaging],
+    );
+    expect(built.manifest.capabilities[0]).toMatchObject({
+      capabilityExecutionRef:
+        "capability-execution:owned_website.brand_messaging:1",
+      capabilityId: messaging,
+    });
+  });
 
   it("accepts same-Brand references and preserves Gate B freshness", () => {
     const built = builder.build(
@@ -128,7 +141,7 @@ describe("W1.0E normalized Evidence boundary", () => {
     );
   });
 
-  it("accepts AVAILABLE with zero items as absence, not negative Evidence", () => {
+  it("accepts AVAILABLE with zero items and retains capability execution lineage", () => {
     const absence = builder.build(evidenceSet([capability(messaging, [])]), [
       messaging,
     ]);
@@ -139,6 +152,8 @@ describe("W1.0E normalized Evidence boundary", () => {
       [messaging],
     );
     expect(absence.manifest.capabilities[0]).toMatchObject({
+      capabilityExecutionRef:
+        "capability-execution:owned_website.brand_messaging:1",
       status: "AVAILABLE",
       evidence: [],
     });
@@ -148,7 +163,7 @@ describe("W1.0E normalized Evidence boundary", () => {
     expect(negative.hash).not.toBe(absence.hash);
   });
 
-  it("preserves conflict groups and deterministically ignores read ordering", () => {
+  it("preserves conflict groups and deterministically ignores Evidence read ordering", () => {
     const first = item({
       evidenceRef: "evidence:message:a",
       conflictGroupRef: "conflict:group:1",
@@ -175,6 +190,23 @@ describe("W1.0E normalized Evidence boundary", () => {
     );
   });
 
+  it("changes the manifest hash when only capability execution lineage changes", () => {
+    const original = builder.build(
+      evidenceSet([capability(messaging, [])]),
+      [messaging],
+    );
+    const changed = builder.build(
+      evidenceSet([
+        capability(messaging, [], {
+          capabilityExecutionRef:
+            "capability-execution:owned_website.brand_messaging:2",
+        }),
+      ]),
+      [messaging],
+    );
+    expect(changed.hash).not.toBe(original.hash);
+  });
+
   it("changes the manifest for a new capture/version", () => {
     const original = builder.build(
       evidenceSet([capability(messaging, [item()])]),
@@ -189,6 +221,28 @@ describe("W1.0E normalized Evidence boundary", () => {
       [messaging],
     );
     expect(changed.hash).not.toBe(original.hash);
+  });
+
+  it("does not change the manifest hash for transient payload/provider execution changes", () => {
+    const original = builder.build(
+      evidenceSet([capability(messaging, [item()])]),
+      [messaging],
+    );
+    const reread = builder.build(
+      evidenceSet([
+        capability(messaging, [
+          item({
+            boundedNormalizedPayload: { message: "Different transient value" },
+            provenance: {
+              ...item().provenance,
+              providerExecutionRef: "different-operational-request",
+            },
+          }),
+        ]),
+      ]),
+      [messaging],
+    );
+    expect(reread.hash).toBe(original.hash);
   });
 
   it("does not change identity for a freshness re-evaluation with unchanged state and basis", () => {
