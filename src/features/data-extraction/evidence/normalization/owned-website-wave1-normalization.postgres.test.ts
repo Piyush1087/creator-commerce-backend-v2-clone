@@ -134,7 +134,9 @@ describePostgres("DE-W1.0E durable normalization", () => {
       }),
     ).toBe(first.evidenceRefs.length);
     expect(
-      await prisma.dataExtractionObservationSupport.count({ where: { brandId } }),
+      await prisma.dataExtractionObservationSupport.count({
+        where: { brandId },
+      }),
     ).toBeGreaterThan(0);
 
     const evidenceCount = await prisma.dataExtractionEvidenceItem.count({
@@ -152,7 +154,9 @@ describePostgres("DE-W1.0E durable normalization", () => {
       await prisma.dataExtractionEvidenceItem.count({ where: { brandId } }),
     ).toBe(evidenceCount);
     expect(
-      await prisma.dataExtractionObservationSupport.count({ where: { brandId } }),
+      await prisma.dataExtractionObservationSupport.count({
+        where: { brandId },
+      }),
     ).toBe(supportCount);
   });
 
@@ -178,11 +182,7 @@ describePostgres("DE-W1.0E durable normalization", () => {
     const callsAfterMessaging = mechanics.calls.length;
 
     const language = await acquisition.request(
-      request(
-        brandId,
-        root,
-        "observed_brand_communication_language_signals",
-      ),
+      request(brandId, root, "observed_brand_communication_language_signals"),
     );
     expect(mechanics.calls.length).toBe(callsAfterMessaging);
     const result = await normalization.normalize({
@@ -196,7 +196,13 @@ describePostgres("DE-W1.0E durable normalization", () => {
         capabilityId: "observed_brand_communication_language_signals",
       },
     });
-    expect(rows.some((row) => JSON.stringify(row.boundedPayload).includes("PRINCIPAL_MESSAGING_LANGUAGE"))).toBe(true);
+    expect(
+      rows.some((row) =>
+        JSON.stringify(row.boundedPayload).includes(
+          "PRINCIPAL_MESSAGING_LANGUAGE",
+        ),
+      ),
+    ).toBe(true);
   });
 
   it("distinguishes usable-source no-constraint as AVAILABLE + []", async () => {
@@ -219,11 +225,7 @@ describePostgres("DE-W1.0E durable normalization", () => {
       capabilityExecutionRef: messaging.capabilityExecutionRef,
     });
     const constraint = await acquisition.request(
-      request(
-        brandId,
-        root,
-        "derived_communication_constraint_evidence",
-      ),
+      request(brandId, root, "derived_communication_constraint_evidence"),
     );
     const result = await normalization.normalize({
       brandId,
@@ -271,10 +273,14 @@ describePostgres("DE-W1.0E durable normalization", () => {
       await prisma.dataExtractionEvidenceItem.count({ where: { brandId } }),
     ).toBe(0);
     expect(
-      await prisma.dataExtractionCapabilityEvidence.count({ where: { brandId } }),
+      await prisma.dataExtractionCapabilityEvidence.count({
+        where: { brandId },
+      }),
     ).toBe(0);
     expect(
-      await prisma.dataExtractionObservationSupport.count({ where: { brandId } }),
+      await prisma.dataExtractionObservationSupport.count({
+        where: { brandId },
+      }),
     ).toBe(0);
   });
 

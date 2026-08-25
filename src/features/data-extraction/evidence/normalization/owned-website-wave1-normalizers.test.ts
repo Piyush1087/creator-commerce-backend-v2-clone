@@ -23,7 +23,11 @@ const baseExecution = {
   retryability: "NOT_APPLICABLE",
   reasonCodes: [],
   coverage: "SINGLE_RESOURCE",
-  acquisitionQuality: { state: "COMPLETE", failureCategories: [], detailCodes: [] },
+  acquisitionQuality: {
+    state: "COMPLETE",
+    failureCategories: [],
+    detailCodes: [],
+  },
   evidenceRefs: [],
   createdAt: "2026-08-25T00:00:00.000Z",
   completedAt: "2026-08-25T00:01:00.000Z",
@@ -54,7 +58,11 @@ function source(
       acquisitionRequestKey: `request:${ref}`,
       startedAt: "2026-08-25T00:00:00.000Z",
       capturedAt: "2026-08-25T00:00:10.000Z",
-      acquisitionQuality: { state: "COMPLETE", failureCategories: [], detailCodes: [] },
+      acquisitionQuality: {
+        state: "COMPLETE",
+        failureCategories: [],
+        detailCodes: [],
+      },
       providerExecutionRefs: [],
     },
     normalizedContentRef: `content:${ref}`,
@@ -74,7 +82,11 @@ function input(
   parentEvidence: any[] = [],
 ): DataExtractionNormalizationInput {
   return {
-    execution: { ...baseExecution, capabilityId, resourceScope: sources.map((item) => item.resource.resourceRef) },
+    execution: {
+      ...baseExecution,
+      capabilityId,
+      resourceScope: sources.map((item) => item.resource.resourceRef),
+    },
     sources,
     parentEvidence,
   } as any;
@@ -103,7 +115,11 @@ function messagingParent(src: any, text: string) {
       parentEvidenceRefs: [],
       parentCaptureRefs: [],
     },
-    deduplication: { itemFingerprint: "parent", repetitionCount: 1, supportingResourceRefs: [src.resource.resourceRef] },
+    deduplication: {
+      itemFingerprint: "parent",
+      repetitionCount: 1,
+      supportingResourceRefs: [src.resource.resourceRef],
+    },
     boundedNormalizedPayload: {
       text_or_normalized_message: text,
       message_role: "BRAND_PROPOSITION",
@@ -119,25 +135,53 @@ function messagingParent(src: any, text: string) {
 describe("DE-W1.0E deterministic normalizers", () => {
   it("keeps fingerprints and semantic observation identity deterministic", () => {
     const payload = { text_or_normalized_message: "We help creators grow" };
-    expect(itemFingerprint("owned_website.brand_messaging", "We help creators grow", payload)).toBe(
-      itemFingerprint("owned_website.brand_messaging", "We help creators grow", payload),
+    expect(
+      itemFingerprint(
+        "owned_website.brand_messaging",
+        "We help creators grow",
+        payload,
+      ),
+    ).toBe(
+      itemFingerprint(
+        "owned_website.brand_messaging",
+        "We help creators grow",
+        payload,
+      ),
     );
-    expect(observationKey("owned_website.brand_messaging", "We help creators grow")).toBe(
+    expect(
+      observationKey("owned_website.brand_messaging", "We help creators grow"),
+    ).toBe(
       observationKey("owned_website.brand_messaging", "we help creators grow"),
     );
     expect(canonicalSemanticText("Hello,   WORLD!")).toBe("hello world");
   });
 
   it("normalizes repeated messaging as repeated representative without synthesizing Intelligence", () => {
-    const first = source("resource:home", "HOMEPAGE", "We help creators grow with better brand partnerships.");
-    const second = source("resource:about", "ABOUT_COMPANY", "We help creators grow with better brand partnerships.");
+    const first = source(
+      "resource:home",
+      "HOMEPAGE",
+      "We help creators grow with better brand partnerships.",
+    );
+    const second = source(
+      "resource:about",
+      "ABOUT_COMPANY",
+      "We help creators grow with better brand partnerships.",
+    );
     const result = new BrandMessagingNormalizer().normalize(
       input("owned_website.brand_messaging", [first, second]),
     );
     expect(result.drafts).toHaveLength(2);
-    expect(result.drafts.every((item) => item.representativeness === "REPEATED_REPRESENTATIVE")).toBe(true);
-    expect(result.drafts[0]?.boundedNormalizedPayload).not.toHaveProperty("value_proposition");
-    expect(JSON.stringify(result.drafts[0]?.boundedNormalizedPayload)).not.toContain("BRAND_CONFIRMED");
+    expect(
+      result.drafts.every(
+        (item) => item.representativeness === "REPEATED_REPRESENTATIVE",
+      ),
+    ).toBe(true);
+    expect(result.drafts[0]?.boundedNormalizedPayload).not.toHaveProperty(
+      "value_proposition",
+    );
+    expect(
+      JSON.stringify(result.drafts[0]?.boundedNormalizedPayload),
+    ).not.toContain("BRAND_CONFIRMED");
   });
 
   it("emits explicit company context but does not infer missing geography or Industry", () => {
@@ -150,7 +194,9 @@ describe("DE-W1.0E deterministic normalizers", () => {
       input("owned_website.brand_company_context", [about]),
     );
     expect(result.drafts.length).toBeGreaterThan(0);
-    const serialized = JSON.stringify(result.drafts.map((item) => item.boundedNormalizedPayload));
+    const serialized = JSON.stringify(
+      result.drafts.map((item) => item.boundedNormalizedPayload),
+    );
     expect(serialized).not.toContain("inferred_industry");
     expect(serialized).not.toContain("currency");
     expect(serialized).not.toContain("geography");
@@ -166,8 +212,12 @@ describe("DE-W1.0E deterministic normalizers", () => {
       input("owned_website.offering_context", [offering]),
     );
     expect(result.drafts.length).toBeGreaterThanOrEqual(2);
-    expect(new Set(result.drafts.map((item) => item.semanticObservationKey)).size).toBe(result.drafts.length);
-    expect(JSON.stringify(result.drafts)).not.toContain("canonical_catalogue_completeness");
+    expect(
+      new Set(result.drafts.map((item) => item.semanticObservationKey)).size,
+    ).toBe(result.drafts.length);
+    expect(JSON.stringify(result.drafts)).not.toContain(
+      "canonical_catalogue_completeness",
+    );
   });
 
   it("emits contract-valid observed language signals, not tone/personality judgments", () => {
@@ -176,7 +226,10 @@ describe("DE-W1.0E deterministic normalizers", () => {
       "HOMEPAGE",
       "We help you find the right creators for your brand. Our platform gives you the tools to start, choose and grow partnerships with confidence. You can discover creators and manage your campaigns in one place.",
     );
-    const parent = messagingParent(home, "We help you find the right creators for your brand.");
+    const parent = messagingParent(
+      home,
+      "We help you find the right creators for your brand.",
+    );
     const result = new CommunicationLanguageSignalsNormalizer().normalize(
       input("observed_brand_communication_language_signals", [home], [parent]),
     );
@@ -186,19 +239,28 @@ describe("DE-W1.0E deterministic normalizers", () => {
       signal_type: "PRINCIPAL_MESSAGING_LANGUAGE",
       surface_importance: "PRINCIPAL",
     });
-    expect(JSON.stringify(result.drafts[0]?.boundedNormalizedPayload)).not.toMatch(/warm|empathetic|personality|tone_trait/i);
+    expect(
+      JSON.stringify(result.drafts[0]?.boundedNormalizedPayload),
+    ).not.toMatch(/warm|empathetic|personality|tone_trait/i);
   });
 
   it("emits explicit constraint Evidence but does not promote ordinary repeated style to a hard rule", () => {
     const home = source("resource:home", "HOMEPAGE", "We help creators grow.");
-    const prohibition = messagingParent(home, "We never use guaranteed outcome claims in creator copy.");
+    const prohibition = messagingParent(
+      home,
+      "We never use guaranteed outcome claims in creator copy.",
+    );
     const ordinary = {
       ...messagingParent(home, "You can discover creators today."),
       evidenceRef: "evidence:ordinary",
     };
     const normalizer = new CommunicationConstraintEvidenceNormalizer();
     const result = normalizer.normalize(
-      input("derived_communication_constraint_evidence", [home], [prohibition, ordinary]),
+      input(
+        "derived_communication_constraint_evidence",
+        [home],
+        [prohibition, ordinary],
+      ),
     );
     expect(result.drafts).toHaveLength(1);
     expect(result.drafts[0]?.boundedNormalizedPayload).toMatchObject({

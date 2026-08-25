@@ -47,9 +47,7 @@ export interface DataExtractionCapabilityNormalizationPortV1 {
 }
 
 @Injectable()
-export class OwnedWebsiteWave1NormalizationService
-  implements DataExtractionCapabilityNormalizationPortV1
-{
+export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapabilityNormalizationPortV1 {
   constructor(
     private readonly persistence: DataExtractionPersistenceService,
     private readonly prisma: PrismaService,
@@ -65,13 +63,19 @@ export class OwnedWebsiteWave1NormalizationService
     );
     if (!execution) throw persistenceError("CAPABILITY_EXECUTION_NOT_FOUND");
     if (!execution.completedAt) {
-      throw new Error("DE_NORMALIZATION_REQUIRES_TERMINAL_ACQUISITION_EXECUTION");
+      throw new Error(
+        "DE_NORMALIZATION_REQUIRES_TERMINAL_ACQUISITION_EXECUTION",
+      );
     }
 
     const sources = await this.loadExplicitSources(execution);
     const parentEvidence = await this.loadParentEvidence(request.brandId);
     const normalizer = normalizerFor(execution.capabilityId);
-    const normalized = normalizer.normalize({ execution, sources, parentEvidence });
+    const normalized = normalizer.normalize({
+      execution,
+      sources,
+      parentEvidence,
+    });
 
     const evidenceRecords = normalized.drafts.map((draft) =>
       this.toEvidenceRecord(execution, draft),
@@ -101,18 +105,27 @@ export class OwnedWebsiteWave1NormalizationService
         records.push(item);
       }
 
-      await this.persistConflicts(tx.semanticObservations, request.brandId, normalized.drafts);
+      await this.persistConflicts(
+        tx.semanticObservations,
+        request.brandId,
+        normalized.drafts,
+      );
       return records;
     });
 
-    const evidenceRefs = await repositories.capabilityEvidence.listEvidenceForExecution(
-      request.brandId,
-      execution.capabilityExecutionRef,
-    );
+    const evidenceRefs =
+      await repositories.capabilityEvidence.listEvidenceForExecution(
+        request.brandId,
+        execution.capabilityExecutionRef,
+      );
 
     return {
       capabilityExecutionRef: execution.capabilityExecutionRef,
-      availability: this.normalizationAvailability(execution, sources.length, persisted.length),
+      availability: this.normalizationAvailability(
+        execution,
+        sources.length,
+        persisted.length,
+      ),
       evidenceRefs,
       reasonCodes: normalized.reasonCodes,
     };
@@ -166,11 +179,21 @@ export class OwnedWebsiteWave1NormalizationService
       );
       const normalized = [...artifacts]
         .reverse()
-        .find((artifact) => artifact.artifactKind === "NORMALIZED_TEXT" && artifact.inlineContent);
+        .find(
+          (artifact) =>
+            artifact.artifactKind === "NORMALIZED_TEXT" &&
+            artifact.inlineContent,
+        );
       const sourceBody = [...artifacts]
         .reverse()
-        .find((artifact) => artifact.artifactKind === "ACQUIRED_SOURCE_BODY" && artifact.inlineContent);
-      const normalizedText = normalized?.inlineContent?.trim() ?? deterministicClean(sourceBody?.inlineContent ?? "");
+        .find(
+          (artifact) =>
+            artifact.artifactKind === "ACQUIRED_SOURCE_BODY" &&
+            artifact.inlineContent,
+        );
+      const normalizedText =
+        normalized?.inlineContent?.trim() ??
+        deterministicClean(sourceBody?.inlineContent ?? "");
       if (!normalizedText) continue;
       const freshness = await this.freshnessFor(
         execution.brandId,
@@ -181,13 +204,21 @@ export class OwnedWebsiteWave1NormalizationService
       sources.push({
         resource,
         capture,
-        ...(normalized ? { normalizedContentRef: normalized.contentArtifactRef } : sourceBody ? { normalizedContentRef: sourceBody.contentArtifactRef } : {}),
+        ...(normalized
+          ? { normalizedContentRef: normalized.contentArtifactRef }
+          : sourceBody
+            ? { normalizedContentRef: sourceBody.contentArtifactRef }
+            : {}),
         normalizedText: normalizedText.slice(0, 15_000),
-        ...(sourceBody?.inlineContent ? { acquiredSourceBody: sourceBody.inlineContent.slice(0, 60_000) } : {}),
+        ...(sourceBody?.inlineContent
+          ? { acquiredSourceBody: sourceBody.inlineContent.slice(0, 60_000) }
+          : {}),
         freshness,
       });
     }
-    return sources.sort((a, b) => a.resource.resourceRef.localeCompare(b.resource.resourceRef));
+    return sources.sort((a, b) =>
+      a.resource.resourceRef.localeCompare(b.resource.resourceRef),
+    );
   }
 
   private async freshnessFor(
@@ -221,8 +252,12 @@ export class OwnedWebsiteWave1NormalizationService
       state: assessment.state,
       evaluatedAt: assessment.evaluatedAt,
       basis: assessment.basis,
-      ...(assessment.priorCaptureRef ? { priorCaptureRef: assessment.priorCaptureRef } : {}),
-      ...(assessment.sourceRevisionRef ? { sourceRevisionRef: assessment.sourceRevisionRef } : {}),
+      ...(assessment.priorCaptureRef
+        ? { priorCaptureRef: assessment.priorCaptureRef }
+        : {}),
+      ...(assessment.sourceRevisionRef
+        ? { sourceRevisionRef: assessment.sourceRevisionRef }
+        : {}),
     };
   }
 
@@ -258,7 +293,9 @@ export class OwnedWebsiteWave1NormalizationService
         ].join("|"),
       )}`,
     );
-    const quality = conservativeEvidenceQuality(draft.source.capture.acquisitionQuality);
+    const quality = conservativeEvidenceQuality(
+      draft.source.capture.acquisitionQuality,
+    );
     return {
       brandId: execution.brandId,
       evidenceRef,
@@ -268,7 +305,9 @@ export class OwnedWebsiteWave1NormalizationService
       captureRef: draft.source.capture.captureRef,
       sourceClass: draft.source.resource.sourceClass,
       resourceType: draft.source.resource.resourceType,
-      ...(draft.source.resource.pageRole ? { pageRole: draft.source.resource.pageRole } : {}),
+      ...(draft.source.resource.pageRole
+        ? { pageRole: draft.source.resource.pageRole }
+        : {}),
       capturedAt: draft.source.capture.capturedAt!,
       freshnessAtEmission: draft.source.freshness,
       representativeness: draft.representativeness,
@@ -286,7 +325,10 @@ export class OwnedWebsiteWave1NormalizationService
         parentEvidenceRefs: draft.parentEvidenceRefs ?? [],
         parentCaptureRefs: [draft.source.capture.captureRef],
         ...(draft.source.capture.providerExecutionRefs[0]
-          ? { providerExecutionRef: draft.source.capture.providerExecutionRefs[0] }
+          ? {
+              providerExecutionRef:
+                draft.source.capture.providerExecutionRefs[0],
+            }
           : {}),
       },
       deduplication: {
@@ -294,7 +336,9 @@ export class OwnedWebsiteWave1NormalizationService
         repetitionCount: 1,
         supportingResourceRefs: [draft.source.resource.resourceRef],
       },
-      ...(draft.source.normalizedContentRef ? { normalizedContentRef: draft.source.normalizedContentRef } : {}),
+      ...(draft.source.normalizedContentRef
+        ? { normalizedContentRef: draft.source.normalizedContentRef }
+        : {}),
       boundedNormalizedPayload: draft.boundedNormalizedPayload,
       contentHash: hash(draft.semanticText),
       ...(draft.polarity ? { polarity: draft.polarity } : {}),
@@ -304,16 +348,27 @@ export class OwnedWebsiteWave1NormalizationService
   }
 
   private async persistConflicts(
-    observations: ReturnType<DataExtractionPersistenceService["repositories"]>["semanticObservations"],
+    observations: ReturnType<
+      DataExtractionPersistenceService["repositories"]
+    >["semanticObservations"],
     brandId: BrandId,
     drafts: readonly NormalizedEvidenceDraft[],
   ): Promise<void> {
     for (let leftIndex = 0; leftIndex < drafts.length; leftIndex += 1) {
-      for (let rightIndex = leftIndex + 1; rightIndex < drafts.length; rightIndex += 1) {
+      for (
+        let rightIndex = leftIndex + 1;
+        rightIndex < drafts.length;
+        rightIndex += 1
+      ) {
         const left = drafts[leftIndex]!;
         const right = drafts[rightIndex]!;
-        if (left.semanticObservationKey === right.semanticObservationKey) continue;
-        if (conflictSignature(left.semanticText) !== conflictSignature(right.semanticText)) continue;
+        if (left.semanticObservationKey === right.semanticObservationKey)
+          continue;
+        if (
+          conflictSignature(left.semanticText) !==
+          conflictSignature(right.semanticText)
+        )
+          continue;
         if (!opposes(left.polarity, right.polarity)) continue;
         await observations.relateConflict(
           brandId,
@@ -330,7 +385,10 @@ export class OwnedWebsiteWave1NormalizationService
     evidenceCount: number,
   ): CapabilityAvailability {
     if (sourceCount === 0) return "UNAVAILABLE";
-    if (execution.capabilityId === "derived_communication_constraint_evidence" && evidenceCount === 0) {
+    if (
+      execution.capabilityId === "derived_communication_constraint_evidence" &&
+      evidenceCount === 0
+    ) {
       return "AVAILABLE";
     }
     if (execution.availability === "UNAVAILABLE") return "UNAVAILABLE";
@@ -371,7 +429,10 @@ function hash(value: string): string {
 function conflictSignature(value: string): string {
   return value
     .toLowerCase()
-    .replace(/\b(must not|do not|does not|don't|doesn't|never|not|cannot|can't)\b/g, "")
+    .replace(
+      /\b(must not|do not|does not|don't|doesn't|never|not|cannot|can't)\b/g,
+      "",
+    )
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -382,5 +443,7 @@ function opposes(
   right: NormalizedEvidenceDraft["polarity"],
 ): boolean {
   const negative = new Set(["EXPLICIT_NEGATIVE", "RESTRICTION"]);
-  return negative.has(left ?? "AFFIRMATIVE") !== negative.has(right ?? "AFFIRMATIVE");
+  return (
+    negative.has(left ?? "AFFIRMATIVE") !== negative.has(right ?? "AFFIRMATIVE")
+  );
 }

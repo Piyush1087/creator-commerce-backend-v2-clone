@@ -2,7 +2,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const root = join(process.cwd(), "src", "features", "data-extraction", "evidence", "normalization");
+const root = join(
+  process.cwd(),
+  "src",
+  "features",
+  "data-extraction",
+  "evidence",
+  "normalization",
+);
 const productionFiles = [
   "owned-website-wave1-normalizers.ts",
   "owned-website-wave1-normalization.service.ts",
