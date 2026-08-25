@@ -40,6 +40,9 @@ jobs:
           cache: npm
       - name: npm ci
         run: npm ci
+      - name: Apply bounded TypeScript fix
+        run: |
+          sed -i 's/acquired: readonly Array</acquired: ReadonlyArray</g' src/features/data-extraction/evidence/acquisition/owned-website-wave1-acquisition.service.ts
       - name: Format D files
         run: |
           npx prettier --write \
