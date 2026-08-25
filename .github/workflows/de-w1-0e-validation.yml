@@ -28,17 +28,65 @@ jobs:
       DE_W1_0C_DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
       DE_W1_0D_DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
       DE_W1_0E_DATABASE_URL: postgresql://validation:validation@localhost:5432/validation
+      BASE_SHA: 4639cce9db2bc6935cd3df3e13e2460506595194
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
-      - run: npm run prisma:generate
-      - run: npx prisma validate
-      - run: npx prisma migrate deploy
-      - name: E unit tests
-        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/normalization/owned-website-wave1-normalizers.test.ts
-      - name: Build
+      - name: npm ci
+        run: npm ci
+      - name: Prisma generate
+        run: npm run prisma:generate
+      - name: Prisma validate
+        run: npx prisma validate
+      - name: Apply all migrations
+        run: npx prisma migrate deploy
+      - name: Reset and reapply all migrations
+        run: npx prisma migrate reset --force --skip-seed
+      - name: E unit and architecture tests
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/normalization/owned-website-wave1-normalizers.test.ts src/features/data-extraction/evidence/normalization/owned-website-wave1-normalization.architecture.test.ts
+      - name: E PostgreSQL integration
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/normalization/owned-website-wave1-normalization.postgres.test.ts
+      - name: D regression
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/owned-website-wave1-acquisition.test.ts src/features/data-extraction/evidence/owned-website-wave1-acquisition.architecture.test.ts src/features/data-extraction/evidence/owned-website-wave1-acquisition.postgres.test.ts
+      - name: C regression
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/evidence-repositories.postgres.test.ts src/features/data-extraction/evidence/evidence-repositories.architecture.test.ts
+      - name: B regression
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/evidence-persistence.postgres.test.ts src/features/data-extraction/evidence/evidence-persistence.architecture.test.ts
+      - name: A regression
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/evidence-runtime-contracts.test.ts src/features/data-extraction/evidence/evidence-runtime.architecture.test.ts
+      - name: W1.0E input compatibility
+        run: npx vitest run --config vitest.config.ts src/features/data-extraction/evidence/evidence-w1-0e-compatibility.test.ts src/features/brand-intelligence/input/evidence/evidence-input.test.ts src/features/brand-intelligence/input/dependency/processor-dependency-preparation.test.ts
+      - name: W1.0F projection compatibility
+        run: npx vitest run --config vitest.config.ts src/features/brand-intelligence/brand-intelligence.current-projection.architecture.test.ts src/features/brand-intelligence/projection
+      - name: Legacy Preview regression
+        run: npx vitest run --config vitest.config.ts src/features/brand-onboarding/brand-preview/data-extraction/brand-preview-evidence.service.test.ts src/features/brand-onboarding/brand-preview/data-extraction/brand-preview-enrichment.service.test.ts
+      - name: Nest build
         run: npm run build
+      - name: Scoped lint
+        run: npx eslint "src/features/data-extraction/evidence/normalization/**/*.ts" "src/features/data-extraction/data-extraction.module.ts"
+      - name: Full suite
+        run: npm test
+      - name: Confirm no schema or migration changes
+        run: git diff --exit-code "$BASE_SHA" -- prisma/schema.prisma prisma/migrations
+      - name: Confirm real processors disabled
+        run: |
+          node <<'NODE'
+          const registry = require('./src/features/brand-intelligence/generated/contract-bundles/registry.json');
+          for (const id of ['brand_communication', 'brand_meaning']) {
+            const row = registry.registrations.find((entry) => entry.processorId === id);
+            if (!row || row.bundled !== true || row.registered !== true || row.executionEnabled !== false) {
+              throw new Error(`${id} processor state changed`);
+            }
+          }
+          NODE
+      - name: Confirm F adapter remains missing binding
+        run: |
+          grep -R "MissingDataExtractionEvidenceAdapter" src/features/brand-intelligence -n >/dev/null
+          ! grep -R "DataExtractionIntelligenceEvidenceAdapter" src/features/data-extraction/evidence/normalization -n
+      - name: Diff check
+        run: git diff --check "$BASE_SHA"
