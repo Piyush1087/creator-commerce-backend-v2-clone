@@ -2,7 +2,13 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const root = join(process.cwd(), "src", "features", "data-extraction", "evidence");
+const root = join(
+  process.cwd(),
+  "src",
+  "features",
+  "data-extraction",
+  "evidence",
+);
 
 function productionFiles(path: string): string[] {
   return readdirSync(path).flatMap((name) => {
