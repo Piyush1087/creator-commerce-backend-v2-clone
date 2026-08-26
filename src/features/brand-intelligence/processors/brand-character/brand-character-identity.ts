@@ -83,34 +83,8 @@ export function characterCurrentFingerprint(
       ),
   );
 }
-const normalize = (text: string) =>
-  text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim();
-export const characterLabel = (item: CharacterItem) =>
-  item.value ?? item.trait ?? "";
-function equivalentLabel(a: string, b: string): boolean {
-  const left = normalize(a);
-  const right = normalize(b);
-  if (left === right) return true;
-  const words = (text: string) =>
-    new Set(
-      text
-        .split(" ")
-        .filter(
-          (word) =>
-            !["a", "an", "the", "our", "and", "to", "of", "for"].includes(word),
-        ),
-    );
-  const l = words(left);
-  const r = words(right);
-  const intersection = [...l].filter((word) => r.has(word)).length;
-  return (
-    Math.min(l.size, r.size) >= 3 &&
-    intersection / Math.max(l.size, r.size) >= 0.8
-  );
-}
+/** Exact ID/path integrity only. Meaning reconciliation belongs to the frozen
+ * reasoning contract and the processor's comparison-only current context. */
 export function validateCharacterIdentity(
   output: BrandCharacterOutput,
   current: readonly CharacterCurrentState[],
@@ -118,36 +92,26 @@ export function validateCharacterIdentity(
 ): void {
   for (const id of BRAND_CHARACTER_OBJECTS) {
     const items = output[id] ?? [];
+    const ids = items.map((item) => item.semantic_id);
+    if (new Set(ids).size !== ids.length)
+      characterInvalid("INVALID_SEMANTIC_ITEM_ID");
+    for (const prior of current.filter(
+      (row) => row.objectSemanticId === id && row.componentSemanticPath !== "$",
+    )) {
+      const old = prior.currentComponentGeneration
+        .valuePayload as unknown as CharacterItem | null;
+      if (
+        old &&
+        typeof old === "object" &&
+        typeof old.semantic_id === "string" &&
+        itemPath(old.semantic_id) !== prior.componentSemanticPath
+      )
+        characterInvalid("CHARACTER_PERSISTED_ID_PATH_MISMATCH");
+    }
     for (const item of items) {
       const path = itemPath(item.semantic_id);
       if (!characterScopeAllows(scope, id, path))
         characterInvalid("CHARACTER_OUTPUT_OUTSIDE_ACTIVE_SCOPE");
-      for (const prior of current.filter(
-        (row) =>
-          row.objectSemanticId === id &&
-          row.componentSemanticPath !== "$" &&
-          row.lifecycle === "ACTIVE",
-      )) {
-        const old = prior.currentComponentGeneration
-          .valuePayload as unknown as CharacterItem;
-        if (
-          old &&
-          typeof old === "object" &&
-          typeof old.semantic_id === "string" &&
-          old.semantic_id !== item.semantic_id &&
-          (normalize(old.semantic_id) === normalize(item.semantic_id) ||
-            equivalentLabel(characterLabel(old), characterLabel(item)))
-        )
-          characterInvalid("CHARACTER_SEMANTIC_ID_CONTINUITY");
-      }
-      if (
-        items.some(
-          (other) =>
-            other !== item &&
-            equivalentLabel(characterLabel(other), characterLabel(item)),
-        )
-      )
-        characterInvalid("DUPLICATE_CHARACTER_MEANING");
     }
   }
 }

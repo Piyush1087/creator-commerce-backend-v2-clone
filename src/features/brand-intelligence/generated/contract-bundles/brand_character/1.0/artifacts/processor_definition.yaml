@@ -46,8 +46,8 @@ canonical_inputs:
 evidence_requirements:
 - owned_website.brand_company_context
 - owned_website.brand_messaging
-- brand_user_input_and_confirmations
 optional_enrichment:
+- brand_user_input_and_confirmations
 - instagram.owned_brand_context
 authority_behavior:
   default_output_authority: CREATOR_SHOP_DERIVED

@@ -559,52 +559,97 @@ describe.skipIf(!enabled)(
       },
     );
 
-    it("updates one unprotected item while preserving unrelated item generations and mixed projection", async () => {
-      const f = await fixture();
-      await f.run(characterOutput(f.prepared.evidence));
-      const before = await f.currents();
-      const full = characterOutput(f.prepared.evidence);
-      const output = {
-        brand_values: [
-          {
-            semantic_id: "principle_transparency",
-            value: "Transparency in all creator partnerships",
-          },
-        ],
-        brand_personality: null,
-        output_metadata: {
-          brand_values: [full.output_metadata.brand_values![0]],
+    it.each(["Transparency in all creator partnerships", "TRANSPARENCY"])(
+      "preserves identity across wording/case update to %s without changing unrelated items",
+      async (label) => {
+        const f = await fixture();
+        await f.run(characterOutput(f.prepared.evidence));
+        const before = await f.currents();
+        const full = characterOutput(f.prepared.evidence);
+        const output = {
+          brand_values: [
+            {
+              semantic_id: "principle_transparency",
+              value: label,
+            },
+          ],
           brand_personality: null,
-        },
-      };
-      expect(
-        (
-          await f.run(
-            output,
-            1,
-            undefined,
-            ["brand_values"],
-            itemPath("principle_transparency"),
-          )
-        ).result?.processorExecution.status,
-      ).toBe("COMPLETED");
-      for (const current of await f.currents()) {
-        const prior = before.find((row) => row.id === current.id)!;
-        if (
-          current.componentSemanticPath === itemPath("principle_transparency")
-        )
-          expect(current.revision).toBe(prior.revision + 1n);
-        else expect(current).toEqual(prior);
-      }
-      const projection = await f.projection.readObject({
-        brandId: f.brandId,
-        objectSemanticId: "brand_values",
-      });
-      expect(projection.mixedGeneration).toBe(true);
-      expect(projection.objectState).toBe("CURRENT");
-      expect(projection.resultReadiness).toBe("READY");
-      expect(projection.assembledValue.value).toHaveLength(2);
-    });
+          output_metadata: {
+            brand_values: [full.output_metadata.brand_values![0]],
+            brand_personality: null,
+          },
+        };
+        expect(
+          (
+            await f.run(
+              output,
+              1,
+              undefined,
+              ["brand_values"],
+              itemPath("principle_transparency"),
+            )
+          ).result?.processorExecution.status,
+        ).toBe("COMPLETED");
+        for (const current of await f.currents()) {
+          const prior = before.find((row) => row.id === current.id)!;
+          if (
+            current.componentSemanticPath === itemPath("principle_transparency")
+          ) {
+            expect(current.id).toBe(prior.id);
+            expect(current.componentSemanticPath).toBe(
+              prior.componentSemanticPath,
+            );
+            expect(current.revision).toBe(prior.revision + 1n);
+          } else expect(current).toEqual(prior);
+        }
+        const projection = await f.projection.readObject({
+          brandId: f.brandId,
+          objectSemanticId: "brand_values",
+        });
+        expect(projection.mixedGeneration).toBe(true);
+        expect(projection.objectState).toBe("CURRENT");
+        expect(projection.resultReadiness).toBe("READY");
+        expect(projection.assembledValue.value).toHaveLength(2);
+      },
+    );
+
+    it.each(["BRAND_CONFIRMED", "SUPPORT_CONTROLLED"] as const)(
+      "cannot replace a directed protected %s semantic ID with another ID",
+      async (protection) => {
+        const f = await fixture();
+        await f.run(characterOutput(f.prepared.evidence));
+        await f.protect("brand_values", "principle_transparency", protection);
+        const before = await f.currents();
+        const full = characterOutput(f.prepared.evidence);
+        const output = {
+          brand_values: [
+            { semantic_id: "replacement_transparency", value: "Transparency" },
+          ],
+          brand_personality: null,
+          output_metadata: {
+            brand_values: [
+              {
+                ...full.output_metadata.brand_values![0],
+                semantic_id: "replacement_transparency",
+              },
+            ],
+            brand_personality: null,
+          },
+        };
+        const failed = await f.run(
+          output,
+          1,
+          undefined,
+          ["brand_values"],
+          itemPath("principle_transparency"),
+        );
+        expect(failed.result?.processorExecution).toMatchObject({
+          status: "FAILED_TERMINAL",
+          lastErrorCode: "CHARACTER_OUTPUT_OUTSIDE_ACTIVE_SCOPE",
+        });
+        expect(await f.currents()).toEqual(before);
+      },
+    );
 
     it("admits a new semantic item without disturbing existing item identity", async () => {
       const f = await fixture();

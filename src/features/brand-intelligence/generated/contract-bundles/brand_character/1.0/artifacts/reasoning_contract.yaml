@@ -18,8 +18,8 @@ provider_or_model_selection: deferred_to_model_registry
 inputs:
   canonical: [brand_name, confirmed_industry, confirmed_sub_industry_or_category_when_authoritative]
   evidence_capabilities:
-    required: [owned_website.brand_company_context, owned_website.brand_messaging, brand_user_input_and_confirmations]
-    optional: [instagram.owned_brand_context]
+    required: [owned_website.brand_company_context, owned_website.brand_messaging]
+    optional: [brand_user_input_and_confirmations, instagram.owned_brand_context]
 
 protected_current_state:
   granularity: item

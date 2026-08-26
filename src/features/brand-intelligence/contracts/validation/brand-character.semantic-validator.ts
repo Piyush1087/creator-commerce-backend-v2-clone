@@ -62,15 +62,8 @@ export class BrandCharacterSemanticValidator implements ProcessorSemanticValidat
         )
       )
         fail("SEMANTIC_ITEM_METADATA_MISMATCH", objectId);
-      const labels = items.map((item) =>
-        normalized(
-          String(
-            row(item)[objectId === "brand_values" ? "value" : "trait"] ?? "",
-          ),
-        ),
-      );
-      if (new Set(labels).size !== labels.length)
-        fail("DUPLICATE_CHARACTER_MEANING", objectId);
+      // Labels are not semantic identity. The frozen reasoning contract owns
+      // meaning reconciliation; deterministic validation checks exact IDs above.
       for (const item of items) {
         const value = row(item);
         const label = String(

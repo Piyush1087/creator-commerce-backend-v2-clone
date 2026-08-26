@@ -2,7 +2,7 @@
   "generatedNotice": "GENERATED — DO NOT EDIT",
   "generatorVersion": "1.0.0",
   "architectureRepository": "Piyush1087/dummy_tcs",
-  "architectureCommitSha": "7bdfd71a3cdd08b0457ee53a357bb65e80ccace1",
+  "architectureCommitSha": "56b52c1106feff2a92f23a7c49674fd116bf8c63",
   "registrations": [
     {
       "processorId": "brand_communication",
@@ -85,7 +85,7 @@
       "outputContractVersion": "1.0",
       "bundleId": "brand_intelligence.brand_character",
       "bundleVersion": "1.0",
-      "bundleContentHash": "7a8f10973175b2e78d6a995e3132608930a737f55a0fbce1597ac5907e18640f",
+      "bundleContentHash": "993dcf05379812db006bc358fecff73ce50f20ababc3553090833664b9cf028e",
       "ownedObjectSemanticIds": [
         "brand_values",
         "brand_personality"

@@ -265,39 +265,124 @@ describe("brand_character executor", () => {
       failure: { category: "VALIDATION_FAILURE" },
     });
   });
-  it("rejects rekeying continuous protected meaning and preserves exact ID across wording/case changes", () => {
-    const output = mutable(characterOutput(evidenceFixture("identity")));
-    const prior = [
-      {
-        objectSemanticId: "brand_values",
-        componentSemanticPath: itemPath("principle_transparency"),
-        lifecycle: "ACTIVE",
-        protectionState: "BRAND_CONFIRMED",
-        currentComponentGeneration: {
-          valuePayload: {
-            semantic_id: "principle_transparency",
-            value: "Transparency",
+  it.each(["Transparency in every creator partnership", "TRANSPARENCY"])(
+    "preserves exact persisted identity when the label changes to %s",
+    (label) => {
+      const output = mutable(characterOutput(evidenceFixture("identity")));
+      const prior = [
+        {
+          objectSemanticId: "brand_values",
+          componentSemanticPath: itemPath("principle_transparency"),
+          lifecycle: "ACTIVE",
+          protectionState: "BRAND_CONFIRMED",
+          currentComponentGeneration: {
+            valuePayload: {
+              semantic_id: "principle_transparency",
+              value: "Transparency",
+            },
           },
         },
+      ] as unknown as CharacterCurrentState[];
+      output.brand_values[0].value = label;
+      expect(() =>
+        validateCharacterIdentity(
+          output as unknown as BrandCharacterOutput,
+          prior,
+          scope("identity"),
+        ),
+      ).not.toThrow();
+      expect(itemPath(output.brand_values[0].semantic_id)).toBe(
+        prior[0].componentSemanticPath,
+      );
+      expect(prior[0].protectionState).toBe("BRAND_CONFIRMED");
+    },
+  );
+  it("accepts distinct semantic IDs with overlapping labels and passes exact current IDs to reasoning", async () => {
+    const original = evidenceFixture("overlapping-labels");
+    const evidence = {
+      ...original,
+      capabilityResults: original.capabilityResults.map((cap, index) =>
+        index
+          ? cap
+          : {
+              ...cap,
+              evidence: cap.evidence.map((item) => ({
+                ...item,
+                boundedNormalizedPayload: {
+                  statement_text:
+                    "Our principles include transparency in creator partnership payment timing and transparency in creator partnership payment terms.",
+                  statement_class: "STATED_PRINCIPLE",
+                },
+              })),
+            },
+      ),
+    };
+    const f = await fixture(evidence);
+    const output = mutable(characterOutput(evidence));
+    output.brand_values = [
+      {
+        semantic_id: "principle_payment_timing",
+        value: "Transparency in creator partnership payment timing",
+      },
+      {
+        semantic_id: "principle_payment_terms",
+        value: "Transparency in creator partnership payment terms",
+      },
+    ];
+    output.output_metadata.brand_values.forEach((meta, index) => {
+      meta.semantic_id = output.brand_values[index].semantic_id;
+    });
+    const current = [
+      {
+        objectSemanticId: "brand_values",
+        componentSemanticPath: itemPath("principle_payment_timing"),
+        lifecycle: "ACTIVE",
+        protectionState: "BRAND_CONFIRMED",
+        currentComponentGeneration: { valuePayload: output.brand_values[0] },
       },
     ] as unknown as CharacterCurrentState[];
-    output.brand_values[0].semantic_id = "new_transparency";
+    f.catalogue.read.mockResolvedValue(current);
+    f.model.generate.mockResolvedValue({ output, providerAttemptCount: 1 });
+    expect((await f.executor.execute(f.context)).readiness).toBe("READY");
+    expect(f.model.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        approvedContext: expect.objectContaining({
+          identityAndProtection: [
+            expect.objectContaining({
+              value: output.brand_values[0],
+              protection: "BRAND_CONFIRMED",
+              comparisonOnly: true,
+            }),
+          ],
+        }),
+      }),
+    );
+  });
+  it("rejects duplicate exact IDs without comparing their labels", () => {
+    const output = mutable(
+      characterOutput(evidenceFixture("duplicate-identity")),
+    );
+    output.brand_values[1].semantic_id = output.brand_values[0].semantic_id;
     expect(() =>
       validateCharacterIdentity(
         output as unknown as BrandCharacterOutput,
-        prior,
-        scope("identity"),
+        [],
+        scope("duplicate-identity"),
       ),
-    ).toThrow("CHARACTER_SEMANTIC_ID_CONTINUITY");
-    output.brand_values[0].semantic_id = "principle_transparency";
-    output.brand_values[0].value = "TRANSPARENCY";
+    ).toThrow("INVALID_SEMANTIC_ITEM_ID");
+  });
+  it("rejects persisted ID/path inconsistency rather than relabeling current identity", () => {
+    const output = characterOutput(evidenceFixture("stored-identity"));
+    const current = [
+      {
+        objectSemanticId: "brand_values",
+        componentSemanticPath: itemPath("different_stored_id"),
+        currentComponentGeneration: { valuePayload: output.brand_values![0] },
+      },
+    ] as unknown as CharacterCurrentState[];
     expect(() =>
-      validateCharacterIdentity(
-        output as unknown as BrandCharacterOutput,
-        prior,
-        scope("identity"),
-      ),
-    ).not.toThrow();
+      validateCharacterIdentity(output, current, scope("stored-identity")),
+    ).toThrow("CHARACTER_PERSISTED_ID_PATH_MISMATCH");
   });
   it.each(["RATE_LIMITED", "REQUEST_TIMEOUT", "NETWORK_ERROR"])(
     "keeps %s retry under W1.0D",

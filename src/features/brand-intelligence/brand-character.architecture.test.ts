@@ -52,7 +52,7 @@ describe("brand_character architecture", () => {
     expect(PROCESSOR_ARCHITECTURE_COMMITS).toEqual({
       brand_communication: "017dbceac494f0861ec9a6bea7af3129b70fa5cb",
       brand_meaning: "2e13fa40235094d127f72b38f43c510232e38be4",
-      brand_character: "7bdfd71a3cdd08b0457ee53a357bb65e80ccace1",
+      brand_character: "56b52c1106feff2a92f23a7c49674fd116bf8c63",
     });
     expect(bundle.manifest.architectureCommitSha).toBe(
       PROCESSOR_ARCHITECTURE_COMMITS.brand_character,
@@ -78,6 +78,26 @@ describe("brand_character architecture", () => {
       "owned_website.brand_company_context",
       "owned_website.brand_messaging",
     ]);
+    const optional = [
+      "brand_user_input_and_confirmations",
+      "instagram.owned_brand_context",
+    ];
+    expect(bundle.artifacts.processorDefinition.evidence_requirements).toEqual(
+      profile.capabilityIds,
+    );
+    expect(bundle.artifacts.processorDefinition.optional_enrichment).toEqual(
+      optional,
+    );
+    expect(bundle.artifacts.reasoningContract.inputs).toMatchObject({
+      evidence_capabilities: { required: [...profile.capabilityIds], optional },
+    });
+    for (const capability of profile.capabilityIds)
+      expect(evidence[capability].required_for_processor).toBe(true);
+    expect(bundle.artifacts.evidenceContract.optional_enrichment).toMatchObject(
+      {
+        "instagram.owned_brand_context": { required_for_processor: false },
+      },
+    );
   });
   it("uses frozen item metadata authority and exact root/item ownership in persistence validation", () => {
     const runtime = contracts();
@@ -137,6 +157,8 @@ describe("brand_character architecture", () => {
       "Optional user-input",
       "comparison-only",
       "same semantic_id",
+      "Materially equivalent meanings share one ID",
+      "comparison-only, NOT Evidence",
     ])
       expect(BRAND_CHARACTER_SYSTEM_INSTRUCTION).toContain(text);
     const module = readFileSync(
@@ -145,5 +167,16 @@ describe("brand_character architecture", () => {
     );
     expect(module).toContain("useClass: ProcessorPersistenceRouter");
     expect(module).toContain("useClass: StructuredBrandCharacterModelProvider");
+  });
+  it("keeps semantic identity independent of lexical scoring", () => {
+    const source = readFileSync(
+      join(__dirname, "processors/brand-character/brand-character-identity.ts"),
+      "utf8",
+    );
+    expect(source).not.toMatch(
+      /equivalentLabel|characterLabel|intersection|Math\.(min|max)|toLowerCase|localeCompare\(.*label|0\.8/u,
+    );
+    expect(source).toContain("new Set(ids)");
+    expect(source).toContain("itemPath(item.semantic_id)");
   });
 });

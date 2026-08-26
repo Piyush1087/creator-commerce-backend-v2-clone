@@ -5,7 +5,7 @@ const ROOT =
 
 export const ARCHITECTURE_REPOSITORY = "Piyush1087/dummy_tcs";
 export const PINNED_ARCHITECTURE_COMMIT =
-  "7bdfd71a3cdd08b0457ee53a357bb65e80ccace1";
+  "56b52c1106feff2a92f23a7c49674fd116bf8c63";
 
 // Independent immutable bundles: the amendment does not repin communication.
 export const PROCESSOR_ARCHITECTURE_COMMITS: Readonly<Record<string, string>> =

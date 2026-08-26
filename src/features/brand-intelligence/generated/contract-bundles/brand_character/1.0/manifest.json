@@ -5,7 +5,7 @@
   "ownerEngine": "brand_intelligence",
   "owningBranch": "brand_expression",
   "architectureRepository": "Piyush1087/dummy_tcs",
-  "architectureCommitSha": "7bdfd71a3cdd08b0457ee53a357bb65e80ccace1",
+  "architectureCommitSha": "56b52c1106feff2a92f23a7c49674fd116bf8c63",
   "processorId": "brand_character",
   "processorVersion": "1.0",
   "outputContractId": "brand_character_output_contract",
@@ -75,7 +75,7 @@
       "status": "FROZEN",
       "required": true,
       "byteLength": 3219,
-      "sha256": "fde92ca7678f8477d9a6a4e54e7c49549b0e59249bab2a7b2af65680432d4c0c"
+      "sha256": "864ed8d5f65ceb492637f5dcfef12eeaf58a6753352bf951d0fe972a23e658b1"
     },
     {
       "role": "REASONING_CONTRACT",
@@ -85,7 +85,7 @@
       "status": "FROZEN",
       "required": true,
       "byteLength": 5694,
-      "sha256": "a803f4deb7cb262a628930dfa41875a77faf5f40c31d4f440a6351c767022baf"
+      "sha256": "cfabbe5f32c5f10ea6c31d8f96f690f62f7315e63034052b3b651c9e4ea0009e"
     },
     {
       "role": "SHARED_METADATA_CONTRACT",
@@ -98,5 +98,5 @@
       "sha256": "47dbd324d4d79136b16ade4448adf78087d93658bcb2281292c40bfe6def98bd"
     }
   ],
-  "bundleContentHash": "7a8f10973175b2e78d6a995e3132608930a737f55a0fbce1597ac5907e18640f"
+  "bundleContentHash": "993dcf05379812db006bc358fecff73ce50f20ababc3553090833664b9cf028e"
 }
