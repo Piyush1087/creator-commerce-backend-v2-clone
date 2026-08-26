@@ -84,7 +84,7 @@ describe("contract runtime registry and startup integrity", () => {
     const runtime = registry();
     runtime.verifyAtRoot(GENERATED_ROOT);
     expect(runtime.isReady()).toBe(true);
-    expect(runtime.registrations()).toHaveLength(5);
+    expect(runtime.registrations()).toHaveLength(6);
     expect(
       runtime
         .registrations()
@@ -95,6 +95,7 @@ describe("contract runtime registry and startup integrity", () => {
       ["brand_character", true],
       ["audience_persona_synthesis", true],
       ["brand_differentiation", true],
+      ["visual_style_synthesis", true],
     ]);
     expect(
       runtime.getVerifiedBundle({

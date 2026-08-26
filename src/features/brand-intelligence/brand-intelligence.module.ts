@@ -1,4 +1,12 @@
 import { Module } from "@nestjs/common";
+import { BrandCanonicalStateModule } from "../brand-canonical-state/brand-canonical-state.module";
+import { VisualStyleProcessorExecutor } from "./processors/visual-style/visual-style-processor.executor";
+import { VisualStylePersistenceHook } from "./processors/visual-style/visual-style-persistence.hook";
+import { VisualStyleStateRepository } from "./processors/visual-style/visual-style-state.repository";
+import {
+  VISUAL_STYLE_MODEL_PROVIDER,
+  StructuredVisualStyleModelProvider,
+} from "./processors/visual-style/visual-style-model.provider";
 import { BrandDifferentiationProcessorExecutor } from "./processors/brand-differentiation/brand-differentiation-processor.executor";
 import { BrandDifferentiationPersistenceHook } from "./processors/brand-differentiation/brand-differentiation-persistence.hook";
 import { BrandDifferentiationStateRepository } from "./processors/brand-differentiation/brand-differentiation-state.repository";
@@ -73,6 +81,13 @@ import {
 } from "./processors/brand-character/brand-character-model.provider";
 
 const internalProviders = [
+  VisualStyleProcessorExecutor,
+  VisualStylePersistenceHook,
+  VisualStyleStateRepository,
+  {
+    provide: VISUAL_STYLE_MODEL_PROVIDER,
+    useClass: StructuredVisualStyleModelProvider,
+  },
   BrandDifferentiationProcessorExecutor,
   BrandDifferentiationPersistenceHook,
   BrandDifferentiationStateRepository,
@@ -152,7 +167,7 @@ const internalProviders = [
 ];
 
 @Module({
-  imports: [DataExtractionModule],
+  imports: [DataExtractionModule, BrandCanonicalStateModule],
   providers: internalProviders,
   exports: internalProviders,
 })

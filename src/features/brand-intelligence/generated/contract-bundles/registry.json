@@ -266,6 +266,114 @@
       "bundled": true,
       "registered": true,
       "executionEnabled": true
+    },
+    {
+      "processorId": "visual_style_synthesis",
+      "processorVersion": "1.0",
+      "outputContractId": "visual_style_synthesis_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "brand_intelligence.visual_style_synthesis",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "abe6db88df94e73ebdae3fd4d5345076054a2ab7642d4b34280ea1cda294dd9a",
+      "ownedObjectSemanticIds": [
+        "visual_style_profile"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/summary"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/style_traits"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/style_traits/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/style_traits/i/{semantic_id}/f/trait"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/photographic_tendencies"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/photographic_tendencies/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/photographic_tendencies/i/{semantic_id}/f/value"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/subject_tendencies"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/subject_tendencies/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/subject_tendencies/i/{semantic_id}/f/value"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/mood_or_treatment"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/mood_or_treatment/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/mood_or_treatment/i/{semantic_id}/f/value"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/graphic_treatment"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/graphic_treatment/f/traits"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/graphic_treatment/f/traits/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/graphic_treatment/f/traits/i/{semantic_id}/f/value"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/visual_constraints"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/visual_constraints/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/visual_constraints/i/{semantic_id}/f/rule"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "visual_style_synthesis",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
     }
   ]
 }

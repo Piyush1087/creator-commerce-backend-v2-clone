@@ -15,6 +15,7 @@ export const PROCESSOR_ARCHITECTURE_COMMITS: Readonly<Record<string, string>> =
     brand_character: "56b52c1106feff2a92f23a7c49674fd116bf8c63",
     audience_persona_synthesis: PINNED_ARCHITECTURE_COMMIT,
     brand_differentiation: PINNED_ARCHITECTURE_COMMIT,
+    visual_style_synthesis: PINNED_ARCHITECTURE_COMMIT,
   };
 
 export const EXECUTABLE_CONTRACT_PROCESSORS: ReadonlySet<string> = new Set([
@@ -23,6 +24,7 @@ export const EXECUTABLE_CONTRACT_PROCESSORS: ReadonlySet<string> = new Set([
   "brand_character",
   "audience_persona_synthesis",
   "brand_differentiation",
+  "visual_style_synthesis",
 ]);
 
 export const CONTRACT_SOURCE_SPECS: readonly ContractSourceSpec[] = [
@@ -203,6 +205,58 @@ export const CONTRACT_SOURCE_SPECS: readonly ContractSourceSpec[] = [
       OUTPUT_CONTRACT: `${ROOT}/artifacts/brand_differentiation/output_contract.yaml`,
       EVIDENCE_CONTRACT: `${ROOT}/evidence/brand_differentiation_evidence.yaml`,
       OBJECT_CONTRACT: `${ROOT}/objects.yaml`,
+      SHARED_METADATA_CONTRACT:
+        "intelligence/architecture/shared_intelligence_metadata_contract.yaml",
+    },
+  },
+  {
+    processorId: "visual_style_synthesis",
+    processorVersion: "1.0",
+    outputContractId: "visual_style_synthesis_output_contract",
+    outputContractVersion: "1.0",
+    evidenceContractId: "visual_style_synthesis_evidence",
+    evidenceContractVersion: "1.0",
+    ownerEngine: "brand_intelligence",
+    owningBranch: "visual_identity",
+    ownedObjectSemanticIds: ["visual_style_profile"],
+    ownedPathPatterns: [
+      "$",
+      "$/f/summary",
+      "$/f/style_traits",
+      "$/f/style_traits/i/{semantic_id}",
+      "$/f/style_traits/i/{semantic_id}/f/trait",
+      "$/f/imagery_style",
+      ...[
+        "photographic_tendencies",
+        "subject_tendencies",
+        "mood_or_treatment",
+      ].flatMap((field) => [
+        `$/f/imagery_style/f/${field}`,
+        `$/f/imagery_style/f/${field}/i/{semantic_id}`,
+        `$/f/imagery_style/f/${field}/i/{semantic_id}/f/value`,
+      ]),
+      "$/f/graphic_treatment",
+      "$/f/graphic_treatment/f/traits",
+      "$/f/graphic_treatment/f/traits/i/{semantic_id}",
+      "$/f/graphic_treatment/f/traits/i/{semantic_id}/f/value",
+      "$/f/visual_constraints",
+      "$/f/visual_constraints/i/{semantic_id}",
+      "$/f/visual_constraints/i/{semantic_id}/f/rule",
+    ].map((componentPathPattern) => ({
+      objectSemanticId: "visual_style_profile",
+      componentPathPattern,
+    })),
+    artifactPaths: {
+      PROCESSOR_DEFINITION:
+        "intelligence/engines/brand_intelligence/branches/visual_identity/processors/visual_style_synthesis.yaml",
+      REASONING_CONTRACT:
+        "intelligence/engines/brand_intelligence/branches/visual_identity/artifacts/visual_style_synthesis/reasoning.yaml",
+      OUTPUT_CONTRACT:
+        "intelligence/engines/brand_intelligence/branches/visual_identity/artifacts/visual_style_synthesis/output_contract.yaml",
+      EVIDENCE_CONTRACT:
+        "intelligence/engines/brand_intelligence/branches/visual_identity/evidence/visual_style_synthesis_evidence.yaml",
+      OBJECT_CONTRACT:
+        "intelligence/engines/brand_intelligence/branches/visual_identity/objects.yaml",
       SHARED_METADATA_CONTRACT:
         "intelligence/architecture/shared_intelligence_metadata_contract.yaml",
     },

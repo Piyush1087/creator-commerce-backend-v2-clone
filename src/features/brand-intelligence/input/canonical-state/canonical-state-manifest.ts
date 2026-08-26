@@ -26,6 +26,10 @@ export interface CanonicalDependencyManifest {
     BusinessStateReference,
     "observedAt"
   >[];
+  readonly visualReferences?: readonly Omit<
+    BusinessStateReference,
+    "observedAt"
+  >[];
 }
 
 @Injectable()
@@ -59,6 +63,20 @@ export class CanonicalStateManifestBuilder {
       brandId: snapshot.brandId,
       canonicalSnapshotRef: snapshot.canonicalSnapshotRef,
       entries,
+      ...(snapshot.visualState
+        ? {
+            visualReferences: [
+              ...(snapshot.visualState.stateReference
+                ? [snapshot.visualState.stateReference]
+                : []),
+              ...snapshot.visualState.items.map(
+                (item) => item.businessStateReference,
+              ),
+            ]
+              .map(({ observedAt: _observedAt, ...ref }) => ref)
+              .sort((a, b) => a.entityId.localeCompare(b.entityId)),
+          }
+        : {}),
       ...(snapshot.offeringFacts
         ? {
             offeringReferences: snapshot.offeringFacts

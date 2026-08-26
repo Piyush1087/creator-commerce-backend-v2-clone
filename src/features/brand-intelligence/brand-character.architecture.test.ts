@@ -50,6 +50,7 @@ describe("brand_character architecture", () => {
       ["brand_character", true, true, true],
       ["audience_persona_synthesis", true, true, true],
       ["brand_differentiation", true, true, true],
+      ["visual_style_synthesis", true, true, true],
     ]);
     expect(PROCESSOR_ARCHITECTURE_COMMITS).toEqual({
       brand_communication: "017dbceac494f0861ec9a6bea7af3129b70fa5cb",
@@ -57,6 +58,7 @@ describe("brand_character architecture", () => {
       brand_character: "56b52c1106feff2a92f23a7c49674fd116bf8c63",
       audience_persona_synthesis: "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
       brand_differentiation: "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
+      visual_style_synthesis: "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
     });
     expect(bundle.manifest.architectureCommitSha).toBe(
       PROCESSOR_ARCHITECTURE_COMMITS.brand_character,

@@ -1,4 +1,5 @@
 import { z, type ZodType } from "zod";
+import { visualStyleOutputContract } from "./visual-style-output-schema";
 
 import type { VerifiedContractBundle } from "../bundle/contract-bundle.types";
 
@@ -101,7 +102,8 @@ function nodeSchema(
 export function verifiedOutputZodSchema(
   bundle: VerifiedContractBundle,
 ): ZodType<unknown> {
-  const response = record(bundle.artifacts.outputContract.response);
+  const contract = visualStyleOutputContract(bundle);
+  const response = record(contract.response);
   if (!response) throw new Error("MISSING_FROZEN_OUTPUT_RESPONSE_SCHEMA");
-  return nodeSchema(response, bundle.artifacts.outputContract);
+  return nodeSchema(response, contract);
 }

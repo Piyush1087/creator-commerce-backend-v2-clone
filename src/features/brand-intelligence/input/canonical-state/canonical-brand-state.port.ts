@@ -37,7 +37,13 @@ export type CanonicalBrandStateResolution =
   | "UNKNOWN_PROVENANCE";
 
 export interface BusinessStateReference {
-  readonly entityType: "BrandProfile" | "Offering";
+  readonly entityType:
+    | "BrandProfile"
+    | "Offering"
+    | "BrandVisualState"
+    | "BrandVisualAsset"
+    | "BrandVisualColor"
+    | "BrandVisualTypography";
   readonly entityId: string;
   readonly semanticFieldPath: string;
   readonly revisionKind: "UPDATED_AT" | "SNAPSHOT_FINGERPRINT";
@@ -69,6 +75,30 @@ export interface CanonicalBrandStateSnapshot {
   readonly entries: readonly CanonicalBrandStateEntry[];
   /** Optional application-owned Offering facts, never observed DE candidates. */
   readonly offeringFacts?: readonly CanonicalOfferingFact[];
+  readonly visualState?: CanonicalVisualSnapshot;
+}
+
+/** Approved application records only; never a legacy logo or observed candidate. */
+export interface CanonicalVisualFact {
+  readonly brandId: string;
+  readonly itemId: string;
+  readonly role:
+    | "PRIMARY_LOGO"
+    | "ALTERNATE_MARK"
+    | "REFERENCE_IMAGE"
+    | "PALETTE"
+    | "TYPOGRAPHY";
+  readonly authority: string;
+  readonly origin: string;
+  /** Transient context; excluded from persisted manifests and Intelligence values. */
+  readonly value: string;
+  readonly usage: string | null;
+  readonly businessStateReference: BusinessStateReference;
+}
+export interface CanonicalVisualSnapshot {
+  readonly brandId: string;
+  readonly stateReference: BusinessStateReference | null;
+  readonly items: readonly CanonicalVisualFact[];
 }
 
 export interface CanonicalOfferingFact {
@@ -86,6 +116,7 @@ export interface CanonicalBrandStateReadRequest {
   readonly brandId: string;
   readonly requiredSemantics: readonly CanonicalBrandStateSemantic[];
   readonly includeOfferingFacts?: boolean;
+  readonly includeVisualState?: boolean;
 }
 
 export interface CanonicalBrandStateReader {

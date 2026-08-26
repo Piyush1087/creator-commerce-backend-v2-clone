@@ -1,0 +1,233 @@
+id: visual_style_synthesis_evidence
+version: "1.0"
+status: FROZEN
+owner_engine: brand_intelligence
+owning_branch: visual_identity
+processor: visual_style_synthesis
+processor_definition: intelligence/engines/brand_intelligence/branches/visual_identity/processors/visual_style_synthesis.yaml
+reasoning_authority: intelligence/engines/brand_intelligence/branches/visual_identity/artifacts/visual_style_synthesis/reasoning.yaml
+output_contract_authority: intelligence/engines/brand_intelligence/branches/visual_identity/artifacts/visual_style_synthesis/output_contract.yaml
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define provider-neutral Visual Identity Evidence semantics while keeping canonical visual assets/settings in
+  application state, distinguishing recurring Brand-level patterns from page/campaign/incidental observations,
+  and preventing observed patterns from becoming protected visual constraints.
+
+boundary:
+  data_extraction_role: acquire_and_normalize_visual_observations
+  intelligence_role: derive_reusable_visual_style_interpretation
+  canonical_visual_state_owner: application_backend
+  canonical_assets_are_observed_evidence: false
+  provider_or_endpoint_names_in_evidence_ids: forbidden
+
+evidence_sufficiency:
+  minimum:
+    rule: >-
+      The processor may execute when available representative visual Evidence is sufficient for at least one
+      defensible visual_style_profile component. No listed visual Evidence subtype is jointly required for all executions.
+  supporting_capabilities:
+    - owned_website.visual_evidence
+    - owned_website.imagery_evidence
+    - owned_website.graphic_treatment_evidence
+    - brand_user_input_and_confirmations
+  optional_enrichment:
+    - instagram.owned_brand_visual_context
+  explicit_non_requirements:
+    brand_user_input_required: false
+    all_visual_subtypes_jointly_required: false
+    canonical_assets_required_for_descriptive_partial: false
+    instagram_required: false
+
+canonical_visual_assets_by_reference:
+  classification: CANONICAL_BUSINESS_STATE_INPUT
+  source_class: CANONICAL_BUSINESS_STATE
+  items:
+    - primary_logo_ref
+    - secondary_logo_or_mark_refs
+    - approved_palette_ref
+    - approved_typography_ref
+    - approved_reference_image_refs
+    - explicit_Brand_visual_guidance_ref
+  copied_into_evidence: false
+  copied_into_intelligence_object: false
+  universally_required_for_descriptive_partial: false
+  rule: stable business-state refs may support interpretation; exact canonical asset/settings payloads remain external.
+
+shared_evidence_item:
+  required_fields:
+    - evidence_ref
+    - evidence_semantic
+    - source_class
+    - source_resource_ref
+    - captured_at
+    - freshness
+    - representativeness
+    - provenance
+  fields:
+    evidence_ref: {type: string, identity_model: capture_scoped_normalized_visual_observation}
+    evidence_semantic: {type: string, provider_neutral: true}
+    source_class:
+      allowed: [OWNED_WEBSITE, BRAND_USER_INPUT, INSTAGRAM_OWNED, MULTI_SOURCE]
+    source_resource_ref: {type: string}
+    source_item_ref: {type: [string, "null"], nullable: true}
+    captured_at: {type: timestamp}
+    freshness: {allowed: [CURRENT, STALE, UNKNOWN]}
+    representativeness:
+      allowed:
+        - PERSISTENT_BRAND_LEVEL
+        - REPEATED_REPRESENTATIVE
+        - PAGE_SPECIFIC
+        - CAMPAIGN_SPECIFIC
+        - INCIDENTAL
+    provenance:
+      required: [acquisition_or_normalization_run_ref]
+      optional: [parent_evidence_refs, normalization_version]
+
+capabilities:
+  owned_website.visual_evidence:
+    required_for_processor: false
+    sufficiency_role: SUPPORTING_CAPABILITY
+    source_class: OWNED_WEBSITE
+    item_semantics:
+      - LOGO_OR_MARK_OBSERVATION
+      - COLOUR_USAGE_OBSERVATION
+      - TYPOGRAPHY_OBSERVATION
+      - LAYOUT_OR_COMPOSITION_OBSERVATION
+      - GENERAL_VISUAL_PATTERN
+    may_support_components:
+      - summary
+      - style_traits
+      - graphic_treatment
+    rules:
+      - observed_logo_is_not_canonical_logo
+      - frequent_colour_is_not_approved_palette
+      - frequent_typeface_is_not_approved_font
+      - repeated visual observation may support descriptive style only
+  owned_website.imagery_evidence:
+    required_for_processor: false
+    sufficiency_role: COMPONENT_SUPPORTING_CAPABILITY
+    source_class: OWNED_WEBSITE
+    item_semantics:
+      - PHOTOGRAPHIC_TENDENCY
+      - SUBJECT_TENDENCY
+      - MOOD_OR_TREATMENT
+      - IMAGE_COMPOSITION_PATTERN
+    may_support_components:
+      - imagery_style
+      - summary
+      - style_traits
+    fields:
+      asset_candidate_ref: {type: [string, "null"], nullable: true}
+      canonical_asset_ref: {type: [string, "null"], nullable: true, role: reference_only}
+    rules:
+      - one image is insufficient for recurring style unless explicitly representative by canonical Brand guidance
+      - candidate image does not become approved reference image
+      - absence does not block graphic_treatment synthesis when graphic Evidence is sufficient
+  owned_website.graphic_treatment_evidence:
+    required_for_processor: false
+    sufficiency_role: COMPONENT_SUPPORTING_CAPABILITY
+    source_class: OWNED_WEBSITE
+    item_semantics:
+      - GRAPHIC_OVERLAY_PATTERN
+      - SHAPE_OR_FRAME_TREATMENT
+      - TEXT_ON_IMAGE_TREATMENT
+      - WHITESPACE_OR_DENSITY_PATTERN
+      - ILLUSTRATION_OR_ICON_TREATMENT
+    may_support_components:
+      - graphic_treatment
+      - summary
+      - style_traits
+    rules:
+      - page-specific treatment is contextual unless repeated
+      - Campaign-specific graphic treatment does not automatically define durable Brand style
+      - absence does not block imagery_style synthesis when imagery Evidence is sufficient
+  brand_user_input_and_confirmations:
+    required_for_processor: false
+    sufficiency_role: SUPPORTING_OR_AUTHORITATIVE_CONTEXT_WHEN_PRESENT
+    source_class: BRAND_USER_INPUT
+    item_semantics:
+      - USER_SUPPLIED_VISUAL_GUIDANCE
+      - USER_SUPPLIED_VISUAL_CONTEXT
+      - USER_SUPPLIED_CONSTRAINT_CANDIDATE
+    rules:
+      - user input may be Evidence before authorized confirmation
+      - protected BRAND_CONFIRMED visual constraints are supplied separately as protected current state
+      - processor does not perform Brand confirmation
+      - absence does not block derived Visual Identity
+
+optional_enrichment:
+  instagram.owned_brand_visual_context:
+    required_for_processor: false
+    source_class: INSTAGRAM_OWNED
+    representativeness_required_for_reusable_inference:
+      - PERSISTENT_BRAND_LEVEL
+      - REPEATED_REPRESENTATIVE
+    rules:
+      - one post or campaign cannot define durable visual style
+      - Instagram absence does not block execution
+      - Instagram pattern cannot create hard constraint
+
+pattern_strength:
+  PERSISTENT_BRAND_LEVEL:
+    eligible_for_descriptive_interpretation: true
+  REPEATED_REPRESENTATIVE:
+    eligible_for_descriptive_interpretation: true
+  PAGE_SPECIFIC:
+    eligible_for_descriptive_interpretation: contextual_only
+  CAMPAIGN_SPECIFIC:
+    eligible_for_descriptive_interpretation: contextual_only
+  INCIDENTAL:
+    eligible_for_descriptive_interpretation: false_alone
+
+constraint_evidence_boundary:
+  observed_pattern_can_establish_brand_confirmed_constraint: false
+  derived_pattern_can_establish_brand_confirmed_constraint: false
+  protected_constraint_source: authorized_application_or_brand_action
+  rule: Evidence may be compared with protected constraint but cannot create or overwrite it.
+
+preview_logo:
+  classification:
+    - APPLICATION_CANDIDATE
+    - RECONCILIATION_CONTEXT
+  direct_canonical_logo: false
+  direct_visual_style_profile: false
+  evidence_use: only_if_normalized_as_visual_observation_or_reconciled_to_application_state
+
+missing_evidence:
+  processor_failure_required: false
+  readiness_rules:
+    - no representative visual Evidence for any requested descriptive component implies WAITING_FOR_EVIDENCE
+    - missing imagery Evidence alone does not block graphic-treatment synthesis
+    - missing graphic-treatment Evidence alone does not block imagery synthesis
+    - missing Brand user input does not block derived Visual Identity
+    - missing canonical approved assets does not block descriptive partial synthesis when Evidence is sufficient
+    - requested operation requiring unavailable canonical state implies WAITING_FOR_CANONICAL_INPUT for that operation
+  rules:
+    - visual_style_profile may be null
+    - any descriptive component may remain null
+    - visual_constraints may be absent
+    - no aesthetic filler
+
+freshness_policy:
+  universal_ttl: none
+  classes:
+    canonical_visual_state: canonical_state_change_driven
+    representative_website_visuals: evidence_refresh_driven
+    page_specific_visuals: context_limited
+    brand_confirmed_constraints: effectively_stable_until_authorized_change
+
+validation_invariants:
+  - canonical visual assets remain business state by reference
+  - provider-neutral Evidence IDs
+  - observed logo does not become canonical logo
+  - frequent colour does not become approved palette
+  - frequent typeface does not become approved font
+  - repeated patterns remain descriptive unless protected authority establishes a constraint
+  - Preview logo is not promoted
+  - Brand user input is not an execution prerequisite
+  - all visual Evidence subtypes are not jointly required
+  - component-level Evidence can support component-level partial synthesis
+  - canonical assets are not universally required for descriptive partial synthesis
+  - Instagram optional
+  - every observed item has evidence_ref

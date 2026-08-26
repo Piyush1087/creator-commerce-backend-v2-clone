@@ -1,4 +1,6 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
+import { BrandVisualStateService } from "../../../brand-canonical-state/brand-visual-state.service";
+import { assembleCanonicalVisualSnapshot } from "./canonical-visual-snapshot";
 import { Prisma } from "@prisma/client";
 
 import { canonicalJson } from "../../contracts/bundle/canonical-json";
@@ -50,7 +52,10 @@ interface EntrySeed {
 
 @Injectable()
 export class M1CanonicalBrandStateAdapter implements CanonicalBrandStateReader {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly visuals?: BrandVisualStateService,
+  ) {}
 
   async read(
     request: CanonicalBrandStateReadRequest,
@@ -76,6 +81,18 @@ export class M1CanonicalBrandStateAdapter implements CanonicalBrandStateReader {
             required.includes(entry.semantic),
           ),
         );
+        if (request.includeVisualState) {
+          if (!this.visuals)
+            throw new InputDependencyError(
+              "CONFIGURATION_DRIFT",
+              "Canonical visual reader is unavailable",
+            );
+          const visualState = await this.visuals.read(
+            request.brandId,
+            transaction,
+          );
+          return assembleCanonicalVisualSnapshot(snapshot, visualState);
+        }
         if (!request.includeOfferingFacts) return snapshot;
         // Explicitly requested by the differentiation profile only. No scan JSON,
         // prices, selling points, claims, or inferred Offering identity.

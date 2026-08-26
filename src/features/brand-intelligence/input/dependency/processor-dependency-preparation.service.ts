@@ -79,6 +79,7 @@ export class ProcessorDependencyPreparationService {
       brandId: request.brandId,
       requiredSemantics: profile.requiredCanonicalSemantics,
       ...(profile.includeOfferingFacts ? { includeOfferingFacts: true } : {}),
+      ...(profile.includeVisualState ? { includeVisualState: true } : {}),
     });
     const evidence = await this.evidenceReader.read({
       brandId: request.brandId,

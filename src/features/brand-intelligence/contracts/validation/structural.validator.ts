@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { visualStyleOutputContract } from "./visual-style-output-schema";
 
 import { canonicalJson } from "../bundle/canonical-json";
 import type { VerifiedContractBundle } from "../bundle/contract-bundle.types";
@@ -47,7 +48,8 @@ export class StructuralValidator {
     bundle: VerifiedContractBundle,
     untrustedOutput: unknown,
   ): ValidationResult<unknown> {
-    const response = record(bundle.artifacts.outputContract.response);
+    const contract = visualStyleOutputContract(bundle);
+    const response = record(contract.response);
     if (!response) {
       return rejected([
         {
@@ -58,13 +60,7 @@ export class StructuralValidator {
       ]);
     }
     const issues: ValidationIssue[] = [];
-    this.validateNode(
-      response,
-      untrustedOutput,
-      "$",
-      bundle.artifacts.outputContract,
-      issues,
-    );
+    this.validateNode(response, untrustedOutput, "$", contract, issues);
     return issues.length === 0 ? accepted(untrustedOutput) : rejected(issues);
   }
 

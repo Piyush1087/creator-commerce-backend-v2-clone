@@ -386,7 +386,8 @@ describe.skipIf(!enabled)(
         retryAtNow: async (id: string) => {
           await prisma.intelligenceProcessorExecution.update({
             where: { id },
-            data: { eligibleAt: new Date() },
+            // Fixture-only: force eligibility without mixing host and database clocks.
+            data: { eligibleAt: new Date(0) },
           });
         },
       };

@@ -43,6 +43,7 @@ describe("Audience processor boundaries", () => {
       "brand_communication",
       "brand_differentiation",
       "brand_meaning",
+      "visual_style_synthesis",
     ]);
     const ownership = new BundlePathOwnershipRegistry(
       runtime,

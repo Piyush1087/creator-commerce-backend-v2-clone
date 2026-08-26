@@ -1,0 +1,173 @@
+{
+  "manifestSchemaVersion": 1,
+  "bundleId": "brand_intelligence.visual_style_synthesis",
+  "bundleVersion": "1.0",
+  "ownerEngine": "brand_intelligence",
+  "owningBranch": "visual_identity",
+  "architectureRepository": "Piyush1087/dummy_tcs",
+  "architectureCommitSha": "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
+  "processorId": "visual_style_synthesis",
+  "processorVersion": "1.0",
+  "outputContractId": "visual_style_synthesis_output_contract",
+  "outputContractVersion": "1.0",
+  "evidenceContractId": "visual_style_synthesis_evidence",
+  "evidenceContractVersion": "1.0",
+  "ownedObjectSemanticIds": [
+    "visual_style_profile"
+  ],
+  "ownedPathPatterns": [
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/summary"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/style_traits"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/style_traits/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/style_traits/i/{semantic_id}/f/trait"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/imagery_style"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/imagery_style/f/photographic_tendencies"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/imagery_style/f/photographic_tendencies/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/imagery_style/f/photographic_tendencies/i/{semantic_id}/f/value"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/imagery_style/f/subject_tendencies"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/imagery_style/f/subject_tendencies/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/imagery_style/f/subject_tendencies/i/{semantic_id}/f/value"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/imagery_style/f/mood_or_treatment"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/imagery_style/f/mood_or_treatment/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/imagery_style/f/mood_or_treatment/i/{semantic_id}/f/value"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/graphic_treatment"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/graphic_treatment/f/traits"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/graphic_treatment/f/traits/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/graphic_treatment/f/traits/i/{semantic_id}/f/value"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/visual_constraints"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/visual_constraints/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "visual_style_profile",
+      "componentPathPattern": "$/f/visual_constraints/i/{semantic_id}/f/rule"
+    }
+  ],
+  "generatedNotice": "GENERATED — DO NOT EDIT",
+  "generatorVersion": "1.0.0",
+  "artifacts": [
+    {
+      "role": "EVIDENCE_CONTRACT",
+      "path": "artifacts/evidence_contract.yaml",
+      "semanticId": "visual_style_synthesis_evidence",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 9610,
+      "sha256": "3a233dbff3201d9256aef06f8e840eef3759525866b7ee8824d0e34588c696bd"
+    },
+    {
+      "role": "OBJECT_CONTRACT",
+      "path": "artifacts/object_contract.yaml",
+      "semanticId": "objects",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 17245,
+      "sha256": "6df3e021dc0784a74101b0e2dec25d5e9876ce3ed3d72a3fb6adad1eceed7c68"
+    },
+    {
+      "role": "OUTPUT_CONTRACT",
+      "path": "artifacts/output_contract.yaml",
+      "semanticId": "visual_style_synthesis_output_contract",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 5767,
+      "sha256": "f76fa3d9f974774e6e715bda0d0a407ee9813d0ab4992bdef9ed044b3d2bed90"
+    },
+    {
+      "role": "PROCESSOR_DEFINITION",
+      "path": "artifacts/processor_definition.yaml",
+      "semanticId": "visual_style_synthesis",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 4629,
+      "sha256": "3d3383e87ff05d4978af13f3c8caf2700a7bb4334272ea25bc8ad8645ba489de"
+    },
+    {
+      "role": "REASONING_CONTRACT",
+      "path": "artifacts/reasoning_contract.yaml",
+      "semanticId": "visual_style_synthesis_reasoning",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 8928,
+      "sha256": "73d2c1a6db2e5d8911ac9ef81a5fdddc83c4684bfa4f75d171bca28e1889d916"
+    },
+    {
+      "role": "SHARED_METADATA_CONTRACT",
+      "path": "artifacts/shared_metadata_contract.yaml",
+      "semanticId": "shared_intelligence_metadata",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 16996,
+      "sha256": "47dbd324d4d79136b16ade4448adf78087d93658bcb2281292c40bfe6def98bd"
+    }
+  ],
+  "bundleContentHash": "abe6db88df94e73ebdae3fd4d5345076054a2ab7642d4b34280ea1cda294dd9a"
+}

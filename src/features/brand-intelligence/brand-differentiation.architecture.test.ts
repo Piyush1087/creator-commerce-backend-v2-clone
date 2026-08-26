@@ -11,7 +11,7 @@ import { ProcessorDependencyProfileRegistry } from "./input/dependency/processor
 import { PROCESSOR_ARCHITECTURE_COMMITS } from "./contracts/bundle/contract-source.spec";
 
 describe("brand_differentiation architecture boundaries", () => {
-  it("registers exactly five independently pinned processors and six frozen differentiation paths", () => {
+  it("registers exactly six independently pinned processors and six frozen differentiation paths", () => {
     const runtime = contracts(),
       bundle = runtime.getVerifiedBundle(registryKey);
     expect(
@@ -26,6 +26,7 @@ describe("brand_differentiation architecture boundaries", () => {
       "brand_communication",
       "brand_differentiation",
       "brand_meaning",
+      "visual_style_synthesis",
     ]);
     expect(PROCESSOR_ARCHITECTURE_COMMITS).toEqual({
       brand_communication: "017dbceac494f0861ec9a6bea7af3129b70fa5cb",
@@ -33,6 +34,7 @@ describe("brand_differentiation architecture boundaries", () => {
       brand_character: "56b52c1106feff2a92f23a7c49674fd116bf8c63",
       audience_persona_synthesis: "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
       brand_differentiation: "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
+      visual_style_synthesis: "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
     });
     expect(bundle.manifest.ownedObjectSemanticIds).toEqual([
       "differentiation_and_proof",

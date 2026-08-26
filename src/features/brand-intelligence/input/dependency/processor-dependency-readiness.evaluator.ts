@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { hasRepresentativeVisualEvidence } from "../evidence/visual-evidence-admission";
 
 import type { CanonicalBrandStateSnapshot } from "../canonical-state/canonical-brand-state.port";
 import type { NormalizedEvidenceSet } from "../evidence/intelligence-evidence.port";
@@ -58,6 +59,14 @@ export class ProcessorDependencyReadinessEvaluator {
       };
     }
 
+    if (profile.processorId === "visual_style_synthesis") {
+      return hasRepresentativeVisualEvidence(evidence)
+        ? { readiness: "READY_TO_RUN", reasonCodes: [] }
+        : {
+            readiness: "WAITING_FOR_EVIDENCE",
+            reasonCodes: ["REPRESENTATIVE_VISUAL_DECLARATIONS_NOT_AVAILABLE"],
+          };
+    }
     if (profile.requiredCapabilityLineages) {
       const missing = profile.requiredCapabilityLineages.filter(
         (id) =>

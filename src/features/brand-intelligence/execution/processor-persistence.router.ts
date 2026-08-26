@@ -1,4 +1,5 @@
 import { Injectable, Optional } from "@nestjs/common";
+import { VisualStylePersistenceHook } from "../processors/visual-style/visual-style-persistence.hook";
 import { BrandDifferentiationPersistenceHook } from "../processors/brand-differentiation/brand-differentiation-persistence.hook";
 import { BrandCharacterPersistenceHook } from "../processors/brand-character/brand-character-persistence.hook";
 import { AudiencePersonaPersistenceHook } from "../processors/audience-persona/audience-persona-persistence.hook";
@@ -23,6 +24,7 @@ export class ProcessorPersistenceRouter implements ProcessorSuccessPersistenceHo
     @Optional() private readonly audience?: AudiencePersonaPersistenceHook,
     @Optional()
     private readonly differentiation?: BrandDifferentiationPersistenceHook,
+    @Optional() private readonly visualStyle?: VisualStylePersistenceHook,
   ) {}
   async persistBeforeCompletion(
     tx: Prisma.TransactionClient,
@@ -30,6 +32,13 @@ export class ProcessorPersistenceRouter implements ProcessorSuccessPersistenceHo
     result: ProcessorExecutionResult,
   ): Promise<void> {
     switch (claim.processorExecution.processorId) {
+      case "visual_style_synthesis":
+        if (!this.visualStyle)
+          throw new ProcessorExecutorFailure({
+            category: "CONFIGURATION_DRIFT",
+            code: "PERSISTENCE_HOOK_REGISTRATION_MISSING",
+          });
+        return this.visualStyle.persistBeforeCompletion(tx, claim, result);
       case "brand_differentiation":
         if (!this.differentiation)
           throw new ProcessorExecutorFailure({
