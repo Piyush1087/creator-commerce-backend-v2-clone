@@ -1,4 +1,4 @@
-param([switch]$FullSuite, [string]$ReportPath)
+param([switch]$FullSuite, [string]$ReportPath, [string[]]$TestPath)
 $ErrorActionPreference = 'Stop'
 $container = 'creator-shop-acceptance-postgres'
 $suffix = [guid]::NewGuid().ToString('N').Substring(0, 12)
@@ -26,7 +26,7 @@ try {
   $databaseCreated = $true
   $testUrl = "postgresql://${testRole}:${testPassword}@127.0.0.1:5432/${testDatabase}?schema=public"
   $urlVariables = @('DATABASE_URL', 'DE_W1_0B_DATABASE_URL', 'DE_W1_0C_DATABASE_URL', 'DE_W1_0D_DATABASE_URL', 'DE_W1_0E_DATABASE_URL', 'DE_W1_0F_DATABASE_URL', 'DE_W2_DATABASE_URL')
-  $flags = @('BRAND_INTELLIGENCE_DATABASE_TEST', 'BRAND_INTELLIGENCE_EXECUTION_DATABASE_TEST', 'BRAND_INTELLIGENCE_PROJECTION_DATABASE_TEST', 'BRAND_COMMUNICATION_DATABASE_TEST', 'BRAND_MEANING_DATABASE_TEST', 'BRAND_CHARACTER_DATABASE_TEST', 'AUDIENCE_PERSONA_DATABASE_TEST', 'BRAND_CENTRE_DATABASE_TEST', 'GATEKEEPER_DATABASE_TEST')
+  $flags = @('BRAND_INTELLIGENCE_DATABASE_TEST', 'BRAND_INTELLIGENCE_EXECUTION_DATABASE_TEST', 'BRAND_INTELLIGENCE_PROJECTION_DATABASE_TEST', 'BRAND_COMMUNICATION_DATABASE_TEST', 'BRAND_MEANING_DATABASE_TEST', 'BRAND_CHARACTER_DATABASE_TEST', 'AUDIENCE_PERSONA_DATABASE_TEST', 'BRAND_DIFFERENTIATION_DATABASE_TEST', 'BRAND_CENTRE_DATABASE_TEST', 'GATEKEEPER_DATABASE_TEST')
   $savedEnvironment['DE_W2_MIGRATION_PHASE'] = $env:DE_W2_MIGRATION_PHASE
   foreach ($name in ($urlVariables + $flags)) {
     $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -56,7 +56,8 @@ try {
   $count = docker exec $container psql -U $adminUser -d $testDatabase -tAc 'SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL'
   if ([int]$count -ne 49) { throw 'Reset did not reapply all 49 migrations' }
   $testArguments = @('node_modules/vitest/vitest.mjs', 'run', '--config', 'scripts/de-wave2-vitest.config.ts', '--fileParallelism', 'false', '--maxWorkers', '1', '--minWorkers', '1', '--testTimeout', '30000', '--hookTimeout', '30000')
-  if (!$FullSuite) { $testArguments += @('src/features/data-extraction/evidence/normalization/wave2', 'src/features/data-extraction/evidence/wave2-migration.postgres.test.ts') }
+  if ($TestPath) { $testArguments += $TestPath }
+  elseif (!$FullSuite) { $testArguments += @('src/features/data-extraction/evidence/normalization/wave2', 'src/features/data-extraction/evidence/wave2-migration.postgres.test.ts') }
   if ($ReportPath) { $testArguments += @('--reporter', 'default', '--reporter', 'json', '--outputFile', $ReportPath) }
   & node @testArguments
   if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }

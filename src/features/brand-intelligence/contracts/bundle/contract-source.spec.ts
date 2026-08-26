@@ -14,6 +14,7 @@ export const PROCESSOR_ARCHITECTURE_COMMITS: Readonly<Record<string, string>> =
     brand_meaning: "2e13fa40235094d127f72b38f43c510232e38be4",
     brand_character: "56b52c1106feff2a92f23a7c49674fd116bf8c63",
     audience_persona_synthesis: PINNED_ARCHITECTURE_COMMIT,
+    brand_differentiation: PINNED_ARCHITECTURE_COMMIT,
   };
 
 export const EXECUTABLE_CONTRACT_PROCESSORS: ReadonlySet<string> = new Set([
@@ -21,6 +22,7 @@ export const EXECUTABLE_CONTRACT_PROCESSORS: ReadonlySet<string> = new Set([
   "brand_meaning",
   "brand_character",
   "audience_persona_synthesis",
+  "brand_differentiation",
 ]);
 
 export const CONTRACT_SOURCE_SPECS: readonly ContractSourceSpec[] = [
@@ -170,6 +172,37 @@ export const CONTRACT_SOURCE_SPECS: readonly ContractSourceSpec[] = [
         "intelligence/engines/brand_intelligence/branches/audience/evidence/audience_persona_synthesis_evidence.yaml",
       OBJECT_CONTRACT:
         "intelligence/engines/brand_intelligence/branches/audience/objects.yaml",
+      SHARED_METADATA_CONTRACT:
+        "intelligence/architecture/shared_intelligence_metadata_contract.yaml",
+    },
+  },
+  {
+    processorId: "brand_differentiation",
+    processorVersion: "1.0",
+    outputContractId: "brand_differentiation_output_contract",
+    outputContractVersion: "1.0",
+    evidenceContractId: "brand_differentiation_evidence",
+    evidenceContractVersion: "1.0",
+    ownerEngine: "brand_intelligence",
+    owningBranch: "brand_expression",
+    ownedObjectSemanticIds: ["differentiation_and_proof"],
+    ownedPathPatterns: [
+      "$",
+      "$/i/{semantic_id}",
+      "$/i/{semantic_id}/f/differentiator",
+      "$/i/{semantic_id}/f/proof_points",
+      "$/i/{semantic_id}/f/proof_points/i/{semantic_id}",
+      "$/i/{semantic_id}/f/proof_points/i/{semantic_id}/f/statement",
+    ].map((componentPathPattern) => ({
+      objectSemanticId: "differentiation_and_proof",
+      componentPathPattern,
+    })),
+    artifactPaths: {
+      PROCESSOR_DEFINITION: `${ROOT}/processors/brand_differentiation.yaml`,
+      REASONING_CONTRACT: `${ROOT}/artifacts/brand_differentiation/reasoning.yaml`,
+      OUTPUT_CONTRACT: `${ROOT}/artifacts/brand_differentiation/output_contract.yaml`,
+      EVIDENCE_CONTRACT: `${ROOT}/evidence/brand_differentiation_evidence.yaml`,
+      OBJECT_CONTRACT: `${ROOT}/objects.yaml`,
       SHARED_METADATA_CONTRACT:
         "intelligence/architecture/shared_intelligence_metadata_contract.yaml",
     },

@@ -1,0 +1,109 @@
+{
+  "manifestSchemaVersion": 1,
+  "bundleId": "brand_intelligence.brand_differentiation",
+  "bundleVersion": "1.0",
+  "ownerEngine": "brand_intelligence",
+  "owningBranch": "brand_expression",
+  "architectureRepository": "Piyush1087/dummy_tcs",
+  "architectureCommitSha": "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
+  "processorId": "brand_differentiation",
+  "processorVersion": "1.0",
+  "outputContractId": "brand_differentiation_output_contract",
+  "outputContractVersion": "1.0",
+  "evidenceContractId": "brand_differentiation_evidence",
+  "evidenceContractVersion": "1.0",
+  "ownedObjectSemanticIds": [
+    "differentiation_and_proof"
+  ],
+  "ownedPathPatterns": [
+    {
+      "objectSemanticId": "differentiation_and_proof",
+      "componentPathPattern": "$"
+    },
+    {
+      "objectSemanticId": "differentiation_and_proof",
+      "componentPathPattern": "$/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "differentiation_and_proof",
+      "componentPathPattern": "$/i/{semantic_id}/f/differentiator"
+    },
+    {
+      "objectSemanticId": "differentiation_and_proof",
+      "componentPathPattern": "$/i/{semantic_id}/f/proof_points"
+    },
+    {
+      "objectSemanticId": "differentiation_and_proof",
+      "componentPathPattern": "$/i/{semantic_id}/f/proof_points/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "differentiation_and_proof",
+      "componentPathPattern": "$/i/{semantic_id}/f/proof_points/i/{semantic_id}/f/statement"
+    }
+  ],
+  "generatedNotice": "GENERATED — DO NOT EDIT",
+  "generatorVersion": "1.0.0",
+  "artifacts": [
+    {
+      "role": "EVIDENCE_CONTRACT",
+      "path": "artifacts/evidence_contract.yaml",
+      "semanticId": "brand_differentiation_evidence",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 6577,
+      "sha256": "ad8e7708dec112451083e037848ea085f39827374f155f14473dce6201baa8df"
+    },
+    {
+      "role": "OBJECT_CONTRACT",
+      "path": "artifacts/object_contract.yaml",
+      "semanticId": "objects",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 23130,
+      "sha256": "3c84c7e300718a3d8bb788b5f0bb76e08a5a8d4f8c97d9e75220176542c9c03d"
+    },
+    {
+      "role": "OUTPUT_CONTRACT",
+      "path": "artifacts/output_contract.yaml",
+      "semanticId": "brand_differentiation_output_contract",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 5900,
+      "sha256": "f8eff7bb3599d6ca9f89a5e5e5b5879a8077d773829a16de5b37f2adf98da7fa"
+    },
+    {
+      "role": "PROCESSOR_DEFINITION",
+      "path": "artifacts/processor_definition.yaml",
+      "semanticId": "brand_differentiation",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 3590,
+      "sha256": "b97e447ac6adad3663273743e33723457c7e230a9787e85bdf8611ca8ad76f87"
+    },
+    {
+      "role": "REASONING_CONTRACT",
+      "path": "artifacts/reasoning_contract.yaml",
+      "semanticId": "brand_differentiation_reasoning",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 5996,
+      "sha256": "2c745747017a1edee0d538ea7ac7c193cf972b2a2e57c6c0d4ee533ccdb961d5"
+    },
+    {
+      "role": "SHARED_METADATA_CONTRACT",
+      "path": "artifacts/shared_metadata_contract.yaml",
+      "semanticId": "shared_intelligence_metadata",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 16996,
+      "sha256": "47dbd324d4d79136b16ade4448adf78087d93658bcb2281292c40bfe6def98bd"
+    }
+  ],
+  "bundleContentHash": "91d6f6f6d8ee6a6b52de5b1aa2d6898563581498b360b7a226f890e1f407686f"
+}

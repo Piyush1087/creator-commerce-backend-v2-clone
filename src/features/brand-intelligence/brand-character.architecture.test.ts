@@ -32,7 +32,7 @@ describe("brand_character architecture", () => {
       );
     }
   });
-  it("preserves Character's pin and optional Evidence alongside the fourth accepted executor", () => {
+  it("preserves Character's pin and optional Evidence alongside the fifth accepted executor", () => {
     const runtime = contracts();
     const bundle = runtime.getVerifiedBundle(registryKey);
     expect(
@@ -49,12 +49,14 @@ describe("brand_character architecture", () => {
       ["brand_meaning", true, true, true],
       ["brand_character", true, true, true],
       ["audience_persona_synthesis", true, true, true],
+      ["brand_differentiation", true, true, true],
     ]);
     expect(PROCESSOR_ARCHITECTURE_COMMITS).toEqual({
       brand_communication: "017dbceac494f0861ec9a6bea7af3129b70fa5cb",
       brand_meaning: "2e13fa40235094d127f72b38f43c510232e38be4",
       brand_character: "56b52c1106feff2a92f23a7c49674fd116bf8c63",
       audience_persona_synthesis: "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
+      brand_differentiation: "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
     });
     expect(bundle.manifest.architectureCommitSha).toBe(
       PROCESSOR_ARCHITECTURE_COMMITS.brand_character,

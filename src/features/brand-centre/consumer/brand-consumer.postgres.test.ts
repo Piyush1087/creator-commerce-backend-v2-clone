@@ -269,6 +269,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         "audience_persona_synthesis",
         "brand_character",
         "brand_communication",
+        "brand_differentiation",
         "brand_meaning",
       ]);
     });

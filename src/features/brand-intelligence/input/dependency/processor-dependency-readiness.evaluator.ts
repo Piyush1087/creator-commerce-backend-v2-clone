@@ -58,6 +58,26 @@ export class ProcessorDependencyReadinessEvaluator {
       };
     }
 
+    if (profile.requiredCapabilityLineages) {
+      const missing = profile.requiredCapabilityLineages.filter(
+        (id) =>
+          !evidence.capabilityResults.some(
+            (cap) =>
+              cap.capabilityId === id &&
+              ["AVAILABLE", "PARTIAL", "DEGRADED"].includes(cap.status) &&
+              cap.acquisitionQuality.state !== "UNAVAILABLE" &&
+              !!cap.capabilityExecutionRef,
+          ),
+      );
+      return missing.length
+        ? {
+            readiness: "WAITING_FOR_EVIDENCE",
+            reasonCodes: missing
+              .map((id) => `MISSING_CAPABILITY_LINEAGE:${id}`)
+              .sort(),
+          }
+        : { readiness: "READY_TO_RUN", reasonCodes: [] };
+    }
     const representative = evidence.capabilityResults.some(
       (capability) =>
         profile.representativeEvidenceAnyOf.includes(capability.capabilityId) &&

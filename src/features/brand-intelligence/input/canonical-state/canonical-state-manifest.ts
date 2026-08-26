@@ -22,6 +22,10 @@ export interface CanonicalDependencyManifest {
   readonly brandId: string;
   readonly canonicalSnapshotRef: string;
   readonly entries: readonly CanonicalDependencyManifestEntry[];
+  readonly offeringReferences?: readonly Omit<
+    BusinessStateReference,
+    "observedAt"
+  >[];
 }
 
 @Injectable()
@@ -55,6 +59,17 @@ export class CanonicalStateManifestBuilder {
       brandId: snapshot.brandId,
       canonicalSnapshotRef: snapshot.canonicalSnapshotRef,
       entries,
+      ...(snapshot.offeringFacts
+        ? {
+            offeringReferences: snapshot.offeringFacts
+              .map((fact) => {
+                const { observedAt: _observedAt, ...reference } =
+                  fact.businessStateReference;
+                return reference;
+              })
+              .sort((a, b) => a.entityId.localeCompare(b.entityId)),
+          }
+        : {}),
     };
     return { manifest, hash: sha256CanonicalExecution(manifest) };
   }

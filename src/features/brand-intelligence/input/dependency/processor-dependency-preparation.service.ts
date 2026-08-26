@@ -78,6 +78,7 @@ export class ProcessorDependencyPreparationService {
     const canonicalState = await this.canonicalReader.read({
       brandId: request.brandId,
       requiredSemantics: profile.requiredCanonicalSemantics,
+      ...(profile.includeOfferingFacts ? { includeOfferingFacts: true } : {}),
     });
     const evidence = await this.evidenceReader.read({
       brandId: request.brandId,

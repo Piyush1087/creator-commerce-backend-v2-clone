@@ -1,0 +1,124 @@
+id: brand_differentiation_reasoning
+version: "1.0"
+status: FROZEN
+processor: brand_differentiation
+owner_engine: brand_intelligence
+owning_branch: brand_expression
+processor_definition: intelligence/engines/brand_intelligence/branches/brand_expression/processors/brand_differentiation.yaml
+object_authority: intelligence/engines/brand_intelligence/branches/brand_expression/objects.yaml#differentiation_and_proof
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define claim-safe grounded reasoning for Brand-level differentiators and factual proof while preserving separate
+  authority, avoiding unsupported superiority, preventing Offering-truth duplication, and applying stricter Healthcare safety.
+model_capability_requirement: structured_grounded_reasoning_with_claim_safety
+provider_or_model_selection: deferred_to_model_registry
+
+inputs:
+  canonical:
+    - brand_name
+    - website_url
+    - confirmed_industry
+    - confirmed_sub_industry_or_category_when_authoritative
+    - canonical Offering facts when relevant
+  evidence_capabilities:
+    required:
+      - owned_website.brand_company_context
+      - owned_website.brand_messaging
+      - owned_website.offering_context
+      - explicit_factual_proof_or_claim_evidence
+
+protected_current_state:
+  granularity: [differentiator_subfield, proof_item]
+  rule: BRAND_CONFIRMED differentiators/proof are protected; new Evidence may affect freshness or create discrepancy but cannot silently replace them.
+
+core_semantics:
+  differentiator:
+    question: what_meaningfully_distinguishes_this_brand_at_brand_level
+    default_authority: CREATOR_SHOP_DERIVED
+    requires: [brand_level_relevance, distinction_beyond_generic_category_convention, representative_grounding]
+    must_not_be: [single_offering_feature, single_offering_benefit, campaign_claim, generic_positive_adjective, generic_category_convention, unsupported_superiority]
+    caution_terms: [premium, best, leading, clinically_proven, fastest, most_trusted, unique]
+    owned_marketing_copy_alone_validates_superiority: false
+  proof:
+    meaning: defensible_factual_support
+    default_authority_when_direct: OBSERVED
+    eligible_examples: [factual_company_history, explicit_certification_or_credential, documented_operating_model, observable_capability, verified_business_fact, owned_source_factual_statement]
+    ineligible_without_support: [customer_testimonial, marketing_adjective, claimed_outcome, unverified_award, unsupported_statistic, superiority_claim_repetition]
+
+authority_separation:
+  - differentiator_authority_does_not_flow_to_proof
+  - proof_authority_does_not_flow_to_differentiator
+  - observed_proof_does_not_make_differentiator_objectively_true
+  - derived_differentiator_does_not_make_proof_derived
+  - brand_confirmed_transition_is_application_owned
+
+claim_vs_proof:
+  claim:
+    may_be_observed_as_brand_statement: true
+    automatically_factual_proof: false
+  proof:
+    requires_fact_eligibility: true
+  rule: Brand claim may remain Evidence while being excluded from proof.
+
+healthcare_claim_safety:
+  strict: true
+  prohibited_as_proof_without_defensible_evidence:
+    - treatment_efficacy
+    - diagnostic_accuracy
+    - clinical_superiority
+    - guaranteed_outcome
+    - medical_success_rate
+    - safety_claim
+  unsupported_brand_claim_behavior:
+    preserve_as_brand_statement_evidence: true
+    accept_as_factual_proof: false
+    derive_superiority_from_claim: false
+
+offering_boundary:
+  canonical_offering_facts_role: context_or_support_only
+  rules:
+    - Offering-specific facts remain Offering truth
+    - Brand-level generalization requires defensible cross-Offering or explicit Brand support
+    - proof may reference canonical Offering fact without copying full Offering record
+    - Product Intelligence proof remains Product/Offering-owned when Offering-specific
+  prohibited: [duplicate_offering_record, duplicate_offering_truth, silent_offering_to_brand_generalization]
+
+reasoning_sequence:
+  - identify active unprotected differentiator/proof scope
+  - classify statements as strategic interpretation, factual candidate, claim, or generic marketing assertion
+  - test Brand-level relevance and remove Offering-specific/category-generic content
+  - evaluate proof candidates using Evidence-strength taxonomy
+  - apply claim-safety rules before proof acceptance
+  - derive differentiator only when defensible; proof may remain null
+  - preserve direct factual proof with OBSERVED authority
+  - allow proof Evidence to exist without forcing a differentiator
+  - assign stable semantic IDs by normalized meaning
+  - omit unsupported superiority, efficacy, awards, statistics, or testimonial-based proof
+
+partial_output:
+  supported: true
+  object_nullable: true
+  differentiator_may_have_null_proof: true
+  proof_required_for_every_differentiator: false
+  proof_evidence_forces_output_record: false
+  unsupported_differentiation: omit_or_null
+  filler: forbidden
+
+authority_rules:
+  processor_may_emit: [OBSERVED, CREATOR_SHOP_DERIVED, SYSTEM_DERIVED]
+  processor_must_not_emit: [BRAND_CONFIRMED, SUPPORT_CONTROLLED]
+  differentiator_default: CREATOR_SHOP_DERIVED
+  proof_default_when_direct: OBSERVED
+  system_derived_use: deterministic_normalization_or_reference_mechanics_only
+
+refresh_and_invalidation:
+  directed_only: true
+  whole_brand_intelligence_recompute: forbidden
+  triggers: [material_brand_level_proof_change, material_brand_proposition_or_differentiator_change, canonical_supporting_fact_change, explicit_brand_edit]
+  item_level_supported: true
+  proof_item_may_stale_independently: true
+  proof_change_may_trigger_parent_differentiator_reevaluation: true
+  non_triggers: [unrelated_brand_character_change, unrelated_communication_wording_change, unrelated_visual_identity_change]
+
+non_goals: [product_intelligence_ownership, competitive_ranking, campaign_claim_generation, provider_model_selection, runtime_implementation, persistence_implementation]

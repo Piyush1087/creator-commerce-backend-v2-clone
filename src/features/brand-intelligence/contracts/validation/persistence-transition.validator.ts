@@ -81,9 +81,10 @@ export class PersistenceTransitionValidator {
     const metadataSchema = (bundle.artifacts.outputContract
       .shared_generated_metadata ??
       bundle.artifacts.outputContract.shared_item_metadata ??
-      bundle.artifacts.outputContract.generated_metadata) as
-      | Readonly<Record<string, unknown>>
-      | undefined;
+      bundle.artifacts.outputContract.generated_metadata ??
+      (bundle.manifest.processorId === "brand_differentiation"
+        ? bundle.artifacts.outputContract.differentiator_metadata
+        : undefined)) as Readonly<Record<string, unknown>> | undefined;
     const fields = metadataSchema?.fields as
       | Readonly<Record<string, unknown>>
       | undefined;

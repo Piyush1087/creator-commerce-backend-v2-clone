@@ -222,6 +222,50 @@
       "bundled": true,
       "registered": true,
       "executionEnabled": true
+    },
+    {
+      "processorId": "brand_differentiation",
+      "processorVersion": "1.0",
+      "outputContractId": "brand_differentiation_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "brand_intelligence.brand_differentiation",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "91d6f6f6d8ee6a6b52de5b1aa2d6898563581498b360b7a226f890e1f407686f",
+      "ownedObjectSemanticIds": [
+        "differentiation_and_proof"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "differentiation_and_proof",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "differentiation_and_proof",
+          "componentPathPattern": "$/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "differentiation_and_proof",
+          "componentPathPattern": "$/i/{semantic_id}/f/differentiator"
+        },
+        {
+          "objectSemanticId": "differentiation_and_proof",
+          "componentPathPattern": "$/i/{semantic_id}/f/proof_points"
+        },
+        {
+          "objectSemanticId": "differentiation_and_proof",
+          "componentPathPattern": "$/i/{semantic_id}/f/proof_points/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "differentiation_and_proof",
+          "componentPathPattern": "$/i/{semantic_id}/f/proof_points/i/{semantic_id}/f/statement"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "brand_differentiation",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
     }
   ]
 }

@@ -1,0 +1,126 @@
+id: brand_differentiation_output_contract
+version: "1.0"
+status: FROZEN
+processor: brand_differentiation
+object: differentiation_and_proof
+strict: true
+additional_properties: false
+processor_definition: intelligence/engines/brand_intelligence/branches/brand_expression/processors/brand_differentiation.yaml
+reasoning_authority: intelligence/engines/brand_intelligence/branches/brand_expression/artifacts/brand_differentiation/reasoning.yaml
+object_authority: intelligence/engines/brand_intelligence/branches/brand_expression/objects.yaml#differentiation_and_proof
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+response:
+  type: object
+  required: [differentiation_and_proof, output_metadata]
+  additional_properties: false
+  properties:
+    differentiation_and_proof:
+      type: [array, "null"]
+      nullable: true
+      item:
+        additional_properties: false
+        required: [semantic_id, differentiator, proof_points]
+        fields:
+          semantic_id: {type: string, min_length: 1, stable_identity_rule: normalized_brand_level_differentiator_meaning}
+          differentiator: {type: string, min_length: 1}
+          proof_points:
+            type: [array, "null"]
+            nullable: true
+            item:
+              additional_properties: false
+              required: [semantic_id, statement]
+              fields:
+                semantic_id: {type: string, min_length: 1, stable_identity_rule: normalized_factual_support_meaning}
+                statement: {type: string, min_length: 1}
+    output_metadata:
+      type: [array, "null"]
+      nullable: true
+      keyed_by: semantic_id
+      item:
+        additional_properties: false
+        required: [semantic_id, differentiator_metadata, proof_point_metadata]
+        fields:
+          semantic_id: {type: string, min_length: 1}
+          differentiator_metadata: {type: object, schema: differentiator_metadata}
+          proof_point_metadata: {type: [array, "null"], nullable: true, keyed_by: semantic_id, item: proof_metadata}
+
+differentiator_metadata:
+  additional_properties: false
+  required: [authority, source_class, freshness, evidence_refs]
+  fields:
+    authority: {type: enum, values: [CREATOR_SHOP_DERIVED, OBSERVED, SYSTEM_DERIVED], forbidden: [BRAND_CONFIRMED, SUPPORT_CONTROLLED]}
+    source_class: {type: enum, values: [OWNED_WEBSITE, BRAND_USER_INPUT, CANONICAL_BUSINESS_STATE, MULTI_SOURCE, SYSTEM_DERIVATION_INPUT]}
+    freshness: {type: enum, values: [CURRENT, STALE, UNKNOWN]}
+    evidence_refs: {type: array, min_items: 1, unique_items: true, item_type: string}
+    business_state_refs: {type: array, required: false, unique_items: true, item_type: string}
+    confidence: {type: [string, "null"], nullable: true, values_when_non_null: [HIGH, MEDIUM, LOW]}
+
+proof_metadata:
+  additional_properties: false
+  required: [semantic_id, authority, source_class, freshness, evidence_refs, proof_strength]
+  fields:
+    semantic_id: {type: string, min_length: 1}
+    authority: {type: enum, values: [OBSERVED, CREATOR_SHOP_DERIVED, SYSTEM_DERIVED], forbidden: [BRAND_CONFIRMED, SUPPORT_CONTROLLED]}
+    source_class: {type: enum, values: [OWNED_WEBSITE, BRAND_USER_INPUT, CANONICAL_BUSINESS_STATE, MULTI_SOURCE, SYSTEM_DERIVATION_INPUT]}
+    freshness: {type: enum, values: [CURRENT, STALE, UNKNOWN]}
+    evidence_refs: {type: array, min_items: 1, unique_items: true, item_type: string}
+    business_state_refs: {type: array, required: false, unique_items: true, item_type: string}
+    proof_strength: {type: enum, values: [DIRECT_FIRST_PARTY_FACT, EXPLICIT_CERTIFICATION_OR_CREDENTIAL, OBSERVABLE_CAPABILITY, VERIFIED_BUSINESS_FACT]}
+
+partial_shape_rules:
+  object_may_be_null: true
+  differentiator_records_may_have_null_proof_points: true
+  proof_required_for_every_differentiator: false
+  output_record_required_for_every_proof_observation: false
+  metadata_alignment:
+    - null_object_requires_null_metadata
+    - every_differentiator_has_matching_metadata
+    - every_proof_has_matching_proof_metadata
+    - proof_metadata_without_proof_invalid
+
+structural_validation:
+  reject_additional_properties: true
+  reject_duplicate_differentiator_semantic_ids: true
+  reject_duplicate_proof_semantic_ids_within_record: true
+  reject_blank_differentiator_or_proof: true
+  reject_missing_metadata: true
+
+semantic_validation:
+  differentiator:
+    - Brand_level_not_Offering_specific
+    - generic_category_convention_invalid
+    - unsupported_superiority_leadership_trust_uniqueness_invalid
+    - campaign_claim_invalid
+  proof:
+    - testimonial_or_social_proof_alone_invalid_factual_proof
+    - generic_marketing_assertion_invalid_factual_proof
+    - unsupported_statistic_award_outcome_or_superiority_invalid_factual_proof
+    - direct_factual_proof_may_remain_OBSERVED_independent_of_differentiator
+  claim_vs_proof:
+    - observed_brand_claim_not_automatically_factual_proof
+    - proof_strength_must_qualify_under_evidence_contract
+  offering_boundary:
+    - offering_refs_reference_only
+    - duplicated_offering_truth_or_product_intelligence_proof_payload_invalid
+
+healthcare_claim_safety:
+  reject_without_defensible_evidence: [treatment_efficacy, diagnostic_accuracy, clinical_superiority, guaranteed_outcome, medical_success_rate, safety_claim]
+  brand_statement_without_proof: may_exist_as_evidence_but_not_output_proof
+
+protected_current_state_validation:
+  silent_replace_confirmed_differentiator: invalid
+  silent_replace_confirmed_proof: invalid
+  processor_emitted_brand_confirmed: invalid
+  processor_emitted_support_controlled: invalid
+
+source_and_lineage_validation:
+  provider_names_as_source_classes: invalid
+  evidence_refs_required_for_every_emitted_differentiator_and_proof: true
+
+readiness:
+  bounded_partial_output_supported: true
+  no_brand_preview_gate: true
+  no_verification_gate: true
+  no_home_gate: true
+  filler: forbidden

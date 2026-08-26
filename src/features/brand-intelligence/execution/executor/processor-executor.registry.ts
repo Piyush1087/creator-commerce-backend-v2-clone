@@ -1,4 +1,5 @@
 import { Injectable, Optional } from "@nestjs/common";
+import { BrandDifferentiationProcessorExecutor } from "../../processors/brand-differentiation/brand-differentiation-processor.executor";
 
 import { IntelligenceExecutionError } from "../domain/intelligence-execution.error";
 import { SYNTHETIC_PROCESSOR_ID } from "../domain/intelligence-execution.types";
@@ -23,6 +24,8 @@ export class ProcessorExecutorRegistry {
     brandCharacterExecutor?: BrandCharacterProcessorExecutor,
     @Optional()
     audiencePersonaExecutor?: AudiencePersonaProcessorExecutor,
+    @Optional()
+    brandDifferentiationExecutor?: BrandDifferentiationProcessorExecutor,
   ) {
     const executors: [string, ProcessorExecutor][] = [
       [SYNTHETIC_PROCESSOR_ID, syntheticExecutor],
@@ -44,6 +47,11 @@ export class ProcessorExecutorRegistry {
       executors.push([
         audiencePersonaExecutor.processorId,
         audiencePersonaExecutor,
+      ]);
+    if (brandDifferentiationExecutor)
+      executors.push([
+        brandDifferentiationExecutor.processorId,
+        brandDifferentiationExecutor,
       ]);
     this.executors = new Map(executors);
   }

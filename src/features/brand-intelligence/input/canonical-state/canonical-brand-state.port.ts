@@ -37,7 +37,7 @@ export type CanonicalBrandStateResolution =
   | "UNKNOWN_PROVENANCE";
 
 export interface BusinessStateReference {
-  readonly entityType: "BrandProfile";
+  readonly entityType: "BrandProfile" | "Offering";
   readonly entityId: string;
   readonly semanticFieldPath: string;
   readonly revisionKind: "UPDATED_AT" | "SNAPSHOT_FINGERPRINT";
@@ -67,11 +67,25 @@ export interface CanonicalBrandStateSnapshot {
   readonly observedAt: string;
   readonly canonicalSnapshotRef: string;
   readonly entries: readonly CanonicalBrandStateEntry[];
+  /** Optional application-owned Offering facts, never observed DE candidates. */
+  readonly offeringFacts?: readonly CanonicalOfferingFact[];
+}
+
+export interface CanonicalOfferingFact {
+  readonly offeringId: string;
+  readonly brandId: string;
+  readonly name: string;
+  readonly type: string;
+  readonly url: string;
+  readonly categoryTag: string | null;
+  readonly isActive: boolean;
+  readonly businessStateReference: BusinessStateReference;
 }
 
 export interface CanonicalBrandStateReadRequest {
   readonly brandId: string;
   readonly requiredSemantics: readonly CanonicalBrandStateSemantic[];
+  readonly includeOfferingFacts?: boolean;
 }
 
 export interface CanonicalBrandStateReader {

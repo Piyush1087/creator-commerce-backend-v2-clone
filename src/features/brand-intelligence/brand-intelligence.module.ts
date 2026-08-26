@@ -1,4 +1,11 @@
 import { Module } from "@nestjs/common";
+import { BrandDifferentiationProcessorExecutor } from "./processors/brand-differentiation/brand-differentiation-processor.executor";
+import { BrandDifferentiationPersistenceHook } from "./processors/brand-differentiation/brand-differentiation-persistence.hook";
+import { BrandDifferentiationStateRepository } from "./processors/brand-differentiation/brand-differentiation-state.repository";
+import {
+  BRAND_DIFFERENTIATION_MODEL_PROVIDER,
+  StructuredBrandDifferentiationModelProvider,
+} from "./processors/brand-differentiation/brand-differentiation-model.provider";
 import { AudiencePersonaProcessorExecutor } from "./processors/audience-persona/audience-persona-processor.executor";
 import { AudiencePersonaPersistenceHook } from "./processors/audience-persona/audience-persona-persistence.hook";
 import { AudiencePersonaStateRepository } from "./processors/audience-persona/audience-persona-state.repository";
@@ -66,6 +73,13 @@ import {
 } from "./processors/brand-character/brand-character-model.provider";
 
 const internalProviders = [
+  BrandDifferentiationProcessorExecutor,
+  BrandDifferentiationPersistenceHook,
+  BrandDifferentiationStateRepository,
+  {
+    provide: BRAND_DIFFERENTIATION_MODEL_PROVIDER,
+    useClass: StructuredBrandDifferentiationModelProvider,
+  },
   AudiencePersonaProcessorExecutor,
   AudiencePersonaPersistenceHook,
   AudiencePersonaStateRepository,

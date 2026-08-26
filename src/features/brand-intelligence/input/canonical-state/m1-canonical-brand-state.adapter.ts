@@ -69,13 +69,63 @@ export class M1CanonicalBrandStateAdapter implements CanonicalBrandStateReader {
             { brandId: request.brandId },
           );
         }
-        return assembleCanonicalBrandStateSnapshot(
+        const snapshot = assembleCanonicalBrandStateSnapshot(
           profile.id,
           profile.updatedAt,
           seedsFromProfile(profile).filter((entry) =>
             required.includes(entry.semantic),
           ),
         );
+        if (!request.includeOfferingFacts) return snapshot;
+        // Explicitly requested by the differentiation profile only. No scan JSON,
+        // prices, selling points, claims, or inferred Offering identity.
+        const offerings = await transaction.offering.findMany({
+          where: { brandProfileId: request.brandId },
+          select: {
+            id: true,
+            brandProfileId: true,
+            name: true,
+            type: true,
+            url: true,
+            categoryTag: true,
+            isActive: true,
+            updatedAt: true,
+          },
+          orderBy: { id: "asc" },
+        });
+        const canonicalSnapshotRef = `canonical-snapshot:sha256:${sha256CanonicalExecution(
+          {
+            brandSnapshot: snapshot.canonicalSnapshotRef,
+            offerings: offerings.map((row) => ({
+              ...row,
+              updatedAt: row.updatedAt.toISOString(),
+            })),
+          },
+        )}`;
+        return {
+          ...snapshot,
+          canonicalSnapshotRef,
+          offeringFacts: offerings.map(
+            ({ updatedAt, id, brandProfileId, ...facts }) => ({
+              ...facts,
+              offeringId: id,
+              brandId: brandProfileId,
+              businessStateReference: {
+                entityType: "Offering" as const,
+                entityId: id,
+                semanticFieldPath: "$",
+                revisionKind: "UPDATED_AT" as const,
+                revisionToken: sha256CanonicalExecution({
+                  id,
+                  facts,
+                  updatedAt: updatedAt.toISOString(),
+                }),
+                observedAt: snapshot.observedAt,
+                canonicalSnapshotRef,
+              },
+            }),
+          ),
+        };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );

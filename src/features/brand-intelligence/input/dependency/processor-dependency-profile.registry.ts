@@ -9,18 +9,21 @@ import type { NormalizedEvidenceCapabilityId } from "../evidence/intelligence-ev
 export interface ProcessorDependencyProfile {
   readonly processorId:
     | "brand_communication"
+    | "brand_differentiation"
     | "brand_meaning"
     | "audience_persona_synthesis"
     | "brand_character";
   readonly processorVersion: "1.0";
   readonly outputContractId:
     | "brand_communication_output_contract"
+    | "brand_differentiation_output_contract"
     | "brand_character_output_contract"
     | "audience_persona_synthesis_output_contract"
     | "brand_meaning_output_contract";
   readonly outputContractVersion: "1.0";
   readonly evidenceContractId:
     | "brand_communication_evidence"
+    | "brand_differentiation_evidence"
     | "brand_character_evidence"
     | "audience_persona_synthesis_evidence"
     | "brand_meaning_evidence";
@@ -29,11 +32,43 @@ export interface ProcessorDependencyProfile {
   readonly blockingConflictSemantics: readonly CanonicalBrandStateSemantic[];
   readonly capabilityIds: readonly NormalizedEvidenceCapabilityId[];
   readonly representativeEvidenceAnyOf: readonly NormalizedEvidenceCapabilityId[];
+  /** Opt-in lineage readiness; available empty captures are not factual proof. */
+  readonly requiredCapabilityLineages?: readonly NormalizedEvidenceCapabilityId[];
+  readonly includeOfferingFacts?: boolean;
 }
 
 const ARCHITECTURE_REPOSITORY = "Piyush1087/dummy_tcs";
 
 const PROFILES: readonly ProcessorDependencyProfile[] = [
+  {
+    processorId: "brand_differentiation",
+    processorVersion: "1.0",
+    outputContractId: "brand_differentiation_output_contract",
+    outputContractVersion: "1.0",
+    evidenceContractId: "brand_differentiation_evidence",
+    requiredCanonicalSemantics: [
+      "brand_name",
+      "website_url",
+      "industry",
+      "sub_industry",
+    ],
+    nonNullableCanonicalAnchors: ["brand_name", "website_url", "industry"],
+    blockingConflictSemantics: [],
+    capabilityIds: [
+      "owned_website.brand_company_context",
+      "owned_website.brand_messaging",
+      "owned_website.offering_context",
+      "explicit_factual_proof_or_claim_evidence",
+    ],
+    requiredCapabilityLineages: [
+      "owned_website.brand_company_context",
+      "owned_website.brand_messaging",
+      "owned_website.offering_context",
+      "explicit_factual_proof_or_claim_evidence",
+    ],
+    representativeEvidenceAnyOf: [],
+    includeOfferingFacts: true,
+  },
   {
     processorId: "audience_persona_synthesis",
     processorVersion: "1.0",
