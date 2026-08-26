@@ -63,7 +63,12 @@ const specs = [
     "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
   ],
 ];
-specs.push(["visual-style", "VisualStyleProcessorExecutor", "visual_style_synthesis", "a6bed1f28564c002f7d76931de0b4dd960ea5ae1"]);
+specs.push([
+  "visual-style",
+  "VisualStyleProcessorExecutor",
+  "visual_style_synthesis",
+  "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
+]);
 const runtime = new ContractRuntimeRegistry(
   new ContractBundleIntegrityVerifier(),
   new SemanticValidator(),
