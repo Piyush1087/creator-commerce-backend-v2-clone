@@ -8,6 +8,7 @@ import { GeminiJsonClient } from "../brand-onboarding/integrations/gemini/gemini
 import { ParallelExtractClient } from "../brand-onboarding/integrations/parallel/parallel-extract.client";
 import { BrandCentreAuthService } from "./brand-centre-auth.service";
 import { BrandCentreController } from "./brand-centre.controller";
+import { BrandWorkspaceAuthorizationService } from "./brand-workspace-authorization.service";
 import { BrandConsumerController } from "./consumer/brand-consumer.controller";
 import { BrandConsumerService } from "./consumer/brand-consumer.service";
 import { BrandCentreBudgetService } from "./services/brand-centre-budget.service";
@@ -34,6 +35,7 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
   providers: [
     BrandConsumerService,
     BrandCentreAuthService,
+    BrandWorkspaceAuthorizationService,
     BrandCentreRoutingService,
     BrandCentreScanService,
     BrandCentreColdStartService,
@@ -51,6 +53,7 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
   ],
   exports: [
     BrandCentreAuthService,
+    BrandWorkspaceAuthorizationService,
     BrandCentreColdStartService,
     BrandCentreScanService,
     BrandCentreDnaService,
