@@ -1,0 +1,489 @@
+version: "1.0"
+status: FROZEN
+engine: brand_intelligence
+branch: audience
+contract: objects
+shared_metadata_contract: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+branch_purpose: >-
+  Maintain a small durable Brand-level Audience model for creator-marketing strategy,
+  Brand Centre, Chat, Campaign targeting derivation, Campaign Brief generation and future Match Intelligence,
+  without becoming CRM segmentation, Offering-specific audience storage or Campaign targeting configuration.
+
+topology:
+  durable_objects:
+    - audience_personas
+  top_level_object_count: 1
+  prohibited_top_level_objects:
+    - motivations
+    - barriers_or_concerns
+    - trust_credibility_needs
+    - creator_communication_implications
+    - demographics
+    - geography
+
+product_density:
+  normal_active_personas_target: [2, 3]
+  universal_readiness_requirement: false
+  filler_to_reach_target: forbidden
+
+compatibility_boundaries:
+  brand_preview:
+    audience_groups_role: [CANDIDATE_SEED, RECONCILIATION_CONTEXT]
+    direct_canonical_persona: false
+    raw_evidence: false
+    rules:
+      - Preview audience_groups must be re-evaluated against this durable Persona contract before durable admission.
+      - Preview appearance does not confer BRAND_CONFIRMED authority.
+      - New durable Personas receive independently assigned semantic_id values.
+      - Original supporting Evidence/provenance must remain available when Preview hypotheses are reused.
+  campaign_targeting:
+    owns_campaign_targeting: false
+    excluded_semantics:
+      - Campaign age filters
+      - Campaign gender filters
+      - Campaign affinity selections
+      - Campaign target geography
+      - Campaign objective
+      - creator archetype selection
+      - creator matching
+    derivation_boundary: >-
+      Campaign targeting may later derive from Brand Audience plus Campaign objective,
+      Offering and Market context; Campaign-specific targeting configuration is not stored in Brand Audience.
+  offering:
+    offering_specific_persona_required: false
+  overall_brand_topology:
+    state: PROVISIONAL
+    rule: >-
+      Audience may be independently frozen, but overall Brand Intelligence topology remains provisional
+      until Brand Expression, Audience, Visual Identity and Geography/Locations are reconciled together.
+
+canonical_business_state_inputs:
+  required_or_applicable:
+    - brand_id
+    - brand_name
+    - confirmed_industry
+    - confirmed_sub_industry_or_category
+  optional_context:
+    - website_url
+    - primary_country_or_geography
+    - Brand-authored Persona fields
+    - Brand-confirmed Persona fields
+  authority_rule: >-
+    Canonical Brand business state is consumed as context and is not duplicated as Audience-owned business state.
+
+shared_rules:
+  no_onboarding_gate: true
+  progressive_maturity: true
+  source_authority_separation: true
+  readiness_freshness_separation: true
+  protected_current_state_vs_derivation:
+    derivation_dependencies:
+      meaning: >-
+        Canonical business-state context, Evidence or upstream Intelligence permitted to derive,
+        refresh or reconcile CREATOR_SHOP_DERIVED Persona semantics.
+      may_trigger_recompute: true
+    protected_current_authoritative_state:
+      meaning: >-
+        Existing BRAND_CONFIRMED Persona fields/items remain current semantic authority while new Evidence
+        may be compared against them.
+      ordinary_derivation_input_for_replacement: false
+      silent_replacement: forbidden
+      conflict_behavior: preserve current protected semantics and record or surface discrepancy for later resolution policy.
+  generation_lineage_required_for_derived_output:
+    - producer
+    - processor_version
+    - execution_id
+    - generated_at
+    - evidence_refs
+  confidence:
+    universally_required: false
+    allowed_values: [HIGH, MEDIUM, LOW]
+    numeric_percentage_required: false
+
+objects:
+  - id: audience_personas
+    semantic_identity:
+      domain: brand_intelligence
+      branch: audience
+      semantic_key: audience_personas
+    definition: >-
+      A small collection of durable Brand-level Audience Personas representing distinct audience groups
+      materially relevant to creator-marketing strategy.
+    why_it_exists: >-
+      Provides reusable audience understanding for Brand Centre, Chat, Creator Strategy and downstream Campaign reasoning
+      without storing campaign-specific targeting or unlimited segmentation.
+    type: array
+    nullable: true
+    aggregate_semantics:
+      active_set_normal_target: [2, 3]
+      active_set_can_be_smaller_when_only_fewer_personas_are_credible: true
+      filler_for_density: forbidden
+    candidate_admission:
+      candidate_is_durable_persona: false
+      candidate_state: TRANSIENT_RECONCILIATION_STATE
+      sequence:
+        - new hypothesis
+        - transient CANDIDATE
+        - compare against existing durable Personas
+        - update existing OR reject OR admit as new durable Persona
+      admission_requires:
+        - satisfies active Persona semantic core
+        - is materially distinct from existing durable Personas unless updating one
+        - has defensible source/Evidence lineage
+        - does not violate sensitive-inference policy
+      persist_every_candidate: false
+    lifecycle:
+      durable_states: [ACTIVE, INACTIVE, SUPERSEDED]
+      candidate_in_durable_lifecycle: false
+      semantics:
+        ACTIVE: Current strategic Persona eligible for normal consumers.
+        INACTIVE: Retained historical/reusable Persona not currently in the active strategic set.
+        SUPERSEDED: Persona identity replaced through merge, split or material conceptual replacement.
+    persona:
+      semantic_id:
+        type: string
+        required_for_durable_persona: true
+        stable_across_refresh: true
+        not_derived_from: [label, array_position, current_wording]
+      required_semantic_core:
+        required_fields: [semantic_id, label, summary]
+        meaningful_decision_context:
+          minimum_dimensions: 1
+          allowed_dimensions:
+            - key_characteristics
+            - motivations
+            - barriers_or_concerns
+            - trust_credibility_needs
+        filler_to_satisfy_core: forbidden
+      fields:
+        label:
+          type: string
+          nullable: false_for_active_persona
+          definition: Concise human-readable Persona label; never the Persona semantic identity.
+          metadata_granularity:
+            authority: field
+            source: field
+            freshness: field_optional
+            supersession: field_optional
+          Brand_editable: true
+          Brand_confirmable: true
+        summary:
+          type: string
+          nullable: false_for_active_persona
+          definition: >-
+            Concise explanation of who this audience group is and why it is strategically relevant to the Brand.
+          metadata_granularity:
+            authority: field
+            source: field
+            freshness: field_optional
+            supersession: field_optional
+          Brand_editable: true
+          Brand_confirmable: true
+        key_characteristics:
+          type: array
+          nullable: true
+          definition: Bounded non-sensitive behavioral or contextual characteristics that materially distinguish this Persona.
+          item:
+            semantic_id: {required: true}
+            value: {type: string, required: true}
+            metadata_granularity:
+              authority: item
+              source: item
+              freshness: item_optional
+              supersession: item_optional
+          Brand_editable: true
+          Brand_confirmable: true
+        motivations:
+          type: array
+          nullable: true
+          definition: Customer goals, desired outcomes or decision motivations relevant to the Brand/category context.
+          item:
+            semantic_id: {required: true}
+            value: {type: string, required: true}
+            metadata_granularity:
+              authority: item
+              source: item
+              freshness: item_optional
+              supersession: item_optional
+          Brand_editable: true
+          Brand_confirmable: true
+        barriers_or_concerns:
+          type: array
+          nullable: true
+          definition: Grounded factors that make attention, trust, evaluation or action harder for this Persona.
+          item:
+            semantic_id: {required: true}
+            value: {type: string, required: true}
+            metadata_granularity:
+              authority: item
+              source: item
+              freshness: item_optional
+              supersession: item_optional
+          Brand_editable: true
+          Brand_confirmable: true
+        trust_credibility_needs:
+          type: array
+          nullable: true
+          definition: Grounded forms of proof, clarity or credibility that materially help this Persona evaluate or trust communication.
+          item:
+            semantic_id: {required: true}
+            value: {type: string, required: true}
+            metadata_granularity:
+              authority: item
+              source: item
+              freshness: item_optional
+              supersession: item_optional
+          Brand_editable: true
+          Brand_confirmable: true
+        creator_communication_implications:
+          type: array
+          nullable: true
+          definition: >-
+            Creator Shop-derived Brand-level implications for how creator communication may help this Persona,
+            without selecting Campaign configuration, deliverables, creator counts or channels.
+          default_authority: CREATOR_SHOP_DERIVED
+          item:
+            semantic_id: {required: true}
+            value: {type: string, required: true}
+            metadata_granularity:
+              authority: item
+              source: item
+              freshness: item_optional
+              supersession: item_optional
+              confidence: item_optional
+          Brand_editable: true
+          Brand_confirmable: true
+        geography_context:
+          type: object
+          nullable: true
+          optional: true
+          definition: >-
+            Contextual geographic relevance for the Persona when strongly grounded and strategically useful.
+          semantic_boundary:
+            not_canonical_owner_of:
+              - Brand Geography or markets_served
+              - canonical business Locations
+              - Campaign target geography
+          metadata_granularity:
+            authority: subfield_or_object
+            source: subfield_or_object
+            freshness: subfield_or_object_optional
+          Brand_editable: true
+          Brand_confirmable: true
+        demographic_context:
+          type: object
+          nullable: true
+          optional: true
+          policy_gated: true
+          non_core: true
+          definition: >-
+            Optional broad demographic context only when strongly grounded, strategically useful and permitted by explicit policy.
+          prohibited_as_mandatory_core:
+            - age
+            - gender
+            - income
+            - marital_status
+          sensitive_inference_without_explicit_policy: forbidden
+          metadata_granularity:
+            authority: subfield_or_object
+            source: subfield_or_object
+            freshness: subfield_or_object_optional
+      mixed_authority:
+        supported: true
+        invariant: >-
+          A Persona may contain BRAND_CONFIRMED scalar fields/items alongside CREATOR_SHOP_DERIVED or OBSERVED fields/items.
+          Refresh must preserve protected semantics independently rather than replacing the Persona aggregate.
+      protected_current_authoritative_state:
+        supported_granularity:
+          - label field
+          - summary field
+          - item in key_characteristics
+          - item in motivations
+          - item in barriers_or_concerns
+          - item in trust_credibility_needs
+          - item in creator_communication_implications
+          - geography context field/subfield where confirmed
+          - demographic context field/subfield where policy permits and confirmed
+        ordinary_derivation_input_for_replacement: false
+        may_be_compared_with_new_evidence: true
+        silent_overwrite: forbidden
+      stable_identity_and_reconciliation:
+        continuity_rule: >-
+          Preserve semantic_id when the underlying audience meaning remains materially continuous across audience/use context,
+          motivations, decision context, barriers or trust needs; label similarity alone is insufficient.
+        update:
+          same_semantic_id: true
+          version_lineage: true
+          auto_refresh_only_unprotected_fields_or_items: true
+        merge:
+          trigger: two prior durable Personas are reconciled into one materially unified Persona
+          new_semantic_id_required: true
+          new_persona_supersedes_all_sources: true
+          automatic_destructive_merge_if_any_source_has_BRAND_CONFIRMED_semantics: forbidden
+        split:
+          trigger: one prior Persona is reconciled into two or more materially distinct durable Personas
+          new_semantic_ids_required: true
+          lineage_back_to_source_persona: required
+          automatic_destruction_of_BRAND_CONFIRMED_source_semantics: forbidden
+        supersession:
+          historical_persona_retained: true
+          deletion_on_leave_active_set: false
+      source:
+        supported_base_classes:
+          - CANONICAL_BUSINESS_STATE
+          - OWNED_WEBSITE
+          - BRAND_USER_INPUT
+          - MULTI_SOURCE
+        later_enrichment_source_classes:
+          - INSTAGRAM_OWNED
+          - PERFORMANCE_EVIDENCE
+        provider_names_as_source_classes: forbidden
+      authority:
+        supported: [CREATOR_SHOP_DERIVED, BRAND_CONFIRMED, OBSERVED]
+        default_new_durable_persona: CREATOR_SHOP_DERIVED
+        Brand_confirmation_transition:
+          from: [CREATOR_SHOP_DERIVED, OBSERVED]
+          to: BRAND_CONFIRMED
+        aggregate_authority_required: false
+      derivation_dependencies:
+        base:
+          canonical_business_state_refs:
+            - brand_id
+            - brand_name
+            - confirmed_industry
+            - confirmed_sub_industry_or_category
+          evidence_classes:
+            - owned_website_brand_company_context
+            - owned_website_customer_use_context
+          semantic_refs:
+            - Brand Expression Intelligence when available
+          user_context:
+            - Brand edits
+            - Brand confirmations
+        later_enrichment:
+          semantic_or_evidence_classes:
+            - own Instagram context
+            - Campaign learning
+            - Performance learning
+            - optional Market or competitor context
+        full_collection_regeneration_on_enrichment: forbidden
+      preview_reconciliation:
+        preview_audience_group:
+          role: [CANDIDATE_SEED, RECONCILIATION_CONTEXT]
+          direct_durable_identity_reuse: false
+          direct_authority_promotion: false
+          optional_lineage_ref: origin_preview_group_ref
+        admission_rules:
+          - original supporting Evidence/provenance remains available
+          - Preview hypothesis is re-evaluated under durable Persona semantic core
+          - new semantic_id assigned independently when a new Persona is admitted
+          - default authority is CREATOR_SHOP_DERIVED
+      readiness:
+        consumer_scoped: true
+        branch_examples:
+          Brand_Centre:
+            PARTIAL: one strong active Persona may be usable
+            READY: domain policy may treat a sufficiently strong small active set as ready without requiring exactly 2–3
+          Chat:
+            PARTIAL_OR_READY: one strong Persona may be sufficient for many questions
+          Creator_Strategy:
+            rule: requires stronger usable motivation/barrier/trust/communication context according to later Creator Strategy contract
+          Campaign_targeting_derivation:
+            rule: requires relevant active Persona plus Campaign/Offering/Market context; Campaign targeting remains downstream
+          Campaign_Brief:
+            rule: may consume relevant Persona context without requiring all optional Persona enrichment
+          future_Match_Intelligence:
+            rule: later contract may require richer Audience semantics
+        filler_to_change_readiness: forbidden
+      freshness:
+        no_global_ttl: true
+        persona_identity_natural_decay: low
+        fields_with_higher_refresh_sensitivity:
+          - creator_communication_implications
+          - trust_credibility_needs
+          - geography_context
+        Brand_confirmed_may_be_STALE_and_authoritative: true
+      invalidation:
+        directed_only: true
+        examples:
+          - event: new Performance learning
+            effect: affected creator_communication_implications may become STALE; Persona identity remains ACTIVE
+          - event: material Brand Expression change
+            effect: affected motivation/trust/communication fields reevaluate; unrelated Personas/fields remain unchanged
+        whole_collection_regeneration_required: false
+      supersession:
+        supported: true
+        historical_lineage_preserved: true
+        stale_does_not_equal_superseded: true
+      confidence:
+        optional: true
+        materially_justified_for:
+          - inferred Persona identity continuity
+          - derived creator_communication_implications
+          - weakly grounded enrichment fields
+        numeric_percentage_required: false
+      maturity:
+        B:
+          durable_persona_required: false
+          consumer_state: Brand Preview audience_groups only
+        D:
+          durable_persona_useful: true
+          expectation: initial credible durable Persona set may become useful after Home
+        E:
+          progressive_target: richer 2–3 active Personas when supported
+        completion_blocks:
+          Brand_Preview: false
+          verification: false
+          Home: false
+      industry_policy:
+        common_schema_across: [D2C, SAAS_AI, HEALTHCARE, OFFLINE_SERVICES]
+        industry_changes:
+          - reasoning emphasis
+          - applicable fields
+          - trust/barrier interpretation
+          - geography relevance
+        separate_industry_persona_schemas: false
+        healthcare:
+          inference_mode: MOST_CONSERVATIVE
+          prefer:
+            - decision context
+            - information needs
+            - trust needs
+            - access barriers
+            - process understanding
+          sensitive_inferred_personal_traits_without_explicit_policy: forbidden
+      downstream_consumers:
+        - Brand_Centre
+        - Chat
+        - Creator_Strategy
+        - Campaign_targeting_derivation
+        - Campaign_Brief
+        - future_Match_Intelligence
+    persistence_target_classification: PERSISTENCE_RECONCILIATION_REQUIRED
+
+persistence_classification_vocabulary:
+  - PERSISTENCE_RECONCILIATION_REQUIRED
+  - DERIVED_INTELLIGENCE_STORAGE_REQUIRED
+  - MAP_TO_CANONICAL_BRAND_STATE
+
+validation_invariants:
+  - Exactly one top-level Audience Object is defined.
+  - audience_personas is the only durable Audience Object.
+  - Durable Persona semantic_id is stable and is not label, array position or current wording.
+  - CANDIDATE is transient reconciliation state and is not an ordinary durable Persona lifecycle state.
+  - Durable lifecycle is limited to ACTIVE, INACTIVE and SUPERSEDED.
+  - A new hypothesis must pass semantic reconciliation/admission before becoming a durable Persona.
+  - Preview audience_groups are CANDIDATE_SEED and RECONCILIATION_CONTEXT, never DIRECT_CANONICAL_PERSONA and never raw Evidence.
+  - Field and list-item authority can differ within one Persona.
+  - BRAND_CONFIRMED fields/items cannot be silently replaced by refresh.
+  - Derivation dependencies are separate from protected current authoritative state.
+  - Merge and split create new semantic identities and preserve lineage.
+  - Demographic context is nullable, optional, policy-gated and non-core.
+  - Sensitive inference without explicit later policy is forbidden.
+  - Persona geography is contextual and does not own Brand Geography, Locations or Campaign target geography.
+  - Campaign targeting taxonomies and configuration are excluded from durable Persona semantics.
+  - 2–3 active Personas is a normal strategic target, not a universal readiness threshold.
+  - No Audience completion state blocks Brand Preview, verification or Home.
+  - Provider names and Data Extraction mechanics are absent from canonical source/dependency semantics.
+  - Persistence implementation is not defined here.

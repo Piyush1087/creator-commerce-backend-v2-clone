@@ -1,4 +1,11 @@
 import { Module } from "@nestjs/common";
+import { AudiencePersonaProcessorExecutor } from "./processors/audience-persona/audience-persona-processor.executor";
+import { AudiencePersonaPersistenceHook } from "./processors/audience-persona/audience-persona-persistence.hook";
+import { AudiencePersonaStateRepository } from "./processors/audience-persona/audience-persona-state.repository";
+import {
+  AUDIENCE_PERSONA_MODEL_PROVIDER,
+  StructuredAudiencePersonaModelProvider,
+} from "./processors/audience-persona/audience-persona-model.provider";
 
 import { DataExtractionModule } from "../data-extraction/data-extraction.module";
 import { DataExtractionIntelligenceEvidenceAdapter } from "../data-extraction/evidence/intelligence/data-extraction-intelligence-evidence.adapter";
@@ -59,6 +66,13 @@ import {
 } from "./processors/brand-character/brand-character-model.provider";
 
 const internalProviders = [
+  AudiencePersonaProcessorExecutor,
+  AudiencePersonaPersistenceHook,
+  AudiencePersonaStateRepository,
+  {
+    provide: AUDIENCE_PERSONA_MODEL_PROVIDER,
+    useClass: StructuredAudiencePersonaModelProvider,
+  },
   ComponentPathCodec,
   ContractBundleIntegrityVerifier,
   StructuralValidator,

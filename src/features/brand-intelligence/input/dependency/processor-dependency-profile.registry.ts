@@ -10,16 +10,19 @@ export interface ProcessorDependencyProfile {
   readonly processorId:
     | "brand_communication"
     | "brand_meaning"
+    | "audience_persona_synthesis"
     | "brand_character";
   readonly processorVersion: "1.0";
   readonly outputContractId:
     | "brand_communication_output_contract"
     | "brand_character_output_contract"
+    | "audience_persona_synthesis_output_contract"
     | "brand_meaning_output_contract";
   readonly outputContractVersion: "1.0";
   readonly evidenceContractId:
     | "brand_communication_evidence"
     | "brand_character_evidence"
+    | "audience_persona_synthesis_evidence"
     | "brand_meaning_evidence";
   readonly requiredCanonicalSemantics: readonly CanonicalBrandStateSemantic[];
   readonly nonNullableCanonicalAnchors: readonly CanonicalBrandStateSemantic[];
@@ -31,6 +34,26 @@ export interface ProcessorDependencyProfile {
 const ARCHITECTURE_REPOSITORY = "Piyush1087/dummy_tcs";
 
 const PROFILES: readonly ProcessorDependencyProfile[] = [
+  {
+    processorId: "audience_persona_synthesis",
+    processorVersion: "1.0",
+    outputContractId: "audience_persona_synthesis_output_contract",
+    outputContractVersion: "1.0",
+    evidenceContractId: "audience_persona_synthesis_evidence",
+    requiredCanonicalSemantics: ["brand_name", "industry", "sub_industry"],
+    nonNullableCanonicalAnchors: ["brand_name", "industry"],
+    blockingConflictSemantics: [],
+    capabilityIds: [
+      "owned_website.brand_messaging",
+      "owned_website.brand_company_context",
+      "owned_website.offering_context",
+    ],
+    representativeEvidenceAnyOf: [
+      "owned_website.brand_messaging",
+      "owned_website.brand_company_context",
+      "owned_website.offering_context",
+    ],
+  },
   {
     processorId: "brand_character",
     processorVersion: "1.0",

@@ -76,6 +76,7 @@ describe("brand_meaning activation boundaries", () => {
       ["brand_communication", true],
       ["brand_meaning", true],
       ["brand_character", true],
+      ["audience_persona_synthesis", true],
     ]);
   });
   it("retains explicit prompt restrictions and only wires existing runtime services", () => {

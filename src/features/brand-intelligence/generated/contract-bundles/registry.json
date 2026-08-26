@@ -2,7 +2,7 @@
   "generatedNotice": "GENERATED — DO NOT EDIT",
   "generatorVersion": "1.0.0",
   "architectureRepository": "Piyush1087/dummy_tcs",
-  "architectureCommitSha": "56b52c1106feff2a92f23a7c49674fd116bf8c63",
+  "architectureCommitSha": "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
   "registrations": [
     {
       "processorId": "brand_communication",
@@ -110,6 +110,114 @@
       ],
       "structuralValidatorId": "contract_output_schema_v1",
       "semanticValidatorId": "brand_character",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
+    },
+    {
+      "processorId": "audience_persona_synthesis",
+      "processorVersion": "1.0",
+      "outputContractId": "audience_persona_synthesis_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "brand_intelligence.audience_persona_synthesis",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "c9fef21ab4bcbc061a6e29e2d4e6c542a87044aec4f2b2d174562faed41192ed",
+      "ownedObjectSemanticIds": [
+        "audience_personas"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/label"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/summary"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/lifecycle"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/geography_context"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/demographic_context"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/key_characteristics"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/key_characteristics/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/key_characteristics/i/{semantic_id}/f/value"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/motivations"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/motivations/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/motivations/i/{semantic_id}/f/value"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/barriers_or_concerns"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/barriers_or_concerns/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/barriers_or_concerns/i/{semantic_id}/f/value"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/trust_credibility_needs"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/trust_credibility_needs/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/trust_credibility_needs/i/{semantic_id}/f/value"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/creator_communication_implications"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/creator_communication_implications/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/creator_communication_implications/i/{semantic_id}/f/value"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "audience_persona_synthesis",
       "persistenceValidatorId": "intelligence_persistence_transition_v1",
       "bundled": true,
       "registered": true,

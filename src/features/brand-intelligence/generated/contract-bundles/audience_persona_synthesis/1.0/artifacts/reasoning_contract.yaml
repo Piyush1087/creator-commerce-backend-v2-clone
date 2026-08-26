@@ -1,0 +1,248 @@
+id: audience_persona_synthesis_reasoning
+version: "1.0"
+status: FROZEN
+processor: audience_persona_synthesis
+owner_engine: brand_intelligence
+owning_branch: audience
+processor_definition: intelligence/engines/brand_intelligence/branches/audience/processors/audience_persona_synthesis.yaml
+object_authority: intelligence/engines/brand_intelligence/branches/audience/objects.yaml#audience_personas
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+execution_architecture: intelligence/architecture/brand_intelligence_execution_and_maturity_contract.md
+
+purpose: >-
+  Govern durable Persona formation and reconciliation so a small strategic Audience set preserves semantic identity,
+  mixed field/item authority, protected Brand-confirmed state, Preview seed boundaries, policy-gated demographics,
+  and Audience geography boundaries while allowing bounded partial maturity.
+
+model_capability_requirement: structured_grounded_reconciliation
+provider_or_model_selection: deferred_to_model_registry
+
+inputs:
+  canonical:
+    - brand_id
+    - brand_name
+    - confirmed_industry
+    - authoritative_sub_industry_or_category_when_available
+  evidence_sufficiency:
+    minimum_rule: >-
+      Execute when sufficient representative grounded Audience Evidence exists to form or reconcile at least one
+      defensible bounded Persona hypothesis. No single Evidence capability is universally mandatory.
+    supporting_capabilities:
+      - owned_website.brand_messaging
+      - owned_website.brand_company_context
+      - owned_website.offering_context
+      - brand_user_input_and_confirmations
+      - brand_preview.audience_candidate_seeds
+    optional:
+      - instagram.owned_brand_context
+  optional_intelligence_context:
+    - Brand Expression Intelligence
+  non_blocking_absence:
+    - no Preview seed when direct Audience Evidence is sufficient
+    - no Brand user input when direct Audience Evidence is sufficient
+    - incomplete Offering context when other representative Audience Evidence is sufficient
+    - no Instagram context
+
+protected_current_state:
+  granularity:
+    - persona_field
+    - persona_list_item
+    - geography_context_subfield
+    - demographic_context_subfield_when_policy_permits
+  rule: >-
+    BRAND_CONFIRMED Persona semantics remain current authority. New Evidence and candidate seeds may be compared
+    against them but cannot silently rewrite, delete, merge away, split away, or re-label them as new semantic IDs.
+  conflict_behavior:
+    - preserve protected current semantic
+    - retain discrepancy or candidate context
+    - reevaluate only unprotected semantics
+    - require later authorized resolution for destructive protected-state changes
+
+reasoning_sequence:
+  - verify canonical Brand anchors required by the processor are available
+  - assess whether available Audience Evidence is sufficiently representative to support at least one bounded Persona hypothesis
+  - if insufficient overall, return WAITING_FOR_EVIDENCE rather than requiring any specific absent optional source
+  - load current durable ACTIVE, INACTIVE, and relevant SUPERSEDED Persona lineage
+  - load protected field/item authority and current unprotected semantics
+  - normalize available Audience Evidence and Preview candidate seeds without treating them as durable truth
+  - form bounded Persona hypotheses around materially distinct audience meaning
+  - compare every hypothesis to durable Persona identity using semantic continuity rather than wording similarity
+  - classify relationship as SAME_PERSONA, POSSIBLE_MATCH, NEW_PERSONA, or MATERIAL_CONFLICT
+  - update unprotected semantics in place for SAME_PERSONA when underlying identity is continuous
+  - preserve POSSIBLE_MATCH as reconciliation context when identity continuity is not defensible
+  - admit NEW_PERSONA only when semantic core, distinctness, Evidence lineage, and policy safeguards pass
+  - handle true merge/split conceptual replacement through SUPERSEDED lineage rather than silent identity reuse
+  - derive creator_communication_implications only as Brand-level Audience-relative implications, never Campaign instructions
+  - return the smallest defensible active set; do not create filler to reach two or three Personas
+
+persona_formation:
+  strategic_set_rule: small_and_material
+  normal_active_target: [2, 3]
+  universal_minimum: none
+  microsegmentation_tree: forbidden
+  active_persona_core:
+    required:
+      - semantic_id
+      - label
+      - summary
+    meaningful_context:
+      minimum_supported_dimensions: 1
+      dimensions:
+        - key_characteristics
+        - motivations
+        - barriers_or_concerns
+        - trust_credibility_needs
+  unsupported_fields: null_or_omit
+  filler: forbidden
+
+semantic_identity:
+  SAME_PERSONA:
+    meaning: underlying audience identity and decision context remain materially continuous
+    action: preserve semantic_id and version lineage
+  POSSIBLE_MATCH:
+    meaning: overlap exists but identity continuity is not defensible yet
+    action: no automatic merge_or_update
+  NEW_PERSONA:
+    meaning: materially distinct durable Audience concept with defensible Evidence
+    action: assign new semantic_id after admission
+  MATERIAL_CONFLICT:
+    meaning: candidate materially conflicts with protected or established Persona semantics
+    action: preserve current protected state and record discrepancy
+  comparison_dimensions:
+    - who_the_group_is
+    - use_or_decision_context
+    - motivations
+    - barriers_or_concerns
+    - trust_credibility_needs
+    - strategically_relevant_characteristics
+  non_identity_dimensions:
+    - label_wording
+    - array_order
+    - summary_style
+    - capitalization
+    - minor_wording_changes
+  numeric_matching_threshold: forbidden
+
+lifecycle_reasoning:
+  ACTIVE:
+    meaning: current Persona eligible for normal consumers
+  INACTIVE:
+    meaning: durable historical/reusable Persona no longer in current active strategic set
+    use_when:
+      - Persona remains semantically coherent but current strategic relevance has materially reduced
+      - Brand explicitly deactivates without conceptual replacement
+    delete_history: false
+  SUPERSEDED:
+    meaning: prior Persona identity replaced by merge, split, or material conceptual replacement
+    requires_lineage: true
+  update_in_place_when:
+    - semantic identity is continuous
+    - changes are field/item enrichment, correction, or wording refinement
+    - no destructive protected-state conflict exists
+  supersede_when:
+    - material identity changes
+    - two Personas merge into one materially unified Persona
+    - one Persona splits into materially distinct Personas
+  routine_evidence_refresh_creates_new_identity: false
+
+preview_seed_reconciliation:
+  input_role:
+    - CANDIDATE_SEED
+    - RECONCILIATION_CONTEXT
+  execution_prerequisite: false
+  direct_promotion: forbidden
+  direct_semantic_id_reuse: forbidden
+  rules:
+    - absence of Preview seed does not block execution when direct Audience Evidence is sufficient
+    - preserve origin_preview_group_ref where useful for lineage
+    - require original supporting Evidence/provenance when available
+    - evaluate against the durable Persona semantic core
+    - default new admitted Persona authority is CREATOR_SHOP_DERIVED
+    - Preview wording and array order have no identity authority
+
+field_semantics:
+  creator_communication_implications:
+    default_authority: CREATOR_SHOP_DERIVED
+    must_not_include:
+      - Campaign objective
+      - Campaign targeting configuration
+      - creator count
+      - deliverables
+      - CTA
+      - channel selection
+  geography_context:
+    role: audience_relevance_context_only
+    must_not_establish:
+      - Serviceability
+      - Brand shipping reach
+      - Offering availability
+      - Campaign commercial feasibility
+      - canonical Location state
+  demographic_context:
+    optional: true
+    policy_gated: true
+    non_core: true
+    rules:
+      - retain explicit permitted user-supplied context with lineage
+      - derive only when explicit policy permits and Evidence is sufficiently grounded
+      - return null or omit when policy or grounding is insufficient
+      - sensitive inference from statistical likelihood or stereotype is forbidden
+
+brand_user_input:
+  required_for_execution: false
+  role_when_present: authoritative_or_corrective_context_subject_to_existing_authority_rules
+
+offering_context:
+  universally_required_for_execution: false
+  rule: Offering-specific Audience clues may enrich or ground a Persona but incomplete Offering context does not block execution when other representative Audience Evidence is sufficient.
+
+instagram_enrichment:
+  required: false
+  may_inform:
+    - Audience relevance
+    - observed use/problem context
+    - trust or communication context
+  rules:
+    - one post or campaign is insufficient for durable Persona identity
+    - Instagram absence never blocks Audience execution when other sufficient Evidence exists
+    - Instagram changes reevaluate only affected Persona semantics
+
+partial_output:
+  supported: true
+  valid:
+    - zero Personas
+    - one strong Persona
+    - multiple Personas
+    - partial Persona with required semantic core only
+  rules:
+    - sufficient Evidence for one or partial Persona permits execution
+    - optional fields may remain null
+    - missing Evidence does not force synthetic motivations, barriers, demographics, geography, or implications
+    - active-set target never authorizes filler
+
+authority_rules:
+  processor_may_emit:
+    - OBSERVED
+    - CREATOR_SHOP_DERIVED
+    - SYSTEM_DERIVED
+  processor_must_not_emit:
+    - BRAND_CONFIRMED
+    - SUPPORT_CONTROLLED
+  brand_confirmation_transition_owner: authorized_application_or_business_state_action
+  system_derived_use: deterministic normalization_or_reference_mechanics_only
+
+refresh_and_invalidation:
+  directed_only: true
+  whole_brand_intelligence_recompute: forbidden
+  whole_collection_regeneration: forbidden
+  triggers:
+    - material positioning_or_messaging_shift_affecting_audience_meaning
+    - material Offering composition change affecting Audience relevance
+    - new representative customer_or_audience_evidence
+    - explicit Brand Persona edit_or_confirmation
+    - later accepted Performance learning affecting trust_or_communication semantics
+  non_triggers:
+    - label wording change alone
+    - unrelated Serviceability change
+    - unrelated visual asset change
+    - one campaign-only message

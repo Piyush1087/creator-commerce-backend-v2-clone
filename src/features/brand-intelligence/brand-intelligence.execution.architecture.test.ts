@@ -37,7 +37,7 @@ describe("W1.0D architecture boundary", () => {
     }
   });
 
-  it("uses only the synthetic executor and three explicitly compiled real executors", () => {
+  it("uses only the synthetic executor and four explicitly compiled real executors", () => {
     const registry = readFileSync(
       join(executionRoot, "executor", "processor-executor.registry.ts"),
       "utf8",
@@ -46,11 +46,12 @@ describe("W1.0D architecture boundary", () => {
     expect(registry).toContain("BrandCommunicationProcessorExecutor");
     expect(registry).toContain("BrandMeaningProcessorExecutor");
     expect(registry).toContain("BrandCharacterProcessorExecutor");
+    expect(registry).toContain("AudiencePersonaProcessorExecutor");
     expect(registry).not.toContain("brand_communication");
     expect(registry).not.toContain("brand_meaning");
   });
 
-  it("activates exactly the three accepted Brand processors", () => {
+  it("activates exactly the four accepted Brand processors", () => {
     const registry = JSON.parse(
       readFileSync(
         join(__dirname, "generated", "contract-bundles", "registry.json"),
@@ -86,6 +87,12 @@ describe("W1.0D architecture boundary", () => {
       },
       {
         processorId: "brand_character",
+        bundled: true,
+        registered: true,
+        executionEnabled: true,
+      },
+      {
+        processorId: "audience_persona_synthesis",
         bundled: true,
         registered: true,
         executionEnabled: true,

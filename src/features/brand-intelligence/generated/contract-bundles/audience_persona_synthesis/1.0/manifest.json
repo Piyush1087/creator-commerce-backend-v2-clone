@@ -1,0 +1,173 @@
+{
+  "manifestSchemaVersion": 1,
+  "bundleId": "brand_intelligence.audience_persona_synthesis",
+  "bundleVersion": "1.0",
+  "ownerEngine": "brand_intelligence",
+  "owningBranch": "audience",
+  "architectureRepository": "Piyush1087/dummy_tcs",
+  "architectureCommitSha": "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
+  "processorId": "audience_persona_synthesis",
+  "processorVersion": "1.0",
+  "outputContractId": "audience_persona_synthesis_output_contract",
+  "outputContractVersion": "1.0",
+  "evidenceContractId": "audience_persona_synthesis_evidence",
+  "evidenceContractVersion": "1.0",
+  "ownedObjectSemanticIds": [
+    "audience_personas"
+  ],
+  "ownedPathPatterns": [
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/label"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/summary"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/lifecycle"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/geography_context"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/demographic_context"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/key_characteristics"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/key_characteristics/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/key_characteristics/i/{semantic_id}/f/value"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/motivations"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/motivations/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/motivations/i/{semantic_id}/f/value"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/barriers_or_concerns"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/barriers_or_concerns/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/barriers_or_concerns/i/{semantic_id}/f/value"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/trust_credibility_needs"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/trust_credibility_needs/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/trust_credibility_needs/i/{semantic_id}/f/value"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/creator_communication_implications"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/creator_communication_implications/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "audience_personas",
+      "componentPathPattern": "$/i/{semantic_id}/f/creator_communication_implications/i/{semantic_id}/f/value"
+    }
+  ],
+  "generatedNotice": "GENERATED — DO NOT EDIT",
+  "generatorVersion": "1.0.0",
+  "artifacts": [
+    {
+      "role": "EVIDENCE_CONTRACT",
+      "path": "artifacts/evidence_contract.yaml",
+      "semanticId": "audience_persona_synthesis_evidence",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 9086,
+      "sha256": "7f43dd852075f958e868c3fe80c5b85e5785660bfb4dadb951b7806eed92ba51"
+    },
+    {
+      "role": "OBJECT_CONTRACT",
+      "path": "artifacts/object_contract.yaml",
+      "semanticId": "objects",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 20728,
+      "sha256": "fee582425a60c338cc7e3c201f462122257e2008d7e33a17daea32b2041d0465"
+    },
+    {
+      "role": "OUTPUT_CONTRACT",
+      "path": "artifacts/output_contract.yaml",
+      "semanticId": "audience_persona_synthesis_output_contract",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 6372,
+      "sha256": "581013669d641d9b4a9a369cc108cdde86fadd473eaabb24e0a636d9de5d62ec"
+    },
+    {
+      "role": "PROCESSOR_DEFINITION",
+      "path": "artifacts/processor_definition.yaml",
+      "semanticId": "audience_persona_synthesis",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 4972,
+      "sha256": "9dba42f416febe112406575862b17ee781347ea529b130ff15bc7599bd4a4dc1"
+    },
+    {
+      "role": "REASONING_CONTRACT",
+      "path": "artifacts/reasoning_contract.yaml",
+      "semanticId": "audience_persona_synthesis_reasoning",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 10484,
+      "sha256": "341bf67c07f916be5f72a5806a8d3e3609db3b8e1caafb4b13655a778d51b083"
+    },
+    {
+      "role": "SHARED_METADATA_CONTRACT",
+      "path": "artifacts/shared_metadata_contract.yaml",
+      "semanticId": "shared_intelligence_metadata",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 16996,
+      "sha256": "47dbd324d4d79136b16ade4448adf78087d93658bcb2281292c40bfe6def98bd"
+    }
+  ],
+  "bundleContentHash": "c9fef21ab4bcbc061a6e29e2d4e6c542a87044aec4f2b2d174562faed41192ed"
+}

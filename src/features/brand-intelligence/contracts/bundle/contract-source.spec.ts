@@ -5,20 +5,22 @@ const ROOT =
 
 export const ARCHITECTURE_REPOSITORY = "Piyush1087/dummy_tcs";
 export const PINNED_ARCHITECTURE_COMMIT =
-  "56b52c1106feff2a92f23a7c49674fd116bf8c63";
+  "a6bed1f28564c002f7d76931de0b4dd960ea5ae1";
 
 // Independent immutable bundles: the amendment does not repin communication.
 export const PROCESSOR_ARCHITECTURE_COMMITS: Readonly<Record<string, string>> =
   {
     brand_communication: "017dbceac494f0861ec9a6bea7af3129b70fa5cb",
     brand_meaning: "2e13fa40235094d127f72b38f43c510232e38be4",
-    brand_character: PINNED_ARCHITECTURE_COMMIT,
+    brand_character: "56b52c1106feff2a92f23a7c49674fd116bf8c63",
+    audience_persona_synthesis: PINNED_ARCHITECTURE_COMMIT,
   };
 
 export const EXECUTABLE_CONTRACT_PROCESSORS: ReadonlySet<string> = new Set([
   "brand_communication",
   "brand_meaning",
   "brand_character",
+  "audience_persona_synthesis",
 ]);
 
 export const CONTRACT_SOURCE_SPECS: readonly ContractSourceSpec[] = [
@@ -118,6 +120,56 @@ export const CONTRACT_SOURCE_SPECS: readonly ContractSourceSpec[] = [
       OUTPUT_CONTRACT: `${ROOT}/artifacts/brand_character/output_contract.yaml`,
       EVIDENCE_CONTRACT: `${ROOT}/evidence/brand_character_evidence.yaml`,
       OBJECT_CONTRACT: `${ROOT}/objects.yaml`,
+      SHARED_METADATA_CONTRACT:
+        "intelligence/architecture/shared_intelligence_metadata_contract.yaml",
+    },
+  },
+  {
+    processorId: "audience_persona_synthesis",
+    processorVersion: "1.0",
+    outputContractId: "audience_persona_synthesis_output_contract",
+    outputContractVersion: "1.0",
+    evidenceContractId: "audience_persona_synthesis_evidence",
+    evidenceContractVersion: "1.0",
+    ownerEngine: "brand_intelligence",
+    owningBranch: "audience",
+    ownedObjectSemanticIds: ["audience_personas"],
+    ownedPathPatterns: [
+      "$",
+      "$/i/{semantic_id}",
+      ...[
+        "label",
+        "summary",
+        "lifecycle",
+        "geography_context",
+        "demographic_context",
+      ].map((field) => `$/i/{semantic_id}/f/${field}`),
+      ...[
+        "key_characteristics",
+        "motivations",
+        "barriers_or_concerns",
+        "trust_credibility_needs",
+        "creator_communication_implications",
+      ].flatMap((field) => [
+        `$/i/{semantic_id}/f/${field}`,
+        `$/i/{semantic_id}/f/${field}/i/{semantic_id}`,
+        `$/i/{semantic_id}/f/${field}/i/{semantic_id}/f/value`,
+      ]),
+    ].map((componentPathPattern) => ({
+      objectSemanticId: "audience_personas",
+      componentPathPattern,
+    })),
+    artifactPaths: {
+      PROCESSOR_DEFINITION:
+        "intelligence/engines/brand_intelligence/branches/audience/processors/audience_persona_synthesis.yaml",
+      REASONING_CONTRACT:
+        "intelligence/engines/brand_intelligence/branches/audience/artifacts/audience_persona_synthesis/reasoning.yaml",
+      OUTPUT_CONTRACT:
+        "intelligence/engines/brand_intelligence/branches/audience/artifacts/audience_persona_synthesis/output_contract.yaml",
+      EVIDENCE_CONTRACT:
+        "intelligence/engines/brand_intelligence/branches/audience/evidence/audience_persona_synthesis_evidence.yaml",
+      OBJECT_CONTRACT:
+        "intelligence/engines/brand_intelligence/branches/audience/objects.yaml",
       SHARED_METADATA_CONTRACT:
         "intelligence/architecture/shared_intelligence_metadata_contract.yaml",
     },

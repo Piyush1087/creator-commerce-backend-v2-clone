@@ -80,7 +80,8 @@ export class PersistenceTransitionValidator {
     const bundle = this.registry.getVerifiedBundle(request.registryKey);
     const metadataSchema = (bundle.artifacts.outputContract
       .shared_generated_metadata ??
-      bundle.artifacts.outputContract.shared_item_metadata) as
+      bundle.artifacts.outputContract.shared_item_metadata ??
+      bundle.artifacts.outputContract.generated_metadata) as
       | Readonly<Record<string, unknown>>
       | undefined;
     const fields = metadataSchema?.fields as

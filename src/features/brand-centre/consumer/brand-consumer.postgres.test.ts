@@ -236,7 +236,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
       await prisma.$disconnect();
     });
 
-    it("all ten Objects are readable; four new read-only scopes cannot authorize processor writes", async () => {
+    it("all ten Objects remain readable; Audience writes require its newly registered owner", async () => {
       const { b } = await brand();
       for (const objectSemanticId of BRAND_CONSUMER_OBJECTS) {
         expect(
@@ -254,7 +254,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
       expect(
         ownership.owns({
           brandId: b.id,
-          objectSemanticId: "audience_personas",
+          objectSemanticId: "visual_style_profile",
           pathSchemeVersion: 1,
           componentSemanticPath: "$",
         }),
@@ -265,7 +265,12 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
           .filter((r) => r.executionEnabled)
           .map((r) => r.processorId)
           .sort(),
-      ).toEqual(["brand_character", "brand_communication", "brand_meaning"]);
+      ).toEqual([
+        "audience_persona_synthesis",
+        "brand_character",
+        "brand_communication",
+        "brand_meaning",
+      ]);
     });
 
     it("partial and explicit-null current remain truthful; no legacy values promoted", async () => {
