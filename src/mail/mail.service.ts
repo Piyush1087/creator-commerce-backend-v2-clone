@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { ServerClient } from "postmark";
+import { Models, ServerClient } from "postmark";
 
 import { resolveNotificationTemplateIdFromEnv } from "../features/notifications/config/notification-postmark-env";
 
@@ -21,6 +21,60 @@ export class MailService {
     @Inject("POSTMARK_CLIENT")
     private readonly postmarkClient: ServerClient,
   ) {}
+
+  async sendTeamInvitation(args: {
+    email: string;
+    brandName: string;
+    role: string;
+    expiresAt: Date;
+    rawToken: string;
+  }): Promise<void> {
+    const configuredId = process.env.POSTMARK_TEAM_INVITE_TEMPLATE_ID;
+    const templateId = Number(configuredId);
+    const frontend = process.env.APP_FRONTEND_URL;
+    if (
+      !configuredId ||
+      !Number.isSafeInteger(templateId) ||
+      templateId <= 0 ||
+      !frontend
+    ) {
+      throw new Error(
+        "Team invitation mail configuration is missing or invalid",
+      );
+    }
+    const origin = new URL(frontend);
+    if (
+      !["http:", "https:"].includes(origin.protocol) ||
+      origin.username ||
+      origin.password
+    ) {
+      throw new Error("APP_FRONTEND_URL must be an HTTP(S) origin");
+    }
+    const link = new URL("/brand/team-invitations/accept", origin);
+    // A fragment keeps the bearer token out of frontend HTTP/access logs.
+    link.hash = new URLSearchParams({ token: args.rawToken }).toString();
+    try {
+      const response = await this.postmarkClient.sendEmailWithTemplate({
+        From: "no-reply@thecreatorshop.in",
+        To: args.email,
+        TemplateId: templateId,
+        TemplateModel: {
+          brand_name: args.brandName,
+          invited_role: args.role,
+          expires_at: args.expiresAt.toISOString(),
+          acceptance_url: link.toString(),
+        },
+        MessageStream: "outbound",
+        TrackLinks: Models.LinkTrackingOptions.None,
+        TrackOpens: false,
+      });
+      if (response.ErrorCode !== 0)
+        throw new Error("Provider rejected invitation");
+    } catch {
+      // Provider errors can echo the URL/template. Never log or rethrow them.
+      throw new Error("Team invitation email dispatch failed");
+    }
+  }
 
   async sendOtp(email: string, otp: string, displayName: string) {
     const templateIdRaw = process.env.POSTMARK_OTP_TEMPLATE_ID;

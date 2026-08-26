@@ -7,7 +7,7 @@ import { BrandRole } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
-import { BrandCentreAuthService } from "../../brand-centre/brand-centre-auth.service";
+import { BrandWorkspaceAuthorizationService } from "../../brand-centre/brand-workspace-authorization.service";
 
 export const BRAND_SETTINGS_MAX_SEATS = 5;
 
@@ -20,43 +20,20 @@ const FINANCIAL_MUTATION_ROLES: BrandRole[] = [
 export class BrandSettingsAccessService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly brandAuth: BrandCentreAuthService,
+    private readonly workspace: BrandWorkspaceAuthorizationService,
   ) {}
 
   async resolveBrandContext(user: AuthUser) {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(user);
-    const membership = await this.ensureMembership(brandProfileId, user);
-    return { brandProfileId, membership };
+    return this.workspace.resolveBrandContext(user);
   }
 
   async ensureMembership(brandProfileId: string, user: AuthUser) {
-    const existing = await this.prisma.brandTeamMember.findUnique({
-      where: {
-        brandProfileId_userId: {
-          brandProfileId,
-          userId: user.id,
-        },
-      },
-    });
-
-    if (existing) {
-      return existing;
+    // Legacy notification caller compatibility: this method now only authorizes.
+    const context = await this.workspace.resolveBrandContext(user);
+    if (context.brandProfileId !== brandProfileId) {
+      throw new ForbiddenException("Brand workspace mismatch");
     }
-
-    const memberCount = await this.prisma.brandTeamMember.count({
-      where: { brandProfileId, isActive: true },
-    });
-
-    return this.prisma.brandTeamMember.create({
-      data: {
-        brandProfileId,
-        userId: user.id,
-        role:
-          memberCount === 0
-            ? BrandRole.BRAND_OWNER
-            : BrandRole.CAMPAIGN_MANAGER,
-      },
-    });
+    return context.membership;
   }
 
   assertFinancialMutation(role: BrandRole): void {

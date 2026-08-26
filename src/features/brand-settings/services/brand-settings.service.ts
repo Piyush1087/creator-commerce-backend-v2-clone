@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -9,7 +8,9 @@ import {
   SettingsNotificationCategory,
   SettingsNotificationChannel,
 } from "@prisma/client";
-import { randomBytes } from "node:crypto";
+import { BrandTeamService } from "./brand-team.service";
+import { BrandTeamInvitationsService } from "./brand-team-invitations.service";
+import { canonicalInvitationRole } from "../team/brand-team-policy";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import {
@@ -59,6 +60,8 @@ export class BrandSettingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: BrandSettingsAccessService,
+    private readonly team: BrandTeamService,
+    private readonly invitations: BrandTeamInvitationsService,
   ) {}
 
   async getOverview(user: AuthUser) {
@@ -81,7 +84,11 @@ export class BrandSettingsService {
         where: { brandProfileId, isActive: true },
       }),
       this.prisma.teamInvitation.count({
-        where: { brandProfileId, status: "PENDING" },
+        where: {
+          brandProfileId,
+          status: "PENDING",
+          expiresAt: { gt: new Date() },
+        },
       }),
     ]);
 
@@ -112,7 +119,11 @@ export class BrandSettingsService {
         orderBy: { joinedAt: "asc" },
       }),
       this.prisma.teamInvitation.findMany({
-        where: { brandProfileId, status: "PENDING" },
+        where: {
+          brandProfileId,
+          status: "PENDING",
+          expiresAt: { gt: new Date() },
+        },
         orderBy: { createdAt: "desc" },
       }),
     ]);
@@ -157,7 +168,7 @@ export class BrandSettingsService {
         pending_invitations: invitations.map((row) => ({
           invitation_id: row.id,
           email: row.email,
-          role: row.role,
+          role: canonicalInvitationRole(row.role),
           status: row.status,
           expires_at: row.expiresAt.toISOString(),
         })),
@@ -438,146 +449,20 @@ export class BrandSettingsService {
     return this.getNotifications(user);
   }
 
-  async updateTeamRole(user: AuthUser, input: UpdateTeamRoleInput) {
-    const { brandProfileId, membership } =
-      await this.access.resolveBrandContext(user);
-    this.access.assertTeamAdmin(membership.role);
-
-    const target = await this.access.getMembershipOrThrow(
-      input.membershipId,
-      brandProfileId,
-    );
-
-    if (
-      target.role === BrandRole.BRAND_OWNER &&
-      input.role !== BrandRole.BRAND_OWNER
-    ) {
-      const ownerCount = await this.prisma.brandTeamMember.count({
-        where: {
-          brandProfileId,
-          isActive: true,
-          role: BrandRole.BRAND_OWNER,
-        },
-      });
-      if (ownerCount <= 1) {
-        throw new BadRequestException(
-          "At least one Brand Owner must remain on the workspace.",
-        );
-      }
-    }
-
-    const updated = await this.prisma.brandTeamMember.update({
-      where: { id: input.membershipId },
-      data: { role: input.role },
-      include: { user: true },
-    });
-
-    return {
-      membership_id: updated.id,
-      user_id: updated.userId,
-      email: updated.user.email,
-      role: updated.role,
-    };
+  updateTeamRole(user: AuthUser, input: UpdateTeamRoleInput) {
+    return this.team.updateRole(user, input);
   }
 
-  async inviteTeamMember(user: AuthUser, input: InviteTeamMemberInput) {
-    const { brandProfileId, membership } =
-      await this.access.resolveBrandContext(user);
-    this.access.assertTeamAdmin(membership.role);
-
-    const [activeMembers, pendingInvites] = await Promise.all([
-      this.prisma.brandTeamMember.count({
-        where: { brandProfileId, isActive: true },
-      }),
-      this.prisma.teamInvitation.count({
-        where: { brandProfileId, status: "PENDING" },
-      }),
-    ]);
-
-    if (activeMembers + pendingInvites >= BRAND_SETTINGS_MAX_SEATS) {
-      throw new BadRequestException(
-        "Workspace seat capacity fully exhausted (5/5). Revoke a member or cancel a pending invitation.",
-      );
-    }
-
-    const normalizedEmail = input.email.trim().toLowerCase();
-    const token = randomBytes(32).toString("hex");
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
-
-    const invitation = await this.prisma.teamInvitation.create({
-      data: {
-        brandProfileId,
-        email: normalizedEmail,
-        role: mapBrandRoleToLegacyInviteRole(input.role),
-        token,
-        expiresAt,
-      },
-    });
-
-    return {
-      invitation_id: invitation.id,
-      email: invitation.email,
-      role: input.role,
-      expires_at: invitation.expiresAt.toISOString(),
-    };
+  inviteTeamMember(user: AuthUser, input: InviteTeamMemberInput) {
+    return this.invitations.create(user, input);
   }
 
-  async revokeTeamMember(user: AuthUser, membershipId: string) {
-    const { brandProfileId, membership } =
-      await this.access.resolveBrandContext(user);
-    this.access.assertTeamAdmin(membership.role);
-
-    const target = await this.access.getMembershipOrThrow(
-      membershipId,
-      brandProfileId,
-    );
-
-    if (target.userId === user.id) {
-      throw new BadRequestException("You cannot revoke your own access.");
-    }
-
-    if (target.role === BrandRole.BRAND_OWNER) {
-      const ownerCount = await this.prisma.brandTeamMember.count({
-        where: {
-          brandProfileId,
-          isActive: true,
-          role: BrandRole.BRAND_OWNER,
-        },
-      });
-      if (ownerCount <= 1) {
-        throw new BadRequestException(
-          "Cannot revoke the last Brand Owner on this workspace.",
-        );
-      }
-    }
-
-    await this.prisma.brandTeamMember.update({
-      where: { id: membershipId },
-      data: { isActive: false },
-    });
-
-    return { revoked: true, membership_id: membershipId };
+  revokeTeamMember(user: AuthUser, membershipId: string) {
+    return this.team.revoke(user, membershipId);
   }
 
-  async cancelTeamInvitation(user: AuthUser, invitationId: string) {
-    const { brandProfileId, membership } =
-      await this.access.resolveBrandContext(user);
-    this.access.assertTeamAdmin(membership.role);
-
-    const invitation = await this.prisma.teamInvitation.findFirst({
-      where: { id: invitationId, brandProfileId, status: "PENDING" },
-    });
-    if (!invitation) {
-      throw new NotFoundException("Pending invitation not found");
-    }
-
-    await this.prisma.teamInvitation.update({
-      where: { id: invitationId },
-      data: { status: "EXPIRED" },
-    });
-
-    return { cancelled: true, invitation_id: invitationId };
+  cancelTeamInvitation(user: AuthUser, invitationId: string) {
+    return this.team.cancel(user, invitationId);
   }
 }
 
@@ -596,15 +481,4 @@ function splitDisplayName(name: string | null | undefined): {
     firstName: parts[0],
     lastName: parts.slice(1).join(" "),
   };
-}
-
-function mapBrandRoleToLegacyInviteRole(role: BrandRole): string {
-  switch (role) {
-    case BrandRole.BRAND_OWNER:
-      return "ADMIN";
-    case BrandRole.FINANCE_ADMIN:
-      return "FINANCE_ADMIN";
-    default:
-      return "CAMPAIGN_MANAGER";
-  }
 }

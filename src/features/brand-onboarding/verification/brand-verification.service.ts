@@ -7,6 +7,11 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { UserRole } from "@prisma/client";
+import { establishInitialBrandOwner } from "../../brand-settings/team/initial-brand-owner";
+import {
+  lockAdmissionEmail,
+  lockBrandTeam,
+} from "../../brand-settings/team/brand-team-policy";
 import { addMinutes } from "date-fns";
 
 import { MailService } from "../../../mail/mail.service";
@@ -189,7 +194,50 @@ export class BrandVerificationService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
-      let organizationId = profile.organizationId;
+      await lockBrandTeam(tx, brandProfileId);
+      const current = await tx.brandProfile.findUniqueOrThrow({
+        where: { id: brandProfileId },
+      });
+      if (current.isVerified && current.organizationId)
+        throw new ConflictException(
+          "This brand is already activated. Please sign in.",
+        );
+      if (
+        !current.identityConfirmedAt ||
+        current.verificationEmail?.trim().toLowerCase() !== email
+      )
+        throw new ConflictException(
+          "Brand identity changed; confirm your work email again.",
+        );
+      await lockAdmissionEmail(tx, email);
+      const matches = await tx.user.findMany({
+        where: { email: { equals: email, mode: "insensitive" } },
+      });
+      if (matches.length > 1)
+        throw new ConflictException("Brand identity is ambiguous.");
+      const existingUser = matches[0];
+      if (
+        existingUser &&
+        (existingUser.role !== UserRole.BRAND ||
+          (existingUser.organizationId &&
+            current.organizationId &&
+            existingUser.organizationId !== current.organizationId))
+      ) {
+        throw new ConflictException(
+          "This account is already associated with another workspace.",
+        );
+      }
+      let organizationId =
+        current.organizationId ?? existingUser?.organizationId ?? null;
+      if (organizationId && !current.organizationId) {
+        const linked = await tx.brandProfile.findUnique({
+          where: { organizationId },
+        });
+        if (linked && linked.id !== current.id)
+          throw new ConflictException(
+            "This account is already associated with another Brand workspace.",
+          );
+      }
       let userId = existingUser?.id;
 
       if (!organizationId) {
@@ -233,6 +281,7 @@ export class BrandVerificationService {
         },
       });
 
+      await establishInitialBrandOwner(tx, profile.id, userId!);
       return { userId: userId!, organizationId };
     });
 
