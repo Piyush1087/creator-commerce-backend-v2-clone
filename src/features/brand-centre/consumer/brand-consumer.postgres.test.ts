@@ -593,7 +593,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         b.id,
         "visual_style_profile",
         { summary: "Observed restraint", style_traits: [] },
-        { partial: true },
+        { partial: true, stale: true },
       );
 
       await processorExecution(b.id, "brand_communication", "COMPLETED");
@@ -667,6 +667,10 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
       expect(result.brandIdentity.values.readiness).toBe("PARTIAL");
       expect(result.audience.state.current.kind).toBe("NO_CURRENT");
       expect(result.visualIdentity.style.readiness).toBe("PARTIAL");
+      expect(result.visualIdentity.style.freshness).toBe("STALE");
+      expect(result.processorRuntime.visual_style_synthesis.activity).toBe(
+        "IDLE",
+      );
       expect(result.serviceability.state.current.kind).toBe("NO_CURRENT");
     });
 
