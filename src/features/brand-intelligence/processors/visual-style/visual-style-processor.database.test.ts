@@ -10,6 +10,7 @@ import { JwtStrategy } from "../../../auth/jwt.strategy";
 import { JwtAuthGuard } from "../../../auth/jwt-auth.guard";
 import { BrandConsumerController } from "../../../brand-centre/consumer/brand-consumer.controller";
 import { BrandConsumerService } from "../../../brand-centre/consumer/brand-consumer.service";
+import { ProcessorRuntimeProjectionService } from "../../../brand-centre/consumer/processor-runtime-projection.service";
 import { BrandCentreAuthService } from "../../../brand-centre/brand-centre-auth.service";
 import { BrandCentreSessionEvictionService } from "../../../brand-centre/services/brand-centre-session-eviction.service";
 import { BrandVisualStateService } from "../../../brand-canonical-state/brand-visual-state.service";
@@ -1056,11 +1057,11 @@ describe.skipIf(!enabled)(
           service,
           new BrandCentreSessionEvictionService(service),
         ),
-        service,
         new M1CanonicalBrandStateAdapter(service),
         new BrandVisualStateService(service),
         new BrandLocationService(service),
         f.projection,
+        new ProcessorRuntimeProjectionService(service),
       );
       const secret = randomUUID();
       new JwtStrategy(new ConfigService({ JWT_SECRET: secret }));
@@ -1093,6 +1094,15 @@ describe.skipIf(!enabled)(
           expect(response.status).toBe(200);
           return response.json() as Promise<{
             runtimeActivity: string;
+            processorRuntime: {
+              visual_style_synthesis: {
+                activity: string;
+                failure: {
+                  currentPreserved: boolean;
+                  retryEligible: boolean;
+                } | null;
+              };
+            };
             visualIdentity: {
               style: {
                 current: { kind: string; value?: unknown };
@@ -1123,7 +1133,14 @@ describe.skipIf(!enabled)(
           2,
           new StructuredEvidenceExecutionError("RATE_LIMITED", 1),
         );
-        expect((await read()).runtimeActivity).toBe("REFRESHING");
+        const retryRead = await read();
+        expect(retryRead.runtimeActivity).toBe("NONE");
+        expect(retryRead.processorRuntime.visual_style_synthesis).toMatchObject(
+          {
+            activity: "RETRY_SCHEDULED",
+            failure: { currentPreserved: true, retryEligible: true },
+          },
+        );
         await f.retryAtNow(retry.result!.processorExecution.id);
         expect(
           (await f.worker.runOnce("visual-http-retry", 60000))

@@ -8,6 +8,7 @@ import { JwtStrategy } from "../../../auth/jwt.strategy";
 import { JwtAuthGuard } from "../../../auth/jwt-auth.guard";
 import { BrandConsumerController } from "../../../brand-centre/consumer/brand-consumer.controller";
 import { BrandConsumerService } from "../../../brand-centre/consumer/brand-consumer.service";
+import { ProcessorRuntimeProjectionService } from "../../../brand-centre/consumer/processor-runtime-projection.service";
 import { BrandCentreAuthService } from "../../../brand-centre/brand-centre-auth.service";
 import { BrandCentreSessionEvictionService } from "../../../brand-centre/services/brand-centre-session-eviction.service";
 import { BrandVisualStateService } from "../../../brand-canonical-state/brand-visual-state.service";
@@ -937,11 +938,11 @@ describe.skipIf(!enabled)(
           service,
           new BrandCentreSessionEvictionService(service),
         ),
-        service,
         new M1CanonicalBrandStateAdapter(service),
         new BrandVisualStateService(service),
         new BrandLocationService(service),
         f.projection,
+        new ProcessorRuntimeProjectionService(service),
       );
       const secret = randomUUID();
       new JwtStrategy(new ConfigService({ JWT_SECRET: secret }));

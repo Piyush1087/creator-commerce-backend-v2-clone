@@ -10,6 +10,7 @@ import { BrandCentreAuthService } from "./brand-centre-auth.service";
 import { BrandCentreController } from "./brand-centre.controller";
 import { BrandConsumerController } from "./consumer/brand-consumer.controller";
 import { BrandConsumerService } from "./consumer/brand-consumer.service";
+import { ProcessorRuntimeProjectionService } from "./consumer/processor-runtime-projection.service";
 import { BrandCentreBudgetService } from "./services/brand-centre-budget.service";
 import { BrandCentreColdStartService } from "./services/brand-centre-cold-start.service";
 import { BrandCentreDnaService } from "./services/brand-centre-dna.service";
@@ -33,6 +34,7 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
   controllers: [BrandCentreController, BrandConsumerController],
   providers: [
     BrandConsumerService,
+    ProcessorRuntimeProjectionService,
     BrandCentreAuthService,
     BrandCentreRoutingService,
     BrandCentreScanService,

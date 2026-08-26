@@ -1,7 +1,15 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { applicationField, intelligenceField } from "./brand-consumer.mapper";
+import {
+  applicationField,
+  BRAND_CONSUMER_OBJECTS,
+  intelligenceField,
+} from "./brand-consumer.mapper";
+import {
+  BRAND_PROCESSOR_IDS,
+  BRAND_PROCESSOR_OBJECT_OWNERSHIP,
+} from "./processor-runtime-projection.types";
 import type { CurrentIntelligenceObjectProjection } from "../../brand-intelligence/projection/intelligence-current-projection.types";
 import {
   CURRENT_READ_AUTHORITY,
@@ -33,6 +41,30 @@ describe("Brand consumer boundaries", () => {
       "fetch(",
     ])
       expect(source).not.toContain(forbidden);
+  });
+  it("projects exactly seven processor runtimes from durable processor executions and frozen ownership", () => {
+    expect(BRAND_PROCESSOR_IDS).toEqual([
+      "brand_communication",
+      "brand_meaning",
+      "brand_character",
+      "audience_persona_synthesis",
+      "brand_differentiation",
+      "visual_style_synthesis",
+      "serviceability_synthesis",
+    ]);
+    expect(
+      Object.values(BRAND_PROCESSOR_OBJECT_OWNERSHIP).flat().sort(),
+    ).toEqual([...BRAND_CONSUMER_OBJECTS].sort());
+    const source = read(
+      "src/features/brand-centre/consumer/processor-runtime-projection.service.ts",
+    );
+    expect(source).toContain(
+      "this.prisma.intelligenceProcessorExecution.findFirst",
+    );
+    expect(source).toContain("where: { brandId, processorId }");
+    expect(source).not.toContain("synthetic_test_processor");
+    expect(source).not.toContain("intelligenceExecution.findFirst");
+    expect(source).not.toContain("brandCentreJob.findFirst");
   });
   it("read-only scopes are frozen/pinned and do not introduce executable registrations", () => {
     expect(CURRENT_READ_AUTHORITY).toBe(

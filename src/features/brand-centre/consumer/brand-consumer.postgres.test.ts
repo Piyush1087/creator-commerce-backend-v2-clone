@@ -2,7 +2,11 @@ import "reflect-metadata";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { Prisma, PrismaClient } from "@prisma/client";
+import {
+  Prisma,
+  PrismaClient,
+  type IntelligenceProcessorExecutionStatus,
+} from "@prisma/client";
 import { Test } from "@nestjs/testing";
 import { ThrottlerGuard } from "@nestjs/throttler";
 import { ConfigService } from "@nestjs/config";
@@ -30,6 +34,7 @@ import { BrandCentreSessionEvictionService } from "../services/brand-centre-sess
 import { BrandConsumerService } from "./brand-consumer.service";
 import { BrandConsumerController } from "./brand-consumer.controller";
 import { BRAND_CONSUMER_OBJECTS } from "./brand-consumer.mapper";
+import { ProcessorRuntimeProjectionService } from "./processor-runtime-projection.service";
 
 describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
   "Brand consumer PostgreSQL and authenticated HTTP",
@@ -60,11 +65,11 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
     );
     const service = new BrandConsumerService(
       auth,
-      db,
       new M1CanonicalBrandStateAdapter(db),
       visuals,
       locations,
       projection,
+      new ProcessorRuntimeProjectionService(db),
     );
     const hash = (value: unknown) =>
       createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -102,7 +107,12 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
       brandId: string,
       objectSemanticId: string,
       value: unknown,
-      options: { protected?: boolean; partial?: boolean; stale?: boolean } = {},
+      options: {
+        protected?: boolean;
+        partial?: boolean;
+        stale?: boolean;
+        supersedes?: { objectId: string; componentId: string };
+      } = {},
     ) {
       const action = await prisma.intelligenceAction.create({
         data: {
@@ -145,6 +155,8 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
           freshnessAtGeneration: "CURRENT",
           activeScope: ["$"],
           activeScopeHash: hash(["$"]),
+          basedOnObjectGenerationId: options.supersedes?.objectId,
+          supersedesObjectGenerationId: options.supersedes?.objectId,
         },
       });
       const component = await prisma.intelligenceComponentGeneration.create({
@@ -171,9 +183,10 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
           readiness,
           freshnessAtGeneration: "CURRENT",
           metadataPayload: {},
+          supersedesComponentGenerationId: options.supersedes?.componentId,
         },
       });
-      return { action, component };
+      return { action, object: obj, component };
     }
 
     async function current(
@@ -182,7 +195,8 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
       value: unknown,
       options: { protected?: boolean; partial?: boolean; stale?: boolean } = {},
     ) {
-      const { component } = await generation(brandId, object, value, options);
+      const generated = await generation(brandId, object, value, options);
+      const { component } = generated;
       const row = await prisma.intelligenceCurrentComponent.create({
         data: {
           brandId,
@@ -202,7 +216,142 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
             : "UNPROTECTED",
         },
       });
-      return { component, row };
+      return { ...generated, row };
+    }
+
+    async function advanceCurrent(
+      previous: Awaited<ReturnType<typeof current>>,
+      brandId: string,
+      objectSemanticId: string,
+      value: unknown,
+    ) {
+      const generated = await generation(brandId, objectSemanticId, value, {
+        supersedes: {
+          objectId: previous.object.id,
+          componentId: previous.component.id,
+        },
+      });
+      const row = await prisma.intelligenceCurrentComponent.update({
+        where: { id: previous.row.id },
+        data: {
+          currentComponentGenerationId: generated.component.id,
+          currentReadiness: generated.component.readiness,
+          currentFreshness: "CURRENT",
+          freshnessEvaluatedAt: new Date(),
+          staleSince: null,
+          staleReasonCode: null,
+          invalidatingRef: null,
+          revision: { increment: 1 },
+        },
+      });
+      return { ...generated, row };
+    }
+
+    async function processorExecution(
+      brandId: string,
+      processorId: string,
+      status: IntelligenceProcessorExecutionStatus,
+      options: {
+        attemptCount?: number;
+        lastErrorCategory?: string;
+        lastErrorCode?: string;
+        resultReadiness?: "READY" | "PARTIAL" | "NOT_READY";
+      } = {},
+    ) {
+      const now = new Date();
+      const running = status === "RUNNING";
+      const terminal = ["COMPLETED", "FAILED_TERMINAL", "CANCELLED"].includes(
+        status,
+      );
+      const executionStatus = running
+        ? "RUNNING"
+        : terminal
+          ? status === "FAILED_TERMINAL"
+            ? "FAILED"
+            : status === "CANCELLED"
+              ? "CANCELLED"
+              : "COMPLETED"
+          : "PENDING";
+      return prisma.intelligenceExecution.create({
+        data: {
+          brandId,
+          triggerType: "CONSUMER_RUNTIME_TEST",
+          triggerRef: processorId,
+          triggerIdempotencyKey: randomUUID(),
+          correlationRef: randomUUID(),
+          requestedImpact: [processorId],
+          status: executionStatus,
+          startedAt: running || terminal ? now : null,
+          completedAt: terminal ? now : null,
+          processorExecutions: {
+            create: {
+              brand: { connect: { id: brandId } },
+              processorId,
+              processorVersion: "1.0",
+              bundleId: `brand_intelligence.${processorId}`,
+              bundleVersion: "1.0",
+              bundleHash: hash(["bundle", processorId]),
+              outputContractId: `${processorId}_output_contract`,
+              outputContractVersion: "1.0",
+              activeScope: ["$"],
+              activeScopeHash: hash(["scope", processorId]),
+              dependencyManifest: {},
+              dependencyManifestHash: hash(["dependency", processorId]),
+              evidenceManifest: {},
+              evidenceManifestHash: hash(["evidence", processorId]),
+              triggerIntentKey: randomUUID(),
+              processorExecutionKey: hash([randomUUID(), processorId]),
+              maxAttempts: 3,
+              status,
+              resultReadiness:
+                status === "COMPLETED"
+                  ? (options.resultReadiness ?? "READY")
+                  : null,
+              eligibleAt: status === "QUEUED" ? now : null,
+              attemptCount: options.attemptCount ?? (running ? 1 : 0),
+              leaseToken: running ? randomUUID() : null,
+              leaseOwnerRef: running ? "consumer-runtime-test" : null,
+              leaseExpiresAt: running ? new Date(now.getTime() + 60_000) : null,
+              lastHeartbeatAt: running ? now : null,
+              lastErrorCategory: options.lastErrorCategory,
+              lastErrorCode: options.lastErrorCode,
+              startedAt: running || terminal ? now : null,
+              completedAt: terminal ? now : null,
+            },
+          },
+        },
+        include: { processorExecutions: true },
+      });
+    }
+
+    async function completeProcessorExecution(
+      execution: Awaited<ReturnType<typeof processorExecution>>,
+      resultReadiness: "READY" | "PARTIAL" | "NOT_READY" = "READY",
+    ) {
+      const now = new Date();
+      await prisma.intelligenceProcessorExecution.update({
+        where: { id: execution.processorExecutions[0].id },
+        data: {
+          status: "COMPLETED",
+          resultReadiness,
+          eligibleAt: null,
+          leaseToken: null,
+          leaseOwnerRef: null,
+          leaseExpiresAt: null,
+          lastHeartbeatAt: null,
+          lastErrorCategory: null,
+          lastErrorCode: null,
+          completedAt: now,
+        },
+      });
+      await prisma.intelligenceExecution.update({
+        where: { id: execution.id },
+        data: {
+          status: "COMPLETED",
+          aggregateResult: "SUCCEEDED",
+          completedAt: now,
+        },
+      });
     }
 
     beforeAll(async () => {
@@ -319,6 +468,9 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         "Protected current",
         { protected: true, stale: true },
       );
+      await current(b.id, "communication_profile", {
+        primary_language: "English",
+      });
       const candidate = await generation(
         b.id,
         "brand_description",
@@ -339,16 +491,10 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
           discrepancyCode: "PROTECTED_VALUE_CONFLICT",
         },
       });
-      await prisma.intelligenceExecution.create({
-        data: {
-          brandId: b.id,
-          triggerType: "test",
-          triggerRef: "secret-internal",
-          triggerIdempotencyKey: randomUUID(),
-          correlationRef: randomUUID(),
-          requestedImpact: [],
-          status: "FAILED",
-        },
+      await processorExecution(b.id, "brand_meaning", "FAILED_TERMINAL", {
+        attemptCount: 3,
+        lastErrorCategory: "VALIDATION_FAILURE",
+        lastErrorCode: "STRUCTURED_OUTPUT_INVALID",
       });
       const result = await service.read(user);
       const field = result.brandIdentity.description;
@@ -362,11 +508,19 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         resultReadiness: "READY",
         candidate: { status: "CONFLICT", count: 1, rawCandidateVisible: false },
       });
-      expect(result.runtimeActivity).toBe("TEMPORARILY_UNAVAILABLE");
+      expect(result.runtimeActivity).toBe("NONE");
+      expect(result.processorRuntime.brand_meaning).toMatchObject({
+        activity: "TEMPORARILY_UNAVAILABLE",
+        hasCurrent: true,
+        failure: {
+          code: "STRUCTURED_OUTPUT_INVALID",
+          currentPreserved: true,
+        },
+      });
+      expect(result.processorRuntime.brand_communication.activity).toBe("IDLE");
       const serialized = JSON.stringify(result);
       for (const secretValue of [
         "SECRET CANDIDATE",
-        "secret-internal",
         candidate.component.id,
         base.component.id,
         "evidenceReferenceSummary",
@@ -416,6 +570,248 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
       expect(result.audience.personas).toHaveLength(1);
       expect(JSON.stringify(result)).not.toContain("inactive-secret");
       expect(JSON.stringify(result)).not.toContain("SECRET EVIDENCE");
+    });
+
+    it("projects one coherent all-seven mixed runtime without global collapse", async () => {
+      const { b, user } = await brand();
+      await current(b.id, "communication_profile", {
+        primary_language: "English",
+      });
+      await current(b.id, "brand_description", "Grounded description");
+      await current(b.id, "positioning", "Grounded positioning");
+      await current(b.id, "value_proposition", "Grounded value");
+      await current(b.id, "brand_values", [{ semantic_id: "clarity" }], {
+        partial: true,
+      });
+      await current(b.id, "brand_personality", [{ semantic_id: "direct" }], {
+        partial: true,
+      });
+      await current(b.id, "differentiation_and_proof", {
+        differentiators: [{ semantic_id: "bounded-proof" }],
+      });
+      await current(
+        b.id,
+        "visual_style_profile",
+        { summary: "Observed restraint", style_traits: [] },
+        { partial: true },
+      );
+
+      await processorExecution(b.id, "brand_communication", "COMPLETED");
+      await processorExecution(b.id, "brand_meaning", "COMPLETED");
+      await processorExecution(b.id, "brand_character", "COMPLETED", {
+        resultReadiness: "PARTIAL",
+      });
+      await processorExecution(
+        b.id,
+        "audience_persona_synthesis",
+        "WAITING_FOR_DEPENDENCY",
+        {
+          lastErrorCategory: "DEPENDENCY_UNAVAILABLE",
+          lastErrorCode: "WAITING_FOR_EVIDENCE",
+        },
+      );
+      await processorExecution(b.id, "brand_differentiation", "RUNNING");
+      await processorExecution(b.id, "visual_style_synthesis", "COMPLETED", {
+        resultReadiness: "PARTIAL",
+      });
+      await processorExecution(
+        b.id,
+        "serviceability_synthesis",
+        "FAILED_TERMINAL",
+        {
+          attemptCount: 3,
+          lastErrorCategory: "RETRYABLE_TECHNICAL",
+          lastErrorCode: "ATTEMPT_EXHAUSTED",
+        },
+      );
+
+      const token = jwt.sign({ sub: user.id, ...user });
+      const response = await fetch(`${baseUrl}/api/v1/brand-centre/brand`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(response.status).toBe(200);
+      const result = await response.json();
+
+      expect(Object.keys(result.processorRuntime)).toEqual([
+        "brand_communication",
+        "brand_meaning",
+        "brand_character",
+        "audience_persona_synthesis",
+        "brand_differentiation",
+        "visual_style_synthesis",
+        "serviceability_synthesis",
+      ]);
+      expect(
+        Object.values(result.processorRuntime).filter(
+          (state: { refreshing: boolean }) => state.refreshing,
+        ),
+      ).toHaveLength(1);
+      expect(result.processorRuntime.brand_differentiation).toMatchObject({
+        activity: "REFRESHING",
+        hasCurrent: true,
+        refreshing: true,
+      });
+      expect(result.processorRuntime.audience_persona_synthesis).toMatchObject({
+        activity: "WAITING_FOR_EVIDENCE",
+        hasCurrent: false,
+      });
+      expect(result.processorRuntime.serviceability_synthesis).toMatchObject({
+        activity: "TEMPORARILY_UNAVAILABLE",
+        hasCurrent: false,
+        failure: { currentPreserved: false, retryEligible: false },
+      });
+      expect(result.runtimeActivity).toBe("REFRESHING");
+      expect(result.workspaceReadiness).toBe("READY");
+      expect(result.brandIdentity.communication.current.kind).toBe("VALUE");
+      expect(result.brandIdentity.description.current.kind).toBe("VALUE");
+      expect(result.brandIdentity.values.readiness).toBe("PARTIAL");
+      expect(result.audience.state.current.kind).toBe("NO_CURRENT");
+      expect(result.visualIdentity.style.readiness).toBe("PARTIAL");
+      expect(result.serviceability.state.current.kind).toBe("NO_CURRENT");
+    });
+
+    it("coexists first-run LEARNING with an unrelated REFRESHING current", async () => {
+      const { b, user } = await brand();
+      await current(b.id, "differentiation_and_proof", {
+        differentiators: [{ semantic_id: "existing" }],
+      });
+      await processorExecution(b.id, "audience_persona_synthesis", "RUNNING");
+      await processorExecution(b.id, "brand_differentiation", "RUNNING");
+
+      const result = await service.read(user);
+      expect(result.processorRuntime.audience_persona_synthesis).toMatchObject({
+        activity: "LEARNING",
+        hasCurrent: false,
+      });
+      expect(result.processorRuntime.brand_differentiation).toMatchObject({
+        activity: "REFRESHING",
+        hasCurrent: true,
+      });
+      expect(result.runtimeActivity).toBe("LEARNING");
+    });
+
+    it("refreshes Differentiation then Visual Style without changing unrelated generations", async () => {
+      const { b, user } = await brand();
+      const initial = new Map<string, Awaited<ReturnType<typeof current>>>();
+      for (const [objectSemanticId, value] of [
+        ["communication_profile", { primary_language: "English" }],
+        ["brand_description", "Description"],
+        ["positioning", "Positioning"],
+        ["value_proposition", "Value"],
+        ["brand_values", [{ semantic_id: "clarity" }]],
+        ["brand_personality", [{ semantic_id: "direct" }]],
+        ["audience_personas", [{ semantic_id: "buyer", lifecycle: "ACTIVE" }]],
+        ["differentiation_and_proof", { differentiators: [] }],
+        ["visual_style_profile", { summary: "Initial style" }],
+        ["serviceability_profile", { overall_scope: "COUNTRY" }],
+      ] as const) {
+        initial.set(
+          objectSemanticId,
+          await current(b.id, objectSemanticId, value),
+        );
+      }
+      const generationIds = async () =>
+        new Map(
+          (
+            await prisma.intelligenceCurrentComponent.findMany({
+              where: { brandId: b.id, componentSemanticPath: "$" },
+              select: {
+                objectSemanticId: true,
+                currentComponentGenerationId: true,
+              },
+            })
+          ).map((row) => [
+            row.objectSemanticId,
+            row.currentComponentGenerationId,
+          ]),
+        );
+
+      const beforeDifferentiation = await generationIds();
+      const differentiationExecution = await processorExecution(
+        b.id,
+        "brand_differentiation",
+        "RUNNING",
+      );
+      let result = await service.read(user);
+      expect(result.processorRuntime.brand_differentiation).toMatchObject({
+        activity: "REFRESHING",
+        refreshing: true,
+      });
+      expect(result.brandIdentity.differentiation.freshness).toBe("CURRENT");
+      expect(
+        Object.entries(result.processorRuntime)
+          .filter(([processorId]) => processorId !== "brand_differentiation")
+          .every(([, state]) => !state.refreshing),
+      ).toBe(true);
+
+      const previousDifferentiation = initial.get("differentiation_and_proof")!;
+      const nextDifferentiation = await advanceCurrent(
+        previousDifferentiation,
+        b.id,
+        "differentiation_and_proof",
+        { differentiators: [{ semantic_id: "refreshed" }] },
+      );
+      await completeProcessorExecution(differentiationExecution);
+      const afterDifferentiation = await generationIds();
+      for (const [objectSemanticId, generationId] of beforeDifferentiation) {
+        expect(afterDifferentiation.get(objectSemanticId)).toBe(
+          objectSemanticId === "differentiation_and_proof"
+            ? nextDifferentiation.component.id
+            : generationId,
+        );
+      }
+      expect(nextDifferentiation.object).toMatchObject({
+        basedOnObjectGenerationId: previousDifferentiation.object.id,
+        supersedesObjectGenerationId: previousDifferentiation.object.id,
+      });
+
+      const previousVisual = initial.get("visual_style_profile")!;
+      await prisma.intelligenceCurrentComponent.update({
+        where: { id: previousVisual.row.id },
+        data: { currentFreshness: "STALE", staleReasonCode: "CANONICAL_EDIT" },
+      });
+      const beforeVisual = await generationIds();
+      const visualExecution = await processorExecution(
+        b.id,
+        "visual_style_synthesis",
+        "RUNNING",
+      );
+      result = await service.read(user);
+      expect(result.processorRuntime.visual_style_synthesis.activity).toBe(
+        "REFRESHING",
+      );
+      expect(result.visualIdentity.style.freshness).toBe("STALE");
+      expect(result.processorRuntime.brand_differentiation.activity).toBe(
+        "IDLE",
+      );
+
+      const nextVisual = await advanceCurrent(
+        previousVisual,
+        b.id,
+        "visual_style_profile",
+        { summary: "Refreshed style" },
+      );
+      await completeProcessorExecution(visualExecution, "PARTIAL");
+      const afterVisual = await generationIds();
+      for (const [objectSemanticId, generationId] of beforeVisual) {
+        expect(afterVisual.get(objectSemanticId)).toBe(
+          objectSemanticId === "visual_style_profile"
+            ? nextVisual.component.id
+            : generationId,
+        );
+      }
+      expect(nextVisual.object).toMatchObject({
+        basedOnObjectGenerationId: previousVisual.object.id,
+        supersedesObjectGenerationId: previousVisual.object.id,
+      });
+      result = await service.read(user);
+      expect(result.processorRuntime.visual_style_synthesis.activity).toBe(
+        "IDLE",
+      );
+      expect(result.visualIdentity.style.current).toMatchObject({
+        kind: "VALUE",
+        value: { summary: "Refreshed style" },
+      });
     });
 
     it("HTTP requires JWT and Brand organization; query-supplied foreign Brand cannot redirect any read", async () => {
