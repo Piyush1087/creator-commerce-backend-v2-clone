@@ -78,8 +78,9 @@ export class PersistenceTransitionValidator {
       );
     }
     const bundle = this.registry.getVerifiedBundle(request.registryKey);
-    const metadataSchema = bundle.artifacts.outputContract
-      .shared_generated_metadata as
+    const metadataSchema = (bundle.artifacts.outputContract
+      .shared_generated_metadata ??
+      bundle.artifacts.outputContract.shared_item_metadata) as
       | Readonly<Record<string, unknown>>
       | undefined;
     const fields = metadataSchema?.fields as

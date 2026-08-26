@@ -1,0 +1,119 @@
+id: brand_character_reasoning
+version: "1.0"
+status: FROZEN
+processor: brand_character
+owner_engine: brand_intelligence
+owning_branch: brand_expression
+processor_definition: intelligence/engines/brand_intelligence/branches/brand_expression/processors/brand_character.yaml
+object_authority: intelligence/engines/brand_intelligence/branches/brand_expression/objects.yaml
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define grounded reasoning for Brand values and personality so durable Brand character requires explicit,
+  repeated, or materially representative evidence and remains distinct from communication tone, visual style,
+  Campaign themes, Audience personality, and founder personality.
+model_capability_requirement: structured_grounded_reasoning
+provider_or_model_selection: deferred_to_model_registry
+
+inputs:
+  canonical: [brand_name, confirmed_industry, confirmed_sub_industry_or_category_when_authoritative]
+  evidence_capabilities:
+    required: [owned_website.brand_company_context, owned_website.brand_messaging, brand_user_input_and_confirmations]
+    optional: [instagram.owned_brand_context]
+
+protected_current_state:
+  granularity: item
+  rule: BRAND_CONFIRMED values/personality items are protected and cannot be silently replaced, deleted, reworded, or downgraded during ordinary refresh.
+  active_scope_expectation: protected semantic_ids normally excluded from automated replacement scope
+
+semantic_separation:
+  brand_values:
+    meaning: principles_beliefs_commitments_or_priorities_the_brand_materially_stands_for
+    valid_support:
+      - explicit mission/value/principle statement
+      - company/founder narrative clearly generalized to the Brand
+      - persistent owned-source commitment
+      - repeated Brand-level behavior/message pattern
+      - Brand user input
+    invalid_shortcuts:
+      - positive_adjective_to_value
+      - single_sustainability_mention_to_value
+      - product_feature_to_value
+      - customer_benefit_to_value
+      - campaign_theme_to_value
+      - one_off_csr_to_durable_value
+    explicit_value_authority_when_direct: OBSERVED
+    derived_probable_value_authority: CREATOR_SHOP_DERIVED
+  brand_personality:
+    meaning: recurring_human_like_traits_describing_who_the_brand_feels_like
+    valid_support:
+      - persistent Brand-level manner of self-presentation
+      - repeated representative messaging behavior
+      - Brand-authored character descriptor genuinely about the Brand
+    must_not_be:
+      - visual_style
+      - campaign_tone
+      - audience_personality
+      - founder_personality_without_brand_generalization
+      - communication_tone_trait_copied_as_synonym
+    personality_vs_tone:
+      brand_personality: who_the_brand_feels_like
+      communication_profile_tone_traits: how_the_brand_communicates
+      correlation_allowed: true
+      duplication_forbidden: true
+
+reasoning_sequence:
+  - identify active unprotected item collections
+  - classify Evidence as explicit principle, repeated behavior, persistent messaging, campaign-specific theme, or incidental copy
+  - derive values only from explicit or sufficiently representative Brand-level support
+  - derive personality only from recurring Brand character generalizable beyond one communication instance
+  - compare personality candidates against communication tone semantics to prevent duplication
+  - assign stable semantic identity from normalized meaning rather than wording, case, or array position
+  - omit weak, generic, one-off, or category-stereotype traits
+  - preserve protected items and return bounded partial collections
+
+stable_semantic_identity:
+  brand_values:
+    key_basis: normalized_principle_or_commitment_meaning
+    not_based_on: [array_order, wording_variation, capitalization]
+  brand_personality:
+    key_basis: normalized_personality_trait_meaning
+    not_based_on: [array_order, wording_variation, capitalization, communication_tone_label_alone]
+  collision_rule: materially_equivalent_meanings_reconcile_to_one_semantic_id
+
+instagram_enrichment:
+  required: false
+  allowed_when: [repeated_or_materially_representative_owned_brand_context, generalizes_beyond_one_post_or_campaign]
+  may_inform: [brand_values, brand_personality]
+  must_not: [become_readiness_prerequisite, replace_protected_confirmed_items, promote_one_post_theme_to_durable_character]
+
+partial_output:
+  supported: true
+  independent_nullable_outputs: true
+  allowed: [values_only, personality_only, both, both_null]
+  filler: forbidden
+
+authority_rules:
+  processor_may_emit: [OBSERVED, CREATOR_SHOP_DERIVED, SYSTEM_DERIVED]
+  processor_must_not_emit: [BRAND_CONFIRMED, SUPPORT_CONTROLLED]
+  observed_item_allowed_when: explicit_brand_owned_principle_or_character_statement_directly_supports_item
+  default_interpretive_authority: CREATOR_SHOP_DERIVED
+  system_derived_use: deterministic_item_normalization_only
+  brand_confirmation_transition_owner: authorized_application_or_business_state_action
+
+refresh_and_invalidation:
+  directed_only: true
+  whole_brand_intelligence_recompute: forbidden
+  triggers:
+    - material_mission_value_principle_change
+    - material_company_story_change_altering_brand_character
+    - material_persistent_brand_behavior_change
+    - explicit_brand_edit
+  non_triggers:
+    - proposition_wording_change_without_character_change
+    - one_campaign_copy_change
+    - one_isolated_social_post
+    - visual_identity_change_alone
+  item_level_supported: true
+
+non_goals: [communication_tone_production, visual_identity, founder_persona_modeling, campaign_character_guidance, provider_model_selection, runtime_implementation, persistence_implementation]

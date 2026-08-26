@@ -29,6 +29,8 @@ export interface EvidenceManifestEntry {
   /** Transient semantic validation context, not the persisted Evidence manifest. */
   readonly representativeness?: string;
   readonly generalizationScope?: string;
+  readonly normalizedPayload?: unknown;
+  readonly polarity?: string;
 }
 
 export interface BusinessStateManifestEntry {

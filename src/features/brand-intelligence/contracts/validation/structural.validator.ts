@@ -18,7 +18,11 @@ function allowedTypes(node: ContractNode): readonly string[] {
   if (Array.isArray(node.type)) {
     return node.type.filter((item): item is string => typeof item === "string");
   }
-  return typeof node.type === "string" ? [node.type] : [];
+  return typeof node.type === "string"
+    ? [node.type]
+    : record(node.fields) || record(node.properties)
+      ? ["object"]
+      : [];
 }
 
 function actualType(value: unknown): string {
@@ -71,6 +75,13 @@ export class StructuralValidator {
     outputContract: ContractNode,
     issues: ValidationIssue[],
   ): void {
+    // Nullability belongs to the reference site, not just the shared schema.
+    if (
+      value === null &&
+      (node.nullable === true ||
+        (Array.isArray(node.type) && node.type.includes("null")))
+    )
+      return;
     if (typeof node.schema === "string") {
       const shared = record(outputContract[node.schema]);
       if (!shared) {

@@ -5,18 +5,20 @@ const ROOT =
 
 export const ARCHITECTURE_REPOSITORY = "Piyush1087/dummy_tcs";
 export const PINNED_ARCHITECTURE_COMMIT =
-  "2e13fa40235094d127f72b38f43c510232e38be4";
+  "7bdfd71a3cdd08b0457ee53a357bb65e80ccace1";
 
 // Independent immutable bundles: the amendment does not repin communication.
 export const PROCESSOR_ARCHITECTURE_COMMITS: Readonly<Record<string, string>> =
   {
     brand_communication: "017dbceac494f0861ec9a6bea7af3129b70fa5cb",
-    brand_meaning: PINNED_ARCHITECTURE_COMMIT,
+    brand_meaning: "2e13fa40235094d127f72b38f43c510232e38be4",
+    brand_character: PINNED_ARCHITECTURE_COMMIT,
   };
 
 export const EXECUTABLE_CONTRACT_PROCESSORS: ReadonlySet<string> = new Set([
   "brand_communication",
   "brand_meaning",
+  "brand_character",
 ]);
 
 export const CONTRACT_SOURCE_SPECS: readonly ContractSourceSpec[] = [
@@ -83,6 +85,38 @@ export const CONTRACT_SOURCE_SPECS: readonly ContractSourceSpec[] = [
       REASONING_CONTRACT: `${ROOT}/artifacts/brand_meaning/reasoning.yaml`,
       OUTPUT_CONTRACT: `${ROOT}/artifacts/brand_meaning/output_contract.yaml`,
       EVIDENCE_CONTRACT: `${ROOT}/evidence/brand_meaning_evidence.yaml`,
+      OBJECT_CONTRACT: `${ROOT}/objects.yaml`,
+      SHARED_METADATA_CONTRACT:
+        "intelligence/architecture/shared_intelligence_metadata_contract.yaml",
+    },
+  },
+  {
+    processorId: "brand_character",
+    processorVersion: "1.0",
+    outputContractId: "brand_character_output_contract",
+    outputContractVersion: "1.0",
+    evidenceContractId: "brand_character_evidence",
+    evidenceContractVersion: "1.0",
+    ownerEngine: "brand_intelligence",
+    owningBranch: "brand_expression",
+    ownedObjectSemanticIds: ["brand_values", "brand_personality"],
+    ownedPathPatterns: [
+      { objectSemanticId: "brand_values", componentPathPattern: "$" },
+      {
+        objectSemanticId: "brand_values",
+        componentPathPattern: "$/i/{semantic_id}",
+      },
+      { objectSemanticId: "brand_personality", componentPathPattern: "$" },
+      {
+        objectSemanticId: "brand_personality",
+        componentPathPattern: "$/i/{semantic_id}",
+      },
+    ],
+    artifactPaths: {
+      PROCESSOR_DEFINITION: `${ROOT}/processors/brand_character.yaml`,
+      REASONING_CONTRACT: `${ROOT}/artifacts/brand_character/reasoning.yaml`,
+      OUTPUT_CONTRACT: `${ROOT}/artifacts/brand_character/output_contract.yaml`,
+      EVIDENCE_CONTRACT: `${ROOT}/evidence/brand_character_evidence.yaml`,
       OBJECT_CONTRACT: `${ROOT}/objects.yaml`,
       SHARED_METADATA_CONTRACT:
         "intelligence/architecture/shared_intelligence_metadata_contract.yaml",

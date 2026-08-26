@@ -75,6 +75,7 @@ describe("brand_meaning activation boundaries", () => {
     ).toEqual([
       ["brand_communication", true],
       ["brand_meaning", true],
+      ["brand_character", true],
     ]);
   });
   it("retains explicit prompt restrictions and only wires existing runtime services", () => {

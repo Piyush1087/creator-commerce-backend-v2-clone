@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { BrandCharacterSemanticValidator } from "./brand-character.semantic-validator";
 
 import type { VerifiedContractBundle } from "../bundle/contract-bundle.types";
 import { accepted, rejected } from "./validation-result";
@@ -323,6 +324,7 @@ export class SemanticValidator {
       [
         new BrandCommunicationSemanticValidator(),
         new BrandMeaningSemanticValidator(),
+        new BrandCharacterSemanticValidator(),
       ].map((validator) => [validator.validatorId, validator]),
     );
 

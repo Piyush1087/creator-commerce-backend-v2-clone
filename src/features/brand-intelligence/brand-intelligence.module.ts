@@ -50,6 +50,13 @@ import {
   StructuredBrandMeaningModelProvider,
 } from "./processors/brand-meaning/brand-meaning-model.provider";
 import { ProcessorPersistenceRouter } from "./execution/processor-persistence.router";
+import { BrandCharacterProcessorExecutor } from "./processors/brand-character/brand-character-processor.executor";
+import { BrandCharacterPersistenceHook } from "./processors/brand-character/brand-character-persistence.hook";
+import { BrandCharacterStateRepository } from "./processors/brand-character/brand-character-state.repository";
+import {
+  BRAND_CHARACTER_MODEL_PROVIDER,
+  StructuredBrandCharacterModelProvider,
+} from "./processors/brand-character/brand-character-model.provider";
 
 const internalProviders = [
   ComponentPathCodec,
@@ -64,6 +71,9 @@ const internalProviders = [
   SyntheticProcessorExecutor,
   BrandCommunicationProcessorExecutor,
   BrandMeaningProcessorExecutor,
+  BrandCharacterProcessorExecutor,
+  BrandCharacterPersistenceHook,
+  BrandCharacterStateRepository,
   BrandCommunicationPersistenceHook,
   BrandMeaningPersistenceHook,
   ProcessorExecutorRegistry,
@@ -99,6 +109,10 @@ const internalProviders = [
     useClass: StructuredBrandMeaningModelProvider,
   },
   IntelligenceGenerationRepository,
+  {
+    provide: BRAND_CHARACTER_MODEL_PROVIDER,
+    useClass: StructuredBrandCharacterModelProvider,
+  },
   IntelligenceCurrentStateRepository,
   IntelligenceCandidateRepository,
   IntelligenceActionRepository,

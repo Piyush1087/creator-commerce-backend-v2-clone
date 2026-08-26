@@ -2,7 +2,7 @@
   "generatedNotice": "GENERATED — DO NOT EDIT",
   "generatorVersion": "1.0.0",
   "architectureRepository": "Piyush1087/dummy_tcs",
-  "architectureCommitSha": "2e13fa40235094d127f72b38f43c510232e38be4",
+  "architectureCommitSha": "7bdfd71a3cdd08b0457ee53a357bb65e80ccace1",
   "registrations": [
     {
       "processorId": "brand_communication",
@@ -73,6 +73,43 @@
       ],
       "structuralValidatorId": "contract_output_schema_v1",
       "semanticValidatorId": "brand_meaning",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
+    },
+    {
+      "processorId": "brand_character",
+      "processorVersion": "1.0",
+      "outputContractId": "brand_character_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "brand_intelligence.brand_character",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "7a8f10973175b2e78d6a995e3132608930a737f55a0fbce1597ac5907e18640f",
+      "ownedObjectSemanticIds": [
+        "brand_values",
+        "brand_personality"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "brand_values",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "brand_values",
+          "componentPathPattern": "$/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "brand_personality",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "brand_personality",
+          "componentPathPattern": "$/i/{semantic_id}"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "brand_character",
       "persistenceValidatorId": "intelligence_persistence_transition_v1",
       "bundled": true,
       "registered": true,
