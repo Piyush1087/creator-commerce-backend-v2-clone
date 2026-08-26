@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { OwnedSiteObservationFragment } from "../acquisition/owned-site-observation-fragment";
 
 import type {
   EvidenceRef,
@@ -26,6 +27,7 @@ export interface DataExtractionNormalizationSource {
   readonly normalizedContentRef?: NormalizedContentRef;
   readonly normalizedText: string;
   readonly acquiredSourceBody?: string;
+  readonly observationFragment?: OwnedSiteObservationFragment;
   readonly freshness: EvidenceFreshnessSnapshot;
 }
 
@@ -33,6 +35,11 @@ export interface DataExtractionNormalizationInput {
   readonly execution: DataExtractionCapabilityExecutionRecord;
   readonly sources: readonly DataExtractionNormalizationSource[];
   readonly parentEvidence: readonly DataExtractionEvidenceItemRecord[];
+  readonly locationReconciliations?: readonly {
+    readonly captureRef: string;
+    readonly sourceLocator: string;
+    readonly canonicalLocationRef: string;
+  }[];
 }
 
 export interface NormalizedEvidenceDraft {

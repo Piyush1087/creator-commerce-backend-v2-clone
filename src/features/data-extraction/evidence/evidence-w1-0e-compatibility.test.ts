@@ -12,11 +12,11 @@ import type {
   DataExtractionCapabilityExecutionRecord,
   DataExtractionEvidenceItemRecord,
 } from "./domain/evidence-records";
-import { WAVE1_EVIDENCE_CAPABILITIES } from "./domain/evidence-vocabulary";
+import { DATA_EXTRACTION_EVIDENCE_CAPABILITIES } from "./domain/evidence-vocabulary";
 
 describe("DE-W1.0A W1.0E compatibility", () => {
   it("uses the exact integrated W1.0E capability vocabulary", () => {
-    expect(WAVE1_EVIDENCE_CAPABILITIES).toEqual(
+    expect(DATA_EXTRACTION_EVIDENCE_CAPABILITIES).toEqual(
       NORMALIZED_EVIDENCE_CAPABILITIES,
     );
   });

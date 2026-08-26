@@ -9,7 +9,7 @@ import type {
 } from "../../../brand-intelligence/input/evidence/intelligence-evidence.port";
 import { asBrandId } from "../domain/evidence-identities";
 import type { DataExtractionEvidenceItemRecord } from "../domain/evidence-records";
-import { WAVE1_EVIDENCE_CAPABILITIES } from "../domain/evidence-vocabulary";
+import { DATA_EXTRACTION_EVIDENCE_CAPABILITIES } from "../domain/evidence-vocabulary";
 import {
   DATA_EXTRACTION_EVIDENCE_QUERY_PORT_V1,
   type DataExtractionCapabilityReadResultV1,
@@ -142,7 +142,8 @@ export class DataExtractionIntelligenceEvidenceAdapter implements IntelligenceEv
       !request.processorVersion ||
       request.capabilityIds.length === 0 ||
       request.capabilityIds.some(
-        (capabilityId) => !WAVE1_EVIDENCE_CAPABILITIES.includes(capabilityId),
+        (capabilityId) =>
+          !DATA_EXTRACTION_EVIDENCE_CAPABILITIES.includes(capabilityId),
       )
     ) {
       throw new Error("INVALID_INTELLIGENCE_EVIDENCE_READ_REQUEST");

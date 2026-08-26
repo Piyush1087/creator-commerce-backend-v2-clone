@@ -8,6 +8,10 @@ export const NORMALIZED_EVIDENCE_CAPABILITIES = [
   "owned_website.offering_context",
   "observed_brand_communication_language_signals",
   "derived_communication_constraint_evidence",
+  "explicit_factual_proof_or_claim_evidence",
+  "owned_website.visual_evidence",
+  "owned_website.serviceability_evidence",
+  "owned_website.location_evidence",
 ] as const;
 
 export type NormalizedEvidenceCapabilityId =

@@ -3,6 +3,9 @@ import { createHash } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 
 import { PrismaService } from "../../../../prisma/prisma.service";
+import { ownedSiteObservationFragmentSchema } from "../acquisition/owned-site-observation-fragment";
+import { isWave2Capability } from "../domain/evidence-vocabulary";
+import { WAVE2_NORMALIZERS, wave2Conflict } from "./wave2/wave2-normalizers";
 import {
   asEvidenceRef,
   asSemanticObservationKey,
@@ -29,11 +32,14 @@ import {
   normalizerFor,
   type DataExtractionNormalizationSource,
   type NormalizedEvidenceDraft,
+  type DataExtractionNormalizationInput,
 } from "./owned-website-wave1-normalizers";
 
 export interface DataExtractionNormalizationRequestV1 {
   readonly brandId: BrandId;
   readonly capabilityExecutionRef: CapabilityExecutionRef;
+  /** Internal application-supplied reconciliation only; never read from acquired HTML. */
+  readonly locationReconciliations?: DataExtractionNormalizationInput["locationReconciliations"];
 }
 
 export interface DataExtractionNormalizationResultV1 {
@@ -79,28 +85,106 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
       execution,
       normalizationStartedAt,
     );
-    const parentEvidence = await this.loadParentEvidence(request.brandId);
-    const normalizer = normalizerFor(execution.capabilityId);
+    const parentEvidence = isWave2Capability(execution.capabilityId)
+      ? []
+      : await this.loadParentEvidence(request.brandId);
+    const normalizer =
+      WAVE2_NORMALIZERS.find(
+        (candidate) => candidate.capabilityId === execution.capabilityId,
+      ) ?? normalizerFor(execution.capabilityId);
+    if (request.locationReconciliations?.length) {
+      if (
+        execution.capabilityId !== "owned_website.location_evidence" ||
+        request.locationReconciliations.length > 96
+      )
+        throw persistenceError("PERSISTENCE_INVARIANT");
+      const locators = new Set<string>();
+      for (const mapping of request.locationReconciliations) {
+        const key = `${mapping.captureRef}|${mapping.sourceLocator}`;
+        if (
+          locators.has(key) ||
+          !sources.some(
+            (source) => source.capture.captureRef === mapping.captureRef,
+          ) ||
+          !(await this.prisma.location.findFirst({
+            where: {
+              id: mapping.canonicalLocationRef,
+              brandProfileId: request.brandId,
+            },
+            select: { id: true },
+          }))
+        )
+          throw persistenceError("PERSISTENCE_INVARIANT");
+        locators.add(key);
+      }
+    }
     const normalized = normalizer.normalize({
       execution,
       sources,
       parentEvidence,
+      locationReconciliations: request.locationReconciliations,
     });
+    for (const mapping of request.locationReconciliations ?? []) {
+      if (
+        !normalized.drafts.some(
+          (draft) =>
+            draft.source.capture.captureRef === mapping.captureRef &&
+            draft.boundedNormalizedPayload.source_locator ===
+              mapping.sourceLocator &&
+            draft.boundedNormalizedPayload.canonical_location_ref ===
+              mapping.canonicalLocationRef,
+        )
+      )
+        throw persistenceError("PERSISTENCE_INVARIANT");
+    }
+    const boundedNormalization =
+      isWave2Capability(execution.capabilityId) &&
+      (sources.some((source) =>
+        source.observationFragment?.limitations.some((code) =>
+          /LIMIT|TRUNCATED|MALFORMED/.test(code),
+        ),
+      ) ||
+        sources.some(
+          (source) =>
+            normalized.drafts.filter(
+              (draft) =>
+                draft.source.capture.captureRef === source.capture.captureRef,
+            ).length >=
+            (execution.capabilityId === "owned_website.visual_evidence"
+              ? 32
+              : 24),
+        ));
+    const normalizationReasons = boundedNormalization
+      ? [...normalized.reasonCodes, "BOUNDED_NORMALIZATION_COVERAGE_LIMIT"]
+      : normalized.reasonCodes;
 
     const evidenceRecords = normalized.drafts.map((draft) =>
-      this.toEvidenceRecord(execution, draft),
+      this.toEvidenceRecord(
+        isWave2Capability(execution.capabilityId)
+          ? { ...execution, coverage: coverageForSourceCount(sources.length) }
+          : execution,
+        draft,
+      ),
     );
     const completion = this.semanticCompletion(
       execution,
       sources,
       evidenceRecords.length,
-      normalized.reasonCodes,
+      normalizationReasons,
       normalizationStartedAt.toISOString(),
     );
 
     const completed = await this.persistence.withTransaction(async (tx) => {
       for (const record of evidenceRecords) {
-        const item = await tx.evidenceItems.insertOrGetExact(record);
+        // A retained capture may already have emitted this immutable item under a
+        // narrower execution scope. Reuse its historical snapshot, never rewrite it.
+        const prior = isWave2Capability(execution.capabilityId)
+          ? await tx.evidenceItems.findByRef(
+              request.brandId,
+              record.evidenceRef,
+            )
+          : null;
+        const item = prior ?? (await tx.evidenceItems.insertOrGetExact(record));
         await tx.capabilityEvidence.attach(
           request.brandId,
           execution.capabilityExecutionRef,
@@ -205,7 +289,28 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
       const normalizedText =
         normalized?.inlineContent?.trim() ??
         deterministicClean(sourceBody?.inlineContent ?? "");
-      if (!normalizedText) continue;
+      const retainedFragment = artifacts.find(
+        (artifact) =>
+          artifact.artifactKind === "STRUCTURED_SOURCE_FRAGMENT" &&
+          artifact.normalizationContractVersion ===
+            "owned-site-observations/1.0",
+      );
+      let observationFragment: DataExtractionNormalizationSource["observationFragment"];
+      if (
+        isWave2Capability(execution.capabilityId) &&
+        retainedFragment?.inlineContent
+      ) {
+        try {
+          observationFragment = ownedSiteObservationFragmentSchema.parse(
+            JSON.parse(retainedFragment.inlineContent) as unknown,
+          );
+        } catch {
+          throw persistenceError("PERSISTENCE_INVARIANT");
+        }
+      }
+      if (!normalizedText && !isWave2Capability(execution.capabilityId))
+        continue;
+      if (!normalizedText && !observationFragment && !sourceBody) continue;
       const freshness = await this.freshnessFor(
         execution.brandId,
         capture.captureRef,
@@ -215,12 +320,15 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
       sources.push({
         resource,
         capture,
-        ...(normalized
-          ? { normalizedContentRef: normalized.contentArtifactRef }
-          : sourceBody
-            ? { normalizedContentRef: sourceBody.contentArtifactRef }
-            : {}),
+        ...(isWave2Capability(execution.capabilityId) && retainedFragment
+          ? { normalizedContentRef: retainedFragment.contentArtifactRef }
+          : normalized
+            ? { normalizedContentRef: normalized.contentArtifactRef }
+            : sourceBody
+              ? { normalizedContentRef: sourceBody.contentArtifactRef }
+              : {}),
         normalizedText: normalizedText.slice(0, 15_000),
+        ...(observationFragment ? { observationFragment } : {}),
         ...(sourceBody?.inlineContent
           ? { acquiredSourceBody: sourceBody.inlineContent.slice(0, 60_000) }
           : {}),
@@ -378,12 +486,16 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
         const right = drafts[rightIndex]!;
         if (left.semanticObservationKey === right.semanticObservationKey)
           continue;
+        const wave2 = wave2Conflict(left, right);
         if (
-          conflictSignature(left.semanticText) !==
-          conflictSignature(right.semanticText)
+          !wave2 &&
+          (conflictSignature(left.semanticText) !==
+            conflictSignature(right.semanticText) ||
+            left.boundedNormalizedPayload.subject_scope !==
+              right.boundedNormalizedPayload.subject_scope)
         )
           continue;
-        if (!opposes(left.polarity, right.polarity)) continue;
+        if (!wave2 && !opposes(left.polarity, right.polarity)) continue;
         await observations.relateConflict(
           brandId,
           left.semanticObservationKey,
@@ -407,11 +519,16 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
     readonly acquisitionQuality: EvidenceAcquisitionQuality;
     readonly completedAt: string;
   } {
-    const availability = this.normalizationAvailability(
+    const baseAvailability = this.normalizationAvailability(
       execution,
       sources,
       evidenceCount,
     );
+    const availability =
+      baseAvailability === "AVAILABLE" &&
+      reasonCodes.includes("BOUNDED_NORMALIZATION_COVERAGE_LIMIT")
+        ? "PARTIAL"
+        : baseAvailability;
     return {
       availability,
       retryability:
@@ -421,7 +538,19 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
           ? [...new Set([...reasonCodes, "NO_DURABLE_NORMALIZATION_SOURCE"])]
           : [...reasonCodes],
       coverage: coverageForSourceCount(sources.length),
-      acquisitionQuality: conservativeQuality(sources),
+      acquisitionQuality:
+        isWave2Capability(execution.capabilityId) &&
+        sources.length > 0 &&
+        sources.length < execution.resourceScope.length
+          ? {
+              ...conservativeQuality(sources),
+              state: "PARTIAL",
+              detailCodes: [
+                ...conservativeQuality(sources).detailCodes,
+                "SELECTED_RESOURCE_UNAVAILABLE",
+              ],
+            }
+          : conservativeQuality(sources),
       completedAt,
     };
   }
@@ -432,6 +561,19 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
     evidenceCount: number,
   ): CapabilityAvailability {
     if (sources.length === 0) return "UNAVAILABLE";
+    if (isWave2Capability(execution.capabilityId)) {
+      const state = conservativeQuality(sources).state;
+      if (state === "DEGRADED") return "DEGRADED";
+      if (
+        state === "PARTIAL" ||
+        sources.length < execution.resourceScope.length
+      )
+        return "PARTIAL";
+      // DOM-only visual evidence is explicitly a useful partial observation, not full visual coverage.
+      if (execution.capabilityId === "owned_website.visual_evidence")
+        return evidenceCount ? "PARTIAL" : "UNAVAILABLE";
+      return "AVAILABLE";
+    }
     if (
       execution.capabilityId === "derived_communication_constraint_evidence" &&
       evidenceCount === 0

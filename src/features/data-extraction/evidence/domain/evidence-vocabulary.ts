@@ -6,7 +6,28 @@ export const WAVE1_EVIDENCE_CAPABILITIES = [
   "derived_communication_constraint_evidence",
 ] as const;
 
-export type EvidenceCapabilityId = (typeof WAVE1_EVIDENCE_CAPABILITIES)[number];
+export const WAVE2_EVIDENCE_CAPABILITIES = [
+  "explicit_factual_proof_or_claim_evidence",
+  "owned_website.visual_evidence",
+  "owned_website.serviceability_evidence",
+  "owned_website.location_evidence",
+] as const;
+
+export const DATA_EXTRACTION_EVIDENCE_CAPABILITIES = [
+  ...WAVE1_EVIDENCE_CAPABILITIES,
+  ...WAVE2_EVIDENCE_CAPABILITIES,
+] as const;
+
+export type EvidenceCapabilityId =
+  (typeof DATA_EXTRACTION_EVIDENCE_CAPABILITIES)[number];
+export type Wave2EvidenceCapabilityId =
+  (typeof WAVE2_EVIDENCE_CAPABILITIES)[number];
+
+export function isWave2Capability(
+  id: EvidenceCapabilityId,
+): id is Wave2EvidenceCapabilityId {
+  return (WAVE2_EVIDENCE_CAPABILITIES as readonly string[]).includes(id);
+}
 
 export type CapabilityAvailability =
   | "AVAILABLE"

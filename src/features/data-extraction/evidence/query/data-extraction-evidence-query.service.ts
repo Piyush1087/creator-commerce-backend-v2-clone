@@ -11,7 +11,7 @@ import type {
   DataExtractionSemanticObservationRecord,
 } from "../domain/evidence-records";
 import {
-  WAVE1_EVIDENCE_CAPABILITIES,
+  DATA_EXTRACTION_EVIDENCE_CAPABILITIES,
   type EvidenceCapabilityId,
 } from "../domain/evidence-vocabulary";
 import { persistenceError } from "../persistence/evidence-persistence.errors";
@@ -103,7 +103,8 @@ export class DataExtractionEvidenceQueryService implements DataExtractionEvidenc
     }
     if (
       request.capabilityIds.some(
-        (capabilityId) => !WAVE1_EVIDENCE_CAPABILITIES.includes(capabilityId),
+        (capabilityId) =>
+          !DATA_EXTRACTION_EVIDENCE_CAPABILITIES.includes(capabilityId),
       )
     ) {
       throw persistenceError("PERSISTENCE_INVARIANT");

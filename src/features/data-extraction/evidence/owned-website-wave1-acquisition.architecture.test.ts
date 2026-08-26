@@ -52,8 +52,8 @@ describe("DE-W1.0D owned-site acquisition architecture", () => {
     expect(readSection).not.toContain("request(");
   });
 
-  it("uses exactly the existing five Wave 1 capabilities and PUBLIC_OWNED_SITE semantics", () => {
-    expect(source).toContain("WAVE1_EVIDENCE_CAPABILITIES");
+  it("uses the bounded DE capability allow-list and PUBLIC_OWNED_SITE semantics", () => {
+    expect(source).toContain("DATA_EXTRACTION_EVIDENCE_CAPABILITIES");
     expect(source).toContain('sourceClass: "OWNED_WEBSITE"');
     expect(source).not.toMatch(/PUBLIC_WEB_SEARCH|INSTAGRAM_CONNECTED/);
   });

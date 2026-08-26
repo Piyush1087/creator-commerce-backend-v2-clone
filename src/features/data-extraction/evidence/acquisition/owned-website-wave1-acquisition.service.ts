@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 
 import { TextContextBuilderService } from "../../../brand-onboarding/surface-scan/stage1b/text-context-builder.service";
 import { ZyteHomepageStrategy } from "../../../brand-onboarding/surface-scan/stage1a/zyte-homepage.strategy";
@@ -19,7 +19,8 @@ import type {
   DataExtractionResourceRecord,
 } from "../domain/evidence-records";
 import {
-  WAVE1_EVIDENCE_CAPABILITIES,
+  DATA_EXTRACTION_EVIDENCE_CAPABILITIES,
+  isWave2Capability,
   type CapabilityAvailability,
   type EvidenceAcquisitionQuality,
   type EvidenceCapabilityId,
@@ -39,6 +40,14 @@ import type {
   DataExtractionCapabilityAcquisitionRequestV1,
   DataExtractionCapabilityAcquisitionResultV1,
 } from "../ports/evidence-runtime.ports";
+import {
+  retainOwnedSiteObservations,
+  type OwnedSiteObservationFragment,
+} from "./owned-site-observation-fragment";
+import {
+  retainedMaterialForWave2,
+  wave2PageScore,
+} from "./wave2-acquisition-policy";
 
 export const OWNED_WEBSITE_WAVE1_BOUNDS = Object.freeze({
   maximumDiscoveredLinksConsidered: 30,
@@ -65,6 +74,7 @@ export interface OwnedWebsitePageAcquisition {
   readonly quality: EvidenceAcquisitionQuality;
   readonly attempts: readonly OwnedWebsiteAcquisitionAttempt[];
   readonly reasonCodes: readonly string[];
+  readonly observationFragment?: OwnedSiteObservationFragment;
 }
 
 export interface OwnedWebsitePageAcquisitionMechanics {
@@ -205,6 +215,7 @@ export class ExistingOwnedWebsiteAcquisitionMechanics implements OwnedWebsitePag
     return {
       url,
       html: boundedHtml,
+      observationFragment: retainOwnedSiteObservations(html),
       cleanText: built?.clean_text.slice(
         0,
         OWNED_WEBSITE_WAVE1_BOUNDS.maximumNormalizedTextChars,
@@ -224,7 +235,8 @@ export class ExistingOwnedWebsiteAcquisitionMechanics implements OwnedWebsitePag
 export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabilityAcquisitionPortV1 {
   constructor(
     private readonly persistence: DataExtractionPersistenceService,
-    private readonly mechanics: ExistingOwnedWebsiteAcquisitionMechanics,
+    @Inject(ExistingOwnedWebsiteAcquisitionMechanics)
+    private readonly mechanics: OwnedWebsitePageAcquisitionMechanics,
   ) {}
 
   async request(
@@ -275,6 +287,73 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
         requestKey: request.requestKey,
         coverage: "SINGLE_RESOURCE",
       }));
+
+    // Retained first-party captures are examined before any new network acquisition.
+    // The same execution proceeds to the existing E normalizer; no Evidence is emitted here.
+    if (
+      isWave2Capability(request.capabilityId) &&
+      request.freshnessIntent !== "FORCE_RECAPTURE"
+    ) {
+      const capabilityId = request.capabilityId;
+      const resources = (
+        await repositories.resources.listForBrand(request.brandId)
+      )
+        .filter(
+          (resource) =>
+            apex(new URL(resource.canonicalUrl).hostname) ===
+            apex(new URL(rootUrl).hostname),
+        )
+        .sort((a, b) =>
+          a.canonicalUrl === rootUrl
+            ? -1
+            : b.canonicalUrl === rootUrl
+              ? 1
+              : wave2PageScore(capabilityId, b.canonicalUrl) -
+                  wave2PageScore(capabilityId, a.canonicalUrl) ||
+                a.canonicalUrl.localeCompare(b.canonicalUrl),
+        );
+      const retained: Array<{
+        resource: DataExtractionResourceRecord;
+        captureRef: CaptureRef;
+        relevant: boolean;
+      }> = [];
+      for (const resource of resources.slice(0, 30)) {
+        const capture = await this.reusableCapture(
+          request.brandId,
+          resource.resourceRef,
+          request.freshnessIntent,
+        );
+        if (!capture) continue;
+        const artifacts = await repositories.contentArtifacts.listForCapture(
+          request.brandId,
+          capture.captureRef,
+        );
+        const relevant = retainedMaterialForWave2(
+          request.capabilityId,
+          artifacts,
+        );
+        if (resource.canonicalUrl === rootUrl || relevant)
+          retained.push({ resource, captureRef: capture.captureRef, relevant });
+        if (retained.length === 4) break;
+      }
+      if (
+        retained.some((entry) => entry.resource.canonicalUrl === rootUrl) &&
+        retained.some((entry) => entry.relevant)
+      ) {
+        for (const entry of retained)
+          await repositories.capabilityResources.attach(
+            request.brandId,
+            execution.capabilityExecutionRef,
+            entry.resource.resourceRef,
+          );
+        return {
+          capabilityExecutionRef: execution.capabilityExecutionRef,
+          evidenceRefs: [],
+          resourceRefs: retained.map((entry) => entry.resource.resourceRef),
+          captureRefs: retained.map((entry) => entry.captureRef),
+        };
+      }
+    }
 
     const acquired: Array<{
       resource: DataExtractionResourceRecord;
@@ -456,6 +535,21 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
           ),
         );
       }
+      if (page.html || page.observationFragment) {
+        const fragment =
+          page.observationFragment ??
+          retainOwnedSiteObservations(page.html ?? "");
+        await tx.contentArtifacts.insert(
+          artifact(
+            request.brandId,
+            captureRef,
+            "STRUCTURED_SOURCE_FRAGMENT",
+            "application/json",
+            JSON.stringify(fragment),
+            "owned-site-observations/1.0",
+          ),
+        );
+      }
       if (page.quality.state === "UNAVAILABLE") {
         await tx.captures.markFailed(request.brandId, captureRef, {
           capturedAt: terminalAt,
@@ -620,10 +714,10 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
   }
 
   private assertRequest(request: DataExtractionCapabilityAcquisitionRequestV1) {
-    if (!WAVE1_EVIDENCE_CAPABILITIES.includes(request.capabilityId)) {
+    if (!DATA_EXTRACTION_EVIDENCE_CAPABILITIES.includes(request.capabilityId)) {
       throw new DataExtractionPersistenceError(
         "PERSISTENCE_INVARIANT",
-        "DATA_EXTRACTION_UNSUPPORTED_WAVE1_CAPABILITY",
+        "DATA_EXTRACTION_UNSUPPORTED_CAPABILITY",
       );
     }
     if (!request.requestKey?.trim() || !request.ownedWebsiteRoot?.trim()) {
@@ -677,7 +771,9 @@ function selectSecondaryUrls(
     .filter((entry) => entry.pageRole !== "HOMEPAGE")
     .map((entry) => ({
       ...entry,
-      score: pageScore(capabilityId, entry.pageRole),
+      score: isWave2Capability(capabilityId)
+        ? wave2PageScore(capabilityId, entry.url)
+        : pageScore(capabilityId, entry.pageRole),
     }))
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score || a.url.localeCompare(b.url));
@@ -721,6 +817,10 @@ export function inferPageRole(value: string): EvidencePageRole {
     return "OTHER";
   }
   if (path === "/" || path === "") return "HOMEPAGE";
+  if (/shipping|delivery|coverage|service.area|polic/.test(path))
+    return "POLICY";
+  if (/credential|accredit|certif|compliance/.test(path))
+    return "COMPANY_OVERVIEW";
   if (/mission|values/.test(path)) return "MISSION_VALUES";
   if (/our-story|brand-story|story/.test(path)) return "BRAND_STORY";
   if (/about/.test(path)) return "ABOUT_COMPANY";
