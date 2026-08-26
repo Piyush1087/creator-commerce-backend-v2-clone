@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { VisualStyleSemanticValidator } from "./visual-style.semantic-validator";
+import { ServiceabilitySemanticValidator } from "./serviceability.semantic-validator";
 import { BrandCharacterSemanticValidator } from "./brand-character.semantic-validator";
 import { AudiencePersonaSemanticValidator } from "./audience-persona.semantic-validator";
 import { BrandDifferentiationSemanticValidator } from "./brand-differentiation.semantic-validator";
@@ -331,6 +332,7 @@ export class SemanticValidator {
         new AudiencePersonaSemanticValidator(),
         new BrandDifferentiationSemanticValidator(),
         new VisualStyleSemanticValidator(),
+        new ServiceabilitySemanticValidator(),
       ].map((validator) => [validator.validatorId, validator]),
     );
 

@@ -30,6 +30,10 @@ export interface CanonicalDependencyManifest {
     BusinessStateReference,
     "observedAt"
   >[];
+  readonly serviceabilityReferences?: readonly Omit<
+    BusinessStateReference,
+    "observedAt"
+  >[];
 }
 
 @Injectable()
@@ -86,6 +90,26 @@ export class CanonicalStateManifestBuilder {
                 return reference;
               })
               .sort((a, b) => a.entityId.localeCompare(b.entityId)),
+          }
+        : {}),
+      ...(snapshot.serviceabilityState
+        ? {
+            serviceabilityReferences: [
+              ...snapshot.serviceabilityState.locations.map(
+                (item) => item.businessStateReference,
+              ),
+              ...snapshot.serviceabilityState.offeringIdentities.map(
+                (item) => item.businessStateReference,
+              ),
+              ...snapshot.serviceabilityState.offeringAvailabilityReferences,
+              ...snapshot.serviceabilityState.offeringLocationReferences,
+            ]
+              .map(({ observedAt: _observedAt, ...ref }) => ref)
+              .sort((a, b) =>
+                `${a.entityType}:${a.entityId}:${a.semanticFieldPath}`.localeCompare(
+                  `${b.entityType}:${b.entityId}:${b.semanticFieldPath}`,
+                ),
+              ),
           }
         : {}),
     };

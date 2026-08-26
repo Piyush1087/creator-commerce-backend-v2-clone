@@ -1,0 +1,454 @@
+version: "1.0"
+status: FROZEN
+engine: brand_intelligence
+branch: serviceability
+contract: objects
+shared_metadata_contract: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+branch_purpose: >-
+  Maintain durable Brand-level serviceability Intelligence describing where the Brand can currently
+  and credibly provide its Offerings to customers, without owning canonical country, Location,
+  Offering availability, Audience geography, Campaign geography, or Market/demand geography.
+
+topology:
+  durable_objects:
+    - serviceability_profile
+  top_level_object_count: 1
+  prohibited_serviceability_objects:
+    - country
+    - business_geography
+    - locations
+    - offering_location_relationships
+    - offering_specific_availability
+    - campaign_target_geography
+    - persona_geography
+    - competitor_geography
+    - demand_geography
+  overall_brand_topology:
+    state: FROZEN
+    rule: >-
+      Serviceability is one of the accepted permanent Brand Intelligence branches together with
+      Brand Expression, Audience and Visual Identity.
+
+canonical_business_state:
+  intelligence_ownership: false
+  role: CANONICAL_BUSINESS_STATE_REFERENCE
+  conceptual_inputs:
+    primary_brand_country_or_geography_anchor: true
+    locations:
+      type: array
+      stable_identity: location_id
+      includes:
+        - name
+        - address
+        - city
+        - state_or_region
+        - country
+        - phone
+        - location_page_url
+        - booking_or_registration_path
+        - approved_contact_path
+        - lifecycle_state
+        - offering_relationships
+    offering_availability_and_location_relationships: true
+  duplication_rule: >-
+    Serviceability Intelligence may reference canonical business-state IDs/refs but must not duplicate
+    Location CRUD state, Offering lifecycle, Offering-location relationships, or Offering-specific availability truth.
+
+legacy_compatibility:
+  identity_branch:
+    mutation: forbidden
+    status: [FROZEN_REFERENCE, COMPATIBILITY_ONLY]
+  country:
+    disposition: CONSUME_AS_CANONICAL_BUSINESS_STATE
+  business_geography:
+    permanent_disposition: SUPERSEDE
+    compatibility_until_explicit_remap: true
+  markets_served:
+    disposition: REUSE_WITH_RECONCILIATION
+    permanent_semantic_replacement: serviceability_profile
+
+shared_rules:
+  no_onboarding_gate: true
+  partial_maturity_allowed: true
+  source_authority_separation: true
+  readiness_freshness_separation: true
+  protected_current_state_vs_derivation:
+    derivation_dependencies:
+      meaning: >-
+        Canonical business-state refs, owned serviceability Evidence, and accepted upstream Intelligence
+        permitted to derive or refresh CREATOR_SHOP_DERIVED serviceability semantics.
+      may_trigger_recompute: true
+    protected_current_authoritative_state:
+      meaning: >-
+        Any future BRAND_CONFIRMED profile item/subfield remains authoritative while new Evidence may
+        be compared against it.
+      ordinary_derivation_input_for_replacement: false
+      silent_replacement: forbidden
+      conflict_behavior: preserve current protected semantics and record or surface discrepancy for later resolution policy.
+  generation_lineage_required_for_derived_outputs:
+    - producer
+    - processor_version
+    - execution_id
+    - generated_at
+    - evidence_refs
+  confidence:
+    universally_required: false
+    allowed_values: [HIGH, MEDIUM, LOW]
+    numeric_percentage_required: false
+
+objects:
+  - id: serviceability_profile
+    semantic_identity:
+      domain: brand_intelligence
+      branch: serviceability
+      semantic_key: serviceability_profile
+    definition: >-
+      Grounded Brand-level serviceability envelope describing where the Brand can currently and credibly
+      provide its Offerings to customers, based on canonical business state and first-party availability evidence.
+    business_question: Where can this Brand currently and credibly provide its Offerings to customers?
+    semantic_boundaries:
+      does_not_answer:
+        - where the Brand is headquartered
+        - where audiences are concentrated
+        - where the next Campaign should target
+        - where market demand is strongest
+        - where competitors are strong
+      brand_level_envelope_not_universal_offering_availability: true
+    type: object
+    nullable: true
+    partial_maturity: true
+
+    structure:
+      fields:
+        overall_scope:
+          type: string
+          nullable: true
+          semantic_role: BRAND_SERVICEABILITY_ENVELOPE
+          allowed_semantics:
+            - LOCAL
+            - REGIONAL
+            - COUNTRY
+            - MULTI_COUNTRY
+            - GLOBAL
+          rules:
+            - Represents the Brand-level outer serviceability pattern/envelope.
+            - Does not imply that every Offering is available everywhere in the envelope.
+            - GLOBAL requires explicit grounded serviceability evidence and must never be inferred merely from a globally accessible website.
+            - Headquarters or primary country alone cannot establish overall serviceability.
+          metadata_granularity:
+            authority: subfield
+            source: subfield
+            freshness: subfield_optional
+            confidence: subfield_optional
+            supersession: subfield_optional
+
+        coverage_is_heterogeneous:
+          type: boolean
+          nullable: false
+          default_semantics: true_when_canonical_offering_availability_varies_materially_by_geography
+          meaning: >-
+            Signals that the Brand-level serviceability envelope contains materially different Offering-level
+            coverage and must not be treated as universal Offering availability.
+          metadata_granularity:
+            authority: subfield
+            source: subfield
+
+        serviceable_markets:
+          type: array
+          nullable: true
+          meaning: >-
+            Grounded Brand-level serviceable geography items. Items describe serviceability context and do not
+            duplicate canonical Location rows or Campaign targeting configuration.
+          item:
+            semantic_id:
+              required: true
+              stable_across_refresh: true
+            scope:
+              type: string
+              allowed_semantics: [LOCAL, REGIONAL, COUNTRY, MULTI_COUNTRY_MEMBER, GLOBAL]
+            label:
+              type: string
+              nullable: true
+              role: human_readable_projection
+            country_code:
+              type: string
+              nullable: true
+              normalization: ISO_3166_1_ALPHA_2
+            locality:
+              type: string
+              nullable: true
+            region:
+              type: string
+              nullable: true
+            radius_km:
+              type: number
+              nullable: true
+            metadata_granularity:
+              authority: item
+              source: item
+              freshness: item
+              confidence: item_optional
+              supersession: item_optional
+          rules:
+            - Item identity is not array position or current wording.
+            - Item geography must be grounded in actual serviceability, not audience or demand concentration.
+            - Items may be independently refreshed or later Brand-confirmed if Product authority allows.
+            - Location IDs may be referenced as basis but Location rows themselves are not copied into the item.
+
+        serviceability_basis:
+          type: array
+          nullable: true
+          meaning: >-
+            Structured traceable reasons why serviceability is considered credible. Basis records should prefer
+            typed categories plus canonical business-state/Evidence refs over arbitrary prose.
+          item:
+            semantic_id:
+              required: true
+            basis_type:
+              type: string
+              allowed_semantics:
+                - CANONICAL_LOCATION_COVERAGE
+                - CANONICAL_OFFERING_AVAILABILITY
+                - SHIPPING_OR_DELIVERY_POLICY
+                - DIGITAL_SERVICE_AVAILABILITY
+                - FIRST_PARTY_SERVICE_AREA_STATEMENT
+                - BRAND_CONFIRMED_GEOGRAPHY_INPUT
+            business_state_refs:
+              type: array
+              nullable: true
+            evidence_refs:
+              type: array
+              nullable: true
+            applies_to_market_refs:
+              type: array
+              nullable: true
+            offering_refs:
+              type: array
+              nullable: true
+              meaning: References only; do not duplicate Offering availability truth.
+            metadata_granularity:
+              authority: item
+              source: item
+              freshness: item
+              confidence: item_optional
+          rule: Demand or audience geography cannot be used as a serviceability basis that establishes or overrides actual availability.
+
+        mixed_coverage_note:
+          type: string
+          nullable: true
+          semantic_role: DESCRIPTIVE_SUMMARY_ONLY
+          rule: >-
+            Optional concise explanation of materially heterogeneous coverage. It must not substitute for canonical
+            Offering availability and must not be the sole basis for geography feasibility decisions.
+          metadata_granularity:
+            authority: subfield
+            source: subfield
+            freshness: subfield_optional
+
+    heterogeneous_offering_coverage:
+      invariant: >-
+        serviceability_profile is a Brand-level serviceability envelope/context, not universal Offering availability.
+      downstream_feasibility_requires:
+        - serviceability_profile
+        - canonical Offering availability
+      universal_offering_availability_inference_from_overall_scope: forbidden
+      duplicate_offering_availability_inside_serviceability: forbidden
+      representation:
+        coverage_is_heterogeneous: explicit_flag
+        serviceability_basis_offering_refs: reference_only
+        mixed_coverage_note: optional_descriptive_context
+
+    source:
+      supported_base_classes:
+        - CANONICAL_BUSINESS_STATE
+        - OWNED_WEBSITE
+        - BRAND_USER_INPUT
+        - MULTI_SOURCE
+      provider_names_as_source_classes: forbidden
+
+    authority:
+      profile_default: CREATOR_SHOP_DERIVED
+      supported_current: [CREATOR_SHOP_DERIVED, OBSERVED]
+      future_brand_confirmation:
+        allowed_by_architecture: true
+        requires_explicit_later_product_authority: true
+        target_authority: BRAND_CONFIRMED
+      mixed_authority_within_object: true
+      aggregate_authority_required: false
+      protected_refresh_rule: >-
+        Any future BRAND_CONFIRMED item/subfield remains authoritative while unprotected derived components
+        may refresh independently.
+
+    derivation_dependencies:
+      canonical_business_state_refs:
+        - primary Brand country/geography anchor
+        - active canonical Location refs
+        - canonical Offering availability refs
+        - Offering-to-Location relationship refs
+      evidence_classes:
+        - owned website shipping or delivery Evidence
+        - owned website service-area Evidence
+        - owned website store, clinic, or location Evidence
+        - explicit Brand geography input
+      optional_supporting_context:
+        - Similarweb demand geography
+        - Instagram audience geography
+        - Campaign or Performance geography learning
+      precedence:
+        rule: >-
+          Demand or audience geography may support understanding but cannot establish or override actual serviceability.
+      all_dependencies_required_for_partial_profile: false
+      protected_current_authoritative_state:
+        allowed: true
+        granularity: item_or_subfield
+        ordinary_derivation_input_for_replacement: false
+
+    relationship_boundaries:
+      locations:
+        canonical_business_state: true
+        serviceability_intelligence_owner: false
+        rule: Serviceability may exceed or differ from simple Location footprint.
+      offerings:
+        canonical_availability_owner: outside_serviceability
+        serviceability_consumes_availability_refs: true
+        prohibited_objects:
+          - offering_location_intelligence
+          - location_relevance_score
+          - service_coverage_by_offering
+      audience:
+        persona_geography_context_owner: Audience
+        duplication: forbidden
+      campaign:
+        target_geography_owner: Campaign_or_downstream_creator_strategy
+        derivation_context:
+          - serviceability_profile
+          - relevant Brand Audience
+          - canonical Offering availability
+          - Campaign objective
+          - Market context
+      market:
+        prohibited_ownership:
+          - demand geography
+          - competitor geography
+          - share of voice
+          - market opportunity
+          - competitive position
+
+    readiness:
+      consumer_scoped: true
+      states: [READY, PARTIAL, NOT_READY, FAILED]
+      rules:
+        Brand_Centre: a partial profile may be useful with canonical country/Location state
+        Chat: partial serviceability context may be useful
+        Creator_Strategy: relevant serviceability context is useful for feasible market reasoning
+        Campaign_targeting_derivation: requires serviceability context plus Offering/Audience/Campaign/Market context
+        Campaign_Brief: may consume relevant location/serviceability context
+        future_Match_Intelligence: may use serviceability as geography-feasibility context
+        Market_composition: may consume serviceability as Brand context but must not reinterpret it as demand
+      insufficient_evidence_behavior:
+        allowed: [PARTIAL, NOT_READY, null]
+        filler: forbidden
+
+    freshness:
+      no_global_ttl: true
+      independently_refreshable_components: true
+      Brand_confirmed_may_be_STALE_and_authoritative: true
+      high_refresh_sensitivity:
+        - serviceable_markets
+        - serviceability_basis
+        - coverage_is_heterogeneous
+      lower_refresh_sensitivity:
+        - stable overall serviceability pattern when dependencies remain unchanged
+
+    invalidation:
+      directed_only: true
+      whole_Brand_Intelligence_rerun: forbidden
+      examples:
+        - event: canonical Location closes
+          effect: affected basis and dependent market items become STALE; profile becomes reevaluation candidate
+        - event: Offering changes from nationwide digital availability to clinic-only
+          effect: affected basis, heterogeneous-coverage semantics and relevant markets become STALE
+        - event: shipping or service-area policy changes
+          effect: only dependent serviceability components are reevaluated
+      unrelated_branches_not_automatically_invalidated:
+        - Brand Expression
+        - Audience
+        - Visual Identity
+
+    supersession:
+      supported: true
+      item_and_subfield_history_supported: true
+      historical_lineage_preserved: true
+      stale_does_not_equal_superseded: true
+
+    confidence:
+      optional: true
+      materially_justified_for:
+        - inferred overall_scope
+        - inferred serviceable_markets
+        - reconciliation of conflicting serviceability signals
+      not_required_for:
+        - canonical business-state inputs
+      numeric_percentage_required: false
+
+    maturity:
+      B:
+        serviceability_profile_required: false
+        canonical_country_may_already_exist: true
+      D:
+        partial_serviceability_profile_may_be_useful_after_Home: true
+      E:
+        richer_serviceability_may_mature_from_Locations_Offering_availability_and_first_party_evidence: true
+      completion_blocks:
+        Brand_Preview: false
+        verification: false
+        Home: false
+
+    industry_policy:
+      common_schema_across: [D2C, SAAS_AI, HEALTHCARE, OFFLINE_SERVICES]
+      separate_industry_schemas: false
+      D2C:
+        likely_emphasis: [shipping availability, transactional availability, geographic restrictions]
+      SAAS_AI:
+        likely_emphasis: [signup availability, service availability, commercial availability]
+      HEALTHCARE:
+        likely_emphasis: [canonical Locations, consultation modalities, permitted service reach]
+      OFFLINE_SERVICES:
+        likely_emphasis: [canonical Locations, service radius, booking or access geography]
+      globally_accessible_website_implies_GLOBAL: false
+
+    downstream_consumers:
+      - Brand_Centre
+      - Chat
+      - Creator_Strategy
+      - Campaign_targeting_derivation
+      - Campaign_Brief
+      - future_Match_Intelligence
+      - Market_composition
+
+    persistence_target_classification: DERIVED_INTELLIGENCE_STORAGE_REQUIRED
+
+persistence_classification_vocabulary:
+  - CANONICAL_BUSINESS_STATE_REFERENCE
+  - DERIVED_INTELLIGENCE_STORAGE_REQUIRED
+  - PERSISTENCE_RECONCILIATION_REQUIRED
+
+validation_invariants:
+  - Exactly one durable Serviceability Intelligence Object is defined.
+  - The only durable Serviceability Object is serviceability_profile.
+  - Locations are canonical business state and are not Intelligence Objects.
+  - business_geography is not retained as a permanent Serviceability Intelligence Object.
+  - Legacy markets_served is superseded semantically by serviceability_profile.
+  - Offering-specific availability is referenced but not duplicated in Serviceability.
+  - Heterogeneous Offering coverage is explicitly represented.
+  - Brand-level serviceability does not imply every Offering is available everywhere in the Brand envelope.
+  - Demand or audience geography cannot establish or override actual serviceability.
+  - Campaign target geography is excluded from Serviceability ownership.
+  - Persona geography is excluded from Serviceability ownership.
+  - GLOBAL cannot be inferred merely from a globally accessible website.
+  - No Serviceability completeness requirement blocks Brand Preview, verification or Home.
+  - Invalidation is directed and does not require unrelated Brand Intelligence reruns.
+  - Existing Identity remains unchanged as compatibility/reference authority.
+  - Overall Brand Intelligence topology is FROZEN for this architecture version.
+  - Persistence implementation is not defined here.

@@ -40,6 +40,7 @@ export interface BusinessStateReference {
   readonly entityType:
     | "BrandProfile"
     | "Offering"
+    | "Location"
     | "BrandVisualState"
     | "BrandVisualAsset"
     | "BrandVisualColor"
@@ -76,6 +77,8 @@ export interface CanonicalBrandStateSnapshot {
   /** Optional application-owned Offering facts, never observed DE candidates. */
   readonly offeringFacts?: readonly CanonicalOfferingFact[];
   readonly visualState?: CanonicalVisualSnapshot;
+  /** Optional application-owned refs; no Offering availability is inferred. */
+  readonly serviceabilityState?: CanonicalServiceabilitySnapshot;
 }
 
 /** Approved application records only; never a legacy logo or observed candidate. */
@@ -112,11 +115,39 @@ export interface CanonicalOfferingFact {
   readonly businessStateReference: BusinessStateReference;
 }
 
+export interface CanonicalLocationReference {
+  readonly brandId: string;
+  readonly locationId: string;
+  readonly name: string | null;
+  readonly city: string | null;
+  readonly authority: string;
+  readonly businessStateReference: BusinessStateReference;
+}
+
+export interface CanonicalOfferingIdentityReference {
+  readonly brandId: string;
+  readonly offeringId: string;
+  readonly name: string;
+  readonly type: string;
+  readonly businessStateReference: BusinessStateReference;
+}
+
+export interface CanonicalServiceabilitySnapshot {
+  readonly brandId: string;
+  readonly locations: readonly CanonicalLocationReference[];
+  readonly offeringIdentities: readonly CanonicalOfferingIdentityReference[];
+  /** Deliberately empty until application-owned availability exists. */
+  readonly offeringAvailabilityReferences: readonly BusinessStateReference[];
+  /** locationIds is not promoted into authoritative relationship state. */
+  readonly offeringLocationReferences: readonly BusinessStateReference[];
+}
+
 export interface CanonicalBrandStateReadRequest {
   readonly brandId: string;
   readonly requiredSemantics: readonly CanonicalBrandStateSemantic[];
   readonly includeOfferingFacts?: boolean;
   readonly includeVisualState?: boolean;
+  readonly includeServiceabilityState?: boolean;
 }
 
 export interface CanonicalBrandStateReader {

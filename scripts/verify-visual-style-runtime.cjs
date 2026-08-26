@@ -69,6 +69,12 @@ specs.push([
   "visual_style_synthesis",
   "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
 ]);
+specs.push([
+  "serviceability",
+  "ServiceabilityProcessorExecutor",
+  "serviceability_synthesis",
+  "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
+]);
 const runtime = new ContractRuntimeRegistry(
   new ContractBundleIntegrityVerifier(),
   new SemanticValidator(),
@@ -120,7 +126,7 @@ for (const [, , processorId, pin] of specs) {
   );
 }
 assert(executors.has("visual_style_synthesis"));
-assert(!executors.has("serviceability_synthesis"));
+assert(executors.has("serviceability_synthesis"));
 const codec = new ComponentPathCodec();
 const scope = new IntelligenceCurrentContractScopeService(
   runtime,
@@ -135,6 +141,14 @@ assert.deepEqual(
     ).ownedPathPatterns,
   ].sort(),
 );
+assert.deepEqual(
+  scope.resolveObject("serviceability_profile").ownedPathPatterns,
+  [
+    ...READ_ONLY_OBJECT_CONTRACTS.find(
+      (r) => r.objectSemanticId === "serviceability_profile",
+    ).ownedPathPatterns,
+  ].sort(),
+);
 console.log(
-  "Built-dist startup READY; exactly six real executors/pins and frozen visual-style projection paths verified.",
+  "Built-dist startup READY; exactly seven real executors/pins and frozen visual-style/serviceability projection paths verified.",
 );

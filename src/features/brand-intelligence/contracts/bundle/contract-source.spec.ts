@@ -16,6 +16,7 @@ export const PROCESSOR_ARCHITECTURE_COMMITS: Readonly<Record<string, string>> =
     audience_persona_synthesis: PINNED_ARCHITECTURE_COMMIT,
     brand_differentiation: PINNED_ARCHITECTURE_COMMIT,
     visual_style_synthesis: PINNED_ARCHITECTURE_COMMIT,
+    serviceability_synthesis: PINNED_ARCHITECTURE_COMMIT,
   };
 
 export const EXECUTABLE_CONTRACT_PROCESSORS: ReadonlySet<string> = new Set([
@@ -25,6 +26,7 @@ export const EXECUTABLE_CONTRACT_PROCESSORS: ReadonlySet<string> = new Set([
   "audience_persona_synthesis",
   "brand_differentiation",
   "visual_style_synthesis",
+  "serviceability_synthesis",
 ]);
 
 export const CONTRACT_SOURCE_SPECS: readonly ContractSourceSpec[] = [
@@ -257,6 +259,55 @@ export const CONTRACT_SOURCE_SPECS: readonly ContractSourceSpec[] = [
         "intelligence/engines/brand_intelligence/branches/visual_identity/evidence/visual_style_synthesis_evidence.yaml",
       OBJECT_CONTRACT:
         "intelligence/engines/brand_intelligence/branches/visual_identity/objects.yaml",
+      SHARED_METADATA_CONTRACT:
+        "intelligence/architecture/shared_intelligence_metadata_contract.yaml",
+    },
+  },
+  {
+    processorId: "serviceability_synthesis",
+    processorVersion: "1.0",
+    outputContractId: "serviceability_synthesis_output_contract",
+    outputContractVersion: "1.0",
+    evidenceContractId: "serviceability_evidence",
+    evidenceContractVersion: "1.0",
+    ownerEngine: "brand_intelligence",
+    owningBranch: "serviceability",
+    ownedObjectSemanticIds: ["serviceability_profile"],
+    ownedPathPatterns: [
+      "$",
+      "$/f/coverage_is_heterogeneous",
+      "$/f/mixed_coverage_note",
+      "$/f/overall_scope",
+      "$/f/serviceability_basis",
+      "$/f/serviceability_basis/i/{semantic_id}",
+      "$/f/serviceability_basis/i/{semantic_id}/f/applies_to_market_refs",
+      "$/f/serviceability_basis/i/{semantic_id}/f/basis_type",
+      "$/f/serviceability_basis/i/{semantic_id}/f/business_state_refs",
+      "$/f/serviceability_basis/i/{semantic_id}/f/evidence_refs",
+      "$/f/serviceability_basis/i/{semantic_id}/f/offering_refs",
+      "$/f/serviceable_markets",
+      "$/f/serviceable_markets/i/{semantic_id}",
+      "$/f/serviceable_markets/i/{semantic_id}/f/country_code",
+      "$/f/serviceable_markets/i/{semantic_id}/f/label",
+      "$/f/serviceable_markets/i/{semantic_id}/f/locality",
+      "$/f/serviceable_markets/i/{semantic_id}/f/radius_km",
+      "$/f/serviceable_markets/i/{semantic_id}/f/region",
+      "$/f/serviceable_markets/i/{semantic_id}/f/scope",
+    ].map((componentPathPattern) => ({
+      objectSemanticId: "serviceability_profile",
+      componentPathPattern,
+    })),
+    artifactPaths: {
+      PROCESSOR_DEFINITION:
+        "intelligence/engines/brand_intelligence/branches/serviceability/processors/serviceability_synthesis.yaml",
+      REASONING_CONTRACT:
+        "intelligence/engines/brand_intelligence/branches/serviceability/artifacts/serviceability_synthesis/reasoning.yaml",
+      OUTPUT_CONTRACT:
+        "intelligence/engines/brand_intelligence/branches/serviceability/artifacts/serviceability_synthesis/output_contract.yaml",
+      EVIDENCE_CONTRACT:
+        "intelligence/engines/brand_intelligence/branches/serviceability/evidence/serviceability_evidence.yaml",
+      OBJECT_CONTRACT:
+        "intelligence/engines/brand_intelligence/branches/serviceability/objects.yaml",
       SHARED_METADATA_CONTRACT:
         "intelligence/architecture/shared_intelligence_metadata_contract.yaml",
     },

@@ -236,7 +236,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
       await prisma.$disconnect();
     });
 
-    it("all ten Objects remain readable; six real processors own their registered writes", async () => {
+    it("all ten Objects remain readable; seven real processors own their registered writes", async () => {
       const { b } = await brand();
       for (const objectSemanticId of BRAND_CONSUMER_OBJECTS) {
         expect(
@@ -266,7 +266,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
           pathSchemeVersion: 1,
           componentSemanticPath: "$",
         }),
-      ).toBe(false);
+      ).toBe(true);
       expect(
         runtime
           .registrations()
@@ -279,6 +279,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         "brand_communication",
         "brand_differentiation",
         "brand_meaning",
+        "serviceability_synthesis",
         "visual_style_synthesis",
       ]);
     });

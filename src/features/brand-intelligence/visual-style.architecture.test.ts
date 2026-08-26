@@ -15,7 +15,7 @@ describe("visual_style_synthesis architecture boundaries", () => {
       bundle = runtime.getVerifiedBundle(registryKey);
     expect(
       runtime.registrations().filter((r) => r.executionEnabled),
-    ).toHaveLength(6);
+    ).toHaveLength(7);
     expect(
       runtime
         .registrations()
@@ -23,7 +23,7 @@ describe("visual_style_synthesis architecture boundaries", () => {
           (r) =>
             r.processorId === "serviceability_synthesis" && r.executionEnabled,
         ),
-    ).toBe(false);
+    ).toBe(true);
     expect(bundle.manifest.architectureCommitSha).toBe(
       "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
     );

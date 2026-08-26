@@ -1,5 +1,6 @@
 import { z, type ZodType } from "zod";
 import { visualStyleOutputContract } from "./visual-style-output-schema";
+import { serviceabilityOutputContract } from "./serviceability-output-schema";
 
 import type { VerifiedContractBundle } from "../bundle/contract-bundle.types";
 
@@ -32,7 +33,7 @@ function nodeSchema(
       : [];
   const nonNull = declared.filter((type) => type !== "null");
   let schema: ZodType<unknown>;
-  if (node.type === "enum") {
+  if (node.type === "enum" || nonNull.includes("enum")) {
     const values = Array.isArray(node.values)
       ? node.values.filter(
           (value): value is string => typeof value === "string",
@@ -90,6 +91,18 @@ function nodeSchema(
       stringSchema = stringSchema.regex(/^[a-z]{2}$/u);
     }
     schema = stringSchema;
+  } else if (nonNull.includes("boolean")) {
+    schema = z.boolean();
+  } else if (nonNull.includes("number")) {
+    let numberSchema = z.number();
+    const minimum =
+      typeof node.minimum === "number"
+        ? node.minimum
+        : typeof node.minimum_when_non_null === "number"
+          ? node.minimum_when_non_null
+          : undefined;
+    if (minimum !== undefined) numberSchema = numberSchema.min(minimum);
+    schema = numberSchema;
   } else {
     throw new Error("UNSUPPORTED_FROZEN_OUTPUT_SCHEMA_NODE");
   }
@@ -102,7 +115,10 @@ function nodeSchema(
 export function verifiedOutputZodSchema(
   bundle: VerifiedContractBundle,
 ): ZodType<unknown> {
-  const contract = visualStyleOutputContract(bundle);
+  const contract = serviceabilityOutputContract(
+    bundle,
+    visualStyleOutputContract(bundle),
+  );
   const response = record(contract.response);
   if (!response) throw new Error("MISSING_FROZEN_OUTPUT_RESPONSE_SCHEMA");
   return nodeSchema(response, contract);

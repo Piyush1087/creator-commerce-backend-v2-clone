@@ -374,6 +374,102 @@
       "bundled": true,
       "registered": true,
       "executionEnabled": true
+    },
+    {
+      "processorId": "serviceability_synthesis",
+      "processorVersion": "1.0",
+      "outputContractId": "serviceability_synthesis_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "brand_intelligence.serviceability_synthesis",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "cacedfd03169a988a51ff5d545f15b230858b5df3f42f02166f58a8980eecf7d",
+      "ownedObjectSemanticIds": [
+        "serviceability_profile"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/coverage_is_heterogeneous"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/mixed_coverage_note"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/overall_scope"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceability_basis"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}/f/applies_to_market_refs"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}/f/basis_type"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}/f/business_state_refs"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}/f/evidence_refs"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}/f/offering_refs"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceable_markets"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/country_code"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/label"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/locality"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/radius_km"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/region"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/scope"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "serviceability_synthesis",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
     }
   ]
 }

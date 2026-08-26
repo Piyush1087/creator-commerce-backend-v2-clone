@@ -1,0 +1,366 @@
+id: serviceability_synthesis_output_contract
+version: "1.0"
+status: FROZEN
+processor: serviceability_synthesis
+object: serviceability_profile
+strict: true
+additional_properties: false
+processor_definition: intelligence/engines/brand_intelligence/branches/serviceability/processors/serviceability_synthesis.yaml
+reasoning_authority: intelligence/engines/brand_intelligence/branches/serviceability/artifacts/serviceability_synthesis/reasoning.yaml
+object_authority: intelligence/engines/brand_intelligence/branches/serviceability/objects.yaml#serviceability_profile
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define machine-valid Serviceability processor output, including normalized Brand-level geography, heterogeneous
+  coverage, traceable basis refs, stable semantic identity, and metadata while prohibiting duplicated Location or
+  Offering truth and unsupported serviceability inference.
+
+response:
+  type: object
+  required:
+    - serviceability_profile
+    - output_metadata
+  properties:
+    serviceability_profile:
+      type:
+        - object
+        - "null"
+      nullable: true
+      additional_properties: false
+      fields:
+        overall_scope:
+          type:
+            - enum
+            - "null"
+          nullable: true
+          values:
+            - LOCAL
+            - REGIONAL
+            - COUNTRY
+            - MULTI_COUNTRY
+            - GLOBAL
+
+        coverage_is_heterogeneous:
+          type: boolean
+          required_when_profile_non_null: true
+
+        serviceable_markets:
+          type:
+            - array
+            - "null"
+          nullable: true
+          item:
+            additional_properties: false
+            required:
+              - semantic_id
+              - scope
+              - label
+              - country_code
+              - locality
+              - region
+              - radius_km
+            fields:
+              semantic_id:
+                type: string
+                min_length: 1
+                stable_identity_rule: normalized_geography_meaning_not_array_position_or_label
+              scope:
+                type: enum
+                values:
+                  - LOCAL
+                  - REGIONAL
+                  - COUNTRY
+                  - MULTI_COUNTRY_MEMBER
+                  - GLOBAL
+              label:
+                type:
+                  - string
+                  - "null"
+                nullable: true
+              country_code:
+                type:
+                  - string
+                  - "null"
+                nullable: true
+                normalization_when_non_null: ISO_3166_1_ALPHA_2
+              locality:
+                type:
+                  - string
+                  - "null"
+                nullable: true
+              region:
+                type:
+                  - string
+                  - "null"
+                nullable: true
+              radius_km:
+                type:
+                  - number
+                  - "null"
+                nullable: true
+                minimum_when_non_null: 0
+
+        serviceability_basis:
+          type:
+            - array
+            - "null"
+          nullable: true
+          item:
+            additional_properties: false
+            required:
+              - semantic_id
+              - basis_type
+              - business_state_refs
+              - evidence_refs
+              - applies_to_market_refs
+              - offering_refs
+            fields:
+              semantic_id:
+                type: string
+                min_length: 1
+                stable_identity_rule: basis_type_plus_stable_referenced_meaning
+              basis_type:
+                type: enum
+                values:
+                  - CANONICAL_LOCATION_COVERAGE
+                  - CANONICAL_OFFERING_AVAILABILITY
+                  - SHIPPING_OR_DELIVERY_POLICY
+                  - DIGITAL_SERVICE_AVAILABILITY
+                  - FIRST_PARTY_SERVICE_AREA_STATEMENT
+                  - BRAND_CONFIRMED_GEOGRAPHY_INPUT
+              business_state_refs:
+                type:
+                  - array
+                  - "null"
+                nullable: true
+                unique_items: true
+                item_type: string
+              evidence_refs:
+                type:
+                  - array
+                  - "null"
+                nullable: true
+                unique_items: true
+                item_type: string
+              applies_to_market_refs:
+                type:
+                  - array
+                  - "null"
+                nullable: true
+                unique_items: true
+                item_type: string
+              offering_refs:
+                type:
+                  - array
+                  - "null"
+                nullable: true
+                unique_items: true
+                item_type: string
+
+        mixed_coverage_note:
+          type:
+            - string
+            - "null"
+          nullable: true
+          semantic_role: DESCRIPTIVE_SUMMARY_ONLY
+
+    output_metadata:
+      type: object
+      additional_properties: false
+      required:
+        - overall_scope
+        - coverage_is_heterogeneous
+        - serviceable_markets
+        - serviceability_basis
+        - mixed_coverage_note
+      fields:
+        overall_scope:
+          type:
+            - object
+            - "null"
+          nullable: true
+          schema: shared_generated_metadata
+        coverage_is_heterogeneous:
+          type:
+            - object
+            - "null"
+          nullable: true
+          schema: shared_generated_metadata
+        serviceable_markets:
+          type:
+            - array
+            - "null"
+          nullable: true
+          keyed_by: semantic_id
+          item: shared_generated_metadata
+        serviceability_basis:
+          type:
+            - array
+            - "null"
+          nullable: true
+          keyed_by: semantic_id
+          item: shared_generated_metadata
+        mixed_coverage_note:
+          type:
+            - object
+            - "null"
+          nullable: true
+          schema: shared_generated_metadata
+
+shared_generated_metadata:
+  additional_properties: false
+  required:
+    - authority
+    - source_class
+    - freshness
+    - evidence_refs
+  fields:
+    semantic_id:
+      type:
+        - string
+        - "null"
+      nullable: true
+      rule: Required for item metadata; null for scalar/subfield metadata.
+    authority:
+      type: enum
+      values:
+        - OBSERVED
+        - CREATOR_SHOP_DERIVED
+      forbidden:
+        - BRAND_CONFIRMED
+        - SUPPORT_CONTROLLED
+    source_class:
+      type: enum
+      values:
+        - OWNED_WEBSITE
+        - BRAND_USER_INPUT
+        - CANONICAL_BUSINESS_STATE
+        - MULTI_SOURCE
+        - SYSTEM_DERIVATION_INPUT
+    freshness:
+      type: enum
+      values:
+        - CURRENT
+        - STALE
+        - UNKNOWN
+    evidence_refs:
+      type: array
+      unique_items: true
+      item_type: string
+      minimum_items_for_derived_or_observed_semantic: 1
+    business_state_refs:
+      type:
+        - array
+        - "null"
+      nullable: true
+      unique_items: true
+      item_type: string
+
+partial_shape_rules:
+  profile_may_be_null: true
+  non_null_profile_rules:
+    - coverage_is_heterogeneous must be present.
+    - overall_scope may be null when bounded serviceable markets exist but outer-scope classification is unresolved.
+    - serviceable_markets may be null or bounded.
+    - serviceability_basis may be null only when no serviceability semantic is being asserted beyond null/unknown state.
+    - mixed_coverage_note is optional unless the reasoning policy determines it is necessary to prevent materially misleading interpretation.
+  filler: forbidden
+
+geography_shape_validation:
+  GLOBAL:
+    country_code: must_be_null
+    locality: must_be_null
+    region: must_be_null
+    radius_km: must_be_null
+  COUNTRY:
+    country_code: required
+    locality: must_be_null
+    region: must_be_null
+    radius_km: must_be_null
+  MULTI_COUNTRY_MEMBER:
+    country_code: required
+    locality: must_be_null
+    region: must_be_null
+    radius_km: must_be_null
+  REGIONAL:
+    country_code: required
+    region: required
+    locality: must_be_null
+  LOCAL:
+    country_code: required
+    locality: required
+    radius_km: optional
+  semantic_id_rules:
+    - semantic_id must be stable for the same normalized geography meaning across refresh.
+    - label change alone must not change semantic_id.
+    - radius adjustment alone should not change a LOCAL market semantic_id when the locality anchor remains the same.
+
+scope_validation:
+  - overall_scope=GLOBAL requires at least one GLOBAL market item or explicit global availability basis.
+  - overall_scope=MULTI_COUNTRY requires at least two distinct COUNTRY or MULTI_COUNTRY_MEMBER country codes.
+  - overall_scope must not be broader than the union of defensible serviceable_markets and serviceability_basis.
+  - globally accessible website is never sufficient for GLOBAL.
+  - headquarters or primary country is never sufficient alone for serviceability.
+
+basis_validation:
+  - Every basis item requires at least one business_state_ref or evidence_ref.
+  - applies_to_market_refs must resolve to emitted serviceable_market semantic_ids when non-null.
+  - offering_refs contain stable Offering references only and must not embed Offering availability payloads.
+  - CANONICAL_LOCATION_COVERAGE may reference Location IDs but must not duplicate Location rows.
+  - CANONICAL_OFFERING_AVAILABILITY may reference Offering/business-state IDs but must not duplicate availability truth.
+  - Demand or audience geography may not be represented as a basis_type establishing serviceability.
+
+heterogeneous_coverage_validation:
+  - coverage_is_heterogeneous=true must be supported by canonical Offering/Location relationship refs or explicit defensible first-party availability differences.
+  - coverage_is_heterogeneous=false must not be emitted when canonical inputs show material geographic variation between active Offerings.
+  - Brand-level overall_scope must not be interpreted as universal Offering availability.
+  - mixed_coverage_note, when emitted, must be descriptive and must not replace canonical Offering availability.
+
+legacy_validation:
+  legacy_markets_served_direct_conversion: invalid
+  legacy_markets_served_may_appear_only_as: reconciliation_or_compatibility_context
+  new_market_requires_current_canonical_or_first_party_support: true
+
+metadata_alignment:
+  - Null scalar field requires null metadata for that field.
+  - Non-null scalar field requires non-null metadata.
+  - Every emitted serviceable_market requires exactly one metadata entry with matching semantic_id.
+  - Every emitted serviceability_basis item requires exactly one metadata entry with matching semantic_id.
+  - Metadata source_class cannot be a provider name.
+
+authority_and_protection_validation:
+  allowed_processor_authority:
+    - OBSERVED
+    - CREATOR_SHOP_DERIVED
+  system_derived_allowed_only_for_reference_normalization: true
+  processor_emitted_brand_confirmed: invalid
+  processor_emitted_support_controlled: invalid
+  protected_brand_confirmed_state_must_not_be_silently_replaced: true
+
+semantic_validation:
+  - first-party commercial/service availability outranks demand/audience geography.
+  - demand/audience geography cannot establish or override serviceability.
+  - contradictory first-party signals unresolved at material breadth must produce narrower/partial/null rather than invented coverage.
+  - canonical Offering/Location truth must not be mutated or duplicated by this output.
+  - every serviceable market must resolve to at least one establishing basis ref.
+  - unsupported broadening is invalid.
+
+migration_gate:
+  legacy_semantics:
+    - identity.markets_served
+    - identity.market_geography
+  output_validation_is_one_required_gate: true
+  retirement_still_requires:
+    - processor definition frozen
+    - reasoning contract frozen
+    - canonical Location and Offering inputs active
+    - runtime/model binding active
+    - persistence/reconciliation active
+    - legacy projection or remap tested
+    - consumers remapped
+
+non_goals:
+  - persistence schema
+  - runtime validator implementation
+  - provider structured-output translation
+  - final Evidence contracts

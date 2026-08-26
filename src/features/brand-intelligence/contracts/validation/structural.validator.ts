@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { visualStyleOutputContract } from "./visual-style-output-schema";
+import { serviceabilityOutputContract } from "./serviceability-output-schema";
 
 import { canonicalJson } from "../bundle/canonical-json";
 import type { VerifiedContractBundle } from "../bundle/contract-bundle.types";
@@ -17,7 +18,9 @@ function record(value: unknown): ContractNode | undefined {
 function allowedTypes(node: ContractNode): readonly string[] {
   if (node.type === "enum") return ["string"];
   if (Array.isArray(node.type)) {
-    return node.type.filter((item): item is string => typeof item === "string");
+    return node.type
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => (item === "enum" ? "string" : item));
   }
   return typeof node.type === "string"
     ? [node.type]
@@ -48,7 +51,10 @@ export class StructuralValidator {
     bundle: VerifiedContractBundle,
     untrustedOutput: unknown,
   ): ValidationResult<unknown> {
-    const contract = visualStyleOutputContract(bundle);
+    const contract = serviceabilityOutputContract(
+      bundle,
+      visualStyleOutputContract(bundle),
+    );
     const response = record(contract.response);
     if (!response) {
       return rejected([
@@ -108,7 +114,10 @@ export class StructuralValidator {
     }
     if (value === null) return;
 
-    if (node.type === "enum") {
+    if (
+      node.type === "enum" ||
+      (Array.isArray(node.type) && node.type.includes("enum"))
+    ) {
       const values = Array.isArray(node.values) ? node.values : [];
       if (!values.includes(value)) {
         issues.push(

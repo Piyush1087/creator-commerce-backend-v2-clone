@@ -1,6 +1,7 @@
 import { Injectable, Optional } from "@nestjs/common";
 import { BrandVisualStateService } from "../../../brand-canonical-state/brand-visual-state.service";
 import { assembleCanonicalVisualSnapshot } from "./canonical-visual-snapshot";
+import { assembleCanonicalServiceabilitySnapshot } from "./canonical-serviceability-snapshot";
 import { Prisma } from "@prisma/client";
 
 import { canonicalJson } from "../../contracts/bundle/canonical-json";
@@ -81,6 +82,38 @@ export class M1CanonicalBrandStateAdapter implements CanonicalBrandStateReader {
             required.includes(entry.semantic),
           ),
         );
+        if (request.includeServiceabilityState) {
+          const [locations, offerings] = await Promise.all([
+            transaction.location.findMany({
+              where: { brandProfileId: request.brandId, lifecycle: "ACTIVE" },
+              select: {
+                id: true,
+                brandProfileId: true,
+                name: true,
+                city: true,
+                authority: true,
+                revision: true,
+              },
+              orderBy: { id: "asc" },
+            }),
+            transaction.offering.findMany({
+              where: { brandProfileId: request.brandId, isActive: true },
+              select: {
+                id: true,
+                brandProfileId: true,
+                name: true,
+                type: true,
+                updatedAt: true,
+              },
+              orderBy: { id: "asc" },
+            }),
+          ]);
+          return assembleCanonicalServiceabilitySnapshot(
+            snapshot,
+            locations,
+            offerings,
+          );
+        }
         if (request.includeVisualState) {
           if (!this.visuals)
             throw new InputDependencyError(

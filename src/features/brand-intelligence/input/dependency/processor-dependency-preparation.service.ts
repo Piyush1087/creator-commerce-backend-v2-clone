@@ -80,6 +80,9 @@ export class ProcessorDependencyPreparationService {
       requiredSemantics: profile.requiredCanonicalSemantics,
       ...(profile.includeOfferingFacts ? { includeOfferingFacts: true } : {}),
       ...(profile.includeVisualState ? { includeVisualState: true } : {}),
+      ...(profile.includeServiceabilityState
+        ? { includeServiceabilityState: true }
+        : {}),
     });
     const evidence = await this.evidenceReader.read({
       brandId: request.brandId,

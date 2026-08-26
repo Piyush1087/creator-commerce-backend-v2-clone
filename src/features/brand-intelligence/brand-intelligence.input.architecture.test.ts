@@ -34,7 +34,7 @@ describe("W1.0E input-port architecture", () => {
     }
   });
 
-  it("keeps input ports bounded with exactly six real executable processors", () => {
+  it("keeps input ports bounded with exactly seven real executable processors", () => {
     expect(
       registry.registrations.map((registration) => ({
         processorId: registration.processorId,
@@ -75,6 +75,12 @@ describe("W1.0E input-port architecture", () => {
       },
       {
         processorId: "visual_style_synthesis",
+        bundled: true,
+        registered: true,
+        executionEnabled: true,
+      },
+      {
+        processorId: "serviceability_synthesis",
         bundled: true,
         registered: true,
         executionEnabled: true,

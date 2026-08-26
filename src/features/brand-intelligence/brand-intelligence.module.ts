@@ -1,4 +1,11 @@
 import { Module } from "@nestjs/common";
+import { ServiceabilityProcessorExecutor } from "./processors/serviceability/serviceability-processor.executor";
+import { ServiceabilityPersistenceHook } from "./processors/serviceability/serviceability-persistence.hook";
+import { ServiceabilityStateRepository } from "./processors/serviceability/serviceability-state.repository";
+import {
+  SERVICEABILITY_MODEL_PROVIDER,
+  StructuredServiceabilityModelProvider,
+} from "./processors/serviceability/serviceability-model.provider";
 import { BrandCanonicalStateModule } from "../brand-canonical-state/brand-canonical-state.module";
 import { VisualStyleProcessorExecutor } from "./processors/visual-style/visual-style-processor.executor";
 import { VisualStylePersistenceHook } from "./processors/visual-style/visual-style-persistence.hook";
@@ -81,6 +88,13 @@ import {
 } from "./processors/brand-character/brand-character-model.provider";
 
 const internalProviders = [
+  ServiceabilityProcessorExecutor,
+  ServiceabilityPersistenceHook,
+  ServiceabilityStateRepository,
+  {
+    provide: SERVICEABILITY_MODEL_PROVIDER,
+    useClass: StructuredServiceabilityModelProvider,
+  },
   VisualStyleProcessorExecutor,
   VisualStylePersistenceHook,
   VisualStyleStateRepository,

@@ -13,7 +13,8 @@ export interface ProcessorDependencyProfile {
     | "brand_differentiation"
     | "brand_meaning"
     | "audience_persona_synthesis"
-    | "brand_character";
+    | "brand_character"
+    | "serviceability_synthesis";
   readonly processorVersion: "1.0";
   readonly outputContractId:
     | "brand_communication_output_contract"
@@ -21,7 +22,8 @@ export interface ProcessorDependencyProfile {
     | "brand_differentiation_output_contract"
     | "brand_character_output_contract"
     | "audience_persona_synthesis_output_contract"
-    | "brand_meaning_output_contract";
+    | "brand_meaning_output_contract"
+    | "serviceability_synthesis_output_contract";
   readonly outputContractVersion: "1.0";
   readonly evidenceContractId:
     | "brand_communication_evidence"
@@ -29,7 +31,8 @@ export interface ProcessorDependencyProfile {
     | "brand_differentiation_evidence"
     | "brand_character_evidence"
     | "audience_persona_synthesis_evidence"
-    | "brand_meaning_evidence";
+    | "brand_meaning_evidence"
+    | "serviceability_evidence";
   readonly requiredCanonicalSemantics: readonly CanonicalBrandStateSemantic[];
   readonly nonNullableCanonicalAnchors: readonly CanonicalBrandStateSemantic[];
   readonly blockingConflictSemantics: readonly CanonicalBrandStateSemantic[];
@@ -39,11 +42,32 @@ export interface ProcessorDependencyProfile {
   readonly requiredCapabilityLineages?: readonly NormalizedEvidenceCapabilityId[];
   readonly includeOfferingFacts?: boolean;
   readonly includeVisualState?: boolean;
+  readonly includeServiceabilityState?: boolean;
 }
 
 const ARCHITECTURE_REPOSITORY = "Piyush1087/dummy_tcs";
 
 const PROFILES: readonly ProcessorDependencyProfile[] = [
+  {
+    processorId: "serviceability_synthesis",
+    processorVersion: "1.0",
+    outputContractId: "serviceability_synthesis_output_contract",
+    outputContractVersion: "1.0",
+    evidenceContractId: "serviceability_evidence",
+    requiredCanonicalSemantics: ["brand_name", "country"],
+    nonNullableCanonicalAnchors: ["brand_name"],
+    blockingConflictSemantics: [],
+    capabilityIds: [
+      "owned_website.serviceability_evidence",
+      "owned_website.location_evidence",
+    ],
+    representativeEvidenceAnyOf: [],
+    requiredCapabilityLineages: [
+      "owned_website.serviceability_evidence",
+      "owned_website.location_evidence",
+    ],
+    includeServiceabilityState: true,
+  },
   {
     processorId: "visual_style_synthesis",
     processorVersion: "1.0",

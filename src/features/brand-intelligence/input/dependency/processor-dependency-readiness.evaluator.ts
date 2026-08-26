@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { hasRepresentativeVisualEvidence } from "../evidence/visual-evidence-admission";
+import { hasDefensibleServiceabilityEvidence } from "../evidence/serviceability-evidence-admission";
 
 import type { CanonicalBrandStateSnapshot } from "../canonical-state/canonical-brand-state.port";
 import type { NormalizedEvidenceSet } from "../evidence/intelligence-evidence.port";
@@ -78,14 +79,22 @@ export class ProcessorDependencyReadinessEvaluator {
               !!cap.capabilityExecutionRef,
           ),
       );
-      return missing.length
-        ? {
-            readiness: "WAITING_FOR_EVIDENCE",
-            reasonCodes: missing
-              .map((id) => `MISSING_CAPABILITY_LINEAGE:${id}`)
-              .sort(),
-          }
-        : { readiness: "READY_TO_RUN", reasonCodes: [] };
+      if (missing.length)
+        return {
+          readiness: "WAITING_FOR_EVIDENCE",
+          reasonCodes: missing
+            .map((id) => `MISSING_CAPABILITY_LINEAGE:${id}`)
+            .sort(),
+        };
+      if (
+        profile.processorId === "serviceability_synthesis" &&
+        !hasDefensibleServiceabilityEvidence(evidence)
+      )
+        return {
+          readiness: "WAITING_FOR_EVIDENCE",
+          reasonCodes: ["DEFENSIBLE_SERVICEABILITY_EVIDENCE_NOT_AVAILABLE"],
+        };
+      return { readiness: "READY_TO_RUN", reasonCodes: [] };
     }
     const representative = evidence.capabilityResults.some(
       (capability) =>
