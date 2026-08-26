@@ -4,6 +4,7 @@ import { ScheduleModule } from "@nestjs/schedule";
 
 import { AuthModule } from "../auth/auth.module";
 import { BrandCentreModule } from "../brand-centre/brand-centre.module";
+import { BrandCanonicalStateModule } from "../brand-canonical-state/brand-canonical-state.module";
 import { InstagramModule } from "../instagram/instagram.module";
 import { MailModule } from "../../mail/mail.module";
 import { PrismaModule } from "../../prisma/prisma.module";
@@ -88,6 +89,7 @@ import { CanonicalBrandStateService } from "./canonical-brand-state/canonical-br
     AuthModule,
     S3Module,
     BrandCentreModule,
+    BrandCanonicalStateModule,
     InstagramModule,
     DataExtractionModule,
   ],

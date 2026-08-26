@@ -2,10 +2,14 @@ import { Module } from "@nestjs/common";
 
 import { PrismaModule } from "../../prisma/prisma.module";
 import { AuthModule } from "../auth/auth.module";
+import { BrandCanonicalStateModule } from "../brand-canonical-state/brand-canonical-state.module";
+import { BrandIntelligenceModule } from "../brand-intelligence/brand-intelligence.module";
 import { GeminiJsonClient } from "../brand-onboarding/integrations/gemini/gemini-json.client";
 import { ParallelExtractClient } from "../brand-onboarding/integrations/parallel/parallel-extract.client";
 import { BrandCentreAuthService } from "./brand-centre-auth.service";
 import { BrandCentreController } from "./brand-centre.controller";
+import { BrandConsumerController } from "./consumer/brand-consumer.controller";
+import { BrandConsumerService } from "./consumer/brand-consumer.service";
 import { BrandCentreBudgetService } from "./services/brand-centre-budget.service";
 import { BrandCentreColdStartService } from "./services/brand-centre-cold-start.service";
 import { BrandCentreDnaService } from "./services/brand-centre-dna.service";
@@ -20,9 +24,15 @@ import { IntelligenceRefreshWorker } from "./workers/intelligence-refresh.worker
 import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
 
 @Module({
-  imports: [PrismaModule, AuthModule],
-  controllers: [BrandCentreController],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    BrandCanonicalStateModule,
+    BrandIntelligenceModule,
+  ],
+  controllers: [BrandCentreController, BrandConsumerController],
   providers: [
+    BrandConsumerService,
     BrandCentreAuthService,
     BrandCentreRoutingService,
     BrandCentreScanService,

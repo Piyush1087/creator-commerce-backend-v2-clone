@@ -4,6 +4,7 @@ import { BundlePathOwnershipRegistry } from "../contracts/registry/bundle-path-o
 import { ContractRuntimeRegistry } from "../contracts/registry/contract-runtime.registry";
 import { ComponentPathCodec } from "../semantic-path/component-path.codec";
 import { IntelligenceCurrentProjectionError } from "./intelligence-current-projection.error";
+import { READ_ONLY_OBJECT_CONTRACTS } from "./current-read-contracts.generated";
 
 export interface IntelligenceProjectionContractScope {
   readonly objectSemanticId: string;
@@ -33,6 +34,10 @@ export class IntelligenceCurrentContractScopeService {
       .filter((registration) =>
         registration.ownedObjectSemanticIds.includes(objectSemanticId),
       );
+    const readOnly = READ_ONLY_OBJECT_CONTRACTS.find(
+      (entry) => entry.objectSemanticId === objectSemanticId,
+    );
+    if (registrations.length === 0 && readOnly) return readOnly;
     if (registrations.length !== 1) {
       throw new IntelligenceCurrentProjectionError(
         "CONTRACT_CONFIGURATION_DRIFT",
@@ -84,6 +89,27 @@ export class IntelligenceCurrentContractScopeService {
   ): boolean {
     try {
       this.codec.assertCanonical(componentSemanticPath);
+      const readOnly = READ_ONLY_OBJECT_CONTRACTS.find(
+        (entry) => entry.objectSemanticId === objectSemanticId,
+      );
+      if (readOnly) {
+        const actual = this.codec.decode(componentSemanticPath).segments;
+        return readOnly.ownedPathPatterns.some((path) => {
+          const pattern = this.codec.decode(path).segments;
+          return (
+            pattern.length === actual.length &&
+            pattern.every((expected, index) => {
+              const found = actual[index];
+              return expected.kind === "field" && found.kind === "field"
+                ? expected.value === found.value
+                : expected.kind === "item" &&
+                    found.kind === "item" &&
+                    (expected.semanticId === "{semantic_id}" ||
+                      expected.semanticId === found.semanticId);
+            })
+          );
+        });
+      }
       return this.ownership.owns({
         brandId,
         objectSemanticId,

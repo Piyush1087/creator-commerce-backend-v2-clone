@@ -1282,6 +1282,8 @@ model BrandProfile {
   offerings              Offering[]
   competitors            Competitor[]
   locations              Location[]
+  visualState            BrandVisualState?
+  locationObservations   BrandLocationObservation[]
   subscriptions          Subscription[]
   teamInvitations        TeamInvitation[]
   brandCentreJobs        BrandCentreJob[]
@@ -1411,20 +1413,189 @@ model Offering {
 }
 
 model Location {
+  id                   String                       @id @default(uuid())
+  brandProfileId       String                       @map("brand_profile_id")
+  brandProfile         BrandProfile                 @relation(fields: [brandProfileId], references: [id])
+  name                 String?
+  address              String
+  city                 String?
+  zip                  String?
+  lat                  Float?
+  lng                  Float?
+  contactDetails       Json?                        @map("contact_details")
+  lifecycle            CanonicalLocationLifecycle   @default(ACTIVE)
+  authority            CanonicalLocationAuthority   @default(LEGACY_UNVERIFIED)
+  observationFreshness LocationObservationFreshness @default(UNKNOWN) @map("observation_freshness")
+  reconciliationState  LocationReconciliationState  @default(UNVERIFIED) @map("reconciliation_state")
+  lastObservedAt       DateTime?                    @map("last_observed_at")
+  revision             Int                          @default(1)
+  provenance           Json?
+  lastObservation      Json?                        @map("last_observation")
+  aliases              BrandLocationAlias[]
+  createdAt            DateTime                     @default(now()) @map("created_at")
+  updatedAt            DateTime                     @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, id])
+  @@index([brandProfileId, lifecycle])
+  @@map("locations")
+}
+
+enum CanonicalVisualAuthority {
+  BRAND_CONFIRMED
+  APPLICATION_CANONICAL
+}
+
+enum CanonicalVisualOrigin {
+  BRAND_UPLOAD
+  BRAND_SELECTION
+  BRAND_EDIT
+  ONBOARDING_CONFIRMATION
+  APPLICATION_WORKFLOW
+  VERIFIED_MIGRATION
+}
+
+enum CanonicalVisualLifecycle {
+  ACTIVE
+  INACTIVE
+}
+
+enum CanonicalVisualAssetRole {
+  LOGO
+  ALTERNATE_MARK
+  REFERENCE_IMAGE
+}
+
+model BrandVisualState {
+  brandProfileId     String                  @id @map("brand_profile_id")
+  brandProfile       BrandProfile            @relation(fields: [brandProfileId], references: [id])
+  primaryLogoAssetId String?                 @map("primary_logo_asset_id")
+  primaryLogo        BrandVisualAsset?       @relation("CanonicalPrimaryLogo", fields: [brandProfileId, primaryLogoAssetId], references: [brandProfileId, id], onDelete: NoAction, onUpdate: NoAction)
+  assets             BrandVisualAsset[]      @relation("VisualAssets")
+  colors             BrandVisualColor[]
+  typography         BrandVisualTypography[]
+  revision           Int                     @default(1)
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @updatedAt @map("updated_at")
+
+  @@map("brand_visual_states")
+}
+
+model BrandVisualAsset {
+  id             String                   @id @default(uuid())
+  brandProfileId String                   @map("brand_profile_id")
+  state          BrandVisualState         @relation("VisualAssets", fields: [brandProfileId], references: [brandProfileId])
+  primaryFor     BrandVisualState[]       @relation("CanonicalPrimaryLogo")
+  role           CanonicalVisualAssetRole
+  url            String
+  label          String?
+  authority      CanonicalVisualAuthority
+  origin         CanonicalVisualOrigin
+  lifecycle      CanonicalVisualLifecycle @default(ACTIVE)
+  provenance     Json?
+  revision       Int                      @default(1)
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  updatedAt      DateTime                 @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, id])
+  @@index([brandProfileId, lifecycle, role])
+  @@map("brand_visual_assets")
+}
+
+model BrandVisualColor {
+  id             String                   @id @default(uuid())
+  brandProfileId String                   @map("brand_profile_id")
+  state          BrandVisualState         @relation(fields: [brandProfileId], references: [brandProfileId])
+  value          String
+  label          String?
+  usage          String?
+  authority      CanonicalVisualAuthority
+  origin         CanonicalVisualOrigin
+  lifecycle      CanonicalVisualLifecycle @default(ACTIVE)
+  provenance     Json?
+  revision       Int                      @default(1)
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  updatedAt      DateTime                 @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, id])
+  @@index([brandProfileId, lifecycle])
+  @@map("brand_visual_colors")
+}
+
+model BrandVisualTypography {
+  id             String                   @id @default(uuid())
+  brandProfileId String                   @map("brand_profile_id")
+  state          BrandVisualState         @relation(fields: [brandProfileId], references: [brandProfileId])
+  family         String
+  label          String?
+  usage          String?
+  authority      CanonicalVisualAuthority
+  origin         CanonicalVisualOrigin
+  lifecycle      CanonicalVisualLifecycle @default(ACTIVE)
+  provenance     Json?
+  revision       Int                      @default(1)
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  updatedAt      DateTime                 @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, id])
+  @@index([brandProfileId, lifecycle])
+  @@map("brand_visual_typography")
+}
+
+enum CanonicalLocationLifecycle {
+  ACTIVE
+  INACTIVE
+}
+
+enum CanonicalLocationAuthority {
+  LEGACY_UNVERIFIED
+  OBSERVED
+  BRAND_CONFIRMED
+  APPLICATION_CANONICAL
+}
+
+enum LocationObservationFreshness {
+  CURRENT
+  POSSIBLY_STALE
+  UNKNOWN
+}
+
+enum LocationReconciliationState {
+  UNVERIFIED
+  MATCHED
+  AMBIGUOUS
+}
+
+enum LocationAliasKind {
+  EXTERNAL
+  POSTAL
+}
+
+model BrandLocationAlias {
+  id             String            @id @default(uuid())
+  brandProfileId String            @map("brand_profile_id")
+  locationId     String            @map("location_id")
+  location       Location          @relation(fields: [brandProfileId, locationId], references: [brandProfileId, id])
+  kind           LocationAliasKind
+  key            String
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  @@unique([brandProfileId, kind, key, locationId])
+  @@index([brandProfileId, kind, key])
+  @@map("brand_location_aliases")
+}
+
+/// Bounded latest unresolved observation per exact candidate identity; never canonical truth.
+model BrandLocationObservation {
   id             String       @id @default(uuid())
   brandProfileId String       @map("brand_profile_id")
   brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id])
-  name           String?
-  address        String
-  city           String?
-  zip            String?
-  lat            Float?
-  lng            Float?
-  contactDetails Json?        @map("contact_details")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
+  fingerprint    String
+  reason         String
+  observed       Json
+  observedAt     DateTime     @default(now()) @map("observed_at")
 
-  @@map("locations")
+  @@unique([brandProfileId, fingerprint])
+  @@map("brand_location_observations")
 }
 
 model Competitor {
