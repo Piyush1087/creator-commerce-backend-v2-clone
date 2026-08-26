@@ -182,7 +182,7 @@ export const ManageConnectionActionSchema = z
     },
     {
       message:
-        'Explicit confirmation required to execute "Delete Ingested Social Data".',
+        "Explicit confirmation required to disconnect and remove connection credentials.",
       path: ["confirmDeleteData"],
     },
   );
@@ -197,6 +197,7 @@ export const IdentityConflictResolutionSchema = z.object({
 export const ConnectInstagramSettingsSchema = z.object({
   code: z.string().min(1),
   redirectUri: z.string().url(),
+  state: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
 });
 
 export type IntegrationConnectionDto = z.infer<

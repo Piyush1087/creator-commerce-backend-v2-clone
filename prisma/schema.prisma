@@ -982,6 +982,7 @@ model User {
   creatorCoPilotThreadsAuthored CreatorCoPilotThread[]          @relation("CreatorCoPilotThreadAuthor")
   creatorCoPilotMessageFeedback CreatorCoPilotMessageFeedback[]
   brandTeamMemberships          BrandTeamMember[]
+  brandInstagramOAuthStates     BrandInstagramOAuthState[]
   triggeredNotifications        Notification[]                  @relation("NotificationTriggerUser")
   notificationRecipients        NotificationRecipient[]
   gatekeeperRecoveryRequests    GatekeeperRecoveryRequest[]
@@ -1338,9 +1339,29 @@ model BrandProfile {
   notificationSettings     BrandNotificationSetting[]
   notifications            Notification[]
   integrations             BrandIntegration[]
+  instagramOAuthStates     BrandInstagramOAuthState[]
   instagramSyncInvitations InstagramSyncInvitation[]
 
   @@map("brand_profiles")
+}
+
+/// One-time, hashed state for authenticated Instagram Settings OAuth only.
+model BrandInstagramOAuthState {
+  id                String       @id @default(uuid())
+  brandProfileId    String       @map("brand_profile_id")
+  brandProfile      BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  initiatedByUserId String       @map("initiated_by_user_id")
+  initiatedByUser   User         @relation(fields: [initiatedByUserId], references: [id], onDelete: Cascade)
+  stateHash         String       @unique @map("state_hash") @db.VarChar(64)
+  redirectUri       String       @map("redirect_uri")
+  expiresAt         DateTime     @map("expires_at")
+  consumedAt        DateTime?    @map("consumed_at")
+  createdAt         DateTime     @default(now()) @map("created_at")
+
+  @@index([expiresAt, consumedAt])
+  @@index([brandProfileId])
+  @@index([initiatedByUserId])
+  @@map("brand_instagram_oauth_states")
 }
 
 /// Brand OAuth connections (Instagram Login + optional Meta Business Suite in Settings).
@@ -1354,6 +1375,9 @@ model BrandIntegration {
   inboundOauthHandle    String?                  @map("inbound_oauth_handle") @db.VarChar(255)
   accessTokenEncrypted  String?                  @map("access_token_encrypted") @db.Text
   refreshTokenEncrypted String?                  @map("refresh_token_encrypted") @db.Text
+  pendingAccessTokenEncrypted String?            @map("pending_access_token_encrypted") @db.Text
+  pendingGrantedScopes BrandIntegrationScope[]   @default([]) @map("pending_granted_scopes")
+  pendingTokenExpiresAt DateTime?                @map("pending_token_expires_at")
   grantedScopes         BrandIntegrationScope[]  @default([]) @map("granted_scopes")
   tokenExpiresAt        DateTime?                @map("token_expires_at")
   isActive              Boolean                  @default(true) @map("is_active")

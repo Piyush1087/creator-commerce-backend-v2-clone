@@ -20,6 +20,7 @@ import { InstagramGraphClient } from "../../instagram/instagram-graph.client";
 import { InstagramOAuthClient } from "../../instagram/instagram-oauth.client";
 import { resolveInstagramScopesFromPermissions } from "../../instagram/instagram-scope.util";
 import { BrandSettingsAccessService } from "./brand-settings-access.service";
+import { BrandInstagramOAuthStateService } from "./brand-instagram-oauth-state.service";
 
 function normalizeHandle(raw: string): string {
   return raw.trim().replace(/^@/, "").toLowerCase();
@@ -39,6 +40,7 @@ export class BrandSettingsIntegrationsService {
     private readonly access: BrandSettingsAccessService,
     private readonly oauth: InstagramOAuthClient,
     private readonly graph: InstagramGraphClient,
+    private readonly states: BrandInstagramOAuthStateService,
   ) {}
 
   async getIntegrations(user: AuthUser) {
@@ -96,9 +98,7 @@ export class BrandSettingsIntegrationsService {
     }
 
     const scrapedHandle =
-      brand.igHandle != null
-        ? `@${brand.igHandle.replace(/^@/, "")}`
-        : null;
+      brand.igHandle != null ? `@${brand.igHandle.replace(/^@/, "")}` : null;
 
     return {
       layoutCase,
@@ -119,21 +119,14 @@ export class BrandSettingsIntegrationsService {
     if (!brand) {
       throw new NotFoundException("Brand profile not found");
     }
-    const finalized = brand.igHandle
-      ? normalizeHandle(brand.igHandle)
-      : "pending";
-    const state = Buffer.from(
-      JSON.stringify({
-        brandProfileId: brand.id,
-        finalizedHandle: finalized,
-        source: "settings",
-        t: Date.now(),
-      }),
-    ).toString("base64url");
+    const state = await this.states.issue({
+      brandProfileId: brand.id,
+      initiatedByUserId: user.id,
+      redirectUri,
+    });
     const url = this.oauth.buildAuthorizeUrl(redirectUri, state);
     return {
       url,
-      state,
       finalizedHandle: brand.igHandle ? withAt(brand.igHandle) : null,
     };
   }
@@ -144,7 +137,7 @@ export class BrandSettingsIntegrationsService {
    */
   async connectInstagram(
     user: AuthUser,
-    args: { code: string; redirectUri: string },
+    args: { code: string; redirectUri: string; state: string },
   ) {
     const { brandProfileId } = await this.access.resolveBrandContext(user);
     const brand = await this.prisma.brandProfile.findUnique({
@@ -154,6 +147,15 @@ export class BrandSettingsIntegrationsService {
     if (!brand) {
       throw new NotFoundException("Brand profile not found");
     }
+
+    await this.states.consume(
+      {
+        brandProfileId: brand.id,
+        initiatedByUserId: user.id,
+        redirectUri: args.redirectUri,
+      },
+      args.state,
+    );
 
     const tokenResult = await this.oauth.exchangeAuthorizationCode(
       args.code,
@@ -188,7 +190,10 @@ export class BrandSettingsIntegrationsService {
     const expiresAt = addSeconds(new Date(), tokenResult.expiresInSeconds);
     const encrypted = encryptField(tokenResult.accessToken);
 
-    if (brand.igHandle && normalizeHandle(me.username) !== normalizeHandle(brand.igHandle)) {
+    if (
+      brand.igHandle &&
+      normalizeHandle(me.username) !== normalizeHandle(brand.igHandle)
+    ) {
       const row = await this.prisma.brandIntegration.upsert({
         where: {
           brandProfileId_provider: {
@@ -202,17 +207,18 @@ export class BrandSettingsIntegrationsService {
           status: BrandIntegrationStatus.DISCONNECTED,
           currentPlatformHandle: current,
           inboundOauthHandle: inbound,
-          accessTokenEncrypted: encrypted,
-          grantedScopes: scopes,
-          tokenExpiresAt: expiresAt,
+          pendingAccessTokenEncrypted: encrypted,
+          pendingGrantedScopes: scopes,
+          pendingTokenExpiresAt: expiresAt,
           isActive: false,
         },
         update: {
           inboundOauthHandle: inbound,
-          accessTokenEncrypted: encrypted,
-          grantedScopes: scopes,
-          tokenExpiresAt: expiresAt,
-          // Keep prior active status until user resolves conflict.
+          pendingAccessTokenEncrypted: encrypted,
+          pendingGrantedScopes: scopes,
+          pendingTokenExpiresAt: expiresAt,
+          // Preserve the current connection and campaign safety while the new
+          // identity is staged. Only OVERWRITE_HANDLE promotes these credentials.
         },
       });
 
@@ -250,6 +256,9 @@ export class BrandSettingsIntegrationsService {
         currentPlatformHandle: inbound,
         inboundOauthHandle: inbound,
         accessTokenEncrypted: encrypted,
+        pendingAccessTokenEncrypted: null,
+        pendingGrantedScopes: [],
+        pendingTokenExpiresAt: null,
         grantedScopes: scopes,
         tokenExpiresAt: expiresAt,
         isActive: true,
@@ -294,7 +303,7 @@ export class BrandSettingsIntegrationsService {
     if (!row) {
       throw new NotFoundException("Integration not found");
     }
-    if (!row.inboundOauthHandle || !row.accessTokenEncrypted) {
+    if (!row.inboundOauthHandle || !row.pendingAccessTokenEncrypted) {
       throw new BadRequestException(
         "No staged identity conflict to resolve. Reconnect Instagram first.",
       );
@@ -316,7 +325,10 @@ export class BrandSettingsIntegrationsService {
         where: { id: row.id },
         data: {
           inboundOauthHandle: null,
-          // Drop staged token if the prior connection was not active.
+          pendingAccessTokenEncrypted: null,
+          pendingGrantedScopes: [],
+          pendingTokenExpiresAt: null,
+          // Keep a prior active connection; clear any inactive credential material.
           ...(row.isActive
             ? {}
             : {
@@ -331,7 +343,7 @@ export class BrandSettingsIntegrationsService {
       return { ok: true, resolution: body.resolution, cancelled: true };
     }
 
-    const status = row.grantedScopes.includes(
+    const status = row.pendingGrantedScopes.includes(
       BrandIntegrationScope.ENGAGEMENT_INSIGHTS,
     )
       ? BrandIntegrationStatus.CONNECTED
@@ -343,6 +355,12 @@ export class BrandSettingsIntegrationsService {
         data: {
           currentPlatformHandle: inbound,
           inboundOauthHandle: inbound,
+          accessTokenEncrypted: row.pendingAccessTokenEncrypted,
+          grantedScopes: row.pendingGrantedScopes,
+          tokenExpiresAt: row.pendingTokenExpiresAt,
+          pendingAccessTokenEncrypted: null,
+          pendingGrantedScopes: [],
+          pendingTokenExpiresAt: null,
           status,
           isActive: true,
         },
@@ -395,6 +413,9 @@ export class BrandSettingsIntegrationsService {
           status: BrandIntegrationStatus.DISCONNECTED,
           accessTokenEncrypted: null,
           refreshTokenEncrypted: null,
+          pendingAccessTokenEncrypted: null,
+          pendingGrantedScopes: [],
+          pendingTokenExpiresAt: null,
         },
       });
       return { ok: true, action: body.action };
@@ -403,10 +424,10 @@ export class BrandSettingsIntegrationsService {
     if (body.action === "DELETE_INGESTED_DATA") {
       if (!body.confirmDeleteData) {
         throw new BadRequestException(
-          'Explicit confirmation required to execute "Delete Ingested Social Data".',
+          "Explicit confirmation required to disconnect and remove connection credentials.",
         );
       }
-      // Analytics purge deferred until those stores exist; clear tokens for now.
+      // Connection removal only. Historical analytics and campaign evidence remain.
       await this.prisma.brandIntegration.update({
         where: { id: row.id },
         data: {
@@ -414,10 +435,22 @@ export class BrandSettingsIntegrationsService {
           status: BrandIntegrationStatus.DISCONNECTED,
           accessTokenEncrypted: null,
           refreshTokenEncrypted: null,
+          pendingAccessTokenEncrypted: null,
+          pendingGrantedScopes: [],
+          pendingTokenExpiresAt: null,
           grantedScopes: [],
+          tokenExpiresAt: null,
+          inboundOauthHandle: null,
         },
       });
-      return { ok: true, action: body.action, purged: true };
+      return {
+        ok: true,
+        action: body.action,
+        disconnected: true,
+        credentialsRemoved: true,
+        futureIngestionStopped: true,
+        historicalDataRetained: true,
+      };
     }
 
     return {
@@ -428,11 +461,12 @@ export class BrandSettingsIntegrationsService {
     };
   }
 
-  /** Marks expired Instagram/Meta tokens TOKEN_EXPIRED. Safe per-row errors. */
+  /** Marks eligible Instagram tokens TOKEN_EXPIRED. Safe per-row errors. */
   async markExpiredTokens(): Promise<{ scanned: number; expired: number }> {
     const now = new Date();
     const candidates = await this.prisma.brandIntegration.findMany({
       where: {
+        provider: BrandIntegrationProvider.INSTAGRAM,
         isActive: true,
         tokenExpiresAt: { lte: now },
         status: {
@@ -448,11 +482,22 @@ export class BrandSettingsIntegrationsService {
     let expired = 0;
     for (const row of candidates) {
       try {
-        await this.prisma.brandIntegration.update({
-          where: { id: row.id },
+        const result = await this.prisma.brandIntegration.updateMany({
+          where: {
+            id: row.id,
+            provider: BrandIntegrationProvider.INSTAGRAM,
+            isActive: true,
+            tokenExpiresAt: { lte: now },
+            status: {
+              in: [
+                BrandIntegrationStatus.CONNECTED,
+                BrandIntegrationStatus.PARTIALLY_CONNECTED,
+              ],
+            },
+          },
           data: { status: BrandIntegrationStatus.TOKEN_EXPIRED },
         });
-        expired += 1;
+        expired += result.count;
       } catch (err) {
         this.logger.error(
           `token expiry update failed integration=${row.id} brand=${row.brandProfileId} err=${String(err)}`,
@@ -474,7 +519,7 @@ export class BrandSettingsIntegrationsService {
       throw new BadRequestException({
         code: "ACTIVE_CAMPAIGNS_BLOCK_DISCONNECT",
         message:
-          "Cannot disconnect or purge social data while campaigns are actively running. Conclude active campaigns before modifying API integrations.",
+          "Cannot disconnect or remove connection credentials while campaigns are actively running. Conclude active campaigns before modifying API integrations.",
       });
     }
   }

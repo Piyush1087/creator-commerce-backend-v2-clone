@@ -12,6 +12,7 @@ import { BrandIntegrationTokenExpiryScheduler } from "./schedulers/brand-integra
 import { BrandSettingsAccessService } from "./services/brand-settings-access.service";
 import { BrandSettingsIntegrationsService } from "./services/brand-settings-integrations.service";
 import { BrandSettingsService } from "./services/brand-settings.service";
+import { BrandInstagramOAuthStateService } from "./services/brand-instagram-oauth-state.service";
 
 @Module({
   imports: [BrandCentreModule, InstagramModule, AuthModule, MailModule],
@@ -22,6 +23,7 @@ import { BrandSettingsService } from "./services/brand-settings.service";
     BrandSettingsAccessService,
     BrandSettingsService,
     BrandSettingsIntegrationsService,
+    BrandInstagramOAuthStateService,
     BrandIntegrationTokenExpiryScheduler,
   ],
   exports: [

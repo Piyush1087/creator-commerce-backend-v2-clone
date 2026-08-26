@@ -14,7 +14,9 @@ export class BrandIntegrationTokenExpiryScheduler {
   ) {}
 
   /** Daily midnight sweep: flip expired active tokens to TOKEN_EXPIRED. */
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, {
+    name: "brand-instagram-token-expiry",
+  })
   async handleMidnightTokenExpiry(): Promise<void> {
     try {
       const result = await this.integrations.markExpiredTokens();

@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
@@ -144,6 +145,7 @@ export class BrandSettingsController {
   }
 
   @Get("integrations/instagram/oauth-url")
+  @Header("Cache-Control", "no-store")
   getInstagramOauthUrl(
     @Req() req: RequestWithAuthUser,
     @Query("redirectUri") redirectUri: string,
