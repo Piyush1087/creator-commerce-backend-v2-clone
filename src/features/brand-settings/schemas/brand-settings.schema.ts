@@ -101,15 +101,13 @@ export const BulkNotificationSettingsSchema = z.object({
   settings: z.array(NotificationSettingLineSchema),
 });
 
-export const UpdateBrandGeneralProfileSchema = z.object({
-  firstName: z.string().min(1).max(100).optional(),
-  lastName: z.string().min(1).max(100).optional(),
-  organizationLegalName: z.string().min(2).max(255).optional(),
-  organizationAddress: z.string().min(5).optional(),
-  countryCode: z.string().length(2).optional(),
-  currencyCode: z.string().length(3).optional(),
-  taxId: z.string().max(50).nullable().optional(),
-});
+export const UpdateBrandGeneralProfileSchema = z
+  .object({
+    firstName: z.string().min(1).max(100).optional(),
+    lastName: z.string().min(1).max(100).optional(),
+    organizationLegalName: z.string().min(2).max(255).optional(),
+  })
+  .strict();
 
 export type UpdateTeamRoleInput = z.infer<typeof UpdateTeamRoleSchema>;
 export type InviteTeamMemberInput = z.infer<typeof InviteTeamMemberSchema>;

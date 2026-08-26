@@ -112,7 +112,10 @@ export class BrandSettingsService {
 
     const [userRow, profile, team, invitations] = await Promise.all([
       this.prisma.user.findUnique({ where: { id: user.id } }),
-      this.prisma.brandProfile.findUnique({ where: { id: brandProfileId } }),
+      this.prisma.brandProfile.findUnique({
+        where: { id: brandProfileId },
+        include: { organization: { select: { name: true } } },
+      }),
       this.prisma.brandTeamMember.findMany({
         where: { brandProfileId, isActive: true },
         include: { user: true },
@@ -140,10 +143,10 @@ export class BrandSettingsService {
         first_name: firstName,
         last_name: lastName,
         email: user.email,
-        avatar_url: profile.logoUrl,
+        avatar_url: null,
       },
       organization: {
-        company_legal_name: profile.name,
+        company_legal_name: profile.organization?.name ?? null,
         corporate_address: null,
         country_code: profile.countryCode,
         currency_code: profile.currencyCode,
@@ -191,20 +194,15 @@ export class BrandSettingsService {
       );
     }
 
-    const updates: {
-      name?: string;
-      countryCode?: string;
-      currencyCode?: string;
-    } = {};
-
-    if (input.organizationLegalName) {
-      updates.name = input.organizationLegalName;
-    }
-    if (input.countryCode) {
-      updates.countryCode = input.countryCode.toUpperCase();
-    }
-    if (input.currencyCode) {
-      updates.currencyCode = input.currencyCode.toUpperCase();
+    // Resolve organization authority through the authorized Brand, never input.
+    const profile = input.organizationLegalName
+      ? await this.prisma.brandProfile.findUnique({
+          where: { id: brandProfileId },
+          select: { organizationId: true },
+        })
+      : null;
+    if (input.organizationLegalName && !profile?.organizationId) {
+      throw new NotFoundException("Organization not found for this Brand");
     }
 
     if (input.firstName || input.lastName) {
@@ -226,10 +224,10 @@ export class BrandSettingsService {
       });
     }
 
-    if (Object.keys(updates).length > 0) {
-      await this.prisma.brandProfile.update({
-        where: { id: brandProfileId },
-        data: updates,
+    if (input.organizationLegalName && profile?.organizationId) {
+      await this.prisma.organization.update({
+        where: { id: profile.organizationId },
+        data: { name: input.organizationLegalName },
       });
     }
 

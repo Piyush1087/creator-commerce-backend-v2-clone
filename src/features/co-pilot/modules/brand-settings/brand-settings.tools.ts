@@ -175,7 +175,7 @@ export class BrandSettingsCoPilotToolsService {
       ...personalMetrics,
       {
         label: "Company",
-        value: general.organization.company_legal_name,
+        value: general.organization.company_legal_name ?? "—",
         statusColor: "NEUTRAL",
       },
       {
