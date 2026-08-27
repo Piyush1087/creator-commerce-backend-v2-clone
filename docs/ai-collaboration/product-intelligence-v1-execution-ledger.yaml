@@ -14,15 +14,15 @@ execution_mode:
 
 branch: phase-g/product-intelligence-v1
 
-current_phase: P0
+current_phase: P1A
 phase_status: CHECKPOINT_READY_FOR_SYSTEMS_REVIEW
 
 checkpoint:
   status: PENDING_SYSTEMS_ACCEPTANCE
   sha: null
-  parent_sha: e066265d720b8f76516acb5063b9843faac5a85e
+  parent_sha: 98eec930ca2f03dd1347f3ee79890083642f2278
 
-previous_accepted_checkpoint_sha: null
+previous_accepted_checkpoint_sha: 98eec930ca2f03dd1347f3ee79890083642f2278
 
 resume_rule:
   candidate_head_self_recorded: false
@@ -30,6 +30,7 @@ resume_rule:
   record_as_previous_accepted_checkpoint_before_next_phase: true
 
 files_changed:
+  - docs/ai-collaboration/product-intelligence-v1-p1-canonical-state-runtime-design.md
   - docs/ai-collaboration/product-intelligence-v1-execution-ledger.yaml
 
 migrations:
@@ -44,13 +45,23 @@ tests:
     - existing_runtime_tests_31
     - existing_runtime_identity_yaml_parse_28_files
     - product_intelligence_semantic_invariants
+    - p1a_design_required_sections_23
+    - p1a_design_repository_citation_sanity
+    - p1a_allowed_files_only
+    - p1a_migration_count_unchanged_49
+    - p1a_execution_ledger_yaml_parse
+    - p1a_markdown_sanity
+    - p1a_git_diff_check
   failed: []
   skipped: []
 
 corrections:
-  current_phase: 3
+  current_phase: 0
   total: 3
   consecutive_same_failure: 0
+  by_phase:
+    P0: 3
+    P1A: 0
 
 last_failure:
   code: P0_SYSTEMS_REVIEW_CORRECTION
@@ -58,7 +69,7 @@ last_failure:
 
 stop_reason: null
 
-next_phase: P1_PENDING_SYSTEMS_AUTHORIZATION
+next_phase: P1B_PENDING_SYSTEMS_MIGRATION_AUTHORIZATION
 
 environment:
   node: v24.19.0
@@ -66,4 +77,4 @@ environment:
   prisma: 6.19.3
   postgres: UNAVAILABLE_PSQL_NOT_INSTALLED_OR_NOT_ON_PATH
 
-last_updated: "2026-08-27T21:53:24.1409331+05:30"
+last_updated: "2026-08-27T22:14:33.9570706+05:30"
