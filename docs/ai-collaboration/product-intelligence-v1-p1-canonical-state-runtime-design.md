@@ -1,8 +1,11 @@
 # Product Intelligence V1 — P1A Canonical State and Runtime Design
 
-**Status:** CHECKPOINT_READY_FOR_SYSTEMS_REVIEW  
-**Authority:** PRODUCT / P1A_ONLY  
-**Implementation authorized:** NO  
+**Status:** CHECKPOINT_READY_FOR_SYSTEMS_REVIEW
+
+**Authority:** PRODUCT / P1A_ONLY
+
+**Implementation authorized:** NO
+
 **Migration authorized or executed:** NO
 
 ## 1. Authority pins

@@ -56,16 +56,16 @@ tests:
   skipped: []
 
 corrections:
-  current_phase: 0
-  total: 3
+  current_phase: 1
+  total: 4
   consecutive_same_failure: 0
   by_phase:
     P0: 3
-    P1A: 0
+    P1A: 1
 
 last_failure:
-  code: P0_SYSTEMS_REVIEW_CORRECTION
-  summary: Corrected Object readiness vocabulary, Product contract review-pending governance status, and non-self-referential ledger checkpoint semantics.
+  code: P1A_DIFF_CHECK_FORMATTING
+  summary: Removed Markdown hard-break trailing spaces found by the committed-diff check; no design semantics changed.
 
 stop_reason: null
 
@@ -77,4 +77,4 @@ environment:
   prisma: 6.19.3
   postgres: UNAVAILABLE_PSQL_NOT_INSTALLED_OR_NOT_ON_PATH
 
-last_updated: "2026-08-27T22:14:33.9570706+05:30"
+last_updated: "2026-08-27T22:15:51.5628253+05:30"
