@@ -2,6 +2,7 @@ import type {
   DataExtractionEvidenceNormalizer,
   DataExtractionNormalizationInput,
 } from "../owned-website-wave1-normalizers";
+import { canonicalOfferingRefForSource } from "../owned-website-wave1-normalizers";
 import { locationEvidenceSchema } from "./wave2-evidence-contracts";
 import {
   draftFor,
@@ -13,6 +14,7 @@ export class LocationEvidenceNormalizer implements DataExtractionEvidenceNormali
   readonly capabilityId = "owned_website.location_evidence" as const;
   normalize(input: DataExtractionNormalizationInput) {
     const drafts = input.sources.flatMap((source) => {
+      const canonicalOfferingRef = canonicalOfferingRefForSource(input, source);
       const observations = [...fragmentFor(source).locations];
       // Unstructured observations stay unparsed; do not invent city/country from a name.
       for (const unit of statementsFor(source)) {
@@ -51,7 +53,9 @@ export class LocationEvidenceNormalizer implements DataExtractionEvidenceNormali
           source_url: source.resource.canonicalUrl,
           source_locator: observation.locator,
           page_role: source.resource.pageRole ?? "OTHER",
-          subject_scope: "CONTEXT_SPECIFIC",
+          subject_scope: canonicalOfferingRef
+            ? "OFFERING_SPECIFIC"
+            : "CONTEXT_SPECIFIC",
           authorship: "BRAND_AUTHORED",
           observation_type:
             /\b(?:permanently closed|temporarily closed|no longer open)\b/i.test(
@@ -65,7 +69,7 @@ export class LocationEvidenceNormalizer implements DataExtractionEvidenceNormali
           canonical_location_ref: reconciliation?.canonicalLocationRef ?? null,
           geography_assertion: null,
           booking_or_access_ref: null,
-          offering_ref: null,
+          offering_ref: canonicalOfferingRef,
           statement_or_normalized_fact: observation.statement,
           observed_name: observation.name,
           street_address: observation.streetAddress,

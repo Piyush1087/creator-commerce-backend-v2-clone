@@ -36,8 +36,8 @@ export const proofEvidenceSchema = z
       "OTHER_BOUNDED_PROOF_CONTEXT",
     ]),
     scope,
-    factual_referent_ref: z.null(),
-    offering_refs: z.array(z.string()).max(0),
+    factual_referent_ref: z.string().min(1).nullable(),
+    offering_refs: z.array(z.string().min(1)).max(1),
     claim_sensitivity: z.array(
       z.enum([
         "BRAND_AUTHORED_CLAIM",
@@ -115,7 +115,7 @@ export const serviceabilityEvidenceSchema = z
       "TRANSACTIONAL",
     ]),
     geography_assertions: z.array(geographyAssertionSchema).max(8),
-    offering_ref: z.null(),
+    offering_ref: z.string().min(1).nullable(),
     offering_candidate_ref: z.string().nullable(),
     statement_or_normalized_fact: text,
     evidence_strength: z.enum([
@@ -139,7 +139,7 @@ export const locationEvidenceSchema = z
     canonical_location_ref: z.string().min(1).nullable(),
     geography_assertion: geographyAssertionSchema.nullable(),
     booking_or_access_ref: z.null(),
-    offering_ref: z.null(),
+    offering_ref: z.string().min(1).nullable(),
     statement_or_normalized_fact: text,
     observed_name: nullableText,
     street_address: nullableText,

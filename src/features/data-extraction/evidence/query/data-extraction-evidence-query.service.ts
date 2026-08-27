@@ -4,9 +4,12 @@ import { Injectable } from "@nestjs/common";
 
 import {
   type BrandId,
+  type CapabilityExecutionRef,
+  type EvidenceRef,
   type SemanticObservationKey,
 } from "../domain/evidence-identities";
 import type {
+  DataExtractionCapabilityExecutionRecord,
   DataExtractionEvidenceItemRecord,
   DataExtractionSemanticObservationRecord,
 } from "../domain/evidence-records";
@@ -35,10 +38,96 @@ export class DataExtractionEvidenceQueryService implements DataExtractionEvidenc
     const capabilityResults: DataExtractionCapabilityReadResultV1[] = [];
     for (const capabilityId of capabilityIds) {
       capabilityResults.push(
-        await this.readCapability(request.brandId, capabilityId),
+        request.exactOfferingScope
+          ? await this.readExactOfferingCapability(
+              request.brandId,
+              capabilityId,
+              request.exactOfferingScope.canonicalOfferingRef,
+            )
+          : await this.readCapability(request.brandId, capabilityId),
       );
     }
     return { brandId: request.brandId, capabilityResults };
+  }
+
+  private async readExactOfferingCapability(
+    brandId: BrandId,
+    capabilityId: EvidenceCapabilityId,
+    canonicalOfferingRef: string,
+  ): Promise<DataExtractionCapabilityReadResultV1> {
+    const repositories = this.persistence.repositories();
+    await repositories.canonicalOfferings.assertOwnedByBrand(
+      brandId,
+      canonicalOfferingRef,
+    );
+    const executions = await repositories.capabilityExecutions.findCompleted(
+      brandId,
+      capabilityId,
+    );
+    const executionRefsByEvidence = new Map<string, Set<string>>();
+    const evidenceByRef = new Map<string, DataExtractionEvidenceItemRecord>();
+    const qualifyingExecutions: DataExtractionCapabilityExecutionRecord[] = [];
+
+    for (const execution of executions) {
+      const qualifyingRefs: EvidenceRef[] = [];
+      for (const evidenceRef of execution.evidenceRefs) {
+        const item = await repositories.evidenceItems.findByRef(
+          brandId,
+          evidenceRef,
+        );
+        if (
+          !item ||
+          item.brandId !== brandId ||
+          item.capabilityId !== capabilityId
+        ) {
+          throw persistenceError("PERSISTENCE_INVARIANT");
+        }
+        if (!isExactOfferingEvidence(item, canonicalOfferingRef)) continue;
+        evidenceByRef.set(item.evidenceRef, item);
+        qualifyingRefs.push(item.evidenceRef);
+        const refs = executionRefsByEvidence.get(item.evidenceRef) ?? new Set();
+        refs.add(execution.capabilityExecutionRef);
+        executionRefsByEvidence.set(item.evidenceRef, refs);
+      }
+      if (qualifyingRefs.length > 0) {
+        qualifyingExecutions.push({
+          ...execution,
+          evidenceRefs: qualifyingRefs,
+        });
+      }
+    }
+
+    if (qualifyingExecutions.length === 0) {
+      return { state: "NOT_REQUESTED", capabilityId, evidence: [] };
+    }
+    const conflictGroups = conflictGroupRefs(
+      brandId,
+      capabilityId,
+      await repositories.semanticObservations.findByCapability(
+        brandId,
+        capabilityId,
+      ),
+    );
+    const evidence = [...evidenceByRef.values()]
+      .map((item) => {
+        const conflictGroupRef = item.semanticObservationKey
+          ? conflictGroups.get(item.semanticObservationKey)
+          : undefined;
+        return {
+          ...item,
+          ...(conflictGroupRef ? { conflictGroupRef } : {}),
+          capabilityExecutionRefs: [
+            ...(executionRefsByEvidence.get(item.evidenceRef) ?? []),
+          ].sort() as CapabilityExecutionRef[],
+        };
+      })
+      .sort(compareEvidence);
+    return {
+      state: "COMPLETED",
+      capabilityExecution: qualifyingExecutions[0]!,
+      capabilityExecutions: qualifyingExecutions,
+      evidence,
+    };
   }
 
   private async readCapability(
@@ -109,7 +198,74 @@ export class DataExtractionEvidenceQueryService implements DataExtractionEvidenc
     ) {
       throw persistenceError("PERSISTENCE_INVARIANT");
     }
+    if (
+      request.exactOfferingScope &&
+      (!request.exactOfferingScope.canonicalOfferingRef?.trim() ||
+        request.capabilityIds.some(
+          (capabilityId) => !EXACT_OFFERING_CAPABILITIES.has(capabilityId),
+        ))
+    ) {
+      throw persistenceError("PERSISTENCE_INVARIANT");
+    }
   }
+}
+
+const EXACT_OFFERING_CAPABILITIES = new Set<EvidenceCapabilityId>([
+  "owned_website.offering_context",
+  "explicit_factual_proof_or_claim_evidence",
+  "derived_communication_constraint_evidence",
+  "owned_website.serviceability_evidence",
+  "owned_website.location_evidence",
+]);
+
+function isExactOfferingEvidence(
+  item: DataExtractionEvidenceItemRecord,
+  canonicalOfferingRef: string,
+): boolean {
+  if (
+    item.pageRole !== "OFFERING_DETAIL" ||
+    !["OFFERING_SPECIFIC", "REPEATED_REPRESENTATIVE"].includes(
+      item.representativeness,
+    )
+  ) {
+    return false;
+  }
+  const payload = asRecord(item.boundedNormalizedPayload);
+  switch (item.capabilityId) {
+    case "owned_website.offering_context":
+      return (
+        payload.generalization_scope === "SINGLE_OFFERING" &&
+        payload.canonical_offering_ref === canonicalOfferingRef
+      );
+    case "explicit_factual_proof_or_claim_evidence":
+      return (
+        payload.scope === "OFFERING_SPECIFIC" &&
+        payload.subject_scope === "OFFERING_SPECIFIC" &&
+        payload.factual_referent_ref === canonicalOfferingRef &&
+        Array.isArray(payload.offering_refs) &&
+        payload.offering_refs.length === 1 &&
+        payload.offering_refs[0] === canonicalOfferingRef
+      );
+    case "derived_communication_constraint_evidence":
+      return (
+        payload.source_instruction_scope === "OFFERING_SPECIFIC" &&
+        payload.canonical_offering_ref === canonicalOfferingRef
+      );
+    case "owned_website.serviceability_evidence":
+    case "owned_website.location_evidence":
+      return (
+        payload.subject_scope === "OFFERING_SPECIFIC" &&
+        payload.offering_ref === canonicalOfferingRef
+      );
+    default:
+      return false;
+  }
+}
+
+function asRecord(value: unknown): Readonly<Record<string, unknown>> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Readonly<Record<string, unknown>>)
+    : {};
 }
 
 function conflictGroupRefs(

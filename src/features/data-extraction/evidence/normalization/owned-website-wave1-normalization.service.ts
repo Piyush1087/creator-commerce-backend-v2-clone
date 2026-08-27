@@ -40,6 +40,8 @@ export interface DataExtractionNormalizationRequestV1 {
   readonly capabilityExecutionRef: CapabilityExecutionRef;
   /** Internal application-supplied reconciliation only; never read from acquired HTML. */
   readonly locationReconciliations?: DataExtractionNormalizationInput["locationReconciliations"];
+  /** Exact capture subset returned by acquisition for one application-owned Offering. */
+  readonly exactOfferingScope?: DataExtractionNormalizationInput["exactOfferingScope"];
 }
 
 export interface DataExtractionNormalizationResultV1 {
@@ -71,6 +73,7 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
       request.capabilityExecutionRef,
     );
     if (!execution) throw persistenceError("CAPABILITY_EXECUTION_NOT_FOUND");
+    await this.assertExactOfferingScope(request, execution);
     if (execution.completedAt) {
       return {
         capabilityExecutionRef: execution.capabilityExecutionRef,
@@ -123,6 +126,7 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
       sources,
       parentEvidence,
       locationReconciliations: request.locationReconciliations,
+      exactOfferingScope: request.exactOfferingScope,
     });
     for (const mapping of request.locationReconciliations ?? []) {
       if (
@@ -223,6 +227,50 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
       evidenceRefs: completed.evidenceRefs,
       reasonCodes: completed.reasonCodes,
     };
+  }
+
+  private async assertExactOfferingScope(
+    request: DataExtractionNormalizationRequestV1,
+    execution: DataExtractionCapabilityExecutionRecord,
+  ): Promise<void> {
+    const scope = request.exactOfferingScope;
+    if (!scope) return;
+    if (
+      !scope.canonicalOfferingRef?.trim() ||
+      scope.captureRefs.length === 0 ||
+      scope.captureRefs.length > 8 ||
+      new Set(scope.captureRefs).size !== scope.captureRefs.length ||
+      ![
+        "owned_website.offering_context",
+        "explicit_factual_proof_or_claim_evidence",
+        "derived_communication_constraint_evidence",
+        "owned_website.serviceability_evidence",
+        "owned_website.location_evidence",
+      ].includes(execution.capabilityId)
+    ) {
+      throw persistenceError("PERSISTENCE_INVARIANT");
+    }
+    const repositories = this.persistence.repositories();
+    await repositories.canonicalOfferings.assertOwnedByBrand(
+      request.brandId,
+      scope.canonicalOfferingRef,
+    );
+    for (const captureRefValue of scope.captureRefs) {
+      const capture = await repositories.captures.findByRef(
+        request.brandId,
+        captureRefValue as CaptureRef,
+      );
+      if (!capture || !execution.resourceScope.includes(capture.resourceRef)) {
+        throw persistenceError("PERSISTENCE_INVARIANT");
+      }
+      const resource = await repositories.resources.findByRef(
+        request.brandId,
+        capture.resourceRef,
+      );
+      if (!resource || resource.pageRole !== "OFFERING_DETAIL") {
+        throw persistenceError("PERSISTENCE_INVARIANT");
+      }
+    }
   }
 
   private async loadExplicitSources(

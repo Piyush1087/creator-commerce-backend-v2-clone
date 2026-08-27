@@ -34,6 +34,9 @@ export class DataExtractionIntelligenceEvidenceAdapter implements IntelligenceEv
         processorId: request.processorId,
         processorVersion: request.processorVersion,
       },
+      ...(request.exactOfferingScope
+        ? { exactOfferingScope: request.exactOfferingScope }
+        : {}),
     });
     const byCapability = new Map(
       result.capabilityResults.map((capability) => [
@@ -50,7 +53,16 @@ export class DataExtractionIntelligenceEvidenceAdapter implements IntelligenceEv
         return this.projectCapability(capability);
       },
     );
-    return { brandId: result.brandId, capabilityResults };
+    return {
+      brandId: result.brandId,
+      ...(request.exactOfferingScope
+        ? {
+            canonicalOfferingRef:
+              request.exactOfferingScope.canonicalOfferingRef,
+          }
+        : {}),
+      capabilityResults,
+    };
   }
 
   private projectCapability(
@@ -85,6 +97,13 @@ export class DataExtractionIntelligenceEvidenceAdapter implements IntelligenceEv
       reasonCodes: [...execution.reasonCodes],
       coverage: execution.coverage,
       acquisitionQuality: { ...execution.acquisitionQuality },
+      ...(result.capabilityExecutions
+        ? {
+            capabilityExecutionRefs: result.capabilityExecutions.map(
+              (candidate) => candidate.capabilityExecutionRef,
+            ),
+          }
+        : {}),
       evidence: [...result.evidence]
         .sort(compareEvidence)
         .map((item) =>
@@ -113,7 +132,9 @@ export class DataExtractionIntelligenceEvidenceAdapter implements IntelligenceEv
       acquisitionQuality: { ...item.qualitySnapshot },
       provenance: {
         ...item.provenance,
-        acquisitionOrNormalizationRunRef: capabilityExecutionRef,
+        acquisitionOrNormalizationRunRef: item.capabilityExecutionRefs
+          ? item.provenance.acquisitionOrNormalizationRunRef
+          : capabilityExecutionRef,
         parentEvidenceRefs: [...item.provenance.parentEvidenceRefs],
         parentCaptureRefs: [...item.provenance.parentCaptureRefs],
       },
@@ -132,6 +153,11 @@ export class DataExtractionIntelligenceEvidenceAdapter implements IntelligenceEv
       ...(item.conflictGroupRef
         ? { conflictGroupRef: item.conflictGroupRef }
         : {}),
+      ...(item.capabilityExecutionRefs
+        ? {
+            capabilityExecutionRefs: [...item.capabilityExecutionRefs],
+          }
+        : {}),
     };
   }
 
@@ -141,6 +167,8 @@ export class DataExtractionIntelligenceEvidenceAdapter implements IntelligenceEv
       !request.processorId ||
       !request.processorVersion ||
       request.capabilityIds.length === 0 ||
+      (request.exactOfferingScope &&
+        !request.exactOfferingScope.canonicalOfferingRef?.trim()) ||
       request.capabilityIds.some(
         (capabilityId) =>
           !DATA_EXTRACTION_EVIDENCE_CAPABILITIES.includes(capabilityId),
