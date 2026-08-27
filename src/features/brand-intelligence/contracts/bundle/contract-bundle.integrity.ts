@@ -320,7 +320,9 @@ export class ContractBundleIntegrityVerifier {
           entry.role === "OBJECT_CONTRACT" ||
           entry.role === "SHARED_METADATA_CONTRACT"
             ? "contract"
-            : "id";
+            : entry.role === "PROCESSOR_DEFINITION" && document.processor_id
+              ? "processor_id"
+              : "id";
         if (
           document[semanticIdKey] !== entry.semanticId ||
           document.version !== entry.semanticVersion
@@ -431,6 +433,45 @@ export class ContractBundleIntegrityVerifier {
     const evidence = parsed.EVIDENCE_CONTRACT;
     const objects = parsed.OBJECT_CONTRACT;
     const shared = parsed.SHARED_METADATA_CONTRACT;
+    const spec = CONTRACT_SOURCE_SPECS.find(
+      (candidate) => candidate.processorId === manifest.processorId,
+    );
+    if (spec?.sourceDialect === "PRODUCT_ENGINE_V1") {
+      const objectRows = Array.isArray(objects.objects) ? objects.objects : [];
+      const objectIds = new Set(
+        objectRows.flatMap((row) => {
+          const value = row as Readonly<Record<string, unknown>>;
+          return typeof value.object_id === "string" ? [value.object_id] : [];
+        }),
+      );
+      const outputObjects = [output.object];
+      const mismatch =
+        processor.processor_id !== manifest.processorId ||
+        processor.version !== manifest.processorVersion ||
+        processor.engine !== manifest.ownerEngine ||
+        reasoning.processor !== manifest.processorId ||
+        reasoning.engine !== manifest.ownerEngine ||
+        output.id !== manifest.outputContractId ||
+        output.version !== manifest.outputContractVersion ||
+        output.processor !== manifest.processorId ||
+        evidence.id !== manifest.evidenceContractId ||
+        evidence.version !== manifest.evidenceContractVersion ||
+        evidence.engine !== manifest.ownerEngine ||
+        objects.engine !== manifest.ownerEngine ||
+        shared.contract !== "shared_intelligence_metadata" ||
+        outputObjects.some(
+          (objectId) =>
+            typeof objectId !== "string" ||
+            !manifest.ownedObjectSemanticIds.includes(objectId) ||
+            !objectIds.has(objectId),
+        );
+      if (mismatch)
+        configuration(
+          "CROSS_ARTIFACT_SEMANTIC_MISMATCH",
+          "Product bundle artifacts do not preserve processor/Object/Evidence/output semantic links",
+        );
+      return;
+    }
     const objectRows = Array.isArray(objects.objects) ? objects.objects : [];
     const objectIds = new Set(
       objectRows.flatMap((row) => {

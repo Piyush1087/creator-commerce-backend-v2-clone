@@ -112,6 +112,29 @@ export interface CanonicalOfferingFact {
   readonly url: string;
   readonly categoryTag: string | null;
   readonly isActive: boolean;
+  readonly canonicalKind?: string | null;
+  readonly canonicalSubtype?: string | null;
+  readonly canonicalLifecycle?: string | null;
+  readonly description?: string | null;
+  readonly customerDestination?: string;
+  readonly mediaRefs?: readonly Readonly<{
+    id: string;
+    url: string;
+    authority: string;
+    origin: string;
+    revision: number;
+  }>[];
+  readonly bundleRelationships?: readonly Readonly<{
+    relationId: string;
+    bundleOfferingId: string;
+    productOfferingId: string;
+    revision: number;
+  }>[];
+  readonly brandConfirmedValues?: readonly Readonly<{
+    semanticFieldPath: string;
+    value: unknown;
+    revision: number;
+  }>[];
   readonly businessStateReference: BusinessStateReference;
 }
 
@@ -148,6 +171,10 @@ export interface CanonicalBrandStateReadRequest {
   readonly includeOfferingFacts?: boolean;
   readonly includeVisualState?: boolean;
   readonly includeServiceabilityState?: boolean;
+  /** Exact Product input scope; never inferred from URL or Evidence. */
+  readonly exactOfferingScope?: Readonly<{
+    readonly canonicalOfferingRef: string;
+  }>;
 }
 
 export interface CanonicalBrandStateReader {

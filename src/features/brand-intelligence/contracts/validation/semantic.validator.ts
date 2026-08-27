@@ -4,6 +4,7 @@ import { ServiceabilitySemanticValidator } from "./serviceability.semantic-valid
 import { BrandCharacterSemanticValidator } from "./brand-character.semantic-validator";
 import { AudiencePersonaSemanticValidator } from "./audience-persona.semantic-validator";
 import { BrandDifferentiationSemanticValidator } from "./brand-differentiation.semantic-validator";
+import { OfferingFactualSemanticValidator } from "./offering-factual.semantic-validator";
 
 import type { VerifiedContractBundle } from "../bundle/contract-bundle.types";
 import { accepted, rejected } from "./validation-result";
@@ -76,6 +77,7 @@ function capabilityIds(bundle: VerifiedContractBundle): Set<string> {
   const evidence = bundle.artifacts.evidenceContract;
   const sections = [
     record(evidence.capabilities),
+    record(evidence.classifications),
     record(evidence.optional_enrichment),
   ];
   return new Set(sections.flatMap((section) => Object.keys(section ?? {})));
@@ -333,6 +335,7 @@ export class SemanticValidator {
         new BrandDifferentiationSemanticValidator(),
         new VisualStyleSemanticValidator(),
         new ServiceabilitySemanticValidator(),
+        new OfferingFactualSemanticValidator(),
       ].map((validator) => [validator.validatorId, validator]),
     );
 

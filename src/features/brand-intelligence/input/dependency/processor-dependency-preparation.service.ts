@@ -26,11 +26,13 @@ import {
   type ProcessorDependencyReadinessAssessment,
 } from "./processor-dependency-readiness.evaluator";
 import type { CanonicalBrandStateSnapshot } from "../canonical-state/canonical-brand-state.port";
+import type { IntelligenceSubjectSelector } from "../../subject/intelligence-subject";
 
 export interface ProcessorDependencyPreparationRequest {
   readonly brandId: string;
   readonly registryKey: ContractRegistryKey;
   readonly activeScope: readonly ComponentSemanticAddress[];
+  readonly subject?: IntelligenceSubjectSelector;
 }
 
 export interface PreparedProcessorDependencies {
@@ -75,6 +77,11 @@ export class ProcessorDependencyPreparationService {
   ): Promise<PreparedProcessorDependencies> {
     const bundle = this.contracts.getVerifiedBundle(request.registryKey);
     const profile = this.profiles.resolve(bundle);
+    const offeringRef =
+      request.subject?.type === "OFFERING" ? request.subject.ref : undefined;
+    if (profile.processorId === "offering_factual_synthesis" && !offeringRef) {
+      throw new Error("PRODUCT_PROCESSOR_REQUIRES_EXACT_OFFERING_SUBJECT");
+    }
     const canonicalState = await this.canonicalReader.read({
       brandId: request.brandId,
       requiredSemantics: profile.requiredCanonicalSemantics,
@@ -83,12 +90,18 @@ export class ProcessorDependencyPreparationService {
       ...(profile.includeServiceabilityState
         ? { includeServiceabilityState: true }
         : {}),
+      ...(offeringRef
+        ? { exactOfferingScope: { canonicalOfferingRef: offeringRef } }
+        : {}),
     });
     const evidence = await this.evidenceReader.read({
       brandId: request.brandId,
       processorId: profile.processorId,
       processorVersion: profile.processorVersion,
       capabilityIds: profile.capabilityIds,
+      ...(offeringRef
+        ? { exactOfferingScope: { canonicalOfferingRef: offeringRef } }
+        : {}),
     });
     const canonicalManifest = this.canonicalManifests.build(canonicalState);
     const evidenceManifest = this.evidenceManifests.build(

@@ -80,6 +80,7 @@ describe("brand_meaning activation boundaries", () => {
       ["brand_differentiation", true],
       ["visual_style_synthesis", true],
       ["serviceability_synthesis", true],
+      ["offering_factual_synthesis", true],
     ]);
   });
   it("retains explicit prompt restrictions and only wires existing runtime services", () => {

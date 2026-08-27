@@ -83,6 +83,8 @@ export interface ContractSourceSpec {
   readonly evidenceContractVersion: string;
   readonly ownerEngine: string;
   readonly owningBranch: string;
+  /** Frozen source layouts predate a single cross-engine YAML shape. */
+  readonly sourceDialect?: "BRAND_BRANCH_V1" | "PRODUCT_ENGINE_V1";
   readonly ownedObjectSemanticIds: readonly string[];
   readonly ownedPathPatterns: readonly OwnedPathPattern[];
   readonly artifactPaths: Readonly<Record<ContractArtifactRole, string>>;

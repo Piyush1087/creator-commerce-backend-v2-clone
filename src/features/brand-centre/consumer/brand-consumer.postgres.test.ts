@@ -427,12 +427,16 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
           componentSemanticPath: "$",
         }),
       ).toBe(true);
+      const executableIds = runtime
+        .registrations()
+        .filter((r) => r.executionEnabled)
+        .map((r) => r.processorId)
+        .sort();
+      expect(executableIds).toContain("offering_factual_synthesis");
       expect(
-        runtime
-          .registrations()
-          .filter((r) => r.executionEnabled)
-          .map((r) => r.processorId)
-          .sort(),
+        executableIds.filter(
+          (processorId) => processorId !== "offering_factual_synthesis",
+        ),
       ).toEqual([
         "audience_persona_synthesis",
         "brand_character",

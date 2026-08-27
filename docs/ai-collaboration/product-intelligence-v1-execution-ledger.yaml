@@ -2,6 +2,7 @@ run_id: product-intelligence-v1
 
 authority:
   repository: Piyush1087/dummy_tcs
+  branch: main
   sha: 811d63a4f81255d9082f765b7569c8b60fcae28e
   product_intelligence_contracts:
     branch: agent/product-intelligence-v1-contracts
@@ -11,6 +12,11 @@ authority:
 backend:
   repository: Piyush1087/creator-commerce-backend-v2-clone
   base_sha: e066265d720b8f76516acb5063b9843faac5a85e
+  product_branch: phase-g/product-intelligence-v1
+  product_branch_pre_integration_sha: ce46eacdc33d8d48cee96d0682d0fa30d7842a0c
+  accepted_de_branch: phase-g/product-intelligence-v1-de-exact-offering-scope
+  accepted_de_checkpoint_sha: ff95d2f63121126a7575824a6cf10f14e1aff4a5
+  integration_method: NORMAL_FAST_FORWARD
 
 execution_mode:
   authorized_mode: HYBRID_RUN
@@ -18,24 +24,44 @@ execution_mode:
 
 branch: phase-g/product-intelligence-v1
 
-current_phase: P2A
+current_phase: P3
 phase_status: CHECKPOINT_READY_FOR_SYSTEMS_REVIEW
 
 checkpoint:
   status: PENDING_SYSTEMS_ACCEPTANCE
   sha: null
-  parent_sha: ce17f9f8b7084fbd188f748b167e680747dad12e
+  parent_sha: ff95d2f63121126a7575824a6cf10f14e1aff4a5
 
-previous_accepted_checkpoint_sha: ce17f9f8b7084fbd188f748b167e680747dad12e
+previous_accepted_checkpoint_sha: ff95d2f63121126a7575824a6cf10f14e1aff4a5
 
 resume_rule:
   candidate_head_self_recorded: false
   accepted_sha_source: NEXT_AUTHORIZED_SYSTEMS_RUNNER_PROMPT
   record_as_previous_accepted_checkpoint_before_next_phase: true
 
+implementation:
+  processor_id: offering_factual_synthesis
+  processor_version: "1.0"
+  owned_object: offering_factual_profile
+  product_executor_ids:
+    - offering_factual_synthesis
+  accepted_de_checkpoint_retained: true
+  commercial_de_capability_implemented: false
+  migration_52_created: false
+  additional_product_processors_implemented: false
+  frontend_changed: false
+
 files_changed:
+  - nest-cli.json
+  - src/features/brand-intelligence/contracts
+  - src/features/brand-intelligence/generated/contract-bundles
+  - src/features/brand-intelligence/input
+  - src/features/brand-intelligence/execution
+  - src/features/brand-intelligence/processors/offering-factual
+  - src/features/brand-intelligence/offering-factual.architecture.test.ts
+  - src/features/brand-centre/consumer/brand-consumer.postgres.test.ts
   - docs/ai-collaboration/product-intelligence-v1-execution-ledger.yaml
-  - docs/ai-collaboration/product-intelligence-v1-p2-de-capability-preflight.md
+  - docs/ai-collaboration/product-intelligence-v1-p3-offering-factual-synthesis.md
 
 migrations:
   before: 51
@@ -44,20 +70,30 @@ migrations:
 
 tests:
   passed:
-    - exact_authority_and_checkpoint_pins
-    - backend_and_authority_worktrees_clean_at_start
-    - migration_count_51
-    - ledger_yaml_parse
-    - p2a_markdown_20_section_sanity
+    - product_contract_structure_and_semantics_22
+    - product_postgres_vertical_slice_3
+    - brand_intelligence_non_database_regressions
+    - seven_brand_processor_postgres_vertical_slices_108
+    - shared_execution_subject_projection_postgres
+    - de_non_database_regressions_108
+    - de_postgres_regressions_55
+    - canonical_offering_postgres_regressions_13
+    - brand_centre_regressions
+    - campaign_regressions_69
+    - deterministic_contract_bundle_verify
+    - prisma_generate_and_validate
+    - production_nest_build
+    - deployable_dist_bundle_byte_verification
+    - fresh_dist_startup_and_health_200
+    - scoped_eslint
     - git_diff_check
   failed: []
   skipped:
-    - postgres_heavy_suite_not_required_for_design_only_phase
-    - runtime_build_not_required_because_no_runtime_or_contract_code_changed
+    - canonical_offering_historical_upgrade_fixture_requires_explicit_upgrade_mode
 
 corrections:
   current_phase: 1
-  total: 9
+  total: 10
   consecutive_same_failure: 0
   by_phase:
     P0: 3
@@ -65,14 +101,15 @@ corrections:
     P1B-1: 2
     P1B-2: 2
     P2A: 1
+    P3: 1
 
 last_failure:
-  code: P2A_MARKDOWN_DIFF_CHECK
-  summary: Removed one Markdown hard-break trailing-space sequence reported by the staged diff check; no audit decision or implementation scope changed.
+  code: P3_GENERATED_BUNDLE_BYTE_DRIFT
+  summary: Canonical regeneration removed formatter-only byte drift from the generated Product manifest; frozen source content and semantic hashes were unchanged.
 
 stop_reason: null
 
-next_phase: P2B_PENDING_SYSTEMS_CAPABILITY_AUTHORIZATION
+next_phase: P4_PENDING_SYSTEMS_AUTHORIZATION
 
 environment:
   node: v24.19.0
@@ -80,4 +117,4 @@ environment:
   prisma: 6.19.3
   postgres: PostgreSQL 16 disposable Docker harness
 
-last_updated: "2026-08-28T00:58:00.4341100+05:30"
+last_updated: "2026-08-28T03:04:24.5800326+05:30"

@@ -60,6 +60,50 @@ export class ProcessorDependencyReadinessEvaluator {
       };
     }
 
+    if (profile.processorId === "offering_factual_synthesis") {
+      const offering = canonical.offeringFacts;
+      const exactRef = evidence.canonicalOfferingRef;
+      if (
+        !exactRef ||
+        offering?.length !== 1 ||
+        offering[0].offeringId !== exactRef ||
+        offering[0].brandId !== canonical.brandId
+      ) {
+        return {
+          readiness: "WAITING_FOR_CANONICAL_INPUT",
+          reasonCodes: ["EXACT_CANONICAL_OFFERING_NOT_AVAILABLE"],
+        };
+      }
+      const context = evidence.capabilityResults.find(
+        (item) => item.capabilityId === "owned_website.offering_context",
+      );
+      const usable = context?.evidence.some((item) => {
+        const payload =
+          item.boundedNormalizedPayload &&
+          typeof item.boundedNormalizedPayload === "object" &&
+          !Array.isArray(item.boundedNormalizedPayload)
+            ? (item.boundedNormalizedPayload as Readonly<
+                Record<string, unknown>
+              >)
+            : undefined;
+        return (
+          item.brandId === canonical.brandId &&
+          item.representativeness === "OFFERING_SPECIFIC" &&
+          item.acquisitionQuality.state !== "UNAVAILABLE" &&
+          item.freshness.state !== "UNKNOWN" &&
+          payload?.generalization_scope === "SINGLE_OFFERING" &&
+          payload.canonical_offering_ref === exactRef &&
+          Object.keys(payload).length > 2
+        );
+      });
+      return usable
+        ? { readiness: "READY_TO_RUN", reasonCodes: [] }
+        : {
+            readiness: "WAITING_FOR_EVIDENCE",
+            reasonCodes: ["EXACT_OFFERING_CONTEXT_NOT_AVAILABLE"],
+          };
+    }
+
     if (profile.processorId === "visual_style_synthesis") {
       return hasRepresentativeVisualEvidence(evidence)
         ? { readiness: "READY_TO_RUN", reasonCodes: [] }

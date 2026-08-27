@@ -1,0 +1,121 @@
+processor_id: offering_factual_synthesis
+version: "1.0"
+status: FROZEN
+engine: product_intelligence
+processor_type: AI_REASONING
+owned_object: offering_factual_profile
+object_authority: intelligence/engines/product_intelligence/objects.yaml#offering_factual_profile
+
+responsibility: >-
+  Produce grounded factual, benefit, proof, usage and customer-context understanding for one exact
+  canonical Offering without changing canonical Offering state or generalizing from sibling Offerings.
+
+scope_semantics:
+  brand_ref: required
+  offering_ref: required
+  one_exact_canonical_offering_per_execution: true
+  evidence_subject_match: exact offering_ref required
+  sibling_offering_evidence: forbidden
+  execution_identity_invariant: independently identifiable by Brand + Offering subject + processor
+  exact_technical_representation: deferred_to_P1
+
+canonical_inputs:
+  - exact Offering.id and Brand ownership
+  - Offering kind and industry-aware subtype
+  - lifecycle
+  - canonical customer destination when factually relevant
+  - canonical media refs when factually relevant as context only
+  - canonical Collection/BUNDLE relationships when relevant
+  - Brand-confirmed Offering values
+
+minimum_evidence_profile:
+  capability: owned_website.offering_context
+  classification: REUSE_WITH_PRODUCT_SCOPE
+  requirements:
+    - evidence is reconciled to the exact canonical Offering
+    - at least one current or usability-qualified Offering-specific observation supports any emitted factual semantic
+    - unsupported output families may remain null or absent
+
+optional_evidence_and_enrichment:
+  - explicit factual proof or claim Evidence scoped to the exact Offering
+  - relevant canonical Brand context only where explicitly applicable and not a substitute for Offering Evidence
+  - Brand-confirmed same-Offering factual context
+  - Meta/Instagram Offering context when explicitly mapped and representative
+
+readiness_and_admission_rules:
+  execution_ready_when:
+    - exact canonical Brand and Offering refs resolve
+    - requested active semantic paths are owned by offering_factual_profile
+    - minimum Evidence profile can support at least one requested semantic or a contract-valid explicit-null evaluation
+  active_lifecycle_required_to_generate_understanding: false
+  active_lifecycle_required_for_new_campaign_use: true
+  conflicts_with_protected_state: compare_only_not_replacement
+  no_filler_to_force_ready: true
+  processor_execution_failure:
+    object_readiness_state_created: false
+    failed_refresh_replaces_prior_current: false
+    readiness_when_no_current_result: NOT_READY
+    failure_exposed_by_runtime_independently: true
+
+partial_output_behavior:
+  supported: true
+  independently_nullable_paths: [factual_summary, key_facts, key_benefits, proof_points, usage_context, customer_context]
+  valid_result: any grounded contract-valid subset
+  unsupported_benefit_or_proof: omit_or_null
+  whole_processor_failure_required_for_one_unsupported_path: false
+
+invalidation_triggers:
+  - material exact-Offering canonical state change
+  - material exact-Offering owned website context change
+  - material same-Offering proof or claim Evidence change
+  - Brand-confirmed same-Offering factual edit
+  - Offering identity reconciliation correction affecting subject scope
+invalidation_scope: affected paths for this Offering only
+
+authority_behavior:
+  default_interpretation: CREATOR_SHOP_DERIVED
+  direct_same_offering_fact_when_supported: OBSERVED
+  deterministic_normalization_when_applicable: SYSTEM_DERIVED
+  processor_must_not_emit: [BRAND_CONFIRMED, SUPPORT_CONTROLLED]
+
+forbidden_writes:
+  - Offering identity
+  - Offering kind or subtype
+  - Offering lifecycle
+  - canonical price or currency
+  - canonical media or media approval
+  - canonical Location or OFFERING_AVAILABLE_AT_LOCATION relations
+  - canonical Collection/BUNDLE relationships
+  - Campaign Asset
+  - Offer
+  - Audience
+
+forbidden_derivations:
+  - fuzzy Offering identity merge
+  - sibling-Offering facts presented as subject-Offering facts
+  - unsupported feature-to-benefit outcome
+  - unsupported efficacy, safety, success, or superiority claim
+  - final Campaign Brief copy
+  - canonical catalogue completeness
+
+failure_isolation_semantics:
+  processor_isolated_from_sibling_processors: true
+  failed_execution_replaces_current_object: false
+  invalid_untrusted_output_persisted_as_current: false
+  contract_valid_partial_output_may_persist: true
+  protected_current_conflict: retain candidate/discrepancy without silent overwrite
+
+claim_and_proof_safety:
+  observed_statement_is_external_verification: false
+  brand_confirmation_is_external_verification: false
+  testimonial_is_proof: false
+  credential_occurrence_is_verification: false
+  same_offering_support_required: true
+  high_risk_claims_without_sufficient_approved_support: FAIL_CLOSED
+
+validation_invariants:
+  - Owns only offering_factual_profile.
+  - Emits only the six semantic paths owned by that Object.
+  - Consumes no sibling-Offering Evidence.
+  - Mutates no canonical application state.
+  - Partial factual understanding is allowed without filler.

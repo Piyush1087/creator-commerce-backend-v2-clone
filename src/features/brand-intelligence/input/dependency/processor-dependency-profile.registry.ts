@@ -14,7 +14,8 @@ export interface ProcessorDependencyProfile {
     | "brand_meaning"
     | "audience_persona_synthesis"
     | "brand_character"
-    | "serviceability_synthesis";
+    | "serviceability_synthesis"
+    | "offering_factual_synthesis";
   readonly processorVersion: "1.0";
   readonly outputContractId:
     | "brand_communication_output_contract"
@@ -23,7 +24,8 @@ export interface ProcessorDependencyProfile {
     | "brand_character_output_contract"
     | "audience_persona_synthesis_output_contract"
     | "brand_meaning_output_contract"
-    | "serviceability_synthesis_output_contract";
+    | "serviceability_synthesis_output_contract"
+    | "offering_factual_synthesis_output_contract";
   readonly outputContractVersion: "1.0";
   readonly evidenceContractId:
     | "brand_communication_evidence"
@@ -32,7 +34,8 @@ export interface ProcessorDependencyProfile {
     | "brand_character_evidence"
     | "audience_persona_synthesis_evidence"
     | "brand_meaning_evidence"
-    | "serviceability_evidence";
+    | "serviceability_evidence"
+    | "product_intelligence_evidence_requirements";
   readonly requiredCanonicalSemantics: readonly CanonicalBrandStateSemantic[];
   readonly nonNullableCanonicalAnchors: readonly CanonicalBrandStateSemantic[];
   readonly blockingConflictSemantics: readonly CanonicalBrandStateSemantic[];
@@ -48,6 +51,22 @@ export interface ProcessorDependencyProfile {
 const ARCHITECTURE_REPOSITORY = "Piyush1087/dummy_tcs";
 
 const PROFILES: readonly ProcessorDependencyProfile[] = [
+  {
+    processorId: "offering_factual_synthesis",
+    processorVersion: "1.0",
+    outputContractId: "offering_factual_synthesis_output_contract",
+    outputContractVersion: "1.0",
+    evidenceContractId: "product_intelligence_evidence_requirements",
+    requiredCanonicalSemantics: [],
+    nonNullableCanonicalAnchors: [],
+    blockingConflictSemantics: [],
+    capabilityIds: [
+      "owned_website.offering_context",
+      "explicit_factual_proof_or_claim_evidence",
+    ],
+    representativeEvidenceAnyOf: ["owned_website.offering_context"],
+    includeOfferingFacts: true,
+  },
   {
     processorId: "serviceability_synthesis",
     processorVersion: "1.0",

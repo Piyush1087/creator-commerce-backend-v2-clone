@@ -2,7 +2,7 @@
   "generatedNotice": "GENERATED — DO NOT EDIT",
   "generatorVersion": "1.0.0",
   "architectureRepository": "Piyush1087/dummy_tcs",
-  "architectureCommitSha": "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
+  "architectureCommitSha": "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
   "registrations": [
     {
       "processorId": "brand_communication",
@@ -466,6 +466,74 @@
       ],
       "structuralValidatorId": "contract_output_schema_v1",
       "semanticValidatorId": "serviceability_synthesis",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
+    },
+    {
+      "processorId": "offering_factual_synthesis",
+      "processorVersion": "1.0",
+      "outputContractId": "offering_factual_synthesis_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "product_intelligence.offering_factual_synthesis",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "0bc42315fbb19cb9eadf79fd1ebd9b1b20511c58f73f792f5e4188b2aacc790a",
+      "ownedObjectSemanticIds": [
+        "offering_factual_profile"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "offering_factual_profile",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "offering_factual_profile",
+          "componentPathPattern": "$/f/factual_summary"
+        },
+        {
+          "objectSemanticId": "offering_factual_profile",
+          "componentPathPattern": "$/f/key_facts"
+        },
+        {
+          "objectSemanticId": "offering_factual_profile",
+          "componentPathPattern": "$/f/key_facts/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "offering_factual_profile",
+          "componentPathPattern": "$/f/key_benefits"
+        },
+        {
+          "objectSemanticId": "offering_factual_profile",
+          "componentPathPattern": "$/f/key_benefits/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "offering_factual_profile",
+          "componentPathPattern": "$/f/proof_points"
+        },
+        {
+          "objectSemanticId": "offering_factual_profile",
+          "componentPathPattern": "$/f/proof_points/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "offering_factual_profile",
+          "componentPathPattern": "$/f/usage_context"
+        },
+        {
+          "objectSemanticId": "offering_factual_profile",
+          "componentPathPattern": "$/f/usage_context/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "offering_factual_profile",
+          "componentPathPattern": "$/f/customer_context"
+        },
+        {
+          "objectSemanticId": "offering_factual_profile",
+          "componentPathPattern": "$/f/customer_context/i/{semantic_id}"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "offering_factual_synthesis",
       "persistenceValidatorId": "intelligence_persistence_transition_v1",
       "bundled": true,
       "registered": true,

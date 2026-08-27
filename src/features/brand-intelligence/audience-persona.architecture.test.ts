@@ -11,7 +11,7 @@ import { ComponentPathCodec } from "./semantic-path/component-path.codec";
 import { READ_ONLY_OBJECT_CONTRACTS } from "./projection/current-read-contracts.generated";
 
 describe("Audience processor boundaries", () => {
-  it("owns exactly the frozen Audience paths and keeps all seven processor pins explicit", () => {
+  it("owns the frozen Audience paths while retaining seven Brand and one Product processor", () => {
     const runtime = contracts(),
       bundle = runtime.getVerifiedBundle(registryKey);
     expect(bundle.manifest.architectureCommitSha).toBe(
@@ -43,6 +43,7 @@ describe("Audience processor boundaries", () => {
       "brand_communication",
       "brand_differentiation",
       "brand_meaning",
+      "offering_factual_synthesis",
       "serviceability_synthesis",
       "visual_style_synthesis",
     ]);
