@@ -18,8 +18,16 @@ current_phase: P0
 phase_status: CHECKPOINT_READY_FOR_SYSTEMS_REVIEW
 
 checkpoint:
-  sha: 3d03e4d79bdd1b6af7c96c6283a9398f0516f275
+  status: PENDING_SYSTEMS_ACCEPTANCE
+  sha: null
   parent_sha: e066265d720b8f76516acb5063b9843faac5a85e
+
+previous_accepted_checkpoint_sha: null
+
+resume_rule:
+  candidate_head_self_recorded: false
+  accepted_sha_source: NEXT_AUTHORIZED_SYSTEMS_RUNNER_PROMPT
+  record_as_previous_accepted_checkpoint_before_next_phase: true
 
 files_changed:
   - docs/ai-collaboration/product-intelligence-v1-execution-ledger.yaml
@@ -40,13 +48,13 @@ tests:
   skipped: []
 
 corrections:
-  current_phase: 2
-  total: 2
+  current_phase: 3
+  total: 3
   consecutive_same_failure: 0
 
 last_failure:
-  code: null
-  summary: null
+  code: P0_SYSTEMS_REVIEW_CORRECTION
+  summary: Corrected Object readiness vocabulary, Product contract review-pending governance status, and non-self-referential ledger checkpoint semantics.
 
 stop_reason: null
 
@@ -58,4 +66,4 @@ environment:
   prisma: 6.19.3
   postgres: UNAVAILABLE_PSQL_NOT_INSTALLED_OR_NOT_ON_PATH
 
-last_updated: "2026-08-27T21:47:30+05:30"
+last_updated: "2026-08-27T21:53:24.1409331+05:30"
