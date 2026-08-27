@@ -288,11 +288,11 @@ database("DE-W2 seven-constraint PostgreSQL compatibility", () => {
       expect(upgradeAfter).toEqual(upgradeBefore);
     },
   );
-  it("has exactly 49 applied migrations and seven renamed explicit nine-ID checks", async () => {
+  it("retains the seven renamed explicit nine-ID checks after migration 50", async () => {
     const migrations = await prisma.$queryRaw<
       Array<{ count: bigint }>
     >`SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`;
-    expect(Number(migrations[0].count)).toBe(49);
+    expect(Number(migrations[0].count)).toBe(50);
     const constraints = await prisma.$queryRaw<
       Array<{ conname: string; definition: string }>
     >`SELECT conname, pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname LIKE 'ck_de_%capability'`;

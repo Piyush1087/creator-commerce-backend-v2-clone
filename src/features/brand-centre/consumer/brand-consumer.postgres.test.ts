@@ -39,7 +39,9 @@ import { ProcessorRuntimeProjectionService } from "./processor-runtime-projectio
 describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
   "Brand consumer PostgreSQL and authenticated HTTP",
   () => {
-    const prisma = new PrismaClient();
+    const prisma = new PrismaClient({
+      transactionOptions: { maxWait: 10_000 },
+    });
     const db = prisma as unknown as PrismaService;
     const runtime = new ContractRuntimeRegistry(
       new ContractBundleIntegrityVerifier(),

@@ -134,7 +134,9 @@ class VerticalSliceWebsiteMechanics implements OwnedWebsitePageAcquisitionMechan
 describe.skipIf(!databaseEnabled)(
   "brand_communication W1.0D persistence and projection PostgreSQL slice",
   () => {
-    const prisma = new PrismaClient();
+    const prisma = new PrismaClient({
+      transactionOptions: { maxWait: 10_000 },
+    });
     const prismaService = prisma as unknown as PrismaService;
     const brandId = randomUUID();
     const codec = new ComponentPathCodec();

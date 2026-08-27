@@ -3,6 +3,10 @@ run_id: product-intelligence-v1
 authority:
   repository: Piyush1087/dummy_tcs
   sha: 811d63a4f81255d9082f765b7569c8b60fcae28e
+  product_intelligence_contracts:
+    branch: agent/product-intelligence-v1-contracts
+    accepted_sha: 3fc2b421826c75e98c834d0b8ea8467ff8eb7b63
+    frozen_sha: bbb0be3345c36e9cc7c4f06ca68fb491b742b83f
 
 backend:
   repository: Piyush1087/creator-commerce-backend-v2-clone
@@ -14,15 +18,15 @@ execution_mode:
 
 branch: phase-g/product-intelligence-v1
 
-current_phase: P1A
+current_phase: P1B-1
 phase_status: CHECKPOINT_READY_FOR_SYSTEMS_REVIEW
 
 checkpoint:
   status: PENDING_SYSTEMS_ACCEPTANCE
   sha: null
-  parent_sha: 98eec930ca2f03dd1347f3ee79890083642f2278
+  parent_sha: 2f6a39409708584f20e15d7b3c8c8de50f850dac
 
-previous_accepted_checkpoint_sha: 98eec930ca2f03dd1347f3ee79890083642f2278
+previous_accepted_checkpoint_sha: 2f6a39409708584f20e15d7b3c8c8de50f850dac
 
 resume_rule:
   candidate_head_self_recorded: false
@@ -30,51 +34,77 @@ resume_rule:
   record_as_previous_accepted_checkpoint_before_next_phase: true
 
 files_changed:
-  - docs/ai-collaboration/product-intelligence-v1-p1-canonical-state-runtime-design.md
   - docs/ai-collaboration/product-intelligence-v1-execution-ledger.yaml
+  - prisma/schema.prisma
+  - prisma/migrations/20260827223000_product_intelligence_v1_canonical_offering_foundation/migration.sql
+  - src/features/brand-canonical-state/brand-canonical-state.postgres.test.ts
+  - src/features/brand-centre/brand-centre.module.ts
+  - src/features/brand-centre/consumer/brand-consumer.postgres.test.ts
+  - src/features/brand-centre/services/brand-centre-dna.service.ts
+  - src/features/brand-centre/services/canonical-offering-state.postgres.test.ts
+  - src/features/brand-centre/services/canonical-offering-state.service.ts
+  - src/features/brand-centre/utils/apply-prompt1-inventory.util.ts
+  - src/features/brand-intelligence/execution/intelligence-execution.database.test.ts
+  - src/features/brand-intelligence/processors/audience-persona/audience-persona-processor.database.test.ts
+  - src/features/brand-intelligence/processors/brand-character/brand-character-processor.database.test.ts
+  - src/features/brand-intelligence/processors/brand-communication/brand-communication-processor.database.test.ts
+  - src/features/brand-intelligence/processors/brand-meaning/brand-meaning-processor.database.test.ts
+  - src/features/brand-onboarding/brand-offerings.service.ts
+  - src/features/brand-onboarding/brand-onboarding.module.ts
+  - src/features/brand-onboarding/brand-profile.service.ts
+  - src/features/brand-onboarding/surface-scan/http-brand-surface-scan.runner.ts
+  - src/features/brand-uce/services/brand-uce-campaign-asset.service.ts
+  - src/features/brand-uce/services/campaign-query.service.ts
+  - src/features/brand-uce/services/campaign-reconciliation-authorization.test.ts
+  - src/features/data-extraction/evidence/wave2-migration.postgres.test.ts
 
 migrations:
   before: 49
-  added: []
-  current_count: 49
+  added:
+    - 20260827223000_product_intelligence_v1_canonical_offering_foundation
+  current_count: 50
 
 tests:
   passed:
-    - product_intelligence_yaml_parse_11_files
-    - existing_runtime_typecheck
-    - existing_runtime_tests_31
-    - existing_runtime_identity_yaml_parse_28_files
-    - product_intelligence_semantic_invariants
-    - p1a_design_required_sections_23
-    - p1a_design_repository_citation_sanity
-    - p1a_allowed_files_only
-    - p1a_migration_count_unchanged_49
-    - p1a_execution_ledger_yaml_parse
-    - p1a_markdown_sanity
-    - p1a_git_diff_check
+    - dummy_tcs_governance_only_diff_12_status_labels
+    - prisma_validate_and_generate
+    - historical_upgrade_49_to_50_with_8_legacy_offerings
+    - full_reset_zero_to_50
+    - canonical_offering_postgres_14
+    - canonical_brand_state_postgres_15
+    - brand_centre_consumer_postgres_8
+    - deep_scan_canonical_boundary_postgres_2
+    - brand_intelligence_database_131
+    - data_extraction_w1_w2_postgres_72
+    - full_vitest_622_passed_237_gated
+    - scoped_eslint
+    - nest_build
+    - prisma_schema_diff_no_canonical_offering_drift
+    - git_diff_check
   failed: []
   skipped: []
 
 corrections:
-  current_phase: 1
-  total: 4
+  current_phase: 2
+  total: 6
   consecutive_same_failure: 0
   by_phase:
     P0: 3
     P1A: 1
+    P1B-1: 2
 
 last_failure:
-  code: P1A_DIFF_CHECK_FORMATTING
-  summary: Removed Markdown hard-break trailing spaces found by the committed-diff check; no design semantics changed.
+  code: P1B1_REGRESSION_HARNESS_EXPECTATION
+  summary: Corrected a seeded legacy Location literal and updated the Campaign selection regression expectation to the accepted canonical fail-closed filter; isolated PostgreSQL suites to remove harness contention and cross-suite queue contamination.
 
 stop_reason: null
 
-next_phase: P1B_PENDING_SYSTEMS_MIGRATION_AUTHORIZATION
+next_phase: P1B-2_PENDING_SYSTEMS_AUTHORIZATION
 
 environment:
   node: v24.19.0
   npm: 11.17.0
   prisma: 6.19.3
-  postgres: UNAVAILABLE_PSQL_NOT_INSTALLED_OR_NOT_ON_PATH
+  postgres: PostgreSQL 16 disposable Docker harness
 
-last_updated: "2026-08-27T22:15:51.5628253+05:30"
+last_updated: "2026-08-27T23:15:27.8634000+05:30"

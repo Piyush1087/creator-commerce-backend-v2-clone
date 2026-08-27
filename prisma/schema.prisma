@@ -121,6 +121,65 @@ enum OfferingType {
   COLLECTION
 }
 
+enum OfferingKind {
+  PRODUCT
+  SERVICE
+  EXPERIENCE
+  BUNDLE
+}
+
+enum OfferingLifecycle {
+  DRAFT_INCOMPLETE
+  ACTIVE
+  PAUSED_INACTIVE
+}
+
+enum CanonicalOfferingAuthority {
+  LEGACY_UNVERIFIED
+  OBSERVED
+  BRAND_CONFIRMED
+  APPLICATION_CANONICAL
+}
+
+enum CanonicalOfferingOrigin {
+  LEGACY_MIGRATION
+  SURFACE_SCAN
+  DEEP_SCAN
+  BRAND_EDIT
+  BRAND_UPLOAD
+  APPLICATION_WORKFLOW
+  CONTROLLED_PRICE_REFRESH
+}
+
+enum CanonicalOfferingProtectionState {
+  UNPROTECTED
+  BRAND_CONFIRMED
+  APPLICATION_CONTROLLED
+}
+
+enum CanonicalOfferingItemLifecycle {
+  ACTIVE
+  INACTIVE
+}
+
+enum OfferingGuidanceKind {
+  SELLING_POINT
+  DO_NOT_SAY
+}
+
+enum OfferingPriceMode {
+  EXACT
+  STARTING_AT
+  RANGE
+  NOT_PUBLICLY_LISTED
+}
+
+enum OfferingPriceFreshness {
+  CURRENT
+  STALE
+  UNKNOWN
+}
+
 enum PerformanceColor {
   GREEN
   YELLOW
@@ -1385,55 +1444,233 @@ model InstagramSyncInvitation {
 }
 
 model Offering {
-  id                 String             @id @default(uuid())
-  brandProfileId     String             @map("brand_profile_id")
-  brandProfile       BrandProfile       @relation(fields: [brandProfileId], references: [id])
-  type               OfferingType
-  name               String
-  description        String?
-  imageUrl           String?            @map("image_url")
-  url                String             @map("offering_url")
+  id                       String                         @id @default(uuid())
+  brandProfileId           String                         @map("brand_profile_id")
+  brandProfile             BrandProfile                   @relation(fields: [brandProfileId], references: [id])
+  type                     OfferingType
+  canonicalKind            OfferingKind?                  @map("canonical_kind")
+  canonicalSubtype         String?                        @map("canonical_subtype") @db.VarChar(100)
+  canonicalLifecycle       OfferingLifecycle?             @map("canonical_lifecycle")
+  name                     String
+  description              String?
+  imageUrl                 String?                        @map("image_url")
+  url                      String                         @map("offering_url")
   /// Collection or healthcare specialty label from list pages (product Prompt 2).
-  categoryTag        String?            @map("category_tag")
+  categoryTag              String?                        @map("category_tag")
   /// Human-visible starting price from list view, before deep scan parses `priceAmount`.
-  startingPriceLabel String?            @map("starting_price_label")
-  priceAmount        Decimal?           @map("price_amount")
-  currency           String             @default("USD")
-  locationIds        String[]           @map("location_ids")
-  isActive           Boolean            @default(true) @map("is_active")
-  isDeepScanned      Boolean            @default(false) @map("is_deep_scanned")
-  isUserEdited       Boolean            @default(false) @map("is_user_edited")
-  sellingPoints      String[]           @default([]) @map("selling_points")
-  doNotSay           String[]           @default([]) @map("do_not_say")
-  createdAt          DateTime           @default(now()) @map("created_at")
-  updatedAt          DateTime           @updatedAt @map("updated_at")
-  campaignAssets     UceCampaignAsset[] @relation("CampaignAssetOffering")
+  startingPriceLabel       String?                        @map("starting_price_label")
+  priceAmount              Decimal?                       @map("price_amount")
+  currency                 String                         @default("USD")
+  locationIds              String[]                       @map("location_ids")
+  isActive                 Boolean                        @default(true) @map("is_active")
+  isDeepScanned            Boolean                        @default(false) @map("is_deep_scanned")
+  isUserEdited             Boolean                        @default(false) @map("is_user_edited")
+  sellingPoints            String[]                       @default([]) @map("selling_points")
+  doNotSay                 String[]                       @default([]) @map("do_not_say")
+  createdAt                DateTime                       @default(now()) @map("created_at")
+  updatedAt                DateTime                       @updatedAt @map("updated_at")
+  campaignAssets           UceCampaignAsset[]             @relation("CampaignAssetOffering")
+  fieldStates              OfferingFieldState[]           @relation("OfferingFieldStates")
+  guidanceItems            OfferingGuidanceItem[]         @relation("OfferingGuidanceItems")
+  priceState               OfferingPriceState?            @relation("OfferingPriceState")
+  mediaState               OfferingMediaState?            @relation("OfferingMediaState")
+  bundleMemberships        OfferingBundleMember[]         @relation("BundleParentOffering")
+  productBundleMemberships OfferingBundleMember[]         @relation("BundleProductOffering")
+  locationAvailability     OfferingLocationAvailability[] @relation("OfferingLocationAvailability")
+  offerApplicability       BrandOfferOffering[]           @relation("BrandOfferApplicabilityOffering")
 
+  @@unique([brandProfileId, id])
   @@map("offerings")
 }
 
+model OfferingFieldState {
+  id                String                           @id @default(uuid())
+  brandProfileId    String                           @map("brand_profile_id")
+  offeringId        String                           @map("offering_id")
+  offering          Offering                         @relation("OfferingFieldStates", fields: [brandProfileId, offeringId], references: [brandProfileId, id], onDelete: Restrict)
+  semanticFieldPath String                           @map("semantic_field_path") @db.VarChar(160)
+  authority         CanonicalOfferingAuthority
+  origin            CanonicalOfferingOrigin
+  provenance        Json?
+  revision          Int                              @default(1)
+  protectionState   CanonicalOfferingProtectionState @default(UNPROTECTED) @map("protection_state")
+  createdAt         DateTime                         @default(now()) @map("created_at")
+  updatedAt         DateTime                         @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, offeringId, semanticFieldPath])
+  @@index([brandProfileId, offeringId, authority])
+  @@map("offering_field_states")
+}
+
+model OfferingGuidanceItem {
+  id                String                           @id @default(uuid())
+  brandProfileId    String                           @map("brand_profile_id")
+  offeringId        String                           @map("offering_id")
+  offering          Offering                         @relation("OfferingGuidanceItems", fields: [brandProfileId, offeringId], references: [brandProfileId, id], onDelete: Restrict)
+  kind              OfferingGuidanceKind
+  text              String                           @db.Text
+  presentationOrder Int                              @default(0) @map("presentation_order")
+  lifecycle         CanonicalOfferingItemLifecycle   @default(ACTIVE)
+  authority         CanonicalOfferingAuthority
+  origin            CanonicalOfferingOrigin
+  provenance        Json?
+  revision          Int                              @default(1)
+  protectionState   CanonicalOfferingProtectionState @default(UNPROTECTED) @map("protection_state")
+  createdAt         DateTime                         @default(now()) @map("created_at")
+  updatedAt         DateTime                         @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, offeringId, id])
+  @@index([brandProfileId, offeringId, kind, lifecycle, presentationOrder])
+  @@map("offering_guidance_items")
+}
+
+model OfferingPriceState {
+  offeringId        String                  @id @map("offering_id")
+  brandProfileId    String                  @map("brand_profile_id")
+  offering          Offering                @relation("OfferingPriceState", fields: [brandProfileId, offeringId], references: [brandProfileId, id], onDelete: Restrict)
+  currentRevisionId String?                 @map("current_revision_id")
+  currentRevision   OfferingPriceRevision?  @relation("CurrentOfferingPriceRevision", fields: [brandProfileId, offeringId, currentRevisionId], references: [brandProfileId, offeringId, id], onDelete: NoAction, onUpdate: NoAction)
+  revisions         OfferingPriceRevision[] @relation("OfferingPriceHistory")
+  revision          Int                     @default(1)
+  createdAt         DateTime                @default(now()) @map("created_at")
+  updatedAt         DateTime                @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, offeringId])
+  @@map("offering_price_states")
+}
+
+model OfferingPriceRevision {
+  id                    String                     @id @default(uuid())
+  brandProfileId        String                     @map("brand_profile_id")
+  offeringId            String                     @map("offering_id")
+  state                 OfferingPriceState         @relation("OfferingPriceHistory", fields: [brandProfileId, offeringId], references: [brandProfileId, offeringId], onDelete: Restrict)
+  currentFor            OfferingPriceState[]       @relation("CurrentOfferingPriceRevision")
+  mode                  OfferingPriceMode
+  currentMinAmount      Decimal?                   @map("current_min_amount") @db.Decimal(18, 2)
+  currentMaxAmount      Decimal?                   @map("current_max_amount") @db.Decimal(18, 2)
+  regularMinAmount      Decimal?                   @map("regular_min_amount") @db.Decimal(18, 2)
+  regularMaxAmount      Decimal?                   @map("regular_max_amount") @db.Decimal(18, 2)
+  currency              String                     @db.Char(3)
+  freshness             OfferingPriceFreshness
+  authority             CanonicalOfferingAuthority
+  origin                CanonicalOfferingOrigin
+  sourceClass           String                     @map("source_class") @db.VarChar(100)
+  sourceRef             String?                    @map("source_ref") @db.VarChar(255)
+  observedAt            DateTime?                  @map("observed_at")
+  freshnessEvaluatedAt  DateTime                   @map("freshness_evaluated_at")
+  provenance            Json?
+  predecessorRevisionId String?                    @map("predecessor_revision_id")
+  predecessorRevision   OfferingPriceRevision?     @relation("OfferingPricePredecessor", fields: [brandProfileId, offeringId, predecessorRevisionId], references: [brandProfileId, offeringId, id], onDelete: Restrict)
+  successorRevisions    OfferingPriceRevision[]    @relation("OfferingPricePredecessor")
+  createdAt             DateTime                   @default(now()) @map("created_at")
+
+  @@unique([brandProfileId, offeringId, id])
+  @@index([brandProfileId, offeringId, createdAt])
+  @@map("offering_price_revisions")
+}
+
+model OfferingMediaState {
+  offeringId          String               @id @map("offering_id")
+  brandProfileId      String               @map("brand_profile_id")
+  offering            Offering             @relation("OfferingMediaState", fields: [brandProfileId, offeringId], references: [brandProfileId, id], onDelete: Restrict)
+  primaryMediaAssetId String?              @map("primary_media_asset_id")
+  primaryMediaAsset   OfferingMediaAsset?  @relation("PrimaryOfferingMedia", fields: [brandProfileId, offeringId, primaryMediaAssetId], references: [brandProfileId, offeringId, id], onDelete: NoAction, onUpdate: NoAction)
+  assets              OfferingMediaAsset[] @relation("OfferingMediaAssets")
+  revision            Int                  @default(1)
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, offeringId])
+  @@map("offering_media_states")
+}
+
+model OfferingMediaAsset {
+  id                String                         @id @default(uuid())
+  brandProfileId    String                         @map("brand_profile_id")
+  offeringId        String                         @map("offering_id")
+  state             OfferingMediaState             @relation("OfferingMediaAssets", fields: [brandProfileId, offeringId], references: [brandProfileId, offeringId], onDelete: Restrict)
+  primaryFor        OfferingMediaState[]           @relation("PrimaryOfferingMedia")
+  url               String                         @db.Text
+  label             String?
+  altText           String?                        @map("alt_text")
+  presentationOrder Int                            @default(0) @map("presentation_order")
+  lifecycle         CanonicalOfferingItemLifecycle @default(ACTIVE)
+  authority         CanonicalOfferingAuthority
+  origin            CanonicalOfferingOrigin
+  provenance        Json?
+  revision          Int                            @default(1)
+  createdAt         DateTime                       @default(now()) @map("created_at")
+  updatedAt         DateTime                       @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, offeringId, id])
+  @@index([brandProfileId, offeringId, lifecycle, presentationOrder])
+  @@map("offering_media_assets")
+}
+
+model OfferingBundleMember {
+  id                String                         @id @default(uuid())
+  brandProfileId    String                         @map("brand_profile_id")
+  bundleOfferingId  String                         @map("bundle_offering_id")
+  productOfferingId String                         @map("product_offering_id")
+  bundleOffering    Offering                       @relation("BundleParentOffering", fields: [brandProfileId, bundleOfferingId], references: [brandProfileId, id], onDelete: Restrict)
+  productOffering   Offering                       @relation("BundleProductOffering", fields: [brandProfileId, productOfferingId], references: [brandProfileId, id], onDelete: Restrict)
+  presentationOrder Int                            @default(0) @map("presentation_order")
+  lifecycle         CanonicalOfferingItemLifecycle @default(ACTIVE)
+  authority         CanonicalOfferingAuthority
+  origin            CanonicalOfferingOrigin
+  provenance        Json?
+  revision          Int                            @default(1)
+  createdAt         DateTime                       @default(now()) @map("created_at")
+  updatedAt         DateTime                       @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, bundleOfferingId, productOfferingId])
+  @@index([brandProfileId, productOfferingId, lifecycle])
+  @@map("offering_bundle_members")
+}
+
+model OfferingLocationAvailability {
+  id             String                         @id @default(uuid())
+  brandProfileId String                         @map("brand_profile_id")
+  offeringId     String                         @map("offering_id")
+  locationId     String                         @map("location_id")
+  offering       Offering                       @relation("OfferingLocationAvailability", fields: [brandProfileId, offeringId], references: [brandProfileId, id], onDelete: Restrict)
+  location       Location                       @relation("OfferingLocationAvailability", fields: [brandProfileId, locationId], references: [brandProfileId, id], onDelete: Restrict)
+  lifecycle      CanonicalOfferingItemLifecycle @default(ACTIVE)
+  authority      CanonicalOfferingAuthority
+  origin         CanonicalOfferingOrigin
+  provenance     Json?
+  revision       Int                            @default(1)
+  createdAt      DateTime                       @default(now()) @map("created_at")
+  updatedAt      DateTime                       @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, offeringId, locationId])
+  @@index([brandProfileId, locationId, lifecycle])
+  @@map("offering_location_availability")
+}
+
 model Location {
-  id                   String                       @id @default(uuid())
-  brandProfileId       String                       @map("brand_profile_id")
-  brandProfile         BrandProfile                 @relation(fields: [brandProfileId], references: [id])
+  id                   String                         @id @default(uuid())
+  brandProfileId       String                         @map("brand_profile_id")
+  brandProfile         BrandProfile                   @relation(fields: [brandProfileId], references: [id])
   name                 String?
   address              String
   city                 String?
   zip                  String?
   lat                  Float?
   lng                  Float?
-  contactDetails       Json?                        @map("contact_details")
-  lifecycle            CanonicalLocationLifecycle   @default(ACTIVE)
-  authority            CanonicalLocationAuthority   @default(LEGACY_UNVERIFIED)
-  observationFreshness LocationObservationFreshness @default(UNKNOWN) @map("observation_freshness")
-  reconciliationState  LocationReconciliationState  @default(UNVERIFIED) @map("reconciliation_state")
-  lastObservedAt       DateTime?                    @map("last_observed_at")
-  revision             Int                          @default(1)
+  contactDetails       Json?                          @map("contact_details")
+  lifecycle            CanonicalLocationLifecycle     @default(ACTIVE)
+  authority            CanonicalLocationAuthority     @default(LEGACY_UNVERIFIED)
+  observationFreshness LocationObservationFreshness   @default(UNKNOWN) @map("observation_freshness")
+  reconciliationState  LocationReconciliationState    @default(UNVERIFIED) @map("reconciliation_state")
+  lastObservedAt       DateTime?                      @map("last_observed_at")
+  revision             Int                            @default(1)
   provenance           Json?
-  lastObservation      Json?                        @map("last_observation")
+  lastObservation      Json?                          @map("last_observation")
   aliases              BrandLocationAlias[]
-  createdAt            DateTime                     @default(now()) @map("created_at")
-  updatedAt            DateTime                     @updatedAt @map("updated_at")
+  offeringAvailability OfferingLocationAvailability[] @relation("OfferingLocationAvailability")
+  createdAt            DateTime                       @default(now()) @map("created_at")
+  updatedAt            DateTime                       @updatedAt @map("updated_at")
 
   @@unique([brandProfileId, id])
   @@index([brandProfileId, lifecycle])
@@ -1706,24 +1943,46 @@ model BrandAudiencePersona {
 }
 
 model BrandOffer {
-  id                 String             @id @default(uuid())
-  brandProfileId     String             @map("brand_profile_id")
-  brandProfile       BrandProfile       @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  offerName          String             @map("offer_name")
-  promoCode          String             @map("promo_code")
-  applicabilityScope String             @map("applicability_scope")
-  validityStart      DateTime           @map("validity_start")
-  validityEnd        DateTime           @map("validity_end")
-  description        String?
-  entityLink         String?            @map("entity_link")
-  termsText          String?            @map("terms_text")
-  isActive           Boolean            @default(true) @map("is_active")
-  createdAt          DateTime           @default(now()) @map("created_at")
-  updatedAt          DateTime           @updatedAt @map("updated_at")
-  campaignAssets     UceCampaignAsset[] @relation("CampaignAssetBrandOffer")
+  id                    String               @id @default(uuid())
+  brandProfileId        String               @map("brand_profile_id")
+  brandProfile          BrandProfile         @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  offerName             String               @map("offer_name")
+  promoCode             String               @map("promo_code")
+  applicabilityScope    String               @map("applicability_scope")
+  validityStart         DateTime             @map("validity_start")
+  validityEnd           DateTime             @map("validity_end")
+  description           String?
+  entityLink            String?              @map("entity_link")
+  termsText             String?              @map("terms_text")
+  isActive              Boolean              @default(true) @map("is_active")
+  createdAt             DateTime             @default(now()) @map("created_at")
+  updatedAt             DateTime             @updatedAt @map("updated_at")
+  campaignAssets        UceCampaignAsset[]   @relation("CampaignAssetBrandOffer")
+  offeringApplicability BrandOfferOffering[] @relation("BrandOfferApplicabilityOffer")
 
   @@unique([brandProfileId, promoCode])
+  @@unique([brandProfileId, id])
   @@map("brand_offers")
+}
+
+model BrandOfferOffering {
+  id             String                         @id @default(uuid())
+  brandProfileId String                         @map("brand_profile_id")
+  brandOfferId   String                         @map("brand_offer_id")
+  offeringId     String                         @map("offering_id")
+  brandOffer     BrandOffer                     @relation("BrandOfferApplicabilityOffer", fields: [brandProfileId, brandOfferId], references: [brandProfileId, id], onDelete: Restrict)
+  offering       Offering                       @relation("BrandOfferApplicabilityOffering", fields: [brandProfileId, offeringId], references: [brandProfileId, id], onDelete: Restrict)
+  lifecycle      CanonicalOfferingItemLifecycle @default(ACTIVE)
+  authority      CanonicalOfferingAuthority
+  origin         CanonicalOfferingOrigin
+  provenance     Json?
+  revision       Int                            @default(1)
+  createdAt      DateTime                       @default(now()) @map("created_at")
+  updatedAt      DateTime                       @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, brandOfferId, offeringId])
+  @@index([brandProfileId, offeringId, lifecycle])
+  @@map("brand_offer_offerings")
 }
 
 model BrandBudgetModificationLog {

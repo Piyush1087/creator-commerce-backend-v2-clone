@@ -3,13 +3,24 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { OfferingType, Prisma } from "@prisma/client";
+import {
+  CanonicalOfferingAuthority,
+  CanonicalOfferingOrigin,
+  OfferingGuidanceKind,
+  OfferingLifecycle,
+  OfferingType,
+  Prisma,
+} from "@prisma/client";
 
 import { gateAndNormalizeBrandUrl } from "../../brand-onboarding/discovery-url.util";
 import { ParallelExtractClient } from "../../brand-onboarding/integrations/parallel/parallel-extract.client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { BrandVisualStateService } from "../../brand-canonical-state/brand-visual-state.service";
 import { getIndustryRoutingTemplate } from "../config/industry-routing-templates";
+import {
+  canonicalOfferingType,
+  CanonicalOfferingStateService,
+} from "./canonical-offering-state.service";
 
 const COLLECTION_TYPES: OfferingType[] = [OfferingType.COLLECTION];
 const PRIMARY_TYPES: OfferingType[] = [
@@ -26,6 +37,7 @@ export class BrandCentreDnaService {
     private readonly prisma: PrismaService,
     private readonly parallel: ParallelExtractClient,
     private readonly visuals: BrandVisualStateService,
+    private readonly canonicalOfferings: CanonicalOfferingStateService,
   ) {}
 
   async getDnaAggregate(brandProfileId: string) {
@@ -410,10 +422,19 @@ export class BrandCentreDnaService {
         "Exactly three selling points are required",
       );
     }
-    return this.prisma.offering.create({
+    const canonical = canonicalOfferingType(data.type);
+    if (!canonical.kind) {
+      throw new BadRequestException(
+        "MODULE cannot be created as canonical Offering without explicit Product eligibility",
+      );
+    }
+    const created = await this.prisma.offering.create({
       data: {
         brandProfileId,
         type: data.type,
+        canonicalKind: canonical.kind,
+        canonicalSubtype: canonical.subtype,
+        canonicalLifecycle: OfferingLifecycle.ACTIVE,
         name: data.name,
         url: normalized,
         description: data.description,
@@ -424,6 +445,41 @@ export class BrandCentreDnaService {
         isUserEdited: true,
       },
     });
+    await this.canonicalOfferings.confirmFields(brandProfileId, created.id, {
+      name: data.name,
+      url: normalized,
+      ...(data.description !== undefined
+        ? { description: data.description }
+        : {}),
+      canonicalKind: canonical.kind,
+      ...(canonical.subtype ? { canonicalSubtype: canonical.subtype } : {}),
+    });
+    if (data.sellingPoints) {
+      await this.canonicalOfferings.replaceBrandGuidance(
+        brandProfileId,
+        created.id,
+        OfferingGuidanceKind.SELLING_POINT,
+        data.sellingPoints,
+      );
+    }
+    if (data.doNotSay) {
+      await this.canonicalOfferings.replaceBrandGuidance(
+        brandProfileId,
+        created.id,
+        OfferingGuidanceKind.DO_NOT_SAY,
+        data.doNotSay,
+      );
+    }
+    if (data.imageUrl) {
+      await this.canonicalOfferings.addMedia(brandProfileId, created.id, {
+        url: data.imageUrl,
+        makePrimary: true,
+        authority: CanonicalOfferingAuthority.BRAND_CONFIRMED,
+        origin: CanonicalOfferingOrigin.BRAND_EDIT,
+        provenance: { actor: "BRAND", operation: "OFFERING_CREATE" },
+      });
+    }
+    return created;
   }
 
   async updateOffering(
@@ -459,7 +515,7 @@ export class BrandCentreDnaService {
         "Exactly three selling points are required",
       );
     }
-    return this.prisma.offering.update({
+    const updated = await this.prisma.offering.update({
       where: { id: offeringId },
       data: {
         name: data.name,
@@ -471,6 +527,46 @@ export class BrandCentreDnaService {
         isUserEdited: true,
       },
     });
+    const touched = Object.fromEntries(
+      Object.entries({
+        name: data.name,
+        url: data.url ? url : undefined,
+        description: data.description,
+      }).filter(([, value]) => value !== undefined),
+    );
+    if (Object.keys(touched).length) {
+      await this.canonicalOfferings.confirmFields(
+        brandProfileId,
+        offeringId,
+        touched,
+      );
+    }
+    if (data.sellingPoints) {
+      await this.canonicalOfferings.replaceBrandGuidance(
+        brandProfileId,
+        offeringId,
+        OfferingGuidanceKind.SELLING_POINT,
+        data.sellingPoints,
+      );
+    }
+    if (data.doNotSay) {
+      await this.canonicalOfferings.replaceBrandGuidance(
+        brandProfileId,
+        offeringId,
+        OfferingGuidanceKind.DO_NOT_SAY,
+        data.doNotSay,
+      );
+    }
+    if (data.imageUrl) {
+      await this.canonicalOfferings.addMedia(brandProfileId, offeringId, {
+        url: data.imageUrl,
+        makePrimary: true,
+        authority: CanonicalOfferingAuthority.BRAND_CONFIRMED,
+        origin: CanonicalOfferingOrigin.BRAND_EDIT,
+        provenance: { actor: "BRAND", operation: "OFFERING_UPDATE" },
+      });
+    }
+    return updated;
   }
 
   async deleteOffering(brandProfileId: string, offeringId: string) {
@@ -480,10 +576,11 @@ export class BrandCentreDnaService {
     if (!row) {
       throw new NotFoundException("Offering not found");
     }
-    await this.prisma.offering.update({
-      where: { id: offeringId },
-      data: { isActive: false },
-    });
+    await this.canonicalOfferings.setLifecycle(
+      brandProfileId,
+      offeringId,
+      OfferingLifecycle.PAUSED_INACTIVE,
+    );
   }
 
   async listOffers(brandProfileId: string) {

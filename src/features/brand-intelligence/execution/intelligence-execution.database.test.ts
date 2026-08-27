@@ -39,7 +39,9 @@ const hash = (seed: string) =>
   createHash("sha256").update(seed, "utf8").digest("hex");
 
 describe.skipIf(!databaseEnabled)("W1.0D PostgreSQL execution runtime", () => {
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient({
+    transactionOptions: { maxWait: 10_000 },
+  });
   const prismaService = prisma as unknown as PrismaService;
   const aggregation = new ExecutionAggregationService();
   const retryBackoff = new RetryBackoffPolicy();

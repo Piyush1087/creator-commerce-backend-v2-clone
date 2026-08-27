@@ -20,6 +20,7 @@ import { BrandCentrePlannerService } from "./services/brand-centre-planner.servi
 import { BrandCentreRoutingService } from "./services/brand-centre-routing.service";
 import { BrandCentreScanService } from "./services/brand-centre-scan.service";
 import { BrandCentreSessionEvictionService } from "./services/brand-centre-session-eviction.service";
+import { CanonicalOfferingStateService } from "./services/canonical-offering-state.service";
 import { DeepScanWorker } from "./workers/deep-scan.worker";
 import { IntelligenceRefreshWorker } from "./workers/intelligence-refresh.worker";
 import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
@@ -44,6 +45,7 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
     BrandCentreIntelligenceService,
     BrandCentrePlannerService,
     BrandCentreSessionEvictionService,
+    CanonicalOfferingStateService,
     BrandCentreJobDispatcherService,
     GeminiJsonClient,
     ParallelExtractClient,
@@ -58,6 +60,7 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
     BrandCentreDnaService,
     BrandCentreIntelligenceService,
     BrandCentrePlannerService,
+    CanonicalOfferingStateService,
   ],
 })
 export class BrandCentreModule {}

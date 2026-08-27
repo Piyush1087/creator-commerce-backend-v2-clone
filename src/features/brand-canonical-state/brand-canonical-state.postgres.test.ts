@@ -11,6 +11,7 @@ import { BrandCentreDnaService } from "../brand-centre/services/brand-centre-dna
 import { BrandProfileService } from "../brand-onboarding/brand-profile.service";
 import type { S3Service } from "../../shared/s3/s3.service";
 import type { ParallelExtractClient } from "../brand-onboarding/integrations/parallel/parallel-extract.client";
+import { CanonicalOfferingStateService } from "../brand-centre/services/canonical-offering-state.service";
 
 describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
   "Brand canonical state PostgreSQL",
@@ -19,6 +20,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
     const db = prisma as unknown as PrismaService;
     const visuals = new BrandVisualStateService(db);
     const locations = new BrandLocationService(db);
+    const canonicalOfferings = new CanonicalOfferingStateService(db);
     const authority = {
       authority: "BRAND_CONFIRMED",
       origin: "BRAND_EDIT",
@@ -184,6 +186,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         db,
         {} as ParallelExtractClient,
         visuals,
+        canonicalOfferings,
       );
       await dna.patchProfile(b.id, {
         logoUrl: "https://approved.example/one.png",
@@ -326,6 +329,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         db,
         {} as ParallelExtractClient,
         visuals,
+        canonicalOfferings,
       );
       await dna.patchIdentity(b.id, {
         palette: ["#123456"],

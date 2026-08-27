@@ -44,7 +44,20 @@ export class BrandProfileService {
     const profile = await this.prisma.brandProfile.findUnique({
       where: { id: brandProfileId },
       include: {
-        offerings: true,
+        offerings: {
+          include: {
+            guidanceItems: {
+              where: { lifecycle: "ACTIVE" },
+              orderBy: { presentationOrder: "asc" },
+            },
+            priceState: { include: { currentRevision: true } },
+            mediaState: { include: { primaryMediaAsset: true } },
+            locationAvailability: {
+              where: { lifecycle: "ACTIVE" },
+              orderBy: { locationId: "asc" },
+            },
+          },
+        },
         competitors: true,
         locations: true,
       },
@@ -73,16 +86,37 @@ export class BrandProfileService {
       offerings: profile.offerings.map((o) => ({
         id: o.id,
         type: o.type,
+        canonicalKind: o.canonicalKind,
+        canonicalSubtype: o.canonicalSubtype,
+        canonicalLifecycle: o.canonicalLifecycle,
         name: o.name,
         description: o.description,
-        imageUrl: o.imageUrl,
+        imageUrl: o.mediaState?.primaryMediaAsset?.url ?? o.imageUrl,
         url: o.url,
         categoryTag: o.categoryTag,
         startingPriceLabel: o.startingPriceLabel,
-        priceAmount: serializeDecimal(o.priceAmount),
-        currency: o.currency,
-        locationIds: o.locationIds,
+        priceAmount: serializeDecimal(
+          o.priceState?.currentRevision?.mode === "EXACT"
+            ? o.priceState.currentRevision.currentMinAmount
+            : o.priceAmount,
+        ),
+        currency: o.priceState?.currentRevision?.currency ?? o.currency,
+        locationIds: o.locationAvailability.length
+          ? o.locationAvailability.map((edge) => edge.locationId)
+          : o.locationIds,
         isActive: o.isActive,
+        sellingPoints: o.guidanceItems.some(
+          (item) => item.kind === "SELLING_POINT",
+        )
+          ? o.guidanceItems
+              .filter((item) => item.kind === "SELLING_POINT")
+              .map((item) => item.text)
+          : o.sellingPoints,
+        doNotSay: o.guidanceItems.some((item) => item.kind === "DO_NOT_SAY")
+          ? o.guidanceItems
+              .filter((item) => item.kind === "DO_NOT_SAY")
+              .map((item) => item.text)
+          : o.doNotSay,
       })),
       competitors: profile.competitors.map((c) => ({
         id: c.id,

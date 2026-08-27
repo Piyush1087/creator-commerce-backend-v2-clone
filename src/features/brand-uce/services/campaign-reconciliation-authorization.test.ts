@@ -117,7 +117,11 @@ describe("Campaign reconciliation authorization boundaries", () => {
     );
     expect(prisma.offering.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { brandProfileId: "brand-1", isActive: true },
+        where: {
+          brandProfileId: "brand-1",
+          canonicalLifecycle: "ACTIVE",
+          canonicalKind: { not: null },
+        },
       }),
     );
     expect(prisma.brandOffer.findMany).toHaveBeenCalledWith(
