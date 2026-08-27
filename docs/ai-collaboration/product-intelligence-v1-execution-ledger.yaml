@@ -18,15 +18,15 @@ execution_mode:
 
 branch: phase-g/product-intelligence-v1
 
-current_phase: P1B-2
+current_phase: P2A
 phase_status: CHECKPOINT_READY_FOR_SYSTEMS_REVIEW
 
 checkpoint:
   status: PENDING_SYSTEMS_ACCEPTANCE
   sha: null
-  parent_sha: bcee70e8a8e097d3ca9a708a97250d36cc38f724
+  parent_sha: ce17f9f8b7084fbd188f748b167e680747dad12e
 
-previous_accepted_checkpoint_sha: bcee70e8a8e097d3ca9a708a97250d36cc38f724
+previous_accepted_checkpoint_sha: ce17f9f8b7084fbd188f748b167e680747dad12e
 
 resume_rule:
   candidate_head_self_recorded: false
@@ -35,89 +35,44 @@ resume_rule:
 
 files_changed:
   - docs/ai-collaboration/product-intelligence-v1-execution-ledger.yaml
-  - prisma/schema.prisma
-  - prisma/migrations/20260827234500_product_intelligence_v1_generic_intelligence_subject_scope/migration.sql
-  - src/features/brand-centre/consumer/brand-consumer.architecture.test.ts
-  - src/features/brand-centre/consumer/brand-consumer.postgres.test.ts
-  - src/features/brand-centre/consumer/processor-runtime-projection.service.test.ts
-  - src/features/brand-centre/consumer/processor-runtime-projection.service.ts
-  - src/features/brand-centre/consumer/processor-runtime-projection.types.ts
-  - src/features/brand-intelligence/brand-intelligence.database.test.ts
-  - src/features/brand-intelligence/execution/domain/execution-hash.ts
-  - src/features/brand-intelligence/execution/domain/intelligence-execution.types.ts
-  - src/features/brand-intelligence/execution/intelligence-execution.database.test.ts
-  - src/features/brand-intelligence/execution/intelligence-execution.service.ts
-  - src/features/brand-intelligence/persistence/intelligence-action.repository.ts
-  - src/features/brand-intelligence/persistence/intelligence-current-state.repository.ts
-  - src/features/brand-intelligence/persistence/intelligence-generation.repository.ts
-  - src/features/brand-intelligence/processors/audience-persona/audience-persona-state.repository.ts
-  - src/features/brand-intelligence/processors/brand-character/brand-character-state.repository.ts
-  - src/features/brand-intelligence/processors/brand-communication/brand-communication-processor.database.test.ts
-  - src/features/brand-intelligence/processors/brand-differentiation/brand-differentiation-state.repository.ts
-  - src/features/brand-intelligence/processors/serviceability/serviceability-state.repository.ts
-  - src/features/brand-intelligence/processors/visual-style/visual-style-state.repository.ts
-  - src/features/brand-intelligence/projection/intelligence-current-projection.database.test.ts
-  - src/features/brand-intelligence/projection/intelligence-current-projection.repository.test.ts
-  - src/features/brand-intelligence/projection/intelligence-current-projection.repository.ts
-  - src/features/brand-intelligence/projection/intelligence-current-projection.service.ts
-  - src/features/brand-intelligence/projection/intelligence-current-projection.types.ts
-  - src/features/brand-intelligence/semantic-path/component-path.types.ts
-  - src/features/brand-intelligence/subject/intelligence-subject.database.test.ts
-  - src/features/brand-intelligence/subject/intelligence-subject.resolver.ts
-  - src/features/brand-intelligence/subject/intelligence-subject.ts
-  - src/features/brand-intelligence/transitions/intelligence-transition.service.ts
-  - src/features/brand-intelligence/transitions/intelligence-transition.types.ts
-  - src/features/data-extraction/evidence/wave2-migration.postgres.test.ts
+  - docs/ai-collaboration/product-intelligence-v1-p2-de-capability-preflight.md
 
 migrations:
-  before: 50
-  added:
-    - 20260827234500_product_intelligence_v1_generic_intelligence_subject_scope
+  before: 51
+  added: []
   current_count: 51
 
 tests:
   passed:
-    - prisma_validate_and_generate
-    - historical_populated_upgrade_50_to_51_with_complete_intelligence_lineage
-    - full_reset_zero_to_51
-    - generic_intelligence_subject_postgres_3
-    - canonical_offering_and_canonical_state_postgres_30_passed_1_optional_historical_skipped
-    - brand_intelligence_execution_postgres_12
-    - brand_intelligence_foundation_postgres_9
-    - brand_intelligence_projection_postgres_2
-    - existing_seven_brand_processors_postgres_108
-    - brand_centre_consumer_postgres_8
-    - data_extraction_w1_w2_postgres_72
-    - campaign_readiness_23
-    - full_non_database_vitest_615_passed
-    - contract_bundle_and_registry_integrity_24
-    - fresh_dist_health_live_http_200
-    - scoped_eslint
-    - nest_build
-    - prisma_schema_diff_no_intelligence_subject_drift
+    - exact_authority_and_checkpoint_pins
+    - backend_and_authority_worktrees_clean_at_start
+    - migration_count_51
+    - ledger_yaml_parse
+    - p2a_markdown_20_section_sanity
     - git_diff_check
   failed: []
   skipped:
-    - p1b1_optional_historical_49_to_50_fixture_not_repeated
-    - data_extraction_optional_historical_upgrade_fixture_not_repeated
+    - postgres_heavy_suite_not_required_for_design_only_phase
+    - runtime_build_not_required_because_no_runtime_or_contract_code_changed
 
 corrections:
-  current_phase: 2
-  total: 8
+  current_phase: 1
+  total: 9
   consecutive_same_failure: 0
   by_phase:
     P0: 3
     P1A: 1
     P1B-1: 2
     P1B-2: 2
+    P2A: 1
 
 last_failure:
-  code: P1B2_SUBJECT_SCOPE_COMPATIBILITY
-  summary: Corrected migration backfill SQL target scoping, then consolidated subject resolver concurrency, legacy Brand basis-hash/address lookup compatibility, and direct database fixture subject lineage under the second and final phase correction.
+  code: P2A_MARKDOWN_DIFF_CHECK
+  summary: Removed one Markdown hard-break trailing-space sequence reported by the staged diff check; no audit decision or implementation scope changed.
 
 stop_reason: null
 
-next_phase: P2_PENDING_SYSTEMS_AUTHORIZATION
+next_phase: P2B_PENDING_SYSTEMS_CAPABILITY_AUTHORIZATION
 
 environment:
   node: v24.19.0
@@ -125,4 +80,4 @@ environment:
   prisma: 6.19.3
   postgres: PostgreSQL 16 disposable Docker harness
 
-last_updated: "2026-08-28T00:21:39.4830418+05:30"
+last_updated: "2026-08-28T00:58:00.4341100+05:30"
