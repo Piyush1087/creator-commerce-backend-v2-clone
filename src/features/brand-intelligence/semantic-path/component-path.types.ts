@@ -11,6 +11,8 @@ export interface DecodedComponentPath {
 
 export interface ComponentSemanticAddress {
   readonly brandId: string;
+  /** Exact durable scope. Omitted only at preserved Brand-only compatibility boundaries. */
+  readonly subjectId?: string;
   readonly objectSemanticId: string;
   readonly pathSchemeVersion: number;
   readonly componentSemanticPath: string;

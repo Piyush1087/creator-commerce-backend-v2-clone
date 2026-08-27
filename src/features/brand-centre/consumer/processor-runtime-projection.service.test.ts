@@ -70,6 +70,9 @@ describe("processor-scoped Brand runtime projection", () => {
         rows.get(where.processorId) ?? null,
     );
     const service = new ProcessorRuntimeProjectionService({
+      intelligenceSubject: {
+        findUnique: async () => ({ id: "brand-subject" }),
+      },
       intelligenceProcessorExecution: { findFirst },
     } as unknown as PrismaService);
     const projection = await service.read("brand", [
@@ -132,6 +135,9 @@ describe("processor-scoped Brand runtime projection", () => {
       ],
     ]);
     const service = new ProcessorRuntimeProjectionService({
+      intelligenceSubject: {
+        findUnique: async () => ({ id: "brand-subject" }),
+      },
       intelligenceProcessorExecution: {
         findFirst: async ({ where }: { where: { processorId: string } }) =>
           rows.get(where.processorId) ?? null,

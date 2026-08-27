@@ -884,6 +884,11 @@ enum IntelligenceComponentTransitionOutcome {
   MARKED_OBSOLETE
 }
 
+enum IntelligenceSubjectType {
+  BRAND
+  OFFERING
+}
+
 // ============================================================================
 // DATA EXTRACTION WAVE 1 PERSISTENCE ENUMS (DE-W1.0B)
 // ============================================================================
@@ -1357,6 +1362,7 @@ model BrandProfile {
   brandPreviewRuns       BrandPreviewRun[]
 
   intelligenceExecutions              IntelligenceExecution[]
+  intelligenceSubjects                IntelligenceSubject[]
   intelligenceProcessorExecutions     IntelligenceProcessorExecution[]
   intelligenceProcessorAttempts       IntelligenceProcessorAttempt[]
   intelligenceObjectGenerations       IntelligenceObjectGeneration[]
@@ -1478,6 +1484,7 @@ model Offering {
   productBundleMemberships OfferingBundleMember[]         @relation("BundleProductOffering")
   locationAvailability     OfferingLocationAvailability[] @relation("OfferingLocationAvailability")
   offerApplicability       BrandOfferOffering[]           @relation("BrandOfferApplicabilityOffering")
+  intelligenceSubjects     IntelligenceSubject[]
 
   @@unique([brandProfileId, id])
   @@map("offerings")
@@ -3542,12 +3549,42 @@ model NotificationJob {
 // PERMANENT BRAND INTELLIGENCE PERSISTENCE FOUNDATION (W1.0A)
 // ============================================================================
 
-/// Durable trigger/correlation envelope for one Brand. Processor siblings are
-/// intentionally independent and do not share an atomic result boundary.
+/// Durable, typed scope for shared Intelligence execution and semantic state.
+/// V1 admits only an exact Brand or an exact same-Brand canonical Offering.
+model IntelligenceSubject {
+  id          String                  @id @default(uuid()) @map("subject_id")
+  brandId     String                  @map("brand_id")
+  brand       BrandProfile            @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  subjectType IntelligenceSubjectType @map("subject_type")
+  subjectRef  String                  @map("subject_ref") @db.VarChar(255)
+  offeringId  String?                 @map("offering_id")
+  offering    Offering?               @relation(fields: [brandId, offeringId], references: [brandProfileId, id], onDelete: Restrict)
+  createdAt   DateTime                @default(now()) @map("created_at")
+  updatedAt   DateTime                @updatedAt @map("updated_at")
+
+  executions           IntelligenceExecution[]
+  processorExecutions  IntelligenceProcessorExecution[]
+  actions              IntelligenceAction[]
+  objectGenerations    IntelligenceObjectGeneration[]
+  componentGenerations IntelligenceComponentGeneration[]
+  currentComponents    IntelligenceCurrentComponent[]
+  candidates           IntelligenceComponentCandidate[]
+  transitions          IntelligenceComponentTransition[]
+
+  @@unique([brandId, subjectType, subjectRef], map: "uq_intelligence_subject_identity")
+  @@unique([id, brandId], map: "uq_intelligence_subject_id_brand")
+  @@index([brandId, subjectType], map: "idx_intelligence_subject_brand_type")
+  @@map("intelligence_subjects")
+}
+
+/// Durable trigger/correlation envelope for one exact Intelligence subject.
+/// Processor siblings are intentionally independent and do not share an atomic result boundary.
 model IntelligenceExecution {
   id                    String                                @id @default(uuid()) @map("execution_id")
   brandId               String                                @map("brand_id")
   brand                 BrandProfile                          @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  subjectId             String                                @map("subject_id")
+  subject               IntelligenceSubject                   @relation(fields: [subjectId, brandId], references: [id, brandId], onDelete: Restrict)
   triggerType           String                                @map("trigger_type") @db.VarChar(100)
   triggerRef            String                                @map("trigger_ref") @db.VarChar(255)
   triggerIdempotencyKey String                                @map("trigger_idempotency_key") @db.VarChar(255)
@@ -3561,9 +3598,10 @@ model IntelligenceExecution {
 
   processorExecutions IntelligenceProcessorExecution[]
 
-  @@unique([brandId, triggerIdempotencyKey], map: "uq_intelligence_execution_trigger")
+  @@unique([brandId, subjectId, triggerIdempotencyKey], map: "uq_intelligence_execution_trigger")
   @@unique([id, brandId], map: "uq_intelligence_execution_id_brand")
-  @@index([brandId, createdAt], map: "idx_intelligence_execution_brand_created")
+  @@unique([id, brandId, subjectId], map: "uq_intelligence_execution_id_brand_subject")
+  @@index([brandId, subjectId, createdAt], map: "idx_intelligence_execution_subject_created")
   @@index([status, createdAt], map: "idx_intelligence_execution_status_created")
   @@index([correlationRef], map: "idx_intelligence_execution_correlation")
   @@map("intelligence_executions")
@@ -3575,8 +3613,10 @@ model IntelligenceProcessorExecution {
   id                     String                               @id @default(uuid()) @map("processor_execution_id")
   executionId            String                               @map("execution_id")
   brandId                String                               @map("brand_id")
-  execution              IntelligenceExecution                @relation(fields: [executionId, brandId], references: [id, brandId], onDelete: Restrict)
+  subjectId              String                               @map("subject_id")
+  execution              IntelligenceExecution                @relation(fields: [executionId, brandId, subjectId], references: [id, brandId, subjectId], onDelete: Restrict)
   brand                  BrandProfile                         @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  subject                IntelligenceSubject                  @relation(fields: [subjectId, brandId], references: [id, brandId], onDelete: Restrict)
   processorId            String                               @map("processor_id") @db.VarChar(160)
   processorVersion       String                               @map("processor_version") @db.VarChar(80)
   bundleId               String                               @map("bundle_id") @db.VarChar(160)
@@ -3592,6 +3632,7 @@ model IntelligenceProcessorExecution {
   evidenceManifestHash   String                               @map("evidence_manifest_hash") @db.Char(64)
   triggerIntentKey       String                               @map("trigger_intent_key") @db.VarChar(255)
   processorExecutionKey  String                               @unique(map: "uq_intelligence_processor_execution_key") @map("processor_execution_key") @db.Char(64)
+  processorKeyVersion    Int                                  @default(2) @map("processor_key_version")
   maxAttempts            Int                                  @map("max_attempts")
   status                 IntelligenceProcessorExecutionStatus @default(QUEUED)
   resultReadiness        IntelligenceReadiness?               @map("result_readiness")
@@ -3615,8 +3656,9 @@ model IntelligenceProcessorExecution {
 
   @@unique([executionId, processorId, activeScopeHash], map: "uq_intelligence_processor_execution_scope")
   @@unique([id, brandId], map: "uq_intelligence_processor_execution_id_brand")
+  @@unique([id, brandId, subjectId], map: "uq_intelligence_processor_execution_id_brand_subject")
   @@index([status, eligibleAt, leaseExpiresAt], map: "idx_intelligence_processor_queue")
-  @@index([brandId, processorId, processorVersion, createdAt], map: "idx_intelligence_processor_brand_version")
+  @@index([brandId, subjectId, processorId, processorVersion, createdAt], map: "idx_intelligence_processor_subject_version")
   @@index([bundleHash], map: "idx_intelligence_processor_bundle_hash")
   @@map("intelligence_processor_executions")
 }
@@ -3659,6 +3701,8 @@ model IntelligenceAction {
   id                       String                          @id @default(uuid()) @map("action_id")
   brandId                  String                          @map("brand_id")
   brand                    BrandProfile                    @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  subjectId                String                          @map("subject_id")
+  subject                  IntelligenceSubject             @relation(fields: [subjectId, brandId], references: [id, brandId], onDelete: Restrict)
   actionType               String                          @map("action_type") @db.VarChar(100)
   actorType                IntelligenceActionActorType     @map("actor_type")
   actorRef                 String                          @map("actor_ref") @db.VarChar(255)
@@ -3669,7 +3713,7 @@ model IntelligenceAction {
   requestedAtomicity       String                          @map("requested_atomicity") @db.VarChar(80)
   outcome                  String                          @db.VarChar(80)
   processorExecutionId     String?                         @map("processor_execution_id")
-  processorExecution       IntelligenceProcessorExecution? @relation(fields: [processorExecutionId, brandId], references: [id, brandId], onDelete: Restrict)
+  processorExecution       IntelligenceProcessorExecution? @relation(fields: [processorExecutionId, brandId, subjectId], references: [id, brandId, subjectId], onDelete: Restrict)
   createdAt                DateTime                        @default(now()) @map("created_at")
 
   objectGenerations  IntelligenceObjectGeneration[]
@@ -3677,9 +3721,10 @@ model IntelligenceAction {
   resolvedCandidates IntelligenceComponentCandidate[]  @relation("CandidateResolutionAction")
   transitions        IntelligenceComponentTransition[]
 
-  @@unique([brandId, actionType, requestIdempotencyKey], map: "uq_intelligence_action_request")
+  @@unique([brandId, subjectId, actionType, requestIdempotencyKey], map: "uq_intelligence_action_request")
   @@unique([id, brandId], map: "uq_intelligence_action_id_brand")
-  @@index([brandId, createdAt], map: "idx_intelligence_action_brand_timeline")
+  @@unique([id, brandId, subjectId], map: "uq_intelligence_action_id_brand_subject")
+  @@index([brandId, subjectId, createdAt], map: "idx_intelligence_action_subject_timeline")
   @@index([correlationRef], map: "idx_intelligence_action_correlation")
   @@map("intelligence_actions")
 }
@@ -3689,6 +3734,8 @@ model IntelligenceObjectGeneration {
   id                           String                          @id @default(uuid()) @map("object_generation_id")
   brandId                      String                          @map("brand_id")
   brand                        BrandProfile                    @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  subjectId                    String                          @map("subject_id")
+  subject                      IntelligenceSubject             @relation(fields: [subjectId, brandId], references: [id, brandId], onDelete: Restrict)
   objectSemanticId             String                          @map("object_semantic_id") @db.VarChar(160)
   objectContractId             String                          @map("object_contract_id") @db.VarChar(160)
   objectContractVersion        String                          @map("object_contract_version") @db.VarChar(80)
@@ -3701,11 +3748,11 @@ model IntelligenceObjectGeneration {
   bundleVersion                String                          @map("bundle_version") @db.VarChar(80)
   bundleHash                   String                          @map("bundle_hash") @db.Char(64)
   processorExecutionId         String?                         @map("processor_execution_id")
-  processorExecution           IntelligenceProcessorExecution? @relation(fields: [processorExecutionId, brandId], references: [id, brandId], onDelete: Restrict)
+  processorExecution           IntelligenceProcessorExecution? @relation(fields: [processorExecutionId, brandId, subjectId], references: [id, brandId, subjectId], onDelete: Restrict)
   successfulAttemptId          String?                         @map("successful_attempt_id")
   successfulAttempt            IntelligenceProcessorAttempt?   @relation("SuccessfulProcessorAttempt", fields: [successfulAttemptId, processorExecutionId, brandId], references: [id, processorExecutionId, brandId], onDelete: Restrict)
   actionId                     String?                         @map("action_id")
-  action                       IntelligenceAction?             @relation(fields: [actionId, brandId], references: [id, brandId], onDelete: Restrict)
+  action                       IntelligenceAction?             @relation(fields: [actionId, brandId, subjectId], references: [id, brandId, subjectId], onDelete: Restrict)
   valueState                   IntelligenceValueState          @map("value_state")
   valuePayload                 Json?                           @map("value_payload")
   valueHash                    String                          @map("value_hash") @db.Char(64)
@@ -3715,10 +3762,10 @@ model IntelligenceObjectGeneration {
   activeScope                  Json                            @map("active_scope")
   activeScopeHash              String                          @map("active_scope_hash") @db.Char(64)
   basedOnObjectGenerationId    String?                         @map("based_on_object_generation_id")
-  basedOnObjectGeneration      IntelligenceObjectGeneration?   @relation("ObjectGenerationBasis", fields: [basedOnObjectGenerationId, brandId, objectSemanticId], references: [id, brandId, objectSemanticId], onDelete: Restrict)
+  basedOnObjectGeneration      IntelligenceObjectGeneration?   @relation("ObjectGenerationBasis", fields: [basedOnObjectGenerationId, brandId, subjectId, objectSemanticId], references: [id, brandId, subjectId, objectSemanticId], onDelete: Restrict)
   dependentObjectGenerations   IntelligenceObjectGeneration[]  @relation("ObjectGenerationBasis")
   supersedesObjectGenerationId String?                         @map("supersedes_object_generation_id")
-  supersedesObjectGeneration   IntelligenceObjectGeneration?   @relation("ObjectGenerationSupersession", fields: [supersedesObjectGenerationId, brandId, objectSemanticId], references: [id, brandId, objectSemanticId], onDelete: Restrict)
+  supersedesObjectGeneration   IntelligenceObjectGeneration?   @relation("ObjectGenerationSupersession", fields: [supersedesObjectGenerationId, brandId, subjectId, objectSemanticId], references: [id, brandId, subjectId, objectSemanticId], onDelete: Restrict)
   supersededByObjectGeneration IntelligenceObjectGeneration?   @relation("ObjectGenerationSupersession")
   generationOrdinal            Int                             @default(1) @map("generation_ordinal")
   createdAt                    DateTime                        @default(now()) @map("created_at")
@@ -3728,11 +3775,12 @@ model IntelligenceObjectGeneration {
   businessStateReferences IntelligenceBusinessStateReference[]
 
   @@unique([id, brandId], map: "uq_intelligence_object_generation_id_brand")
-  @@unique([id, brandId, objectSemanticId], map: "uq_intelligence_object_generation_address")
-  @@unique([supersedesObjectGenerationId, brandId, objectSemanticId], map: "uq_intelligence_object_generation_supersedes")
+  @@unique([id, brandId, subjectId], map: "uq_intelligence_object_generation_id_brand_subject")
+  @@unique([id, brandId, subjectId, objectSemanticId], map: "uq_intelligence_object_generation_address")
+  @@unique([supersedesObjectGenerationId, brandId, subjectId, objectSemanticId], map: "uq_intelligence_object_generation_supersedes")
   @@unique([processorExecutionId, objectSemanticId], map: "uq_intelligence_object_generation_processor")
   @@unique([actionId, objectSemanticId, generationOrdinal], map: "uq_intelligence_object_generation_action")
-  @@index([brandId, objectSemanticId, createdAt], map: "idx_intelligence_object_generation_history")
+  @@index([brandId, subjectId, objectSemanticId, createdAt], map: "idx_intelligence_object_generation_history")
   @@index([processorExecutionId], map: "idx_intelligence_object_generation_processor")
   @@index([actionId], map: "idx_intelligence_object_generation_action")
   @@map("intelligence_object_generations")
@@ -3743,9 +3791,11 @@ model IntelligenceComponentGeneration {
   id                              String                           @id @default(uuid()) @map("component_generation_id")
   brandId                         String                           @map("brand_id")
   brand                           BrandProfile                     @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  subjectId                       String                           @map("subject_id")
+  subject                         IntelligenceSubject              @relation(fields: [subjectId, brandId], references: [id, brandId], onDelete: Restrict)
   objectGenerationId              String                           @map("object_generation_id")
   objectSemanticId                String                           @map("object_semantic_id") @db.VarChar(160)
-  objectGeneration                IntelligenceObjectGeneration     @relation(fields: [objectGenerationId, brandId, objectSemanticId], references: [id, brandId, objectSemanticId], onDelete: Restrict)
+  objectGeneration                IntelligenceObjectGeneration     @relation(fields: [objectGenerationId, brandId, subjectId, objectSemanticId], references: [id, brandId, subjectId, objectSemanticId], onDelete: Restrict)
   pathSchemeVersion               Int                              @default(1) @map("path_scheme_version")
   componentSemanticPath           String                           @map("component_semantic_path") @db.Text
   nodeKind                        IntelligenceNodeKind             @map("node_kind")
@@ -3763,7 +3813,7 @@ model IntelligenceComponentGeneration {
   evidenceStrength                String?                          @map("evidence_strength") @db.VarChar(80)
   presentationOrder               Int?                             @map("presentation_order")
   supersedesComponentGenerationId String?                          @map("supersedes_component_generation_id")
-  supersedesComponentGeneration   IntelligenceComponentGeneration? @relation("ComponentGenerationSupersession", fields: [supersedesComponentGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  supersedesComponentGeneration   IntelligenceComponentGeneration? @relation("ComponentGenerationSupersession", fields: [supersedesComponentGenerationId, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
   supersededByComponentGeneration IntelligenceComponentGeneration? @relation("ComponentGenerationSupersession")
   createdAt                       DateTime                         @default(now()) @map("created_at")
 
@@ -3778,9 +3828,9 @@ model IntelligenceComponentGeneration {
 
   @@unique([objectGenerationId, componentSemanticPath], map: "uq_intelligence_component_generation_path")
   @@unique([id, brandId], map: "uq_intelligence_component_generation_id_brand")
-  @@unique([id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], map: "uq_intelligence_component_generation_address")
-  @@unique([supersedesComponentGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], map: "uq_intelligence_component_generation_supersedes")
-  @@index([brandId, objectSemanticId, componentSemanticPath, createdAt], map: "idx_intelligence_component_generation_history")
+  @@unique([id, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], map: "uq_intelligence_component_generation_address")
+  @@unique([supersedesComponentGenerationId, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], map: "uq_intelligence_component_generation_supersedes")
+  @@index([brandId, subjectId, objectSemanticId, componentSemanticPath, createdAt], map: "idx_intelligence_component_generation_history")
   @@index([objectGenerationId], map: "idx_intelligence_component_generation_object")
   @@map("intelligence_component_generations")
 }
@@ -3791,12 +3841,14 @@ model IntelligenceCurrentComponent {
   id                           String                                @id @default(uuid()) @map("current_component_id")
   brandId                      String                                @map("brand_id")
   brand                        BrandProfile                          @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  subjectId                    String                                @map("subject_id")
+  subject                      IntelligenceSubject                   @relation(fields: [subjectId, brandId], references: [id, brandId], onDelete: Restrict)
   objectSemanticId             String                                @map("object_semantic_id") @db.VarChar(160)
   pathSchemeVersion            Int                                   @default(1) @map("path_scheme_version")
   componentSemanticPath        String                                @map("component_semantic_path") @db.Text
   nodeKind                     IntelligenceNodeKind                  @map("node_kind")
   currentComponentGenerationId String                                @map("current_component_generation_id")
-  currentComponentGeneration   IntelligenceComponentGeneration       @relation("CurrentComponentGeneration", fields: [currentComponentGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  currentComponentGeneration   IntelligenceComponentGeneration       @relation("CurrentComponentGeneration", fields: [currentComponentGenerationId, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
   currentContractId            String                                @map("current_contract_id") @db.VarChar(160)
   currentContractVersion       String                                @map("current_contract_version") @db.VarChar(80)
   currentAuthority             IntelligenceAuthority                 @map("current_authority")
@@ -3816,13 +3868,13 @@ model IntelligenceCurrentComponent {
   candidates  IntelligenceComponentCandidate[]
   transitions IntelligenceComponentTransition[]
 
-  @@unique([brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], map: "uq_intelligence_current_component_address")
+  @@unique([brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], map: "uq_intelligence_current_component_address")
   @@unique([id, brandId], map: "uq_intelligence_current_component_id_brand")
-  @@unique([id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], map: "uq_intelligence_current_component_full_address")
-  @@index([brandId, objectSemanticId], map: "idx_intelligence_current_component_object")
-  @@index([brandId, componentSemanticPath], map: "idx_intelligence_current_component_path")
-  @@index([brandId, currentFreshness], map: "idx_intelligence_current_component_freshness")
-  @@index([brandId, protectionState], map: "idx_intelligence_current_component_protection")
+  @@unique([id, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], map: "uq_intelligence_current_component_full_address")
+  @@index([brandId, subjectId, objectSemanticId], map: "idx_intelligence_current_component_object")
+  @@index([brandId, subjectId, componentSemanticPath], map: "idx_intelligence_current_component_path")
+  @@index([brandId, subjectId, currentFreshness], map: "idx_intelligence_current_component_freshness")
+  @@index([brandId, subjectId, protectionState], map: "idx_intelligence_current_component_protection")
   @@index([currentComponentGenerationId], map: "idx_intelligence_current_component_generation")
   @@map("intelligence_current_components")
 }
@@ -3833,32 +3885,34 @@ model IntelligenceComponentCandidate {
   id                                String                               @id @default(uuid()) @map("component_candidate_id")
   brandId                           String                               @map("brand_id")
   brand                             BrandProfile                         @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  subjectId                         String                               @map("subject_id")
+  subject                           IntelligenceSubject                  @relation(fields: [subjectId, brandId], references: [id, brandId], onDelete: Restrict)
   currentComponentId                String                               @map("current_component_id")
   objectSemanticId                  String                               @map("object_semantic_id") @db.VarChar(160)
   pathSchemeVersion                 Int                                  @map("path_scheme_version")
   componentSemanticPath             String                               @map("component_semantic_path") @db.Text
-  currentComponent                  IntelligenceCurrentComponent         @relation(fields: [currentComponentId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  currentComponent                  IntelligenceCurrentComponent         @relation(fields: [currentComponentId, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
   candidateComponentGenerationId    String                               @unique(map: "uq_intelligence_candidate_generation") @map("candidate_component_generation_id")
-  candidateComponentGeneration      IntelligenceComponentGeneration      @relation("CandidateComponentGeneration", fields: [candidateComponentGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  candidateComponentGeneration      IntelligenceComponentGeneration      @relation("CandidateComponentGeneration", fields: [candidateComponentGenerationId, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
   basisCurrentComponentGenerationId String                               @map("basis_current_component_generation_id")
-  basisCurrentComponentGeneration   IntelligenceComponentGeneration      @relation("CandidateBasisGeneration", fields: [basisCurrentComponentGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  basisCurrentComponentGeneration   IntelligenceComponentGeneration      @relation("CandidateBasisGeneration", fields: [basisCurrentComponentGenerationId, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
   basisCurrentRevision              BigInt                               @map("basis_current_revision")
   candidateValueHash                String                               @map("candidate_value_hash") @db.Char(64)
   discrepancyCode                   String                               @map("discrepancy_code") @db.VarChar(160)
   producerExecutionId               String?                              @map("producer_execution_id")
-  producerExecution                 IntelligenceProcessorExecution?      @relation("CandidateProducerExecution", fields: [producerExecutionId, brandId], references: [id, brandId], onDelete: Restrict)
+  producerExecution                 IntelligenceProcessorExecution?      @relation("CandidateProducerExecution", fields: [producerExecutionId, brandId, subjectId], references: [id, brandId, subjectId], onDelete: Restrict)
   producerActionId                  String?                              @map("producer_action_id")
-  producerAction                    IntelligenceAction?                  @relation("CandidateProducerAction", fields: [producerActionId, brandId], references: [id, brandId], onDelete: Restrict)
+  producerAction                    IntelligenceAction?                  @relation("CandidateProducerAction", fields: [producerActionId, brandId, subjectId], references: [id, brandId, subjectId], onDelete: Restrict)
   status                            IntelligenceComponentCandidateStatus @default(PENDING)
   createdAt                         DateTime                             @default(now()) @map("created_at")
   resolvedAt                        DateTime?                            @map("resolved_at")
   resolutionActionId                String?                              @map("resolution_action_id")
-  resolutionAction                  IntelligenceAction?                  @relation("CandidateResolutionAction", fields: [resolutionActionId, brandId], references: [id, brandId], onDelete: Restrict)
+  resolutionAction                  IntelligenceAction?                  @relation("CandidateResolutionAction", fields: [resolutionActionId, brandId, subjectId], references: [id, brandId, subjectId], onDelete: Restrict)
 
   transitions IntelligenceComponentTransition[]
 
   @@unique([id, brandId], map: "uq_intelligence_candidate_id_brand")
-  @@unique([id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], map: "uq_intelligence_candidate_full_address")
+  @@unique([id, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], map: "uq_intelligence_candidate_full_address")
   @@index([currentComponentId, status, createdAt], map: "idx_intelligence_candidate_pending")
   @@index([resolutionActionId], map: "idx_intelligence_candidate_resolution")
   @@map("intelligence_component_candidates")
@@ -3921,35 +3975,37 @@ model IntelligenceComponentTransition {
   id                    String                                 @id @default(uuid()) @map("component_transition_id")
   brandId               String                                 @map("brand_id")
   brand                 BrandProfile                           @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  subjectId             String                                 @map("subject_id")
+  subject               IntelligenceSubject                    @relation(fields: [subjectId, brandId], references: [id, brandId], onDelete: Restrict)
   actionId              String                                 @map("action_id")
-  action                IntelligenceAction                     @relation(fields: [actionId, brandId], references: [id, brandId], onDelete: Restrict)
+  action                IntelligenceAction                     @relation(fields: [actionId, brandId, subjectId], references: [id, brandId, subjectId], onDelete: Restrict)
   currentComponentId    String?                                @map("current_component_id")
   objectSemanticId      String                                 @map("object_semantic_id") @db.VarChar(160)
   pathSchemeVersion     Int                                    @map("path_scheme_version")
   componentSemanticPath String                                 @map("component_semantic_path") @db.Text
-  currentComponent      IntelligenceCurrentComponent?          @relation(fields: [currentComponentId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  currentComponent      IntelligenceCurrentComponent?          @relation(fields: [currentComponentId, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
   fromGenerationId      String?                                @map("from_generation_id")
-  fromGeneration        IntelligenceComponentGeneration?       @relation("TransitionFromGeneration", fields: [fromGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  fromGeneration        IntelligenceComponentGeneration?       @relation("TransitionFromGeneration", fields: [fromGenerationId, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
   expectedExists        Boolean                                @map("expected_exists")
   expectedRevision      BigInt?                                @map("expected_revision")
   expectedGenerationId  String?                                @map("expected_generation_id")
-  expectedGeneration    IntelligenceComponentGeneration?       @relation("TransitionExpectedGeneration", fields: [expectedGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  expectedGeneration    IntelligenceComponentGeneration?       @relation("TransitionExpectedGeneration", fields: [expectedGenerationId, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
   observedRevision      BigInt?                                @map("observed_revision")
   observedGenerationId  String?                                @map("observed_generation_id")
-  observedGeneration    IntelligenceComponentGeneration?       @relation("TransitionObservedGeneration", fields: [observedGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  observedGeneration    IntelligenceComponentGeneration?       @relation("TransitionObservedGeneration", fields: [observedGenerationId, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
   proposedGenerationId  String?                                @map("proposed_generation_id")
-  proposedGeneration    IntelligenceComponentGeneration?       @relation("TransitionProposedGeneration", fields: [proposedGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  proposedGeneration    IntelligenceComponentGeneration?       @relation("TransitionProposedGeneration", fields: [proposedGenerationId, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
   toGenerationId        String?                                @map("to_generation_id")
-  toGeneration          IntelligenceComponentGeneration?       @relation("TransitionToGeneration", fields: [toGenerationId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  toGeneration          IntelligenceComponentGeneration?       @relation("TransitionToGeneration", fields: [toGenerationId, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
   candidateId           String?                                @map("candidate_id")
-  candidate             IntelligenceComponentCandidate?        @relation(fields: [candidateId, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
+  candidate             IntelligenceComponentCandidate?        @relation(fields: [candidateId, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], references: [id, brandId, subjectId, objectSemanticId, pathSchemeVersion, componentSemanticPath], onDelete: Restrict)
   transitionType        String                                 @map("transition_type") @db.VarChar(100)
   outcome               IntelligenceComponentTransitionOutcome
   reasonCode            String                                 @map("reason_code") @db.VarChar(160)
   resultingRevision     BigInt?                                @map("resulting_revision")
   createdAt             DateTime                               @default(now()) @map("created_at")
 
-  @@unique([actionId, objectSemanticId, componentSemanticPath], map: "uq_intelligence_component_transition_action_path")
+  @@unique([actionId, subjectId, objectSemanticId, componentSemanticPath], map: "uq_intelligence_component_transition_action_path")
   @@index([currentComponentId, createdAt], map: "idx_intelligence_component_transition_current")
   @@index([actionId], map: "idx_intelligence_component_transition_action")
   @@index([outcome, reasonCode], map: "idx_intelligence_component_transition_outcome")

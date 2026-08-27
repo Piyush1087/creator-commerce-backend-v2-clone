@@ -42,6 +42,7 @@ export class IntelligenceCurrentProjectionService implements IntelligenceCurrent
     const snapshot = await this.repository.readObjectSnapshot(
       request.brandId,
       request.objectSemanticId,
+      request.subject,
     );
     this.assertSnapshot(snapshot, request.brandId, request.objectSemanticId);
     for (const component of snapshot.components) {
@@ -60,7 +61,7 @@ export class IntelligenceCurrentProjectionService implements IntelligenceCurrent
       }
     }
     const components = snapshot.components.map((component) =>
-      this.projectComponent(snapshot, component),
+      this.projectComponent(snapshot, component, Boolean(request.subject)),
     );
     const currentPaths = new Set(
       components.map((component) => component.componentSemanticPath),
@@ -108,6 +109,7 @@ export class IntelligenceCurrentProjectionService implements IntelligenceCurrent
     );
     return {
       brandId: request.brandId,
+      ...(request.subject ? { subjectId: snapshot.subjectId } : {}),
       objectSemanticId: request.objectSemanticId,
       objectContract: objectContracts.length === 1 ? objectContracts[0] : null,
       objectContractVersions: objectContracts,
@@ -164,12 +166,14 @@ export class IntelligenceCurrentProjectionService implements IntelligenceCurrent
       request.brandId,
       request.objectSemanticId,
       request.componentSemanticPath,
+      request.subject,
     );
     this.assertSnapshot(snapshot, request.brandId, request.objectSemanticId);
     if (snapshot.components.length === 0) {
       return {
         projectionState: "NO_CURRENT",
         brandId: request.brandId,
+        ...(request.subject ? { subjectId: snapshot.subjectId } : {}),
         objectSemanticId: request.objectSemanticId,
         componentSemanticPath: request.componentSemanticPath,
         pathSchemeVersion: 1,
@@ -182,12 +186,17 @@ export class IntelligenceCurrentProjectionService implements IntelligenceCurrent
         "A semantic component address resolved more than one current row",
       );
     }
-    return this.projectComponent(snapshot, snapshot.components[0]);
+    return this.projectComponent(
+      snapshot,
+      snapshot.components[0],
+      Boolean(request.subject),
+    );
   }
 
   private projectComponent(
     snapshot: ProjectionRepositorySnapshot,
     component: ProjectionComponentRecord,
+    exposeSubject = false,
   ): CurrentIntelligenceComponentProjection {
     this.assertCurrentGeneration(component);
     const lineageKey = keyOf(
@@ -215,6 +224,7 @@ export class IntelligenceCurrentProjectionService implements IntelligenceCurrent
     return {
       projectionState: "CURRENT",
       brandId: component.brandId,
+      ...(exposeSubject ? { subjectId: component.subjectId } : {}),
       objectSemanticId: component.objectSemanticId,
       componentSemanticPath: component.componentSemanticPath,
       pathSchemeVersion: 1,
@@ -255,6 +265,7 @@ export class IntelligenceCurrentProjectionService implements IntelligenceCurrent
       snapshot.components.some(
         (component) =>
           component.brandId !== brandId ||
+          component.subjectId !== snapshot.subjectId ||
           component.objectSemanticId !== objectSemanticId,
       ) ||
       snapshot.evidenceReferences.some(
@@ -277,6 +288,8 @@ export class IntelligenceCurrentProjectionService implements IntelligenceCurrent
       component.pathSchemeVersion !== 1 ||
       generation.id !== component.currentComponentGenerationId ||
       generation.brandId !== component.brandId ||
+      generation.subjectId !== component.subjectId ||
+      generation.objectGeneration.subjectId !== component.subjectId ||
       generation.objectSemanticId !== component.objectSemanticId ||
       generation.pathSchemeVersion !== component.pathSchemeVersion ||
       generation.componentSemanticPath !== component.componentSemanticPath ||

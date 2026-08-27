@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../../prisma/prisma.service";
 import { DIFFERENTIATION_OBJECT } from "./brand-differentiation.types";
+import { resolveIntelligenceSubject } from "../../subject/intelligence-subject";
 
 const include = Prisma.validator<Prisma.IntelligenceCurrentComponentInclude>()({
   currentComponentGeneration: true,
@@ -13,12 +14,18 @@ export type DifferentiationCurrentState =
 @Injectable()
 export class BrandDifferentiationStateRepository {
   constructor(private readonly prisma: PrismaService) {}
-  read(
+  async read(
     brandId: string,
     tx?: Prisma.TransactionClient,
   ): Promise<DifferentiationCurrentState[]> {
-    return (tx ?? this.prisma).intelligenceCurrentComponent.findMany({
-      where: { brandId, objectSemanticId: DIFFERENTIATION_OBJECT },
+    const client = tx ?? this.prisma;
+    const subject = await resolveIntelligenceSubject(client, brandId);
+    return client.intelligenceCurrentComponent.findMany({
+      where: {
+        brandId,
+        subjectId: subject.id,
+        objectSemanticId: DIFFERENTIATION_OBJECT,
+      },
       include,
       orderBy: { componentSemanticPath: "asc" },
     });

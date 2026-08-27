@@ -18,6 +18,8 @@ export type ExpectedCurrent =
 export interface TransitionActionContext {
   readonly id: string;
   readonly brandId: string;
+  /** Optional only for legacy Brand actions; persisted actions always resolve it. */
+  readonly subjectId?: string;
   readonly actionType: string;
   readonly actorType: IntelligenceActionActorType;
   readonly actorRef: string;

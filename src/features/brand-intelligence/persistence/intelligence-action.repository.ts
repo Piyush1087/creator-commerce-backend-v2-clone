@@ -7,11 +7,12 @@ import {
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IntelligencePersistenceError } from "../domain/intelligence-persistence.error";
+import { resolveIntelligenceSubject } from "../subject/intelligence-subject.resolver";
 
 export type ActionWrite = Omit<
   Prisma.IntelligenceActionUncheckedCreateInput,
-  "createdAt"
->;
+  "createdAt" | "subjectId"
+> & { readonly subjectId?: string };
 export type TransitionWrite = Omit<
   Prisma.IntelligenceComponentTransitionUncheckedCreateInput,
   "createdAt"
@@ -30,23 +31,26 @@ export class IntelligenceActionRepository {
     tx: Prisma.TransactionClient,
     data: ActionWrite,
   ): Promise<ActionLookupResult> {
+    const subjectId = await this.resolveSubjectId(tx, data);
+    const scopedData = { ...data, subjectId };
     const existing = await tx.intelligenceAction.findUnique({
       where: {
-        brandId_actionType_requestIdempotencyKey: {
+        brandId_subjectId_actionType_requestIdempotencyKey: {
           brandId: data.brandId,
+          subjectId,
           actionType: data.actionType,
           requestIdempotencyKey: data.requestIdempotencyKey,
         },
       },
     });
     if (existing) {
-      this.assertSameAction(existing, data);
+      this.assertSameAction(existing, scopedData);
       return { action: existing, replayed: true };
     }
 
     try {
       return {
-        action: await tx.intelligenceAction.create({ data }),
+        action: await tx.intelligenceAction.create({ data: scopedData }),
         replayed: false,
       };
     } catch (error) {
@@ -56,14 +60,15 @@ export class IntelligenceActionRepository {
       ) {
         const raced = await tx.intelligenceAction.findUniqueOrThrow({
           where: {
-            brandId_actionType_requestIdempotencyKey: {
+            brandId_subjectId_actionType_requestIdempotencyKey: {
               brandId: data.brandId,
+              subjectId,
               actionType: data.actionType,
               requestIdempotencyKey: data.requestIdempotencyKey,
             },
           },
         });
-        this.assertSameAction(raced, data);
+        this.assertSameAction(raced, scopedData);
         return { action: raced, replayed: true };
       }
       throw error;
@@ -98,6 +103,7 @@ export class IntelligenceActionRepository {
     const fields = [
       "id",
       "brandId",
+      "subjectId",
       "actionType",
       "actorType",
       "actorRef",
@@ -118,5 +124,41 @@ export class IntelligenceActionRepository {
         "Action idempotency identity was replayed with different content",
       );
     }
+  }
+
+  private async resolveSubjectId(
+    tx: Prisma.TransactionClient,
+    data: ActionWrite,
+  ): Promise<string> {
+    if (data.subjectId) {
+      const subject = await tx.intelligenceSubject.findUnique({
+        where: {
+          id_brandId: { id: data.subjectId, brandId: data.brandId },
+        },
+        select: { id: true },
+      });
+      if (!subject) {
+        throw new IntelligencePersistenceError(
+          "TENANCY_VIOLATION",
+          "Action subject does not belong to the requested Brand",
+        );
+      }
+      return subject.id;
+    }
+    if (data.processorExecutionId) {
+      const processor =
+        await tx.intelligenceProcessorExecution.findUniqueOrThrow({
+          where: { id: data.processorExecutionId },
+          select: { brandId: true, subjectId: true },
+        });
+      if (processor.brandId !== data.brandId) {
+        throw new IntelligencePersistenceError(
+          "TENANCY_VIOLATION",
+          "Action processor belongs to another Brand",
+        );
+      }
+      return processor.subjectId;
+    }
+    return (await resolveIntelligenceSubject(tx, data.brandId)).id;
   }
 }

@@ -9,6 +9,7 @@ describe("W1.0F projection query boundary", () => {
     const row = {
       id: "current:1",
       brandId: "brand:1",
+      subjectId: "subject:brand:1",
       objectSemanticId: "brand_description",
       pathSchemeVersion: 1,
       componentSemanticPath: "$",
@@ -26,6 +27,7 @@ describe("W1.0F projection query boundary", () => {
       currentComponentGeneration: {
         id: "component:1",
         brandId: "brand:1",
+        subjectId: "subject:brand:1",
         objectGenerationId: "object:1",
         objectSemanticId: "brand_description",
         componentSemanticPath: "$",
@@ -44,6 +46,7 @@ describe("W1.0F projection query boundary", () => {
         objectGeneration: {
           id: "object:1",
           brandId: "brand:1",
+          subjectId: "subject:brand:1",
           objectSemanticId: "brand_description",
           objectContractId: "objects",
           objectContractVersion: "1.0",
@@ -68,6 +71,9 @@ describe("W1.0F projection query boundary", () => {
       },
     };
     const prisma = {
+      intelligenceSubject: {
+        findUnique: vi.fn().mockResolvedValue({ id: "subject:brand:1" }),
+      },
       $transaction: vi.fn(
         async (
           callback: (client: typeof transaction) => Promise<unknown>,
