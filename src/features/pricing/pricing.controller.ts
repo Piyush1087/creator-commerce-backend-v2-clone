@@ -17,12 +17,8 @@ import type { RequestWithAuthUser } from "../auth/auth.controller";
 import { Public } from "../auth/decorators/public.decorator";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { BrandCentreAuthService } from "../brand-centre/brand-centre-auth.service";
-import {
-  BootstrapTrialDto,
-  CancelSubscriptionDto,
-  ChangeTierDto,
-  InitializeRazorpayTrialDto,
-} from "./dto/pricing.dto";
+import { BrandSettingsAccessService } from "../brand-settings/services/brand-settings-access.service";
+import { CancelSubscriptionDto, ChangeTierDto } from "./dto/pricing.dto";
 import { EntitlementService } from "./services/entitlement.service";
 import { GeoRoutingService } from "./services/geo-routing.service";
 import { PlanCatalogService } from "./services/plan-catalog.service";
@@ -34,6 +30,7 @@ import { SubscriptionLifecycleService } from "./services/subscription-lifecycle.
 export class PricingController {
   constructor(
     private readonly brandAuth: BrandCentreAuthService,
+    private readonly brandSettingsAccess: BrandSettingsAccessService,
     private readonly planCatalog: PlanCatalogService,
     private readonly lifecycle: SubscriptionLifecycleService,
     private readonly entitlement: EntitlementService,
@@ -112,22 +109,17 @@ export class PricingController {
 
   @Post("trial/bootstrap")
   @HttpCode(HttpStatus.CREATED)
-  async bootstrapLocalTrial(
-    @Req() req: RequestWithAuthUser,
-    @Body() body: BootstrapTrialDto,
-  ) {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
-    const subscription = await this.lifecycle.bootstrapLocalTrial(
-      brandProfileId,
-      body.currency,
-    );
+  async bootstrapLocalTrial(@Req() req: RequestWithAuthUser) {
+    const brandProfileId = await this.resolveMutationBrandId(req);
+    const subscription =
+      await this.lifecycle.bootstrapLocalTrial(brandProfileId);
     return { subscription };
   }
 
   @Post("trial/restore")
   @HttpCode(HttpStatus.OK)
   async restoreFoundersTrial(@Req() req: RequestWithAuthUser) {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const brandProfileId = await this.resolveMutationBrandId(req);
     const subscription =
       await this.lifecycle.restoreFoundersTrialAfterAbandonedCheckout(
         brandProfileId,
@@ -137,15 +129,10 @@ export class PricingController {
 
   @Post("trial/razorpay")
   @HttpCode(HttpStatus.CREATED)
-  async initializeRazorpayTrial(
-    @Req() req: RequestWithAuthUser,
-    @Body() body: InitializeRazorpayTrialDto,
-  ) {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
-    const subscription = await this.lifecycle.initializeRazorpayTrial(
-      brandProfileId,
-      body.currency,
-    );
+  async initializeRazorpayTrial(@Req() req: RequestWithAuthUser) {
+    const brandProfileId = await this.resolveMutationBrandId(req);
+    const subscription =
+      await this.lifecycle.initializeRazorpayTrial(brandProfileId);
     return { subscription };
   }
 
@@ -155,7 +142,7 @@ export class PricingController {
     @Req() req: RequestWithAuthUser,
     @Body() body: ChangeTierDto,
   ) {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const brandProfileId = await this.resolveMutationBrandId(req);
     return this.lifecycle.upgradeOrDowngradeTier(
       brandProfileId,
       body.target_tier,
@@ -168,7 +155,7 @@ export class PricingController {
     @Req() req: RequestWithAuthUser,
     @Body() body: CancelSubscriptionDto,
   ) {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const brandProfileId = await this.resolveMutationBrandId(req);
     const subscription = await this.lifecycle.cancelSubscription(
       brandProfileId,
       body.cancel_at_cycle_end ?? false,
@@ -179,7 +166,17 @@ export class PricingController {
   @Post("reactivate")
   @HttpCode(HttpStatus.OK)
   async reactivateSubscription(@Req() req: RequestWithAuthUser) {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const brandProfileId = await this.resolveMutationBrandId(req);
     return this.lifecycle.reactivateSubscription(brandProfileId);
+  }
+
+  private async resolveMutationBrandId(
+    req: RequestWithAuthUser,
+  ): Promise<string> {
+    const context = await this.brandSettingsAccess.resolveBrandContext(
+      req.user,
+    );
+    this.brandSettingsAccess.assertFinancialMutation(context.membership.role);
+    return context.brandProfileId;
   }
 }

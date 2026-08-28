@@ -22,11 +22,7 @@ import type { TierChangeResult } from "../types/tier-change.types";
 import { GeoRoutingService } from "./geo-routing.service";
 import { PricingRazorpayClient } from "./pricing-razorpay.client";
 import { RazorpayPlanProvisioningService } from "./razorpay-plan-provisioning.service";
-
-const CHANGEABLE_TIERS: SubscriptionTier[] = [
-  SubscriptionTier.GROWTH_STARTER,
-  SubscriptionTier.PROFESSIONAL,
-];
+import { SubscriptionAccessService } from "./subscription-access.service";
 
 @Injectable()
 export class SubscriptionLifecycleService {
@@ -38,16 +34,20 @@ export class SubscriptionLifecycleService {
     private readonly geoRouting: GeoRoutingService,
     private readonly razorpay: PricingRazorpayClient,
     private readonly planProvisioning: RazorpayPlanProvisioningService,
+    private readonly subscriptionAccess: SubscriptionAccessService,
   ) {}
 
   async getSubscription(brandProfileId: string) {
-    return this.prisma.brandSubscription.findUnique({
+    const subscription = await this.prisma.brandSubscription.findUnique({
       where: { brandProfileId },
       include: { featureUsages: true },
     });
+    return subscription
+      ? this.subscriptionAccess.toReadModel(subscription)
+      : null;
   }
 
-  async bootstrapLocalTrial(brandProfileId: string, currency?: "INR" | "USD") {
+  async bootstrapLocalTrial(brandProfileId: string) {
     const existing = await this.prisma.brandSubscription.findUnique({
       where: { brandProfileId },
     });
@@ -65,8 +65,9 @@ export class SubscriptionLifecycleService {
       throw new NotFoundException("Brand profile not found");
     }
 
-    const resolvedCurrency =
-      currency ?? this.geoRouting.resolveGeoContext(profile.countryCode).currency;
+    const resolvedCurrency = this.geoRouting.resolveGeoContext(
+      profile.countryCode,
+    ).currency;
     const trialEndsAt = this.addDays(new Date(), TRIAL_DURATION_DAYS);
 
     const subscription = await this.prisma.brandSubscription.create({
@@ -90,10 +91,7 @@ export class SubscriptionLifecycleService {
     return subscription;
   }
 
-  async initializeRazorpayTrial(
-    brandProfileId: string,
-    currency?: "INR" | "USD",
-  ) {
+  async initializeRazorpayTrial(brandProfileId: string) {
     const profile = await this.prisma.brandProfile.findUnique({
       where: { id: brandProfileId },
       select: { countryCode: true },
@@ -102,8 +100,9 @@ export class SubscriptionLifecycleService {
       throw new NotFoundException("Brand profile not found");
     }
 
-    const resolvedCurrency =
-      currency ?? this.geoRouting.resolveGeoContext(profile.countryCode).currency;
+    const resolvedCurrency = this.geoRouting.resolveGeoContext(
+      profile.countryCode,
+    ).currency;
     const trialDurationSeconds = TRIAL_DURATION_DAYS * 24 * 60 * 60;
     const startBillingEpoch =
       Math.floor(Date.now() / 1000) + trialDurationSeconds;
@@ -163,63 +162,10 @@ export class SubscriptionLifecycleService {
     brandProfileId: string,
     targetTier: SubscriptionTier,
   ): Promise<TierChangeResult> {
-    if (!CHANGEABLE_TIERS.includes(targetTier)) {
-      throw new BadRequestException(
-        "Target tier must be GROWTH_STARTER or PROFESSIONAL",
-      );
-    }
-
-    const subscription = await this.prisma.brandSubscription.findUnique({
-      where: { brandProfileId },
-      include: { featureUsages: true },
-    });
-    if (!subscription) {
-      throw new NotFoundException("Subscription not found");
-    }
-
-    if (!this.planProvisioning.isBillableTier(targetTier)) {
-      throw new BadRequestException("Target tier is not billable via Razorpay.");
-    }
-
-    const currency =
-      subscription.currency === SubscriptionCurrency.INR ? "INR" : "USD";
-    const targetPlanId = await this.planProvisioning.resolvePlanId(
-      targetTier,
-      currency,
+    void brandProfileId;
+    throw new BadRequestException(
+      `${targetTier} is not an available MVP plan change target. Founder's Beta is the only purchasable plan.`,
     );
-
-    if (this.requiresPaidTierCheckout(subscription)) {
-      return this.beginPaidTierCheckoutFromTrial(
-        brandProfileId,
-        subscription,
-        targetTier,
-        targetPlanId,
-      );
-    }
-
-    if (!subscription.razorpaySubscriptionId) {
-      throw new NotFoundException(
-        "No manageable subscription mapping localized for current user.",
-      );
-    }
-
-    const razorpayIds = await this.applyRazorpayPlanChange(
-      subscription.razorpaySubscriptionId,
-      targetPlanId,
-    );
-
-    const updated = await this.prisma.brandSubscription.update({
-      where: { brandProfileId },
-      data: {
-        tier: targetTier,
-        razorpaySubscriptionId: razorpayIds.subscriptionId,
-        razorpayPlanId: razorpayIds.planId,
-      },
-      include: { featureUsages: true },
-    });
-
-    await this.syncLegacyBrandProfileFields(brandProfileId, updated);
-    return { subscription: updated, checkout: null };
   }
 
   private async beginPaidTierCheckoutFromTrial(
@@ -382,10 +328,7 @@ export class SubscriptionLifecycleService {
     };
   }
 
-  async cancelSubscription(
-    brandProfileId: string,
-    cancelAtCycleEnd = false,
-  ) {
+  async cancelSubscription(brandProfileId: string, cancelAtCycleEnd = false) {
     const subscription = await this.prisma.brandSubscription.findUnique({
       where: { brandProfileId },
     });
@@ -438,9 +381,7 @@ export class SubscriptionLifecycleService {
         };
       } catch (error) {
         const message =
-          error instanceof BadRequestException
-            ? String(error.message)
-            : "";
+          error instanceof BadRequestException ? String(error.message) : "";
         if (
           message.toLowerCase().includes("authenticated") ||
           message.toLowerCase().includes("active state")
@@ -448,7 +389,10 @@ export class SubscriptionLifecycleService {
           this.logger.warn(
             `Razorpay PATCH plan failed for ${razorpaySubscriptionId} (${razorpayStatus}); replacing subscription`,
           );
-          return this.replaceRazorpaySubscription(razorpaySubscriptionId, targetPlanId);
+          return this.replaceRazorpaySubscription(
+            razorpaySubscriptionId,
+            targetPlanId,
+          );
         }
         throw error;
       }
@@ -460,7 +404,10 @@ export class SubscriptionLifecycleService {
       razorpayStatus === "halted" ||
       razorpayStatus === "cancelled"
     ) {
-      return this.replaceRazorpaySubscription(razorpaySubscriptionId, targetPlanId);
+      return this.replaceRazorpaySubscription(
+        razorpaySubscriptionId,
+        targetPlanId,
+      );
     }
 
     throw new BadRequestException(
@@ -578,18 +525,20 @@ export class SubscriptionLifecycleService {
           invoice.status === "issued" || invoice.status === "partially_paid",
       )
       .map((invoice) => invoice.short_url)
-      .filter((url): url is string => typeof url === "string" && url.length > 0);
+      .filter(
+        (url): url is string => typeof url === "string" && url.length > 0,
+      );
   }
 
   private buildInitialFeatureUsageRows() {
     const resetAt = this.calculateInitialResetWindow();
-    return FEATURE_LIMIT_KEYS.filter((key) => key !== "ESCROW_AGGREGATE_CAP").map(
-      (featureKey) => ({
-        featureKey,
-        currentUsageCount: 0,
-        resetAt,
-      }),
-    );
+    return FEATURE_LIMIT_KEYS.filter(
+      (key) => key !== "ESCROW_AGGREGATE_CAP",
+    ).map((featureKey) => ({
+      featureKey,
+      currentUsageCount: 0,
+      resetAt,
+    }));
   }
 
   private calculateInitialResetWindow(): Date {

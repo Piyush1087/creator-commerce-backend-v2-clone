@@ -1,6 +1,13 @@
 import { SubscriptionTier } from "@prisma/client";
 
-export type BillableSubscriptionTier = Exclude<SubscriptionTier, "ENTERPRISE">;
+export type BillableSubscriptionTier = Extract<
+  SubscriptionTier,
+  "FOUNDERS_BETA"
+>;
+export type ProviderMappedSubscriptionTier = Exclude<
+  SubscriptionTier,
+  "ENTERPRISE"
+>;
 
 export type RazorpayPlanCurrency = "INR" | "USD";
 
@@ -11,16 +18,19 @@ export type RazorpayPlanDefinition = {
   currency: RazorpayPlanCurrency;
 };
 
-/** Amounts in minor units (USD cents / INR paise). Matches product-docs/Razorpay-setup.md. */
+/**
+ * Provider compatibility definitions in minor units (USD cents / INR paise).
+ * Only FOUNDERS_BETA is purchasable Product authority for MVP.
+ */
 export const RAZORPAY_PLAN_DEFINITIONS: Record<
-  BillableSubscriptionTier,
+  ProviderMappedSubscriptionTier,
   Record<RazorpayPlanCurrency, RazorpayPlanDefinition>
 > = {
   FOUNDERS_BETA: {
     INR: {
       name: "Founder's Beta",
       description: "Founder's Beta monthly — Creator Commerce",
-      amountMinor: 850_000,
+      amountMinor: 999_000,
       currency: "INR",
     },
     USD: {
@@ -33,13 +43,13 @@ export const RAZORPAY_PLAN_DEFINITIONS: Record<
   GROWTH_STARTER: {
     INR: {
       name: "Growth Starter",
-      description: "Growth Starter monthly — Creator Commerce",
+      description: "Legacy Growth Starter provider mapping",
       amountMinor: 1_490_000,
       currency: "INR",
     },
     USD: {
       name: "Growth Starter",
-      description: "Growth Starter monthly — Creator Commerce",
+      description: "Legacy Growth Starter provider mapping",
       amountMinor: 14_900,
       currency: "USD",
     },
@@ -47,13 +57,13 @@ export const RAZORPAY_PLAN_DEFINITIONS: Record<
   PROFESSIONAL: {
     INR: {
       name: "Professional",
-      description: "Professional monthly — Creator Commerce",
+      description: "Legacy Professional provider mapping",
       amountMinor: 3_400_000,
       currency: "INR",
     },
     USD: {
       name: "Professional",
-      description: "Professional monthly — Creator Commerce",
+      description: "Legacy Professional provider mapping",
       amountMinor: 39_900,
       currency: "USD",
     },
@@ -62,7 +72,7 @@ export const RAZORPAY_PLAN_DEFINITIONS: Record<
 
 /** Optional dashboard plan id hints; resolved or auto-created via Razorpay Plans API. */
 export const PLAN_MAPPINGS: Record<
-  BillableSubscriptionTier,
+  ProviderMappedSubscriptionTier,
   Record<RazorpayPlanCurrency, string>
 > = {
   FOUNDERS_BETA: {
@@ -138,12 +148,15 @@ export const FEATURE_LIMITS: Record<
   },
 };
 
-export const ESCROW_TAKE_RATES: Record<SubscriptionTier, number> = {
+/** Legacy future-tier values are compatibility data, not purchasable MVP terms. */
+export const LEGACY_ESCROW_TAKE_RATES: Record<SubscriptionTier, number> = {
   FOUNDERS_BETA: 0.07,
   GROWTH_STARTER: 0.06,
   PROFESSIONAL: 0.05,
   ENTERPRISE: 0.02,
 };
+
+export const FOUNDERS_BETA_COMMISSION_RATE = 0.07;
 
 export const CYCLIC_FEATURE_KEYS: FeatureLimitKey[] = [
   "MAX_DEEP_SCANS_MONTHLY",

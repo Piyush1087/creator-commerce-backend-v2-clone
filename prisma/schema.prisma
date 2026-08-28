@@ -192,7 +192,9 @@ enum PlanType {
 
 enum SubscriptionStatus {
   TRIALING
+  TRIAL_EXPIRED
   ACTIVE
+  CANCEL_SCHEDULED
   PAST_DUE
   CANCELED
   HALTED
@@ -3011,6 +3013,11 @@ model BrandSubscription {
   trialEndsAt            DateTime?            @map("trial_ends_at")
   currentPeriodStart     DateTime             @default(now()) @map("current_period_start")
   currentPeriodEnd       DateTime             @map("current_period_end")
+  cancelScheduledAt      DateTime?            @map("cancel_scheduled_at")
+  cancelEffectiveAt      DateTime?            @map("cancel_effective_at")
+  firstPaymentFailureAt  DateTime?            @map("first_payment_failure_at")
+  paymentGraceEndsAt     DateTime?            @map("payment_grace_ends_at")
+  providerStatus         String?              @map("provider_status")
   createdAt              DateTime             @default(now()) @map("created_at")
   updatedAt              DateTime             @updatedAt @map("updated_at")
 

@@ -6,6 +6,7 @@ import {
   PLAN_MAPPINGS,
   RAZORPAY_PLAN_DEFINITIONS,
   type BillableSubscriptionTier,
+  type ProviderMappedSubscriptionTier,
   type RazorpayPlanCurrency,
 } from "../constants/subscription.constants";
 import { PricingRazorpayClient } from "./pricing-razorpay.client";
@@ -57,21 +58,23 @@ export class RazorpayPlanProvisioningService {
   }
 
   isBillableTier(tier: SubscriptionTier): tier is BillableSubscriptionTier {
-    return tier !== SubscriptionTier.ENTERPRISE;
+    return tier === SubscriptionTier.FOUNDERS_BETA;
   }
 
-  resolveTierForPlanId(planId: string): BillableSubscriptionTier | null {
+  resolveTierForPlanId(planId: string): ProviderMappedSubscriptionTier | null {
     for (const [cacheKey, cachedPlanId] of this.resolvedPlanIds) {
       if (cachedPlanId !== planId) {
         continue;
       }
-      const tier = cacheKey.split("_")[0] as BillableSubscriptionTier;
+      const tier = cacheKey.split("_")[0] as ProviderMappedSubscriptionTier;
       if (tier in RAZORPAY_PLAN_DEFINITIONS) {
         return tier;
       }
     }
 
-    for (const tier of Object.keys(RAZORPAY_PLAN_DEFINITIONS) as BillableSubscriptionTier[]) {
+    for (const tier of Object.keys(
+      RAZORPAY_PLAN_DEFINITIONS,
+    ) as ProviderMappedSubscriptionTier[]) {
       for (const currency of ["INR", "USD"] as const) {
         if (PLAN_MAPPINGS[tier][currency] === planId) {
           return tier;
@@ -82,7 +85,11 @@ export class RazorpayPlanProvisioningService {
     return null;
   }
 
-  private rememberPlanId(cacheKey: string, planId: string, source: string): void {
+  private rememberPlanId(
+    cacheKey: string,
+    planId: string,
+    source: string,
+  ): void {
     this.resolvedPlanIds.set(cacheKey, planId);
     this.logger.log(`Razorpay plan ${cacheKey} → ${planId} (${source})`);
   }

@@ -2,7 +2,7 @@ import { ForbiddenException, Injectable } from "@nestjs/common";
 import { SubscriptionStatus, SubscriptionTier } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
-import { ESCROW_TAKE_RATES } from "../../pricing/constants/subscription.constants";
+import { FOUNDERS_BETA_COMMISSION_RATE } from "../../pricing/constants/subscription.constants";
 import { EntitlementService } from "../../pricing/services/entitlement.service";
 
 export interface EscrowBillingContext {
@@ -50,7 +50,7 @@ export class EscrowSubscriptionContextService {
     });
 
     if (!subscription) {
-      return ESCROW_TAKE_RATES.FOUNDERS_BETA;
+      return FOUNDERS_BETA_COMMISSION_RATE;
     }
 
     return this.entitlement.getEscrowTakeRate(subscription.tier);
