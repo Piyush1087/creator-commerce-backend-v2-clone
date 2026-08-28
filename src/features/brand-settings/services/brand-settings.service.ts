@@ -188,7 +188,10 @@ export class BrandSettingsService {
     const { brandProfileId, membership } =
       await this.access.resolveBrandContext(user);
 
-    if (membership.role === BrandRole.CAMPAIGN_MANAGER) {
+    if (
+      membership.role === BrandRole.CAMPAIGN_MANAGER &&
+      input.organizationLegalName
+    ) {
       throw new ForbiddenException(
         "Campaign Managers cannot modify organization settings.",
       );

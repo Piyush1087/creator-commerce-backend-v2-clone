@@ -39,11 +39,11 @@ const forbiddenMutations = [
 ];
 
 describe("BS-01 General writable contract", () => {
-  it("accepts only personal names and organization legal name", () => {
+  it("accepts only personal names and the operational Organization name", () => {
     const input = {
       firstName: "Ada",
       lastName: "Lovelace",
-      organizationLegalName: "Legal Ltd",
+      organizationLegalName: "Workspace Name",
     };
     expect(UpdateBrandGeneralProfileSchema.parse(input)).toEqual(input);
   });
@@ -152,7 +152,7 @@ describe.skipIf(process.env.BS01_DATABASE_TEST !== "true")(
       name: string | null = "Ada Byron Lovelace",
     ) {
       const org = await prisma.organization.create({
-        data: { name: "Workspace Legal Ltd" },
+        data: { name: "Workspace Organization" },
       });
       orgIds.push(org.id);
       const brand = await prisma.brandProfile.create({
@@ -269,25 +269,37 @@ describe.skipIf(process.env.BS01_DATABASE_TEST !== "true")(
       });
     });
     it.each(["BRAND_OWNER", "FINANCE_ADMIN"] as const)(
-      "%s persists legal name without changing protected identity",
+      "%s persists the operational Organization name without changing protected identity",
       async (role) => {
         const w = await workspace(role);
         const before = await protectedState(w.brand.id);
         const response = await request(w.user, {
-          organizationLegalName: "New Legal Ltd",
+          organizationLegalName: "New Workspace Name",
         });
         expect(response.status).toBe(200);
         expect(
           (await settings.getGeneral(w.user)).organization.company_legal_name,
-        ).toBe("New Legal Ltd");
+        ).toBe("New Workspace Name");
         expect(
           (
             await prisma.organization.findUniqueOrThrow({
               where: { id: w.org.id },
             })
           ).name,
-        ).toBe("New Legal Ltd");
+        ).toBe("New Workspace Name");
         expect(await protectedState(w.brand.id)).toEqual(before);
+      },
+    );
+    it.each(["BRAND_OWNER", "FINANCE_ADMIN", "CAMPAIGN_MANAGER"] as const)(
+      "%s may update their own personal name",
+      async (role) => {
+        const w = await workspace(role, "Ada Lovelace");
+        const response = await request(w.user, { firstName: "Grace" });
+        expect(response.status).toBe(200);
+        expect(
+          (await prisma.user.findUniqueOrThrow({ where: { id: w.user.id } }))
+            .name,
+        ).toBe("Grace Lovelace");
       },
     );
     it.each([
@@ -355,8 +367,37 @@ describe.skipIf(process.env.BS01_DATABASE_TEST !== "true")(
         ).toBe(0);
       },
     );
-    it.each(["CAMPAIGN_MANAGER", "MISSING", "INACTIVE"] as const)(
-      "denies %s mutations without membership admission",
+    it("denies Campaign Manager organization and mixed mutations atomically", async () => {
+      const w = await workspace("CAMPAIGN_MANAGER", "Ada Lovelace");
+      const beforeBrand = await protectedState(w.brand.id);
+
+      expect(
+        (await request(w.user, { organizationLegalName: "Denied" })).status,
+      ).toBe(403);
+      expect(
+        (
+          await request(w.user, {
+            firstName: "Must not persist",
+            organizationLegalName: "Denied",
+          })
+        ).status,
+      ).toBe(403);
+
+      expect(
+        (await prisma.user.findUniqueOrThrow({ where: { id: w.user.id } }))
+          .name,
+      ).toBe(w.user.name);
+      expect(
+        (
+          await prisma.organization.findUniqueOrThrow({
+            where: { id: w.org.id },
+          })
+        ).name,
+      ).toBe(w.org.name);
+      expect(await protectedState(w.brand.id)).toEqual(beforeBrand);
+    });
+    it.each(["MISSING", "INACTIVE"] as const)(
+      "denies %s mutations through workspace admission",
       async (role) => {
         const w = await workspace(role);
         const memberships = await prisma.brandTeamMember.findMany({
@@ -368,9 +409,7 @@ describe.skipIf(process.env.BS01_DATABASE_TEST !== "true")(
         expect((await request(w.user, { firstName: "Denied" })).status).toBe(
           403,
         );
-        expect((await request(w.user)).status).toBe(
-          role === "CAMPAIGN_MANAGER" ? 200 : 403,
-        );
+        expect((await request(w.user)).status).toBe(403);
         expect(
           await prisma.brandTeamMember.findMany({
             where: { brandProfileId: w.brand.id },

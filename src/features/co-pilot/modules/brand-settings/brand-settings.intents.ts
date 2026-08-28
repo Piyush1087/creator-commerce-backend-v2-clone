@@ -338,8 +338,8 @@ export function detectBrandSettingsWrite(
       missingSlots.push(
         textSlot(
           "organizationLegalName",
-          "Organization legal name",
-          "Company legal name",
+          "Organization name",
+          "Workspace or organization name",
         ),
       );
     }
@@ -357,8 +357,8 @@ export function detectBrandSettingsWrite(
       missingSlots.push(
         textSlot(
           "organizationLegalName",
-          "Organization legal name",
-          "Company legal name",
+          "Organization name",
+          "Workspace or organization name",
         ),
       );
     }

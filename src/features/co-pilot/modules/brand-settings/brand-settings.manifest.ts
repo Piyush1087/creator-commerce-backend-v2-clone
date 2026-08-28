@@ -47,7 +47,7 @@ export const BRAND_SETTINGS_FUNCTION_MANIFEST: BrandSettingsManifestEntry[] = [
     tool: "settings.updateGeneral",
     intent: "SETTINGS_UPDATE_GENERAL",
     description:
-      "Update organization legal name / country / currency, or personal first/last name (not email/password)",
+      "Update operational Organization name or personal first/last name (not email/password, country, or currency)",
     submodule: "GENERAL",
     backendRoute: "PATCH /api/v1/brand/settings/general",
     serviceMethod: "updateGeneral",

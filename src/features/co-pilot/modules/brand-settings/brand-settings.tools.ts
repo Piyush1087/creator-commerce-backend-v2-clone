@@ -88,7 +88,7 @@ export class BrandSettingsCoPilotToolsService {
     }
 
     const org = general.organization;
-    return `General settings: personal profile “${displayPersonal}” (${email}). Company “${org.company_legal_name}”, country ${org.country_code ?? "—"}, currency ${org.currency_code ?? "—"}. Brand display name “${general.brand_identity.display_name}”${general.brand_identity.website_url ? ` · ${general.brand_identity.website_url}` : ""}.`;
+    return `General settings: personal profile “${displayPersonal}” (${email}). Organization “${org.company_legal_name}”, country ${org.country_code ?? "—"}, currency ${org.currency_code ?? "—"}. Brand display name “${general.brand_identity.display_name}”${general.brand_identity.website_url ? ` · ${general.brand_identity.website_url}` : ""}.`;
   }
 
   financeNarrative(
@@ -174,7 +174,7 @@ export class BrandSettingsCoPilotToolsService {
     return [
       ...personalMetrics,
       {
-        label: "Company",
+        label: "Organization",
         value: general.organization.company_legal_name ?? "—",
         statusColor: "NEUTRAL",
       },
