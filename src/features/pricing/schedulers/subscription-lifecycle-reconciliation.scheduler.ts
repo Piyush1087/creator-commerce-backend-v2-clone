@@ -25,6 +25,7 @@ export class SubscriptionLifecycleReconciliationScheduler {
     await this.expireTrials(now);
     await this.expirePaymentGrace(now);
     await this.retryPendingProviderCancellations(now);
+    await this.reconcilePendingCancellationsAtBoundary(now);
     await this.finalizeScheduledCancellations(now);
   }
 
@@ -83,12 +84,8 @@ export class SubscriptionLifecycleReconciliationScheduler {
   private async finalizeScheduledCancellations(now: Date): Promise<void> {
     const due = await this.prisma.brandSubscription.findMany({
       where: {
-        status: {
-          in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCEL_SCHEDULED],
-        },
-        providerCancellationState: {
-          in: [PROVIDER_CANCELLATION_PENDING, PROVIDER_CANCELLATION_SCHEDULED],
-        },
+        status: SubscriptionStatus.CANCEL_SCHEDULED,
+        providerCancellationState: PROVIDER_CANCELLATION_SCHEDULED,
         cancelEffectiveAt: { lte: now },
       },
       select: {
@@ -102,18 +99,8 @@ export class SubscriptionLifecycleReconciliationScheduler {
         const result = await this.prisma.brandSubscription.updateMany({
           where: {
             id: subscription.id,
-            status: {
-              in: [
-                SubscriptionStatus.ACTIVE,
-                SubscriptionStatus.CANCEL_SCHEDULED,
-              ],
-            },
-            providerCancellationState: {
-              in: [
-                PROVIDER_CANCELLATION_PENDING,
-                PROVIDER_CANCELLATION_SCHEDULED,
-              ],
-            },
+            status: SubscriptionStatus.CANCEL_SCHEDULED,
+            providerCancellationState: PROVIDER_CANCELLATION_SCHEDULED,
             cancelEffectiveAt: { lte: now },
           },
           data: {
@@ -130,6 +117,62 @@ export class SubscriptionLifecycleReconciliationScheduler {
       } catch (error) {
         this.logger.error(
           `Failed to finalize scheduled cancellation ${subscription.id}: ${
+            error instanceof Error ? error.message : "unknown error"
+          }`,
+        );
+      }
+    }
+  }
+
+  private async reconcilePendingCancellationsAtBoundary(
+    now: Date,
+  ): Promise<void> {
+    const pending = await this.prisma.brandSubscription.findMany({
+      where: {
+        status: SubscriptionStatus.ACTIVE,
+        providerCancellationState: PROVIDER_CANCELLATION_PENDING,
+        cancelEffectiveAt: { lte: now },
+        razorpaySubscriptionId: { not: null },
+      },
+      select: {
+        id: true,
+        brandProfileId: true,
+        razorpaySubscriptionId: true,
+      },
+    });
+
+    for (const subscription of pending) {
+      try {
+        const provider = await this.razorpay.fetchSubscription(
+          subscription.razorpaySubscriptionId!,
+        );
+        if (provider.status.toLowerCase() !== "cancelled") {
+          this.logger.warn(
+            `Cancellation remains unresolved at boundary for ${subscription.id}; provider status is ${provider.status}`,
+          );
+          continue;
+        }
+        const result = await this.prisma.brandSubscription.updateMany({
+          where: {
+            id: subscription.id,
+            status: SubscriptionStatus.ACTIVE,
+            providerCancellationState: PROVIDER_CANCELLATION_PENDING,
+            cancelEffectiveAt: { lte: now },
+          },
+          data: {
+            status: SubscriptionStatus.CANCELED,
+            providerStatus: "cancelled",
+          },
+        });
+        if (result.count > 0) {
+          await this.updateLegacyStatus(
+            subscription.brandProfileId,
+            SubscriptionStatus.CANCELED,
+          );
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Failed to reconcile pending cancellation ${subscription.id}: ${
             error instanceof Error ? error.message : "unknown error"
           }`,
         );

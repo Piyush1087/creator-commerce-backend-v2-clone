@@ -193,7 +193,7 @@ describe("SubscriptionLifecycleService P2", () => {
     );
   });
 
-  it("clears an unresolved cancellation only after provider truth remains active", async () => {
+  it("does not treat provider active status as proof an ambiguous cancellation is reversible", async () => {
     const h = harness({
       subscription: baseSubscription({
         status: SubscriptionStatus.ACTIVE,
@@ -203,13 +203,16 @@ describe("SubscriptionLifecycleService P2", () => {
         cancelEffectiveAt: new Date(Date.now() + 86_400_000),
       }),
     });
-    const result = await h.service.reactivateSubscription("brand-1");
-    expect(result).toMatchObject({ recovery_mode: "cancellation_reversed" });
+    await expect(h.service.reactivateSubscription("brand-1")).rejects.toThrow(
+      "Cancellation reconciliation is still pending",
+    );
     expect(h.getRow()).toMatchObject({
       status: SubscriptionStatus.ACTIVE,
-      cancelEffectiveAt: null,
+      providerCancellationState: "SCHEDULE_PENDING",
+      cancelEffectiveAt: expect.any(Date),
     });
-    expect(h.razorpay.createImmediateSubscription).not.toHaveBeenCalled();
+    expect(h.razorpay.fetchSubscription).not.toHaveBeenCalled();
+    expect(h.razorpay.createFutureSubscription).not.toHaveBeenCalled();
   });
 
   it("starts provider recovery for HALTED without fabricating ACTIVE", async () => {

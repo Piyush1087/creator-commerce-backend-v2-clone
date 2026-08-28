@@ -271,29 +271,9 @@ export class SubscriptionLifecycleService {
       subscription.cancelEffectiveAt > new Date() &&
       subscription.razorpaySubscriptionId
     ) {
-      const provider = await this.razorpay.fetchSubscription(
-        subscription.razorpaySubscriptionId,
+      throw new ConflictException(
+        "Cancellation reconciliation is still pending. Retry after provider scheduling is confirmed.",
       );
-      if (provider.status.toLowerCase() !== "active") {
-        throw new BadRequestException(
-          "Provider cancellation state is unresolved; reactivation cannot be confirmed.",
-        );
-      }
-      const updated = await this.prisma.brandSubscription.update({
-        where: { brandProfileId },
-        data: {
-          status: SubscriptionStatus.ACTIVE,
-          cancelScheduledAt: null,
-          cancelEffectiveAt: null,
-          providerCancellationState: null,
-        },
-        include: { featureUsages: true },
-      });
-      await this.syncLegacyBrandProfileFields(brandProfileId, updated);
-      return {
-        subscription: this.subscriptionAccess.toReadModel(updated),
-        recovery_mode: "cancellation_reversed" as const,
-      };
     }
 
     if (
