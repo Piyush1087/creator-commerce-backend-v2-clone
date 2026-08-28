@@ -11,8 +11,8 @@ import {
 import { ContractRuntimeRegistry } from "./contracts/registry/contract-runtime.registry";
 import { SemanticValidator } from "./contracts/validation/semantic.validator";
 
-describe("offering_factual_synthesis P3 architecture", () => {
-  it("materializes exactly one executable Product processor at the frozen pin", () => {
+describe("Product Intelligence P4 architecture", () => {
+  it("materializes exactly three executable Product processors at the frozen pin", () => {
     const runtime = new ContractRuntimeRegistry(
       new ContractBundleIntegrityVerifier(),
       new SemanticValidator(),
@@ -28,24 +28,38 @@ describe("offering_factual_synthesis P3 architecture", () => {
       .filter((entry) => entry.bundleId.startsWith("product_intelligence."));
     expect(product.map((entry) => entry.processorId)).toEqual([
       "offering_factual_synthesis",
+      "offering_creator_communication",
+      "offering_actionability_synthesis",
     ]);
-    expect(product[0].executionEnabled).toBe(true);
-    expect(PROCESSOR_ARCHITECTURE_COMMITS.offering_factual_synthesis).toBe(
+    expect(product.every((entry) => entry.executionEnabled)).toBe(true);
+    expect(
+      product.map((entry) => PROCESSOR_ARCHITECTURE_COMMITS[entry.processorId]),
+    ).toEqual([
       "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
-    );
+      "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
+      "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
+    ]);
     expect(
       CONTRACT_SOURCE_SPECS.filter(
         (spec) => spec.ownerEngine === "product_intelligence",
       ).map((spec) => spec.processorId),
-    ).toEqual(["offering_factual_synthesis"]);
+    ).toEqual([
+      "offering_factual_synthesis",
+      "offering_creator_communication",
+      "offering_actionability_synthesis",
+    ]);
     expect(
       [...EXECUTABLE_CONTRACT_PROCESSORS].filter((id) =>
         id.startsWith("offering_"),
       ),
-    ).toEqual(["offering_factual_synthesis"]);
+    ).toEqual([
+      "offering_factual_synthesis",
+      "offering_creator_communication",
+      "offering_actionability_synthesis",
+    ]);
   });
 
-  it("owns only the factual profile and never implements commercial or sibling processors", () => {
+  it("keeps the accepted factual Object ownership and excludes commercial DE or consumers", () => {
     const spec = CONTRACT_SOURCE_SPECS.find(
       (candidate) => candidate.processorId === "offering_factual_synthesis",
     )!;
@@ -72,7 +86,7 @@ describe("offering_factual_synthesis P3 architecture", () => {
       .map((file) => readFileSync(join(root, file), "utf8"))
       .join("\n");
     expect(source).not.toMatch(
-      /offering_creator_communication|offering_actionability_synthesis|offering_commercial_evidence|@Controller|@Resolver/iu,
+      /offering_commercial_evidence|@Controller|@Resolver/iu,
     );
     expect(source).not.toMatch(
       /evidence\/(acquisition|normalization)|\.offering\.(create|update|delete|upsert)/u,

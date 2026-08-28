@@ -46,6 +46,10 @@ import {
   OFFERING_FACTUAL_OBJECT,
   type OfferingFactualPersistencePayload,
 } from "./offering-factual.types";
+import {
+  derivedConfigForProcessor,
+  type OfferingDerivedPersistencePayload,
+} from "../offering-derived/offering-derived.types";
 
 type JsonRecord = Readonly<Record<string, unknown>>;
 
@@ -56,6 +60,24 @@ interface ExtractedComponent {
   readonly nodeKind: IntelligenceNodeKind;
   readonly presentationOrder?: number;
 }
+
+interface PersistenceConfig {
+  readonly processorId: string;
+  readonly objectSemanticId: string;
+  readonly profileField: string;
+  readonly payloadKind: string;
+}
+
+const FACTUAL_CONFIG: PersistenceConfig = {
+  processorId: "offering_factual_synthesis",
+  objectSemanticId: OFFERING_FACTUAL_OBJECT,
+  profileField: OFFERING_FACTUAL_OBJECT,
+  payloadKind: "OFFERING_FACTUAL_V1",
+};
+
+type ProductPersistencePayload =
+  | OfferingFactualPersistencePayload
+  | OfferingDerivedPersistencePayload;
 
 function record(value: unknown): JsonRecord | undefined {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -100,14 +122,26 @@ export class OfferingFactualPersistenceHook implements ProcessorSuccessPersisten
     claim: ClaimedProcessorWork,
     result: ProcessorExecutionResult,
   ): Promise<void> {
-    if (claim.processorExecution.processorId !== "offering_factual_synthesis") {
-      invalid("WRONG_PROCESSOR_PERSISTENCE_HOOK");
-    }
+    const derived = derivedConfigForProcessor(
+      claim.processorExecution.processorId,
+    );
+    const config: PersistenceConfig | undefined =
+      claim.processorExecution.processorId === FACTUAL_CONFIG.processorId
+        ? FACTUAL_CONFIG
+        : derived
+          ? {
+              processorId: derived.processorId,
+              objectSemanticId: derived.objectSemanticId,
+              profileField: derived.profileField,
+              payloadKind: derived.payloadKind,
+            }
+          : undefined;
+    if (!config) invalid("WRONG_PROCESSOR_PERSISTENCE_HOOK");
     const raw = result.persistencePayload;
     if (
       !raw ||
       typeof raw !== "object" ||
-      (raw as { kind?: unknown }).kind !== "OFFERING_FACTUAL_V1"
+      (raw as { kind?: unknown }).kind !== config.payloadKind
     ) {
       invalid("MISSING_VALIDATED_PERSISTENCE_PAYLOAD");
     }
@@ -116,7 +150,8 @@ export class OfferingFactualPersistenceHook implements ProcessorSuccessPersisten
         tx,
         claim,
         result,
-        raw as OfferingFactualPersistencePayload,
+        raw as ProductPersistencePayload,
+        config,
       );
     } catch (error) {
       if (error instanceof ProcessorExecutorFailure) throw error;
@@ -143,7 +178,8 @@ export class OfferingFactualPersistenceHook implements ProcessorSuccessPersisten
     tx: Prisma.TransactionClient,
     claim: ClaimedProcessorWork,
     result: ProcessorExecutionResult,
-    payload: OfferingFactualPersistencePayload,
+    payload: ProductPersistencePayload,
+    config: PersistenceConfig,
   ): Promise<void> {
     const execution = claim.processorExecution;
     const { prepared, output, offeringRef } = payload;
@@ -159,7 +195,7 @@ export class OfferingFactualPersistenceHook implements ProcessorSuccessPersisten
         (address) =>
           address.brandId !== execution.brandId ||
           address.subjectId !== execution.subjectId ||
-          address.objectSemanticId !== OFFERING_FACTUAL_OBJECT,
+          address.objectSemanticId !== config.objectSemanticId,
       ) ||
       sha256CanonicalExecution(canonicalActiveScope(scope)) !==
         execution.activeScopeHash ||
@@ -197,9 +233,16 @@ export class OfferingFactualPersistenceHook implements ProcessorSuccessPersisten
       allEvidence.map((item) => [item.evidenceRef, item]),
     );
     const businessFact = prepared.canonicalState.offeringFacts[0];
-    const businessRef = offeringBusinessStateRef(
-      businessFact.offeringId,
-      businessFact.businessStateReference,
+    const businessReferenceByRef = new Map(
+      [
+        businessFact.businessStateReference,
+        ...(prepared.intelligenceObjectDependencies ?? []).map(
+          (dependency) => dependency.businessStateReference,
+        ),
+      ].map((reference) => [
+        offeringBusinessStateRef(reference.entityId, reference),
+        reference,
+      ]),
     );
     const components: ComponentGenerationWrite[] = [];
     const evidenceReferences: EvidenceReferenceWrite[] = [];
@@ -208,10 +251,10 @@ export class OfferingFactualPersistenceHook implements ProcessorSuccessPersisten
     const proposals: ProposedComponentTransition[] = [];
 
     for (const address of scope) {
-      const extracted = this.extract(output, address);
+      const extracted = this.extract(output, address, config);
       const current = locked.get(this.currentState.key(address));
       const componentId = deterministicUuid(
-        `${execution.id}:${OFFERING_FACTUAL_OBJECT}:${address.componentSemanticPath}`,
+        `${execution.id}:${config.objectSemanticId}:${address.componentSemanticPath}`,
       );
       const evidenceRefs = this.stringRefs(extracted.metadata, "evidence_refs");
       const businessRefs = this.stringRefs(
@@ -234,7 +277,7 @@ export class OfferingFactualPersistenceHook implements ProcessorSuccessPersisten
         pathSchemeVersion: address.pathSchemeVersion,
         componentSemanticPath: address.componentSemanticPath,
         nodeKind: extracted.nodeKind,
-        componentContractId: OFFERING_FACTUAL_OBJECT,
+        componentContractId: config.objectSemanticId,
         componentContractVersion: execution.outputContractVersion,
         valueState: state,
         valuePayload: jsonValue(extracted.value, state),
@@ -276,8 +319,9 @@ export class OfferingFactualPersistenceHook implements ProcessorSuccessPersisten
           evidenceManifestHash: execution.evidenceManifestHash,
         });
       }
-      if (effectiveBusinessRefs.includes(businessRef)) {
-        const reference = businessFact.businessStateReference;
+      for (const businessRef of effectiveBusinessRefs) {
+        const reference = businessReferenceByRef.get(businessRef);
+        if (!reference) invalid("PERSISTENCE_UNKNOWN_BUSINESS_STATE_REF");
         businessStateReferences.push({
           id: deterministicUuid(`${componentId}:business:${businessRef}`),
           componentSemanticPath: address.componentSemanticPath,
@@ -334,19 +378,19 @@ export class OfferingFactualPersistenceHook implements ProcessorSuccessPersisten
         `PERSISTENCE_${validation.issues[0]?.code ?? "INVALID_TRANSITION"}`,
       );
     }
-    const profile = output.offering_factual_profile;
+    const profile = output[config.profileField];
     const objectValueState =
       profile === null
         ? IntelligenceValueState.EXPLICIT_NULL
         : IntelligenceValueState.VALUE;
     const objectGenerationId = deterministicUuid(
-      `${execution.id}:${OFFERING_FACTUAL_OBJECT}`,
+      `${execution.id}:${config.objectSemanticId}`,
     );
     const persisted = await this.generations.persistInTransaction(tx, {
       object: {
         id: objectGenerationId,
         brandId: execution.brandId,
-        objectSemanticId: OFFERING_FACTUAL_OBJECT,
+        objectSemanticId: config.objectSemanticId,
         objectContractId: "objects",
         objectContractVersion: "1.0",
         outputContractId: execution.outputContractId,
@@ -407,7 +451,7 @@ export class OfferingFactualPersistenceHook implements ProcessorSuccessPersisten
               }
             : { state: "ABSENT" as const },
           generationId: componentByPath.get(address.componentSemanticPath)!.id,
-          discrepancyCode: "PROTECTED_OFFERING_VALUE_CONFLICT",
+          discrepancyCode: "PROTECTED_PRODUCT_INTELLIGENCE_VALUE_CONFLICT",
         };
       }),
     });
@@ -424,12 +468,13 @@ export class OfferingFactualPersistenceHook implements ProcessorSuccessPersisten
   private extract(
     output: JsonRecord,
     address: ComponentSemanticAddress,
+    config: PersistenceConfig,
   ): ExtractedComponent {
-    const profile = record(output.offering_factual_profile);
+    const profile = record(output[config.profileField]);
     const metadata = record(output.output_metadata) ?? {};
     if (address.componentSemanticPath === "$") {
       return this.component(
-        output.offering_factual_profile,
+        output[config.profileField],
         metadata,
         IntelligenceNodeKind.SCALAR,
       );

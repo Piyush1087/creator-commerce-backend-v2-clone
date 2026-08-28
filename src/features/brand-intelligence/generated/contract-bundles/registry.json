@@ -538,6 +538,86 @@
       "bundled": true,
       "registered": true,
       "executionEnabled": true
+    },
+    {
+      "processorId": "offering_creator_communication",
+      "processorVersion": "1.0",
+      "outputContractId": "offering_creator_communication_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "product_intelligence.offering_creator_communication",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "018d457b4ac7c0841808aacac6b9ab778b270d022721eae57716cdbfa7296023",
+      "ownedObjectSemanticIds": [
+        "offering_creator_communication_profile"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "offering_creator_communication_profile",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "offering_creator_communication_profile",
+          "componentPathPattern": "$/f/creator_talking_points"
+        },
+        {
+          "objectSemanticId": "offering_creator_communication_profile",
+          "componentPathPattern": "$/f/creator_talking_points/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "offering_creator_communication_profile",
+          "componentPathPattern": "$/f/communication_constraints"
+        },
+        {
+          "objectSemanticId": "offering_creator_communication_profile",
+          "componentPathPattern": "$/f/communication_constraints/i/{semantic_id}"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "offering_creator_communication",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
+    },
+    {
+      "processorId": "offering_actionability_synthesis",
+      "processorVersion": "1.0",
+      "outputContractId": "offering_actionability_synthesis_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "product_intelligence.offering_actionability_synthesis",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "d17d9a4cb792a9449d3191415e3e3950e88b5ade91538c351c7cf871c4c65474",
+      "ownedObjectSemanticIds": [
+        "offering_actionability_profile"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "offering_actionability_profile",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "offering_actionability_profile",
+          "componentPathPattern": "$/f/customer_action"
+        },
+        {
+          "objectSemanticId": "offering_actionability_profile",
+          "componentPathPattern": "$/f/customer_action/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "offering_actionability_profile",
+          "componentPathPattern": "$/f/commercial_context"
+        },
+        {
+          "objectSemanticId": "offering_actionability_profile",
+          "componentPathPattern": "$/f/commercial_context/i/{semantic_id}"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "offering_actionability_synthesis",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
     }
   ]
 }

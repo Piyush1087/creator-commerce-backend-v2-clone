@@ -12,6 +12,10 @@ import { BrandMeaningProcessorExecutor } from "../../processors/brand-meaning/br
 import { BrandCharacterProcessorExecutor } from "../../processors/brand-character/brand-character-processor.executor";
 import { AudiencePersonaProcessorExecutor } from "../../processors/audience-persona/audience-persona-processor.executor";
 import { OfferingFactualProcessorExecutor } from "../../processors/offering-factual/offering-factual-processor.executor";
+import {
+  OfferingActionabilityProcessorExecutor,
+  OfferingCreatorCommunicationProcessorExecutor,
+} from "../../processors/offering-derived/offering-derived-processor.executor";
 
 @Injectable()
 export class ProcessorExecutorRegistry {
@@ -35,6 +39,10 @@ export class ProcessorExecutorRegistry {
     serviceabilityExecutor?: ServiceabilityProcessorExecutor,
     @Optional()
     offeringFactualExecutor?: OfferingFactualProcessorExecutor,
+    @Optional()
+    offeringCreatorExecutor?: OfferingCreatorCommunicationProcessorExecutor,
+    @Optional()
+    offeringActionabilityExecutor?: OfferingActionabilityProcessorExecutor,
   ) {
     const executors: [string, ProcessorExecutor][] = [
       [SYNTHETIC_PROCESSOR_ID, syntheticExecutor],
@@ -73,6 +81,16 @@ export class ProcessorExecutorRegistry {
       executors.push([
         offeringFactualExecutor.processorId,
         offeringFactualExecutor,
+      ]);
+    if (offeringCreatorExecutor)
+      executors.push([
+        offeringCreatorExecutor.processorId,
+        offeringCreatorExecutor,
+      ]);
+    if (offeringActionabilityExecutor)
+      executors.push([
+        offeringActionabilityExecutor.processorId,
+        offeringActionabilityExecutor,
       ]);
     this.executors = new Map(executors);
   }

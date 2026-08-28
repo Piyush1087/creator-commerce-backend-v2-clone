@@ -11,7 +11,7 @@ import { ProcessorDependencyProfileRegistry } from "./input/dependency/processor
 import { PROCESSOR_ARCHITECTURE_COMMITS } from "./contracts/bundle/contract-source.spec";
 
 describe("brand_differentiation architecture boundaries", () => {
-  it("retains seven Brand processors, one Product processor, and six differentiation paths", () => {
+  it("retains seven Brand processors, three Product processors, and six differentiation paths", () => {
     const runtime = contracts(),
       bundle = runtime.getVerifiedBundle(registryKey);
     expect(
@@ -26,6 +26,8 @@ describe("brand_differentiation architecture boundaries", () => {
       "brand_communication",
       "brand_differentiation",
       "brand_meaning",
+      "offering_actionability_synthesis",
+      "offering_creator_communication",
       "offering_factual_synthesis",
       "serviceability_synthesis",
       "visual_style_synthesis",
@@ -39,6 +41,10 @@ describe("brand_differentiation architecture boundaries", () => {
       visual_style_synthesis: "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
       serviceability_synthesis: "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
       offering_factual_synthesis: "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
+      offering_creator_communication:
+        "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
+      offering_actionability_synthesis:
+        "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
     });
     expect(bundle.manifest.ownedObjectSemanticIds).toEqual([
       "differentiation_and_proof",

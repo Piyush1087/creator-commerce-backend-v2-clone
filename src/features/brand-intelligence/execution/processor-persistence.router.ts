@@ -39,6 +39,8 @@ export class ProcessorPersistenceRouter implements ProcessorSuccessPersistenceHo
   ): Promise<void> {
     switch (claim.processorExecution.processorId) {
       case "offering_factual_synthesis":
+      case "offering_creator_communication":
+      case "offering_actionability_synthesis":
         if (!this.offeringFactual)
           throw new ProcessorExecutorFailure({
             category: "CONFIGURATION_DRIFT",

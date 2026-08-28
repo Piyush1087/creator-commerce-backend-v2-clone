@@ -40,6 +40,7 @@ export interface BusinessStateReference {
   readonly entityType:
     | "BrandProfile"
     | "Offering"
+    | "IntelligenceCurrentObject"
     | "Location"
     | "BrandVisualState"
     | "BrandVisualAsset"
@@ -133,6 +134,39 @@ export interface CanonicalOfferingFact {
   readonly brandConfirmedValues?: readonly Readonly<{
     semanticFieldPath: string;
     value: unknown;
+    revision: number;
+  }>[];
+  readonly canonicalPrice?: Readonly<{
+    revisionId: string;
+    mode: string;
+    currentMinAmount: string | null;
+    currentMaxAmount: string | null;
+    regularMinAmount: string | null;
+    regularMaxAmount: string | null;
+    currency: string;
+    freshness: string;
+    authority: string;
+    observedAt: string | null;
+  }> | null;
+  readonly canonicalOffers?: readonly Readonly<{
+    applicabilityId: string;
+    offerId: string;
+    name: string;
+    promoCode: string;
+    applicabilityScope: string;
+    validityStart: string;
+    validityEnd: string;
+    description: string | null;
+    entityLink: string | null;
+    termsText: string | null;
+    revision: number;
+  }>[];
+  readonly availableAtLocations?: readonly Readonly<{
+    relationId: string;
+    locationId: string;
+    name: string | null;
+    address: string;
+    city: string | null;
     revision: number;
   }>[];
   readonly businessStateReference: BusinessStateReference;

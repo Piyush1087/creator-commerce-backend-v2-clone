@@ -262,6 +262,61 @@ export class M1CanonicalBrandStateAdapter implements CanonicalBrandStateReader {
           },
           orderBy: { id: "asc" },
         },
+        priceState: {
+          select: {
+            currentRevision: {
+              select: {
+                id: true,
+                mode: true,
+                currentMinAmount: true,
+                currentMaxAmount: true,
+                regularMinAmount: true,
+                regularMaxAmount: true,
+                currency: true,
+                freshness: true,
+                authority: true,
+                observedAt: true,
+              },
+            },
+          },
+        },
+        offerApplicability: {
+          where: { lifecycle: "ACTIVE", brandOffer: { isActive: true } },
+          select: {
+            id: true,
+            revision: true,
+            brandOffer: {
+              select: {
+                id: true,
+                offerName: true,
+                promoCode: true,
+                applicabilityScope: true,
+                validityStart: true,
+                validityEnd: true,
+                description: true,
+                entityLink: true,
+                termsText: true,
+              },
+            },
+          },
+          orderBy: { id: "asc" },
+        },
+        locationAvailability: {
+          where: { lifecycle: "ACTIVE", location: { lifecycle: "ACTIVE" } },
+          select: {
+            id: true,
+            revision: true,
+            location: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+                city: true,
+              },
+            },
+          },
+          orderBy: { id: "asc" },
+        },
       },
     });
     if (!offering) {
@@ -305,6 +360,51 @@ export class M1CanonicalBrandStateAdapter implements CanonicalBrandStateReader {
       ...offering.productBundleMemberships,
     ].map(({ id, ...relation }) => ({ relationId: id, ...relation }));
     const mediaRefs = offering.mediaState?.assets ?? [];
+    const canonicalPrice = offering.priceState?.currentRevision
+      ? {
+          revisionId: offering.priceState.currentRevision.id,
+          mode: String(offering.priceState.currentRevision.mode),
+          currentMinAmount:
+            offering.priceState.currentRevision.currentMinAmount?.toString() ??
+            null,
+          currentMaxAmount:
+            offering.priceState.currentRevision.currentMaxAmount?.toString() ??
+            null,
+          regularMinAmount:
+            offering.priceState.currentRevision.regularMinAmount?.toString() ??
+            null,
+          regularMaxAmount:
+            offering.priceState.currentRevision.regularMaxAmount?.toString() ??
+            null,
+          currency: offering.priceState.currentRevision.currency,
+          freshness: String(offering.priceState.currentRevision.freshness),
+          authority: String(offering.priceState.currentRevision.authority),
+          observedAt:
+            offering.priceState.currentRevision.observedAt?.toISOString() ??
+            null,
+        }
+      : null;
+    const canonicalOffers = offering.offerApplicability.map((item) => ({
+      applicabilityId: item.id,
+      offerId: item.brandOffer.id,
+      name: item.brandOffer.offerName,
+      promoCode: item.brandOffer.promoCode,
+      applicabilityScope: item.brandOffer.applicabilityScope,
+      validityStart: item.brandOffer.validityStart.toISOString(),
+      validityEnd: item.brandOffer.validityEnd.toISOString(),
+      description: item.brandOffer.description,
+      entityLink: item.brandOffer.entityLink,
+      termsText: item.brandOffer.termsText,
+      revision: item.revision,
+    }));
+    const availableAtLocations = offering.locationAvailability.map((item) => ({
+      relationId: item.id,
+      locationId: item.location.id,
+      name: item.location.name,
+      address: item.location.address,
+      city: item.location.city,
+      revision: item.revision,
+    }));
     const stable = {
       id: offering.id,
       brandProfileId: offering.brandProfileId,
@@ -321,6 +421,9 @@ export class M1CanonicalBrandStateAdapter implements CanonicalBrandStateReader {
       mediaRefs,
       bundleRelationships,
       brandConfirmedValues,
+      canonicalPrice,
+      canonicalOffers,
+      availableAtLocations,
       updatedAt: offering.updatedAt.toISOString(),
     };
     const revisionToken = sha256CanonicalExecution(stable);
@@ -345,6 +448,9 @@ export class M1CanonicalBrandStateAdapter implements CanonicalBrandStateReader {
           mediaRefs,
           bundleRelationships,
           brandConfirmedValues,
+          canonicalPrice,
+          canonicalOffers,
+          availableAtLocations,
           businessStateReference: {
             entityType: "Offering",
             entityId: offering.id,

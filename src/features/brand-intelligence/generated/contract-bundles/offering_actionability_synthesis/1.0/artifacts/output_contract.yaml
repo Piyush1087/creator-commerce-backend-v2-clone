@@ -1,0 +1,111 @@
+id: offering_actionability_synthesis_output_contract
+version: "1.0"
+status: FROZEN
+processor: offering_actionability_synthesis
+object: offering_actionability_profile
+strict: true
+additional_properties: false
+processor_definition: intelligence/engines/product_intelligence/processors/offering_actionability_synthesis.yaml
+reasoning_authority: intelligence/engines/product_intelligence/artifacts/offering_actionability_synthesis/reasoning.yaml
+object_authority: intelligence/engines/product_intelligence/objects.yaml#offering_actionability_profile
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define customer-action and commercial-context interpretation for one exact canonical Offering without copying
+  or mutating canonical destination, price, Offer, Location relations, or broader geography.
+
+subject:
+  required: [brand_ref, offering_ref]
+  exact_canonical_offering_match_required: true
+
+response:
+  type: object
+  required: [offering_actionability_profile, output_metadata]
+  additional_properties: false
+  properties:
+    offering_actionability_profile:
+      type: [object, "null"]
+      nullable: true
+      additional_properties: false
+      fields:
+        customer_action:
+          type: [array, "null"]
+          nullable: true
+          item: {additional_properties: false, required: [semantic_id, action], fields: {semantic_id: {type: string, min_length: 1}, action: {type: string, min_length: 1}}}
+        commercial_context:
+          type: [array, "null"]
+          nullable: true
+          item: {additional_properties: false, required: [semantic_id, context], fields: {semantic_id: {type: string, min_length: 1}, context: {type: string, min_length: 1}}}
+    output_metadata:
+      type: object
+      additional_properties: false
+      required: [customer_action, commercial_context]
+      fields:
+        customer_action: {type: [array, "null"], nullable: true, keyed_by: semantic_id, item: shared_item_metadata}
+        commercial_context: {type: [array, "null"], nullable: true, keyed_by: semantic_id, item: shared_item_metadata}
+
+shared_item_metadata:
+  additional_properties: false
+  required: [semantic_id, authority, source_class, freshness, evidence_refs, business_state_refs]
+  fields:
+    semantic_id: {type: string, min_length: 1}
+    authority: {type: enum, values: [OBSERVED, CREATOR_SHOP_DERIVED, SYSTEM_DERIVED], forbidden: [BRAND_CONFIRMED, SUPPORT_CONTROLLED]}
+    source_class: {type: enum, values: [OWNED_WEBSITE, BRAND_USER_INPUT, CANONICAL_BUSINESS_STATE, MULTI_SOURCE, SYSTEM_DERIVATION_INPUT]}
+    freshness: {type: enum, values: [CURRENT, STALE, UNKNOWN]}
+    evidence_refs: {type: array, unique_items: true, item_type: string}
+    business_state_refs: {type: array, unique_items: true, item_type: string}
+
+partial_shape_rules:
+  profile_may_be_null: true
+  component_level_nullability: true
+  both_families_non_null_required: false
+  no_list_cardinality_frozen: true
+  missing_or_stale_price_is_not_zero: true
+  no_filler_to_force_ready: true
+  metadata_alignment:
+    - null semantic collection requires null metadata
+    - every emitted semantic item has exactly one metadata item with the same semantic_id
+
+canonical_input_validation:
+  deterministic_inputs:
+    - lifecycle
+    - customer destination
+    - canonical price and currency commercial tuple
+    - canonical Offer refs when available
+    - OFFERING_AVAILABLE_AT_LOCATION refs
+  canonical_values_referenced_not_owned: true
+  price_and_currency_tuple_not_split_or_mutated: true
+  location_relation_exact_meaning_required: true
+
+semantic_validation:
+  customer_action:
+    - interpretation must be supported by current canonical destination, exact Location relation, or same-Offering Evidence
+    - action is reusable context and not final Campaign CTA copy
+    - unavailable or inactive state must not be presented as currently actionable
+  commercial_context:
+    - derived interpretation must retain canonical commercial lineage
+    - absent formerly public price must not become zero or silent null
+    - Offer remains a separate canonical commercial entity
+    - observed promotion does not become canonical Offer state
+  geography:
+    - exact Location relation does not imply delivery origin, warehouse origin, service radius, marketing geography, or Brand-wide serviceability
+    - broader observed availability remains derived context
+    - broad canonical geography creation is invalid
+
+scope_validation:
+  every_offering_specific_ref_must_match_subject_offering: true
+  sibling_offering_evidence: invalid
+  same_brand_alone_is_insufficient_scope: true
+
+de_dependency_validation:
+  commercial_price_evidence_sufficiency: P2_DE_CAPABILITY_PREFLIGHT_REQUIRED
+  new_price_or_commercial_capability_frozen_here: false
+
+authority_and_protection_validation:
+  processor_emitted_brand_confirmed: invalid
+  processor_emitted_support_controlled: invalid
+  canonical_price_mutation: invalid
+
+readiness:
+  bounded_partial_output_supported: true
+  invalid_or_failed_output_replaces_current: false

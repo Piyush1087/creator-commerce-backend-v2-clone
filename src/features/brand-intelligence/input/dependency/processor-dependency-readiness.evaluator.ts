@@ -60,7 +60,11 @@ export class ProcessorDependencyReadinessEvaluator {
       };
     }
 
-    if (profile.processorId === "offering_factual_synthesis") {
+    if (
+      profile.processorId === "offering_factual_synthesis" ||
+      profile.processorId === "offering_creator_communication" ||
+      profile.processorId === "offering_actionability_synthesis"
+    ) {
       const offering = canonical.offeringFacts;
       const exactRef = evidence.canonicalOfferingRef;
       if (
@@ -73,6 +77,9 @@ export class ProcessorDependencyReadinessEvaluator {
           readiness: "WAITING_FOR_CANONICAL_INPUT",
           reasonCodes: ["EXACT_CANONICAL_OFFERING_NOT_AVAILABLE"],
         };
+      }
+      if (profile.processorId !== "offering_factual_synthesis") {
+        return { readiness: "READY_TO_RUN", reasonCodes: [] };
       }
       const context = evidence.capabilityResults.find(
         (item) => item.capabilityId === "owned_website.offering_context",

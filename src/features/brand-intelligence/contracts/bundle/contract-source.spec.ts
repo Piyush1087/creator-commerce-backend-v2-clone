@@ -20,6 +20,8 @@ export const PROCESSOR_ARCHITECTURE_COMMITS: Readonly<Record<string, string>> =
     visual_style_synthesis: PINNED_BRAND_ARCHITECTURE_COMMIT,
     serviceability_synthesis: PINNED_BRAND_ARCHITECTURE_COMMIT,
     offering_factual_synthesis: PINNED_ARCHITECTURE_COMMIT,
+    offering_creator_communication: PINNED_ARCHITECTURE_COMMIT,
+    offering_actionability_synthesis: PINNED_ARCHITECTURE_COMMIT,
   };
 
 export const EXECUTABLE_CONTRACT_PROCESSORS: ReadonlySet<string> = new Set([
@@ -31,6 +33,8 @@ export const EXECUTABLE_CONTRACT_PROCESSORS: ReadonlySet<string> = new Set([
   "visual_style_synthesis",
   "serviceability_synthesis",
   "offering_factual_synthesis",
+  "offering_creator_communication",
+  "offering_actionability_synthesis",
 ]);
 
 export const CONTRACT_SOURCE_SPECS: readonly ContractSourceSpec[] = [
@@ -348,6 +352,75 @@ export const CONTRACT_SOURCE_SPECS: readonly ContractSourceSpec[] = [
         "intelligence/engines/product_intelligence/artifacts/offering_factual_synthesis/reasoning.yaml",
       OUTPUT_CONTRACT:
         "intelligence/engines/product_intelligence/artifacts/offering_factual_synthesis/output_contract.yaml",
+      EVIDENCE_CONTRACT:
+        "intelligence/engines/product_intelligence/evidence/product_intelligence_evidence_requirements.yaml",
+      OBJECT_CONTRACT: "intelligence/engines/product_intelligence/objects.yaml",
+      SHARED_METADATA_CONTRACT:
+        "intelligence/architecture/shared_intelligence_metadata_contract.yaml",
+    },
+  },
+  {
+    processorId: "offering_creator_communication",
+    processorVersion: "1.0",
+    outputContractId: "offering_creator_communication_output_contract",
+    outputContractVersion: "1.0",
+    evidenceContractId: "product_intelligence_evidence_requirements",
+    evidenceContractVersion: "1.0",
+    ownerEngine: "product_intelligence",
+    owningBranch: "product_intelligence",
+    sourceDialect: "PRODUCT_ENGINE_V1",
+    ownedObjectSemanticIds: ["offering_creator_communication_profile"],
+    ownedPathPatterns: [
+      "$",
+      ...["creator_talking_points", "communication_constraints"].flatMap(
+        (field) => [`$/f/${field}`, `$/f/${field}/i/{semantic_id}`],
+      ),
+    ].map((componentPathPattern) => ({
+      objectSemanticId: "offering_creator_communication_profile",
+      componentPathPattern,
+    })),
+    artifactPaths: {
+      PROCESSOR_DEFINITION:
+        "intelligence/engines/product_intelligence/processors/offering_creator_communication.yaml",
+      REASONING_CONTRACT:
+        "intelligence/engines/product_intelligence/artifacts/offering_creator_communication/reasoning.yaml",
+      OUTPUT_CONTRACT:
+        "intelligence/engines/product_intelligence/artifacts/offering_creator_communication/output_contract.yaml",
+      EVIDENCE_CONTRACT:
+        "intelligence/engines/product_intelligence/evidence/product_intelligence_evidence_requirements.yaml",
+      OBJECT_CONTRACT: "intelligence/engines/product_intelligence/objects.yaml",
+      SHARED_METADATA_CONTRACT:
+        "intelligence/architecture/shared_intelligence_metadata_contract.yaml",
+    },
+  },
+  {
+    processorId: "offering_actionability_synthesis",
+    processorVersion: "1.0",
+    outputContractId: "offering_actionability_synthesis_output_contract",
+    outputContractVersion: "1.0",
+    evidenceContractId: "product_intelligence_evidence_requirements",
+    evidenceContractVersion: "1.0",
+    ownerEngine: "product_intelligence",
+    owningBranch: "product_intelligence",
+    sourceDialect: "PRODUCT_ENGINE_V1",
+    ownedObjectSemanticIds: ["offering_actionability_profile"],
+    ownedPathPatterns: [
+      "$",
+      ...["customer_action", "commercial_context"].flatMap((field) => [
+        `$/f/${field}`,
+        `$/f/${field}/i/{semantic_id}`,
+      ]),
+    ].map((componentPathPattern) => ({
+      objectSemanticId: "offering_actionability_profile",
+      componentPathPattern,
+    })),
+    artifactPaths: {
+      PROCESSOR_DEFINITION:
+        "intelligence/engines/product_intelligence/processors/offering_actionability_synthesis.yaml",
+      REASONING_CONTRACT:
+        "intelligence/engines/product_intelligence/artifacts/offering_actionability_synthesis/reasoning.yaml",
+      OUTPUT_CONTRACT:
+        "intelligence/engines/product_intelligence/artifacts/offering_actionability_synthesis/output_contract.yaml",
       EVIDENCE_CONTRACT:
         "intelligence/engines/product_intelligence/evidence/product_intelligence_evidence_requirements.yaml",
       OBJECT_CONTRACT: "intelligence/engines/product_intelligence/objects.yaml",

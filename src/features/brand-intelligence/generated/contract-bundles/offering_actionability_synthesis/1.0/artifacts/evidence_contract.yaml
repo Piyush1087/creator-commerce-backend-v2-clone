@@ -1,0 +1,149 @@
+id: product_intelligence_evidence_requirements
+version: "1.0"
+status: FROZEN
+engine: product_intelligence
+scope: ONE_EXACT_CANONICAL_OFFERING_WITHIN_ONE_BRAND
+shared_envelope: data-extraction/contracts/normalized_evidence_envelope_v1.yaml
+product_authority: intelligence/product_authority/product_intelligence_product_authority_register_v1.md
+
+purpose: >-
+  Classify the minimum and optional provider-neutral Evidence capabilities Product Intelligence V1 may consume,
+  enforce exact canonical Offering scope, and preserve P2 ownership of any commercial/price capability decision.
+
+scope_and_reconciliation:
+  exact_canonical_offering_ref_required_for_product_use: true
+  canonical_offering_identity_owner: application_backend
+  deterministic_reconciliation:
+    processor: false
+    ai_reasoning: false
+    may_attach_existing_canonical_offering_ref: true
+    may_create_or_mutate_canonical_offering: false
+    fuzzy_automatic_merge: forbidden
+    url_equality_as_universal_identity: forbidden
+    unresolved_identity_behavior: exclude_from_product_processor_or_route_to_review
+  cross_offering_rules:
+    sibling_offering_evidence_as_subject_support: forbidden
+    same_brand_is_not_same_offering: true
+    claim_support_must_match_exact_offering: true
+
+classifications:
+  owned_website.offering_context:
+    classification: REUSE_WITH_PRODUCT_SCOPE
+    existing_contract: data-extraction/contracts/owned_website_offering_context_v1.yaml
+    use_by: [offering_factual_synthesis]
+    product_scope_requirements:
+      - generalization_scope must be SINGLE_OFFERING for an Offering-specific assertion
+      - canonical_offering_ref must match the processor subject Offering
+      - observed labels are not canonical identity
+      - conflicts and capture history remain preserved
+
+  explicit_factual_proof_or_claim_evidence:
+    classification: REUSE_WITH_PRODUCT_SCOPE
+    use_by: [offering_factual_synthesis, offering_creator_communication]
+    product_scope_requirements:
+      - Evidence must resolve to the exact canonical Offering
+      - observed claim wording remains distinct from external verification
+      - testimonial remains distinct from proof
+      - credential occurrence remains distinct from credential verification
+      - regulated or high-risk claims require sufficient approved support or fail closed
+    new_capability_frozen_here: false
+
+  derived_communication_constraint_evidence:
+    classification: REUSE_EXISTING_CAPABILITY
+    existing_contract: data-extraction/contracts/derived_communication_constraint_evidence_v1.yaml
+    use_by: [offering_creator_communication]
+    scope_requirements:
+      - OFFERING_SPECIFIC items must match the exact canonical Offering
+      - BRAND_LEVEL items may apply only when the rule explicitly governs the subject Offering
+      - CONTEXT_SPECIFIC and UNKNOWN items cannot silently become Offering-wide hard rules
+      - repeated patterns remain descriptive and do not become mandatory constraints
+
+  owned_website.serviceability_evidence:
+    classification: OPTIONAL_ACTIONABILITY_ENRICHMENT
+    use_by: [offering_actionability_synthesis]
+    scope_requirements:
+      - Offering-scoped observations must match the exact canonical Offering
+      - broader observations remain derived context and do not create broad canonical geography
+      - serviceability Evidence does not replace OFFERING_AVAILABLE_AT_LOCATION canonical relations
+
+  owned_website.location_evidence:
+    classification: OPTIONAL_ACTIONABILITY_ENRICHMENT
+    use_by: [offering_actionability_synthesis]
+    scope_requirements:
+      - Location observation alone does not prove Offering availability
+      - canonical Location refs remain application-owned
+      - exact Offering-to-Location applicability requires canonical relation or explicit qualified support
+
+  Meta_Instagram:
+    classification: OPTIONAL
+    required_for_product_intelligence_v1: false
+    rules:
+      - enrichment must be explicitly reconciled to the exact Offering
+      - incidental or campaign-specific content cannot establish durable Offering truth
+      - absence of enrichment does not block execution
+
+  Similarweb:
+    classification: NOT_REQUIRED
+    required_for_product_intelligence_v1: false
+
+  competitor_sources:
+    classification: NOT_REQUIRED
+    required_for_product_intelligence_v1: false
+    sibling_or_competitor_claim_as_subject_truth: forbidden
+
+commercial_and_price_dependency:
+  product_commercial_price_evidence_sufficiency: P2_DE_CAPABILITY_PREFLIGHT_REQUIRED
+  bounded_product_price_capability_may_be_required: EXPECTED_POSSIBILITY_NOT_FROZEN
+  new_de_price_or_commercial_capability_frozen_in_P0: false
+  P0_must_not:
+    - define a price extraction capability
+    - define commercial payload semantics
+    - authorize canonical price mutation
+    - reinterpret missing price as zero or null
+  canonical_rule: >-
+    Price and currency are one application-owned commercial tuple. Reliable current first-party same-Offering
+    price is the controlled refresh exception, but capability sufficiency and implementation belong to P2 preflight.
+
+minimum_profiles:
+  offering_factual_synthesis:
+    required:
+      - exact Brand and canonical Offering refs
+      - owned_website.offering_context with Product scope sufficient for at least one requested semantic or explicit-null evaluation
+    conditional:
+      - same-Offering factual proof or claim Evidence for proof_points and claim-sensitive benefits
+  offering_creator_communication:
+    required:
+      - exact Brand and canonical Offering refs
+      - current offering_factual_profile or equivalent permitted same-Offering factual lineage
+      - sufficient same-Offering support for each claim-sensitive talking point
+    conditional:
+      - Brand-confirmed Offering do-not-say guidance
+      - relevant Brand or Offering communication constraint Evidence
+  offering_actionability_synthesis:
+    required:
+      - exact Brand and canonical Offering refs
+      - canonical lifecycle, destination, commercial tuple, Offer refs, and Location relations as applicable to emitted semantics
+    optional:
+      - Offering-scoped serviceability Evidence
+      - Offering-scoped location Evidence
+    deferred:
+      - commercial and price Evidence capability sufficiency to P2 preflight
+
+quality_and_failure_behavior:
+  explicit_negative_distinct_from_absence: true
+  conflicts_preserved: true
+  stale_evidence_remains_auditable: true
+  unavailable_optional_enrichment_blocks_processor: false
+  insufficient_claim_support: fail_closed
+  insufficient_family_support: partial_null_or_not_ready
+  provider_failure_does_not_fabricate_evidence: true
+
+validation_invariants:
+  - Every Product processor is scoped to one exact canonical Offering within one Brand.
+  - Same-Brand sibling Offering Evidence is not valid subject support.
+  - Existing capabilities are reused only with the declared Product scope.
+  - Meta/Instagram is optional.
+  - Similarweb and competitor sources are not required.
+  - No new commercial or price Data Extraction capability is frozen in P0.
+  - Product commercial and price Evidence sufficiency remains a P2 preflight decision.
+  - Data Extraction does not create or mutate canonical Offering state.

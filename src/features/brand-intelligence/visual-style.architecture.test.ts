@@ -17,9 +17,7 @@ describe("visual_style_synthesis architecture boundaries", () => {
       runtime
         .registrations()
         .filter(
-          (r) =>
-            r.executionEnabled &&
-            r.processorId !== "offering_factual_synthesis",
+          (r) => r.executionEnabled && !r.processorId.startsWith("offering_"),
         ),
     ).toHaveLength(7);
     expect(

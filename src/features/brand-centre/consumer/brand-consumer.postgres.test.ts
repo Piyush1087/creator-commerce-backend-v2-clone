@@ -432,10 +432,17 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         .filter((r) => r.executionEnabled)
         .map((r) => r.processorId)
         .sort();
-      expect(executableIds).toContain("offering_factual_synthesis");
+      const productIds = executableIds.filter((processorId) =>
+        processorId.startsWith("offering_"),
+      );
+      expect(productIds).toEqual([
+        "offering_actionability_synthesis",
+        "offering_creator_communication",
+        "offering_factual_synthesis",
+      ]);
       expect(
         executableIds.filter(
-          (processorId) => processorId !== "offering_factual_synthesis",
+          (processorId) => !productIds.includes(processorId),
         ),
       ).toEqual([
         "audience_persona_synthesis",

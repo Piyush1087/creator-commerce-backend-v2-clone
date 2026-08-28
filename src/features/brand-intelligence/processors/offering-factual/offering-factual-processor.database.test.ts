@@ -59,6 +59,15 @@ import {
 } from "./offering-factual-model.provider";
 import { OfferingFactualPersistenceHook } from "./offering-factual-persistence.hook";
 import { OfferingFactualProcessorExecutor } from "./offering-factual-processor.executor";
+import {
+  OfferingActionabilityProcessorExecutor,
+  OfferingCreatorCommunicationProcessorExecutor,
+} from "../offering-derived/offering-derived-processor.executor";
+import {
+  OfferingDerivedProviderError,
+  type OfferingDerivedModelProvider,
+  type OfferingDerivedModelRequest,
+} from "../offering-derived/offering-derived-model.provider";
 
 const databaseUrl = process.env.PRODUCT_INTELLIGENCE_DATABASE_TEST_URL;
 if (databaseUrl) process.env.DATABASE_URL = databaseUrl;
@@ -152,6 +161,11 @@ describePostgres(
     const deAdapter = new DataExtractionIntelligenceEvidenceAdapter(
       new DataExtractionEvidenceQueryService(dePersistence),
     );
+    const projection = new IntelligenceCurrentProjectionService(
+      new IntelligenceCurrentProjectionRepository(prismaService),
+      new IntelligenceCurrentContractScopeService(contracts, ownership, codec),
+      new IntelligenceObjectAssembler(codec),
+    );
     const dependencies = new ProcessorDependencyPreparationService(
       contracts,
       new ProcessorDependencyProfileRegistry(),
@@ -160,6 +174,7 @@ describePostgres(
       new CanonicalStateManifestBuilder(),
       new EvidenceManifestBuilder(),
       new ProcessorDependencyReadinessEvaluator(),
+      projection,
     );
     let failNext = false;
     let staleNext = false;
@@ -235,6 +250,135 @@ describePostgres(
       semantic,
       provider,
     );
+    let failCreatorNext = false;
+    let staleActionNext = false;
+    let creatorTalkingPoint =
+      "Highlight the Offering's grounded material and intended everyday use.";
+    let customerAction =
+      "Visit the exact Offering customer destination to continue.";
+    const creatorProvider: OfferingDerivedModelProvider = {
+      generate: vi.fn(async (request: OfferingDerivedModelRequest) => {
+        if (failCreatorNext) {
+          failCreatorNext = false;
+          throw new OfferingDerivedProviderError("PROVIDER_UNAVAILABLE", true);
+        }
+        const context = request.approvedContext as Record<string, unknown>;
+        const current = (
+          context.currentIntelligence as Array<Record<string, unknown>>
+        )[0];
+        const canonical = context.canonicalOffering as Record<string, unknown>;
+        const factualBusinessRef = String(current.businessStateRef);
+        const canonicalBusinessRef = String(canonical.businessStateRef);
+        const meta = {
+          authority: "CREATOR_SHOP_DERIVED",
+          source_class: "SYSTEM_DERIVATION_INPUT",
+          freshness: "CURRENT",
+          evidence_refs: [],
+          business_state_refs: [canonicalBusinessRef, factualBusinessRef],
+        };
+        return {
+          output: {
+            offering_creator_communication_profile: {
+              creator_talking_points: [
+                {
+                  semantic_id: "reusable-grounded-fact",
+                  talking_point: creatorTalkingPoint,
+                },
+              ],
+              communication_constraints: [
+                {
+                  semantic_id: "avoid-unsupported-medical-claims",
+                  constraint:
+                    "Do not make unsupported medical or efficacy claims.",
+                },
+              ],
+            },
+            output_metadata: {
+              creator_talking_points: [
+                { semantic_id: "reusable-grounded-fact", ...meta },
+              ],
+              communication_constraints: [
+                { semantic_id: "avoid-unsupported-medical-claims", ...meta },
+              ],
+            },
+          },
+          providerAttemptCount: 1,
+        };
+      }),
+    };
+    const actionabilityProvider: OfferingDerivedModelProvider = {
+      generate: vi.fn(async (request: OfferingDerivedModelRequest) => {
+        const context = request.approvedContext as Record<string, unknown>;
+        const subject = context.subject as Record<string, unknown>;
+        const canonical = context.canonicalOffering as Record<string, unknown>;
+        if (staleActionNext && subject.offeringRef === offeringA) {
+          staleActionNext = false;
+          await prisma.offering.update({
+            where: { id: offeringA },
+            data: {
+              description: `Changed during actionability ${randomUUID()}`,
+            },
+          });
+        }
+        const businessStateRef = String(canonical.businessStateRef);
+        const meta = {
+          authority: "SYSTEM_DERIVED",
+          source_class: "CANONICAL_BUSINESS_STATE",
+          freshness: "CURRENT",
+          evidence_refs: [],
+          business_state_refs: [businessStateRef],
+        };
+        const price = canonical.canonicalPrice as Record<
+          string,
+          unknown
+        > | null;
+        return {
+          output: {
+            offering_actionability_profile: {
+              customer_action: [
+                {
+                  semantic_id: "visit-exact-customer-destination",
+                  action: customerAction,
+                },
+              ],
+              commercial_context: price
+                ? [
+                    {
+                      semantic_id: "canonical-current-price",
+                      context: `Current canonical price is ${String(price.currentMinAmount)} ${String(price.currency)}.`,
+                    },
+                  ]
+                : null,
+            },
+            output_metadata: {
+              customer_action: [
+                { semantic_id: "visit-exact-customer-destination", ...meta },
+              ],
+              commercial_context: price
+                ? [{ semantic_id: "canonical-current-price", ...meta }]
+                : null,
+            },
+          },
+          providerAttemptCount: 1,
+        };
+      }),
+    };
+    const creatorExecutor = new OfferingCreatorCommunicationProcessorExecutor(
+      prismaService,
+      dependencies,
+      contracts,
+      new StructuralValidator(),
+      semantic,
+      creatorProvider,
+    );
+    const actionabilityExecutor = new OfferingActionabilityProcessorExecutor(
+      prismaService,
+      dependencies,
+      contracts,
+      new StructuralValidator(),
+      semantic,
+      actionabilityProvider,
+    );
     const executors = new ProcessorExecutorRegistry(
       new SyntheticProcessorExecutor(),
       undefined,
@@ -245,6 +389,8 @@ describePostgres(
       undefined,
       undefined,
       executor,
+      creatorExecutor,
+      actionabilityExecutor,
     );
     const executionService = new IntelligenceExecutionService(
       prismaService,
@@ -272,11 +418,6 @@ describePostgres(
       finalization,
       executors,
       hook,
-    );
-    const projection = new IntelligenceCurrentProjectionService(
-      new IntelligenceCurrentProjectionRepository(prismaService),
-      new IntelligenceCurrentContractScopeService(contracts, ownership, codec),
-      new IntelligenceObjectAssembler(codec),
     );
     const runtimeProjection = new ProcessorRuntimeProjectionService(
       prismaService,
@@ -375,6 +516,60 @@ describePostgres(
       if (!value.prepared.dependencyEligible) return value;
       const result = await worker.runOnce(`product-p3-${randomUUID()}`, 60_000);
       return { ...value, result };
+    }
+
+    async function runDerived(
+      offeringRef: string,
+      key: Readonly<{
+        processorId: string;
+        processorVersion: string;
+        outputContractId: string;
+        outputContractVersion: string;
+      }>,
+      objectSemanticId: string,
+      itemPaths: readonly string[],
+    ) {
+      const subject = await resolveIntelligenceSubject(prismaService, brandId, {
+        type: "OFFERING",
+        ref: offeringRef,
+      });
+      const activeScope = ["$", ...itemPaths].map((componentSemanticPath) => ({
+        brandId,
+        subjectId: subject.id,
+        objectSemanticId,
+        pathSchemeVersion: 1,
+        componentSemanticPath,
+      }));
+      const prepared = await dependencies.prepare({
+        brandId,
+        registryKey: key,
+        activeScope,
+        subject: { type: "OFFERING", ref: offeringRef },
+      });
+      const trigger = randomUUID();
+      const created = await executionService.createOrReturn({
+        brandId,
+        subject: { type: "OFFERING", ref: offeringRef },
+        triggerType: "PRODUCT_P4_TEST",
+        triggerRef: `product-p4:${trigger}`,
+        triggerIdempotencyKey: trigger,
+        correlationRef: `correlation:${trigger}`,
+        requestedImpact: { objectSemanticId },
+        processors: [
+          {
+            registryKey: key,
+            activeScope,
+            dependencyManifest: prepared.dependencyManifest,
+            evidenceManifest: prepared.evidenceManifest,
+            executionIntentKey: `${key.processorId}:${offeringRef}:${trigger}`,
+            maxAttempts: 1,
+            dependencyEligible: prepared.dependencyEligible,
+          },
+        ],
+      });
+      if (!prepared.dependencyEligible) return { created, prepared };
+      const result = await worker.runOnce(`product-p4-${randomUUID()}`, 60_000);
+      return { created, prepared, result };
     }
 
     beforeAll(async () => {
@@ -685,6 +880,373 @@ describePostgres(
           subject: { type: "OFFERING", ref: foreignOffering },
         }),
       ).rejects.toThrow();
+    }, 30_000);
+
+    it("reuses only A's current factual Object for creator communication and preserves current on failure", async () => {
+      const factualSubject = await resolveIntelligenceSubject(
+        prismaService,
+        brandId,
+        { type: "OFFERING", ref: offeringA },
+      );
+      const protectedFactual =
+        await prisma.intelligenceCurrentComponent.findFirstOrThrow({
+          where: {
+            brandId,
+            subjectId: factualSubject.id,
+            objectSemanticId: "offering_factual_profile",
+            componentSemanticPath: "$/f/factual_summary",
+          },
+          include: { currentComponentGeneration: true },
+        });
+      await prisma.intelligenceCurrentComponent.update({
+        where: { id: protectedFactual.id },
+        data: {
+          currentAuthority:
+            protectedFactual.currentComponentGeneration.authority,
+          protectionState: "UNPROTECTED",
+        },
+      });
+      const key = {
+        processorId: "offering_creator_communication",
+        processorVersion: "1.0",
+        outputContractId: "offering_creator_communication_output_contract",
+        outputContractVersion: "1.0",
+      } as const;
+      const completed = await runDerived(
+        offeringA,
+        key,
+        "offering_creator_communication_profile",
+        [
+          "$/f/creator_talking_points/i/reusable-grounded-fact",
+          "$/f/communication_constraints/i/avoid-unsupported-medical-claims",
+        ],
+      );
+      expect(completed.prepared.dependencyEligible).toBe(true);
+      expect(completed.prepared.intelligenceObjectDependencies).toEqual([
+        expect.objectContaining({
+          objectSemanticId: "offering_factual_profile",
+          assembledValue: expect.objectContaining({
+            factual_summary: expect.stringContaining("Offering A"),
+          }),
+        }),
+      ]);
+      expect(JSON.stringify(completed.prepared)).not.toContain(
+        "Offering B grounded",
+      );
+      expect(completed.result!.processorExecution.status).toBe("COMPLETED");
+      const current = await projection.readObject({
+        brandId,
+        subject: { type: "OFFERING", ref: offeringA },
+        objectSemanticId: "offering_creator_communication_profile",
+      });
+      expect(current.objectState).toBe("CURRENT");
+      expect(JSON.stringify(current)).toContain("reusable-grounded-fact");
+      const generation =
+        await prisma.intelligenceObjectGeneration.findFirstOrThrow({
+          where: {
+            brandId,
+            subjectId: current.subjectId,
+            objectSemanticId: "offering_creator_communication_profile",
+          },
+          include: { businessStateReferences: true },
+        });
+      expect(generation.businessStateReferences).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            entityType: "Offering",
+            entityId: offeringA,
+          }),
+          expect.objectContaining({
+            entityType: "IntelligenceCurrentObject",
+            entityId: expect.stringContaining("offering_factual_profile"),
+          }),
+        ]),
+      );
+      const beforeFailure = current.components[0].currentContractVersion;
+      const generationCount = await prisma.intelligenceObjectGeneration.count({
+        where: {
+          brandId,
+          subjectId: current.subjectId,
+          objectSemanticId: "offering_creator_communication_profile",
+        },
+      });
+      failCreatorNext = true;
+      const failed = await runDerived(
+        offeringA,
+        key,
+        "offering_creator_communication_profile",
+        ["$/f/creator_talking_points/i/reusable-grounded-fact"],
+      );
+      expect(failed.result!.processorExecution.status).toBe("FAILED_TERMINAL");
+      expect(
+        await prisma.intelligenceObjectGeneration.count({
+          where: {
+            brandId,
+            subjectId: current.subjectId,
+            objectSemanticId: "offering_creator_communication_profile",
+          },
+        }),
+      ).toBe(generationCount);
+      expect(
+        (
+          await projection.readObject({
+            brandId,
+            subject: { type: "OFFERING", ref: offeringA },
+            objectSemanticId: "offering_creator_communication_profile",
+          })
+        ).components[0].currentContractVersion,
+      ).toBe(beforeFailure);
+
+      const protectedCreator =
+        await prisma.intelligenceCurrentComponent.findFirstOrThrow({
+          where: {
+            brandId,
+            subjectId: current.subjectId,
+            objectSemanticId: "offering_creator_communication_profile",
+            componentSemanticPath:
+              "$/f/creator_talking_points/i/reusable-grounded-fact",
+          },
+        });
+      await prisma.intelligenceCurrentComponent.update({
+        where: { id: protectedCreator.id },
+        data: {
+          currentAuthority: "BRAND_CONFIRMED",
+          protectionState: "BRAND_CONFIRMED",
+        },
+      });
+      creatorTalkingPoint =
+        "Highlight the Offering's grounded construction and intended everyday use.";
+      const conflict = await runDerived(
+        offeringA,
+        key,
+        "offering_creator_communication_profile",
+        ["$/f/creator_talking_points/i/reusable-grounded-fact"],
+      );
+      expect(conflict.result!.processorExecution.status).toBe("COMPLETED");
+      expect(
+        (
+          await prisma.intelligenceCurrentComponent.findUniqueOrThrow({
+            where: { id: protectedCreator.id },
+          })
+        ).currentComponentGenerationId,
+      ).toBe(protectedCreator.currentComponentGenerationId);
+      expect(
+        await prisma.intelligenceComponentCandidate.count({
+          where: {
+            brandId,
+            subjectId: current.subjectId,
+            objectSemanticId: "offering_creator_communication_profile",
+            componentSemanticPath:
+              "$/f/creator_talking_points/i/reusable-grounded-fact",
+            status: "PENDING",
+          },
+        }),
+      ).toBe(1);
+    }, 30_000);
+
+    it("uses exact canonical price/Offer/Location for A and emits bounded no-price partial output for B", async () => {
+      await prisma.offeringPriceState.create({
+        data: { brandProfileId: brandId, offeringId: offeringA },
+      });
+      const price = await prisma.offeringPriceRevision.create({
+        data: {
+          brandProfileId: brandId,
+          offeringId: offeringA,
+          mode: "EXACT",
+          currentMinAmount: 25,
+          currentMaxAmount: 25,
+          currency: "USD",
+          freshness: "CURRENT",
+          authority: "APPLICATION_CANONICAL",
+          origin: "APPLICATION_WORKFLOW",
+          sourceClass: "CANONICAL_BUSINESS_STATE",
+          freshnessEvaluatedAt: new Date(),
+        },
+      });
+      await prisma.offeringPriceState.update({
+        where: { offeringId: offeringA },
+        data: { currentRevisionId: price.id },
+      });
+      const location = await prisma.location.create({
+        data: {
+          brandProfileId: brandId,
+          name: "Exact Store",
+          address: "1 Exact Street",
+          city: "Mumbai",
+        },
+      });
+      await prisma.offeringLocationAvailability.create({
+        data: {
+          brandProfileId: brandId,
+          offeringId: offeringA,
+          locationId: location.id,
+          authority: "APPLICATION_CANONICAL",
+          origin: "APPLICATION_WORKFLOW",
+        },
+      });
+      const offer = await prisma.brandOffer.create({
+        data: {
+          brandProfileId: brandId,
+          offerName: "Exact A Offer",
+          promoCode: randomUUID(),
+          applicabilityScope: "Offering A only",
+          validityStart: new Date(Date.now() - 1_000),
+          validityEnd: new Date(Date.now() + 86_400_000),
+        },
+      });
+      await prisma.brandOfferOffering.create({
+        data: {
+          brandProfileId: brandId,
+          brandOfferId: offer.id,
+          offeringId: offeringA,
+          authority: "APPLICATION_CANONICAL",
+          origin: "APPLICATION_WORKFLOW",
+        },
+      });
+      const key = {
+        processorId: "offering_actionability_synthesis",
+        processorVersion: "1.0",
+        outputContractId: "offering_actionability_synthesis_output_contract",
+        outputContractVersion: "1.0",
+      } as const;
+      const runA = await runDerived(
+        offeringA,
+        key,
+        "offering_actionability_profile",
+        [
+          "$/f/customer_action/i/visit-exact-customer-destination",
+          "$/f/commercial_context/i/canonical-current-price",
+        ],
+      );
+      const runB = await runDerived(
+        offeringB,
+        key,
+        "offering_actionability_profile",
+        ["$/f/customer_action/i/visit-exact-customer-destination"],
+      );
+      expect(runA.result!.processorExecution.status).toBe("COMPLETED");
+      expect(runB.result!.processorExecution.status).toBe("COMPLETED");
+      const calls = vi.mocked(actionabilityProvider.generate).mock.calls;
+      const contextA = calls.at(-2)![0].approvedContext as Record<
+        string,
+        unknown
+      >;
+      const contextB = calls.at(-1)![0].approvedContext as Record<
+        string,
+        unknown
+      >;
+      expect(contextA.canonicalOffering).toMatchObject({
+        offeringRef: offeringA,
+        canonicalPrice: { currentMinAmount: "25", currency: "USD" },
+        canonicalOffers: [expect.objectContaining({ offerId: offer.id })],
+        availableAtLocations: [
+          expect.objectContaining({ locationId: location.id }),
+        ],
+      });
+      expect(contextB.canonicalOffering).toMatchObject({
+        offeringRef: offeringB,
+        canonicalPrice: null,
+        canonicalOffers: [],
+        availableAtLocations: [],
+      });
+      expect(JSON.stringify(contextB)).not.toContain(location.id);
+      expect(JSON.stringify(contextB)).not.toContain(offer.id);
+      expect(JSON.stringify(contextB)).not.toContain("priceAmount");
+      const bProjection = await projection.readObject({
+        brandId,
+        subject: { type: "OFFERING", ref: offeringB },
+        objectSemanticId: "offering_actionability_profile",
+      });
+      expect(bProjection.consumerReadiness).toBe("PARTIAL");
+      const aProjection = await projection.readObject({
+        brandId,
+        subject: { type: "OFFERING", ref: offeringA },
+        objectSemanticId: "offering_actionability_profile",
+      });
+      expect(aProjection.consumerReadiness).toBe("READY");
+      expect(bProjection.assembledValue).toMatchObject({
+        state: "VALUE",
+        value: {
+          customer_action: expect.any(Array),
+          commercial_context: null,
+        },
+      });
+
+      staleActionNext = true;
+      const actionSubjectA = await resolveIntelligenceSubject(
+        prismaService,
+        brandId,
+        { type: "OFFERING", ref: offeringA },
+      );
+      const generationCount = await prisma.intelligenceObjectGeneration.count({
+        where: {
+          brandId,
+          subjectId: actionSubjectA.id,
+          objectSemanticId: "offering_actionability_profile",
+        },
+      });
+      const stale = await runDerived(
+        offeringA,
+        key,
+        "offering_actionability_profile",
+        ["$/f/customer_action/i/visit-exact-customer-destination"],
+      );
+      expect(stale.result!.processorExecution.status).toBe("FAILED_TERMINAL");
+      expect(
+        await prisma.intelligenceObjectGeneration.count({
+          where: {
+            brandId,
+            subjectId: actionSubjectA.id,
+            objectSemanticId: "offering_actionability_profile",
+          },
+        }),
+      ).toBe(generationCount);
+
+      const protectedAction =
+        await prisma.intelligenceCurrentComponent.findFirstOrThrow({
+          where: {
+            brandId,
+            subjectId: actionSubjectA.id,
+            objectSemanticId: "offering_actionability_profile",
+            componentSemanticPath:
+              "$/f/customer_action/i/visit-exact-customer-destination",
+          },
+        });
+      await prisma.intelligenceCurrentComponent.update({
+        where: { id: protectedAction.id },
+        data: {
+          currentAuthority: "BRAND_CONFIRMED",
+          protectionState: "BRAND_CONFIRMED",
+        },
+      });
+      customerAction =
+        "Visit the exact Offering customer destination to review the canonical details.";
+      const conflict = await runDerived(
+        offeringA,
+        key,
+        "offering_actionability_profile",
+        ["$/f/customer_action/i/visit-exact-customer-destination"],
+      );
+      expect(conflict.result!.processorExecution.status).toBe("COMPLETED");
+      expect(
+        (
+          await prisma.intelligenceCurrentComponent.findUniqueOrThrow({
+            where: { id: protectedAction.id },
+          })
+        ).currentComponentGenerationId,
+      ).toBe(protectedAction.currentComponentGenerationId);
+      expect(
+        await prisma.intelligenceComponentCandidate.count({
+          where: {
+            brandId,
+            subjectId: actionSubjectA.id,
+            objectSemanticId: "offering_actionability_profile",
+            componentSemanticPath:
+              "$/f/customer_action/i/visit-exact-customer-destination",
+            status: "PENDING",
+          },
+        }),
+      ).toBe(1);
     }, 30_000);
   },
 );

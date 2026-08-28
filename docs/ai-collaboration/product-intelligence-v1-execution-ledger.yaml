@@ -24,15 +24,15 @@ execution_mode:
 
 branch: phase-g/product-intelligence-v1
 
-current_phase: P3
+current_phase: P4
 phase_status: CHECKPOINT_READY_FOR_SYSTEMS_REVIEW
 
 checkpoint:
   status: PENDING_SYSTEMS_ACCEPTANCE
   sha: null
-  parent_sha: ff95d2f63121126a7575824a6cf10f14e1aff4a5
+  parent_sha: 65aee09bc4d0eb6a0e43dad4044214431607a56f
 
-previous_accepted_checkpoint_sha: ff95d2f63121126a7575824a6cf10f14e1aff4a5
+previous_accepted_checkpoint_sha: 65aee09bc4d0eb6a0e43dad4044214431607a56f
 
 resume_rule:
   candidate_head_self_recorded: false
@@ -40,28 +40,36 @@ resume_rule:
   record_as_previous_accepted_checkpoint_before_next_phase: true
 
 implementation:
-  processor_id: offering_factual_synthesis
+  processor_ids:
+    - offering_factual_synthesis
+    - offering_creator_communication
+    - offering_actionability_synthesis
   processor_version: "1.0"
-  owned_object: offering_factual_profile
+  owned_objects:
+    - offering_factual_profile
+    - offering_creator_communication_profile
+    - offering_actionability_profile
   product_executor_ids:
     - offering_factual_synthesis
+    - offering_creator_communication
+    - offering_actionability_synthesis
   accepted_de_checkpoint_retained: true
   commercial_de_capability_implemented: false
   migration_52_created: false
-  additional_product_processors_implemented: false
+  fourth_product_processor_implemented: false
   frontend_changed: false
 
 files_changed:
-  - nest-cli.json
   - src/features/brand-intelligence/contracts
   - src/features/brand-intelligence/generated/contract-bundles
   - src/features/brand-intelligence/input
   - src/features/brand-intelligence/execution
-  - src/features/brand-intelligence/processors/offering-factual
+  - src/features/brand-intelligence/processors/offering-derived
+  - src/features/brand-intelligence/processors/offering-factual/offering-factual-persistence.hook.ts
   - src/features/brand-intelligence/offering-factual.architecture.test.ts
   - src/features/brand-centre/consumer/brand-consumer.postgres.test.ts
   - docs/ai-collaboration/product-intelligence-v1-execution-ledger.yaml
-  - docs/ai-collaboration/product-intelligence-v1-p3-offering-factual-synthesis.md
+  - docs/ai-collaboration/product-intelligence-v1-p4-remaining-processors.md
 
 migrations:
   before: 51
@@ -70,30 +78,32 @@ migrations:
 
 tests:
   passed:
-    - product_contract_structure_and_semantics_22
-    - product_postgres_vertical_slice_3
-    - brand_intelligence_non_database_regressions
-    - seven_brand_processor_postgres_vertical_slices_108
-    - shared_execution_subject_projection_postgres
-    - de_non_database_regressions_108
-    - de_postgres_regressions_55
-    - canonical_offering_postgres_regressions_13
-    - brand_centre_regressions
-    - campaign_regressions_69
-    - deterministic_contract_bundle_verify
-    - prisma_generate_and_validate
-    - production_nest_build
-    - deployable_dist_bundle_byte_verification
-    - fresh_dist_startup_and_health_200
+    - frozen_contract_bundle_generation_and_verification
+    - product_structural_and_semantic_validation_10_tests
+    - product_dependency_waiting_and_exact_current_factual_reuse
+    - product_postgresql_vertical_slice_5_tests
+    - all_non_postgresql_source_suites_93_files_640_tests
+    - seven_brand_processor_postgresql_suites_108_tests
+    - de_w1_w2_exact_scope_postgresql_74_tests
+    - canonical_offering_and_deep_scan_postgresql_15_tests
+    - brand_centre_consumer_postgresql_8_tests
+    - campaign_regressions
+    - prisma_generate_validate
+    - production_build
     - scoped_eslint
+    - source_dist_bundle_and_registry_verification
+    - fresh_dist_startup_health_200_database_up
     - git_diff_check
   failed: []
   skipped:
-    - canonical_offering_historical_upgrade_fixture_requires_explicit_upgrade_mode
+    - two_preexisting_intentional_postgresql_cases
+  harness_notes:
+    - PostgreSQL processor suites used isolated cloned disposable databases.
+    - A parallel Brand regression attempt saturated the local host; sequential reruns used test-only timeout headroom and all passed without production runtime changes.
 
 corrections:
-  current_phase: 1
-  total: 10
+  current_phase: 2
+  total: 12
   consecutive_same_failure: 0
   by_phase:
     P0: 3
@@ -102,14 +112,13 @@ corrections:
     P1B-2: 2
     P2A: 1
     P3: 1
+    P4: 2
 
-last_failure:
-  code: P3_GENERATED_BUNDLE_BYTE_DRIFT
-  summary: Canonical regeneration removed formatter-only byte drift from the generated Product manifest; frozen source content and semantic hashes were unchanged.
+last_failure: null
 
 stop_reason: null
 
-next_phase: P4_PENDING_SYSTEMS_AUTHORIZATION
+next_phase: P5_PENDING_SYSTEMS_AUTHORIZATION
 
 environment:
   node: v24.19.0
@@ -117,4 +126,4 @@ environment:
   prisma: 6.19.3
   postgres: PostgreSQL 16 disposable Docker harness
 
-last_updated: "2026-08-28T03:04:24.5800326+05:30"
+last_updated: "2026-08-28T13:56:47.4673739+05:30"

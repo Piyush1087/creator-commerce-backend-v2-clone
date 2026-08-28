@@ -123,6 +123,18 @@ describe("W1.0D architecture boundary", () => {
         registered: true,
         executionEnabled: true,
       },
+      {
+        processorId: "offering_creator_communication",
+        bundled: true,
+        registered: true,
+        executionEnabled: true,
+      },
+      {
+        processorId: "offering_actionability_synthesis",
+        bundled: true,
+        registered: true,
+        executionEnabled: true,
+      },
     ]);
   });
 });

@@ -92,6 +92,16 @@ import {
   OFFERING_FACTUAL_MODEL_PROVIDER,
   StructuredOfferingFactualModelProvider,
 } from "./processors/offering-factual/offering-factual-model.provider";
+import {
+  OfferingActionabilityProcessorExecutor,
+  OfferingCreatorCommunicationProcessorExecutor,
+} from "./processors/offering-derived/offering-derived-processor.executor";
+import {
+  OFFERING_ACTIONABILITY_MODEL_PROVIDER,
+  OFFERING_CREATOR_MODEL_PROVIDER,
+  StructuredOfferingActionabilityModelProvider,
+  StructuredOfferingCreatorModelProvider,
+} from "./processors/offering-derived/offering-derived-model.provider";
 
 const internalProviders = [
   ServiceabilityProcessorExecutor,
@@ -139,9 +149,19 @@ const internalProviders = [
   BrandCharacterStateRepository,
   OfferingFactualProcessorExecutor,
   OfferingFactualPersistenceHook,
+  OfferingCreatorCommunicationProcessorExecutor,
+  OfferingActionabilityProcessorExecutor,
   {
     provide: OFFERING_FACTUAL_MODEL_PROVIDER,
     useClass: StructuredOfferingFactualModelProvider,
+  },
+  {
+    provide: OFFERING_CREATOR_MODEL_PROVIDER,
+    useClass: StructuredOfferingCreatorModelProvider,
+  },
+  {
+    provide: OFFERING_ACTIONABILITY_MODEL_PROVIDER,
+    useClass: StructuredOfferingActionabilityModelProvider,
   },
   BrandCommunicationPersistenceHook,
   BrandMeaningPersistenceHook,

@@ -5,6 +5,10 @@ import { BrandCharacterSemanticValidator } from "./brand-character.semantic-vali
 import { AudiencePersonaSemanticValidator } from "./audience-persona.semantic-validator";
 import { BrandDifferentiationSemanticValidator } from "./brand-differentiation.semantic-validator";
 import { OfferingFactualSemanticValidator } from "./offering-factual.semantic-validator";
+import {
+  OfferingActionabilitySemanticValidator,
+  OfferingCreatorCommunicationSemanticValidator,
+} from "./offering-derived.semantic-validator";
 
 import type { VerifiedContractBundle } from "../bundle/contract-bundle.types";
 import { accepted, rejected } from "./validation-result";
@@ -336,6 +340,8 @@ export class SemanticValidator {
         new VisualStyleSemanticValidator(),
         new ServiceabilitySemanticValidator(),
         new OfferingFactualSemanticValidator(),
+        new OfferingCreatorCommunicationSemanticValidator(),
+        new OfferingActionabilitySemanticValidator(),
       ].map((validator) => [validator.validatorId, validator]),
     );
 
