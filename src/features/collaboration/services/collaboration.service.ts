@@ -377,7 +377,9 @@ export class CollaborationService {
     const context = await this.brandWorkspace.resolveBrandContext(user);
     const thread = await this.access.assertThreadForUser(user, collaborationId);
     if (thread.brandProfileId !== context.brandProfileId) {
-      throw new ForbiddenException("Collaboration is outside this Brand workspace");
+      throw new ForbiddenException(
+        "Collaboration is outside this Brand workspace",
+      );
     }
     const alreadyAdvanced =
       thread.currentStage === UceMilestoneStage.STAGE_3_LOGISTICS;
@@ -782,16 +784,8 @@ export class CollaborationService {
         where: { collaborationId },
         data: {
           isComplianceVerified: true,
-          isFinalPayoutReleased:
-            thread.payoutMode === CollaborationPayoutMode.ESCROW,
         },
       });
-      if (thread.payoutMode === CollaborationPayoutMode.ESCROW) {
-        await tx.collaborationCommercial.update({
-          where: { collaborationId },
-          data: { escrowStatus: CollaborationEscrowStatus.SETTLED },
-        });
-      }
       await tx.collaboration.update({
         where: { id: collaborationId },
         data: { currentStage: UceMilestoneStage.STAGE_6_FEEDBACK_SYNC },
@@ -800,7 +794,7 @@ export class CollaborationService {
         tx,
         collaborationId,
         "COMPLIANCE_VERIFIED",
-        "Compliance verified. Final settlement staged.",
+        "Compliance verified. Final payout is eligible for approval.",
         { unreadCreator: true },
       );
     });

@@ -2947,6 +2947,21 @@ model BrandEscrowVault {
   @@map("brand_escrow_vaults")
 }
 
+enum EscrowCreatorPayoutStatus {
+  APPROVED
+  PROCESSING
+  PAID
+  FAILED
+}
+
+enum EscrowCreatorPayoutAttemptStatus {
+  CREATED
+  PROCESSING
+  PAID
+  FAILED
+  REVERSED
+}
+
 model EscrowFundingLoad {
   id                    String                  @id @default(uuid()) @map("funding_load_id")
   vaultId               String                  @map("vault_id")
@@ -3031,12 +3046,61 @@ model CreatorSettlementProfile {
   panNumber               String?        @map("pan_number") @db.VarChar(10)
   isPanVerified           Boolean        @default(false) @map("is_pan_verified")
   razorpayFundAccountId   String?        @unique @map("razorpay_fund_account_id")
+  razorpayContactId       String?        @map("razorpay_contact_id")
   isSettlementRouteActive Boolean        @default(false) @map("is_settlement_route_active")
   createdAt               DateTime       @default(now()) @map("created_at")
   updatedAt               DateTime       @updatedAt @map("updated_at")
 
   @@index([creatorProfileId])
   @@map("creator_settlement_profiles")
+}
+
+model EscrowCreatorPayout {
+  id                      String                    @id @default(uuid()) @map("payout_id")
+  collaborationId         String                    @map("collaboration_id")
+  escrowLockId            String                    @map("escrow_lock_id")
+  brandProfileId          String                    @map("brand_id")
+  creatorProfileId        String                    @map("creator_profile_id")
+  tranche                 EscrowPayoutTranche
+  contractedAmount        Decimal                   @map("contracted_amount") @db.Decimal(15, 4)
+  currency                String                    @db.VarChar(3)
+  status                  EscrowCreatorPayoutStatus @default(APPROVED)
+  approvedByUserId        String                    @map("approved_by_user_id")
+  approvedAt              DateTime                  @default(now()) @map("approved_at")
+  processingAt            DateTime?                 @map("processing_at")
+  paidAt                  DateTime?                 @map("paid_at")
+  failedAt                DateTime?                 @map("failed_at")
+  currentProvider         String?                   @map("current_provider")
+  currentProviderPayoutId String?                   @unique @map("current_provider_payout_id")
+  currentProviderStatus   String?                   @map("current_provider_status")
+  diagnosticPayload       Json?                     @map("diagnostic_payload")
+  createdAt               DateTime                  @default(now()) @map("created_at")
+  updatedAt               DateTime                  @updatedAt @map("updated_at")
+  attempts                EscrowCreatorPayoutAttempt[]
+
+  @@unique([collaborationId, tranche])
+  @@index([brandProfileId, status, createdAt])
+  @@index([escrowLockId])
+  @@map("escrow_creator_payouts")
+}
+
+model EscrowCreatorPayoutAttempt {
+  id                     String                           @id @default(uuid()) @map("attempt_id")
+  payoutId               String                           @map("payout_id")
+  payout                 EscrowCreatorPayout              @relation(fields: [payoutId], references: [id], onDelete: Restrict)
+  provider               String
+  providerPayoutId       String?                          @unique @map("provider_payout_id")
+  providerIdempotencyKey String                           @unique @map("provider_idempotency_key")
+  providerStatus         String?                          @map("provider_status")
+  status                 EscrowCreatorPayoutAttemptStatus @default(CREATED)
+  initiatedAt            DateTime                         @default(now()) @map("initiated_at")
+  terminalAt             DateTime?                        @map("terminal_at")
+  diagnosticPayload      Json?                            @map("diagnostic_payload")
+  createdAt              DateTime                         @default(now()) @map("created_at")
+  updatedAt              DateTime                         @updatedAt @map("updated_at")
+
+  @@index([payoutId, initiatedAt])
+  @@map("escrow_creator_payout_attempts")
 }
 
 model IdempotencyRegistry {

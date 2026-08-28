@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import {
   CollaborationEscrowStatus,
   EscrowTransactionType,
@@ -26,7 +30,10 @@ function resolveCreatorHandle(row: {
   creatorUser: {
     name: string | null;
     email: string;
-    creatorProfile: { displayName: string | null; instagramHandle: string | null } | null;
+    creatorProfile: {
+      displayName: string | null;
+      instagramHandle: string | null;
+    } | null;
   };
 }): string {
   const profile = row.creatorUser.creatorProfile;
@@ -41,13 +48,9 @@ function resolveCreatorHandle(row: {
 
 function resolveUpiVpa(
   stored: string | null | undefined,
-  brandDomain: string,
-): string {
-  if (stored) {
-    return stored;
-  }
-  const slug = brandDomain.replace(/[^a-z0-9]/gi, "").toLowerCase();
-  return `${slug || "brand"}.escrow@razorpay`;
+  _brandDomain: string,
+): string | null {
+  return stored ?? null;
 }
 
 @Injectable()
@@ -65,7 +68,12 @@ export class BrandPayoutsService {
     const brandProfileId = await this.brandAuth.resolveBrandProfileId(user);
     const brand = await this.prisma.brandProfile.findUnique({
       where: { id: brandProfileId },
-      select: { id: true, name: true, domain: true, payoutsWorkspaceRole: true },
+      select: {
+        id: true,
+        name: true,
+        domain: true,
+        payoutsWorkspaceRole: true,
+      },
     });
 
     if (!brand) {
@@ -131,12 +139,18 @@ export class BrandPayoutsService {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
+    const canonicalPayouts = await this.prisma.escrowCreatorPayout.findMany({
+      where: { brandProfileId },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
 
     const collaborationIds = [
       ...new Set(
-        ledgerRows
-          .map((row) => row.collaborationId)
-          .filter((id): id is string => Boolean(id)),
+        [
+          ...ledgerRows.map((row) => row.collaborationId),
+          ...canonicalPayouts.map((row) => row.collaborationId),
+        ].filter((id): id is string => Boolean(id)),
       ),
     ];
 
@@ -184,7 +198,7 @@ export class BrandPayoutsService {
       current_stage: lock.collaboration.currentStage,
     }));
 
-    const disbursals = ledgerRows
+    const legacyDisbursals = ledgerRows
       .filter((entry) => DISBURSAL_TYPES.has(entry.transactionType))
       .map((entry) => {
         const collab = entry.collaborationId
@@ -204,6 +218,23 @@ export class BrandPayoutsService {
           transaction_status: entry.transactionStatus,
         };
       });
+    const disbursals = [
+      ...canonicalPayouts.map((payout) => {
+        const collab = collabById.get(payout.collaborationId);
+        return {
+          disbursal_id: payout.id,
+          collaboration_id: payout.collaborationId,
+          recipient_creator: collab ? resolveCreatorHandle(collab) : null,
+          campaign_name: collab?.campaign.name ?? null,
+          tranche_phase: payout.tranche,
+          net_settled_amount: decimalToNumber(payout.contractedAmount),
+          razorpay_clearing_reference: payout.currentProviderPayoutId,
+          cleared_at: payout.paidAt?.toISOString() ?? null,
+          transaction_status: payout.status,
+        };
+      }),
+      ...legacyDisbursals,
+    ];
 
     return {
       workspace_role: brand.payoutsWorkspaceRole,

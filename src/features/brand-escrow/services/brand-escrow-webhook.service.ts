@@ -1,10 +1,16 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  Optional,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Prisma } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import { createHmac } from "crypto";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { RazorpayClient } from "./razorpay.client";
+import { EscrowCreatorPayoutService } from "./escrow-creator-payout.service";
 
 interface Payload {
   event: string;
@@ -12,6 +18,7 @@ interface Payload {
     payment?: { entity: Record<string, unknown> };
     order?: { entity: Record<string, unknown> };
     virtual_account?: { entity: Record<string, unknown> };
+    payout?: { entity: Record<string, unknown> };
   };
 }
 
@@ -22,6 +29,7 @@ export class BrandEscrowWebhookService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly razorpay: RazorpayClient,
+    @Optional() private readonly creatorPayout?: EscrowCreatorPayoutService,
   ) {}
 
   verifySignature(
@@ -30,7 +38,16 @@ export class BrandEscrowWebhookService {
   ): void {
     if (!signature)
       throw new BadRequestException("Missing Razorpay webhook signature");
-    const secret = this.config.get<string>("RAZORPAY_WEBHOOK_SECRET", "");
+    let isPayout = false;
+    try {
+      isPayout = String(
+        JSON.parse(rawBody?.toString("utf8") ?? "{}").event,
+      ).startsWith("payout.");
+    } catch {}
+    const secret = this.config.get<string>(
+      isPayout ? "RAZORPAYX_PAYOUT_WEBHOOK_SECRET" : "RAZORPAY_WEBHOOK_SECRET",
+      "",
+    );
     if (!secret)
       throw new BadRequestException("Webhook secret is not configured");
     if (!rawBody?.length)
@@ -43,6 +60,19 @@ export class BrandEscrowWebhookService {
 
   async handleWebhook(raw: unknown): Promise<void> {
     const payload = raw as Payload;
+    if (payload.event.startsWith("payout.")) {
+      const payout = payload.payload.payout?.entity;
+      if (
+        this.creatorPayout &&
+        typeof payout?.id === "string" &&
+        typeof payout.status === "string"
+      )
+        await this.creatorPayout.reconcileProviderPayout(
+          payout.id,
+          payout.status,
+        );
+      return;
+    }
     if (payload.event === "virtual_account.credited")
       return this.creditVirtualAccount(payload);
     if (payload.event === "order.paid" || payload.event === "payment.captured")

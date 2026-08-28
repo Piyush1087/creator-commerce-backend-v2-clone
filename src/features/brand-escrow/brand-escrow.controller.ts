@@ -31,6 +31,7 @@ import { BrandEscrowComputationService } from "./services/brand-escrow-computati
 import { BrandEscrowHardenedService } from "./services/brand-escrow-hardened.service";
 import { BrandEscrowInterlockService } from "./services/brand-escrow-interlock.service";
 import { BrandEscrowService } from "./services/brand-escrow.service";
+import { EscrowCreatorPayoutService } from "./services/escrow-creator-payout.service";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -117,6 +118,7 @@ export class BrandEscrowEngineController {
     private readonly workspaceAuth: BrandWorkspaceAuthorizationService,
     private readonly access: BrandEscrowAccessService,
     private readonly computation: BrandEscrowComputationService,
+    private readonly creatorPayout: EscrowCreatorPayoutService,
   ) {}
 
   @Post("lock-collaboration-funds")
@@ -148,15 +150,19 @@ export class BrandEscrowEngineController {
     @Req() req: RequestWithAuthUser,
     @Body() body: ExecuteTrancheDisbursalDto,
   ) {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const { brandProfileId } = await this.workspaceAuth.resolveBrandContext(
+      req.user,
+    );
     await this.access.assertCollaborationAccess(
       req.user,
       body.collaboration_id,
       brandProfileId,
     );
 
-    return this.computation.executeTrancheDisbursal({
+    return this.creatorPayout.approveAndStart({
       collaborationId: body.collaboration_id,
+      brandProfileId,
+      approvedByUserId: req.user.id,
       tranche: body.tranche,
     });
   }

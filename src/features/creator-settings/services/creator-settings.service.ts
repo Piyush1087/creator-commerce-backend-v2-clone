@@ -592,6 +592,16 @@ export class CreatorSettingsService {
     );
     this.access.assertPayoutMutation(role);
 
+    const existingSettlement =
+      await this.prisma.creatorSettlementProfile.findUnique({
+        where: { creatorProfileId: profile.id },
+      });
+    const bankChanged =
+      !existingSettlement ||
+      existingSettlement.accountHolderName !== input.beneficiaryLegalName ||
+      existingSettlement.bankAccountNumber !== input.accountNumber ||
+      existingSettlement.ifscCode !== input.routingIfscSwift;
+
     await this.prisma.creatorBankDetails.updateMany({
       where: { creatorProfileId: profile.id, isPrimary: true },
       data: { isPrimary: false },
@@ -621,6 +631,12 @@ export class CreatorSettingsService {
         accountHolderName: input.beneficiaryLegalName,
         bankAccountNumber: input.accountNumber,
         ifscCode: input.routingIfscSwift,
+        ...(bankChanged
+          ? {
+              razorpayFundAccountId: null,
+              isSettlementRouteActive: false,
+            }
+          : {}),
       },
     });
 

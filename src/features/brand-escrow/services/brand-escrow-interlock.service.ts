@@ -5,15 +5,10 @@ import {
   NotFoundException,
   PreconditionFailedException,
 } from "@nestjs/common";
-import {
-  CollaborationMessageKind,
-  CollaborationPayoutMode,
-  UceMilestoneStage,
-} from "@prisma/client";
+import { CollaborationMessageKind, UceMilestoneStage } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 
 import { PrismaService } from "../../../prisma/prisma.service";
-import { BrandEscrowComputationService } from "./brand-escrow-computation.service";
 
 export type EscrowRefundReasonCode =
   | "BR_03_LOGISTICS_STRIKE"
@@ -34,10 +29,7 @@ export interface TriggerCancellationRefundInput {
 
 @Injectable()
 export class BrandEscrowInterlockService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly computationService: BrandEscrowComputationService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async transitionCollaborationStage(input: TransitionStageInput) {
     return this.prisma.$transaction(async (tx) => {
@@ -89,23 +81,6 @@ export class BrandEscrowInterlockService {
           stageUpdatedAt: new Date(),
         },
       });
-
-      if (
-        collab.payoutMode === CollaborationPayoutMode.ESCROW &&
-        (targetStage === UceMilestoneStage.STAGE_3_LOGISTICS ||
-          targetStage === UceMilestoneStage.STAGE_4_CONTENT_REVIEW)
-      ) {
-        const lock = await tx.collaborationEscrowLock.findUnique({
-          where: { collaborationId: input.collaborationId },
-        });
-
-        if (lock && !lock.advanceTrancheDisbursed) {
-          await this.computationService.executeTrancheDisbursal({
-            collaborationId: input.collaborationId,
-            tranche: "ADVANCE_30",
-          });
-        }
-      }
 
       await tx.collaborationMessage.create({
         data: {

@@ -22,6 +22,8 @@ import { EscrowComputationEngine } from "./services/escrow-computation.engine";
 import { EscrowSubscriptionContextService } from "./services/escrow-subscription-context.service";
 import { IdempotencyManager } from "./services/idempotency.manager";
 import { RazorpayClient } from "./services/razorpay.client";
+import { RazorpayXPayoutAdapter } from "./services/razorpayx-payout.adapter";
+import { EscrowCreatorPayoutService } from "./services/escrow-creator-payout.service";
 
 @Module({
   imports: [
@@ -49,12 +51,15 @@ import { RazorpayClient } from "./services/razorpay.client";
     EscrowSubscriptionContextService,
     IdempotencyManager,
     RazorpayClient,
+    RazorpayXPayoutAdapter,
+    EscrowCreatorPayoutService,
   ],
   exports: [
     BrandEscrowService,
     BrandEscrowComputationService,
     BrandEscrowInterlockService,
     BrandEscrowHardenedService,
+    EscrowCreatorPayoutService,
   ],
 })
 export class BrandEscrowModule {}

@@ -351,6 +351,10 @@ export class BrandEscrowComputationService {
   }
 
   async executeTrancheDisbursal(input: ExecuteTrancheDisbursalInput) {
+    throw new BadRequestException(
+      "Legacy disbursal is disabled; use authenticated creator payout approval",
+    );
+    /* istanbul ignore next -- unreachable historical implementation retained for read compatibility */
     return this.prisma.$transaction(async (tx) => {
       const lock = await tx.collaborationEscrowLock.findUnique({
         where: { collaborationId: input.collaborationId },
