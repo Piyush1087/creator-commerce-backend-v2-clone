@@ -1,0 +1,239 @@
+id: brand_communication_output_contract
+version: "1.0"
+status: FROZEN
+processor: brand_communication
+object: communication_profile
+strict: true
+additional_properties: false
+processor_definition: intelligence/engines/brand_intelligence/branches/brand_expression/processors/brand_communication.yaml
+reasoning_authority: intelligence/engines/brand_intelligence/branches/brand_expression/artifacts/brand_communication/reasoning.yaml
+object_authority: intelligence/engines/brand_intelligence/branches/brand_expression/objects.yaml#communication_profile
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define machine-valid processor output for communication_profile while preserving partial output, item/subfield
+  authority, Evidence lineage, protected-current-state semantics, and the prohibition on geography-derived language.
+
+response:
+  type: object
+  required:
+    - communication_profile
+    - output_metadata
+  properties:
+    communication_profile:
+      type:
+        - object
+        - "null"
+      nullable: true
+      additional_properties: false
+      fields:
+        tone_traits:
+          type:
+            - array
+            - "null"
+          nullable: true
+          item:
+            additional_properties: false
+            required:
+              - semantic_id
+              - trait
+            fields:
+              semantic_id:
+                type: string
+                min_length: 1
+                stable_identity_rule: normalized_trait_meaning_not_array_position
+              trait:
+                type: string
+                min_length: 1
+        free_text_guidance:
+          type:
+            - string
+            - "null"
+          nullable: true
+        communication_constraints:
+          type:
+            - array
+            - "null"
+          nullable: true
+          item:
+            additional_properties: false
+            required:
+              - semantic_id
+              - constraint
+            fields:
+              semantic_id:
+                type: string
+                min_length: 1
+                stable_identity_rule: normalized_constraint_meaning_not_array_position
+              constraint:
+                type: string
+                min_length: 1
+        primary_language:
+          type:
+            - string
+            - "null"
+          nullable: true
+          normalization_when_non_null: ISO_639_1_lowercase
+
+    output_metadata:
+      type: object
+      additional_properties: false
+      required:
+        - tone_traits
+        - free_text_guidance
+        - communication_constraints
+        - primary_language
+      fields:
+        tone_traits:
+          type:
+            - array
+            - "null"
+          nullable: true
+          keyed_by: semantic_id
+          item: shared_generated_metadata
+        free_text_guidance:
+          type:
+            - object
+            - "null"
+          nullable: true
+          schema: shared_generated_metadata
+        communication_constraints:
+          type:
+            - array
+            - "null"
+          nullable: true
+          keyed_by: semantic_id
+          item: shared_generated_metadata
+        primary_language:
+          type:
+            - object
+            - "null"
+          nullable: true
+          schema: shared_generated_metadata
+
+shared_generated_metadata:
+  additional_properties: false
+  required:
+    - authority
+    - source_class
+    - freshness
+    - evidence_refs
+  fields:
+    semantic_id:
+      type:
+        - string
+        - "null"
+      nullable: true
+      rule: Required when metadata corresponds to an item; null for scalar/subfield metadata.
+    authority:
+      type: enum
+      values:
+        - OBSERVED
+        - CREATOR_SHOP_DERIVED
+      forbidden:
+        - BRAND_CONFIRMED
+        - SUPPORT_CONTROLLED
+    source_class:
+      type: enum
+      values:
+        - OWNED_WEBSITE
+        - BRAND_USER_INPUT
+        - INSTAGRAM_OWNED
+        - MULTI_SOURCE
+        - SYSTEM_DERIVATION_INPUT
+    freshness:
+      type: enum
+      values:
+        - CURRENT
+        - STALE
+        - UNKNOWN
+    evidence_refs:
+      type: array
+      min_items: 1
+      unique_items: true
+      item_type: string
+
+partial_shape_rules:
+  communication_profile_may_be_null: true
+  component_level_nullability: true
+  all_components_required_to_be_non_null: false
+  primary_language_required: false
+  examples_allowed:
+    - tone_traits_non_null_only
+    - primary_language_non_null_only
+    - tone_traits_and_constraints_non_null
+    - full_profile
+  metadata_alignment:
+    - Null semantic component requires null metadata for that component.
+    - Non-null scalar component requires non-null metadata.
+    - Every emitted tone_traits item must have exactly one metadata entry with the same semantic_id.
+    - Every emitted communication_constraints item must have exactly one metadata entry with the same semantic_id.
+
+structural_validation:
+  reject_additional_properties: true
+  reject_duplicate_tone_semantic_ids: true
+  reject_duplicate_constraint_semantic_ids: true
+  reject_blank_trait_or_constraint: true
+  reject_non_normalized_primary_language: true
+  reject_missing_metadata_for_emitted_component: true
+  reject_metadata_without_corresponding_semantic_value: true
+
+semantic_validation:
+  tone_traits:
+    - must be grounded in Brand communication evidence
+    - generic praise or unsupported trait is invalid
+    - materially duplicate traits are invalid
+  free_text_guidance:
+    - must be descriptive/advisory rather than a hard rule
+    - Campaign-specific CTA, deliverable, objective, timing, or talking-point instruction is invalid
+  communication_constraints:
+    - must concern verbal/message/tone/terminology/claim communication boundaries
+    - visual execution constraints are invalid
+    - inferred hard rule without explicit or defensible grounding is invalid
+    - Campaign-specific CTA/deliverable/objective/timing instruction is invalid
+  primary_language:
+    - must resolve from communication Evidence refs
+    - country/geography cannot be an establishing Evidence ref
+    - if multiple materially co-primary languages remain unresolved, value must be null
+    - ISO normalization required when non-null
+
+protected_current_state_validation:
+  ordinary_refresh_must_not_replace_brand_confirmed: true
+  processor_emitted_brand_confirmed: invalid
+  runtime_active_scope_should_exclude_protected_components: true
+
+authority_validation:
+  allowed_processor_authority:
+    - OBSERVED
+    - CREATOR_SHOP_DERIVED
+  observed_allowed_for:
+    - directly observed primary_language
+    - explicit owned-source communication constraint
+  derived_allowed_for:
+    - tone interpretation
+    - free-text guidance
+    - reconciled language interpretation
+    - defensible derived constraint
+  support_controlled_emission: invalid
+
+source_and_lineage_validation:
+  evidence_refs_required_for_every_non_null_generated_component_or_item: true
+  provider_names_as_source_classes: invalid
+  source_class_must_match_shared_metadata_vocabulary: true
+
+migration_gate:
+  legacy_semantic: identity.primary_language
+  output_validation_is_one_required_gate: true
+  retirement_still_requires:
+    - processor definition frozen
+    - reasoning contract frozen
+    - runtime/model binding active
+    - persistence/reconciliation active
+    - compatibility adapter tested
+    - consumers remapped
+
+non_goals:
+  - persistence schema
+  - runtime validator implementation
+  - provider structured-output translation
+  - secondary-language permanent Object

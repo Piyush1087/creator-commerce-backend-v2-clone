@@ -1,0 +1,121 @@
+version: '1.0'
+status: FROZEN
+owner_engine: brand_intelligence
+shared_runtime_dependencies:
+- Compiler
+- Prompt Builder
+- Model Registry
+- provider port
+- Safe YAML loader
+- telemetry
+- generic persistence adapter
+shared_authority_rules:
+  processors_may_emit:
+  - OBSERVED
+  - CREATOR_SHOP_DERIVED
+  - SYSTEM_DERIVED
+  processors_must_not_emit:
+  - BRAND_CONFIRMED
+  - SUPPORT_CONTROLLED
+  brand_confirmation_transition_owner: authorized_application_or_business_state_action
+  protected_current_authoritative_state:
+    ordinary_derivation_dependency: false
+    silent_overwrite: forbidden
+    new_evidence_behavior: compare_or_surface_discrepancy_without_automatic_replacement
+shared_readiness_rules:
+  partial_valid_output_supported: true
+  no_brand_preview_gate: true
+  no_verification_gate: true
+  no_home_gate: true
+  no_filler_to_force_ready: true
+  consumer_scoped_readiness: true
+shared_invalidation_rules:
+  directed_only: true
+  whole_brand_intelligence_recompute: forbidden
+id: brand_communication
+owning_branch: brand_expression
+processor_type: HYBRID
+purpose: Produce the reusable Brand communication_profile, combining grounded semantic interpretation of tone/guidance/constraints with deterministic normalization of primary communication language when evidence is sufficiently explicit.
+outputs:
+- communication_profile
+output_components:
+- tone_traits
+- free_text_guidance
+- communication_constraints
+- primary_language
+canonical_inputs:
+- brand_name
+- confirmed_industry
+- Brand-confirmed communication state when present
+evidence_requirements:
+- owned_website.brand_messaging
+- owned_website.brand_company_context
+- observed Brand communication-language signals
+- brand_user_input_and_confirmations
+optional_enrichment:
+- instagram.owned_brand_context
+hybrid_responsibility:
+  AI_REASONING:
+  - tone_traits
+  - free_text_guidance
+  - communication_constraints
+  - language resolution when multiple communication signals require reconciliation
+  DETERMINISTIC:
+  - ISO_639_1 lowercase normalization when language is explicitly resolved
+  separate_primary_language_processor: forbidden
+primary_language_invariant:
+  must_derive_from_actual_brand_communication_evidence: true
+  country_default_inference: forbidden
+  example_forbidden: country=India must not imply primary_language=Hindi
+  nullable: true
+  missing_language_invalidates_whole_profile: false
+authority_behavior:
+  default_interpretive_authority: CREATOR_SHOP_DERIVED
+  observed_authority_allowed_for_directly_observed_language_or_explicit_constraints: true
+  aggregate_brand_confirmation_emitted_by_processor: false
+partial_output_behavior:
+  valid_shapes:
+  - tone only
+  - language only
+  - tone + constraints
+  - full profile
+  component_level_nullability: true
+  valid_run_requires_primary_language: false
+readiness_contribution:
+  Brand_Centre: PARTIAL_ALLOWED
+  Chat: IMPORTANT_CONTEXT_WHEN_AVAILABLE
+  Creator_Strategy: IMPORTANT_CONTEXT_WHEN_AVAILABLE
+  Campaign_Brief: IMPORTANT_CONTEXT_WHEN_AVAILABLE
+refresh_triggers:
+- material Brand messaging change
+- material tone or communication-policy change
+- material communication-language evidence change
+- Brand-confirmed communication change
+invalidation_rules:
+  item_and_subfield_level_supported: true
+  only_affected_components_refresh: true
+model_profile_requirement_class: hybrid_semantic_resolution
+validation_responsibility:
+- validate communication_profile structure and stable item identities
+- validate primary_language ISO normalization when resolved
+- reject country-to-language inference
+- preserve protected confirmed tone/constraint/guidance/language independently
+- exclude Campaign CTA, deliverable instructions, campaign objective and campaign-specific talking points
+persistence_boundary: Processor defines semantic output only; persistence/reconciliation is a required later migration stage.
+non_owned_scope:
+- visual execution constraints
+- Campaign CTA
+- Campaign deliverable instructions
+- Campaign objective
+- Campaign-specific mandatory talking points
+- canonical country
+migration_relevance:
+  replaces_legacy_semantic: identity.primary_language
+  legacy_primary_language_retirement_requires:
+  - this processor contract frozen
+  - communication_profile validation active
+  - runtime loading active
+  - persistence/reconciliation path active
+  - compatibility adapter tested
+  - consumer migration complete
+  identity_core_retirement: not_retireable_merely_because_this_contract_exists

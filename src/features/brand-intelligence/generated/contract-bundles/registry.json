@@ -1,0 +1,475 @@
+{
+  "generatedNotice": "GENERATED — DO NOT EDIT",
+  "generatorVersion": "1.0.0",
+  "architectureRepository": "Piyush1087/dummy_tcs",
+  "architectureCommitSha": "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
+  "registrations": [
+    {
+      "processorId": "brand_communication",
+      "processorVersion": "1.0",
+      "outputContractId": "brand_communication_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "brand_intelligence.brand_communication",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "5d50cb31390ba1f26a038e7492af46f28ca563b729ebc5d82f2396b2bc8be4b2",
+      "ownedObjectSemanticIds": [
+        "communication_profile"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "communication_profile",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "communication_profile",
+          "componentPathPattern": "$/f/tone_traits/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "communication_profile",
+          "componentPathPattern": "$/f/free_text_guidance"
+        },
+        {
+          "objectSemanticId": "communication_profile",
+          "componentPathPattern": "$/f/communication_constraints/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "communication_profile",
+          "componentPathPattern": "$/f/primary_language"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "brand_communication",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
+    },
+    {
+      "processorId": "brand_meaning",
+      "processorVersion": "1.0",
+      "outputContractId": "brand_meaning_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "brand_intelligence.brand_meaning",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "77d40718947b3b7a4d3994c8db04ae9b5fc68a4419a157a7a2e3c523437d2c14",
+      "ownedObjectSemanticIds": [
+        "brand_description",
+        "positioning",
+        "value_proposition"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "brand_description",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "positioning",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "value_proposition",
+          "componentPathPattern": "$"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "brand_meaning",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
+    },
+    {
+      "processorId": "brand_character",
+      "processorVersion": "1.0",
+      "outputContractId": "brand_character_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "brand_intelligence.brand_character",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "993dcf05379812db006bc358fecff73ce50f20ababc3553090833664b9cf028e",
+      "ownedObjectSemanticIds": [
+        "brand_values",
+        "brand_personality"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "brand_values",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "brand_values",
+          "componentPathPattern": "$/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "brand_personality",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "brand_personality",
+          "componentPathPattern": "$/i/{semantic_id}"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "brand_character",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
+    },
+    {
+      "processorId": "audience_persona_synthesis",
+      "processorVersion": "1.0",
+      "outputContractId": "audience_persona_synthesis_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "brand_intelligence.audience_persona_synthesis",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "c9fef21ab4bcbc061a6e29e2d4e6c542a87044aec4f2b2d174562faed41192ed",
+      "ownedObjectSemanticIds": [
+        "audience_personas"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/label"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/summary"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/lifecycle"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/geography_context"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/demographic_context"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/key_characteristics"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/key_characteristics/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/key_characteristics/i/{semantic_id}/f/value"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/motivations"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/motivations/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/motivations/i/{semantic_id}/f/value"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/barriers_or_concerns"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/barriers_or_concerns/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/barriers_or_concerns/i/{semantic_id}/f/value"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/trust_credibility_needs"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/trust_credibility_needs/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/trust_credibility_needs/i/{semantic_id}/f/value"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/creator_communication_implications"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/creator_communication_implications/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "audience_personas",
+          "componentPathPattern": "$/i/{semantic_id}/f/creator_communication_implications/i/{semantic_id}/f/value"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "audience_persona_synthesis",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
+    },
+    {
+      "processorId": "brand_differentiation",
+      "processorVersion": "1.0",
+      "outputContractId": "brand_differentiation_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "brand_intelligence.brand_differentiation",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "91d6f6f6d8ee6a6b52de5b1aa2d6898563581498b360b7a226f890e1f407686f",
+      "ownedObjectSemanticIds": [
+        "differentiation_and_proof"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "differentiation_and_proof",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "differentiation_and_proof",
+          "componentPathPattern": "$/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "differentiation_and_proof",
+          "componentPathPattern": "$/i/{semantic_id}/f/differentiator"
+        },
+        {
+          "objectSemanticId": "differentiation_and_proof",
+          "componentPathPattern": "$/i/{semantic_id}/f/proof_points"
+        },
+        {
+          "objectSemanticId": "differentiation_and_proof",
+          "componentPathPattern": "$/i/{semantic_id}/f/proof_points/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "differentiation_and_proof",
+          "componentPathPattern": "$/i/{semantic_id}/f/proof_points/i/{semantic_id}/f/statement"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "brand_differentiation",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
+    },
+    {
+      "processorId": "visual_style_synthesis",
+      "processorVersion": "1.0",
+      "outputContractId": "visual_style_synthesis_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "brand_intelligence.visual_style_synthesis",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "abe6db88df94e73ebdae3fd4d5345076054a2ab7642d4b34280ea1cda294dd9a",
+      "ownedObjectSemanticIds": [
+        "visual_style_profile"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/summary"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/style_traits"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/style_traits/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/style_traits/i/{semantic_id}/f/trait"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/photographic_tendencies"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/photographic_tendencies/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/photographic_tendencies/i/{semantic_id}/f/value"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/subject_tendencies"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/subject_tendencies/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/subject_tendencies/i/{semantic_id}/f/value"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/mood_or_treatment"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/mood_or_treatment/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/imagery_style/f/mood_or_treatment/i/{semantic_id}/f/value"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/graphic_treatment"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/graphic_treatment/f/traits"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/graphic_treatment/f/traits/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/graphic_treatment/f/traits/i/{semantic_id}/f/value"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/visual_constraints"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/visual_constraints/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "visual_style_profile",
+          "componentPathPattern": "$/f/visual_constraints/i/{semantic_id}/f/rule"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "visual_style_synthesis",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
+    },
+    {
+      "processorId": "serviceability_synthesis",
+      "processorVersion": "1.0",
+      "outputContractId": "serviceability_synthesis_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "brand_intelligence.serviceability_synthesis",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "cacedfd03169a988a51ff5d545f15b230858b5df3f42f02166f58a8980eecf7d",
+      "ownedObjectSemanticIds": [
+        "serviceability_profile"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/coverage_is_heterogeneous"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/mixed_coverage_note"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/overall_scope"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceability_basis"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}/f/applies_to_market_refs"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}/f/basis_type"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}/f/business_state_refs"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}/f/evidence_refs"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}/f/offering_refs"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceable_markets"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/country_code"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/label"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/locality"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/radius_km"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/region"
+        },
+        {
+          "objectSemanticId": "serviceability_profile",
+          "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/scope"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "serviceability_synthesis",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
+    }
+  ]
+}

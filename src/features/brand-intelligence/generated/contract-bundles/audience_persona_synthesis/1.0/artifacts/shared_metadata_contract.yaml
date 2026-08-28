@@ -1,0 +1,360 @@
+version: "1.0"
+status: FROZEN
+contract: shared_intelligence_metadata
+scope: platform_wide_durable_intelligence_metadata
+owner: intelligence_engine
+
+purpose: >-
+  Define the smallest reusable platform metadata conventions required to preserve semantic identity,
+  provenance, authority, readiness, freshness, dependency-directed invalidation, generation lineage,
+  supersession and optional uncertainty semantics across durable Creator Shop Intelligence domains,
+  without forcing every domain to share one semantic schema or persist every metadata field.
+
+principles:
+  - source_is_not_authority
+  - authority_is_not_freshness
+  - readiness_is_not_freshness
+  - readiness_may_be_consumer_scoped
+  - source_classes_are_provider_neutral
+  - derived_intelligence_retains_traceable_execution_and_evidence_lineage
+  - brand_confirmed_values_are_not_silently_overwritten
+  - support_controlled_identity_discrepancies_do_not_auto_mutate_identity
+  - domain_specific_authority_exceptions_must_be_explicit
+  - dependency_invalidation_is_directed_not_whole_engine_refresh
+  - invalidation_does_not_delete_history
+  - metadata_semantics_do_not_require_one_storage_shape
+  - canonical_business_objects_remain_owned_by_application_backend_authority
+
+canonical_business_state_boundary:
+  intelligence_does_not_become_canonical_owner_of:
+    - brand_account_or_confirmed_identity_records
+    - offering_operational_records_and_lifecycle
+    - campaign_records
+    - collaboration_records
+    - quarterly_budget_or_accounting_ledger
+  intelligence_may:
+    - consume_canonical_business_state
+    - reference_canonical_business_objects
+    - derive_intelligence_about_them
+    - attach_metadata_to_derived_results_or_reconciled_fields
+    - detect_conflicts_or_staleness
+    - request_authorized_resolution
+  rule: Intelligence metadata must not create a parallel canonical business database merely because a value participates in Intelligence reasoning.
+
+semantic_identity:
+  universally_reusable: true
+  definition: Identifies the semantic fact, object, result or synthesis that the metadata describes.
+  fields:
+    semantic_key:
+      required_when_metadata_persisted: true
+      meaning: Stable semantic object/result identifier within its owning Intelligence contract.
+    domain:
+      required_when_metadata_persisted: true
+      meaning: Owning durable Intelligence domain.
+    branch_or_scope:
+      required: false
+      meaning: Optional branch, processor scope or semantic sub-domain when useful.
+    schema_version:
+      required_for_versioned_derived_intelligence: true
+      meaning: Version of the semantic contract governing the value/result.
+
+source:
+  universally_reusable: true
+  definition: >-
+    Describes the semantic origin category of the information supporting a value/result.
+    Source is independent from authority. A website-originated value may later become Brand-confirmed.
+  class:
+    required_where_source_is_meaningful: true
+    provider_neutral: true
+    canonical_base_values:
+      - OWNED_WEBSITE
+      - BRAND_USER_INPUT
+      - INSTAGRAM_OWNED
+      - CAMPAIGN_STATE
+      - COLLABORATION_STATE
+      - PERFORMANCE_EVIDENCE
+      - COMPETITOR_PUBLIC_WEB
+      - CANONICAL_BUSINESS_STATE
+      - SYSTEM_DERIVATION_INPUT
+      - MULTI_SOURCE
+    extension_policy: Domains may add source classes only when they represent a genuinely different semantic origin, not a provider or endpoint.
+    forbidden_as_source_classes:
+      - ZYTE
+      - CHEERIO
+      - GEMINI
+      - OPENAI
+      - PARALLEL
+      - META_GRAPH_ENDPOINT
+      - PROVIDER_OR_ENDPOINT_NAME
+  provenance_refs:
+    evidence_refs:
+      type: array
+      required: false
+      meaning: Concrete normalized Evidence references supporting the value/result.
+    business_state_refs:
+      type: array
+      required: false
+      meaning: Concrete references to canonical application/backend business objects or state consumed by Intelligence.
+    user_action_refs:
+      type: array
+      required: false
+      meaning: Explicit Brand/support/admin confirmation or correction events when relevant.
+    runtime_provider_refs:
+      canonical_metadata_role: false
+      rule: Provider/model/endpoint execution details remain runtime/Data Extraction provenance and may be referenced indirectly through execution or Evidence records rather than promoted into source.class.
+
+authority:
+  universally_reusable: true
+  definition: Describes which actor or system rule currently has semantic precedence for the value.
+  states:
+    OBSERVED:
+      meaning: Source-grounded value not explicitly elevated through Brand/support confirmation and eligible for refresh according to domain policy.
+    CREATOR_SHOP_DERIVED:
+      meaning: Intelligence interpretation, synthesis or recommendation produced by Creator Shop.
+    BRAND_CONFIRMED:
+      meaning: Value explicitly accepted, corrected or authored by an authorized Brand actor and protected from silent automated overwrite.
+    SUPPORT_CONTROLLED:
+      meaning: Canonical identity or operational anchor whose mutation requires an authorized support/exception path.
+    SYSTEM_DERIVED:
+      meaning: Deterministic value derived from authoritative dependencies; direct manual editing is normally invalid.
+  overwrite_policy:
+    generic_rules:
+      - OBSERVED may refresh automatically when source/domain freshness policy permits.
+      - CREATOR_SHOP_DERIVED may recompute when declared dependencies invalidate it.
+      - BRAND_CONFIRMED must not be silently replaced by later observed or derived values.
+      - SUPPORT_CONTROLLED discrepancies may create conflict/review state but must not auto-mutate the canonical identity anchor.
+      - SYSTEM_DERIVED recomputes only when an authoritative dependency changes through an authorized path.
+    domain_exception_rule: >-
+      A Product/Domain authority may explicitly define a narrower exception without weakening the generic platform rule.
+      The exception must name the affected semantic field and permitted transition.
+    known_product_exception:
+      offering_price:
+        rule: Reliable current first-party price may update current Offering truth according to future Product/Offering Intelligence authority.
+        prohibition: Do not generalize this exception to other BRAND_CONFIRMED fields.
+
+readiness:
+  universally_reusable: true
+  definition: Describes whether Intelligence is safe and sufficient for a declared consumer or use now.
+  states:
+    - READY
+    - PARTIAL
+    - NOT_READY
+    - FAILED
+  consumer_scope:
+    allowed: true
+    rule: The same Intelligence may be READY for one consumer and PARTIAL or NOT_READY for another.
+  reason_codes:
+    required: false
+    ownership: domain_or_execution_profile_contract
+  invariants:
+    - Readiness does not imply freshness.
+    - Freshness does not imply readiness.
+    - Readiness thresholds remain domain/consumer-specific; the shared contract defines vocabulary, not cardinality or business rules.
+    - PARTIAL must represent usable bounded degradation, not fabricated filler.
+
+freshness:
+  universally_reusable: true
+  definition: Describes whether the supporting source/dependencies remain current enough for the intended semantic use.
+  states:
+    - CURRENT
+    - STALE
+    - UNKNOWN
+  optional_runtime_state:
+    - REFRESHING
+  fields:
+    evaluated_at:
+      required_when_freshness_evaluated: true
+    stale_since:
+      required_when_known: false
+    invalidated_by:
+      type: array
+      required: false
+  policy:
+    - No platform-wide TTL is implied.
+    - Freshness rules may vary materially by semantic field, source and consumer.
+    - Brand-confirmed authority can remain authoritative while freshness is STALE.
+    - Fresh observed Evidence can conflict with a protected authority value without gaining overwrite rights.
+
+dependency_and_invalidation:
+  universally_reusable_for_derived_intelligence: true
+  definition: Declares upstream semantic, business-state or Evidence dependencies that may invalidate a derived result.
+  dependency_refs:
+    semantic_refs:
+      type: array
+      required: false
+    business_state_refs:
+      type: array
+      required: false
+    evidence_refs:
+      type: array
+      required: false
+    policy_or_taxonomy_refs:
+      type: array
+      required: false
+  invalidation_rules:
+    - Only declared materially affected dependents become stale or reevaluation candidates.
+    - Invalidation propagates through directed dependency edges rather than forcing whole-engine refresh.
+    - Invalidation normally preserves historical values and lineage; it does not delete prior Intelligence.
+    - Marking a result stale does not itself require immediate recomputation; execution profile/trigger policy decides when recomputation occurs.
+    - Downstream recomputation consumes validated current upstream state only.
+  canonical_example:
+    sequence:
+      - canonical Offering materially changes
+      - affected Product Intelligence tied to that Offering becomes STALE
+      - only Observations depending on that Product Intelligence become STALE
+      - affected Creator Strategy Recommendations become reevaluation candidates
+      - unrelated Brand Identity, Audience or Instagram Intelligence remains unchanged
+
+generation_lineage:
+  universally_reusable_for_derived_intelligence: true
+  definition: Records how and when the current derived Intelligence version was produced.
+  fields:
+    producer:
+      required: true
+      meaning: Processor or deterministic resolver that produced the result.
+    processor_version:
+      required_for_processor_output: true
+    execution_id:
+      required_for_runtime_generated_output: true
+    processor_execution_id:
+      required_for_runtime_generated_output: false
+    generated_at:
+      required: true
+    artifact_versions:
+      type: array
+      required: false
+    evidence_refs:
+      type: array
+      required: false
+    prompt_build_id:
+      required_for_ai_output_when_available: false
+  provider_neutrality_rule: Provider/model telemetry belongs to runtime lineage and may be resolved through execution references; semantic contracts must not depend on provider identity.
+
+supersession:
+  universally_reusable_when_version_history_matters: false
+  definition: Links a current or historical Intelligence result to the version that it replaces or that replaces it.
+  fields:
+    supersedes_ref:
+      required: false
+    superseded_by_ref:
+      required: false
+    supersession_reason:
+      required: false
+  rules:
+    - Supersession is distinct from freshness; a stale value may remain current until recomputation completes.
+    - Superseded Intelligence remains historical lineage unless retention policy explicitly removes it later.
+    - Supersession must not erase evidence/execution traceability.
+
+confidence_and_evidence_strength:
+  universally_required: false
+  definition: Optional metadata for domains where uncertainty materially affects interpretation, readiness, ranking or user-safe behavior.
+  confidence:
+    allowed_semantic_values: [HIGH, MEDIUM, LOW]
+    numeric_percentage_required: false
+    rule: Do not manufacture confidence simply because the shared contract supports it.
+  evidence_strength:
+    allowed: true
+    vocabulary_owner: domain_contract
+    rule: Evidence strength may use domain-appropriate semantic vocabulary when comparability/coverage matters.
+  separation_rule: Confidence in a derived conclusion is not the same as Evidence availability, authority or freshness.
+
+shared_transition_rules:
+  source_to_authority:
+    example:
+      - source.class = OWNED_WEBSITE
+      - authority = OBSERVED
+      - Brand explicitly confirms or edits value
+      - source lineage remains traceable to OWNED_WEBSITE plus Brand action
+      - authority becomes BRAND_CONFIRMED
+    invariant: source.class does not automatically change merely because authority changes.
+  observed_refresh:
+    from: {authority: OBSERVED}
+    to: {authority: OBSERVED}
+    allowed_when: domain source/freshness policy authorizes refresh and validation succeeds
+  derived_recompute:
+    from: {authority: CREATOR_SHOP_DERIVED}
+    to: {authority: CREATOR_SHOP_DERIVED}
+    allowed_when: declared dependency invalidates prior result and recomputation validates
+  brand_confirmation:
+    from_authority: [OBSERVED, CREATOR_SHOP_DERIVED]
+    to_authority: BRAND_CONFIRMED
+    requires: authorized Brand confirmation/edit event
+  protected_conflict:
+    current_authority: BRAND_CONFIRMED
+    incoming_authority: [OBSERVED, CREATOR_SHOP_DERIVED]
+    action: preserve_current_and_surface_or_record_conflict_according_to_domain_policy
+    silent_overwrite: forbidden
+  support_controlled_conflict:
+    current_authority: SUPPORT_CONTROLLED
+    incoming_source_change: any
+    action: preserve_identity_anchor_and_route_to_authorized_exception_or_support_resolution_when_material
+    automatic_identity_mutation: forbidden
+  deterministic_dependency_change:
+    current_authority: SYSTEM_DERIVED
+    action: recompute_from_new_authoritative_dependency
+  domain_exception:
+    rule: Generic transition rules may be overridden only by explicit accepted domain/Product authority naming the semantic exception and permitted transition.
+
+identity_reference_mapping:
+  source_artifact: intelligence/engines/brand_intelligence/branches/identity/objects.yaml
+  mapping:
+    producer: REUSE_PLATFORM_WIDE
+    depends_on: REUSE_PLATFORM_WIDE
+    evidence_required: REUSE_PLATFORM_WIDE
+    backend_mapping: REUSE_PLATFORM_WIDE_AS_PERSISTENCE_MAPPING_CONCEPT
+    refreshable: REUSE_WITH_REDEFINITION_AS_FRESHNESS_PLUS_INVALIDATION_POLICY
+    overwrite_rule: REUSE_WITH_REDEFINITION_AS_AUTHORITY_OVERWRITE_POLICY
+    authorized_override: REUSE_WITH_REDEFINITION_AS_AUTHORITY_TRANSITION_POLICY
+    origin: REUSE_WITH_REDEFINITION_AS_SOURCE_OR_BUSINESS_INPUT_LINEAGE
+    application_input: REUSE_WITH_REDEFINITION_AS_CANONICAL_BUSINESS_INPUT_NOT_PLATFORM_LIFECYCLE
+    derived_locked: REUSE_WITH_REDEFINITION_AS_SYSTEM_DERIVED_AUTHORITY_PLUS_DERIVATION_RULE
+    intelligence_refreshable: REUSE_WITH_REDEFINITION_AS_CREATOR_SHOP_DERIVED_PLUS_FRESHNESS_INVALIDATION
+    onboarding_locked: IDENTITY_LOCAL_DO_NOT_PROMOTE
+    checkpoint: IDENTITY_LOCAL_DO_NOT_PROMOTE
+    checkpoint_required: IDENTITY_LOCAL_DO_NOT_PROMOTE
+    checkpoint_resolution: IDENTITY_LOCAL_DO_NOT_PROMOTE
+    editable_once_before_domain_verification: STALE_DO_NOT_PROMOTE
+    verified_commit_locking: STALE_DO_NOT_PROMOTE
+    ai_nullable: DOMAIN_OBJECT_CONTRACT_NOT_SHARED_METADATA
+    required: DOMAIN_OR_CONSUMER_CONTRACT_NOT_SHARED_METADATA
+
+persistence_neutrality:
+  rule: This contract defines semantics, not a mandatory database shape.
+  every_object_must_persist_every_metadata_field: false
+  later_backend_reconciliation_required_for:
+    - field_or_object_level_authority_storage_where_needed
+    - durable_derived_result_snapshots
+    - freshness_and_invalidation_markers_where_needed
+    - dependency_references_for_persistent_invalidation_where_needed
+    - supersession_and_history_lineage_where_needed
+    - consumer_readiness_when_it_must_survive_runtime_boundaries
+  parallel_intelligence_database_required: false
+
+runtime_neutrality:
+  rule: Existing shared Compiler/runtime architecture remains the execution foundation.
+  later_capabilities_may_need_extension_for:
+    - metadata_carrying_validated_outputs
+    - consumer_scoped_readiness_recording
+    - dependency_invalidation_registration
+    - directed_stale_propagation
+    - authority_aware_persistence_guards
+    - supersession_lineage
+    - freshness_evaluation_hooks
+  implementation_authorized_by_this_contract: false
+
+shared_invariants:
+  - source.class and authority must remain independently representable.
+  - source.class represents semantic origin, while evidence/business/user refs represent concrete provenance.
+  - provider and endpoint names must not become canonical source classes.
+  - authority and freshness must remain independently representable.
+  - readiness and freshness must remain independently representable.
+  - readiness may be consumer-scoped.
+  - Brand-confirmed values cannot be silently overwritten by observed or Creator Shop-derived refresh.
+  - Support-controlled identity discrepancies cannot auto-mutate canonical identity.
+  - Domain-specific overwrite exceptions require explicit accepted authority and must not weaken generic protection globally.
+  - Directed invalidation must not cause unrelated Intelligence recomputation.
+  - Invalidation must not delete historical Intelligence by default.
+  - Derived Intelligence must retain processor/execution/version/Evidence lineage sufficient for later explanation without private chain-of-thought.
+  - Confidence/evidence-strength metadata is optional and must not require fake numeric percentages.
+  - Canonical business entities remain owned outside the Intelligence metadata contract.
+  - Different Intelligence domains may use different semantic schemas while sharing these metadata conventions.

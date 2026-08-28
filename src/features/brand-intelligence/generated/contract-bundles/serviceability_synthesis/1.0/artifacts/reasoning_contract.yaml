@@ -1,0 +1,193 @@
+id: serviceability_synthesis_reasoning
+version: "1.0"
+status: FROZEN
+processor: serviceability_synthesis
+owner_engine: brand_intelligence
+owning_branch: serviceability
+processor_definition: intelligence/engines/brand_intelligence/branches/serviceability/processors/serviceability_synthesis.yaml
+object_authority: intelligence/engines/brand_intelligence/branches/serviceability/objects.yaml#serviceability_profile
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define the reasoning policy for producing Brand-level serviceability from canonical Location/Offering state and
+  first-party commercial/service availability Evidence without conflating headquarters, audience demand, website
+  accessibility, or Offering-specific availability with the Brand-level serviceability envelope.
+
+model_capability_requirement: hybrid_semantic_resolution_with_geography_safety
+provider_or_model_selection: deferred_to_model_registry
+
+inputs:
+  canonical:
+    - primary Brand country/geography anchor
+    - active canonical Location refs
+    - canonical Offering availability refs
+    - Offering-to-Location relationship refs
+  evidence_capabilities:
+    required:
+      - owned_website.serviceability_evidence
+      - owned_website.location_evidence
+    optional_supporting:
+      - demand geography
+      - audience geography
+      - legacy markets_served compatibility context
+
+evidence_precedence:
+  highest_authority:
+    - canonical Offering availability
+    - canonical Offering-to-Location relationships
+    - canonical active Location state for physical presence
+  primary_observed_serviceability:
+    - explicit first-party shipping or delivery policy
+    - explicit first-party service-area statement
+    - explicit first-party digital service availability
+    - explicit first-party transactional or booking availability
+  contextual_physical_presence:
+    - canonical active Locations
+    - owned website location evidence
+  supporting_only:
+    - demand geography
+    - audience geography
+    - legacy markets_served compatibility context
+  hard_rules:
+    - first-party commercial/service availability outranks demand or audience geography.
+    - demand or audience geography cannot establish or override serviceability.
+    - headquarters or primary country alone cannot establish serviceability.
+    - a globally accessible website cannot establish GLOBAL serviceability.
+    - Brand-level serviceability envelope does not imply every Offering is available everywhere inside the envelope.
+
+reasoning_sequence:
+  - load authoritative canonical Location and Offering availability context
+  - resolve typed serviceability basis refs from canonical state and first-party Evidence
+  - identify explicit location-bound, regional, country, multi-country, digital, shipping, or service-area availability
+  - detect materially heterogeneous Offering coverage
+  - construct defensible serviceable market candidates from actual availability
+  - reconcile contradictory canonical and first-party signals without mutating canonical business state
+  - determine the smallest truthful Brand-level outer serviceability envelope
+  - assign overall_scope from the resolved serviceable market set
+  - add mixed_coverage_note only when needed to prevent a misleading universal-availability interpretation
+  - use demand/audience geography only as supporting context
+  - use legacy markets_served only as reconciliation context, never as direct conversion truth
+  - return a narrower or partial profile when broader availability cannot be defended
+
+canonical_vs_observed_conflict:
+  rule: >-
+    Canonical business state remains authoritative for known Offering/Location truth. Conflicting first-party website
+    Evidence may create a discrepancy and may cause affected derived Serviceability components to be partial/stale,
+    but it must not silently rewrite canonical Offering availability or Location state.
+  safe_resolution:
+    - preserve canonical business-state truth for specific Offering/Location availability
+    - prefer narrower defensible Brand-level serviceability when conflict affects breadth
+    - retain Evidence refs for discrepancy analysis
+    - return partial/null affected components when conflict cannot be safely reconciled
+
+first_party_conflict_resolution:
+  precedence_when_available:
+    - explicit current shipping/service-area/booking/availability policy
+    - specific Offering or Location availability statement
+    - general Brand availability statement
+    - generic marketing/geographic copy
+  freshness_rule: Prefer demonstrably more current first-party policy when timestamps/version context are available.
+  unresolved_conflict: return narrower defensible or partial/null result rather than averaging or inventing breadth
+
+overall_scope:
+  allowed:
+    - LOCAL
+    - REGIONAL
+    - COUNTRY
+    - MULTI_COUNTRY
+    - GLOBAL
+  derivation:
+    LOCAL: defensible serviceability is bounded to one locality/service radius pattern.
+    REGIONAL: defensible serviceability is broader than one locality but bounded below country scope.
+    COUNTRY: defensible serviceability covers a country at Brand level for at least one material Offering/channel, without implying every Offering is national.
+    MULTI_COUNTRY: defensible serviceability spans multiple explicit countries without explicit global availability.
+    GLOBAL: explicit grounded serviceability supports global commercial/service availability; technical website accessibility is insufficient.
+  rule: overall_scope is the outer Brand-level envelope represented by serviceable_markets, not a universal Offering availability assertion.
+
+heterogeneous_coverage:
+  detect_when:
+    - canonical Offering availability materially differs by geography
+    - some active Offerings are location-bound while others have broader digital/shipping availability
+    - Offering-to-Location relationships create materially different accessible markets
+  coverage_is_heterogeneous_false_when: no material Offering-level geographic variation is established from available canonical state.
+  note_policy:
+    - mixed_coverage_note is descriptive only and must never replace canonical Offering availability.
+    - Emit mixed_coverage_note when omission would make the Brand-level outer envelope materially misleading about Offering-specific reach.
+    - Omit the note when the profile can be interpreted truthfully from markets/basis without additional prose.
+  universal_availability_inference: forbidden
+
+serviceable_markets:
+  identity_rule: semantic_id follows normalized geography meaning, not array order or display label.
+  identity_guidance:
+    GLOBAL: stable global semantic key.
+    COUNTRY: normalized country code.
+    MULTI_COUNTRY_MEMBER: normalized country code.
+    REGIONAL: normalized country plus region.
+    LOCAL: normalized country plus region/locality anchor; radius change alone should not require a new semantic identity.
+  grounding_rule: Every market must have at least one serviceability_basis reference establishing actual availability.
+
+serviceability_basis:
+  allowed_basis_types:
+    - CANONICAL_LOCATION_COVERAGE
+    - CANONICAL_OFFERING_AVAILABILITY
+    - SHIPPING_OR_DELIVERY_POLICY
+    - DIGITAL_SERVICE_AVAILABILITY
+    - FIRST_PARTY_SERVICE_AREA_STATEMENT
+    - BRAND_CONFIRMED_GEOGRAPHY_INPUT
+  identity_rule: semantic_id follows basis type plus stable referenced business/Evidence meaning, not array position.
+  reference_rules:
+    - Canonical Location rows are referenced by ID only; do not copy Location records.
+    - Canonical Offering availability is referenced by Offering/business-state ref only; do not copy availability truth.
+    - offering_refs may scope a basis but never become an embedded Offering availability object.
+    - At least one business_state_ref or evidence_ref must establish each basis item.
+
+legacy_markets_served:
+  role: compatibility_or_reconciliation_context_only
+  direct_conversion_to_serviceability_profile: forbidden
+  rules:
+    - May help identify areas that require reconciliation.
+    - Cannot establish a new market without current canonical or first-party serviceability support.
+    - Cannot supply heterogeneous Offering coverage semantics absent canonical Offering context.
+
+partial_output:
+  supported: true
+  behaviors:
+    - Prefer narrower defensible serviceability over unsupported broad scope.
+    - serviceability_profile may be null when no defensible Brand-level serviceability can be established.
+    - serviceable_markets or basis collections may be smaller than expected when Evidence is bounded.
+    - Contradictory unresolved signals may yield PARTIAL without being treated as provider failure.
+  filler: forbidden
+
+authority_rules:
+  profile_default: CREATOR_SHOP_DERIVED
+  observed_basis_allowed: true
+  system_derived_reference_normalization_allowed: true
+  processor_must_not_emit:
+    - BRAND_CONFIRMED
+    - SUPPORT_CONTROLLED
+  brand_confirmation_transition_owner: authorized_application_or_business_state_action
+  protected_brand_confirmed_component_refresh: forbidden_without_authorized_transition
+
+migration_gate:
+  legacy_semantics:
+    - identity.markets_served
+    - identity.market_geography
+  cannot_retire_until:
+    - processor definition frozen
+    - reasoning contract frozen
+    - output validation active
+    - canonical Location and Offering inputs active
+    - runtime/model binding active
+    - persistence/reconciliation active
+    - legacy projection or remap tested
+    - consumers remapped
+
+non_goals:
+  - final Evidence provider mechanics
+  - provider or model selection
+  - canonical Location CRUD
+  - canonical Offering availability mutation
+  - Campaign target geography
+  - Persona geography
+  - demand geography ownership
+  - persistence implementation

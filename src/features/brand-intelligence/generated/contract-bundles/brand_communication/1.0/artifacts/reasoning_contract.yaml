@@ -1,0 +1,169 @@
+id: brand_communication_reasoning
+version: "1.0"
+status: FROZEN
+processor: brand_communication
+owner_engine: brand_intelligence
+owning_branch: brand_expression
+processor_definition: intelligence/engines/brand_intelligence/branches/brand_expression/processors/brand_communication.yaml
+object_authority: intelligence/engines/brand_intelligence/branches/brand_expression/objects.yaml#communication_profile
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define the grounded reasoning policy for producing communication_profile without turning descriptive Brand
+  communication patterns into unsupported hard rules, inferring language from geography, or overwriting protected
+  Brand-confirmed communication state.
+
+model_capability_requirement: hybrid_semantic_resolution
+provider_or_model_selection: deferred_to_model_registry
+
+inputs:
+  canonical:
+    - brand_name
+    - confirmed_industry
+    - Brand-confirmed communication state when present
+  evidence_capabilities:
+    required:
+      - owned_website.brand_messaging
+      - owned_website.brand_company_context
+      - observed Brand communication-language signals
+      - brand_user_input_and_confirmations
+    optional:
+      - instagram.owned_brand_context
+
+protected_current_state:
+  rule: >-
+    BRAND_CONFIRMED tone traits, guidance, constraints or primary_language are comparison-only context for
+    ordinary automated refresh and must not be emitted as replacement proposals for the protected component.
+  runtime_scope_expectation: protected components should normally be excluded from active refresh output scope.
+  conflict_behavior:
+    - preserve protected current value
+    - record or surface discrepancy through later application/runtime policy
+    - do not silently rewrite protected state
+
+reasoning_sequence:
+  - identify active unprotected communication_profile components requested by runtime
+  - separate direct observed communication facts from interpretive communication patterns
+  - resolve primary communication language only from actual Brand communication signals
+  - infer tone traits only from repeated or materially representative Brand messaging evidence
+  - derive free-text guidance as descriptive reusable communication guidance, not as a hard prohibition
+  - emit communication constraints only when grounded in explicit Brand rules, explicit owned-source restrictions, or defensible repeated constraints
+  - reconcile optional owned Instagram context only for subfields it materially informs
+  - omit unsupported, contradictory, Campaign-specific, or weakly grounded content
+  - return bounded partial output when only some components are defensible
+
+tone_traits:
+  semantic_role: descriptive_reusable_brand_tone
+  rules:
+    - A trait must describe how the Brand materially communicates, not generic positive praise.
+    - Prefer repeated or high-salience messaging patterns over one-off campaign copy.
+    - Do not infer a trait from typography, imagery, geography, or Industry stereotype alone.
+    - Similar traits should be consolidated rather than emitted as near-duplicates.
+    - Stable semantic identity follows the normalized trait meaning, not array position or wording variation.
+  default_authority: CREATOR_SHOP_DERIVED
+
+free_text_guidance:
+  semantic_role: descriptive_advisory_guidance
+  rules:
+    - Summarize useful recurring communication tendencies not captured cleanly by tone traits.
+    - Guidance may recommend preserving an observed communication pattern but is not a mandatory Brand rule.
+    - Do not phrase descriptive inference as MUST, NEVER, ALWAYS, REQUIRED, or equivalent hard constraint unless the source is an explicit rule and the semantic belongs in communication_constraints.
+    - Omit when there is no additional grounded guidance beyond tone traits and explicit constraints.
+  default_authority: CREATOR_SHOP_DERIVED
+
+communication_constraints:
+  semantic_role: explicit_or_strongly_grounded_verbal_message_constraint
+  rules:
+    - Constraints concern verbal, message, tone, terminology, claim, or communication execution boundaries.
+    - Visual execution constraints belong to Visual Identity and are excluded.
+    - Campaign CTA, deliverable instructions, Campaign objective, timing, and campaign-specific talking points are excluded.
+    - Direct explicit Brand-authored or owned-source requirements/prohibitions may be emitted as OBSERVED.
+    - A processor-derived interpretation must not manufacture a hard rule merely because a pattern is common or absent.
+    - Stable semantic identity follows the normalized constraint meaning, not wording or list position.
+  allowed_processor_authority:
+    - OBSERVED
+    - CREATOR_SHOP_DERIVED
+
+primary_language:
+  semantic_role: primary_brand_communication_language
+  normalization: ISO_639_1_lowercase_when_resolved
+  hard_rules:
+    - Resolve only from actual observed Brand communication.
+    - Country, geography, Industry, headquarters, currency, or customer geography must never be used as a language default.
+    - country=India must not imply primary_language=Hindi.
+    - A directly observed explicit Brand language setting or consistently dominant Brand communication language may resolve primary_language.
+  multiple_language_policy:
+    - Evaluate meaningful Brand communication coverage across principal owned messaging, not raw token count alone.
+    - Distinguish dominant Brand communication from incidental translations, legal boilerplate, location names, or isolated foreign-language phrases.
+    - When one language clearly dominates principal Brand messaging, resolve it as primary_language.
+    - When two or more languages are materially co-primary and no defensible dominant language exists, return primary_language=null.
+    - Secondary or mixed-language evidence remains Evidence/provenance context; do not create a new permanent secondary-language Object in this contract.
+    - A later Product decision may introduce richer multilingual semantics if a consumer justifies them.
+  conflicting_signal_policy:
+    - Prefer direct Brand-owned communication evidence over geography or proxy signals.
+    - Prefer current principal Brand messaging over isolated legacy or incidental text when freshness is available.
+    - If conflict remains material and dominance cannot be defended, return null rather than guess.
+  authority:
+    direct_observation: OBSERVED
+    reconciled_interpretation: CREATOR_SHOP_DERIVED
+
+instagram_enrichment:
+  role: optional_owned_brand_communication_context
+  rules:
+    - May enrich tone_traits or primary_language when it provides materially representative owned Brand communication.
+    - May enrich free_text_guidance only when the pattern generalizes beyond one post/campaign.
+    - Must not create or override a hard communication constraint unless the constraint is explicitly Brand-authored.
+    - Must not refresh unrelated communication_profile components solely because Instagram evidence changed.
+    - Must not overwrite protected Brand-confirmed components.
+
+partial_output:
+  supported: true
+  valid_examples:
+    - tone_traits only
+    - primary_language only
+    - tone_traits plus communication_constraints
+    - full communication_profile
+  rules:
+    - Every component is independently nullable according to the frozen Object contract.
+    - primary_language=null does not invalidate communication_profile.
+    - Missing unsupported components must remain null/empty rather than being filled generically.
+    - A run may be valid when only one requested component is defensible.
+
+unsupported_content_policy:
+  omit:
+    - generic praise
+    - unsupported Brand claims
+    - inferred hard rules without grounding
+    - visual constraints
+    - Campaign-specific CTA or deliverable instructions
+    - Campaign objective or timing
+    - country-derived language assumptions
+  filler: forbidden
+
+authority_rules:
+  processor_may_emit:
+    - OBSERVED
+    - CREATOR_SHOP_DERIVED
+  processor_must_not_emit:
+    - BRAND_CONFIRMED
+    - SUPPORT_CONTROLLED
+  brand_confirmation_transition_owner: authorized_application_or_business_state_action
+
+migration_gate:
+  legacy_semantic: identity.primary_language
+  cannot_retire_until:
+    - processor definition frozen
+    - reasoning contract frozen
+    - output validation active
+    - runtime/model binding active
+    - persistence/reconciliation active
+    - compatibility adapter tested
+    - consumers remapped
+
+non_goals:
+  - final Evidence provider mechanics
+  - provider or model selection
+  - runtime implementation
+  - persistence implementation
+  - multilingual Product redesign
+  - Campaign communication strategy
+  - Visual Identity constraints

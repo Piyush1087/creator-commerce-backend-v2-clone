@@ -1,0 +1,358 @@
+id: brand_communication_evidence
+version: "1.0"
+status: FROZEN
+owner_engine: brand_intelligence
+owning_branch: brand_expression
+processor: brand_communication
+processor_definition: intelligence/engines/brand_intelligence/branches/brand_expression/processors/brand_communication.yaml
+reasoning_authority: intelligence/engines/brand_intelligence/branches/brand_expression/artifacts/brand_communication/reasoning.yaml
+output_contract_authority: intelligence/engines/brand_intelligence/branches/brand_expression/artifacts/brand_communication/output_contract.yaml
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define the provider-neutral normalized Evidence semantics required by brand_communication to derive tone,
+  reusable communication guidance, grounded communication constraints, and primary communication language
+  without treating all website text as equivalent Brand messaging or inferring language from geography.
+
+boundary:
+  data_extraction_role: acquire and normalize source material into these Evidence semantics
+  intelligence_role: interpret Evidence, apply precedence, resolve conflicts, and produce communication_profile
+  provider_or_endpoint_names_in_evidence_ids: forbidden
+  final_provider_or_acquisition_mechanics: out_of_scope
+  brand_confirmed_state_is_observed_evidence: false
+
+shared_evidence_item:
+  required_fields:
+    - evidence_ref
+    - evidence_semantic
+    - source_class
+    - source_resource_ref
+    - captured_at
+    - freshness
+    - provenance
+  fields:
+    evidence_ref:
+      type: string
+      identity_model: execution_or_capture_scoped_normalized_evidence_item
+      rule: >-
+        Stable enough to reference the same normalized observation inside its capture/evidence record and later
+        audit lineage; it is not a permanent Brand semantic Object ID and may change when the underlying source
+        item is materially replaced.
+    evidence_semantic:
+      type: string
+      provider_neutral: true
+    source_class:
+      allowed:
+        - OWNED_WEBSITE
+        - BRAND_USER_INPUT
+        - INSTAGRAM_OWNED
+        - MULTI_SOURCE
+      rule: Must use the shared metadata source vocabulary and never a provider, endpoint, parser, or model name.
+    source_resource_ref:
+      type: string
+      meaning: Provider-neutral reference to the owned page, message surface, user action, or normalized source record.
+    source_item_ref:
+      type: [string, "null"]
+      nullable: true
+      meaning: Optional stable reference to the source block/item within the resource.
+    captured_at:
+      type: timestamp
+    observed_at:
+      type: [timestamp, "null"]
+      nullable: true
+      meaning: Use when the source explicitly exposes a meaningful observation/publication time.
+    freshness:
+      allowed: [CURRENT, STALE, UNKNOWN]
+      rule: Freshness is evaluated separately from semantic authority.
+    representativeness:
+      allowed:
+        - PERSISTENT_BRAND_LEVEL
+        - REPEATED_REPRESENTATIVE
+        - CONTEXT_SPECIFIC
+        - INCIDENTAL
+      meaning: >-
+        Qualitative weight describing how representative the communication is of reusable Brand-level behavior;
+        this is not a numeric confidence score or authority level.
+    evidence_strength:
+      allowed:
+        - EXPLICIT_RULE_OR_DECLARATION
+        - DIRECT_OBSERVATION
+        - REPEATED_PATTERN
+        - CONTEXTUAL_SUPPORT
+        - INCIDENTAL
+      optional: true
+      meaning: Qualitative grounding strength for the asserted communication observation.
+    provenance:
+      required:
+        - acquisition_or_normalization_run_ref
+      optional:
+        - parent_evidence_refs
+        - normalization_version
+      provider_details_as_semantic_fields: forbidden
+
+capabilities:
+  owned_website.brand_messaging:
+    required_for_processor: true
+    source_class: OWNED_WEBSITE
+    item_semantic: brand_messaging_observation
+    qualifies:
+      - homepage Brand copy
+      - About, mission, values, or company-story copy
+      - category or service positioning copy
+      - representative headline/subheadline systems
+      - representative FAQ/help copy
+      - persistent Brand-level messaging
+      - explicit owned-source communication instructions or disclaimers
+    excludes_as_establishing_brand_messaging:
+      - legal boilerplate without Brand communication significance
+      - navigation labels
+      - isolated campaign banners
+      - third-party testimonials
+      - user-generated reviews
+      - location names
+      - product SKU text
+      - machine-generated metadata with no visible Brand communication role
+    fields:
+      text_or_normalized_message: string
+      message_role:
+        allowed:
+          - BRAND_PROPOSITION
+          - BRAND_STORY_OR_MISSION
+          - BRAND_POSITIONING
+          - CUSTOMER_GUIDANCE
+          - HELP_OR_FAQ
+          - EXPLICIT_COMMUNICATION_RULE
+          - OTHER_REPRESENTATIVE_BRAND_MESSAGE
+      representativeness: shared_evidence_item.representativeness
+      evidence_strength: shared_evidence_item.evidence_strength
+    processor_components:
+      tone_traits: primary
+      free_text_guidance: primary
+      communication_constraints: conditional
+      primary_language: primary_when_language_signal_is_derived_from_principal_message
+    refresh_sensitivity: MEDIUM
+    rules:
+      - PERSISTENT_BRAND_LEVEL and REPEATED_REPRESENTATIVE normally outrank CONTEXT_SPECIFIC and INCIDENTAL for reusable tone/language interpretation.
+      - One isolated campaign slogan must not outweigh persistent Brand-level messaging.
+      - Repeated patterns may support descriptive tone/guidance but do not by themselves create a hard communication rule.
+
+  owned_website.brand_company_context:
+    required_for_processor: true
+    source_class: OWNED_WEBSITE
+    item_semantic: brand_company_context_observation
+    qualifies:
+      - mission and values statements
+      - company story
+      - founder/company narrative when Brand-authored
+      - explicit Brand principles relevant to communication
+    processor_components:
+      tone_traits: supporting
+      free_text_guidance: supporting
+      communication_constraints: conditional
+      primary_language: supporting_when_text_is_principal_brand_communication
+    refresh_sensitivity: LOW_TO_MEDIUM
+    rules:
+      - Company context may explain tone but must not override more representative current Brand messaging.
+      - Factual company context is not automatically a communication constraint.
+
+  observed_brand_communication_language_signals:
+    required_for_processor: true
+    source_class: [OWNED_WEBSITE, BRAND_USER_INPUT, INSTAGRAM_OWNED, MULTI_SOURCE]
+    item_semantic: communication_language_observation
+    fields:
+      language_code:
+        type: [string, "null"]
+        nullable: true
+        normalization_when_non_null: ISO_639_1_lowercase
+      signal_type:
+        allowed:
+          - EXPLICIT_LANGUAGE_DECLARATION
+          - PRINCIPAL_MESSAGING_LANGUAGE
+          - TRANSLATION_LOCALIZATION_VARIANT
+          - INCIDENTAL_FOREIGN_FRAGMENT
+          - LEGAL_BOILERPLATE_LANGUAGE
+          - LOCATION_OR_PROPER_NAME_LANGUAGE
+      representativeness: shared_evidence_item.representativeness
+      message_evidence_refs:
+        type: array
+        item_type: string
+        rule: References the communication observations from which the language signal was normalized.
+    processor_components:
+      primary_language: primary
+      tone_traits: none
+      free_text_guidance: none
+      communication_constraints: none
+    refresh_sensitivity: MEDIUM
+    non_establishing_context:
+      - country
+      - geography
+      - industry
+      - currency
+      - headquarters
+      - audience geography
+    rules:
+      - Only actual communication observations or explicit Brand language declarations can establish language.
+      - Translation/localization variants must remain distinguishable from the principal messaging language.
+      - Incidental fragments, boilerplate, and proper names cannot establish primary_language.
+      - Evidence may support a dominant language, materially co-primary languages, or insufficient resolution without creating a permanent secondary-language Object.
+
+  brand_user_input_and_confirmations:
+    required_for_processor: true
+    source_class: BRAND_USER_INPUT
+    evidence_role: user_authored_or_user_supplied_communication_input
+    item_semantics:
+      - USER_AUTHORED_COMMUNICATION_GUIDANCE
+      - USER_SUPPLIED_COMMUNICATION_CONSTRAINT
+      - USER_SUPPLIED_LANGUAGE_DECLARATION
+    processor_components:
+      tone_traits: possible
+      free_text_guidance: primary_when_unconfirmed_user_input
+      communication_constraints: primary_when_explicit
+      primary_language: primary_when_explicit
+    refresh_sensitivity: EVENT_DRIVEN
+    rules:
+      - Brand user input may be Evidence/input before an authorized confirmation transition.
+      - Once a value is BRAND_CONFIRMED, the protected current state is supplied separately as authority context, not relabeled as ordinary observed Evidence authorizing replacement.
+
+  communication_constraint_evidence:
+    derived_from_capabilities:
+      - owned_website.brand_messaging
+      - owned_website.brand_company_context
+      - brand_user_input_and_confirmations
+    item_semantic: communication_constraint_observation
+    fields:
+      constraint_signal_type:
+        allowed:
+          - EXPLICIT_BRAND_AUTHORED_PROHIBITION
+          - EXPLICIT_REQUIRED_TERMINOLOGY
+          - EXPLICIT_CLAIM_OR_DISCLAIMER_RULE
+          - PERSISTENT_OWNED_SOURCE_INSTRUCTION
+          - REPEATED_COMMUNICATION_PATTERN
+      normalized_constraint_text: string
+    strength_rules:
+      hard_constraint_eligible:
+        - EXPLICIT_BRAND_AUTHORED_PROHIBITION
+        - EXPLICIT_REQUIRED_TERMINOLOGY
+        - EXPLICIT_CLAIM_OR_DISCLAIMER_RULE
+        - PERSISTENT_OWNED_SOURCE_INSTRUCTION
+      descriptive_only_without_additional_authority:
+        - REPEATED_COMMUNICATION_PATTERN
+    processor_components:
+      communication_constraints: primary
+      free_text_guidance: possible_when_pattern_is_descriptive_only
+    rule: A repeated pattern alone may support descriptive interpretation but must not automatically establish a hard rule.
+
+optional_enrichment:
+  instagram.owned_brand_context:
+    required_for_processor: false
+    source_class: INSTAGRAM_OWNED
+    role: OPTIONAL_LATER_ENRICHMENT
+    representativeness_required_for_reusable_inference:
+      - PERSISTENT_BRAND_LEVEL
+      - REPEATED_REPRESENTATIVE
+    may_refresh:
+      - tone_traits
+      - primary_language
+      - free_text_guidance
+    must_not_automatically_refresh:
+      - communication_constraints
+    rules:
+      - One post/campaign is CONTEXT_SPECIFIC and cannot redefine reusable Brand communication.
+      - Explicit Brand-authored rules may support a constraint only when the normalized item clearly represents a rule rather than a pattern.
+
+protected_current_authority_context:
+  classification: CANONICAL_BUSINESS_STATE_INPUT
+  examples:
+    - BRAND_CONFIRMED tone trait
+    - BRAND_CONFIRMED free-text guidance
+    - BRAND_CONFIRMED communication constraint
+    - BRAND_CONFIRMED primary_language
+  source_class_when_referenced: CANONICAL_BUSINESS_STATE
+  ordinary_evidence_for_replacement: false
+  behavior:
+    - compare new Evidence against protected state
+    - preserve protected state during ordinary refresh
+    - surface discrepancy through later runtime/application policy
+  rule: BRAND_CONFIRMED current state and observed website Evidence are distinct provenance/authority channels.
+
+legacy_compatibility:
+  identity.primary_language:
+    classification: LEGACY_COMPATIBILITY_CONTEXT
+    current_authoritative_permanent_output: false
+    fresh_evidence: false
+    use:
+      - migration reconciliation
+      - fallback compatibility until consumer remap
+    rules:
+      - Must retain legacy provenance.
+      - Must not masquerade as newly observed communication Evidence.
+      - Must not override BRAND_CONFIRMED communication_profile.primary_language.
+      - Must not establish a new primary language without current communication Evidence or authorized Brand input.
+
+missing_evidence:
+  processor_failure_required: false
+  rules:
+    - Missing language Evidence permits primary_language=null.
+    - Missing constraint Evidence permits communication_constraints=null or empty according to output contract.
+    - Missing representative messaging may result in a partial or null communication_profile.
+    - Never fabricate default tone, guidance, constraint, or language Evidence.
+
+freshness_policy:
+  universal_ttl: none
+  classes:
+    brand_company_context: slower_changing
+    persistent_brand_messaging: medium_refresh_sensitivity
+    principal_language_signals: medium_refresh_sensitivity
+    context_specific_campaign_messaging: short_context_lifecycle
+    explicit_brand_constraint: event_driven_or_authoritative_until_changed
+  invariant: freshness != authority
+
+evidence_to_component_map:
+  owned_website.brand_messaging:
+    tone_traits: PRIMARY
+    free_text_guidance: PRIMARY
+    communication_constraints: CONDITIONAL_EXPLICIT_RULE
+    primary_language: PRIMARY_WHEN_REPRESENTATIVE
+  owned_website.brand_company_context:
+    tone_traits: SUPPORTING
+    free_text_guidance: SUPPORTING
+    communication_constraints: CONDITIONAL_EXPLICIT_RULE
+    primary_language: SUPPORTING_WHEN_REPRESENTATIVE
+  observed_brand_communication_language_signals:
+    tone_traits: NONE
+    free_text_guidance: NONE
+    communication_constraints: NONE
+    primary_language: PRIMARY
+  brand_user_input_and_confirmations:
+    tone_traits: POSSIBLE
+    free_text_guidance: PRIMARY_WHEN_USER_AUTHORED
+    communication_constraints: PRIMARY_WHEN_EXPLICIT
+    primary_language: PRIMARY_WHEN_EXPLICIT
+  instagram.owned_brand_context:
+    tone_traits: OPTIONAL_ENRICHMENT
+    free_text_guidance: OPTIONAL_ENRICHMENT
+    communication_constraints: EXPLICIT_ONLY
+    primary_language: OPTIONAL_ENRICHMENT
+  legacy_identity.primary_language:
+    tone_traits: NONE
+    free_text_guidance: NONE
+    communication_constraints: NONE
+    primary_language: RECONCILIATION_ONLY
+
+data_extraction_handoff:
+  owned_website.brand_messaging: READY_TO_HAND_TO_DATA_EXTRACTION
+  owned_website.brand_company_context: READY_TO_HAND_TO_DATA_EXTRACTION
+  observed_brand_communication_language_signals: READY_TO_HAND_TO_DATA_EXTRACTION
+  brand_user_input_and_confirmations: NEEDS_BACKEND_CANONICAL_STATE_FIRST
+  instagram.owned_brand_context: OPTIONAL_LATER_ENRICHMENT
+  legacy_identity.primary_language: LEGACY_COMPATIBILITY_ONLY
+
+validation_invariants:
+  - Evidence semantic IDs are provider-neutral.
+  - Brand-confirmed state is distinguished from observed Evidence.
+  - Country, currency, Industry, headquarters, and audience geography cannot establish communication language.
+  - Representativeness distinguishes persistent Brand messaging from incidental/context-specific copy.
+  - Repeated communication patterns alone do not establish hard constraints.
+  - Missing Evidence is allowed and never filled with invented defaults.
+  - Legacy Identity primary_language is compatibility-only.
+  - Every Evidence item exposes an evidence_ref usable by processor output lineage.
