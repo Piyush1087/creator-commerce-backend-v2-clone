@@ -37,7 +37,6 @@ import {
   assertBrandCanCounter,
   assertComplianceNotVerified,
   assertCreatorCanSubmitQuote,
-  assertEscrowNotFunded,
   assertLivePostNotSubmitted,
   assertLogisticsNotDispatched,
   assertNoPendingMedia,
@@ -58,6 +57,8 @@ import type { ProvisionCollaborationInput } from "./collaboration-provision.serv
 import { CollaborationProvisionService } from "./collaboration-provision.service";
 import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
 import { CollaborationRealtimeService } from "./collaboration-realtime.service";
+import { BrandEscrowComputationService } from "../../brand-escrow/services/brand-escrow-computation.service";
+import { BrandWorkspaceAuthorizationService } from "../../brand-centre/brand-workspace-authorization.service";
 
 const LIVE_URL_DOMAINS = [/instagram\.com/i, /tiktok\.com/i, /youtube\.com/i];
 
@@ -69,6 +70,8 @@ export class CollaborationService {
     private readonly provision: CollaborationProvisionService,
     private readonly subscriptionCapabilities: SubscriptionCapabilityService,
     private readonly realtime: CollaborationRealtimeService,
+    private readonly escrowReserve: BrandEscrowComputationService,
+    private readonly brandWorkspace: BrandWorkspaceAuthorizationService,
   ) {}
 
   async listThreads(user: AuthUser, query: ListCollaborationThreadsQueryDto) {
@@ -371,23 +374,35 @@ export class CollaborationService {
     if (user.role !== UserRole.BRAND) {
       throw new ForbiddenException("Brand access required");
     }
+    const context = await this.brandWorkspace.resolveBrandContext(user);
     const thread = await this.access.assertThreadForUser(user, collaborationId);
-    this.assertStage(thread, UceMilestoneStage.STAGE_2_SECUREMENT);
+    if (thread.brandProfileId !== context.brandProfileId) {
+      throw new ForbiddenException("Collaboration is outside this Brand workspace");
+    }
+    const alreadyAdvanced =
+      thread.currentStage === UceMilestoneStage.STAGE_3_LOGISTICS;
+    if (!alreadyAdvanced) {
+      this.assertStage(thread, UceMilestoneStage.STAGE_2_SECUREMENT);
+    }
     if (thread.payoutMode !== CollaborationPayoutMode.ESCROW) {
       throw new BadRequestException(
         "Escrow funding only applies to ESCROW mode",
       );
     }
-    assertEscrowNotFunded(thread.commercials);
+    const reserve = await this.escrowReserve.executeStage2Lock({
+      collaborationId,
+      brandProfileId: thread.brandProfileId,
+      grossCreatorQuote: 0,
+      expectedTdsPercentage: 0,
+    });
+    if (reserve.state !== "FUNDED") {
+      return this.broadcastAndReturnThread(user, collaborationId);
+    }
+    if (alreadyAdvanced) {
+      return this.broadcastAndReturnThread(user, collaborationId);
+    }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.collaborationCommercial.update({
-        where: { collaborationId },
-        data: {
-          escrowVaultId: dto.escrow_vault_id ?? `vault_${collaborationId}`,
-          escrowStatus: CollaborationEscrowStatus.FUNDED,
-        },
-      });
       await tx.collaboration.update({
         where: { id: collaborationId },
         data: { currentStage: UceMilestoneStage.STAGE_3_LOGISTICS },

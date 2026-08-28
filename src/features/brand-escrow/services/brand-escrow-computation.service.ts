@@ -13,7 +13,11 @@ import { randomUUID } from "crypto";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
-import type { EscrowCurrency, EscrowTdsPercentage } from "../types";
+import type {
+  EscrowCurrency,
+  EscrowTdsPercentage,
+  VaultRowLock,
+} from "../types";
 import { EscrowComputationEngine } from "./escrow-computation.engine";
 import { EscrowSubscriptionContextService } from "./escrow-subscription-context.service";
 
@@ -38,7 +42,11 @@ export class BrandEscrowComputationService {
     private readonly subscriptionCapabilities: SubscriptionCapabilityService,
   ) {}
 
-  async executeStage2Lock(input: ExecuteLockAllocationInput) {
+  async executeStage2Lock(
+    input: ExecuteLockAllocationInput,
+  ): Promise<Record<string, unknown>> {
+    return this.executeCanonicalReserve(input);
+    /* istanbul ignore next -- retained below only until P3 removes legacy payout coupling */
     await this.subscriptionCapabilities.assertCapability(
       input.brandProfileId,
       "ESCROW_RESERVE",
@@ -175,6 +183,164 @@ export class BrandEscrowComputationService {
         net_creator_payout_pool: lock.netCreatorPayoutPool.toNumber(),
       };
     });
+  }
+
+  private async executeCanonicalReserve(input: ExecuteLockAllocationInput) {
+    await this.subscriptionCapabilities.assertCapability(
+      input.brandProfileId,
+      "ESCROW_RESERVE",
+    );
+    return this.prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<VaultRowLock[]>`
+        SELECT vault_id, brand_id, total_pooled_balance, locked_campaign_funds,
+               available_balance, currency
+        FROM brand_escrow_vaults
+        WHERE brand_id = ${input.brandProfileId}
+        FOR UPDATE
+      `;
+      if (!rows.length) throw new NotFoundException("Escrow vault not found");
+      const row = rows[0];
+      const vaultId = String(row.vault_id);
+      const currency = String(row.currency) as EscrowCurrency;
+      const available = new Decimal(row.available_balance);
+      const locked = new Decimal(row.locked_campaign_funds);
+      const collaboration = await tx.collaboration.findUnique({
+        where: { id: input.collaborationId },
+        include: { commercials: true },
+      });
+      if (!collaboration)
+        throw new NotFoundException("Collaboration not found");
+      if (collaboration.brandProfileId !== input.brandProfileId)
+        throw new BadRequestException(
+          "Collaboration does not belong to this brand",
+        );
+      if (collaboration.payoutMode !== CollaborationPayoutMode.ESCROW)
+        throw new BadRequestException(
+          "Collaboration is not in ESCROW payout mode",
+        );
+      const gross = collaboration.commercials?.finalQuote;
+      if (!gross || gross.lessThanOrEqualTo(0))
+        throw new BadRequestException(
+          "Accepted positive final quote is required",
+        );
+      const metrics = this.computationEngine.calculateStructure({
+        grossCreatorQuote: gross.toNumber(),
+        currency,
+        expectedTdsPercentage: 0,
+        platformTakeRate: 0.07,
+      });
+      const existing = await tx.collaborationEscrowLock.findUnique({
+        where: { collaborationId: input.collaborationId },
+      });
+      if (existing) {
+        if (
+          !existing.grossCreatorQuote.equals(gross) ||
+          !existing.totalEscrowLockedAmount.equals(
+            metrics.totalEscrowLockedAmount,
+          )
+        )
+          throw new ConflictException(
+            "Existing reserve conflicts with accepted commercials",
+          );
+        return this.mapReserve(existing, "FUNDED", available);
+      }
+      if (collaboration.currentStage !== "STAGE_2_SECUREMENT")
+        throw new BadRequestException(
+          "Collaboration is not eligible for securement",
+        );
+      if (
+        currency === "INR" &&
+        locked.add(metrics.totalEscrowLockedAmount).greaterThan(500000)
+      )
+        throw new BadRequestException(
+          "INR aggregate reserve cap of 500000 exceeded",
+        );
+      if (available.lessThan(metrics.totalEscrowLockedAmount)) {
+        await tx.collaborationCommercial.update({
+          where: { collaborationId: input.collaborationId },
+          data: { escrowStatus: CollaborationEscrowStatus.AWAITING_FUNDS },
+        });
+        return {
+          state: "AWAITING_FUNDS",
+          collaboration_id: input.collaborationId,
+          required_reserve: metrics.totalEscrowLockedAmount.toNumber(),
+          available_balance: available.toNumber(),
+          shortfall: metrics.totalEscrowLockedAmount.sub(available).toNumber(),
+        };
+      }
+      await tx.brandEscrowVault.update({
+        where: { id: vaultId },
+        data: {
+          availableBalance: { decrement: metrics.totalEscrowLockedAmount },
+          lockedCampaignFunds: { increment: metrics.totalEscrowLockedAmount },
+        },
+      });
+      const lock = await tx.collaborationEscrowLock.create({
+        data: {
+          collaborationId: input.collaborationId,
+          brandProfileId: input.brandProfileId,
+          grossCreatorQuote: gross,
+          platformCommissionFee: metrics.platformCommissionFee,
+          platformCommissionGst: metrics.platformCommissionGst,
+          totalEscrowLockedAmount: metrics.totalEscrowLockedAmount,
+          expectedTdsPercentage: new Decimal(0),
+          calculatedTdsDeduction: new Decimal(0),
+          netCreatorPayoutPool: gross,
+        },
+      });
+      await tx.escrowTransactionLedger.create({
+        data: {
+          vaultId,
+          brandProfileId: input.brandProfileId,
+          collaborationId: input.collaborationId,
+          transactionType: "RESERVE",
+          amount: metrics.totalEscrowLockedAmount,
+          currency,
+          idempotencyKey: `reserve:${input.collaborationId}`,
+          transactionStatus: "CLEARED",
+        },
+      });
+      await tx.collaborationCommercial.update({
+        where: { collaborationId: input.collaborationId },
+        data: {
+          escrowVaultId: vaultId,
+          escrowStatus: CollaborationEscrowStatus.FUNDED,
+        },
+      });
+      return this.mapReserve(
+        lock,
+        "FUNDED",
+        available.sub(metrics.totalEscrowLockedAmount),
+      );
+    });
+  }
+
+  private mapReserve(
+    lock: {
+      id: string;
+      collaborationId: string;
+      grossCreatorQuote: Decimal;
+      platformCommissionFee: Decimal;
+      platformCommissionGst: Decimal;
+      totalEscrowLockedAmount: Decimal;
+      calculatedTdsDeduction: Decimal;
+      netCreatorPayoutPool: Decimal;
+    },
+    state: string,
+    available: Decimal,
+  ) {
+    return {
+      state,
+      lock_id: lock.id,
+      collaboration_id: lock.collaborationId,
+      creator_gross: lock.grossCreatorQuote.toNumber(),
+      platform_commission: lock.platformCommissionFee.toNumber(),
+      commission_gst: lock.platformCommissionGst.toNumber(),
+      total_reserve: lock.totalEscrowLockedAmount.toNumber(),
+      calculated_tds_deduction: lock.calculatedTdsDeduction.toNumber(),
+      creator_payout_pool: lock.netCreatorPayoutPool.toNumber(),
+      available_balance: available.toNumber(),
+    };
   }
 
   async executeTrancheDisbursal(input: ExecuteTrancheDisbursalInput) {

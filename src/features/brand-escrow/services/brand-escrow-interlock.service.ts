@@ -10,7 +10,6 @@ import {
   UceMilestoneStage,
 } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
-import { randomUUID } from "crypto";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import { BrandEscrowComputationService } from "./brand-escrow-computation.service";
@@ -72,7 +71,9 @@ export class BrandEscrowInterlockService {
 
         if (
           !vault ||
-          vault.lockedCampaignFunds.lessThan(fundingLock.totalEscrowLockedAmount)
+          vault.lockedCampaignFunds.lessThan(
+            fundingLock.totalEscrowLockedAmount,
+          )
         ) {
           throw new PreconditionFailedException(
             "Vault allocation does not match collaboration escrow lock",
@@ -132,7 +133,14 @@ export class BrandEscrowInterlockService {
         throw new NotFoundException("Escrow lock not found for collaboration");
       }
 
-      if (lock.lockReleasedViaRefund || lock.finalTrancheDisbursed) {
+      if (lock.lockReleasedViaRefund) {
+        return {
+          collaboration_id: input.collaborationId,
+          refund_status: "ALREADY_REVERSED",
+          amount_returned: 0,
+        };
+      }
+      if (lock.finalTrancheDisbursed) {
         throw new BadRequestException(
           "Escrow lock has already been settled or reversed",
         );
@@ -146,35 +154,19 @@ export class BrandEscrowInterlockService {
         throw new NotFoundException("Escrow vault not found");
       }
 
-      let refundAmount = new Decimal(0);
-
-      if (
-        input.reasonCode === "BR_03_LOGISTICS_STRIKE" ||
-        input.reasonCode === "MUTUAL_TERMINATION"
-      ) {
-        if (!lock.advanceTrancheDisbursed) {
-          refundAmount = lock.totalEscrowLockedAmount;
-        } else {
-          const completedAdvance = lock.netCreatorPayoutPool.mul(0.3);
-          refundAmount = lock.totalEscrowLockedAmount.sub(completedAdvance);
-        }
-      } else if (input.reasonCode === "BR_04_HARD_STOP_REJECTION") {
-        const completedAdvance = lock.netCreatorPayoutPool.mul(0.3);
-        refundAmount = lock.totalEscrowLockedAmount.sub(completedAdvance);
-      }
+      const completedAdvance = lock.advanceTrancheDisbursed
+        ? lock.netCreatorPayoutPool.mul(0.3)
+        : new Decimal(0);
+      const refundAmount = lock.totalEscrowLockedAmount.sub(completedAdvance);
 
       if (refundAmount.lessThanOrEqualTo(0)) {
         throw new BadRequestException("Calculated refund amount is invalid");
       }
 
-      const lockedReleaseAmount = lock.advanceTrancheDisbursed
-        ? lock.totalEscrowLockedAmount.sub(lock.netCreatorPayoutPool.mul(0.3))
-        : lock.totalEscrowLockedAmount;
-
       await tx.brandEscrowVault.update({
         where: { id: vault.id },
         data: {
-          lockedCampaignFunds: { decrement: lockedReleaseAmount },
+          lockedCampaignFunds: { decrement: refundAmount },
           availableBalance: { increment: refundAmount },
         },
       });
@@ -189,16 +181,21 @@ export class BrandEscrowInterlockService {
           vaultId: vault.id,
           brandProfileId: lock.brandProfileId,
           collaborationId: input.collaborationId,
-          transactionType: "FAILED_COLLAB_REFUND",
+          transactionType: "COLLAB_REFUND",
           amount: refundAmount,
           currency: vault.currency,
-          idempotencyKey: randomUUID(),
+          idempotencyKey: `collab-refund:${input.collaborationId}`,
           transactionStatus: "CLEARED",
           errorDiagnosticPayload: {
             reasonCode: input.reasonCode,
             notes: input.diagnosticNotes,
           },
         },
+      });
+
+      await tx.collaborationCommercial.updateMany({
+        where: { collaborationId: input.collaborationId },
+        data: { escrowStatus: "REFUNDED" },
       });
 
       await tx.collaborationMessage.create({

@@ -81,11 +81,9 @@ describe("P3 domain commit-boundary enforcement", () => {
     const prisma = { $transaction: vi.fn() };
     const idempotency = { registerIntent: vi.fn() };
     const service = new BrandEscrowHardenedService(
-      prisma as never,
       idempotency as never,
-      {} as never,
-      {} as never,
       restrictedCapability() as never,
+      {} as never,
     );
     await expect(
       service.secureCollaborationFundsHardened(

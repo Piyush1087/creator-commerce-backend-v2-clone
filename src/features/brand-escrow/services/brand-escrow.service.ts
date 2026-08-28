@@ -360,10 +360,12 @@ export class BrandEscrowService {
       expectedTdsPercentage: 0 | 1 | 2;
     },
   ) {
-    const platformTakeRate =
-      await this.escrowBilling.resolveTakeRateForBrand(brandProfileId);
+    const vault = await this.ensureVault(brandProfileId);
+    const platformTakeRate = 0.07;
     const metrics = this.computationEngine.calculateStructure({
-      ...input,
+      grossCreatorQuote: input.grossCreatorQuote,
+      currency: vault.currency as "INR" | "USD",
+      expectedTdsPercentage: 0,
       platformTakeRate,
     });
     return {
@@ -374,6 +376,10 @@ export class BrandEscrowService {
       total_escrow_locked_amount: metrics.totalEscrowLockedAmount.toNumber(),
       calculated_tds_deduction: metrics.calculatedTdsDeduction.toNumber(),
       net_creator_payout_pool: metrics.netCreatorPayoutPool.toNumber(),
+      creator_gross: metrics.grossCreatorQuote.toNumber(),
+      platform_commission: metrics.platformCommissionFee.toNumber(),
+      commission_gst: metrics.platformCommissionGst.toNumber(),
+      total_reserve: metrics.totalEscrowLockedAmount.toNumber(),
     };
   }
 }

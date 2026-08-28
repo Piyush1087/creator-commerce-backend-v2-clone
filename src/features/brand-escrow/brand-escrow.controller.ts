@@ -114,6 +114,7 @@ export class BrandEscrowController {
 export class BrandEscrowEngineController {
   constructor(
     private readonly brandAuth: BrandCentreAuthService,
+    private readonly workspaceAuth: BrandWorkspaceAuthorizationService,
     private readonly access: BrandEscrowAccessService,
     private readonly computation: BrandEscrowComputationService,
   ) {}
@@ -124,7 +125,9 @@ export class BrandEscrowEngineController {
     @Req() req: RequestWithAuthUser,
     @Body() body: ExecuteLockAllocationDto,
   ) {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const { brandProfileId } = await this.workspaceAuth.resolveBrandContext(
+      req.user,
+    );
     await this.access.assertCollaborationAccess(
       req.user,
       body.collaboration_id,
@@ -164,6 +167,7 @@ export class BrandEscrowEngineController {
 export class BrandEscrowInterlockController {
   constructor(
     private readonly brandAuth: BrandCentreAuthService,
+    private readonly workspaceAuth: BrandWorkspaceAuthorizationService,
     private readonly access: BrandEscrowAccessService,
     private readonly interlock: BrandEscrowInterlockService,
   ) {}
@@ -174,7 +178,9 @@ export class BrandEscrowInterlockController {
     @Req() req: RequestWithAuthUser,
     @Body() body: TransitionStageDto,
   ) {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const { brandProfileId } = await this.workspaceAuth.resolveBrandContext(
+      req.user,
+    );
     await this.access.assertCollaborationAccess(
       req.user,
       body.collaboration_id,
@@ -194,7 +200,9 @@ export class BrandEscrowInterlockController {
     @Req() req: RequestWithAuthUser,
     @Body() body: TriggerCancellationRefundDto,
   ) {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const { brandProfileId } = await this.workspaceAuth.resolveBrandContext(
+      req.user,
+    );
     await this.access.assertCollaborationAccess(
       req.user,
       body.collaboration_id,
@@ -214,6 +222,7 @@ export class BrandEscrowInterlockController {
 export class BrandEscrowHardenedController {
   constructor(
     private readonly brandAuth: BrandCentreAuthService,
+    private readonly workspaceAuth: BrandWorkspaceAuthorizationService,
     private readonly access: BrandEscrowAccessService,
     private readonly hardened: BrandEscrowHardenedService,
   ) {}
@@ -234,7 +243,9 @@ export class BrandEscrowHardenedController {
       throw new BadRequestException("x-idempotency-key must be a valid UUID");
     }
 
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const { brandProfileId } = await this.workspaceAuth.resolveBrandContext(
+      req.user,
+    );
     await this.access.assertCollaborationAccess(
       req.user,
       body.collaboration_id,

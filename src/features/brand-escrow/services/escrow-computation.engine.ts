@@ -20,7 +20,7 @@ export class EscrowComputationEngine {
     input: CalculateEscrowStructureInput,
   ): EscrowCalculationOutput {
     const grossCreatorQuote = new Decimal(input.grossCreatorQuote);
-    const platformCommissionFee = grossCreatorQuote.mul(input.platformTakeRate);
+    const platformCommissionFee = grossCreatorQuote.mul("0.07");
     const platformCommissionGst =
       input.currency === "INR"
         ? platformCommissionFee.mul(0.18)
@@ -28,10 +28,8 @@ export class EscrowComputationEngine {
     const totalEscrowLockedAmount = grossCreatorQuote
       .add(platformCommissionFee)
       .add(platformCommissionGst);
-    const calculatedTdsDeduction = grossCreatorQuote.mul(
-      new Decimal(input.expectedTdsPercentage).div(100),
-    );
-    const netCreatorPayoutPool = grossCreatorQuote.sub(calculatedTdsDeduction);
+    const calculatedTdsDeduction = new Decimal(0);
+    const netCreatorPayoutPool = grossCreatorQuote;
 
     return {
       grossCreatorQuote,
