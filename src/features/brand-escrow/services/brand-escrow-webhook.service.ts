@@ -46,7 +46,8 @@ export class BrandEscrowWebhookService {
       return this.creditVirtualAccount(payload);
     if (payload.event === "order.paid" || payload.event === "payment.captured")
       return this.creditGateway(payload);
-    if (payload.event === "payment.failed") return this.failGateway(payload);
+    // A failed payment is one attempt against an order, not terminal funding truth.
+    if (payload.event === "payment.failed") return;
     if (payload.event === "payment.authorized")
       return this.captureAuthorized(payload);
   }
@@ -93,16 +94,25 @@ export class BrandEscrowWebhookService {
         : await tx.escrowFundingLoad.findUnique({
             where: { providerOrderId: orderId },
           });
-      if (!load || load.state === "CREDITED" || load.state === "FAILED") return;
+      if (!load) return;
       if (orderId && load.providerOrderId && orderId !== load.providerOrderId)
         return;
+      if (load.state === "CREDITED") {
+        if (paymentId && !load.providerPaymentId) {
+          await tx.escrowFundingLoad.update({
+            where: { id: load.id },
+            data: { providerPaymentId: paymentId },
+          });
+        }
+        return;
+      }
       await tx.escrowFundingLoad.update({
         where: { id: load.id },
         data: {
           state: "CREDITED",
           providerPaymentId: paymentId,
           creditedAt: new Date(),
-          sourceReference: paymentId ?? orderId,
+          sourceReference: load.sourceReference ?? paymentId ?? orderId,
         },
       });
       await tx.escrowTransactionLedger.update({
@@ -188,37 +198,6 @@ export class BrandEscrowWebhookService {
         },
       });
     });
-  }
-
-  private async failGateway(payload: Payload): Promise<void> {
-    const payment = payload.payload.payment?.entity;
-    const loadId = this.note(payment, "funding_load_id");
-    const orderId =
-      typeof payment?.order_id === "string" ? payment.order_id : undefined;
-    if (!loadId && !orderId) return;
-    const load = loadId
-      ? await this.prisma.escrowFundingLoad.findUnique({
-          where: { id: loadId },
-        })
-      : await this.prisma.escrowFundingLoad.findUnique({
-          where: { providerOrderId: orderId },
-        });
-    if (!load || load.state === "CREDITED") return;
-    await this.prisma.$transaction([
-      this.prisma.escrowFundingLoad.update({
-        where: { id: load.id },
-        data: {
-          state: "FAILED",
-          failedAt: new Date(),
-          providerPaymentId:
-            typeof payment?.id === "string" ? payment.id : undefined,
-        },
-      }),
-      this.prisma.escrowTransactionLedger.update({
-        where: { idempotencyKey: `load:${load.idempotencyKey}` },
-        data: { transactionStatus: "FAILED" },
-      }),
-    ]);
   }
 
   private note(

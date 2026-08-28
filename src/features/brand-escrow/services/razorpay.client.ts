@@ -20,6 +20,9 @@ interface RazorpayVirtualAccountResponse {
 
 interface RazorpayOrderResponse {
   id: string;
+  amount?: number;
+  currency?: string;
+  receipt?: string;
 }
 
 @Injectable()
@@ -83,6 +86,32 @@ export class RazorpayClient {
     }
   }
 
+  private async getJson<T>(path: string): Promise<T> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const response = await fetch(`https://api.razorpay.com/v1/${path}`, {
+        headers: { Authorization: this.authHeader },
+        signal: controller.signal,
+      });
+      const payload = (await response.json()) as T & {
+        error?: { description?: string };
+      };
+      if (!response.ok) {
+        throw new BadRequestException(
+          payload.error?.description ??
+            `Razorpay request failed with status ${response.status}`,
+        );
+      }
+      return payload;
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      throw new ServiceUnavailableException("Payment gateway handshake failed");
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   async createVirtualAccount(params: {
     description: string;
     customerId?: string;
@@ -109,6 +138,22 @@ export class RazorpayClient {
       payment_capture: 1,
       notes: params.notes,
     });
+  }
+
+  async findOrderByReceipt(
+    receipt: string,
+  ): Promise<RazorpayOrderResponse | null> {
+    const response = await this.getJson<{ items?: RazorpayOrderResponse[] }>(
+      `orders?receipt=${encodeURIComponent(receipt)}`,
+    );
+    const exact =
+      response.items?.filter((order) => order.receipt === receipt) ?? [];
+    if (exact.length > 1) {
+      throw new BadRequestException(
+        "Multiple provider orders exist for the funding receipt",
+      );
+    }
+    return exact[0] ?? null;
   }
 
   async capturePayment(paymentId: string, amountPaise: number): Promise<void> {

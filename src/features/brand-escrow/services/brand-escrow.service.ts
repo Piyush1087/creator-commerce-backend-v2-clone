@@ -36,13 +36,13 @@ export class BrandEscrowService {
     );
   }
 
-  async ensureVault(brandProfileId: string, provisionVirtualAccount = false) {
+  async ensureVault(brandProfileId: string, provisionVirtualAccount = true) {
     const brand = await this.prisma.brandProfile.findUnique({
       where: { id: brandProfileId },
     });
     if (!brand) throw new NotFoundException("Brand profile not found");
     const currency = resolveEscrowCurrency(brand);
-    let vault = await this.prisma.brandEscrowVault.upsert({
+    const vault = await this.prisma.brandEscrowVault.upsert({
       where: { brandProfileId },
       create: { brandProfileId, currency },
       update: {},
@@ -53,21 +53,31 @@ export class BrandEscrowService {
       this.virtualAccountsEnabled() &&
       !vault.razorpayVirtualAccountId
     ) {
-      const account = await this.razorpay.createVirtualAccount({
-        description: `Treasury funding account for ${brand.name}`,
-      });
-      const bank = extractBankReceiver(account.receivers);
-      vault = await this.prisma.brandEscrowVault.update({
-        where: { id: vault.id },
-        data: {
-          razorpayVirtualAccountId: account.id,
-          virtualAccountNumber: bank?.account_number ?? null,
-          ifscCode: bank?.ifsc ?? null,
-          upiVpa: extractVpaReceiver(account.receivers),
-          bankName: bank?.bank_name ?? null,
-          virtualAccountEnabled: true,
+      return this.prisma.$transaction(
+        async (tx) => {
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-va:${brandProfileId}`}))`;
+          const authoritative = await tx.brandEscrowVault.findUniqueOrThrow({
+            where: { id: vault.id },
+          });
+          if (authoritative.razorpayVirtualAccountId) return authoritative;
+          const account = await this.razorpay.createVirtualAccount({
+            description: `Treasury funding account for ${brand.name}`,
+          });
+          const bank = extractBankReceiver(account.receivers);
+          return tx.brandEscrowVault.update({
+            where: { id: vault.id },
+            data: {
+              razorpayVirtualAccountId: account.id,
+              virtualAccountNumber: bank?.account_number ?? null,
+              ifscCode: bank?.ifsc ?? null,
+              upiVpa: extractVpaReceiver(account.receivers),
+              bankName: bank?.bank_name ?? null,
+              virtualAccountEnabled: true,
+            },
+          });
         },
-      });
+        { maxWait: 10_000, timeout: 30_000 },
+      );
     }
     return vault;
   }
@@ -127,27 +137,37 @@ export class BrandEscrowService {
     const principal = new Decimal(targetAllocation);
     if (vault.currency === "INR" && principal.lessThan(5000))
       throw new BadRequestException("Minimum INR treasury top-up is 5000");
-    const existing = await this.prisma.escrowFundingLoad.findUnique({
+    let existing = await this.prisma.escrowFundingLoad.findUnique({
       where: { idempotencyKey },
     });
-    if (existing) return this.mapCheckout(existing);
+    if (existing) return this.ensureProviderOrder(existing.id);
     const fee =
       vault.currency === "INR" ? principal.mul("0.02") : new Decimal(0);
     const feeTax = vault.currency === "INR" ? fee.mul("0.18") : new Decimal(0);
-    const load = await this.prisma.escrowFundingLoad.create({
-      data: {
-        vaultId: vault.id,
-        brandProfileId,
-        sourceType: "GATEWAY",
-        currency: vault.currency,
-        principalAmount: principal,
-        processingFee: fee,
-        processingFeeTax: feeTax,
-        state: "LOAD_INITIATED",
-        idempotencyKey,
-        initiatedAt: new Date(),
-      },
-    });
+    let load;
+    try {
+      load = await this.prisma.escrowFundingLoad.create({
+        data: {
+          vaultId: vault.id,
+          brandProfileId,
+          sourceType: "GATEWAY",
+          currency: vault.currency,
+          principalAmount: principal,
+          processingFee: fee,
+          processingFeeTax: feeTax,
+          state: "LOAD_INITIATED",
+          idempotencyKey,
+          initiatedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      if (!this.isUniqueConstraint(error)) throw error;
+      existing = await this.prisma.escrowFundingLoad.findUnique({
+        where: { idempotencyKey },
+      });
+      if (!existing) throw error;
+      return this.ensureProviderOrder(existing.id);
+    }
     await this.prisma.escrowTransactionLedger.create({
       data: {
         vaultId: vault.id,
@@ -173,21 +193,67 @@ export class BrandEscrowService {
           transactionStatus: "PENDING",
         },
       });
-    const order = await this.razorpay.createOrder({
-      amountPaise: Math.round(principal.add(fee).add(feeTax).toNumber() * 100),
-      currency: vault.currency,
-      receipt: load.id,
-      notes: {
-        vault_id: vault.id,
-        idempotency_key: idempotencyKey,
-        funding_load_id: load.id,
+    return this.ensureProviderOrder(load.id);
+  }
+
+  private async ensureProviderOrder(loadId: string) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-order:${loadId}`}))`;
+        const load = await tx.escrowFundingLoad.findUniqueOrThrow({
+          where: { id: loadId },
+        });
+        if (load.providerOrderId) return this.mapCheckout(load);
+        const expectedAmount = Math.round(
+          load.principalAmount
+            .add(load.processingFee)
+            .add(load.processingFeeTax)
+            .toNumber() * 100,
+        );
+        let order = await this.razorpay.findOrderByReceipt(load.id);
+        if (!order) {
+          try {
+            order = await this.razorpay.createOrder({
+              amountPaise: expectedAmount,
+              currency: load.currency,
+              receipt: load.id,
+              notes: {
+                vault_id: load.vaultId,
+                idempotency_key: load.idempotencyKey ?? "",
+                funding_load_id: load.id,
+              },
+            });
+          } catch (error) {
+            order = await this.razorpay.findOrderByReceipt(load.id);
+            if (!order) throw error;
+          }
+        }
+        if (
+          order.receipt !== load.id ||
+          order.currency?.toUpperCase() !== load.currency.toUpperCase() ||
+          order.amount !== expectedAmount
+        ) {
+          throw new BadRequestException(
+            "Recovered provider order does not match the funding load",
+          );
+        }
+        return this.mapCheckout(
+          await tx.escrowFundingLoad.update({
+            where: { id: load.id },
+            data: { providerOrderId: order.id, state: "PENDING" },
+          }),
+        );
       },
-    });
-    return this.mapCheckout(
-      await this.prisma.escrowFundingLoad.update({
-        where: { id: load.id },
-        data: { providerOrderId: order.id, state: "PENDING" },
-      }),
+      { maxWait: 10_000, timeout: 30_000 },
+    );
+  }
+
+  private isUniqueConstraint(error: unknown): boolean {
+    return (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2002"
     );
   }
 

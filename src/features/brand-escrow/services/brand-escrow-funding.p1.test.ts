@@ -135,12 +135,29 @@ describe("BS09 P1 treasury funding foundation", () => {
       escrowFundingLoad: {
         findUnique: vi.fn().mockResolvedValue(null),
         create: vi.fn().mockResolvedValue(load),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          ...load,
+          vaultId: "vault-1",
+          currency: "INR",
+          idempotencyKey: "key",
+        }),
         update,
       },
       escrowTransactionLedger: { create: vi.fn().mockResolvedValue({}) },
+      $queryRaw: vi.fn(),
     };
+    Object.assign(prisma, {
+      $transaction: async (callback: (tx: typeof prisma) => unknown) =>
+        callback(prisma),
+    });
     const result = await service(prisma, {
-      createOrder: vi.fn().mockResolvedValue({ id: "order-1" }),
+      findOrderByReceipt: vi.fn().mockResolvedValue(null),
+      createOrder: vi.fn().mockResolvedValue({
+        id: "order-1",
+        receipt: "load-1",
+        currency: "INR",
+        amount: 1023600,
+      }),
     }).createCardTopUpIntent("brand-1", 10000, "key");
     expect(result).toMatchObject({
       allocation_amount: 10000,
