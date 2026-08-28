@@ -4,6 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
+import { PricingInvoiceService } from "../../pricing/services/pricing-invoice.service";
+import type { PricingRazorpayClient } from "../../pricing/services/pricing-razorpay.client";
 import type { BrandSettingsAccessService } from "../services/brand-settings-access.service";
 import { BrandSettingsService } from "../services/brand-settings.service";
 import type { BrandTeamInvitationsService } from "../services/brand-team-invitations.service";
@@ -16,6 +18,7 @@ describe.skipIf(process.env.BS03_DATABASE_TEST !== "true")(
     let role = BrandRole.BRAND_OWNER;
     let organizationId: string;
     let brandProfileId: string;
+    let subscriptionId: string;
     const user = {
       id: "bs03-test-user",
       email: "bs03@example.test",
@@ -63,6 +66,14 @@ describe.skipIf(process.env.BS03_DATABASE_TEST !== "true")(
         },
       });
       brandProfileId = brand.id;
+      const subscription = await prisma.brandSubscription.create({
+        data: {
+          brandProfileId,
+          razorpaySubscriptionId: "sub_bs03",
+          currentPeriodEnd: new Date("2026-09-01T00:00:00.000Z"),
+        },
+      });
+      subscriptionId = subscription.id;
     });
 
     afterAll(async () => {
@@ -78,9 +89,9 @@ describe.skipIf(process.env.BS03_DATABASE_TEST !== "true")(
       const created = await service.upsertBillingProfile(user, {
         legalEntityName: "Acme LLC",
         legalEntityType: "LLC",
-        billingCountryCode: "US",
+        billingCountryCode: "IN",
         billingAddress: "100 Main Street, Wilmington, DE",
-        gstin: null,
+        gstin: "27ABCDE1234F1Z5",
       });
       expect(created.profile_state).toBe("CONFIGURED");
       expect(created.is_complete_for_paid_conversion).toBe(true);
@@ -94,6 +105,23 @@ describe.skipIf(process.env.BS03_DATABASE_TEST !== "true")(
         gstin: null,
       });
       expect(updated.profile_state).toBe("UPDATED");
+
+      const countAfterMaterialUpdate =
+        await prisma.brandBillingProfileVersion.count({
+          where: { brandProfileId },
+        });
+      await service.upsertBillingProfile(user, {
+        legalEntityName: "Acme Corporation",
+        legalEntityType: "Corporation",
+        billingCountryCode: "US",
+        billingAddress: "100 Main Street, Wilmington, DE",
+        gstin: null,
+      });
+      expect(
+        await prisma.brandBillingProfileVersion.count({
+          where: { brandProfileId },
+        }),
+      ).toBe(countAfterMaterialUpdate);
 
       const [billing, brand] = await Promise.all([
         prisma.brandBillingProfile.findUniqueOrThrow({
@@ -109,6 +137,163 @@ describe.skipIf(process.env.BS03_DATABASE_TEST !== "true")(
       expect(billing.pan).toBeNull();
       expect(billing.defaultTdsPercentage.toNumber()).toBe(2);
       expect(billing.currencyPreference).toBe("INR");
+      const versions = await prisma.brandBillingProfileVersion.findMany({
+        where: { brandProfileId },
+        orderBy: { createdAt: "asc" },
+      });
+      expect(versions).toHaveLength(2);
+      expect(versions[0]).toMatchObject({
+        legalEntityName: "Acme LLC",
+        billingCountryCode: "IN",
+        gstin: "27ABCDE1234F1Z5",
+      });
+      expect(versions[1]).toMatchObject({
+        legalEntityName: "Acme Corporation",
+        billingCountryCode: "US",
+        gstin: null,
+      });
+    });
+
+    it("resolves immutable invoice snapshots by issuedAt without current-profile fallback", async () => {
+      const versions = await prisma.brandBillingProfileVersion.findMany({
+        where: { brandProfileId },
+        orderBy: { createdAt: "asc" },
+      });
+      const effectiveA = new Date("2026-08-01T00:00:00.000Z");
+      const effectiveB = new Date("2026-08-03T00:00:00.000Z");
+      await prisma.brandBillingProfileVersion.update({
+        where: { id: versions[0].id },
+        data: { effectiveFrom: effectiveA },
+      });
+      await prisma.brandBillingProfileVersion.update({
+        where: { id: versions[1].id },
+        data: { effectiveFrom: effectiveB },
+      });
+      const invoices = new PricingInvoiceService(
+        prisma as unknown as PrismaService,
+        {} as PricingRazorpayClient,
+      );
+      const base = {
+        subscription_id: "sub_bs03",
+        amount: 1000,
+        amount_paid: 0,
+        currency: "USD",
+        status: "issued",
+      };
+
+      await invoices.upsertFromRazorpayEntity({
+        brandProfileId,
+        brandSubscriptionId: subscriptionId,
+        razorpaySubscriptionId: "sub_bs03",
+        invoice: {
+          ...base,
+          id: "inv_before_change",
+          issued_at: Date.parse("2026-08-02T00:00:00.000Z") / 1000,
+        },
+      });
+      const before = await prisma.brandBillingInvoice.findUniqueOrThrow({
+        where: { razorpayInvoiceId: "inv_before_change" },
+      });
+      expect(before).toMatchObject({
+        billingProfileVersionId: versions[0].id,
+        billingLegalEntityName: "Acme LLC",
+        billingGstin: "27ABCDE1234F1Z5",
+      });
+
+      await invoices.upsertFromRazorpayEntity({
+        brandProfileId,
+        brandSubscriptionId: subscriptionId,
+        razorpaySubscriptionId: "sub_bs03",
+        invoice: {
+          ...base,
+          id: "inv_before_change",
+          status: "paid",
+          amount_paid: 1000,
+          issued_at: Date.parse("2026-08-02T00:00:00.000Z") / 1000,
+        },
+      });
+      expect(
+        await prisma.brandBillingInvoice.findUniqueOrThrow({
+          where: { razorpayInvoiceId: "inv_before_change" },
+        }),
+      ).toMatchObject({
+        status: "paid",
+        billingProfileVersionId: versions[0].id,
+        billingLegalEntityName: "Acme LLC",
+      });
+
+      await invoices.upsertFromRazorpayEntity({
+        brandProfileId,
+        brandSubscriptionId: subscriptionId,
+        razorpaySubscriptionId: "sub_bs03",
+        invoice: {
+          ...base,
+          id: "inv_after_change",
+          issued_at: Date.parse("2026-08-05T00:00:00.000Z") / 1000,
+        },
+      });
+      expect(
+        await prisma.brandBillingInvoice.findUniqueOrThrow({
+          where: { razorpayInvoiceId: "inv_after_change" },
+        }),
+      ).toMatchObject({
+        billingProfileVersionId: versions[1].id,
+        billingLegalEntityName: "Acme Corporation",
+        billingGstin: null,
+      });
+
+      await invoices.upsertFromRazorpayEntity({
+        brandProfileId,
+        brandSubscriptionId: subscriptionId,
+        razorpaySubscriptionId: "sub_bs03",
+        invoice: {
+          ...base,
+          id: "inv_no_history",
+          issued_at: Date.parse("2026-07-01T00:00:00.000Z") / 1000,
+        },
+      });
+      expect(
+        await prisma.brandBillingInvoice.findUniqueOrThrow({
+          where: { razorpayInvoiceId: "inv_no_history" },
+        }),
+      ).toMatchObject({
+        billingProfileVersionId: null,
+        billingLegalEntityName: null,
+      });
+
+      const invoiceViews = new PricingInvoiceService(
+        prisma as unknown as PrismaService,
+        {
+          listSubscriptionInvoices: async () => [
+            {
+              ...base,
+              id: "inv_before_change",
+              issued_at: Date.parse("2026-08-02T00:00:00.000Z") / 1000,
+            },
+            {
+              ...base,
+              id: "provider_only_invoice",
+              issued_at: Date.parse("2026-08-02T00:00:00.000Z") / 1000,
+            },
+          ],
+        } as unknown as PricingRazorpayClient,
+      );
+      const views = await invoiceViews.listInvoicesForBrand(brandProfileId);
+      expect(
+        views.find((invoice) => invoice.id === "inv_before_change"),
+      ).toMatchObject({
+        historicalBillingIdentityAvailable: true,
+        billingIdentity: {
+          legalEntityName: "Acme LLC",
+          gstin: "27ABCDE1234F1Z5",
+        },
+      });
+      expect(
+        views.find((invoice) => invoice.id === "provider_only_invoice"),
+      ).toMatchObject({
+        historicalBillingIdentityAvailable: false,
+        billingIdentity: null,
+      });
     });
 
     it("keeps Campaign Manager reads read-only and denies mutation", async () => {

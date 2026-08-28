@@ -53,6 +53,15 @@ describe("BS-03 canonical Billing contract", () => {
     ).toBe(false);
   });
 
+  it("rejects a structurally valid but nonexistent ISO country code", () => {
+    expect(
+      BrandBillingProfileSchema.safeParse({
+        ...canonicalInput,
+        billingCountryCode: "ZZ",
+      }).success,
+    ).toBe(false);
+  });
+
   it("reports NOT_CONFIGURED readiness without inventing legal identity", () => {
     expect(billingReadiness(null)).toEqual({
       is_complete_for_paid_conversion: false,
@@ -111,8 +120,15 @@ describe("BS-03 Billing lifecycle and authorization", () => {
         updatedAt: new Date("2026-08-28T12:00:00.000Z"),
       }),
     );
+    const createVersion = vi.fn().mockResolvedValue({ id: "version-1" });
+    const transactionClient = {
+      brandBillingProfile: { findUnique, upsert },
+      brandBillingProfileVersion: { create: createVersion },
+    };
     const prisma = {
       brandBillingProfile: { findUnique, upsert },
+      $transaction: (run: (tx: typeof transactionClient) => unknown) =>
+        run(transactionClient),
     } as unknown as PrismaService;
     const access = {
       resolveBrandContext: vi.fn().mockResolvedValue({
@@ -135,13 +151,14 @@ describe("BS-03 Billing lifecycle and authorization", () => {
       ),
       findUnique,
       upsert,
+      createVersion,
     };
   }
 
   it.each([BrandRole.BRAND_OWNER, BrandRole.FINANCE_ADMIN])(
     "%s creates a CONFIGURED profile",
     async (role) => {
-      const { service, upsert } = harness(role, null);
+      const { service, upsert, createVersion } = harness(role, null);
       const result = await service.upsertBillingProfile(user, canonicalInput);
       expect(result.billing_profile.profile_state).toBe("CONFIGURED");
       expect(result.is_complete_for_paid_conversion).toBe(true);
@@ -150,11 +167,12 @@ describe("BS-03 Billing lifecycle and authorization", () => {
           create: expect.objectContaining({ profileState: "CONFIGURED" }),
         }),
       );
+      expect(createVersion).toHaveBeenCalledTimes(1);
     },
   );
 
   it("a subsequent material Finance Admin update becomes UPDATED", async () => {
-    const { service } = harness(BrandRole.FINANCE_ADMIN, {
+    const { service, createVersion } = harness(BrandRole.FINANCE_ADMIN, {
       registeredCompanyName: canonicalInput.legalEntityName,
       legalEntityType: canonicalInput.legalEntityType,
       billingCountryCode: "US",
@@ -165,6 +183,21 @@ describe("BS-03 Billing lifecycle and authorization", () => {
     });
     const result = await service.upsertBillingProfile(user, canonicalInput);
     expect(result.billing_profile.profile_state).toBe("UPDATED");
+    expect(createVersion).toHaveBeenCalledTimes(1);
+  });
+
+  it("a no-op update does not create a history version", async () => {
+    const { service, createVersion } = harness(BrandRole.BRAND_OWNER, {
+      registeredCompanyName: canonicalInput.legalEntityName,
+      legalEntityType: canonicalInput.legalEntityType,
+      billingCountryCode: canonicalInput.billingCountryCode,
+      corporateBillingAddress: canonicalInput.billingAddress,
+      gstin: null,
+      profileState: "CONFIGURED",
+      configuredAt: new Date("2026-08-27T12:00:00.000Z"),
+    });
+    await service.upsertBillingProfile(user, canonicalInput);
+    expect(createVersion).not.toHaveBeenCalled();
   });
 
   it("Campaign Manager can read but cannot mutate", async () => {

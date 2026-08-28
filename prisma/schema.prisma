@@ -1335,6 +1335,7 @@ model BrandProfile {
 
   teamMembers              BrandTeamMember[]
   billingProfile           BrandBillingProfile?
+  billingProfileVersions   BrandBillingProfileVersion[]
   withdrawalAccounts       BrandWithdrawalAccount[]
   notificationSettings     BrandNotificationSetting[]
   notifications            Notification[]
@@ -2488,6 +2489,23 @@ model BrandBillingProfile {
   @@map("brand_billing_profiles")
 }
 
+model BrandBillingProfileVersion {
+  id                      String       @id @default(uuid()) @map("version_id")
+  brandProfileId          String       @map("brand_id")
+  brandProfile            BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  legalEntityName         String       @map("legal_entity_name") @db.VarChar(255)
+  legalEntityType         String?      @map("legal_entity_type") @db.VarChar(100)
+  billingCountryCode      String?      @map("billing_country_code") @db.Char(2)
+  billingAddress          String       @map("billing_address") @db.Text
+  gstin                   String?      @db.VarChar(15)
+  effectiveFrom           DateTime     @map("effective_from")
+  createdAt               DateTime     @default(now()) @map("created_at")
+  invoices                BrandBillingInvoice[]
+
+  @@index([brandProfileId, effectiveFrom])
+  @@map("brand_billing_profile_versions")
+}
+
 enum BillingProfileState {
   CONFIGURED
   UPDATED
@@ -3022,12 +3040,20 @@ model BrandBillingInvoice {
   billingPeriodStart     DateTime?         @map("billing_period_start")
   billingPeriodEnd       DateTime?         @map("billing_period_end")
   issuedAt               DateTime?         @map("issued_at")
+  billingProfileVersionId String?          @map("billing_profile_version_id")
+  billingProfileVersion   BrandBillingProfileVersion? @relation(fields: [billingProfileVersionId], references: [id], onDelete: SetNull)
+  billingLegalEntityName  String?           @map("billing_legal_entity_name") @db.VarChar(255)
+  billingLegalEntityType  String?           @map("billing_legal_entity_type") @db.VarChar(100)
+  billingCountryCode      String?           @map("billing_country_code") @db.Char(2)
+  billingAddress          String?           @map("billing_address") @db.Text
+  billingGstin            String?           @map("billing_gstin") @db.VarChar(15)
   createdAt              DateTime          @default(now()) @map("created_at")
   updatedAt              DateTime          @updatedAt @map("updated_at")
 
   @@index([brandProfileId])
   @@index([brandSubscriptionId])
   @@index([paidAt])
+  @@index([billingProfileVersionId])
   @@map("brand_billing_invoices")
 }
 

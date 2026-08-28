@@ -318,37 +318,54 @@ export class BrandSettingsService {
       await this.access.resolveBrandContext(user);
     this.access.assertFinancialMutation(membership.role);
 
-    const existing = await this.prisma.brandBillingProfile.findUnique({
-      where: { brandProfileId },
-    });
-    const isMaterialUpdate =
-      !!existing &&
-      (existing.registeredCompanyName !== input.legalEntityName ||
-        existing.legalEntityType !== input.legalEntityType ||
-        existing.billingCountryCode !== input.billingCountryCode ||
-        existing.corporateBillingAddress !== input.billingAddress ||
-        existing.gstin !== input.gstin);
     const now = new Date();
-    const profile = await this.prisma.brandBillingProfile.upsert({
-      where: { brandProfileId },
-      create: {
-        brandProfileId,
-        registeredCompanyName: input.legalEntityName,
-        legalEntityType: input.legalEntityType,
-        billingCountryCode: input.billingCountryCode,
-        corporateBillingAddress: input.billingAddress,
-        gstin: input.gstin,
-        profileState: "CONFIGURED",
-        configuredAt: now,
-      },
-      update: {
-        registeredCompanyName: input.legalEntityName,
-        legalEntityType: input.legalEntityType,
-        billingCountryCode: input.billingCountryCode,
-        corporateBillingAddress: input.billingAddress,
-        gstin: input.gstin,
-        ...(isMaterialUpdate ? { profileState: "UPDATED" as const } : {}),
-      },
+    const gstin = input.gstin ?? null;
+    const profile = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.brandBillingProfile.findUnique({
+        where: { brandProfileId },
+      });
+      const isMaterialUpdate =
+        !!existing &&
+        (existing.registeredCompanyName !== input.legalEntityName ||
+          existing.legalEntityType !== input.legalEntityType ||
+          existing.billingCountryCode !== input.billingCountryCode ||
+          existing.corporateBillingAddress !== input.billingAddress ||
+          existing.gstin !== gstin);
+      const saved = await tx.brandBillingProfile.upsert({
+        where: { brandProfileId },
+        create: {
+          brandProfileId,
+          registeredCompanyName: input.legalEntityName,
+          legalEntityType: input.legalEntityType,
+          billingCountryCode: input.billingCountryCode,
+          corporateBillingAddress: input.billingAddress,
+          gstin,
+          profileState: "CONFIGURED",
+          configuredAt: now,
+        },
+        update: {
+          registeredCompanyName: input.legalEntityName,
+          legalEntityType: input.legalEntityType,
+          billingCountryCode: input.billingCountryCode,
+          corporateBillingAddress: input.billingAddress,
+          gstin,
+          ...(isMaterialUpdate ? { profileState: "UPDATED" as const } : {}),
+        },
+      });
+      if (!existing || isMaterialUpdate) {
+        await tx.brandBillingProfileVersion.create({
+          data: {
+            brandProfileId,
+            legalEntityName: input.legalEntityName,
+            legalEntityType: input.legalEntityType,
+            billingCountryCode: input.billingCountryCode,
+            billingAddress: input.billingAddress,
+            gstin,
+            effectiveFrom: now,
+          },
+        });
+      }
+      return saved;
     });
 
     return {

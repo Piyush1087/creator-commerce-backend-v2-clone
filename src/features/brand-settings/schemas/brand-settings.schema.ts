@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isIso31661Alpha2CountryCode } from "../../../shared/geography/iso-country-code";
 
 export const BrandRoleEnum = z.enum([
   "BRAND_OWNER",
@@ -45,7 +46,11 @@ export const BrandBillingProfileSchema = z
       .string()
       .trim()
       .toUpperCase()
-      .regex(/^[A-Z]{2}$/, "Use an ISO-3166-1 alpha-2 country code"),
+      .regex(/^[A-Z]{2}$/, "Use an ISO-3166-1 alpha-2 country code")
+      .refine(
+        isIso31661Alpha2CountryCode,
+        "Use an assigned ISO-3166-1 alpha-2 country code",
+      ),
     billingAddress: z.string().trim().min(10).max(2000),
     gstin: optionalGstin,
   })

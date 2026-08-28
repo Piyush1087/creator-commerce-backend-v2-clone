@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import type { BrandBillingInvoice } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { RazorpayInvoiceEntity } from "../types/razorpay-invoice.types";
@@ -28,10 +29,23 @@ export class PricingInvoiceService {
     const invoices = await this.razorpay.listSubscriptionInvoices(
       subscription.razorpaySubscriptionId,
     );
+    const persisted = await this.prisma.brandBillingInvoice.findMany({
+      where: {
+        brandProfileId,
+        razorpayInvoiceId: { in: invoices.map((invoice) => invoice.id) },
+      },
+    });
+    const persistedByProviderId = new Map(
+      persisted.map((invoice) => [invoice.razorpayInvoiceId, invoice]),
+    );
 
     return invoices
       .map((invoice) =>
-        this.mapRazorpayInvoice(invoice, subscription.currency),
+        this.mapRazorpayInvoice(
+          invoice,
+          subscription.currency,
+          persistedByProviderId.get(invoice.id) ?? null,
+        ),
       )
       .sort((left, right) => {
         const leftTime = left.paidAt ?? left.issuedAt ?? "";
@@ -51,7 +65,10 @@ export class PricingInvoiceService {
       throw new NotFoundException("Invoice not found for this brand");
     }
 
-    return this.mapRazorpayInvoice(invoice, subscription.currency);
+    const persisted = await this.prisma.brandBillingInvoice.findUnique({
+      where: { razorpayInvoiceId },
+    });
+    return this.mapRazorpayInvoice(invoice, subscription.currency, persisted);
   }
 
   async resolveInvoiceViewUrl(
@@ -104,6 +121,31 @@ export class PricingInvoiceService {
       invoice.currency && invoice.currency.length > 0
         ? invoice.currency
         : input.fallbackCurrency ?? "USD";
+    const issuedAt = this.epochToDate(invoice.issued_at);
+    const existing = await this.prisma.brandBillingInvoice.findUnique({
+      where: { razorpayInvoiceId: invoice.id },
+      select: { billingProfileVersionId: true },
+    });
+    const version =
+      !existing?.billingProfileVersionId && issuedAt
+        ? await this.prisma.brandBillingProfileVersion.findFirst({
+            where: {
+              brandProfileId: input.brandProfileId,
+              effectiveFrom: { lte: issuedAt },
+            },
+            orderBy: { effectiveFrom: "desc" },
+          })
+        : null;
+    const snapshot = version
+      ? {
+          billingProfileVersionId: version.id,
+          billingLegalEntityName: version.legalEntityName,
+          billingLegalEntityType: version.legalEntityType,
+          billingCountryCode: version.billingCountryCode,
+          billingAddress: version.billingAddress,
+          billingGstin: version.gstin,
+        }
+      : {};
 
     return this.prisma.brandBillingInvoice.upsert({
       where: { razorpayInvoiceId: invoice.id },
@@ -122,7 +164,8 @@ export class PricingInvoiceService {
         paidAt: this.epochToDate(invoice.paid_at),
         billingPeriodStart: this.epochToDate(invoice.billing_start),
         billingPeriodEnd: this.epochToDate(invoice.billing_end),
-        issuedAt: this.epochToDate(invoice.issued_at),
+        issuedAt,
+        ...snapshot,
       },
       update: {
         razorpayPaymentId: input.razorpayPaymentId ?? invoice.payment_id ?? null,
@@ -135,7 +178,8 @@ export class PricingInvoiceService {
         paidAt: this.epochToDate(invoice.paid_at),
         billingPeriodStart: this.epochToDate(invoice.billing_start),
         billingPeriodEnd: this.epochToDate(invoice.billing_end),
-        issuedAt: this.epochToDate(invoice.issued_at),
+        issuedAt,
+        ...snapshot,
       },
     });
   }
@@ -157,6 +201,7 @@ export class PricingInvoiceService {
   private mapRazorpayInvoice(
     invoice: RazorpayInvoiceEntity,
     fallbackCurrency: string,
+    persisted: BrandBillingInvoice | null,
   ): BillingInvoiceView {
     const currency =
       invoice.currency && invoice.currency.length > 0
@@ -177,6 +222,21 @@ export class PricingInvoiceService {
       issuedAt: this.epochToIso(invoice.issued_at),
       billingPeriodStart: this.epochToIso(invoice.billing_start),
       billingPeriodEnd: this.epochToIso(invoice.billing_end),
+      billingIdentity:
+        persisted?.billingProfileVersionId && persisted.billingLegalEntityName && persisted.billingAddress
+          ? {
+              legalEntityName: persisted.billingLegalEntityName,
+              legalEntityType: persisted.billingLegalEntityType,
+              billingCountryCode: persisted.billingCountryCode,
+              billingAddress: persisted.billingAddress,
+              gstin: persisted.billingGstin,
+            }
+          : null,
+      historicalBillingIdentityAvailable: Boolean(
+        persisted?.billingProfileVersionId &&
+          persisted.billingLegalEntityName &&
+          persisted.billingAddress,
+      ),
       lineItems: (invoice.line_items ?? []).map((item) => ({
         name: item.name ?? "Subscription charge",
         amount: item.amount ?? 0,
