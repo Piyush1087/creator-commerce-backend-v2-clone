@@ -111,6 +111,10 @@ describe("BS09 P1 treasury funding foundation", () => {
   it("keeps 10000 principal separate from 200 fee and 36 GST without crediting the vault", async () => {
     const load = {
       id: "load-1",
+      vaultId: "vault-1",
+      brandProfileId: "brand-1",
+      currency: "INR",
+      idempotencyKey: "key",
       providerOrderId: null,
       principalAmount: new Decimal(10000),
       processingFee: new Decimal(200),

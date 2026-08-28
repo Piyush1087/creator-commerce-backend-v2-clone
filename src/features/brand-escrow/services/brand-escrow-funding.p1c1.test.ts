@@ -197,16 +197,24 @@ describe("BS09 P1C1 provider truth and recovery", () => {
       state: "PENDING",
       principalAmount: new Decimal(10000),
       processingFee: new Decimal(200),
+      processingFeeTax: new Decimal(36),
     };
     let credits = 0;
     const tx = {
+      $queryRaw: vi.fn(),
       escrowFundingLoad: {
         findUnique: vi.fn().mockImplementation(() => load),
         update: vi
           .fn()
           .mockImplementation(({ data }) => (load = { ...load, ...data })),
       },
-      escrowTransactionLedger: { update: vi.fn() },
+      escrowTransactionLedger: {
+        upsert: vi.fn().mockImplementation(({ create }) => ({
+          id: create.transactionType === "LOAD" ? "ledger-load" : "ledger-fee",
+          transactionStatus: "PENDING",
+        })),
+        update: vi.fn(),
+      },
       brandEscrowVault: {
         update: vi.fn().mockImplementation(() => {
           credits += 1;
@@ -255,16 +263,24 @@ describe("BS09 P1C1 provider truth and recovery", () => {
       state: "PENDING",
       principalAmount: new Decimal(5000),
       processingFee: new Decimal(100),
+      processingFeeTax: new Decimal(18),
     };
     let credits = 0;
     const tx = {
+      $queryRaw: vi.fn(),
       escrowFundingLoad: {
         findUnique: vi.fn().mockImplementation(() => load),
         update: vi
           .fn()
           .mockImplementation(({ data }) => (load = { ...load, ...data })),
       },
-      escrowTransactionLedger: { update: vi.fn() },
+      escrowTransactionLedger: {
+        upsert: vi.fn().mockImplementation(({ create }) => ({
+          id: create.transactionType === "LOAD" ? "ledger-load" : "ledger-fee",
+          transactionStatus: "PENDING",
+        })),
+        update: vi.fn(),
+      },
       brandEscrowVault: {
         update: vi.fn().mockImplementation(() => {
           credits += 1;

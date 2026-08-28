@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import type { Prisma } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import { createHmac } from "crypto";
 import { PrismaService } from "../../../prisma/prisma.service";
@@ -97,6 +98,7 @@ export class BrandEscrowWebhookService {
       if (!load) return;
       if (orderId && load.providerOrderId && orderId !== load.providerOrderId)
         return;
+      await this.ensureGatewayLedgerFoundation(tx, load);
       if (load.state === "CREDITED") {
         if (paymentId && !load.providerPaymentId) {
           await tx.escrowFundingLoad.update({
@@ -135,6 +137,69 @@ export class BrandEscrowWebhookService {
         },
       });
     });
+  }
+
+  private async ensureGatewayLedgerFoundation(
+    tx: Prisma.TransactionClient,
+    load: {
+      id: string;
+      vaultId: string;
+      brandProfileId: string;
+      idempotencyKey: string | null;
+      principalAmount: Decimal;
+      processingFee: Decimal;
+      processingFeeTax: Decimal;
+      currency: string;
+      state: string;
+    },
+  ): Promise<void> {
+    if (!load.idempotencyKey) return;
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-ledger:${load.id}`}))`;
+    const principal = await tx.escrowTransactionLedger.upsert({
+      where: { idempotencyKey: `load:${load.idempotencyKey}` },
+      create: {
+        vaultId: load.vaultId,
+        brandProfileId: load.brandProfileId,
+        transactionType: "LOAD",
+        amount: load.principalAmount,
+        currency: load.currency,
+        idempotencyKey: `load:${load.idempotencyKey}`,
+        transactionStatus: load.state === "CREDITED" ? "CREDITED" : "PENDING",
+      },
+      update: {},
+    });
+    if (
+      load.state === "CREDITED" &&
+      principal.transactionStatus !== "CREDITED"
+    ) {
+      await tx.escrowTransactionLedger.update({
+        where: { id: principal.id },
+        data: { transactionStatus: "CREDITED" },
+      });
+    }
+    if (load.processingFee.add(load.processingFeeTax).greaterThan(0)) {
+      const fee = await tx.escrowTransactionLedger.upsert({
+        where: { idempotencyKey: `load-fee:${load.idempotencyKey}` },
+        create: {
+          vaultId: load.vaultId,
+          brandProfileId: load.brandProfileId,
+          transactionType: "LOAD_FEE",
+          amount: load.processingFee.add(load.processingFeeTax),
+          currency: load.currency,
+          gatewayProcessingSurcharge: load.processingFee,
+          gatewaySurchargeGst: load.processingFeeTax,
+          idempotencyKey: `load-fee:${load.idempotencyKey}`,
+          transactionStatus: load.state === "CREDITED" ? "CREDITED" : "PENDING",
+        },
+        update: {},
+      });
+      if (load.state === "CREDITED" && fee.transactionStatus !== "CREDITED") {
+        await tx.escrowTransactionLedger.update({
+          where: { id: fee.id },
+          data: { transactionStatus: "CREDITED" },
+        });
+      }
+    }
   }
 
   private async creditVirtualAccount(payload: Payload): Promise<void> {

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -140,25 +141,39 @@ export class BrandEscrowService {
     let existing = await this.prisma.escrowFundingLoad.findUnique({
       where: { idempotencyKey },
     });
-    if (existing) return this.ensureProviderOrder(existing.id);
+    if (existing) {
+      await this.ensureLedgerFoundation(existing.id);
+      return this.ensureProviderOrder(existing.id);
+    }
     const fee =
       vault.currency === "INR" ? principal.mul("0.02") : new Decimal(0);
     const feeTax = vault.currency === "INR" ? fee.mul("0.18") : new Decimal(0);
     let load;
     try {
-      load = await this.prisma.escrowFundingLoad.create({
-        data: {
-          vaultId: vault.id,
-          brandProfileId,
-          sourceType: "GATEWAY",
-          currency: vault.currency,
-          principalAmount: principal,
-          processingFee: fee,
-          processingFeeTax: feeTax,
-          state: "LOAD_INITIATED",
-          idempotencyKey,
-          initiatedAt: new Date(),
-        },
+      load = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.escrowFundingLoad.create({
+          data: {
+            vaultId: vault.id,
+            brandProfileId,
+            sourceType: "GATEWAY",
+            currency: vault.currency,
+            principalAmount: principal,
+            processingFee: fee,
+            processingFeeTax: feeTax,
+            state: "LOAD_INITIATED",
+            idempotencyKey,
+            initiatedAt: new Date(),
+          },
+        });
+        await tx.escrowTransactionLedger.create({
+          data: this.loadLedgerData(created),
+        });
+        if (fee.add(feeTax).greaterThan(0)) {
+          await tx.escrowTransactionLedger.create({
+            data: this.loadFeeLedgerData(created),
+          });
+        }
+        return created;
       });
     } catch (error) {
       if (!this.isUniqueConstraint(error)) throw error;
@@ -166,34 +181,94 @@ export class BrandEscrowService {
         where: { idempotencyKey },
       });
       if (!existing) throw error;
+      await this.ensureLedgerFoundation(existing.id);
       return this.ensureProviderOrder(existing.id);
     }
-    await this.prisma.escrowTransactionLedger.create({
-      data: {
-        vaultId: vault.id,
-        brandProfileId,
-        transactionType: "LOAD",
-        amount: principal,
-        currency: vault.currency,
-        idempotencyKey: `load:${idempotencyKey}`,
-        transactionStatus: "PENDING",
-      },
-    });
-    if (fee.greaterThan(0))
-      await this.prisma.escrowTransactionLedger.create({
-        data: {
-          vaultId: vault.id,
-          brandProfileId,
-          transactionType: "LOAD_FEE",
-          amount: fee.add(feeTax),
-          currency: vault.currency,
-          gatewayProcessingSurcharge: fee,
-          gatewaySurchargeGst: feeTax,
-          idempotencyKey: `load-fee:${idempotencyKey}`,
-          transactionStatus: "PENDING",
-        },
-      });
     return this.ensureProviderOrder(load.id);
+  }
+
+  private async ensureLedgerFoundation(loadId: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const load = await tx.escrowFundingLoad.findUniqueOrThrow({
+        where: { id: loadId },
+      });
+      if (load.sourceType !== "GATEWAY" || !load.idempotencyKey) return;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-ledger:${load.id}`}))`;
+      const principal = await tx.escrowTransactionLedger.upsert({
+        where: { idempotencyKey: `load:${load.idempotencyKey}` },
+        create: this.loadLedgerData(load),
+        update: {},
+      });
+      if (
+        principal.transactionType !== "LOAD" ||
+        !principal.amount.equals(load.principalAmount) ||
+        principal.currency !== load.currency
+      ) {
+        throw new ConflictException("Funding LOAD ledger integrity mismatch");
+      }
+      const requiresFee = load.processingFee
+        .add(load.processingFeeTax)
+        .greaterThan(0);
+      if (requiresFee) {
+        const fee = await tx.escrowTransactionLedger.upsert({
+          where: { idempotencyKey: `load-fee:${load.idempotencyKey}` },
+          create: this.loadFeeLedgerData(load),
+          update: {},
+        });
+        if (
+          fee.transactionType !== "LOAD_FEE" ||
+          !fee.amount.equals(load.processingFee.add(load.processingFeeTax)) ||
+          fee.currency !== load.currency
+        ) {
+          throw new ConflictException(
+            "Funding LOAD_FEE ledger integrity mismatch",
+          );
+        }
+      }
+    });
+  }
+
+  private loadLedgerData(load: {
+    vaultId: string;
+    brandProfileId: string;
+    principalAmount: Decimal;
+    currency: string;
+    idempotencyKey: string | null;
+  }) {
+    if (!load.idempotencyKey)
+      throw new ConflictException("Gateway funding load lacks idempotency key");
+    return {
+      vaultId: load.vaultId,
+      brandProfileId: load.brandProfileId,
+      transactionType: "LOAD" as const,
+      amount: load.principalAmount,
+      currency: load.currency,
+      idempotencyKey: `load:${load.idempotencyKey}`,
+      transactionStatus: "PENDING" as const,
+    };
+  }
+
+  private loadFeeLedgerData(load: {
+    vaultId: string;
+    brandProfileId: string;
+    processingFee: Decimal;
+    processingFeeTax: Decimal;
+    currency: string;
+    idempotencyKey: string | null;
+  }) {
+    if (!load.idempotencyKey)
+      throw new ConflictException("Gateway funding load lacks idempotency key");
+    return {
+      vaultId: load.vaultId,
+      brandProfileId: load.brandProfileId,
+      transactionType: "LOAD_FEE" as const,
+      amount: load.processingFee.add(load.processingFeeTax),
+      currency: load.currency,
+      gatewayProcessingSurcharge: load.processingFee,
+      gatewaySurchargeGst: load.processingFeeTax,
+      idempotencyKey: `load-fee:${load.idempotencyKey}`,
+      transactionStatus: "PENDING" as const,
+    };
   }
 
   private async ensureProviderOrder(loadId: string) {
