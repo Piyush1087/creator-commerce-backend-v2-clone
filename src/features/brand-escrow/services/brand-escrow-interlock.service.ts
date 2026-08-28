@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   PreconditionFailedException,
@@ -154,9 +155,26 @@ export class BrandEscrowInterlockService {
         throw new NotFoundException("Escrow vault not found");
       }
 
-      const completedAdvance = lock.advanceTrancheDisbursed
-        ? lock.netCreatorPayoutPool.mul(0.3)
-        : new Decimal(0);
+      let completedAdvance = new Decimal(0);
+      if (lock.advanceTrancheDisbursed) {
+        const commercial = await tx.collaborationCommercial.findUnique({
+          where: { collaborationId: input.collaborationId },
+        });
+        const contractedAdvance = commercial?.advance30Amount;
+        if (
+          !commercial ||
+          contractedAdvance === null ||
+          contractedAdvance === undefined ||
+          contractedAdvance.lessThan(0) ||
+          contractedAdvance.greaterThan(lock.grossCreatorQuote) ||
+          !commercial.finalQuote?.equals(lock.grossCreatorQuote)
+        ) {
+          throw new ConflictException(
+            "Disbursed advance lacks valid contracted commercial authority",
+          );
+        }
+        completedAdvance = contractedAdvance;
+      }
       const refundAmount = lock.totalEscrowLockedAmount.sub(completedAdvance);
 
       if (refundAmount.lessThanOrEqualTo(0)) {
