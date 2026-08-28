@@ -24,6 +24,11 @@ function subscription(): BrandSubscription {
     currentPeriodEnd: new Date("2026-09-01T00:00:00.000Z"),
     cancelScheduledAt: null,
     cancelEffectiveAt: null,
+    providerCancellationState: null,
+    continuationRazorpaySubscriptionId: null,
+    continuationRazorpayPlanId: null,
+    continuationProviderStatus: null,
+    continuationStartsAt: null,
     firstPaymentFailureAt: null,
     paymentGraceEndsAt: null,
     createdAt: new Date("2026-08-01T00:00:00.000Z"),
@@ -35,15 +40,18 @@ function harness(overrides: Partial<BrandSubscription> = {}) {
   let row = { ...subscription(), ...overrides };
   const prisma = {
     brandSubscription: {
-      findUnique: vi
-        .fn()
-        .mockImplementation(({ where }) =>
-          Promise.resolve(
-            where.razorpaySubscriptionId === row.razorpaySubscriptionId
-              ? row
-              : null,
-          ),
-        ),
+      findUnique: vi.fn().mockImplementation(({ where }) => {
+        const matchesCurrent =
+          where.razorpaySubscriptionId !== undefined &&
+          where.razorpaySubscriptionId === row.razorpaySubscriptionId;
+        const matchesContinuation =
+          where.continuationRazorpaySubscriptionId !== undefined &&
+          where.continuationRazorpaySubscriptionId ===
+            row.continuationRazorpaySubscriptionId;
+        return Promise.resolve(
+          matchesCurrent || matchesContinuation ? row : null,
+        );
+      }),
       update: vi.fn().mockImplementation(({ data }) => {
         row = { ...row, ...data };
         return Promise.resolve(row);
@@ -169,6 +177,79 @@ describe("PricingWebhookService P2 reconciliation", () => {
     );
     expect(h.prisma.brandSubscription.update).not.toHaveBeenCalled();
     expect(h.getRow().status).toBe(SubscriptionStatus.ACTIVE);
+  });
+
+  it("promotes a non-overlapping continuation only when its paid period activates", async () => {
+    const currentPeriodEnd = new Date("2026-09-01T00:00:00.000Z");
+    const nextPeriodEnd = new Date("2026-10-01T00:00:00.000Z");
+    const h = harness({
+      status: SubscriptionStatus.CANCEL_SCHEDULED,
+      cancelScheduledAt: new Date("2026-08-20T00:00:00.000Z"),
+      cancelEffectiveAt: currentPeriodEnd,
+      providerCancellationState: "SCHEDULED",
+      continuationRazorpaySubscriptionId: "provider-continuation",
+      continuationRazorpayPlanId: "plan-founders-next",
+      continuationProviderStatus: "authenticated",
+      continuationStartsAt: currentPeriodEnd,
+    });
+    await h.service.handleWebhook({
+      event: "subscription.activated",
+      payload: {
+        subscription: {
+          entity: {
+            id: "provider-continuation",
+            status: "active",
+            plan_id: "plan-founders-next",
+            current_start: Math.floor(currentPeriodEnd.getTime() / 1000),
+            current_end: Math.floor(nextPeriodEnd.getTime() / 1000),
+            notes: { target_tier: "FOUNDERS_BETA" },
+          },
+        },
+      },
+    });
+    expect(h.getRow()).toMatchObject({
+      status: SubscriptionStatus.ACTIVE,
+      tier: SubscriptionTier.FOUNDERS_BETA,
+      razorpaySubscriptionId: "provider-continuation",
+      currentPeriodStart: currentPeriodEnd,
+      currentPeriodEnd: nextPeriodEnd,
+      cancelEffectiveAt: null,
+      continuationRazorpaySubscriptionId: null,
+    });
+
+    await h.service.handleWebhook(
+      failurePayload(1_777_593_600, "provider-current"),
+    );
+    expect(h.getRow().status).toBe(SubscriptionStatus.ACTIVE);
+  });
+
+  it("ignores continuation activation that overlaps the paid current period", async () => {
+    const h = harness({
+      status: SubscriptionStatus.CANCEL_SCHEDULED,
+      cancelEffectiveAt: new Date("2026-09-01T00:00:00.000Z"),
+      providerCancellationState: "SCHEDULED",
+      continuationRazorpaySubscriptionId: "provider-continuation",
+      continuationStartsAt: new Date("2026-09-01T00:00:00.000Z"),
+    });
+    await h.service.handleWebhook({
+      event: "subscription.activated",
+      payload: {
+        subscription: {
+          entity: {
+            id: "provider-continuation",
+            status: "active",
+            current_start: 1_777_593_600,
+            current_end: 1_780_185_600,
+            notes: { target_tier: "FOUNDERS_BETA" },
+          },
+        },
+      },
+    });
+    expect(h.getRow()).toMatchObject({
+      status: SubscriptionStatus.CANCEL_SCHEDULED,
+      razorpaySubscriptionId: "provider-current",
+      continuationRazorpaySubscriptionId: "provider-continuation",
+    });
   });
 
   it("invoice paid preserves invoice snapshot upsert", async () => {

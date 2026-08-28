@@ -92,6 +92,10 @@ export class PricingWebhookService {
           where: { razorpaySubscriptionId: subscriptionId },
           data: { providerStatus: "authenticated" },
         });
+        await this.prisma.brandSubscription.updateMany({
+          where: { continuationRazorpaySubscriptionId: subscriptionId },
+          data: { continuationProviderStatus: "authenticated" },
+        });
         return;
       }
       case "subscription.charged": {
@@ -134,6 +138,13 @@ export class PricingWebhookService {
               providerStatus: entityData.status,
             },
           });
+          await this.prisma.brandSubscription.updateMany({
+            where: { continuationRazorpaySubscriptionId: entityData.id },
+            data: {
+              continuationRazorpayPlanId: entityData.plan_id,
+              continuationProviderStatus: entityData.status,
+            },
+          });
         }
         return;
       }
@@ -145,6 +156,10 @@ export class PricingWebhookService {
         await this.prisma.brandSubscription.updateMany({
           where: { razorpaySubscriptionId: subscriptionId },
           data: { providerStatus: "pending" },
+        });
+        await this.prisma.brandSubscription.updateMany({
+          where: { continuationRazorpaySubscriptionId: subscriptionId },
+          data: { continuationProviderStatus: "pending" },
         });
         return;
       }
@@ -253,9 +268,12 @@ export class PricingWebhookService {
       where: { razorpaySubscriptionId },
     });
     if (!subscription) {
-      this.logger.debug(
-        `Ignored subscription.cancelled for unknown Razorpay subscription ${razorpaySubscriptionId}`,
-      );
+      await this.prisma.brandSubscription.updateMany({
+        where: {
+          continuationRazorpaySubscriptionId: razorpaySubscriptionId,
+        },
+        data: { continuationProviderStatus: "cancelled" },
+      });
       return;
     }
 
@@ -341,9 +359,16 @@ export class PricingWebhookService {
       notes?: RazorpaySubscriptionNotes;
     },
   ) {
-    const existing = await this.prisma.brandSubscription.findUnique({
+    let existing = await this.prisma.brandSubscription.findUnique({
       where: { razorpaySubscriptionId },
     });
+    let isContinuation = false;
+    if (!existing) {
+      existing = await this.prisma.brandSubscription.findUnique({
+        where: { continuationRazorpaySubscriptionId: razorpaySubscriptionId },
+      });
+      isContinuation = existing !== null;
+    }
     if (!existing) {
       return;
     }
@@ -387,7 +412,14 @@ export class PricingWebhookService {
 
     const periodStart = new Date(resolvedEntity.current_start * 1000);
     const periodEnd = new Date(resolvedEntity.current_end * 1000);
+    if (isContinuation && periodStart < existing.currentPeriodEnd) {
+      this.logger.warn(
+        `Ignored overlapping continuation period for ${razorpaySubscriptionId}`,
+      );
+      return;
+    }
     const cancellationStillScheduled =
+      !isContinuation &&
       existing.status === SubscriptionStatus.CANCEL_SCHEDULED &&
       existing.cancelEffectiveAt !== null &&
       existing.cancelEffectiveAt > new Date() &&
@@ -397,11 +429,20 @@ export class PricingWebhookService {
       : SubscriptionStatus.ACTIVE;
 
     const subscription = await this.prisma.brandSubscription.update({
-      where: { razorpaySubscriptionId },
+      where: isContinuation
+        ? { brandProfileId: existing.brandProfileId }
+        : { razorpaySubscriptionId },
       data: {
         status: productStatus,
         tier: SubscriptionTier.FOUNDERS_BETA,
-        razorpayPlanId: resolvedEntity.plan_id ?? existing.razorpayPlanId,
+        razorpaySubscriptionId: isContinuation
+          ? razorpaySubscriptionId
+          : existing.razorpaySubscriptionId,
+        razorpayPlanId:
+          resolvedEntity.plan_id ??
+          (isContinuation
+            ? existing.continuationRazorpayPlanId
+            : existing.razorpayPlanId),
         providerStatus: resolvedEntity.status ?? "active",
         currentPeriodStart: periodStart,
         currentPeriodEnd: periodEnd,
@@ -414,6 +455,13 @@ export class PricingWebhookService {
         cancelEffectiveAt: cancellationStillScheduled
           ? existing.cancelEffectiveAt
           : null,
+        providerCancellationState: cancellationStillScheduled
+          ? existing.providerCancellationState
+          : null,
+        continuationRazorpaySubscriptionId: null,
+        continuationRazorpayPlanId: null,
+        continuationProviderStatus: null,
+        continuationStartsAt: null,
       },
     });
 
@@ -589,10 +637,16 @@ export class PricingWebhookService {
       return;
     }
 
-    const subscription = await this.prisma.brandSubscription.findUnique({
+    let subscription = await this.prisma.brandSubscription.findUnique({
       where: { razorpaySubscriptionId },
     });
-
+    if (!subscription) {
+      subscription = await this.prisma.brandSubscription.findUnique({
+        where: {
+          continuationRazorpaySubscriptionId: razorpaySubscriptionId,
+        },
+      });
+    }
     if (!subscription) {
       this.logger.warn(
         `invoice.paid for unknown subscription ${razorpaySubscriptionId}`,
@@ -607,6 +661,13 @@ export class PricingWebhookService {
       razorpaySubscriptionId,
       providerSubscription,
     );
+
+    subscription = await this.prisma.brandSubscription.findUnique({
+      where: { razorpaySubscriptionId },
+    });
+    if (!subscription) {
+      return;
+    }
 
     await this.invoices.upsertFromRazorpayInvoiceId(
       subscription.brandProfileId,

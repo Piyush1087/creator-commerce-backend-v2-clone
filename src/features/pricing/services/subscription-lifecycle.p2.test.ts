@@ -29,6 +29,11 @@ function baseSubscription(
     currentPeriodEnd: new Date("2026-09-01T00:00:00.000Z"),
     cancelScheduledAt: null,
     cancelEffectiveAt: null,
+    providerCancellationState: null,
+    continuationRazorpaySubscriptionId: null,
+    continuationRazorpayPlanId: null,
+    continuationProviderStatus: null,
+    continuationStartsAt: null,
     firstPaymentFailureAt: null,
     paymentGraceEndsAt: null,
     createdAt: new Date("2026-08-01T00:00:00.000Z"),
@@ -52,9 +57,14 @@ function harness(input?: {
     },
     brandSubscription: {
       findUnique: vi.fn().mockImplementation(() => Promise.resolve(row)),
+      findUniqueOrThrow: vi.fn().mockImplementation(() => Promise.resolve(row)),
       update: vi.fn().mockImplementation(({ data }) => {
         row = { ...row, ...data };
         return Promise.resolve({ ...row, featureUsages: [] });
+      }),
+      updateMany: vi.fn().mockImplementation(({ data }) => {
+        row = { ...row, ...data };
+        return Promise.resolve({ count: 1 });
       }),
     },
   };
@@ -69,6 +79,11 @@ function harness(input?: {
       status: "created",
     }),
     cancelSubscription: vi.fn().mockResolvedValue({}),
+    fetchSubscription: vi.fn().mockResolvedValue({ status: "active" }),
+    createFutureSubscription: vi.fn().mockResolvedValue({
+      id: "provider-continuation",
+      status: "created",
+    }),
     listSubscriptionInvoices: vi.fn().mockResolvedValue([]),
   };
   const plans = {
@@ -127,7 +142,7 @@ describe("SubscriptionLifecycleService P2", () => {
     },
   );
 
-  it("schedules ACTIVE cancellation at current period end without provider cancel", async () => {
+  it("schedules provider cancellation at cycle end before confirming Product cancellation", async () => {
     const currentPeriodEnd = new Date("2026-09-01T00:00:00.000Z");
     const h = harness({
       subscription: baseSubscription({
@@ -143,7 +158,32 @@ describe("SubscriptionLifecycleService P2", () => {
       accessMode: "FULL_ACCESS",
       cancelEffectiveAt: currentPeriodEnd,
     });
-    expect(h.razorpay.cancelSubscription).not.toHaveBeenCalled();
+    expect(h.razorpay.cancelSubscription).toHaveBeenCalledWith(
+      "provider-current",
+      true,
+    );
+    expect(h.getRow()).toMatchObject({
+      status: SubscriptionStatus.CANCEL_SCHEDULED,
+      providerCancellationState: "SCHEDULED",
+    });
+  });
+
+  it("keeps unresolved intent ACTIVE when provider scheduling fails", async () => {
+    const h = harness({
+      subscription: baseSubscription({
+        status: SubscriptionStatus.ACTIVE,
+        trialEndsAt: null,
+        razorpaySubscriptionId: "provider-current",
+      }),
+    });
+    h.razorpay.cancelSubscription.mockRejectedValueOnce(new Error("timeout"));
+    await expect(h.service.cancelSubscription("brand-1")).rejects.toThrow(
+      "timeout",
+    );
+    expect(h.getRow()).toMatchObject({
+      status: SubscriptionStatus.ACTIVE,
+      providerCancellationState: "SCHEDULE_PENDING",
+    });
   });
 
   it("rejects cancellation for a pure trial", async () => {
@@ -153,11 +193,13 @@ describe("SubscriptionLifecycleService P2", () => {
     );
   });
 
-  it("reverses scheduled cancellation without provider resume/uncancel", async () => {
+  it("clears an unresolved cancellation only after provider truth remains active", async () => {
     const h = harness({
       subscription: baseSubscription({
-        status: SubscriptionStatus.CANCEL_SCHEDULED,
+        status: SubscriptionStatus.ACTIVE,
         trialEndsAt: null,
+        razorpaySubscriptionId: "provider-current",
+        providerCancellationState: "SCHEDULE_PENDING",
         cancelEffectiveAt: new Date(Date.now() + 86_400_000),
       }),
     });
@@ -184,20 +226,65 @@ describe("SubscriptionLifecycleService P2", () => {
     expect(h.getRow().status).toBe(SubscriptionStatus.HALTED);
   });
 
-  it("uses provider recovery if a scheduled provider was already cancelled", async () => {
+  it("creates a future Founder's continuation without clearing scheduled cancellation", async () => {
+    const currentPeriodEnd = new Date(Date.now() + 86_400_000);
     const h = harness({
+      countryCode: "IN",
       subscription: baseSubscription({
         status: SubscriptionStatus.CANCEL_SCHEDULED,
         trialEndsAt: null,
-        providerStatus: "cancelled",
-        cancelEffectiveAt: new Date(Date.now() + 86_400_000),
+        providerCancellationState: "SCHEDULED",
+        razorpaySubscriptionId: "provider-current",
+        cancelEffectiveAt: currentPeriodEnd,
+        currentPeriodEnd,
       }),
     });
-    await h.service.reactivateSubscription("brand-1");
-    expect(h.razorpay.createImmediateSubscription).toHaveBeenCalledOnce();
+    const result = await h.service.reactivateSubscription("brand-1");
+    expect(h.billing.requireCompleteBillingProfile).toHaveBeenCalledWith(
+      "brand-1",
+    );
+    expect(h.plans.resolvePlanId).toHaveBeenCalledWith(
+      SubscriptionTier.FOUNDERS_BETA,
+      "INR",
+    );
+    expect(h.razorpay.createFutureSubscription).toHaveBeenCalledWith(
+      "plan-founders",
+      Math.floor(currentPeriodEnd.getTime() / 1000),
+      expect.objectContaining({ target_tier: SubscriptionTier.FOUNDERS_BETA }),
+    );
+    expect(h.razorpay.createImmediateSubscription).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      recovery_mode: "continuation_authorization",
+      subscription: {
+        lifecycleStatus: "CANCEL_SCHEDULED",
+        accessMode: "FULL_ACCESS",
+      },
+    });
     expect(h.getRow()).toMatchObject({
       status: SubscriptionStatus.CANCEL_SCHEDULED,
-      providerStatus: "reactivation_pending",
+      currency: SubscriptionCurrency.INR,
+      continuationRazorpaySubscriptionId: "provider-continuation",
+      continuationStartsAt: currentPeriodEnd,
     });
+  });
+
+  it("requires complete Billing before creating a cancellation continuation", async () => {
+    const currentPeriodEnd = new Date(Date.now() + 86_400_000);
+    const h = harness({
+      billingError: new BadRequestException("incomplete"),
+      subscription: baseSubscription({
+        status: SubscriptionStatus.CANCEL_SCHEDULED,
+        trialEndsAt: null,
+        providerCancellationState: "SCHEDULED",
+        razorpaySubscriptionId: "provider-current",
+        cancelEffectiveAt: currentPeriodEnd,
+        currentPeriodEnd,
+      }),
+    });
+    await expect(h.service.reactivateSubscription("brand-1")).rejects.toThrow(
+      "incomplete",
+    );
+    expect(h.razorpay.createFutureSubscription).not.toHaveBeenCalled();
+    expect(h.getRow().status).toBe(SubscriptionStatus.CANCEL_SCHEDULED);
   });
 });

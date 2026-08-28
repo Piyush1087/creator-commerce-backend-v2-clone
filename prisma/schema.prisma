@@ -3018,6 +3018,11 @@ model BrandSubscription {
   firstPaymentFailureAt  DateTime?            @map("first_payment_failure_at")
   paymentGraceEndsAt     DateTime?            @map("payment_grace_ends_at")
   providerStatus         String?              @map("provider_status")
+  providerCancellationState String? @map("provider_cancellation_state")
+  continuationRazorpaySubscriptionId String? @unique @map("continuation_razorpay_subscription_id")
+  continuationRazorpayPlanId String? @map("continuation_razorpay_plan_id")
+  continuationProviderStatus String? @map("continuation_provider_status")
+  continuationStartsAt DateTime? @map("continuation_starts_at")
   createdAt              DateTime             @default(now()) @map("created_at")
   updatedAt              DateTime             @updatedAt @map("updated_at")
 

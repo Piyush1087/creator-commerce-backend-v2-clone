@@ -16,6 +16,8 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { BrandSettingsService } from "../../brand-settings/services/brand-settings.service";
 import {
   FEATURE_LIMIT_KEYS,
+  PROVIDER_CANCELLATION_PENDING,
+  PROVIDER_CANCELLATION_SCHEDULED,
   TRIAL_DURATION_DAYS,
 } from "../constants/subscription.constants";
 import type { TierChangeResult } from "../types/tier-change.types";
@@ -262,17 +264,28 @@ export class SubscriptionLifecycleService {
     }
 
     if (
-      subscription.status === SubscriptionStatus.CANCEL_SCHEDULED &&
+      subscription.status === SubscriptionStatus.ACTIVE &&
+      subscription.providerCancellationState ===
+        PROVIDER_CANCELLATION_PENDING &&
       subscription.cancelEffectiveAt !== null &&
       subscription.cancelEffectiveAt > new Date() &&
-      subscription.providerStatus !== "cancelled"
+      subscription.razorpaySubscriptionId
     ) {
+      const provider = await this.razorpay.fetchSubscription(
+        subscription.razorpaySubscriptionId,
+      );
+      if (provider.status.toLowerCase() !== "active") {
+        throw new BadRequestException(
+          "Provider cancellation state is unresolved; reactivation cannot be confirmed.",
+        );
+      }
       const updated = await this.prisma.brandSubscription.update({
         where: { brandProfileId },
         data: {
           status: SubscriptionStatus.ACTIVE,
           cancelScheduledAt: null,
           cancelEffectiveAt: null,
+          providerCancellationState: null,
         },
         include: { featureUsages: true },
       });
@@ -281,6 +294,16 @@ export class SubscriptionLifecycleService {
         subscription: this.subscriptionAccess.toReadModel(updated),
         recovery_mode: "cancellation_reversed" as const,
       };
+    }
+
+    if (
+      subscription.status === SubscriptionStatus.CANCEL_SCHEDULED &&
+      subscription.providerCancellationState ===
+        PROVIDER_CANCELLATION_SCHEDULED &&
+      subscription.cancelEffectiveAt !== null &&
+      subscription.cancelEffectiveAt > new Date()
+    ) {
+      return this.startCancellationContinuation(subscription);
     }
 
     if (
@@ -345,18 +368,120 @@ export class SubscriptionLifecycleService {
         "Only an active paid subscription can be scheduled for cancellation.",
       );
     }
+    if (!subscription.razorpaySubscriptionId) {
+      throw new BadRequestException(
+        "Active subscription is missing its provider binding.",
+      );
+    }
 
-    const updated = await this.prisma.brandSubscription.update({
+    const cancelScheduledAt = new Date();
+    const intent = await this.prisma.brandSubscription.update({
       where: { brandProfileId },
       data: {
-        status: SubscriptionStatus.CANCEL_SCHEDULED,
-        cancelScheduledAt: new Date(),
+        cancelScheduledAt,
         cancelEffectiveAt: subscription.currentPeriodEnd,
+        providerCancellationState: PROVIDER_CANCELLATION_PENDING,
       },
+    });
+
+    const provider = await this.razorpay.cancelSubscription(
+      subscription.razorpaySubscriptionId,
+      true,
+    );
+    const confirmed = await this.prisma.brandSubscription.updateMany({
+      where: {
+        id: intent.id,
+        status: SubscriptionStatus.ACTIVE,
+        providerCancellationState: PROVIDER_CANCELLATION_PENDING,
+      },
+      data: {
+        status: SubscriptionStatus.CANCEL_SCHEDULED,
+        providerCancellationState: PROVIDER_CANCELLATION_SCHEDULED,
+        providerStatus: provider.status ?? subscription.providerStatus,
+      },
+    });
+    if (confirmed.count === 0) {
+      throw new ConflictException(
+        "Provider cancellation was scheduled but local confirmation requires reconciliation.",
+      );
+    }
+
+    const updated = await this.prisma.brandSubscription.findUniqueOrThrow({
+      where: { brandProfileId },
       include: { featureUsages: true },
     });
     await this.syncLegacyBrandProfileFields(brandProfileId, updated);
     return this.subscriptionAccess.toReadModel(updated);
+  }
+
+  private async startCancellationContinuation(subscription: {
+    brandProfileId: string;
+    currentPeriodEnd: Date;
+    continuationRazorpaySubscriptionId: string | null;
+  }) {
+    await this.brandSettings.requireCompleteBillingProfile(
+      subscription.brandProfileId,
+    );
+    const profile = await this.prisma.brandProfile.findUnique({
+      where: { id: subscription.brandProfileId },
+      select: { countryCode: true },
+    });
+    if (!profile) {
+      throw new NotFoundException("Brand profile not found");
+    }
+    const razorpayKeyId = this.config.get<string>("RAZORPAY_API_KEY_ID", "");
+    if (!razorpayKeyId) {
+      throw new BadRequestException("Razorpay is not configured for checkout.");
+    }
+
+    if (subscription.continuationRazorpaySubscriptionId) {
+      return {
+        subscription: await this.getSubscription(subscription.brandProfileId),
+        checkout: {
+          subscriptionId: subscription.continuationRazorpaySubscriptionId,
+          razorpayKeyId,
+          targetTier: SubscriptionTier.FOUNDERS_BETA,
+        },
+        recovery_mode: "continuation_authorization" as const,
+      };
+    }
+
+    const currency = this.geoRouting.resolveGeoContext(
+      profile.countryCode,
+    ).currency;
+    const planId = await this.planProvisioning.resolvePlanId(
+      SubscriptionTier.FOUNDERS_BETA,
+      currency,
+    );
+    const provider = await this.razorpay.createFutureSubscription(
+      planId,
+      Math.floor(subscription.currentPeriodEnd.getTime() / 1000),
+      {
+        brand_profile_id: subscription.brandProfileId,
+        target_tier: SubscriptionTier.FOUNDERS_BETA,
+      },
+    );
+    const updated = await this.prisma.brandSubscription.update({
+      where: { brandProfileId: subscription.brandProfileId },
+      data: {
+        currency: currency as SubscriptionCurrency,
+        continuationRazorpaySubscriptionId: provider.id,
+        continuationRazorpayPlanId: planId,
+        continuationProviderStatus: provider.status ?? "created",
+        continuationStartsAt: subscription.currentPeriodEnd,
+      },
+      include: { featureUsages: true },
+    });
+
+    return {
+      subscription: this.subscriptionAccess.toReadModel(updated),
+      checkout: {
+        subscriptionId: provider.id,
+        razorpayKeyId,
+        targetTier: SubscriptionTier.FOUNDERS_BETA,
+      },
+      recovery_mode: "continuation_authorization" as const,
+    };
   }
 
   private async applyRazorpayPlanChange(

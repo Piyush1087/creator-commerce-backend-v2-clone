@@ -13,6 +13,13 @@ describe("SubscriptionLifecycleReconciliationScheduler", () => {
           .mockResolvedValueOnce([{ id: "grace", brandProfileId: "brand-g" }])
           .mockResolvedValueOnce([
             {
+              id: "pending",
+              brandProfileId: "brand-p",
+              razorpaySubscriptionId: "provider-pending",
+            },
+          ])
+          .mockResolvedValueOnce([
+            {
               id: "cancel",
               brandProfileId: "brand-c",
               razorpaySubscriptionId: "provider-current",
@@ -41,6 +48,10 @@ describe("SubscriptionLifecycleReconciliationScheduler", () => {
       expect.objectContaining({ data: { status: SubscriptionStatus.HALTED } }),
     );
     expect(razorpay.cancelSubscription).toHaveBeenCalledWith(
+      "provider-pending",
+      true,
+    );
+    expect(razorpay.cancelSubscription).not.toHaveBeenCalledWith(
       "provider-current",
       false,
     );

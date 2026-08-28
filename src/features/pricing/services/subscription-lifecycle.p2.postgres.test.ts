@@ -84,12 +84,22 @@ describe.skipIf(process.env.BS08_DATABASE_TEST !== "true")(
           status: SubscriptionStatus.CANCEL_SCHEDULED,
           cancelScheduledAt: scheduledAt,
           cancelEffectiveAt: effectiveAt,
+          providerCancellationState: "SCHEDULED",
+          continuationRazorpaySubscriptionId: "sub_continuation_bs08",
+          continuationRazorpayPlanId: "plan_founders_usd",
+          continuationProviderStatus: "created",
+          continuationStartsAt: effectiveAt,
         },
       });
       expect(stored).toMatchObject({
         status: SubscriptionStatus.CANCEL_SCHEDULED,
         cancelScheduledAt: scheduledAt,
         cancelEffectiveAt: effectiveAt,
+        providerCancellationState: "SCHEDULED",
+        continuationRazorpaySubscriptionId: "sub_continuation_bs08",
+        continuationRazorpayPlanId: "plan_founders_usd",
+        continuationProviderStatus: "created",
+        continuationStartsAt: effectiveAt,
       });
     });
   },
