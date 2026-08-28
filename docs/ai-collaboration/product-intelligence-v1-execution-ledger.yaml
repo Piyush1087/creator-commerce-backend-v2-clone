@@ -28,15 +28,15 @@ execution_mode:
 
 branch: phase-g/product-intelligence-v1
 
-current_phase: P5
+current_phase: P6
 phase_status: CHECKPOINT_READY_FOR_SYSTEMS_REVIEW
 
 checkpoint:
   status: PENDING_SYSTEMS_ACCEPTANCE
   sha: null
-  parent_sha: 41e7e24da52e361ebe43b584f19d22ff3e572642
+  parent_sha: f8aa9791fc61f64a52e9719df6f4c921072aa9e7
 
-previous_accepted_checkpoint_sha: 41e7e24da52e361ebe43b584f19d22ff3e572642
+previous_accepted_checkpoint_sha: f8aa9791fc61f64a52e9719df6f4c921072aa9e7
 
 resume_rule:
   candidate_head_self_recorded: false
@@ -65,19 +65,13 @@ implementation:
   consumer_is_read_only: true
   canonical_price_reconciliation_implemented: false
   frontend_changed: false
+  p6_runtime_code_changed: false
+  development_updated: false
+  migration_53_created: false
 
 files_changed:
-  - src/features/brand-centre/brand-centre.module.ts
-  - src/features/brand-centre/consumer/product-consumer.controller.ts
-  - src/features/brand-centre/consumer/product-consumer.service.ts
-  - src/features/brand-centre/consumer/product-consumer.mapper.ts
-  - src/features/brand-centre/consumer/product-consumer.schema.ts
-  - src/features/brand-centre/consumer/product-consumer.types.ts
-  - src/features/brand-centre/consumer/product-consumer.schema.test.ts
-  - src/features/brand-centre/consumer/product-consumer.architecture.test.ts
-  - src/features/brand-centre/consumer/product-consumer.postgres.test.ts
   - docs/ai-collaboration/product-intelligence-v1-execution-ledger.yaml
-  - docs/ai-collaboration/product-intelligence-v1-p5-consumer-runtime-contract.md
+  - docs/ai-collaboration/product-intelligence-v1-p6-final-acceptance.md
 
 migrations:
   before: 52
@@ -86,32 +80,35 @@ migrations:
 
 tests:
   passed:
-    - product_consumer_schema_and_architecture_4_tests
-    - product_consumer_postgresql_4_grouped_scenarios
-    - product_p3_p4_postgresql_vertical_slice_5_tests
     - all_non_postgresql_source_suites_99_files_663_tests
-    - brand_consumer_postgresql_8_tests
+    - product_processor_postgresql_vertical_slice_5_tests
+    - product_consumer_postgresql_4_grouped_scenarios
     - canonical_offering_postgresql_15_tests
-    - seven_brand_processor_postgresql_suites_108_tests
-    - de_w1_w2_exact_scope_postgresql_79_tests
+    - canonical_brand_postgresql_15_tests
+    - brand_consumer_postgresql_8_tests
     - shared_intelligence_postgresql_26_tests
+    - seven_brand_processor_postgresql_suites_108_tests
+    - de_w1_postgresql_41_tests
+    - de_p2b2_verifier_86_tests
     - campaign_readiness_23_tests
     - frozen_contract_bundle_generation_and_verification
     - prisma_generate_validate
-    - production_build
+    - migration_51_to_52_upgrade_and_0_to_52_reset
+    - production_build_and_production_typecheck
     - scoped_eslint
     - source_dist_bundle_and_registry_verification
     - fresh_dist_startup_health_200_database_up
     - git_diff_check
   failed: []
   skipped:
-    - two_preexisting_intentional_postgresql_cases
+    - two_intentional_migration_phase_cases
   harness_notes:
-    - PostgreSQL processor suites used isolated cloned disposable databases.
-    - A parallel Brand regression attempt saturated the local host; sequential reruns used test-only timeout headroom and all passed without production runtime changes.
+    - PostgreSQL-heavy suites used serialized isolated cloned disposable databases.
+    - One malformed PowerShell test URL was corrected before rerunning unchanged shared-runtime suites successfully.
+    - Repository-wide lint and test-only no-emit diagnostics expose pre-existing formatting, fixture-typing, and generated SST declaration debt outside P6; scoped ESLint and the production TypeScript project pass.
 
 corrections:
-  current_phase: 2
+  current_phase: 0
   total: 14
   consecutive_same_failure: 0
   by_phase:
@@ -123,12 +120,13 @@ corrections:
     P3: 1
     P4: 2
     P5: 2
+    P6: 0
 
 last_failure: null
 
 stop_reason: null
 
-next_phase: P6_PENDING_SYSTEMS_AUTHORIZATION
+next_phase: FINAL_ACCEPTANCE_PENDING_SYSTEMS_REVIEW
 
 environment:
   node: v24.19.0
@@ -136,4 +134,4 @@ environment:
   prisma: 6.19.3
   postgres: PostgreSQL 16 disposable Docker harness
 
-last_updated: "2026-08-28T16:10:00+05:30"
+last_updated: "2026-08-28T17:27:00+05:30"
