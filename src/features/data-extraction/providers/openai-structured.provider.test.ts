@@ -145,6 +145,41 @@ describe("OpenAIStructuredProvider", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("surfaces the OpenAI API error body on 401 without retrying", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: {
+            message: "Incorrect API key provided: sk-proj-secretvalue",
+            type: "invalid_request_error",
+            code: "invalid_api_key",
+          },
+        }),
+        { status: 401 },
+      ),
+    );
+    const provider = new OpenAIStructuredProvider(
+      config({ OPENAI_API_KEY: "test-key" }),
+    );
+
+    try {
+      await execute(provider);
+      throw new Error("expected OpenAI 401 to reject");
+    } catch (error) {
+      expect(error).toMatchObject({
+        detail: {
+          code: "AUTHENTICATION_FAILED",
+          provider: "OPENAI",
+          providerStatusCode: 401,
+        },
+      });
+      const message = (error as { detail: { message: string } }).detail.message;
+      expect(message).toContain("Incorrect API key provided");
+      expect(message).not.toContain("sk-proj-secretvalue");
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("parses Retry-After and returns RATE_LIMITED after exhausted attempts", async () => {
     fetchMock.mockImplementation(() =>
       Promise.resolve(

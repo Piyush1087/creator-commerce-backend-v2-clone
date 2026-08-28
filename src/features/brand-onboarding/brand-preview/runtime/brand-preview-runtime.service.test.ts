@@ -215,6 +215,18 @@ describe("BrandPreviewRuntimeService", () => {
     expect(updates.at(-1)?.state).toBe(BrandPreviewRuntimeState.PREVIEW_READY);
   });
 
+  it("continues Preview synthesis when optional enrichment JSON fails", async () => {
+    const { service, enrichment, synthesize, updates } = harness({
+      evidence: evidence(false),
+    });
+    enrichment.acquire.mockRejectedValue(
+      new Error("Gemini grounded assessment was not valid JSON"),
+    );
+    await service.execute("run-1", "lease-1");
+    expect(synthesize).toHaveBeenCalledOnce();
+    expect(updates.at(-1)?.state).toBe(BrandPreviewRuntimeState.PREVIEW_READY);
+  });
+
   it("performs one enrichment and one resynthesis, then returns NOT_READY", async () => {
     const invalid = synthesis("INVENTED");
     const { service, enrichment, synthesize, updates } = harness({

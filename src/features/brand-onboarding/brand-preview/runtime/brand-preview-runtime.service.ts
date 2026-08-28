@@ -287,19 +287,26 @@ export class BrandPreviewRuntimeService {
     runId: string,
     leaseToken: string,
     websiteUrl: string,
-  ): Promise<PublicWebEnrichment> {
+  ): Promise<PublicWebEnrichment | undefined> {
     const claimed = await this.prisma.brandPreviewRun.updateMany({
       where: { id: runId, leaseToken, enrichmentAttempted: false },
       data: { enrichmentAttempted: true },
     });
-    if (claimed.count === 0) throw new Error("ENRICHMENT_ALREADY_ATTEMPTED");
-    const primary = await this.artifacts.resolvePrimaryModel();
-    const result = await this.enrichment.acquire({
-      runId,
-      websiteUrl,
-      modelId: primary.model_id,
-    });
-    return result.payload;
+    if (claimed.count === 0) return undefined;
+    try {
+      const primary = await this.artifacts.resolvePrimaryModel();
+      const result = await this.enrichment.acquire({
+        runId,
+        websiteUrl,
+        modelId: primary.model_id,
+      });
+      return result.payload;
+    } catch (error) {
+      this.logger.warn(
+        `brand_preview.enrichment_failed runId=${runId} error=${error instanceof Error ? error.message : String(error)}`,
+      );
+      return undefined;
+    }
   }
 
   private phase(

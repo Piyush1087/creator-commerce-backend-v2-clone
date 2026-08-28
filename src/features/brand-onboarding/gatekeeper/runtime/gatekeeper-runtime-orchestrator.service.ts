@@ -48,6 +48,8 @@ type StageResult = {
   telemetry?: ProviderTelemetry;
   promptBuildId?: string;
   errorCode?: string;
+  providerStatusCode?: number;
+  providerMessage?: string;
 };
 
 export type GatekeeperAssessmentExecution = {
@@ -314,6 +316,14 @@ export class GatekeeperRuntimeOrchestratorService {
             evidenceRefs: [],
             promptBuildId: prompt.promptBuildId,
             errorCode: detail.code,
+            providerStatusCode:
+              "providerStatusCode" in detail
+                ? detail.providerStatusCode
+                : undefined,
+            providerMessage:
+              typeof detail.message === "string"
+                ? detail.message.slice(0, 400)
+                : undefined,
           };
           return {
             taskId: task.id,
@@ -427,6 +437,14 @@ export class GatekeeperRuntimeOrchestratorService {
         fallbackStage: "parallel",
         terminalState: "TECHNICAL_FAILURE",
         errorCode: code,
+        providerStatusCode:
+          error instanceof DataExtractionProviderError
+            ? error.detail.providerStatusCode
+            : undefined,
+        providerMessage:
+          error instanceof DataExtractionProviderError
+            ? error.detail.message.slice(0, 400)
+            : String(error).slice(0, 400),
       });
       return { state: "TECHNICAL_FAILURE", evidence: null, evidenceRefs: [] };
     }
@@ -489,6 +507,14 @@ export class GatekeeperRuntimeOrchestratorService {
         evidenceRefs: [],
         promptBuildId: prompt.promptBuildId,
         errorCode: code,
+        providerStatusCode:
+          error instanceof DataExtractionProviderError
+            ? error.detail.providerStatusCode
+            : undefined,
+        providerMessage:
+          error instanceof DataExtractionProviderError
+            ? error.detail.message.slice(0, 400)
+            : String(error).slice(0, 400),
       };
       this.recordStage(args.executionId, "openai", CAPABILITIES.openai, stage);
       return stage;
@@ -538,6 +564,8 @@ export class GatekeeperRuntimeOrchestratorService {
       fallbackStage: stageName,
       terminalState: stage.state,
       errorCode: stage.errorCode,
+      providerStatusCode: stage.providerStatusCode,
+      providerMessage: stage.providerMessage,
     });
   }
 

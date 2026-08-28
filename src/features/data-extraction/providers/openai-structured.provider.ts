@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { ZodType } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -8,6 +8,11 @@ import {
   type ProviderEvidenceResult,
 } from "../contracts/provider-execution.contract";
 import { withBoundedTechnicalRetry } from "../utils/provider-retry.util";
+import {
+  credentialFingerprint,
+  extractProviderMessage,
+  sanitizeProviderMessage,
+} from "../utils/provider-error-diagnostics.util";
 
 const CAPABILITY_ID = "openai_structured_assessment";
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -55,8 +60,15 @@ function extractOutputText(response: OpenAIResponsePayload): string {
   return "";
 }
 
+function openaiHttpFailureMessage(status: number, body: string): string {
+  const detail = sanitizeProviderMessage(extractProviderMessage(new Error(body)));
+  return `OpenAI Responses API failed (${status}): ${detail}`;
+}
+
 @Injectable()
 export class OpenAIStructuredProvider {
+  private readonly logger = new Logger(OpenAIStructuredProvider.name);
+
   constructor(private readonly config: ConfigService) {}
 
   async execute<T>(args: {
@@ -74,6 +86,18 @@ export class OpenAIStructuredProvider {
     const capabilityId = args.capabilityId ?? CAPABILITY_ID;
     const apiKey = this.config.get<string>("OPENAI_API_KEY", "").trim();
     if (!apiKey) {
+      this.logger.warn({
+        msg: "data_extraction.provider_failure",
+        provider: "OPENAI",
+        capabilityId,
+        modelId: args.modelId,
+        credentialEnv: "OPENAI_API_KEY",
+        credentialPresent: false,
+        credentialFingerprint: "missing",
+        mappedCode: "CONFIGURATION_ERROR",
+        providerMessage: "OPENAI_API_KEY is not configured",
+        acquisitionRunId: args.acquisitionRunId,
+      });
       throw new DataExtractionProviderError({
         code: "CONFIGURATION_ERROR",
         provider: "OPENAI",
@@ -159,7 +183,7 @@ export class OpenAIStructuredProvider {
             const text = await response.text();
             if (!response.ok) {
               throw new OpenAIHttpError(
-                `OpenAI Responses API failed (${response.status})`,
+                openaiHttpFailureMessage(response.status, text),
                 response.status,
                 parseRetryAfter(response.headers.get("retry-after")),
               );
@@ -266,12 +290,30 @@ export class OpenAIStructuredProvider {
               : error.status >= 500
                 ? "PROVIDER_UNAVAILABLE"
                 : "PROVIDER_ERROR";
+        const credential = credentialFingerprint(apiKey);
+        this.logger.warn({
+          msg: "data_extraction.provider_failure",
+          provider: "OPENAI",
+          capabilityId,
+          modelId: args.modelId,
+          credentialEnv: "OPENAI_API_KEY",
+          credentialPresent: credential.present,
+          credentialFingerprint: credential.fingerprint,
+          httpStatus: error.status ?? null,
+          mappedCode: code,
+          providerMessage: sanitizeProviderMessage(error.message),
+          endpoint: OPENAI_RESPONSES_URL,
+          acquisitionRunId: args.acquisitionRunId,
+          attemptCount,
+        });
         throw new DataExtractionProviderError({
           code,
           provider: "OPENAI",
           capabilityId,
           modelId: args.modelId,
-          message: `OpenAI structured assessment failed (${code})`,
+          message: sanitizeProviderMessage(
+            `OpenAI structured assessment failed (${code}): ${error.message}`,
+          ),
           retryable: false,
           attemptCount,
           providerStatusCode: error.status,
@@ -279,6 +321,22 @@ export class OpenAIStructuredProvider {
           acquisitionRunId: args.acquisitionRunId,
         });
       }
+      const credential = credentialFingerprint(apiKey);
+      this.logger.warn({
+        msg: "data_extraction.provider_failure",
+        provider: "OPENAI",
+        capabilityId,
+        modelId: args.modelId,
+        credentialEnv: "OPENAI_API_KEY",
+        credentialPresent: credential.present,
+        credentialFingerprint: credential.fingerprint,
+        mappedCode: "PROVIDER_ERROR",
+        providerMessage: sanitizeProviderMessage(
+          error instanceof Error ? error.message : String(error),
+        ),
+        acquisitionRunId: args.acquisitionRunId,
+        attemptCount,
+      });
       throw new DataExtractionProviderError({
         code: "PROVIDER_ERROR",
         provider: "OPENAI",

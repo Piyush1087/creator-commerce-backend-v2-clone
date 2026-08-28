@@ -105,6 +105,28 @@ describe("GeminiGatekeeperProvider", () => {
     expect(createInteraction).toHaveBeenCalledTimes(1);
   });
 
+  it("retries malformed JSON once for Brand Preview public-web enrichment", async () => {
+    createInteraction
+      .mockResolvedValueOnce(response({ text: "{not-json" }))
+      .mockResolvedValueOnce(
+        response({
+          owned: true,
+          search: true,
+          text: JSON.stringify({ ok: true }),
+        }),
+      );
+    const provider = new GeminiGatekeeperProvider(
+      config({ GEMINI_API_KEY: "test-key" }),
+    );
+
+    const result = await execute(provider, {
+      capabilityId: "brand_preview.public_web_enrichment",
+      maxAttempts: 2,
+    });
+    expect(result.payload).toEqual({ ok: true });
+    expect(createInteraction).toHaveBeenCalledTimes(2);
+  });
+
   it("parses structured output wrapped in a markdown json fence", async () => {
     createInteraction.mockResolvedValue(
       response({
@@ -214,6 +236,35 @@ describe("GeminiGatekeeperProvider", () => {
       },
     });
     expect(createInteraction).toHaveBeenCalledTimes(2);
+  });
+
+  it("surfaces the Gemini API message on 401 without retrying", async () => {
+    const error = Object.assign(
+      new Error("Request failed"),
+      {
+        status: 401,
+        error: {
+          code: 401,
+          message: "API key not valid. Please pass a valid API key.",
+          status: "UNAUTHENTICATED",
+        },
+      },
+    );
+    createInteraction.mockRejectedValue(error);
+    const provider = new GeminiGatekeeperProvider(
+      config({ GEMINI_API_KEY: "test-key" }),
+    );
+
+    await expect(execute(provider)).rejects.toMatchObject({
+      detail: {
+        code: "AUTHENTICATION_FAILED",
+        provider: "GOOGLE_GEMINI",
+        providerStatusCode: 401,
+        message: expect.stringContaining("API key not valid"),
+        attemptCount: 1,
+      },
+    });
+    expect(createInteraction).toHaveBeenCalledTimes(1);
   });
 
   it("normalizes a confirmed model-unavailable 404 without retrying", async () => {

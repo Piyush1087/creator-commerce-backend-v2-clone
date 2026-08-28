@@ -15,6 +15,10 @@ export type GatekeeperTelemetryEvent = {
   fallbackStage?: string;
   terminalState?: string;
   errorCode?: string;
+  providerStatusCode?: number;
+  providerMessage?: string;
+  credentialEnv?: string;
+  credentialFingerprint?: string;
   occurredAt: string;
 };
 
