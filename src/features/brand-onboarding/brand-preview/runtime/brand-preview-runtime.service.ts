@@ -22,6 +22,7 @@ import type {
   BrandPreviewEvidence,
   PublicWebEnrichment,
 } from "../brand-preview.types";
+import { CanonicalBrandStateService } from "../../canonical-brand-state/canonical-brand-state.service";
 import { BrandPreviewArtifactLoader } from "./brand-preview-artifact.loader";
 import {
   BrandPreviewSynthesisService,
@@ -37,6 +38,7 @@ export class BrandPreviewRuntimeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gatekeeper: GatekeeperPersistenceService,
+    private readonly brandState: CanonicalBrandStateService,
     @Inject(BRAND_PREVIEW_WEBSITE_EVIDENCE)
     private readonly websiteEvidence: BrandPreviewWebsiteEvidencePort,
     @Inject(BRAND_PREVIEW_PUBLIC_WEB_ENRICHMENT)
@@ -75,11 +77,37 @@ export class BrandPreviewRuntimeService {
         return;
       }
 
+      const initialLifecycleMode = run.brandProfileId
+        ? "POST_PROFILE"
+        : "PRE_PROFILE";
+      const initialState = await this.brandState.readSnapshot({
+        leadId: run.discoveryLeadId,
+        lifecycleMode: initialLifecycleMode,
+        ...(run.brandProfileId ? { brandProfileId: run.brandProfileId } : {}),
+        candidates: {
+          confirmedIndustry,
+          provisionalSubIndustry:
+            gatekeeper.assessment?.provisional_sub_industry,
+        },
+        correlationId: runId,
+      });
+      const initialWebsiteUrl = initialState.website_url.value;
+      const initialIndustry = initialState.industry.value;
+      const initialBrandName = initialState.brand_name.value;
+      if (!initialWebsiteUrl || !initialIndustry) {
+        await this.finish(runId, leaseToken, {
+          state: BrandPreviewRuntimeState.PREVIEW_NOT_READY,
+          errorCode: "PRECONDITION_LOST",
+        });
+        return;
+      }
+      const acquisitionUrl = navigableWebsiteUrl(initialWebsiteUrl);
+
       const evidence = await this.websiteEvidence.acquire({
-        websiteUrl: gatekeeper.submission.normalized_url,
+        websiteUrl: acquisitionUrl,
         sameRunGatekeeperEvidence: gatekeeper,
       });
-      if (!evidence.brandName) {
+      if (!evidence.brandName && !initialBrandName) {
         await this.finish(runId, leaseToken, {
           state: BrandPreviewRuntimeState.PREVIEW_NOT_READY,
           errorCode: "REQUIRED_IDENTITY_NOT_GROUNDED",
@@ -90,41 +118,70 @@ export class BrandPreviewRuntimeService {
       let enrichment: PublicWebEnrichment | undefined;
       if (!evidence.sufficientForPreviewSynthesisAttempt) {
         await this.phase(runId, leaseToken, "LEARNING_AUDIENCE");
-        enrichment = await this.enrichOnce(
-          runId,
-          leaseToken,
-          gatekeeper.submission.normalized_url,
-        );
+        enrichment = await this.enrichOnce(runId, leaseToken, acquisitionUrl);
       }
 
-      const profile = await this.prisma.brandProfile.upsert({
-        where: { domain: gatekeeper.submission.normalized_domain },
-        create: {
-          domain: gatekeeper.submission.normalized_domain,
-          name: evidence.brandName,
-          industry: confirmedIndustry,
-          subIndustry: gatekeeper.assessment?.provisional_sub_industry,
-          logoUrl: evidence.logoUrl,
-          brandValues: [],
-          policyFlags: [],
-        },
-        update: {},
-        select: { id: true },
-      });
+      const profile = run.brandProfileId
+        ? { id: run.brandProfileId }
+        : await this.prisma.brandProfile.upsert({
+            where: { domain: gatekeeper.submission.normalized_domain },
+            create: {
+              domain: gatekeeper.submission.normalized_domain,
+              name: evidence.brandName ?? (initialBrandName as string),
+              industry: confirmedIndustry,
+              subIndustry: gatekeeper.assessment?.provisional_sub_industry,
+              logoUrl: evidence.logoUrl,
+              brandValues: [],
+              policyFlags: [],
+            },
+            update: {},
+            select: { id: true },
+          });
       await this.casUpdate(runId, leaseToken, {
         brandProfileId: profile.id,
         evidenceSnapshot: evidence as unknown as Prisma.InputJsonValue,
         phase: null,
       });
 
+      const postProfileState = await this.brandState.readSnapshot({
+        leadId: run.discoveryLeadId,
+        lifecycleMode: "POST_PROFILE",
+        brandProfileId: profile.id,
+        candidates: {
+          brandName: evidence.brandName,
+          brandLogo: evidence.logoUrl,
+          confirmedIndustry,
+          provisionalSubIndustry:
+            gatekeeper.assessment?.provisional_sub_industry,
+        },
+        correlationId: runId,
+      });
+      const brandName = postProfileState.brand_name.value;
+      const canonicalWebsiteUrl = postProfileState.website_url.value;
+      const canonicalIndustry = postProfileState.industry.value;
+      const logoUrl = postProfileState.brand_logo.value;
+      if (!brandName || !canonicalWebsiteUrl || !canonicalIndustry) {
+        await this.finish(runId, leaseToken, {
+          state: BrandPreviewRuntimeState.PREVIEW_NOT_READY,
+          errorCode: "REQUIRED_IDENTITY_NOT_GROUNDED",
+          evidence,
+        });
+        return;
+      }
+      const canonicalEvidence: BrandPreviewEvidence = {
+        ...evidence,
+        brandName,
+        logoUrl,
+      };
+
       let result = await this.synthesizeAndEvaluate({
         runId,
-        evidence,
+        evidence: canonicalEvidence,
         enrichment,
-        brandName: evidence.brandName,
-        websiteUrl: gatekeeper.submission.normalized_url,
-        confirmedIndustry,
-        logoUrl: evidence.logoUrl,
+        brandName,
+        websiteUrl: canonicalWebsiteUrl,
+        confirmedIndustry: canonicalIndustry,
+        logoUrl,
       });
       const enrichmentEligible =
         result.mandatoryNarrativeValid &&
@@ -137,29 +194,25 @@ export class BrandPreviewRuntimeService {
         enrichmentEligible
       ) {
         await this.phase(runId, leaseToken, "FINDING_CREATOR_OPPORTUNITIES");
-        enrichment = await this.enrichOnce(
-          runId,
-          leaseToken,
-          gatekeeper.submission.normalized_url,
-        );
+        enrichment = await this.enrichOnce(runId, leaseToken, acquisitionUrl);
         result = await this.synthesizeAndEvaluate({
           runId,
-          evidence,
+          evidence: canonicalEvidence,
           enrichment,
-          brandName: evidence.brandName,
-          websiteUrl: gatekeeper.submission.normalized_url,
-          confirmedIndustry,
-          logoUrl: evidence.logoUrl,
+          brandName,
+          websiteUrl: canonicalWebsiteUrl,
+          confirmedIndustry: canonicalIndustry,
+          logoUrl,
         });
       }
       await this.phase(runId, leaseToken, "PREPARING_PREVIEW");
       const snapshot = {
         identity: {
-          brand_name: evidence.brandName,
-          website_url: gatekeeper.submission.normalized_url,
+          brand_name: brandName,
+          website_url: canonicalWebsiteUrl,
           display_domain: gatekeeper.submission.normalized_domain,
-          confirmed_industry: confirmedIndustry,
-          logo_url: evidence.logoUrl,
+          confirmed_industry: canonicalIndustry,
+          logo_url: logoUrl,
         },
         ...result.output,
       };
@@ -307,5 +360,15 @@ export class BrandPreviewRuntimeService {
       leaseToken: null,
       leaseExpiresAt: null,
     });
+  }
+}
+
+function navigableWebsiteUrl(value: string): string {
+  try {
+    return new URL(
+      value.includes("://") ? value : `https://${value}`,
+    ).toString();
+  } catch {
+    return value;
   }
 }

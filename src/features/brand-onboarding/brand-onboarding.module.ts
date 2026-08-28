@@ -4,6 +4,7 @@ import { ScheduleModule } from "@nestjs/schedule";
 
 import { AuthModule } from "../auth/auth.module";
 import { BrandCentreModule } from "../brand-centre/brand-centre.module";
+import { BrandCanonicalStateModule } from "../brand-canonical-state/brand-canonical-state.module";
 import { InstagramModule } from "../instagram/instagram.module";
 import { MailModule } from "../../mail/mail.module";
 import { PrismaModule } from "../../prisma/prisma.module";
@@ -77,6 +78,8 @@ import {
   BRAND_PREVIEW_PUBLIC_WEB_ENRICHMENT,
   BRAND_PREVIEW_WEBSITE_EVIDENCE,
 } from "./brand-preview/data-extraction/brand-preview-evidence.port";
+import { BrandStateReadTelemetryService } from "./canonical-brand-state/brand-state-read-telemetry.service";
+import { CanonicalBrandStateService } from "./canonical-brand-state/canonical-brand-state.service";
 
 @Module({
   imports: [
@@ -86,6 +89,7 @@ import {
     AuthModule,
     S3Module,
     BrandCentreModule,
+    BrandCanonicalStateModule,
     InstagramModule,
     DataExtractionModule,
   ],
@@ -112,6 +116,8 @@ import {
     GatekeeperPromptService,
     GatekeeperRuntimeOrchestratorService,
     GatekeeperTelemetryService,
+    CanonicalBrandStateService,
+    BrandStateReadTelemetryService,
     BrandPreviewRunService,
     BrandPreviewWebsiteEvidenceService,
     BrandPreviewPublicWebEnrichmentService,

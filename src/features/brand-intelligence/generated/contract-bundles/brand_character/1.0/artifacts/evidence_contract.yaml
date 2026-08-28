@@ -1,0 +1,107 @@
+id: brand_character_evidence
+version: "1.0"
+status: FROZEN
+owner_engine: brand_intelligence
+owning_branch: brand_expression
+processor: brand_character
+processor_definition: intelligence/engines/brand_intelligence/branches/brand_expression/processors/brand_character.yaml
+reasoning_authority: intelligence/engines/brand_intelligence/branches/brand_expression/artifacts/brand_character/reasoning.yaml
+output_contract_authority: intelligence/engines/brand_intelligence/branches/brand_expression/artifacts/brand_character/output_contract.yaml
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define provider-neutral Evidence semantics that distinguish explicit Brand principles, repeated Brand behavior,
+  persistent character, one-off campaign themes, incidental copy, and optional owned Instagram context.
+
+boundary:
+  data_extraction_role: acquire_and_normalize
+  intelligence_role: judge_representativeness_and_derive_brand_character
+  provider_or_endpoint_names_in_evidence_ids: forbidden
+  protected_brand_confirmed_state_is_observed_evidence: false
+
+shared_evidence_item:
+  required_fields: [evidence_ref, evidence_semantic, source_class, source_resource_ref, captured_at, freshness, provenance]
+  fields:
+    evidence_ref: {type: string, identity_model: capture_scoped_normalized_evidence_item}
+    evidence_semantic: {type: string, provider_neutral: true}
+    source_class: {allowed: [OWNED_WEBSITE, BRAND_USER_INPUT, INSTAGRAM_OWNED, MULTI_SOURCE]}
+    source_resource_ref: {type: string}
+    captured_at: {type: timestamp}
+    freshness: {allowed: [CURRENT, STALE, UNKNOWN]}
+    representativeness: {allowed: [EXPLICIT_BRAND_PRINCIPLE, REPEATED_BRAND_BEHAVIOR, PERSISTENT_BRAND_MESSAGING, CONTEXT_SPECIFIC_CAMPAIGN, INCIDENTAL]}
+    evidence_strength: {allowed: [EXPLICIT_DECLARATION, REPEATED_REPRESENTATIVE_PATTERN, PERSISTENT_SUPPORT, CONTEXTUAL_SUPPORT, INCIDENTAL]}
+    provenance: {required: [acquisition_or_normalization_run_ref], optional: [parent_evidence_refs, normalization_version]}
+
+capabilities:
+  owned_website.brand_company_context:
+    required_for_processor: true
+    source_class: OWNED_WEBSITE
+    item_semantics: [MISSION_OR_PURPOSE_STATEMENT, EXPLICIT_BRAND_PRINCIPLE, COMPANY_OR_FOUNDER_NARRATIVE, PERSISTENT_BRAND_COMMITMENT, DOCUMENTED_COMPANY_BEHAVIOR]
+    output_roles: {brand_values: PRIMARY, brand_personality: SUPPORTING}
+    rules:
+      - founder_narrative_supports_brand_character_only_when_generalized_to_brand
+      - one_off_csr_is_contextual_unless_repeated_or_explicitly_principled
+  owned_website.brand_messaging:
+    required_for_processor: true
+    source_class: OWNED_WEBSITE
+    item_semantics: [PERSISTENT_BRAND_MESSAGE, REPEATED_BRAND_BEHAVIOR_SIGNAL, CHARACTERISTIC_SELF_PRESENTATION, CONTEXT_SPECIFIC_CAMPAIGN_MESSAGE]
+    output_roles: {brand_values: SUPPORTING, brand_personality: PRIMARY}
+    rules:
+      - positive_adjectives_alone_insufficient_for_values
+      - one_playful_headline_insufficient_for_playful_personality
+      - repeated_representative_patterns_may_support_derived_personality
+  brand_user_input_and_confirmations:
+    required_for_processor: false
+    optional_for_mvp: true
+    source_class: BRAND_USER_INPUT
+    item_semantics: [USER_AUTHORED_BRAND_VALUE, USER_AUTHORED_BRAND_PERSONALITY, USER_SUPPLIED_CHARACTER_CONTEXT]
+    rules:
+      - absence_does_not_block_processor_execution
+      - unconfirmed_input_is_evidence
+      - protected_brand_confirmed_items_supplied_separately
+
+optional_enrichment:
+  instagram.owned_brand_context:
+    required_for_processor: false
+    source_class: INSTAGRAM_OWNED
+    role: OPTIONAL_LATER_ENRICHMENT
+    representativeness_required: [REPEATED_BRAND_BEHAVIOR, PERSISTENT_BRAND_MESSAGING]
+    rules:
+      - one_post_or_campaign_cannot_establish_durable_character
+      - instagram_not_readiness_prerequisite
+
+non_establishing_or_weak_context:
+  - one_off_campaign_theme
+  - incidental_copy
+  - generic_positive_wording
+  - isolated_sustainability_mention
+  - product_feature
+  - customer_benefit
+  - visual_style_alone
+  - founder_personality_without_brand_generalization
+
+protected_current_authority_context:
+  classification: CANONICAL_BUSINESS_STATE_INPUT
+  granularity: item
+  ordinary_evidence_for_replacement: false
+
+missing_evidence:
+  processor_failure_required: false
+  rules: [values_may_be_null, personality_may_be_null, both_may_be_null, no_filler]
+
+freshness_policy:
+  universal_ttl: none
+  brand_values: low_natural_decay
+  brand_personality: low_to_medium_natural_decay
+  explicit_brand_input: event_driven
+  instagram_optional_context: medium_refresh_sensitivity
+
+validation_invariants:
+  - provider_neutral_evidence_ids
+  - explicit_principle_repeated_behavior_persistent_messaging_campaign_theme_and_incidental_copy_distinct
+  - one_off_positive_wording_cannot_establish_durable_character
+  - visual_style_does_not_establish_personality
+  - instagram_optional_not_required
+  - optional_user_input_absence_does_not_block_mvp_execution
+  - protected_brand_confirmed_items_separate_authority_context
+  - every_item_has_evidence_ref

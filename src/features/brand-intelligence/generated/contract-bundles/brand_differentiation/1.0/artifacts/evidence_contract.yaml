@@ -1,0 +1,133 @@
+id: brand_differentiation_evidence
+version: "1.0"
+status: FROZEN
+owner_engine: brand_intelligence
+owning_branch: brand_expression
+processor: brand_differentiation
+processor_definition: intelligence/engines/brand_intelligence/branches/brand_expression/processors/brand_differentiation.yaml
+reasoning_authority: intelligence/engines/brand_intelligence/branches/brand_expression/artifacts/brand_differentiation/reasoning.yaml
+output_contract_authority: intelligence/engines/brand_intelligence/branches/brand_expression/artifacts/brand_differentiation/output_contract.yaml
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define provider-neutral Evidence semantics that separate Brand claims from factual proof, preserve Brand-level
+  versus Offering-specific scope, support mixed authority, and enable stricter Healthcare claim safety.
+
+boundary:
+  data_extraction_role: acquire_and_normalize_source_material_and_factual_observations
+  intelligence_role: classify_claim_proof_eligibility_brand_scope_and_strategic_differentiation
+  canonical_offering_facts_are_observed_web_evidence: false
+  provider_or_endpoint_names_in_evidence_ids: forbidden
+
+shared_evidence_item:
+  required_fields: [evidence_ref, evidence_semantic, source_class, source_resource_ref, captured_at, freshness, provenance]
+  fields:
+    evidence_ref: {type: string, identity_model: capture_scoped_normalized_evidence_item}
+    evidence_semantic: {type: string, provider_neutral: true}
+    source_class: {allowed: [OWNED_WEBSITE, BRAND_USER_INPUT, CANONICAL_BUSINESS_STATE, MULTI_SOURCE]}
+    source_resource_ref: {type: string}
+    captured_at: {type: timestamp}
+    freshness: {allowed: [CURRENT, STALE, UNKNOWN]}
+    representativeness: {allowed: [BRAND_LEVEL, MULTI_OFFERING, OFFERING_SPECIFIC, CONTEXT_SPECIFIC, INCIDENTAL]}
+    provenance: {required: [acquisition_or_normalization_run_ref], optional: [parent_evidence_refs, normalization_version]}
+
+proof_strength_taxonomy:
+  DIRECT_FIRST_PARTY_FACT: {factual_proof_eligible: true}
+  EXPLICIT_CERTIFICATION_OR_CREDENTIAL: {factual_proof_eligible: true}
+  OBSERVABLE_CAPABILITY: {factual_proof_eligible: true}
+  VERIFIED_BUSINESS_FACT: {factual_proof_eligible: true}
+  FIRST_PARTY_CLAIM: {factual_proof_eligible: false_by_default}
+  TESTIMONIAL_OR_SOCIAL_PROOF: {factual_proof_eligible: false_by_default}
+  GENERIC_MARKETING_ASSERTION: {factual_proof_eligible: false}
+
+capabilities:
+  owned_website.brand_company_context:
+    required_for_processor: true
+    source_class: OWNED_WEBSITE
+    item_semantics: [COMPANY_HISTORY_FACT, OPERATING_MODEL_FACT, COMPANY_CAPABILITY, BRAND_LEVEL_CREDENTIAL]
+    default_scope: BRAND_LEVEL
+  owned_website.brand_messaging:
+    required_for_processor: true
+    source_class: OWNED_WEBSITE
+    item_semantics: [DIFFERENTIATION_CLAIM, SUPERIORITY_CLAIM, TRUST_CLAIM, BRAND_PROPOSITION, GENERIC_MARKETING_ASSERTION]
+    rule: messaging_establishes_claim_occurrence_not_proof
+  owned_website.offering_context:
+    required_for_processor: true
+    source_class: OWNED_WEBSITE
+    item_semantics: [OFFERING_FEATURE, OFFERING_CAPABILITY, OFFERING_BENEFIT_CLAIM, OFFERING_EFFICACY_OR_PERFORMANCE_CLAIM]
+    default_scope: OFFERING_SPECIFIC
+    rule: Offering_specific_content_not_generalized_without_brand_level_support
+  explicit_factual_proof_or_claim_evidence:
+    required_for_processor: true
+    source_class: [OWNED_WEBSITE, BRAND_USER_INPUT, MULTI_SOURCE]
+    item_semantic: proof_or_claim_observation
+    fields:
+      statement: {type: string}
+      proof_strength:
+        allowed: [DIRECT_FIRST_PARTY_FACT, EXPLICIT_CERTIFICATION_OR_CREDENTIAL, OBSERVABLE_CAPABILITY, VERIFIED_BUSINESS_FACT, FIRST_PARTY_CLAIM, TESTIMONIAL_OR_SOCIAL_PROOF, GENERIC_MARKETING_ASSERTION]
+      scope: {allowed: [BRAND_LEVEL, MULTI_OFFERING, OFFERING_SPECIFIC, CONTEXT_SPECIFIC]}
+      factual_referent_ref: {type: [string, "null"], nullable: true}
+      offering_refs: {type: array, required: false, item_type: string}
+    rules:
+      - non_proof_eligible_items_may_support_claim_understanding_but_not_factual_proof
+      - offering_refs_are_references_only
+      - scope_must_remain_explicit
+
+canonical_context:
+  canonical_offering_facts:
+    classification: CANONICAL_BUSINESS_STATE_INPUT
+    source_class: CANONICAL_BUSINESS_STATE
+    role: REFERENCE_OR_SUPPORT
+    data_extraction_evidence: false
+    rules:
+      - reference_not_duplicate
+      - brand_level_generalization_requires_separate_reasoning
+      - verified_fact_may_support_VERIFIED_BUSINESS_FACT_when_semantically_appropriate
+
+healthcare_claim_safety:
+  high_risk_claim_types: [TREATMENT_EFFICACY, DIAGNOSTIC_ACCURACY, CLINICAL_SUPERIORITY, GUARANTEED_OUTCOME, MEDICAL_SUCCESS_RATE, SAFETY_CLAIM]
+  rules:
+    - brand_authored_high_risk_claim_is_FIRST_PARTY_CLAIM_without_separate_proof
+    - testimonial_or_marketing_repetition_cannot_elevate_high_risk_claim_to_proof
+    - insufficiently_supported_claim_may_remain_claim_evidence_but_not_proof
+    - no_numeric_confidence_threshold
+
+brand_level_vs_offering_scope:
+  rules:
+    - BRAND_LEVEL_proof_may_support_brand_differentiation
+    - MULTI_OFFERING_may_support_when_representative
+    - OFFERING_SPECIFIC_remains_offering_scoped_without_explicit_brand_generalization
+    - Product_Intelligence_proof_not_copied_wholesale
+
+protected_current_authority_context:
+  classification: CANONICAL_BUSINESS_STATE_INPUT
+  granularity: differentiator_subfield_and_proof_item
+  ordinary_evidence_for_replacement: false
+
+missing_evidence:
+  processor_failure_required: false
+  rules:
+    - differentiator_may_have_null_proof
+    - proof_observations_need_not_force_differentiator
+    - object_may_be_null
+    - no_unsupported_proof_or_superiority_filler
+
+freshness_policy:
+  universal_ttl: none
+  proof_facts: fact_specific
+  brand_messaging_claims: medium_refresh_sensitivity
+  offering_facts: follow_canonical_business_state_changes
+  certifications_credentials: event_or_expiry_sensitive_when_known
+
+validation_invariants:
+  - provider_neutral_evidence_and_proof_strength
+  - claim_distinct_from_factual_proof
+  - FIRST_PARTY_CLAIM_not_proof_by_default
+  - TESTIMONIAL_OR_SOCIAL_PROOF_not_objective_proof_by_default
+  - GENERIC_MARKETING_ASSERTION_not_proof
+  - no_offering_truth_duplication_or_silent_generalization
+  - direct_factual_proof_may_remain_OBSERVED_independent_of_differentiator
+  - healthcare_claim_safety_explicit
+  - protected_brand_confirmed_state_separate_from_evidence
+  - missing_evidence_never_forces_filler
+  - every_item_has_evidence_ref

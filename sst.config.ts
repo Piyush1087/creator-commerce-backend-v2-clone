@@ -76,6 +76,13 @@ export default $config({
         ? "https://dashboard.thecreatorshop.in"
         : "http://localhost:5173,https://dashboard.dev.thecreatorshop.in,https://dashboard.thecreatorshop.in";
 
+    const appFrontendUrl =
+      $app.stage === "prod"
+        ? process.env.APP_FRONTEND_URL_PROD?.trim() || defaultFrontendUrl
+        : $app.stage === "dev"
+          ? process.env.APP_FRONTEND_URL_DEV?.trim() || defaultFrontendUrl
+          : process.env.APP_FRONTEND_URL?.trim() || defaultFrontendUrl;
+
     const { buildNotificationPostmarkTemplateEnv } =
       await import("./src/features/notifications/config/notification-postmark-env");
 
@@ -119,12 +126,9 @@ export default $config({
         $app.stage === "prod"
           ? "false"
           : (process.env.NOTIFICATIONS_DEV_EMIT_ENABLED ?? "false"),
-      APP_FRONTEND_URL:
-        $app.stage === "prod"
-          ? process.env.APP_FRONTEND_URL_PROD?.trim() || defaultFrontendUrl
-          : $app.stage === "dev"
-            ? process.env.APP_FRONTEND_URL_DEV?.trim() || defaultFrontendUrl
-            : process.env.APP_FRONTEND_URL?.trim() || defaultFrontendUrl,
+      APP_FRONTEND_URL: appFrontendUrl,
+      // Social-sync invite links still read FRONTEND_APP_URL (legacy name).
+      FRONTEND_APP_URL: appFrontendUrl,
       ...buildNotificationPostmarkTemplateEnv(process.env),
       // Brand onboarding Stage 1A — Zyte + Playwright (Parallel is legacy only)
       BRAND_SCAN_ACQUISITION:

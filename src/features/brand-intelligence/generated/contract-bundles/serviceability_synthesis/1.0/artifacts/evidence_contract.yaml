@@ -1,0 +1,408 @@
+id: serviceability_evidence
+version: "1.0"
+status: FROZEN
+owner_engine: brand_intelligence
+owning_branch: serviceability
+processor: serviceability_synthesis
+processor_definition: intelligence/engines/brand_intelligence/branches/serviceability/processors/serviceability_synthesis.yaml
+reasoning_authority: intelligence/engines/brand_intelligence/branches/serviceability/artifacts/serviceability_synthesis/reasoning.yaml
+output_contract_authority: intelligence/engines/brand_intelligence/branches/serviceability/artifacts/serviceability_synthesis/output_contract.yaml
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define provider-neutral normalized Evidence semantics for Brand serviceability, including positive and restrictive
+  first-party availability observations and location observations, while keeping canonical Location and Offering
+  state separate from acquired Evidence and preserving conflicts for Intelligence reasoning.
+
+boundary:
+  data_extraction_role: acquire and normalize observed first-party serviceability/location Evidence
+  intelligence_role: resolve precedence/conflicts and synthesize serviceability_profile
+  canonical_business_state_owner: application_backend
+  provider_or_endpoint_names_in_evidence_ids: forbidden
+  final_provider_or_acquisition_mechanics: out_of_scope
+  canonical_state_is_scraped_evidence: false
+
+canonical_business_state_inputs:
+  classification: CANONICAL_BUSINESS_STATE_INPUT
+  source_class: CANONICAL_BUSINESS_STATE
+  items:
+    primary_brand_country_or_geography_anchor:
+      establishing_serviceability_alone: false
+    active_canonical_locations:
+      reference_identity: location_id
+      copied_into_evidence: false
+      role: authoritative physical-presence context
+    canonical_offering_availability:
+      reference_identity: offering_or_business_state_ref
+      copied_into_evidence: false
+      role: authoritative known Offering availability
+    offering_to_location_relationships:
+      copied_into_evidence: false
+      role: authoritative known relationship context
+  precedence: HIGHEST_FOR_KNOWN_CANONICAL_FACTS
+  rule: >-
+    Canonical business state is consumed as authoritative input and referenced through business_state_refs;
+    it is not relabeled as observed website Evidence and Data Extraction does not mutate it.
+
+shared_evidence_item:
+  required_fields:
+    - evidence_ref
+    - evidence_semantic
+    - source_class
+    - source_resource_ref
+    - captured_at
+    - freshness
+    - provenance
+  fields:
+    evidence_ref:
+      type: string
+      identity_model: execution_or_capture_scoped_normalized_evidence_item
+      rule: >-
+        Traceable identifier for the normalized observation within its source/capture lifecycle. It is not a
+        permanent serviceability Object ID; materially changed source statements may produce a new Evidence item/ref.
+    evidence_semantic:
+      type: string
+      provider_neutral: true
+    source_class:
+      allowed:
+        - OWNED_WEBSITE
+        - BRAND_USER_INPUT
+        - INSTAGRAM_OWNED
+        - PERFORMANCE_EVIDENCE
+        - MULTI_SOURCE
+        - SYSTEM_DERIVATION_INPUT
+      provider_or_endpoint_name_forbidden: true
+    source_resource_ref:
+      type: string
+      meaning: Provider-neutral page/source record reference.
+    source_item_ref:
+      type: [string, "null"]
+      nullable: true
+    captured_at:
+      type: timestamp
+    observed_at:
+      type: [timestamp, "null"]
+      nullable: true
+    freshness:
+      allowed: [CURRENT, STALE, UNKNOWN]
+    evidence_strength:
+      allowed:
+        - EXPLICIT_CURRENT_POLICY
+        - SPECIFIC_AVAILABILITY_STATEMENT
+        - GENERAL_AVAILABILITY_STATEMENT
+        - GENERIC_MARKETING_GEOGRAPHY
+        - CONTEXTUAL_SUPPORT
+      optional: true
+    conflict_group_ref:
+      type: [string, "null"]
+      nullable: true
+      meaning: Groups observations that appear materially contradictory without resolving the contradiction in Data Extraction.
+    provenance:
+      required:
+        - acquisition_or_normalization_run_ref
+      optional:
+        - parent_evidence_refs
+        - normalization_version
+      provider_details_as_semantic_fields: forbidden
+
+normalized_geography_assertion:
+  fields:
+    polarity:
+      allowed:
+        - SUPPORTED
+        - EXCLUDED
+    scope:
+      allowed:
+        - LOCAL
+        - REGIONAL
+        - COUNTRY
+        - MULTI_COUNTRY_MEMBER
+        - GLOBAL
+    country_code:
+      type: [string, "null"]
+      nullable: true
+      normalization_when_non_null: ISO_3166_1_ALPHA_2
+    region:
+      type: [string, "null"]
+      nullable: true
+    locality:
+      type: [string, "null"]
+      nullable: true
+    radius_km:
+      type: [number, "null"]
+      nullable: true
+  rules:
+    - Positive and restrictive assertions must remain distinguishable.
+    - Geography normalization does not decide whether the assertion is authoritative or current.
+    - GLOBAL assertions remain observations requiring Intelligence validation; website accessibility is not a GLOBAL assertion.
+
+coverage_modality:
+  allowed:
+    - PHYSICAL_LOCATION
+    - SHIPPING_DELIVERY
+    - DIGITAL_REMOTE
+    - BOOKING_SERVICE
+    - TRANSACTIONAL
+  purpose: Distinguish physical presence from ability to ship, serve remotely, book, or transact without creating separate Intelligence Objects.
+
+capabilities:
+  owned_website.serviceability_evidence:
+    required_for_processor: true
+    source_class: OWNED_WEBSITE
+    item_semantic: first_party_serviceability_observation
+    observation_types:
+      - SHIPPING_DELIVERY_GEOGRAPHY
+      - SERVICE_AREA_STATEMENT
+      - DIGITAL_REMOTE_AVAILABILITY
+      - BOOKING_AVAILABILITY
+      - TRANSACTION_AVAILABILITY
+      - GEOGRAPHY_RESTRICTION
+      - EXPLICIT_UNSUPPORTED_GEOGRAPHY
+      - GENERAL_BRAND_AVAILABILITY
+      - GENERIC_MARKETING_GEOGRAPHY
+    fields:
+      observation_type: capabilities.owned_website.serviceability_evidence.observation_types
+      coverage_modality: coverage_modality
+      geography_assertions:
+        type: array
+        item: normalized_geography_assertion
+      offering_ref:
+        type: [string, "null"]
+        nullable: true
+        role: reference_only_when_mapped_to_known_canonical_offering
+      offering_candidate_ref:
+        type: [string, "null"]
+        nullable: true
+        role: reference_only_when_source_is_not_yet_mapped_to_canonical_offering
+      statement_or_normalized_fact: string
+      evidence_strength: shared_evidence_item.evidence_strength
+    refresh_sensitivity: HIGH
+    rules:
+      - '"Ships across India" is positive SHIPPING_DELIVERY evidence.'
+      - '"Only available in Delhi NCR" is restrictive Evidence and must retain excluded/bounded semantics.'
+      - '"Available worldwide" is potential global first-party Evidence, not automatic GLOBAL Intelligence.'
+      - Current explicit availability/restriction policy outranks generic Brand geography copy.
+      - Offering-specific observed availability does not replace canonical Offering availability when canonical truth exists.
+      - Explicit unsupported geography must be preserved, not dropped because positive evidence also exists.
+
+  owned_website.location_evidence:
+    required_for_processor: true
+    source_class: OWNED_WEBSITE
+    item_semantic: first_party_location_observation
+    observation_types:
+      - LOCATION_PAGE
+      - LOCATION_DIRECTORY_ENTRY
+      - LOCATION_SPECIFIC_SERVICE_AVAILABILITY
+      - LOCATION_BOOKING_PATH
+      - PHYSICAL_ADDRESS_OR_PRESENCE
+      - LOCATION_STATUS_SIGNAL
+    fields:
+      observation_type: capabilities.owned_website.location_evidence.observation_types
+      candidate_location_ref:
+        type: [string, "null"]
+        nullable: true
+        role: candidate_or_corroboration_reference_only
+      canonical_location_ref:
+        type: [string, "null"]
+        nullable: true
+        role: reference_only_when_reconciled_to_application_owned_location
+      geography_assertion:
+        type: [object, "null"]
+        nullable: true
+        schema: normalized_geography_assertion
+      booking_or_access_ref:
+        type: [string, "null"]
+        nullable: true
+      offering_ref:
+        type: [string, "null"]
+        nullable: true
+        role: reference_only
+      statement_or_normalized_fact: string
+    refresh_sensitivity: HIGH
+    rules:
+      - A store/clinic/office page proves observed physical presence context, not automatically Brand-wide serviceability.
+      - '"Visit our New York office" is location Evidence unless separate availability semantics establish customer serviceability.'
+      - Canonical Location rows must never be copied into Evidence items.
+      - Inactive/stale location observations must be retained with freshness/conflict semantics rather than silently discarded.
+
+supporting_context:
+  demand_geography:
+    required_for_processor: false
+    role: OPTIONAL_LATER_ENRICHMENT
+    establishing_serviceability: false
+    source_class_allowed:
+      - PERFORMANCE_EVIDENCE
+      - SYSTEM_DERIVATION_INPUT
+      - MULTI_SOURCE
+    processor_components:
+      overall_scope: SUPPORTING_ONLY
+      serviceable_markets: SUPPORTING_ONLY
+    rule: Demand geography can corroborate relevance but cannot create a positive serviceability basis.
+  audience_geography:
+    required_for_processor: false
+    role: OPTIONAL_LATER_ENRICHMENT
+    establishing_serviceability: false
+    source_class_allowed:
+      - INSTAGRAM_OWNED
+      - SYSTEM_DERIVATION_INPUT
+      - MULTI_SOURCE
+    processor_components:
+      overall_scope: SUPPORTING_ONLY
+      serviceable_markets: SUPPORTING_ONLY
+    rule: Audience geography cannot establish or override availability.
+  competitor_geography:
+    required_for_processor: false
+    establishing_serviceability: false
+    use_for_serviceability_synthesis: forbidden
+
+offering_relationship:
+  evidence_offering_reference_is_canonical_truth: false
+  rules:
+    - offering_ref or offering_candidate_ref may scope an observed statement.
+    - Evidence Offering reference does not become canonical Offering availability.
+    - When canonical Offering availability exists, the canonical state has precedence for known Offering truth.
+    - Processor output may reference Offering IDs but must not embed Offering availability payloads.
+
+precedence:
+  ordered_high_to_low:
+    - CANONICAL_OFFERING_AND_LOCATION_STATE
+    - CURRENT_EXPLICIT_FIRST_PARTY_AVAILABILITY_POLICY
+    - SPECIFIC_OFFERING_OR_LOCATION_AVAILABILITY_STATEMENT
+    - GENERAL_BRAND_AVAILABILITY_STATEMENT
+    - GENERIC_MARKETING_GEOGRAPHY
+    - DEMAND_OR_AUDIENCE_GEOGRAPHY_CONTEXT
+  rules:
+    - Canonical state is not Evidence but is the highest-precedence business-state input for known facts.
+    - Restrictive current first-party statements can narrow broader general statements.
+    - Demand/audience geography cannot produce a serviceability_basis establishing availability.
+    - Headquarters or primary country alone cannot establish serviceability.
+    - Website global accessibility cannot establish GLOBAL.
+
+negative_and_conflicting_evidence:
+  supported: true
+  negative_types:
+    - EXPLICIT_GEOGRAPHY_RESTRICTION
+    - EXPLICIT_UNSUPPORTED_GEOGRAPHY
+    - INACTIVE_LOCATION_SIGNAL
+    - EXPIRED_OR_STALE_AVAILABILITY_STATEMENT
+  conflict_semantics:
+    preserve_all_material_observations: true
+    conflict_group_ref: supported
+    resolution_owner: INTELLIGENCE_ENGINE
+    data_extraction_must_not:
+      - discard lower-precedence contradictory Evidence solely to simplify output
+      - decide which conflicting statement is semantically authoritative
+      - rewrite canonical business state
+  examples:
+    - current shipping page conflicts with older policy page
+    - Location directory lists a site that canonical state marks inactive
+    - general global claim conflicts with specific country restrictions
+  processor_behavior_reference: >-
+    The reasoning contract resolves conflict by precedence/freshness and may return narrower, PARTIAL, NOT_READY,
+    or null Serviceability rather than inventing breadth.
+
+legacy_compatibility:
+  identity.markets_served:
+    classification: LEGACY_COMPATIBILITY_CONTEXT
+    current_authoritative_permanent_output: false
+    fresh_evidence: false
+    establishing_serviceability: false
+    use:
+      - migration reconciliation
+      - identify hypotheses requiring current support
+      - temporary legacy projection compatibility
+    rules:
+      - Legacy markets_served must retain legacy provenance.
+      - It must not be converted directly into serviceability_profile.
+      - A market requires current canonical or first-party support before becoming new Serviceability.
+      - Legacy value cannot supply heterogeneous Offering coverage truth.
+
+missing_evidence:
+  processor_failure_required: false
+  rules:
+    - No defensible serviceability Evidence and no applicable canonical availability may yield serviceability_profile=null.
+    - Bounded Evidence may yield PARTIAL or a narrower market set.
+    - Missing optional demand/audience context never blocks Serviceability.
+    - Never fabricate availability, Location, Offering, or geography Evidence.
+
+freshness_policy:
+  universal_ttl: none
+  classes:
+    shipping_delivery_policy: HIGH
+    service_area_policy: HIGH
+    booking_transaction_availability: HIGH
+    location_status_availability: HIGH
+    generic_brand_geography_copy: MEDIUM
+    canonical_business_state: event_driven_authoritative_input
+  rules:
+    - Stale Evidence remains auditable and may participate in conflict reconciliation.
+    - Freshness does not confer authority over canonical business state.
+    - Explicit current restrictions normally outweigh stale broader availability statements.
+
+evidence_to_component_map:
+  canonical_active_locations:
+    overall_scope: CONTEXT
+    coverage_is_heterogeneous: INPUT
+    serviceable_markets: ESTABLISH_PHYSICAL_PRESENCE_CONTEXT
+    serviceability_basis: CANONICAL_LOCATION_COVERAGE
+    mixed_coverage_note: POSSIBLE
+  canonical_offering_availability:
+    overall_scope: PRIMARY_INPUT
+    coverage_is_heterogeneous: PRIMARY_INPUT
+    serviceable_markets: PRIMARY_INPUT
+    serviceability_basis: CANONICAL_OFFERING_AVAILABILITY
+    mixed_coverage_note: PRIMARY_WHEN_HETEROGENEOUS
+  owned_website.serviceability_evidence:
+    overall_scope: PRIMARY_OBSERVED
+    coverage_is_heterogeneous: POSSIBLE
+    serviceable_markets: PRIMARY_OBSERVED
+    serviceability_basis: PRIMARY_OBSERVED
+    mixed_coverage_note: POSSIBLE
+  owned_website.location_evidence:
+    overall_scope: SUPPORTING_PHYSICAL_CONTEXT
+    coverage_is_heterogeneous: POSSIBLE
+    serviceable_markets: CONDITIONAL
+    serviceability_basis: FIRST_PARTY_SERVICE_AREA_OR_LOCATION_CONTEXT
+    mixed_coverage_note: POSSIBLE
+  demand_geography:
+    overall_scope: SUPPORTING_ONLY
+    coverage_is_heterogeneous: NONE
+    serviceable_markets: SUPPORTING_ONLY
+    serviceability_basis: FORBIDDEN_AS_ESTABLISHING_BASIS
+    mixed_coverage_note: NONE
+  audience_geography:
+    overall_scope: SUPPORTING_ONLY
+    coverage_is_heterogeneous: NONE
+    serviceable_markets: SUPPORTING_ONLY
+    serviceability_basis: FORBIDDEN_AS_ESTABLISHING_BASIS
+    mixed_coverage_note: NONE
+  legacy_identity.markets_served:
+    overall_scope: RECONCILIATION_ONLY
+    coverage_is_heterogeneous: NONE
+    serviceable_markets: RECONCILIATION_ONLY
+    serviceability_basis: FORBIDDEN_AS_ESTABLISHING_BASIS
+    mixed_coverage_note: NONE
+
+data_extraction_handoff:
+  owned_website.serviceability_evidence: READY_TO_HAND_TO_DATA_EXTRACTION
+  owned_website.location_evidence: READY_TO_HAND_TO_DATA_EXTRACTION
+  canonical_active_locations: NEEDS_BACKEND_CANONICAL_STATE_FIRST
+  canonical_offering_availability: NEEDS_BACKEND_CANONICAL_STATE_FIRST
+  offering_to_location_relationships: NEEDS_BACKEND_CANONICAL_STATE_FIRST
+  demand_geography: OPTIONAL_LATER_ENRICHMENT
+  audience_geography: OPTIONAL_LATER_ENRICHMENT
+  legacy_identity.markets_served: LEGACY_COMPATIBILITY_ONLY
+
+validation_invariants:
+  - Evidence semantic IDs are provider-neutral.
+  - Canonical Location/Offering state is distinct from website observations.
+  - Positive and restrictive serviceability Evidence are both supported.
+  - Conflicting Evidence is preserved for Intelligence resolution.
+  - Demand/audience geography cannot establish serviceability.
+  - Website global accessibility cannot establish GLOBAL.
+  - Headquarters alone cannot establish serviceability.
+  - Canonical Location rows are never duplicated in Evidence.
+  - Canonical Offering availability is never duplicated in Evidence.
+  - Legacy markets_served is compatibility-only.
+  - Missing Evidence is allowed without filler.
+  - Every observed Evidence item exposes an evidence_ref usable by processor output lineage.

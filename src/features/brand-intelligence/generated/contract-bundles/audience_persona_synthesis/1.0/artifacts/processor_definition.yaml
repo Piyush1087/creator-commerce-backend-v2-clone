@@ -1,0 +1,137 @@
+version: "1.0"
+status: FROZEN
+owner_engine: brand_intelligence
+id: audience_persona_synthesis
+owning_branch: audience
+processor_type: AI_REASONING
+purpose: >-
+  Synthesize and reconcile the small durable Brand-level audience_personas collection from canonical Brand context,
+  grounded Audience Evidence, Preview candidate seeds, and Brand user input without turning Preview hypotheses,
+  Campaign targeting, Offering-specific clues, geography, or demographics into unsupported durable truth.
+outputs:
+  - audience_personas
+canonical_inputs:
+  - brand_id
+  - brand_name
+  - confirmed_industry
+  - authoritative_sub_industry_or_category_when_available
+evidence_sufficiency:
+  minimum:
+    rule: >-
+      Canonical Brand anchors must be available plus sufficient representative grounded Audience Evidence to form
+      or reconcile at least one defensible bounded Persona hypothesis. No individual supporting Evidence capability
+      below is a universal execution prerequisite.
+  supporting_capabilities:
+    - owned_website.brand_messaging
+    - owned_website.brand_company_context
+    - owned_website.offering_context
+    - brand_user_input_and_confirmations
+    - brand_preview.audience_candidate_seeds
+  optional_enrichment:
+    - instagram.owned_brand_context
+    - Brand Expression Intelligence
+    - Campaign and Performance learning when later accepted
+  non_blocking_absence:
+    - brand_preview.audience_candidate_seeds
+    - brand_user_input_and_confirmations
+    - owned_website.offering_context
+    - instagram.owned_brand_context
+shared_authority_rules:
+  processor_may_emit:
+    - OBSERVED
+    - CREATOR_SHOP_DERIVED
+    - SYSTEM_DERIVED
+  processor_must_not_emit:
+    - BRAND_CONFIRMED
+    - SUPPORT_CONTROLLED
+  protected_current_authoritative_state:
+    ordinary_derivation_dependency: false
+    silent_overwrite: forbidden
+    compare_new_evidence_without_automatic_replacement: true
+persona_identity:
+  durable_identity_key: semantic_id
+  identity_basis: semantic_continuity_of_audience_meaning
+  not_based_on:
+    - label
+    - array_position
+    - current_summary_wording
+    - capitalization
+    - minor_item_wording
+  candidate_relationship_classes:
+    - SAME_PERSONA
+    - POSSIBLE_MATCH
+    - NEW_PERSONA
+    - MATERIAL_CONFLICT
+  numeric_similarity_threshold: forbidden
+reconciliation:
+  supports:
+    - existing_persona_update
+    - new_persona_admission
+    - partial_persona
+    - merge_or_split_supersession
+    - inactive_retention
+    - mixed_field_and_item_authority
+  wholesale_array_replacement: forbidden
+  brand_confirmed_field_or_item_replacement: forbidden
+lifecycle:
+  durable_states:
+    - ACTIVE
+    - INACTIVE
+    - SUPERSEDED
+  candidate_is_durable_state: false
+  history_deletion_on_refresh: forbidden
+preview_boundary:
+  audience_groups_role:
+    - CANDIDATE_SEED
+    - RECONCILIATION_CONTEXT
+  automatic_durable_persona: forbidden
+  preview_identity_reuse: forbidden
+demographic_boundary:
+  optional: true
+  policy_gated: true
+  unsupported_or_sensitive_inference: forbidden
+geography_boundary:
+  audience_geography_establishes_serviceability: false
+  audience_geography_establishes_offering_availability: false
+  audience_geography_establishes_campaign_feasibility: false
+partial_output_behavior:
+  zero_personas_allowed: true
+  one_persona_allowed: true
+  multiple_personas_allowed: true
+  partial_persona_allowed: true
+  target_active_set: [2, 3]
+  target_is_readiness_threshold: false
+  filler: forbidden
+readiness:
+  consumer_scoped: true
+  execution_rules:
+    - direct sufficient representative Audience Evidence may enable READY_TO_RUN without a Preview seed
+    - missing Brand user input does not imply WAITING_FOR_EVIDENCE
+    - incomplete Offering context does not automatically block Audience execution
+    - insufficient representative Audience Evidence overall implies WAITING_FOR_EVIDENCE
+    - sufficient Evidence for one or partial Persona permits execution and partial output
+  no_brand_preview_gate: true
+  no_verification_gate: true
+  no_home_gate: true
+  no_brand_centre_entry_gate: true
+refresh_triggers:
+  - material Brand positioning or messaging change affecting Audience meaning
+  - material Offering composition change affecting target Audience
+  - new representative customer or Audience Evidence
+  - explicit Brand Persona edit or confirmation
+  - later accepted Campaign or Performance learning affecting declared Persona fields
+invalidation:
+  directed_only: true
+  whole_brand_intelligence_recompute: forbidden
+  whole_persona_collection_regeneration_required: false
+model_profile_requirement_class: structured_grounded_reconciliation
+provider_or_model_selection: deferred
+persistence_boundary: Semantic processor contract only; persistence implementation is deferred.
+non_owned_scope:
+  - Campaign targeting configuration
+  - Serviceability
+  - canonical Locations
+  - canonical Offering availability
+  - CRM segmentation
+  - unrestricted demographic inference
+  - Brand Preview synthesis

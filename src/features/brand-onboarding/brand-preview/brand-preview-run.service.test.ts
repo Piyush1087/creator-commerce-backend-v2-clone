@@ -171,7 +171,10 @@ describe("BrandPreviewRunService", () => {
             completeness: "PARTIAL",
             brandProfileId: "profile-stable",
             previewOutputSnapshot: {
-              identity: { brand_name: "Example" },
+              identity: {
+                brand_name: "Example",
+                website_url: "example.com",
+              },
               brand_descriptor: null,
               brand_understanding_narrative: "Narrative",
               audience_groups: [
@@ -197,6 +200,12 @@ describe("BrandPreviewRunService", () => {
       {} as GatekeeperPersistenceService,
     );
     const projected = await service.get("lead-1");
+    expect(projected.preview).toMatchObject({
+      identity: {
+        brand_name: "Example",
+        website_url: "https://example.com/",
+      },
+    });
     expect(projected.verificationContext.brandProfileId).toBe("profile-stable");
     expect(JSON.stringify(projected)).not.toContain("secret-ref");
     expect(JSON.stringify(projected)).not.toContain("internal_confidence");

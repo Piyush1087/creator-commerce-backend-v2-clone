@@ -8,6 +8,7 @@ import { OfferingType, Prisma } from "@prisma/client";
 import { gateAndNormalizeBrandUrl } from "../../brand-onboarding/discovery-url.util";
 import { ParallelExtractClient } from "../../brand-onboarding/integrations/parallel/parallel-extract.client";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { BrandVisualStateService } from "../../brand-canonical-state/brand-visual-state.service";
 import { getIndustryRoutingTemplate } from "../config/industry-routing-templates";
 
 const COLLECTION_TYPES: OfferingType[] = [OfferingType.COLLECTION];
@@ -24,6 +25,7 @@ export class BrandCentreDnaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly parallel: ParallelExtractClient,
+    private readonly visuals: BrandVisualStateService,
   ) {}
 
   async getDnaAggregate(brandProfileId: string) {
@@ -31,9 +33,15 @@ export class BrandCentreDnaService {
       where: { id: brandProfileId },
       include: {
         offerings: { where: { isActive: true }, orderBy: { createdAt: "asc" } },
-        competitors: { where: { isActive: true }, orderBy: { createdAt: "asc" } },
+        competitors: {
+          where: { isActive: true },
+          orderBy: { createdAt: "asc" },
+        },
         audiencePersonas: { orderBy: { sortOrder: "asc" } },
-        brandOffers: { where: { isActive: true }, orderBy: { createdAt: "desc" } },
+        brandOffers: {
+          where: { isActive: true },
+          orderBy: { createdAt: "desc" },
+        },
         budgetConfiguration: true,
       },
     });
@@ -49,7 +57,10 @@ export class BrandCentreDnaService {
       COLLECTION_TYPES.includes(o.type),
     );
 
-    const strategicDna = (profile.strategicDna ?? {}) as Record<string, unknown>;
+    const strategicDna = (profile.strategicDna ?? {}) as Record<
+      string,
+      unknown
+    >;
     const narrative = (strategicDna.narrative ?? {}) as Record<string, unknown>;
     const visuals = (strategicDna.visuals ?? {}) as Record<string, unknown>;
     const compliance = (strategicDna.complianceGuardrails ?? {}) as Record<
@@ -115,16 +126,25 @@ export class BrandCentreDnaService {
       lifecycleStage?: string;
     },
   ) {
-    await this.prisma.brandProfile.update({
-      where: { id: brandProfileId },
-      data: {
-        logoUrl: data.logoUrl,
-        name: data.brandName,
-        igHandle: data.igHandle,
-        ytHandle: data.ytHandle,
-        tiktokHandle: data.tiktokHandle,
-        lifecycleStage: data.lifecycleStage,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      if (data.logoUrl !== undefined)
+        await this.visuals.confirmLogo(
+          brandProfileId,
+          data.logoUrl,
+          "BRAND_SELECTION",
+          tx,
+        );
+      await tx.brandProfile.update({
+        where: { id: brandProfileId },
+        data: {
+          logoUrl: data.logoUrl,
+          name: data.brandName,
+          igHandle: data.igHandle,
+          ytHandle: data.ytHandle,
+          tiktokHandle: data.tiktokHandle,
+          lifecycleStage: data.lifecycleStage,
+        },
+      });
     });
     return this.getDnaAggregate(brandProfileId);
   }
@@ -201,19 +221,22 @@ export class BrandCentreDnaService {
       },
     };
 
-    await this.prisma.brandProfile.update({
-      where: { id: brandProfileId },
-      data: {
-        strategicDna: strategicDna as unknown as Prisma.InputJsonValue,
-        visualIdentity: {
-          colors: data.palette,
-          fonts: {
-            heading: data.fonts?.[0] ?? "Unknown",
-            body: data.fonts?.[1] ?? data.fonts?.[0] ?? "Unknown",
-          },
-          aesthetic: data.aesthetics,
-        } as unknown as Prisma.InputJsonValue,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      await this.visuals.confirmLegacyIdentity(brandProfileId, data, tx);
+      await tx.brandProfile.update({
+        where: { id: brandProfileId },
+        data: {
+          strategicDna: strategicDna as unknown as Prisma.InputJsonValue,
+          visualIdentity: {
+            colors: data.palette,
+            fonts: {
+              heading: data.fonts?.[0] ?? "Unknown",
+              body: data.fonts?.[1] ?? data.fonts?.[0] ?? "Unknown",
+            },
+            aesthetic: data.aesthetics,
+          } as unknown as Prisma.InputJsonValue,
+        },
+      });
     });
     return this.getDnaAggregate(brandProfileId);
   }
@@ -240,7 +263,8 @@ export class BrandCentreDnaService {
       data: {
         brandProfileId,
         personaName: data.personaName,
-        demographicsJson: data.demographicsJson as unknown as Prisma.InputJsonValue,
+        demographicsJson:
+          data.demographicsJson as unknown as Prisma.InputJsonValue,
         psychographicsText: data.psychographicsText,
         sortOrder: count,
         isUserEdited: true,
@@ -302,7 +326,9 @@ export class BrandCentreDnaService {
     const profileHost = profileDomain.toLowerCase().replace(/^www\./, "");
     const urlHost = gated.hostname.toLowerCase().replace(/^www\./, "");
     if (urlHost !== profileHost && !urlHost.endsWith(`.${profileHost}`)) {
-      throw new BadRequestException("URL must belong to your verified brand domain");
+      throw new BadRequestException(
+        "URL must belong to your verified brand domain",
+      );
     }
     return gated.normalizedUrl;
   }
@@ -371,11 +397,18 @@ export class BrandCentreDnaService {
       where: { brandProfileId, isActive: true, type: { in: types } },
     });
     if (count >= max) {
-      throw new BadRequestException(`Maximum ${max} items allowed for this section`);
+      throw new BadRequestException(
+        `Maximum ${max} items allowed for this section`,
+      );
     }
-    const normalized = await this.assertUrlOnBrandDomain(profile.domain, data.url);
+    const normalized = await this.assertUrlOnBrandDomain(
+      profile.domain,
+      data.url,
+    );
     if (data.sellingPoints && data.sellingPoints.length !== 3) {
-      throw new BadRequestException("Exactly three selling points are required");
+      throw new BadRequestException(
+        "Exactly three selling points are required",
+      );
     }
     return this.prisma.offering.create({
       data: {
@@ -422,7 +455,9 @@ export class BrandCentreDnaService {
       url = await this.assertUrlOnBrandDomain(profile.domain, data.url);
     }
     if (data.sellingPoints && data.sellingPoints.length !== 3) {
-      throw new BadRequestException("Exactly three selling points are required");
+      throw new BadRequestException(
+        "Exactly three selling points are required",
+      );
     }
     return this.prisma.offering.update({
       where: { id: offeringId },
@@ -560,7 +595,12 @@ export class BrandCentreDnaService {
 
   async createCompetitor(
     brandProfileId: string,
-    data: { name: string; websiteUrl: string; whyCompetitor?: string; logoUrl?: string },
+    data: {
+      name: string;
+      websiteUrl: string;
+      whyCompetitor?: string;
+      logoUrl?: string;
+    },
   ) {
     const count = await this.prisma.competitor.count({
       where: { brandProfileId, isActive: true },

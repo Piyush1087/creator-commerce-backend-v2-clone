@@ -1,0 +1,99 @@
+{
+  "manifestSchemaVersion": 1,
+  "bundleId": "brand_intelligence.brand_meaning",
+  "bundleVersion": "1.0",
+  "ownerEngine": "brand_intelligence",
+  "owningBranch": "brand_expression",
+  "architectureRepository": "Piyush1087/dummy_tcs",
+  "architectureCommitSha": "2e13fa40235094d127f72b38f43c510232e38be4",
+  "processorId": "brand_meaning",
+  "processorVersion": "1.0",
+  "outputContractId": "brand_meaning_output_contract",
+  "outputContractVersion": "1.0",
+  "evidenceContractId": "brand_meaning_evidence",
+  "evidenceContractVersion": "1.0",
+  "ownedObjectSemanticIds": [
+    "brand_description",
+    "positioning",
+    "value_proposition"
+  ],
+  "ownedPathPatterns": [
+    {
+      "objectSemanticId": "brand_description",
+      "componentPathPattern": "$"
+    },
+    {
+      "objectSemanticId": "positioning",
+      "componentPathPattern": "$"
+    },
+    {
+      "objectSemanticId": "value_proposition",
+      "componentPathPattern": "$"
+    }
+  ],
+  "generatedNotice": "GENERATED — DO NOT EDIT",
+  "generatorVersion": "1.0.0",
+  "artifacts": [
+    {
+      "role": "EVIDENCE_CONTRACT",
+      "path": "artifacts/evidence_contract.yaml",
+      "semanticId": "brand_meaning_evidence",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 5162,
+      "sha256": "9c7bf4169408d7d8652abca94654b5a6d2006adea82b7db1590ed0c9e29eed68"
+    },
+    {
+      "role": "OBJECT_CONTRACT",
+      "path": "artifacts/object_contract.yaml",
+      "semanticId": "objects",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 23130,
+      "sha256": "3c84c7e300718a3d8bb788b5f0bb76e08a5a8d4f8c97d9e75220176542c9c03d"
+    },
+    {
+      "role": "OUTPUT_CONTRACT",
+      "path": "artifacts/output_contract.yaml",
+      "semanticId": "brand_meaning_output_contract",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 4220,
+      "sha256": "68fd0dadaba9a9d7e181ebfb6a76f1175b238c359c079850b1153cf897460f5a"
+    },
+    {
+      "role": "PROCESSOR_DEFINITION",
+      "path": "artifacts/processor_definition.yaml",
+      "semanticId": "brand_meaning",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 3504,
+      "sha256": "0b5962242f7f765add5d89efbd4061398b9be62ba683401f6b2f07eacfc82fdb"
+    },
+    {
+      "role": "REASONING_CONTRACT",
+      "path": "artifacts/reasoning_contract.yaml",
+      "semanticId": "brand_meaning_reasoning",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 5813,
+      "sha256": "4548f48727425e8475b442cbef25f2b8473eeb7acb158acd9827def815a12f5d"
+    },
+    {
+      "role": "SHARED_METADATA_CONTRACT",
+      "path": "artifacts/shared_metadata_contract.yaml",
+      "semanticId": "shared_intelligence_metadata",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 16996,
+      "sha256": "47dbd324d4d79136b16ade4448adf78087d93658bcb2281292c40bfe6def98bd"
+    }
+  ],
+  "bundleContentHash": "77d40718947b3b7a4d3994c8db04ae9b5fc68a4419a157a7a2e3c523437d2c14"
+}

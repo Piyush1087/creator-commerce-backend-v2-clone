@@ -136,6 +136,8 @@ export class DeepScanWorker {
         description: data.strategicDNA.narrative.briefDescription,
         strategicDna: strategicDna as unknown as Prisma.InputJsonValue,
         visualIdentity: {
+          // Observed compatibility context only; never canonical visual approval.
+          observedLogoUrl: data.brandProfile?.logoUrl ?? null,
           colors: data.strategicDNA.visuals.palette,
           fonts: {
             heading: data.strategicDNA.visuals.fonts[0] ?? "Unknown",
@@ -144,9 +146,10 @@ export class DeepScanWorker {
               data.strategicDNA.visuals.fonts[0] ??
               "Unknown",
           },
-          toneOfVoice: data.strategicDNA.narrative.toneOfVoice.map(
-            (label) => ({ label, description: "" }),
-          ),
+          toneOfVoice: data.strategicDNA.narrative.toneOfVoice.map((label) => ({
+            label,
+            description: "",
+          })),
           aesthetic: data.strategicDNA.visuals.aesthetics,
         } as unknown as Prisma.InputJsonValue,
         scanStatus: ScanStatus.READY,
@@ -156,6 +159,7 @@ export class DeepScanWorker {
       };
 
       if (data.brandProfile?.logoUrl) {
+        // The canonical-logo DB guard preserves an approved one-way logoUrl mirror.
         profilePatch.logoUrl = data.brandProfile.logoUrl;
       }
       if (data.brandProfile?.lifecycleStage) {
@@ -207,11 +211,7 @@ export class DeepScanWorker {
         }
 
         if (data.offersLedger.length > 0) {
-          await applyPrompt1OffersLedger(
-            tx,
-            profile.id,
-            data.offersLedger,
-          );
+          await applyPrompt1OffersLedger(tx, profile.id, data.offersLedger);
         }
 
         await tx.brandBudgetConfiguration.upsert({
@@ -255,8 +255,7 @@ export class DeepScanWorker {
               growthImpactMatrix as unknown as Prisma.InputJsonValue,
             baselineHealth:
               data.baselineHealth as unknown as Prisma.InputJsonValue,
-            shareOfVoice:
-              data.shareOfVoice as unknown as Prisma.InputJsonValue,
+            shareOfVoice: data.shareOfVoice as unknown as Prisma.InputJsonValue,
             refreshedAt: new Date(),
           },
           update: {
@@ -264,8 +263,7 @@ export class DeepScanWorker {
               growthImpactMatrix as unknown as Prisma.InputJsonValue,
             baselineHealth:
               data.baselineHealth as unknown as Prisma.InputJsonValue,
-            shareOfVoice:
-              data.shareOfVoice as unknown as Prisma.InputJsonValue,
+            shareOfVoice: data.shareOfVoice as unknown as Prisma.InputJsonValue,
             refreshedAt: new Date(),
           },
         });

@@ -3,6 +3,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import { BrandLocationService } from "../../brand-canonical-state/brand-location.service";
 import { BrandCentreColdStartService } from "../../brand-centre/services/brand-centre-cold-start.service";
 import {
   BrandScanGateException,
@@ -74,6 +75,7 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
     private readonly config: ConfigService,
     private readonly brandCentreColdStart: BrandCentreColdStartService,
     private readonly scanProgress: SurfaceScanProgressStore,
+    private readonly locations: BrandLocationService,
   ) {}
 
   async run(args: {
@@ -494,17 +496,19 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
         },
       });
 
-      await tx.offering.deleteMany({ where: { brandProfileId: profile.id } });
+      // Keep existing Offering IDs/locationIds. Rescanning inventory is not removal authority.
       await tx.competitor.deleteMany({ where: { brandProfileId: profile.id } });
-      await tx.location.deleteMany({ where: { brandProfileId: profile.id } });
 
       if (payload.products.length > 0) {
         const defaultCurrency = this.config.get<string>(
           "DEFAULT_CURRENCY_CODE",
           "USD",
         );
-        await tx.offering.createMany({
-          data: payload.products.map((item) => ({
+        for (const item of payload.products) {
+          const existing = await tx.offering.findMany({
+            where: { brandProfileId: profile.id, url: item.url },
+          });
+          const observed = {
             brandProfileId: profile.id,
             type: item.type,
             name: item.name,
@@ -515,8 +519,15 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
             startingPriceLabel: item.startingPriceLabel ?? null,
             priceAmount: tryParseStartingPriceLabel(item.startingPriceLabel),
             currency: defaultCurrency,
-          })),
-        });
+          };
+          if (!existing.length) await tx.offering.create({ data: observed });
+          else if (existing.length === 1 && !existing[0].isUserEdited) {
+            await tx.offering.update({
+              where: { id: existing[0].id },
+              data: observed,
+            });
+          }
+        }
       }
 
       if (payload.competitors.length > 0) {
@@ -532,17 +543,17 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
         });
       }
 
-      if (payload.locations.length > 0) {
-        await tx.location.createMany({
-          data: normalizedLocations.map((item) => ({
-            brandProfileId: profile.id,
-            name: item.name ?? null,
-            address: item.address,
-            city: item.city ?? null,
-            zip: item.zip ?? null,
-          })),
-        });
-      }
+      await this.locations.reconcile(
+        profile.id,
+        normalizedLocations.map((item) => ({
+          name: item.name ?? null,
+          address: item.address,
+          city: item.city ?? null,
+          zip: item.zip ?? null,
+        })),
+        "LEGACY_SURFACE_SCAN",
+        tx,
+      );
 
       return profile.id;
     });

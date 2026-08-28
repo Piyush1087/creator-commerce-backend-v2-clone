@@ -1,0 +1,161 @@
+{
+  "manifestSchemaVersion": 1,
+  "bundleId": "brand_intelligence.serviceability_synthesis",
+  "bundleVersion": "1.0",
+  "ownerEngine": "brand_intelligence",
+  "owningBranch": "serviceability",
+  "architectureRepository": "Piyush1087/dummy_tcs",
+  "architectureCommitSha": "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
+  "processorId": "serviceability_synthesis",
+  "processorVersion": "1.0",
+  "outputContractId": "serviceability_synthesis_output_contract",
+  "outputContractVersion": "1.0",
+  "evidenceContractId": "serviceability_evidence",
+  "evidenceContractVersion": "1.0",
+  "ownedObjectSemanticIds": [
+    "serviceability_profile"
+  ],
+  "ownedPathPatterns": [
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/coverage_is_heterogeneous"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/mixed_coverage_note"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/overall_scope"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/serviceability_basis"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}/f/applies_to_market_refs"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}/f/basis_type"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}/f/business_state_refs"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}/f/evidence_refs"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/serviceability_basis/i/{semantic_id}/f/offering_refs"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/serviceable_markets"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/country_code"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/label"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/locality"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/radius_km"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/region"
+    },
+    {
+      "objectSemanticId": "serviceability_profile",
+      "componentPathPattern": "$/f/serviceable_markets/i/{semantic_id}/f/scope"
+    }
+  ],
+  "generatedNotice": "GENERATED — DO NOT EDIT",
+  "generatorVersion": "1.0.0",
+  "artifacts": [
+    {
+      "role": "EVIDENCE_CONTRACT",
+      "path": "artifacts/evidence_contract.yaml",
+      "semanticId": "serviceability_evidence",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 16765,
+      "sha256": "0cfa6980d38b3b4b4093bb76f8d8a96afa3f0c14c5f4365c07209d9ebd239731"
+    },
+    {
+      "role": "OBJECT_CONTRACT",
+      "path": "artifacts/object_contract.yaml",
+      "semanticId": "objects",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 18210,
+      "sha256": "01d121f2853bf5682142cf4ba258375ca08af239ea0e16d66865d63b5c0d68be"
+    },
+    {
+      "role": "OUTPUT_CONTRACT",
+      "path": "artifacts/output_contract.yaml",
+      "semanticId": "serviceability_synthesis_output_contract",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 12336,
+      "sha256": "3c31d643afc32fae90271623a7418f29a56afd6646147f3021facdb549efcd74"
+    },
+    {
+      "role": "PROCESSOR_DEFINITION",
+      "path": "artifacts/processor_definition.yaml",
+      "semanticId": "serviceability_synthesis",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 5475,
+      "sha256": "81a127a37fa68634367e118418a80b50cca5f550711e07134ccbb7dc9f628d49"
+    },
+    {
+      "role": "REASONING_CONTRACT",
+      "path": "artifacts/reasoning_contract.yaml",
+      "semanticId": "serviceability_synthesis_reasoning",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 9807,
+      "sha256": "fab8da6ae0444fc3b50095b5c8bd13a6b27d2a4778f8a7aadda8ffc6634efe66"
+    },
+    {
+      "role": "SHARED_METADATA_CONTRACT",
+      "path": "artifacts/shared_metadata_contract.yaml",
+      "semanticId": "shared_intelligence_metadata",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 16996,
+      "sha256": "47dbd324d4d79136b16ade4448adf78087d93658bcb2281292c40bfe6def98bd"
+    }
+  ],
+  "bundleContentHash": "cacedfd03169a988a51ff5d545f15b230858b5df3f42f02166f58a8980eecf7d"
+}

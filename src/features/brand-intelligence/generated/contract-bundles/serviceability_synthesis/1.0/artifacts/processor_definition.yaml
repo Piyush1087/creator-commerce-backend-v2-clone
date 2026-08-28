@@ -1,0 +1,140 @@
+version: '1.0'
+status: FROZEN
+owner_engine: brand_intelligence
+shared_runtime_dependencies:
+- Compiler
+- Prompt Builder
+- Model Registry
+- provider port
+- Safe YAML loader
+- telemetry
+- generic persistence adapter
+shared_authority_rules:
+  processors_may_emit:
+  - OBSERVED
+  - CREATOR_SHOP_DERIVED
+  - SYSTEM_DERIVED
+  processors_must_not_emit:
+  - BRAND_CONFIRMED
+  - SUPPORT_CONTROLLED
+  brand_confirmation_transition_owner: authorized_application_or_business_state_action
+  protected_current_authoritative_state:
+    ordinary_derivation_dependency: false
+    silent_overwrite: forbidden
+    new_evidence_behavior: compare_or_surface_discrepancy_without_automatic_replacement
+shared_readiness_rules:
+  partial_valid_output_supported: true
+  no_brand_preview_gate: true
+  no_verification_gate: true
+  no_home_gate: true
+  no_filler_to_force_ready: true
+  consumer_scoped_readiness: true
+shared_invalidation_rules:
+  directed_only: true
+  whole_brand_intelligence_recompute: forbidden
+id: serviceability_synthesis
+owning_branch: serviceability
+processor_type: HYBRID
+purpose: Produce the Brand-level serviceability_profile by combining canonical Location/Offering availability state with grounded first-party serviceability evidence, while keeping Offering-specific availability, demand geography and Campaign targeting outside Serviceability ownership.
+outputs:
+- serviceability_profile
+output_components:
+- overall_scope
+- coverage_is_heterogeneous
+- serviceable_markets
+- serviceability_basis
+- mixed_coverage_note
+canonical_inputs:
+- primary Brand country/geography anchor
+- active canonical Location refs
+- canonical Offering availability refs
+- Offering-to-Location relationship refs
+evidence_requirements:
+- owned_website.serviceability_evidence
+- owned_website.location_evidence
+optional_enrichment:
+- demand geography
+- audience geography
+- legacy markets_served compatibility context
+hybrid_responsibility:
+  DETERMINISTIC:
+  - normalize canonical Location refs
+  - normalize canonical Offering availability refs
+  - resolve typed serviceability basis refs
+  - detect explicit heterogeneous Offering coverage
+  - enforce geography-shape invariants
+  - reject invalid GLOBAL state
+  - ensure Offering availability is referenced not duplicated
+  AI_REASONING:
+  - resolve shipping/service-area statements
+  - resolve digital availability and business-model context
+  - reconcile conflicting first-party availability signals
+  - derive Brand-level serviceability envelope
+  separate_serviceability_evidence_resolver_processor: forbidden
+evidence_precedence:
+  primary: first-party commercial/service availability plus canonical business state
+  supporting:
+  - demand geography
+  - audience geography
+  supporting_cannot_establish_or_override_serviceability: true
+critical_invariants:
+  globally_accessible_website_implies_GLOBAL: false
+  headquarters_equals_serviceability: false
+  brand_envelope_implies_every_offering_available_everywhere: false
+  legacy_markets_served_direct_conversion_to_serviceability_profile: forbidden
+authority_behavior:
+  profile_default: CREATOR_SHOP_DERIVED
+  observed_basis_items_allowed: true
+  system_derived_normalized_refs_allowed: true
+  aggregate_brand_confirmation_emitted_by_processor: false
+partial_output_behavior:
+  object_nullable: true
+  partial_profile_allowed: true
+  bounded_partial_understanding_allowed: true
+  unsupported_breadth: narrower_or_null_not_invent
+readiness_contribution:
+  Brand_Centre: PARTIAL_ALLOWED
+  Chat: PARTIAL_ALLOWED
+  Creator_Strategy: FEASIBILITY_CONTEXT_WHEN_AVAILABLE
+  Campaign_targeting_derivation: REQUIRES_OTHER_CONTEXT_TOO
+  Campaign_Brief: OPTIONAL_LOCATION_CONTEXT
+refresh_triggers:
+- canonical Location activation/deactivation/change
+- canonical Offering availability change
+- Offering-to-Location relationship change
+- shipping or service-area policy change
+- material first-party serviceability evidence change
+invalidation_rules:
+  basis_and_market_item_level_supported: true
+  offering_or_location_change_invalidates_only_dependent_components: true
+  unrelated_brand_processors_not_automatically_invalidated: true
+model_profile_requirement_class: hybrid_semantic_resolution_with_geography_safety
+validation_responsibility:
+- validate serviceability_profile structure
+- validate stable serviceable-market and basis item identity
+- enforce GLOBAL safety
+- enforce heterogeneous Offering coverage semantics
+- ensure canonical Offering availability is referenced rather than duplicated
+- ensure demand/audience geography cannot establish serviceability
+- enforce Brand-level envelope boundary
+persistence_boundary: Processor defines derived profile semantics and canonical refs only; storage and migration are deferred.
+non_owned_scope:
+- canonical Location CRUD
+- canonical Offering availability
+- Offering-to-Location relationships
+- Persona geography
+- Campaign target geography
+- demand geography
+- competitor geography
+migration_relevance:
+  replaces_legacy_semantic: identity.markets_served
+  legacy_markets_served_role: reconciliation_or_compatibility_input_only
+  market_geography_retirement_requires:
+  - this processor contract frozen
+  - serviceability_profile validation active
+  - canonical Location inputs available
+  - canonical Offering availability inputs available
+  - runtime producer active
+  - persistence/reconciliation path active
+  - legacy consumer projection or remap tested
+  market_geography_retirement: not_retireable_merely_because_this_contract_exists

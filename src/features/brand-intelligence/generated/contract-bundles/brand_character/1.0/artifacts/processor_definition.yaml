@@ -1,0 +1,89 @@
+version: '1.0'
+status: FROZEN
+owner_engine: brand_intelligence
+shared_runtime_dependencies:
+- Compiler
+- Prompt Builder
+- Model Registry
+- provider port
+- Safe YAML loader
+- telemetry
+- generic persistence adapter
+shared_authority_rules:
+  processors_may_emit:
+  - OBSERVED
+  - CREATOR_SHOP_DERIVED
+  - SYSTEM_DERIVED
+  processors_must_not_emit:
+  - BRAND_CONFIRMED
+  - SUPPORT_CONTROLLED
+  brand_confirmation_transition_owner: authorized_application_or_business_state_action
+  protected_current_authoritative_state:
+    ordinary_derivation_dependency: false
+    silent_overwrite: forbidden
+    new_evidence_behavior: compare_or_surface_discrepancy_without_automatic_replacement
+shared_readiness_rules:
+  partial_valid_output_supported: true
+  no_brand_preview_gate: true
+  no_verification_gate: true
+  no_home_gate: true
+  no_filler_to_force_ready: true
+  consumer_scoped_readiness: true
+shared_invalidation_rules:
+  directed_only: true
+  whole_brand_intelligence_recompute: forbidden
+id: brand_character
+owning_branch: brand_expression
+processor_type: AI_REASONING
+purpose: Produce durable Brand values and personality from materially relevant company-story, mission, values, behaviour and Brand messaging evidence, with stable item identity and protected confirmed items.
+outputs:
+- brand_values
+- brand_personality
+canonical_inputs:
+- brand_name
+- confirmed_industry
+- confirmed_sub_industry_or_category
+evidence_requirements:
+- owned_website.brand_company_context
+- owned_website.brand_messaging
+optional_enrichment:
+- brand_user_input_and_confirmations
+- instagram.owned_brand_context
+authority_behavior:
+  default_output_authority: CREATOR_SHOP_DERIVED
+  observed_item_authority_allowed_when_explicitly_stated: true
+  stable_item_identity_required: true
+  aggregate_brand_confirmation_emitted_by_processor: false
+partial_output_behavior:
+  independent_nullable_outputs: true
+  valid_run_requires_all_outputs: false
+  empty_or_unsupported_characteristics: omit_or_null_not_fill
+readiness_contribution:
+  Brand_Centre: PARTIAL_ALLOWED
+  Chat: SUPPORTING_CONTEXT
+  Creator_Strategy: SUPPORTING_CONTEXT
+  Campaign_Brief: SUPPORTING_CONTEXT
+refresh_triggers:
+- material mission or values evidence change
+- material company-story evidence change
+- material Brand-behaviour evidence change
+- Brand-confirmed values or personality change
+invalidation_rules:
+  proposition_copy_change_alone_does_not_trigger: true
+  item_level_invalidation_supported: true
+  affected_outputs_only: true
+model_profile_requirement_class: structured_grounded_reasoning
+validation_responsibility:
+- validate array/item shape and stable semantic identity
+- preserve independently protected confirmed items
+- reject generic filler traits or values unsupported by evidence
+- prevent automatic refresh solely from proposition-copy changes
+persistence_boundary: Processor defines semantic outputs and item identity only; persistence structure is deferred.
+non_owned_scope:
+- Brand proposition or positioning
+- communication tone profile
+- Campaign character guidance
+- canonical Brand business-state fields
+migration_relevance:
+  legacy_identity_dependency: none_direct
+  identity_core_retirement: does_not_by_itself_make_identity_core_retireable

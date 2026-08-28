@@ -1,0 +1,105 @@
+id: brand_meaning_reasoning
+version: "1.0"
+status: FROZEN
+processor: brand_meaning
+owner_engine: brand_intelligence
+owning_branch: brand_expression
+processor_definition: intelligence/engines/brand_intelligence/branches/brand_expression/processors/brand_meaning.yaml
+object_authority: intelligence/engines/brand_intelligence/branches/brand_expression/objects.yaml
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+canonical_state_read_authority: intelligence/architecture/brand_canonical_state_read_contract.md
+
+purpose: >-
+  Define grounded reasoning for brand_description, positioning, and value_proposition so they remain distinct
+  Brand-level semantics and never collapse into paraphrases, Preview promotion, Offering duplication, or unsupported claims.
+model_capability_requirement: structured_grounded_reasoning
+provider_or_model_selection: deferred_to_model_registry
+
+inputs:
+  canonical: [brand_name, website_url, confirmed_industry, confirmed_sub_industry_or_category_when_authoritative]
+  evidence_capabilities:
+    required:
+      - owned_website.brand_company_context
+      - owned_website.brand_messaging
+      - owned_website.offering_context
+      - brand_user_input_and_confirmations
+  rules:
+    - canonical business state is context and never an output
+    - provisional sub-industry must not be relabeled confirmed
+    - Brand Preview text is not durable input authority
+
+protected_current_state:
+  rule: BRAND_CONFIRMED outputs are comparison-only during ordinary refresh and must not be silently replaced.
+  runtime_scope_expectation: protected outputs should normally be excluded from active refresh scope
+  conflict_behavior: [preserve_current, retain_discrepancy_lineage, no_silent_overwrite]
+
+semantic_separation:
+  brand_description:
+    meaning: what_the_brand_is_and_principally_does
+    must_not_be: [tagline, preview_brand_descriptor, preview_brand_understanding_narrative, campaign_statement, offering_description, generic_praise]
+  positioning:
+    meaning: strategic_place_or_meaning_the_brand_seeks_to_occupy
+    reasoning_context: [category_context, customer_use_context, brand_messaging, grounded_brand_level_differentiation]
+    unsupported_inferences_forbidden: [market_leadership, premium_position, category_dominance, customer_preference, market_share, competitor_ranking]
+    nullable_when_no_defensible_position: true
+  value_proposition:
+    meaning: principal_customer_facing_value_exchange
+    rules:
+      - do not invent outcomes from features
+      - do not convert generic benefits into objective superiority
+      - Offering-specific value remains Offering truth unless Brand-level generalization is defensible
+    claim_safety:
+      healthcare: [clinical_outcome, treatment_efficacy, diagnosis_claim, guaranteed_health_result, medical_superiority]
+      saas_ai: [productivity_lift, performance_improvement, accuracy_gain, time_saved, roi_guarantee]
+      d2c_services: [objective_superiority, best_or_leading, guaranteed_outcome]
+
+reasoning_sequence:
+  - identify active unprotected outputs
+  - establish Brand-level context from canonical state and representative Evidence
+  - separate Brand-level semantics from Offering-specific truth
+  - derive brand_description only from defensible company/Brand context
+  - derive positioning only when strategic meaning is supported
+  - derive value_proposition only when customer value is grounded safely
+  - cross-check the three outputs against semantic definitions to prevent paraphrase collapse
+  - remove Preview, Campaign, generic praise, and unsupported claims
+  - return each output independently as value or null
+
+offering_boundary:
+  rule: Offering Evidence may inform Brand reasoning but is not universal Brand truth.
+  generalization_requires: [representative_multi_offering_support, explicit_brand_level_support]
+  prohibited:
+    - copy_single_offering_description_as_brand_description
+    - promote_offering_performance_or_efficacy_claim_to_brand_value_proposition
+    - duplicate_canonical_offering_truth
+
+preview_boundary:
+  direct_promotion_forbidden:
+    - brand_descriptor_to_brand_description
+    - brand_understanding_narrative_to_brand_description
+    - brand_understanding_narrative_to_positioning
+    - brand_understanding_narrative_to_value_proposition
+
+partial_output:
+  supported: true
+  independent_nullable_outputs: true
+  valid_example: {brand_description: non_null, positioning: null, value_proposition: non_null}
+  filler: forbidden
+
+authority_rules:
+  default_interpretive_authority: CREATOR_SHOP_DERIVED
+  processor_may_emit: [OBSERVED, CREATOR_SHOP_DERIVED, SYSTEM_DERIVED]
+  processor_must_not_emit: [BRAND_CONFIRMED, SUPPORT_CONTROLLED]
+  observed_use: only_for_semantically_direct_factual_brand_owned_information_when_object_contract_allows
+  system_derived_use: deterministic_normalization_only
+  brand_confirmation_transition_owner: authorized_application_or_business_state_action
+
+refresh_and_invalidation:
+  directed_only: true
+  whole_brand_intelligence_recompute: forbidden
+  triggers:
+    brand_description: [material_brand_business_context_change, material_brand_proposition_change, material_brand_level_offering_composition_change, explicit_brand_edit]
+    positioning: [material_positioning_or_proposition_change, material_category_context_change, explicit_brand_edit]
+    value_proposition: [material_customer_value_change, material_brand_level_offering_context_change, material_brand_messaging_change, explicit_brand_edit]
+  non_triggers: [incidental_wording_change_without_meaning_change, unrelated_visual_identity_change, unrelated_serviceability_change, one_campaign_copy_change]
+
+non_goals: [provider_model_selection, runtime_implementation, persistence_implementation, product_offering_ownership, campaign_strategy]

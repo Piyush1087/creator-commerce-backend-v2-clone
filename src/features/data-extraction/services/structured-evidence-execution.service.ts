@@ -29,6 +29,7 @@ export class StructuredEvidenceExecutionService {
     timeoutMs: number;
     maxAttempts: number;
     schemaName: string;
+    temperature?: number;
   }): Promise<ProviderEvidenceResult<T>> {
     const { providerAdapter, schemaName, ...common } = args;
     try {

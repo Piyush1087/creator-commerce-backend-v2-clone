@@ -1,0 +1,98 @@
+id: brand_character_output_contract
+version: "1.0"
+status: FROZEN
+processor: brand_character
+objects: [brand_values, brand_personality]
+strict: true
+additional_properties: false
+processor_definition: intelligence/engines/brand_intelligence/branches/brand_expression/processors/brand_character.yaml
+reasoning_authority: intelligence/engines/brand_intelligence/branches/brand_expression/artifacts/brand_character/reasoning.yaml
+object_authority: intelligence/engines/brand_intelligence/branches/brand_expression/objects.yaml
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+response:
+  type: object
+  required: [brand_values, brand_personality, output_metadata]
+  additional_properties: false
+  properties:
+    brand_values:
+      type: [array, "null"]
+      nullable: true
+      item:
+        required: [semantic_id, value]
+        additional_properties: false
+        fields:
+          semantic_id: {type: string, min_length: 1, stable_identity_rule: normalized_value_meaning_not_order_wording_or_case}
+          value: {type: string, min_length: 1}
+    brand_personality:
+      type: [array, "null"]
+      nullable: true
+      item:
+        required: [semantic_id, trait]
+        additional_properties: false
+        fields:
+          semantic_id: {type: string, min_length: 1, stable_identity_rule: normalized_personality_meaning_not_order_wording_or_case}
+          trait: {type: string, min_length: 1}
+    output_metadata:
+      type: object
+      required: [brand_values, brand_personality]
+      additional_properties: false
+      fields:
+        brand_values: {type: [array, "null"], nullable: true, keyed_by: semantic_id, item: shared_item_metadata}
+        brand_personality: {type: [array, "null"], nullable: true, keyed_by: semantic_id, item: shared_item_metadata}
+
+shared_item_metadata:
+  additional_properties: false
+  required: [semantic_id, authority, source_class, freshness, evidence_refs]
+  fields:
+    semantic_id: {type: string, min_length: 1}
+    authority: {type: enum, values: [OBSERVED, CREATOR_SHOP_DERIVED, SYSTEM_DERIVED], forbidden: [BRAND_CONFIRMED, SUPPORT_CONTROLLED]}
+    source_class: {type: enum, values: [OWNED_WEBSITE, BRAND_USER_INPUT, INSTAGRAM_OWNED, MULTI_SOURCE, SYSTEM_DERIVATION_INPUT]}
+    freshness: {type: enum, values: [CURRENT, STALE, UNKNOWN]}
+    evidence_refs: {type: array, min_items: 1, unique_items: true, item_type: string}
+
+partial_shape_rules:
+  independent_nullability: true
+  all_outputs_required_non_null: false
+  empty_collection_without_defensible_items: prefer_null
+  metadata_alignment:
+    - null_collection_requires_null_metadata
+    - every_item_has_exactly_one_matching_metadata_entry
+    - metadata_without_item_invalid
+
+structural_validation:
+  reject_additional_properties: true
+  reject_duplicate_value_semantic_ids: true
+  reject_duplicate_personality_semantic_ids: true
+  reject_blank_values_or_traits: true
+  reject_missing_item_metadata: true
+
+semantic_validation:
+  brand_values:
+    - positive_language_alone_cannot_establish_value
+    - product_feature_customer_benefit_campaign_theme_or_one_off_csr_cannot_automatically_establish_value
+    - materially_equivalent_values_must_not_duplicate
+  brand_personality:
+    - reusable_brand_character_required
+    - visual_style_audience_personality_campaign_tone_or_founder_personality_invalid_without_brand_generalization
+    - communication_tone_trait_copied_as_personality_without_distinct_character_semantics_invalid
+  personality_vs_tone_boundary:
+    brand_personality: who_the_brand_feels_like
+    communication_profile_tone_traits: how_the_brand_communicates
+    semantic_duplicate_across_boundary: invalid
+
+protected_current_state_validation:
+  confirmed_item_silent_replacement: invalid
+  confirmed_item_reword_as_new_semantic_id: invalid
+  runtime_active_scope_should_exclude_protected_items: true
+
+source_and_lineage_validation:
+  evidence_refs_required_for_every_item: true
+  provider_names_as_source_classes: invalid
+
+readiness:
+  bounded_partial_output_supported: true
+  no_brand_preview_gate: true
+  no_verification_gate: true
+  no_home_gate: true
+  filler: forbidden

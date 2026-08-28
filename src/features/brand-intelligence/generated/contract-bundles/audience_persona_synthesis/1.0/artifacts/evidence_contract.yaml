@@ -1,0 +1,223 @@
+id: audience_persona_synthesis_evidence
+version: "1.0"
+status: FROZEN
+owner_engine: brand_intelligence
+owning_branch: audience
+processor: audience_persona_synthesis
+processor_definition: intelligence/engines/brand_intelligence/branches/audience/processors/audience_persona_synthesis.yaml
+reasoning_authority: intelligence/engines/brand_intelligence/branches/audience/artifacts/audience_persona_synthesis/reasoning.yaml
+output_contract_authority: intelligence/engines/brand_intelligence/branches/audience/artifacts/audience_persona_synthesis/output_contract.yaml
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define provider-neutral Audience Evidence that distinguishes Brand-level Audience signals from Offering-specific clues,
+  Preview candidate seeds, Campaign-only context, generic marketing language, and unsupported demographic inference.
+
+boundary:
+  data_extraction_role: acquire_and_normalize_source_material
+  intelligence_role: form_and_reconcile_durable_personas
+  provider_or_endpoint_names_in_evidence_ids: forbidden
+  preview_seed_is_durable_evidence_truth: false
+  canonical_state_is_observed_evidence: false
+
+evidence_sufficiency:
+  minimum:
+    rule: >-
+      The processor may execute when available Evidence, considered in combination, is sufficiently representative
+      and grounded to form or reconcile at least one defensible bounded Persona hypothesis. No listed capability is
+      individually mandatory for every execution.
+  supporting_capabilities:
+    - owned_website.brand_messaging
+    - owned_website.brand_company_context
+    - owned_website.offering_context
+    - brand_user_input_and_confirmations
+    - brand_preview.audience_candidate_seeds
+  optional_enrichment:
+    - instagram.owned_brand_context
+  explicit_non_requirements:
+    preview_seed_required: false
+    brand_user_input_required: false
+    offering_context_required: false
+    instagram_required: false
+
+shared_evidence_item:
+  required_fields:
+    - evidence_ref
+    - evidence_semantic
+    - source_class
+    - source_resource_ref
+    - captured_at
+    - freshness
+    - provenance
+  fields:
+    evidence_ref: {type: string, identity_model: capture_scoped_normalized_evidence_item}
+    evidence_semantic: {type: string, provider_neutral: true}
+    source_class:
+      allowed: [OWNED_WEBSITE, BRAND_USER_INPUT, INSTAGRAM_OWNED, MULTI_SOURCE]
+    source_resource_ref: {type: string}
+    captured_at: {type: timestamp}
+    freshness: {allowed: [CURRENT, STALE, UNKNOWN]}
+    representativeness:
+      allowed: [PERSISTENT_BRAND_LEVEL, REPEATED_REPRESENTATIVE, OFFERING_SPECIFIC, CAMPAIGN_SPECIFIC, GENERIC, INCIDENTAL]
+    provenance:
+      required: [acquisition_or_normalization_run_ref]
+      optional: [parent_evidence_refs, normalization_version]
+
+audience_signal_taxonomy:
+  EXPLICIT_TARGET_AUDIENCE_STATEMENT:
+    durable_support_strength: HIGH_SEMANTIC_SUPPORT
+  REPEATED_CUSTOMER_USE_CONTEXT:
+    durable_support_strength: REPEATED_SUPPORT
+  REPEATED_PROBLEM_OR_NEED_CONTEXT:
+    durable_support_strength: REPEATED_SUPPORT
+  REPEATED_MOTIVATION_OR_DECISION_CONTEXT:
+    durable_support_strength: REPEATED_SUPPORT
+  REPEATED_BARRIER_OR_TRUST_CONTEXT:
+    durable_support_strength: REPEATED_SUPPORT
+  OFFERING_SPECIFIC_AUDIENCE_CLUE:
+    durable_support_strength: CONTEXTUAL_ONLY
+  BRAND_PREVIEW_CANDIDATE_SEED:
+    durable_support_strength: RECONCILIATION_ONLY
+  CAMPAIGN_ONLY_AUDIENCE_CONTEXT:
+    durable_support_strength: NON_DURABLE_BY_DEFAULT
+  GENERIC_MARKETING_LANGUAGE:
+    durable_support_strength: WEAK
+  UNSUPPORTED_DEMOGRAPHIC_INFERENCE:
+    durable_support_strength: FORBIDDEN
+
+capabilities:
+  owned_website.brand_messaging:
+    required_for_processor: false
+    sufficiency_role: SUPPORTING_CAPABILITY
+    source_class: OWNED_WEBSITE
+    signals:
+      - EXPLICIT_TARGET_AUDIENCE_STATEMENT
+      - REPEATED_CUSTOMER_USE_CONTEXT
+      - REPEATED_PROBLEM_OR_NEED_CONTEXT
+      - REPEATED_MOTIVATION_OR_DECISION_CONTEXT
+      - REPEATED_BARRIER_OR_TRUST_CONTEXT
+      - GENERIC_MARKETING_LANGUAGE
+  owned_website.brand_company_context:
+    required_for_processor: false
+    sufficiency_role: SUPPORTING_CAPABILITY
+    source_class: OWNED_WEBSITE
+    signals:
+      - EXPLICIT_TARGET_AUDIENCE_STATEMENT
+      - REPEATED_CUSTOMER_USE_CONTEXT
+      - REPEATED_PROBLEM_OR_NEED_CONTEXT
+  owned_website.offering_context:
+    required_for_processor: false
+    sufficiency_role: SUPPORTING_CAPABILITY
+    source_class: OWNED_WEBSITE
+    signals:
+      - OFFERING_SPECIFIC_AUDIENCE_CLUE
+      - REPEATED_CUSTOMER_USE_CONTEXT
+      - REPEATED_PROBLEM_OR_NEED_CONTEXT
+    rules:
+      - Offering-specific clue does not automatically become Brand-level Persona truth
+      - repeated cross-Offering or explicit Brand-level support is needed for durable generalization
+      - absence does not block execution when other representative Audience Evidence is sufficient
+  brand_user_input_and_confirmations:
+    required_for_processor: false
+    sufficiency_role: SUPPORTING_OR_AUTHORITATIVE_CONTEXT_WHEN_PRESENT
+    source_class: BRAND_USER_INPUT
+    item_semantics:
+      - USER_AUTHORED_PERSONA_CONTEXT
+      - USER_AUTHORED_AUDIENCE_CORRECTION
+      - USER_SUPPLIED_GEOGRAPHY_CONTEXT
+      - USER_SUPPLIED_PERMITTED_DEMOGRAPHIC_CONTEXT
+    rules:
+      - unconfirmed user input is Evidence/context
+      - protected BRAND_CONFIRMED Persona state is supplied separately as authority context
+      - absence does not block initial derived Audience synthesis
+  brand_preview.audience_candidate_seeds:
+    required_for_processor: false
+    sufficiency_role: RECONCILIATION_CONTEXT_ONLY
+    source_class: SYSTEM_DERIVATION_INPUT
+    evidence_role:
+      - CANDIDATE_SEED
+      - RECONCILIATION_CONTEXT
+    direct_durable_persona: false
+    direct_authority_promotion: false
+    fields:
+      preview_group_ref: {type: string}
+      label_or_summary: {type: [string, "null"], nullable: true}
+      original_evidence_refs: {type: array, required: false, item_type: string}
+    rules:
+      - seed wording and position have no durable identity authority
+      - seed must be re-evaluated under durable Persona rules
+      - original Evidence lineage should be retained when available
+      - absence does not block execution when direct Audience Evidence is sufficient
+
+optional_enrichment:
+  instagram.owned_brand_context:
+    required_for_processor: false
+    source_class: INSTAGRAM_OWNED
+    role: OPTIONAL_CONTEXT
+    rules:
+      - representative/repeated context may enrich Persona fields
+      - single post or Campaign cannot establish durable Persona identity
+      - absence never blocks execution
+
+scope_boundary:
+  BRAND_LEVEL_AUDIENCE_SIGNAL:
+    may_support_durable_persona: true
+  OFFERING_SPECIFIC_AUDIENCE_CLUE:
+    may_support_durable_persona: only_after_generalization
+  CAMPAIGN_ONLY_CONTEXT:
+    may_support_durable_persona: false_by_default
+  GENERIC_MESSAGING:
+    may_support_durable_persona: false_alone
+
+geography_evidence:
+  role: audience_context_only
+  establishing_serviceability: false
+  establishing_offering_availability: false
+  establishing_campaign_feasibility: false
+
+demographic_evidence:
+  optional: true
+  policy_gated: true
+  permitted_sources:
+    - explicit Brand user input when policy permits
+    - explicit first-party Audience statement when policy permits
+  forbidden:
+    - statistical stereotype
+    - model assumption
+    - unsupported sensitive inference
+    - inference from geography alone
+  insufficient_policy_or_evidence_behavior: omit_or_null
+
+protected_current_authority_context:
+  classification: CANONICAL_BUSINESS_STATE_INPUT
+  ordinary_evidence_for_replacement: false
+  rules:
+    - preserve protected fields/items
+    - compare new Evidence
+    - record discrepancy without silent overwrite
+
+missing_evidence:
+  processor_failure_required: false
+  readiness_rules:
+    - insufficient representative Audience Evidence overall implies WAITING_FOR_EVIDENCE
+    - missing Preview seed alone does not imply WAITING_FOR_EVIDENCE
+    - missing Brand user input alone does not imply WAITING_FOR_EVIDENCE
+    - missing Offering context alone does not imply WAITING_FOR_EVIDENCE
+  rules:
+    - zero durable Personas is valid
+    - one strong Persona is valid
+    - optional Persona fields may remain null
+    - never fabricate motivations barriers trust needs demographics geography or implications
+
+validation_invariants:
+  - provider_neutral_evidence_ids
+  - Preview seed is reconciliation-only and not an execution prerequisite
+  - Brand user input is not an execution prerequisite
+  - Offering context is supporting rather than universally required
+  - sufficient direct Audience Evidence can enable execution
+  - Brand-level and Offering-specific Audience signals remain distinct
+  - Campaign-only context does not automatically become durable Audience
+  - generic messaging alone cannot establish durable Persona
+  - unsupported demographic inference forbidden
+  - Audience geography cannot establish Serviceability
+  - every observed item has evidence_ref

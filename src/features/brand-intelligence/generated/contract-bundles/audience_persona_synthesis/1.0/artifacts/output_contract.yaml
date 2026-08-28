@@ -1,0 +1,186 @@
+id: audience_persona_synthesis_output_contract
+version: "1.0"
+status: FROZEN
+processor: audience_persona_synthesis
+object: audience_personas
+strict: true
+additional_properties: false
+processor_definition: intelligence/engines/brand_intelligence/branches/audience/processors/audience_persona_synthesis.yaml
+reasoning_authority: intelligence/engines/brand_intelligence/branches/audience/artifacts/audience_persona_synthesis/reasoning.yaml
+object_authority: intelligence/engines/brand_intelligence/branches/audience/objects.yaml
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+response:
+  type: object
+  required:
+    - audience_personas
+    - output_metadata
+    - reconciliation
+  additional_properties: false
+  properties:
+    audience_personas:
+      type:
+        - array
+        - "null"
+      nullable: true
+      item:
+        additional_properties: false
+        required:
+          - semantic_id
+          - label
+          - summary
+          - lifecycle
+        fields:
+          semantic_id:
+            type: string
+            min_length: 1
+            stable_identity_rule: semantic_continuity_not_label_order_or_wording
+          label:
+            type: string
+            min_length: 1
+          summary:
+            type: string
+            min_length: 1
+          lifecycle:
+            type: enum
+            values: [ACTIVE, INACTIVE, SUPERSEDED]
+          key_characteristics: {type: [array, "null"], nullable: true, item: semantic_value_item}
+          motivations: {type: [array, "null"], nullable: true, item: semantic_value_item}
+          barriers_or_concerns: {type: [array, "null"], nullable: true, item: semantic_value_item}
+          trust_credibility_needs: {type: [array, "null"], nullable: true, item: semantic_value_item}
+          creator_communication_implications: {type: [array, "null"], nullable: true, item: semantic_value_item}
+          geography_context:
+            type: [object, "null"]
+            nullable: true
+            semantic_role: AUDIENCE_CONTEXT_ONLY
+          demographic_context:
+            type: [object, "null"]
+            nullable: true
+            policy_gated: true
+            semantic_role: OPTIONAL_NON_CORE_CONTEXT
+    output_metadata:
+      type: [array, "null"]
+      nullable: true
+      keyed_by: persona_semantic_id
+      item:
+        additional_properties: false
+        required:
+          - semantic_id
+          - field_metadata
+          - item_metadata
+        fields:
+          semantic_id: {type: string, min_length: 1}
+          field_metadata: {type: object, additional_properties: true}
+          item_metadata: {type: object, additional_properties: true}
+    reconciliation:
+      type: array
+      item:
+        additional_properties: false
+        required:
+          - candidate_ref
+          - relationship
+          - matched_persona_semantic_id
+        fields:
+          candidate_ref: {type: string, min_length: 1}
+          relationship: {type: enum, values: [SAME_PERSONA, POSSIBLE_MATCH, NEW_PERSONA, MATERIAL_CONFLICT]}
+          matched_persona_semantic_id: {type: [string, "null"], nullable: true}
+          origin_preview_group_ref: {type: [string, "null"], nullable: true}
+
+semantic_value_item:
+  additional_properties: false
+  required: [semantic_id, value]
+  fields:
+    semantic_id:
+      type: string
+      min_length: 1
+      stable_identity_rule: normalized_item_meaning_not_array_position_or_wording
+    value:
+      type: string
+      min_length: 1
+
+generated_metadata:
+  required:
+    - authority
+    - source_class
+    - freshness
+    - evidence_refs
+  fields:
+    authority:
+      type: enum
+      values: [OBSERVED, CREATOR_SHOP_DERIVED, SYSTEM_DERIVED]
+      forbidden: [BRAND_CONFIRMED, SUPPORT_CONTROLLED]
+    source_class:
+      type: enum
+      values: [OWNED_WEBSITE, BRAND_USER_INPUT, INSTAGRAM_OWNED, CANONICAL_BUSINESS_STATE, MULTI_SOURCE, SYSTEM_DERIVATION_INPUT]
+    freshness:
+      type: enum
+      values: [CURRENT, STALE, UNKNOWN]
+    evidence_refs:
+      type: array
+      unique_items: true
+      item_type: string
+    business_state_refs:
+      type: array
+      required: false
+      unique_items: true
+      item_type: string
+    confidence:
+      type: [string, "null"]
+      nullable: true
+      values_when_non_null: [HIGH, MEDIUM, LOW]
+
+partial_shape_rules:
+  zero_personas_valid: true
+  one_persona_valid: true
+  multiple_personas_valid: true
+  active_persona_requires_core_fields: [semantic_id, label, summary]
+  optional_fields_may_be_null: true
+  filler_to_reach_two_or_three: forbidden
+
+structural_validation:
+  reject_additional_properties: true
+  reject_duplicate_persona_semantic_ids: true
+  reject_duplicate_item_semantic_ids_within_field: true
+  reject_blank_required_strings: true
+  reject_candidate_relationship_without_candidate_ref: true
+
+semantic_validation:
+  stable_identity:
+    - label_change_alone_must_not_create_new_identity
+    - array_order_must_not_define_identity
+    - minor_wording_change_must_not_define_identity
+  preview:
+    - preview_candidate_seed_must_not_be_auto_promoted
+    - preview_semantic_id_must_not_be_reused_as_durable_persona_id
+  lifecycle:
+    - durable_states_limited_to_ACTIVE_INACTIVE_SUPERSEDED
+    - routine_evidence_refresh_must_not_create_new_identity
+    - supersession_requires_lineage
+  geography:
+    - audience_geography_cannot_establish_serviceability
+    - audience_geography_cannot_establish_offering_availability
+    - audience_geography_cannot_establish_campaign_feasibility
+  demographics:
+    - demographic_context_optional
+    - demographic_context_policy_gated
+    - unsupported_or_sensitive_inference_invalid
+  creator_communication_implications:
+    - Campaign targeting configuration invalid
+    - deliverables_CTA_creator_count_or_channel_instruction invalid
+
+protected_current_state_validation:
+  silent_replace_brand_confirmed_field_or_item: invalid
+  destructive_merge_or_split_of_protected_semantics: invalid
+  processor_emitted_brand_confirmed: invalid
+
+lineage_validation:
+  non_null_generated_semantics_require_evidence_or_business_state_lineage: true
+  provider_names_as_source_classes: invalid
+  generation_lineage_required_at_runtime_boundary: true
+
+readiness:
+  consumer_scoped: true
+  no_brand_preview_gate: true
+  no_verification_gate: true
+  no_home_gate: true
+  no_brand_centre_entry_gate: true
