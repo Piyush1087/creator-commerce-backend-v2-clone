@@ -11,6 +11,8 @@ import { BrandCentreController } from "./brand-centre.controller";
 import { BrandConsumerController } from "./consumer/brand-consumer.controller";
 import { BrandConsumerService } from "./consumer/brand-consumer.service";
 import { ProcessorRuntimeProjectionService } from "./consumer/processor-runtime-projection.service";
+import { ProductConsumerController } from "./consumer/product-consumer.controller";
+import { ProductConsumerService } from "./consumer/product-consumer.service";
 import { BrandCentreBudgetService } from "./services/brand-centre-budget.service";
 import { BrandCentreColdStartService } from "./services/brand-centre-cold-start.service";
 import { BrandCentreDnaService } from "./services/brand-centre-dna.service";
@@ -32,9 +34,14 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
     BrandCanonicalStateModule,
     BrandIntelligenceModule,
   ],
-  controllers: [BrandCentreController, BrandConsumerController],
+  controllers: [
+    BrandCentreController,
+    BrandConsumerController,
+    ProductConsumerController,
+  ],
   providers: [
     BrandConsumerService,
+    ProductConsumerService,
     ProcessorRuntimeProjectionService,
     BrandCentreAuthService,
     BrandCentreRoutingService,

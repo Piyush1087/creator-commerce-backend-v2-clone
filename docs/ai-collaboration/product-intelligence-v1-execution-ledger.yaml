@@ -8,14 +8,18 @@ authority:
     branch: agent/product-intelligence-v1-contracts
     accepted_sha: 3fc2b421826c75e98c834d0b8ea8467ff8eb7b63
     frozen_sha: bbb0be3345c36e9cc7c4f06ca68fb491b742b83f
+  commercial_de_contract:
+    branch: agent/product-intelligence-v1-de-commercial-evidence-contract
+    accepted_sha: aef995beb5c7c8ddd5fd6442e9b6e543a051bd1c
+    frozen_sha: ef363a04a3e4bc115ac17868a3f5987e2af76d63
 
 backend:
   repository: Piyush1087/creator-commerce-backend-v2-clone
   base_sha: e066265d720b8f76516acb5063b9843faac5a85e
   product_branch: phase-g/product-intelligence-v1
-  product_branch_pre_integration_sha: ce46eacdc33d8d48cee96d0682d0fa30d7842a0c
-  accepted_de_branch: phase-g/product-intelligence-v1-de-exact-offering-scope
-  accepted_de_checkpoint_sha: ff95d2f63121126a7575824a6cf10f14e1aff4a5
+  product_branch_pre_integration_sha: 6013c9df695b394e72b58628d4b1e6ffa28eeb53
+  accepted_de_branch: phase-g/product-intelligence-v1-de-commercial-evidence
+  accepted_de_checkpoint_sha: 41e7e24da52e361ebe43b584f19d22ff3e572642
   integration_method: NORMAL_FAST_FORWARD
 
 execution_mode:
@@ -24,15 +28,15 @@ execution_mode:
 
 branch: phase-g/product-intelligence-v1
 
-current_phase: P4
+current_phase: P5
 phase_status: CHECKPOINT_READY_FOR_SYSTEMS_REVIEW
 
 checkpoint:
   status: PENDING_SYSTEMS_ACCEPTANCE
   sha: null
-  parent_sha: 65aee09bc4d0eb6a0e43dad4044214431607a56f
+  parent_sha: 41e7e24da52e361ebe43b584f19d22ff3e572642
 
-previous_accepted_checkpoint_sha: 65aee09bc4d0eb6a0e43dad4044214431607a56f
+previous_accepted_checkpoint_sha: 41e7e24da52e361ebe43b584f19d22ff3e572642
 
 resume_rule:
   candidate_head_self_recorded: false
@@ -54,40 +58,45 @@ implementation:
     - offering_creator_communication
     - offering_actionability_synthesis
   accepted_de_checkpoint_retained: true
-  commercial_de_capability_implemented: false
-  migration_52_created: false
+  commercial_de_capability_implemented: true
+  migration_52_created: true
   fourth_product_processor_implemented: false
+  consumer_endpoint: GET /api/v1/brand-centre/offerings/:offeringId/intelligence
+  consumer_is_read_only: true
+  canonical_price_reconciliation_implemented: false
   frontend_changed: false
 
 files_changed:
-  - src/features/brand-intelligence/contracts
-  - src/features/brand-intelligence/generated/contract-bundles
-  - src/features/brand-intelligence/input
-  - src/features/brand-intelligence/execution
-  - src/features/brand-intelligence/processors/offering-derived
-  - src/features/brand-intelligence/processors/offering-factual/offering-factual-persistence.hook.ts
-  - src/features/brand-intelligence/offering-factual.architecture.test.ts
-  - src/features/brand-centre/consumer/brand-consumer.postgres.test.ts
+  - src/features/brand-centre/brand-centre.module.ts
+  - src/features/brand-centre/consumer/product-consumer.controller.ts
+  - src/features/brand-centre/consumer/product-consumer.service.ts
+  - src/features/brand-centre/consumer/product-consumer.mapper.ts
+  - src/features/brand-centre/consumer/product-consumer.schema.ts
+  - src/features/brand-centre/consumer/product-consumer.types.ts
+  - src/features/brand-centre/consumer/product-consumer.schema.test.ts
+  - src/features/brand-centre/consumer/product-consumer.architecture.test.ts
+  - src/features/brand-centre/consumer/product-consumer.postgres.test.ts
   - docs/ai-collaboration/product-intelligence-v1-execution-ledger.yaml
-  - docs/ai-collaboration/product-intelligence-v1-p4-remaining-processors.md
+  - docs/ai-collaboration/product-intelligence-v1-p5-consumer-runtime-contract.md
 
 migrations:
-  before: 51
+  before: 52
   added: []
-  current_count: 51
+  current_count: 52
 
 tests:
   passed:
-    - frozen_contract_bundle_generation_and_verification
-    - product_structural_and_semantic_validation_10_tests
-    - product_dependency_waiting_and_exact_current_factual_reuse
-    - product_postgresql_vertical_slice_5_tests
-    - all_non_postgresql_source_suites_93_files_640_tests
+    - product_consumer_schema_and_architecture_4_tests
+    - product_consumer_postgresql_4_grouped_scenarios
+    - product_p3_p4_postgresql_vertical_slice_5_tests
+    - all_non_postgresql_source_suites_99_files_663_tests
+    - brand_consumer_postgresql_8_tests
+    - canonical_offering_postgresql_15_tests
     - seven_brand_processor_postgresql_suites_108_tests
-    - de_w1_w2_exact_scope_postgresql_74_tests
-    - canonical_offering_and_deep_scan_postgresql_15_tests
-    - brand_centre_consumer_postgresql_8_tests
-    - campaign_regressions
+    - de_w1_w2_exact_scope_postgresql_79_tests
+    - shared_intelligence_postgresql_26_tests
+    - campaign_readiness_23_tests
+    - frozen_contract_bundle_generation_and_verification
     - prisma_generate_validate
     - production_build
     - scoped_eslint
@@ -103,7 +112,7 @@ tests:
 
 corrections:
   current_phase: 2
-  total: 12
+  total: 14
   consecutive_same_failure: 0
   by_phase:
     P0: 3
@@ -113,12 +122,13 @@ corrections:
     P2A: 1
     P3: 1
     P4: 2
+    P5: 2
 
 last_failure: null
 
 stop_reason: null
 
-next_phase: P5_PENDING_SYSTEMS_AUTHORIZATION
+next_phase: P6_PENDING_SYSTEMS_AUTHORIZATION
 
 environment:
   node: v24.19.0
@@ -126,4 +136,4 @@ environment:
   prisma: 6.19.3
   postgres: PostgreSQL 16 disposable Docker harness
 
-last_updated: "2026-08-28T13:56:47.4673739+05:30"
+last_updated: "2026-08-28T16:10:00+05:30"
