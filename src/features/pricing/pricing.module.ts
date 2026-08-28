@@ -6,6 +6,7 @@ import { BrandCentreModule } from "../brand-centre/brand-centre.module";
 import { BrandSettingsModule } from "../brand-settings/brand-settings.module";
 import { PricingController } from "./pricing.controller";
 import { PricingWebhookController } from "./pricing-webhook.controller";
+import { SubscriptionLifecycleReconciliationScheduler } from "./schedulers/subscription-lifecycle-reconciliation.scheduler";
 import { EntitlementService } from "./services/entitlement.service";
 import { GeoRoutingService } from "./services/geo-routing.service";
 import { PlanCatalogService } from "./services/plan-catalog.service";
@@ -29,6 +30,7 @@ import { SubscriptionAccessService } from "./services/subscription-access.servic
     RazorpayPlanProvisioningService,
     PricingInvoiceService,
     PricingWebhookService,
+    SubscriptionLifecycleReconciliationScheduler,
   ],
   exports: [
     EntitlementService,

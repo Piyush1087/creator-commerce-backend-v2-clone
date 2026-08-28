@@ -18,7 +18,7 @@ import { Public } from "../auth/decorators/public.decorator";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { BrandCentreAuthService } from "../brand-centre/brand-centre-auth.service";
 import { BrandSettingsAccessService } from "../brand-settings/services/brand-settings-access.service";
-import { CancelSubscriptionDto, ChangeTierDto } from "./dto/pricing.dto";
+import { ChangeTierDto } from "./dto/pricing.dto";
 import { EntitlementService } from "./services/entitlement.service";
 import { GeoRoutingService } from "./services/geo-routing.service";
 import { PlanCatalogService } from "./services/plan-catalog.service";
@@ -131,9 +131,7 @@ export class PricingController {
   @HttpCode(HttpStatus.CREATED)
   async initializeRazorpayTrial(@Req() req: RequestWithAuthUser) {
     const brandProfileId = await this.resolveMutationBrandId(req);
-    const subscription =
-      await this.lifecycle.initializeRazorpayTrial(brandProfileId);
-    return { subscription };
+    return this.lifecycle.startPaidConversion(brandProfileId);
   }
 
   @Post("tier/change")
@@ -149,17 +147,19 @@ export class PricingController {
     );
   }
 
+  @Post("paid-conversion/start")
+  @HttpCode(HttpStatus.CREATED)
+  async startPaidConversion(@Req() req: RequestWithAuthUser) {
+    const brandProfileId = await this.resolveMutationBrandId(req);
+    return this.lifecycle.startPaidConversion(brandProfileId);
+  }
+
   @Post("cancel")
   @HttpCode(HttpStatus.OK)
-  async cancelSubscription(
-    @Req() req: RequestWithAuthUser,
-    @Body() body: CancelSubscriptionDto,
-  ) {
+  async cancelSubscription(@Req() req: RequestWithAuthUser) {
     const brandProfileId = await this.resolveMutationBrandId(req);
-    const subscription = await this.lifecycle.cancelSubscription(
-      brandProfileId,
-      body.cancel_at_cycle_end ?? false,
-    );
+    const subscription =
+      await this.lifecycle.cancelSubscription(brandProfileId);
     return { subscription };
   }
 

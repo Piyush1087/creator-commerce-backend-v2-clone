@@ -74,8 +74,11 @@ describe("SubscriptionAccessService", () => {
           cancelEffectiveAt: new Date("2026-08-27T00:00:00.000Z"),
         },
         NOW,
-      ).accessMode,
-    ).toBe("RESTRICTED_WIND_DOWN");
+      ),
+    ).toMatchObject({
+      lifecycleStatus: "CANCELLED",
+      accessMode: "RESTRICTED_WIND_DOWN",
+    });
   });
 
   it("uses the payment grace deadline independently of provider status", () => {
@@ -89,6 +92,18 @@ describe("SubscriptionAccessService", () => {
       lifecycleStatus: "PAST_DUE",
       accessMode: "FULL_ACCESS",
       requiredAction: "UPDATE_PAYMENT_METHOD",
+    });
+    expect(
+      service.derive(
+        {
+          ...pastDue,
+          paymentGraceEndsAt: new Date("2026-08-27T00:00:00.000Z"),
+        },
+        NOW,
+      ),
+    ).toMatchObject({
+      lifecycleStatus: "HALTED",
+      accessMode: "RESTRICTED_WIND_DOWN",
     });
   });
 });

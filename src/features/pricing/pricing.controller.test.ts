@@ -17,6 +17,9 @@ function controllerFor(role: BrandRole) {
   };
   const lifecycle = {
     bootstrapLocalTrial: vi.fn().mockResolvedValue({ id: "subscription-1" }),
+    startPaidConversion: vi
+      .fn()
+      .mockResolvedValue({ checkout: { id: "checkout" } }),
     getSubscription: vi.fn().mockResolvedValue({ id: "subscription-1" }),
   };
   const controller = new PricingController(
@@ -62,5 +65,24 @@ describe("PricingController financial authorization", () => {
       subscription: { id: "subscription-1" },
     });
     expect(lifecycle.getSubscription).toHaveBeenCalledWith("brand-1");
+  });
+
+  it.each([BrandRole.BRAND_OWNER, BrandRole.FINANCE_ADMIN])(
+    "allows %s to start paid conversion",
+    async (role) => {
+      const { controller, lifecycle, request } = controllerFor(role);
+      await controller.startPaidConversion(request);
+      expect(lifecycle.startPaidConversion).toHaveBeenCalledWith("brand-1");
+    },
+  );
+
+  it("denies Campaign Manager paid conversion", async () => {
+    const { controller, lifecycle, request } = controllerFor(
+      BrandRole.CAMPAIGN_MANAGER,
+    );
+    await expect(
+      controller.startPaidConversion(request),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(lifecycle.startPaidConversion).not.toHaveBeenCalled();
   });
 });

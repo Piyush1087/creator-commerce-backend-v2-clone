@@ -54,25 +54,27 @@ export class SubscriptionAccessService {
     }
 
     if (subscription.status === SubscriptionStatus.CANCEL_SCHEDULED) {
+      const cancellationEffective =
+        subscription.cancelEffectiveAt !== null &&
+        subscription.cancelEffectiveAt <= now;
       return {
-        lifecycleStatus: "CANCEL_SCHEDULED",
-        accessMode:
-          subscription.cancelEffectiveAt !== null &&
-          subscription.cancelEffectiveAt <= now
-            ? "RESTRICTED_WIND_DOWN"
-            : "FULL_ACCESS",
+        lifecycleStatus: cancellationEffective
+          ? "CANCELLED"
+          : "CANCEL_SCHEDULED",
+        accessMode: cancellationEffective
+          ? "RESTRICTED_WIND_DOWN"
+          : "FULL_ACCESS",
         requiredAction: "NONE",
       };
     }
 
     if (subscription.status === SubscriptionStatus.PAST_DUE) {
+      const graceExpired =
+        subscription.paymentGraceEndsAt === null ||
+        subscription.paymentGraceEndsAt <= now;
       return {
-        lifecycleStatus: "PAST_DUE",
-        accessMode:
-          subscription.paymentGraceEndsAt !== null &&
-          subscription.paymentGraceEndsAt > now
-            ? "FULL_ACCESS"
-            : "RESTRICTED_WIND_DOWN",
+        lifecycleStatus: graceExpired ? "HALTED" : "PAST_DUE",
+        accessMode: graceExpired ? "RESTRICTED_WIND_DOWN" : "FULL_ACCESS",
         requiredAction: "UPDATE_PAYMENT_METHOD",
       };
     }

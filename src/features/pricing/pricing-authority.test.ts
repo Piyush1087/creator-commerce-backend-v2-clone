@@ -98,6 +98,7 @@ describe("BS08 MVP pricing authority", () => {
       razorpay as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     await Reflect.apply(lifecycle.bootstrapLocalTrial, lifecycle, [
