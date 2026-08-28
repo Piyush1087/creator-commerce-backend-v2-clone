@@ -242,7 +242,14 @@ export class BrandEscrowComputationService {
           throw new ConflictException(
             "Existing reserve conflicts with accepted commercials",
           );
-        return this.mapReserve(existing, "FUNDED", available);
+        const state = existing.lockReleasedViaRefund
+          ? "REFUNDED"
+          : existing.finalTrancheDisbursed
+            ? "SETTLED"
+            : existing.advanceTrancheDisbursed
+              ? "PARTIAL_RELEASE"
+              : "FUNDED";
+        return this.mapReserve(existing, state, available);
       }
       if (collaboration.currentStage !== "STAGE_2_SECUREMENT")
         throw new BadRequestException(

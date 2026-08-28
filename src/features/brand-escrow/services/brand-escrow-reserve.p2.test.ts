@@ -147,4 +147,111 @@ describe("BS09 P2 canonical reserve economics", () => {
     expect(tx.collaborationEscrowLock.create).not.toHaveBeenCalled();
     expect(tx.escrowTransactionLedger.create).not.toHaveBeenCalled();
   });
+
+  describe.each([
+    {
+      name: "active untouched",
+      flags: {
+        advanceTrancheDisbursed: false,
+        finalTrancheDisbursed: false,
+        lockReleasedViaRefund: false,
+      },
+      expectedState: "FUNDED",
+    },
+    {
+      name: "partially released",
+      flags: {
+        advanceTrancheDisbursed: true,
+        finalTrancheDisbursed: false,
+        lockReleasedViaRefund: false,
+      },
+      expectedState: "PARTIAL_RELEASE",
+    },
+    {
+      name: "refunded",
+      flags: {
+        advanceTrancheDisbursed: false,
+        finalTrancheDisbursed: false,
+        lockReleasedViaRefund: true,
+      },
+      expectedState: "REFUNDED",
+    },
+    {
+      name: "settled",
+      flags: {
+        advanceTrancheDisbursed: true,
+        finalTrancheDisbursed: true,
+        lockReleasedViaRefund: false,
+      },
+      expectedState: "SETTLED",
+    },
+  ])("existing $name reserve", ({ flags, expectedState }) => {
+    it(`returns ${expectedState} without reserving again`, async () => {
+      const existing = {
+        id: "lock-existing",
+        collaborationId: "collab-1",
+        grossCreatorQuote: new Decimal(100000),
+        platformCommissionFee: new Decimal(7000),
+        platformCommissionGst: new Decimal(1260),
+        totalEscrowLockedAmount: new Decimal(108260),
+        calculatedTdsDeduction: new Decimal(0),
+        netCreatorPayoutPool: new Decimal(100000),
+        ...flags,
+      };
+      const tx = {
+        $queryRaw: vi.fn().mockResolvedValue([
+          {
+            vault_id: "vault-1",
+            brand_id: "brand-1",
+            total_pooled_balance: 200000,
+            locked_campaign_funds: 108260,
+            available_balance: 91740,
+            currency: "INR",
+          },
+        ]),
+        collaboration: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "collab-1",
+            brandProfileId: "brand-1",
+            payoutMode: "ESCROW",
+            currentStage: "STAGE_3_LOGISTICS",
+            commercials: {
+              finalQuote: new Decimal(100000),
+              escrowStatus: expectedState,
+            },
+          }),
+        },
+        collaborationEscrowLock: {
+          findUnique: vi.fn().mockResolvedValue(existing),
+          create: vi.fn(),
+        },
+        brandEscrowVault: { update: vi.fn() },
+        escrowTransactionLedger: { create: vi.fn() },
+        collaborationCommercial: { update: vi.fn() },
+      };
+      const service = new BrandEscrowComputationService(
+        {
+          $transaction: (callback: (value: typeof tx) => unknown) =>
+            callback(tx),
+        } as never,
+        engine,
+        {} as never,
+        { assertCapability: vi.fn() } as never,
+      );
+
+      const result = await service.executeStage2Lock({
+        collaborationId: "collab-1",
+        brandProfileId: "brand-1",
+        grossCreatorQuote: 1,
+        expectedTdsPercentage: 2,
+      });
+
+      expect(result.state).toBe(expectedState);
+      expect(tx.brandEscrowVault.update).not.toHaveBeenCalled();
+      expect(tx.collaborationEscrowLock.create).not.toHaveBeenCalled();
+      expect(tx.escrowTransactionLedger.create).not.toHaveBeenCalled();
+      expect(tx.collaborationCommercial.update).not.toHaveBeenCalled();
+      expect(existing).toMatchObject(flags);
+    });
+  });
 });
