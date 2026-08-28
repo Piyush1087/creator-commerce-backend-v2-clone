@@ -4,7 +4,7 @@ import { Injectable } from "@nestjs/common";
 
 import { PrismaService } from "../../../../prisma/prisma.service";
 import { ownedSiteObservationFragmentSchema } from "../acquisition/owned-site-observation-fragment";
-import { isWave2Capability } from "../domain/evidence-vocabulary";
+import { isRetainedOwnedSiteCapability } from "../domain/evidence-vocabulary";
 import { WAVE2_NORMALIZERS, wave2Conflict } from "./wave2/wave2-normalizers";
 import {
   asEvidenceRef,
@@ -88,7 +88,7 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
       execution,
       normalizationStartedAt,
     );
-    const parentEvidence = isWave2Capability(execution.capabilityId)
+    const parentEvidence = isRetainedOwnedSiteCapability(execution.capabilityId)
       ? []
       : await this.loadParentEvidence(request.brandId);
     const normalizer =
@@ -142,7 +142,7 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
         throw persistenceError("PERSISTENCE_INVARIANT");
     }
     const boundedNormalization =
-      isWave2Capability(execution.capabilityId) &&
+      isRetainedOwnedSiteCapability(execution.capabilityId) &&
       (sources.some((source) =>
         source.observationFragment?.limitations.some((code) =>
           /LIMIT|TRUNCATED|MALFORMED/.test(code),
@@ -164,7 +164,7 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
 
     const evidenceRecords = normalized.drafts.map((draft) =>
       this.toEvidenceRecord(
-        isWave2Capability(execution.capabilityId)
+        isRetainedOwnedSiteCapability(execution.capabilityId)
           ? { ...execution, coverage: coverageForSourceCount(sources.length) }
           : execution,
         draft,
@@ -182,7 +182,7 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
       for (const record of evidenceRecords) {
         // A retained capture may already have emitted this immutable item under a
         // narrower execution scope. Reuse its historical snapshot, never rewrite it.
-        const prior = isWave2Capability(execution.capabilityId)
+        const prior = isRetainedOwnedSiteCapability(execution.capabilityId)
           ? await tx.evidenceItems.findByRef(
               request.brandId,
               record.evidenceRef,
@@ -234,6 +234,12 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
     execution: DataExtractionCapabilityExecutionRecord,
   ): Promise<void> {
     const scope = request.exactOfferingScope;
+    if (
+      execution.capabilityId === "owned_website.offering_commercial_evidence" &&
+      !scope
+    ) {
+      throw persistenceError("PERSISTENCE_INVARIANT");
+    }
     if (!scope) return;
     if (
       !scope.canonicalOfferingRef?.trim() ||
@@ -246,6 +252,7 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
         "derived_communication_constraint_evidence",
         "owned_website.serviceability_evidence",
         "owned_website.location_evidence",
+        "owned_website.offering_commercial_evidence",
       ].includes(execution.capabilityId)
     ) {
       throw persistenceError("PERSISTENCE_INVARIANT");
@@ -345,7 +352,7 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
       );
       let observationFragment: DataExtractionNormalizationSource["observationFragment"];
       if (
-        isWave2Capability(execution.capabilityId) &&
+        isRetainedOwnedSiteCapability(execution.capabilityId) &&
         retainedFragment?.inlineContent
       ) {
         try {
@@ -356,7 +363,10 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
           throw persistenceError("PERSISTENCE_INVARIANT");
         }
       }
-      if (!normalizedText && !isWave2Capability(execution.capabilityId))
+      if (
+        !normalizedText &&
+        !isRetainedOwnedSiteCapability(execution.capabilityId)
+      )
         continue;
       if (!normalizedText && !observationFragment && !sourceBody) continue;
       const freshness = await this.freshnessFor(
@@ -368,7 +378,8 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
       sources.push({
         resource,
         capture,
-        ...(isWave2Capability(execution.capabilityId) && retainedFragment
+        ...(isRetainedOwnedSiteCapability(execution.capabilityId) &&
+        retainedFragment
           ? { normalizedContentRef: retainedFragment.contentArtifactRef }
           : normalized
             ? { normalizedContentRef: normalized.contentArtifactRef }
@@ -587,7 +598,7 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
           : [...reasonCodes],
       coverage: coverageForSourceCount(sources.length),
       acquisitionQuality:
-        isWave2Capability(execution.capabilityId) &&
+        isRetainedOwnedSiteCapability(execution.capabilityId) &&
         sources.length > 0 &&
         sources.length < execution.resourceScope.length
           ? {
@@ -609,7 +620,7 @@ export class OwnedWebsiteWave1NormalizationService implements DataExtractionCapa
     evidenceCount: number,
   ): CapabilityAvailability {
     if (sources.length === 0) return "UNAVAILABLE";
-    if (isWave2Capability(execution.capabilityId)) {
+    if (isRetainedOwnedSiteCapability(execution.capabilityId)) {
       const state = conservativeQuality(sources).state;
       if (state === "DEGRADED") return "DEGRADED";
       if (

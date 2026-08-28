@@ -3,16 +3,21 @@ import type {
   NormalizedEvidenceDraft,
 } from "../owned-website-wave1-normalizers";
 import { LocationEvidenceNormalizer } from "./location-evidence.normalizer";
+import { CommercialEvidenceNormalizer } from "./commercial-evidence.normalizer";
 import { ProofEvidenceNormalizer } from "./proof-evidence.normalizer";
 import { ServiceabilityEvidenceNormalizer } from "./serviceability-evidence.normalizer";
 import { VisualEvidenceNormalizer } from "./visual-evidence.normalizer";
-import { serviceabilityEvidenceSchema } from "./wave2-evidence-contracts";
+import {
+  commercialEvidenceSchema,
+  serviceabilityEvidenceSchema,
+} from "./wave2-evidence-contracts";
 
 export const WAVE2_NORMALIZERS: readonly DataExtractionEvidenceNormalizer[] = [
   new ProofEvidenceNormalizer(),
   new VisualEvidenceNormalizer(),
   new ServiceabilityEvidenceNormalizer(),
   new LocationEvidenceNormalizer(),
+  new CommercialEvidenceNormalizer(),
 ];
 
 export function wave2Conflict(
@@ -30,6 +35,22 @@ export function wave2Conflict(
     left.conflictFamily === right.conflictFamily
   )
     return true;
+  const commercialA = commercialEvidenceSchema.safeParse(
+    left.boundedNormalizedPayload,
+  );
+  const commercialB = commercialEvidenceSchema.safeParse(
+    right.boundedNormalizedPayload,
+  );
+  if (commercialA.success || commercialB.success) {
+    return (
+      commercialA.success &&
+      commercialB.success &&
+      commercialA.data.canonical_offering_ref ===
+        commercialB.data.canonical_offering_ref &&
+      left.conflictFamily !== undefined &&
+      left.conflictFamily === right.conflictFamily
+    );
+  }
   const a = serviceabilityEvidenceSchema.safeParse(
     left.boundedNormalizedPayload,
   );

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   DATA_EXTRACTION_EVIDENCE_CAPABILITIES,
+  OFFERING_COMMERCIAL_EVIDENCE_CAPABILITIES,
   WAVE1_EVIDENCE_CAPABILITIES,
   WAVE2_EVIDENCE_CAPABILITIES,
 } from "../../domain/evidence-vocabulary";
@@ -11,7 +12,7 @@ import { ownedSiteObservationFragmentSchema } from "../../acquisition/owned-site
 import { WAVE2_NORMALIZERS } from "./wave2-normalizers";
 
 describe("DE-W2 bounded contracts and ownership", () => {
-  it("adds exactly four capabilities while preserving Wave 1 and the reader envelope", () => {
+  it("preserves Wave 1/Wave 2 and adds one bounded commercial capability", () => {
     expect(WAVE1_EVIDENCE_CAPABILITIES).toHaveLength(5);
     expect(WAVE2_EVIDENCE_CAPABILITIES).toEqual([
       "explicit_factual_proof_or_claim_evidence",
@@ -22,9 +23,13 @@ describe("DE-W2 bounded contracts and ownership", () => {
     expect(DATA_EXTRACTION_EVIDENCE_CAPABILITIES).toEqual(
       NORMALIZED_EVIDENCE_CAPABILITIES,
     );
-    expect(WAVE2_NORMALIZERS.map((n) => n.capabilityId)).toEqual(
-      WAVE2_EVIDENCE_CAPABILITIES,
-    );
+    expect(OFFERING_COMMERCIAL_EVIDENCE_CAPABILITIES).toEqual([
+      "owned_website.offering_commercial_evidence",
+    ]);
+    expect(WAVE2_NORMALIZERS.map((n) => n.capabilityId)).toEqual([
+      ...WAVE2_EVIDENCE_CAPABILITIES,
+      ...OFFERING_COMMERCIAL_EVIDENCE_CAPABILITIES,
+    ]);
   });
   it("rejects external canonical references in retained source descriptors", () => {
     expect(
@@ -33,6 +38,7 @@ describe("DE-W2 bounded contracts and ownership", () => {
         statements: [],
         visuals: [],
         locations: [],
+        commercials: [],
         limitations: [],
         canonical_location_ref: "untrusted",
       }).success,

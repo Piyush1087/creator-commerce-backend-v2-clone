@@ -216,6 +216,7 @@ const EXACT_OFFERING_CAPABILITIES = new Set<EvidenceCapabilityId>([
   "derived_communication_constraint_evidence",
   "owned_website.serviceability_evidence",
   "owned_website.location_evidence",
+  "owned_website.offering_commercial_evidence",
 ]);
 
 function isExactOfferingEvidence(
@@ -256,6 +257,12 @@ function isExactOfferingEvidence(
       return (
         payload.subject_scope === "OFFERING_SPECIFIC" &&
         payload.offering_ref === canonicalOfferingRef
+      );
+    case "owned_website.offering_commercial_evidence":
+      return (
+        payload.subject_scope === "OFFERING_SPECIFIC" &&
+        payload.evidence_semantic === "exact_offering_commercial_observation" &&
+        payload.canonical_offering_ref === canonicalOfferingRef
       );
     default:
       return false;

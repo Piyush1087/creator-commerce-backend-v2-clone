@@ -12,6 +12,7 @@ export const NORMALIZED_EVIDENCE_CAPABILITIES = [
   "owned_website.visual_evidence",
   "owned_website.serviceability_evidence",
   "owned_website.location_evidence",
+  "owned_website.offering_commercial_evidence",
 ] as const;
 
 export type NormalizedEvidenceCapabilityId =

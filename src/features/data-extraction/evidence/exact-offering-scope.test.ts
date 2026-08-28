@@ -507,4 +507,72 @@ describe("P2B-1 exact Offering Evidence reader", () => {
       result.capabilityResults[0]?.evidence.map((item) => item.evidenceRef),
     ).toEqual([exact.evidenceRef]);
   });
+
+  it("admits only exact same-Offering commercial Evidence with durable lineage", async () => {
+    const commercial = (
+      ref: string,
+      canonicalOfferingRef: string | null,
+      overrides: Partial<DataExtractionEvidenceItemRecord> = {},
+    ) =>
+      evidence(
+        ref,
+        {
+          evidence_semantic: "exact_offering_commercial_observation",
+          subject_scope: canonicalOfferingRef
+            ? "OFFERING_SPECIFIC"
+            : "BRAND_LEVEL",
+          canonical_offering_ref: canonicalOfferingRef,
+          observed_price_mode: "EXACT",
+          current_min_amount: 999,
+          current_max_amount: 999,
+        },
+        {
+          capabilityId: "owned_website.offering_commercial_evidence",
+          ...overrides,
+        },
+      );
+    const exact = commercial("evidence:commercial-a", offeringA);
+    const sibling = commercial("evidence:commercial-b", offeringB);
+    const broad = commercial("evidence:commercial-broad", null, {
+      pageRole: "PRICING_PLANS",
+      representativeness: "PERSISTENT_BRAND_LEVEL",
+    });
+    const completed = execution(
+      "commercial",
+      [exact.evidenceRef, sibling.evidenceRef, broad.evidenceRef],
+      "owned_website.offering_commercial_evidence",
+    );
+    const rows = new Map(
+      [exact, sibling, broad].map((item) => [item.evidenceRef, item]),
+    );
+    const query = new DataExtractionEvidenceQueryService({
+      repositories: () => ({
+        canonicalOfferings: {
+          assertOwnedByBrand: vi.fn(async () => undefined),
+        },
+        capabilityExecutions: { findCompleted: vi.fn(async () => [completed]) },
+        evidenceItems: {
+          findByRef: vi.fn(
+            async (_brand: string, ref: EvidenceRef) => rows.get(ref) ?? null,
+          ),
+        },
+        semanticObservations: { findByCapability: vi.fn(async () => []) },
+      }),
+    } as never);
+
+    const result = await query.readExisting({
+      brandId,
+      capabilityIds: ["owned_website.offering_commercial_evidence"],
+      exactOfferingScope: { canonicalOfferingRef: offeringA },
+    });
+    const capability = result.capabilityResults[0];
+    expect(capability?.evidence).toHaveLength(1);
+    expect(capability?.evidence[0]).toMatchObject({
+      evidenceRef: exact.evidenceRef,
+      captureRef: exact.captureRef,
+      resourceRef: exact.resourceRef,
+      freshnessAtEmission: exact.freshnessAtEmission,
+      capabilityExecutionRefs: [completed.capabilityExecutionRef],
+    });
+  });
 });

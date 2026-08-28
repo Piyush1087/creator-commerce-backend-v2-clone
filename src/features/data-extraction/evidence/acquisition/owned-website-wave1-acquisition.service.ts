@@ -20,7 +20,7 @@ import type {
 } from "../domain/evidence-records";
 import {
   DATA_EXTRACTION_EVIDENCE_CAPABILITIES,
-  isWave2Capability,
+  isRetainedOwnedSiteCapability,
   type CapabilityAvailability,
   type EvidenceAcquisitionQuality,
   type EvidenceCapabilityId,
@@ -320,7 +320,7 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
     // Retained first-party captures are examined before any new network acquisition.
     // The same execution proceeds to the existing E normalizer; no Evidence is emitted here.
     if (
-      isWave2Capability(request.capabilityId) &&
+      isRetainedOwnedSiteCapability(request.capabilityId) &&
       !exactOfferingScope &&
       request.freshnessIntent !== "FORCE_RECAPTURE"
     ) {
@@ -850,6 +850,12 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
     if (!request.requestKey?.trim() || !request.ownedWebsiteRoot?.trim()) {
       throw persistenceError("PERSISTENCE_INVARIANT");
     }
+    if (
+      request.capabilityId === "owned_website.offering_commercial_evidence" &&
+      !request.exactOfferingScope
+    ) {
+      throw persistenceError("PERSISTENCE_INVARIANT");
+    }
   }
 }
 
@@ -932,7 +938,7 @@ function selectSecondaryUrls(
     .filter((entry) => entry.pageRole !== "HOMEPAGE")
     .map((entry) => ({
       ...entry,
-      score: isWave2Capability(capabilityId)
+      score: isRetainedOwnedSiteCapability(capabilityId)
         ? wave2PageScore(capabilityId, entry.url)
         : pageScore(capabilityId, entry.pageRole),
     }))
