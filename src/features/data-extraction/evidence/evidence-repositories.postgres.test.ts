@@ -805,4 +805,37 @@ describePostgres("DE-W1.0C durable Evidence repositories", () => {
       await root.semanticObservations.findByKey(brandId, observationKey),
     ).toBeNull();
   });
+
+  it("atomically elects exactly one CapabilityExecution request-key creator", async () => {
+    const brandId = await brand("atomic-capability-claim");
+    const repository = persistence.repositories().capabilityExecutions;
+    const requestKey = `offering-price-refresh:${randomUUID()}`;
+    const common = {
+      brandId,
+      capabilityId: "owned_website.offering_commercial_evidence" as const,
+      normalizationContractVersion: "1.0",
+      resourceScopeHash: randomUUID().replaceAll("-", ""),
+      freshnessIntent: "FORCE_RECAPTURE" as const,
+      requestKey,
+      coverage: "SINGLE_RESOURCE" as const,
+    };
+    const claims = await Promise.all([
+      repository.createOrGetClaimed({
+        ...common,
+        capabilityExecutionRef: asCapabilityExecutionRef(
+          `capability-execution:${randomUUID()}`,
+        ),
+      }),
+      repository.createOrGetClaimed({
+        ...common,
+        capabilityExecutionRef: asCapabilityExecutionRef(
+          `capability-execution:${randomUUID()}`,
+        ),
+      }),
+    ]);
+    expect(claims.filter((claim) => claim.created)).toHaveLength(1);
+    expect(
+      new Set(claims.map((claim) => claim.record.capabilityExecutionRef)).size,
+    ).toBe(1);
+  });
 });

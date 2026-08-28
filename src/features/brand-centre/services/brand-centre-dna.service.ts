@@ -8,6 +8,8 @@ import {
   CanonicalOfferingOrigin,
   OfferingGuidanceKind,
   OfferingLifecycle,
+  OfferingPriceFreshness,
+  OfferingPriceMode,
   OfferingType,
   Prisma,
 } from "@prisma/client";
@@ -567,6 +569,101 @@ export class BrandCentreDnaService {
       });
     }
     return updated;
+  }
+
+  async setManualOfferingPrice(
+    brandProfileId: string,
+    offeringId: string,
+    input: Readonly<{
+      mode: OfferingPriceMode;
+      currentMinAmount?: string | null;
+      currentMaxAmount?: string | null;
+      regularReferenceMinAmount?: string | null;
+      regularReferenceMaxAmount?: string | null;
+      currency: string;
+    }>,
+  ) {
+    const offering = await this.canonicalOfferings.read(
+      brandProfileId,
+      offeringId,
+    );
+    if (!offering) throw new NotFoundException("Offering not found");
+    this.assertManualPriceTuple(input);
+    const state = offering.priceState;
+    return this.canonicalOfferings.advancePrice(
+      brandProfileId,
+      offeringId,
+      state?.revision ?? null,
+      {
+        mode: input.mode,
+        currentMinAmount: input.currentMinAmount,
+        currentMaxAmount: input.currentMaxAmount,
+        regularMinAmount: input.regularReferenceMinAmount,
+        regularMaxAmount: input.regularReferenceMaxAmount,
+        currency: input.currency.toUpperCase(),
+        freshness: OfferingPriceFreshness.CURRENT,
+        authority: CanonicalOfferingAuthority.BRAND_CONFIRMED,
+        origin: CanonicalOfferingOrigin.BRAND_EDIT,
+        sourceClass: "APPLICATION",
+        freshnessEvaluatedAt: new Date(),
+        provenance: { actor: "BRAND", operation: "MANUAL_PRICE_EDIT" },
+      },
+    );
+  }
+
+  private assertManualPriceTuple(
+    input: Readonly<{
+      mode: OfferingPriceMode;
+      currentMinAmount?: string | null;
+      currentMaxAmount?: string | null;
+      regularReferenceMinAmount?: string | null;
+      regularReferenceMaxAmount?: string | null;
+    }>,
+  ): void {
+    const min = input.currentMinAmount;
+    const max = input.currentMaxAmount;
+    const regularMin = input.regularReferenceMinAmount;
+    const regularMax = input.regularReferenceMaxAmount;
+    const same = (left?: string | null, right?: string | null) =>
+      left != null &&
+      right != null &&
+      new Prisma.Decimal(left).equals(new Prisma.Decimal(right));
+    if (input.mode === OfferingPriceMode.NOT_PUBLICLY_LISTED) {
+      if ([min, max, regularMin, regularMax].some((value) => value != null)) {
+        throw new BadRequestException(
+          "NOT_PUBLICLY_LISTED cannot carry amount fields",
+        );
+      }
+      return;
+    }
+    if (min == null) throw new BadRequestException("Current minimum required");
+    if (
+      input.mode === OfferingPriceMode.EXACT &&
+      (max == null || !same(min, max))
+    ) {
+      throw new BadRequestException("EXACT requires equal min/max amounts");
+    }
+    if (input.mode === OfferingPriceMode.STARTING_AT && max != null) {
+      throw new BadRequestException("STARTING_AT cannot carry a maximum");
+    }
+    if (
+      input.mode === OfferingPriceMode.RANGE &&
+      (max == null || new Prisma.Decimal(max).lte(new Prisma.Decimal(min)))
+    ) {
+      throw new BadRequestException("RANGE requires an ascending min/max");
+    }
+    if ((regularMin == null) !== (regularMax == null)) {
+      throw new BadRequestException(
+        "Regular reference amounts must be supplied as a pair",
+      );
+    }
+    if (
+      regularMin != null &&
+      regularMax != null &&
+      new Prisma.Decimal(regularMin).gt(new Prisma.Decimal(regularMax))
+    ) {
+      throw new BadRequestException("Regular reference range is invalid");
+    }
   }
 
   async deleteOffering(brandProfileId: string, offeringId: string) {

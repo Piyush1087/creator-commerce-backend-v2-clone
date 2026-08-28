@@ -82,6 +82,10 @@ export interface DataExtractionCapabilityAcquisitionRequestV1 {
     readonly canonicalOfferingRef: string;
     readonly resourceUrls: readonly string[];
   }>;
+  /** Bounded refresh mode: acquire only exact resources and never rediscover navigation. */
+  readonly acquisitionMode?: "GENERIC" | "EXACT_RESOURCES_ONLY";
+  /** When set, only the atomic request-key creator may perform network work. */
+  readonly executionClaim?: "REQUIRE_CREATOR";
   readonly correlationRef?: string;
 }
 
@@ -98,6 +102,7 @@ export interface DataExtractionCapabilityAcquisitionResultV1 {
   readonly resourceRefs?: readonly ResourceRef[];
   readonly captureRefs?: readonly CaptureRef[];
   readonly exactOfferingResources?: readonly DataExtractionExactOfferingResourceV1[];
+  readonly executionClaim?: "CREATED" | "EXISTING";
 }
 
 /** Separate acquisition/refresh command boundary. It must never be used by readExisting(). */

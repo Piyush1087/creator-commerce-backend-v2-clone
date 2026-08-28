@@ -224,6 +224,12 @@ export interface SemanticObservationRepository {
 }
 
 export interface CapabilityExecutionRepository {
+  createOrGetClaimed(input: CreateCapabilityExecutionInput): Promise<
+    Readonly<{
+      record: DataExtractionCapabilityExecutionRecord;
+      created: boolean;
+    }>
+  >;
   createOrGet(
     input: CreateCapabilityExecutionInput,
   ): Promise<DataExtractionCapabilityExecutionRecord>;

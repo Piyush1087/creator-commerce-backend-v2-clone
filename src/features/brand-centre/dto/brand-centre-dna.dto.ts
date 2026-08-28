@@ -1,4 +1,4 @@
-import { OfferingType } from "@prisma/client";
+import { OfferingPriceMode, OfferingType } from "@prisma/client";
 import {
   IsArray,
   IsEnum,
@@ -8,6 +8,7 @@ import {
   IsString,
   IsUrl,
   MaxLength,
+  Matches,
   MinLength,
   ValidateNested,
 } from "class-validator";
@@ -177,6 +178,32 @@ export class UpdateOfferingDto {
   @IsArray()
   @IsString({ each: true })
   doNotSay?: string[];
+}
+
+const DECIMAL_AMOUNT_PATTERN = /^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/u;
+
+export class ManualOfferingPriceDto {
+  @IsEnum(OfferingPriceMode)
+  mode!: OfferingPriceMode;
+
+  @IsOptional()
+  @Matches(DECIMAL_AMOUNT_PATTERN)
+  currentMinAmount?: string | null;
+
+  @IsOptional()
+  @Matches(DECIMAL_AMOUNT_PATTERN)
+  currentMaxAmount?: string | null;
+
+  @IsOptional()
+  @Matches(DECIMAL_AMOUNT_PATTERN)
+  regularReferenceMinAmount?: string | null;
+
+  @IsOptional()
+  @Matches(DECIMAL_AMOUNT_PATTERN)
+  regularReferenceMaxAmount?: string | null;
+
+  @Matches(/^[A-Za-z]{3}$/u)
+  currency!: string;
 }
 
 export class CreateOfferDto {

@@ -1,9 +1,11 @@
 import { Module } from "@nestjs/common";
+import { ScheduleModule } from "@nestjs/schedule";
 
 import { PrismaModule } from "../../prisma/prisma.module";
 import { AuthModule } from "../auth/auth.module";
 import { BrandCanonicalStateModule } from "../brand-canonical-state/brand-canonical-state.module";
 import { BrandIntelligenceModule } from "../brand-intelligence/brand-intelligence.module";
+import { DataExtractionModule } from "../data-extraction/data-extraction.module";
 import { GeminiJsonClient } from "../brand-onboarding/integrations/gemini/gemini-json.client";
 import { ParallelExtractClient } from "../brand-onboarding/integrations/parallel/parallel-extract.client";
 import { BrandCentreAuthService } from "./brand-centre-auth.service";
@@ -23,6 +25,11 @@ import { BrandCentreRoutingService } from "./services/brand-centre-routing.servi
 import { BrandCentreScanService } from "./services/brand-centre-scan.service";
 import { BrandCentreSessionEvictionService } from "./services/brand-centre-session-eviction.service";
 import { CanonicalOfferingStateService } from "./services/canonical-offering-state.service";
+import { CanonicalOfferingPriceReconciliationService } from "./services/canonical-offering-price-reconciliation.service";
+import { OfferingPriceRefreshConfigService } from "./services/offering-price-refresh-config.service";
+import { OfferingPriceRefreshCoordinatorService } from "./services/offering-price-refresh-coordinator.service";
+import { OfferingPriceRefreshEligibilityService } from "./services/offering-price-refresh-eligibility.service";
+import { OfferingPriceRefreshScheduler } from "./services/offering-price-refresh.scheduler";
 import { DeepScanWorker } from "./workers/deep-scan.worker";
 import { IntelligenceRefreshWorker } from "./workers/intelligence-refresh.worker";
 import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
@@ -33,6 +40,8 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
     AuthModule,
     BrandCanonicalStateModule,
     BrandIntelligenceModule,
+    DataExtractionModule,
+    ScheduleModule,
   ],
   controllers: [
     BrandCentreController,
@@ -53,6 +62,11 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
     BrandCentrePlannerService,
     BrandCentreSessionEvictionService,
     CanonicalOfferingStateService,
+    CanonicalOfferingPriceReconciliationService,
+    OfferingPriceRefreshConfigService,
+    OfferingPriceRefreshEligibilityService,
+    OfferingPriceRefreshCoordinatorService,
+    OfferingPriceRefreshScheduler,
     BrandCentreJobDispatcherService,
     GeminiJsonClient,
     ParallelExtractClient,
@@ -68,6 +82,8 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
     BrandCentreIntelligenceService,
     BrandCentrePlannerService,
     CanonicalOfferingStateService,
+    CanonicalOfferingPriceReconciliationService,
+    OfferingPriceRefreshCoordinatorService,
   ],
 })
 export class BrandCentreModule {}

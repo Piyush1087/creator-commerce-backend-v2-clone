@@ -59,6 +59,20 @@ export interface CanonicalPriceInput {
   readonly conflicting?: boolean;
 }
 
+export type ControlledPriceRefreshGuardCode =
+  | "INACTIVE_OFFERING"
+  | "MANUAL_PRICE_PROTECTED";
+
+export class ControlledPriceRefreshGuardError extends ConflictException {
+  constructor(readonly guardCode: ControlledPriceRefreshGuardCode) {
+    super(`Controlled price refresh rejected: ${guardCode}`);
+  }
+}
+
+export interface CanonicalPriceWriteOptions {
+  readonly controlledRefresh?: boolean;
+}
+
 @Injectable()
 export class CanonicalOfferingStateService {
   constructor(private readonly prisma: PrismaService) {}
@@ -203,6 +217,7 @@ export class CanonicalOfferingStateService {
     offeringId: string,
     expectedStateRevision: number | null,
     input: CanonicalPriceInput,
+    options: CanonicalPriceWriteOptions = {},
   ) {
     if (input.conflicting) {
       throw new ConflictException(
@@ -212,14 +227,37 @@ export class CanonicalOfferingStateService {
     this.assertPrice(input);
     return this.prisma.$transaction(
       async (tx) => {
-        await this.requireOffering(tx, brandProfileId, offeringId);
+        const offering = await this.requireOffering(
+          tx,
+          brandProfileId,
+          offeringId,
+        );
         let state = await tx.offeringPriceState.findUnique({
           where: { offeringId },
+          include: { currentRevision: true },
         });
+        if (options.controlledRefresh) {
+          if (offering.canonicalLifecycle !== OfferingLifecycle.ACTIVE) {
+            throw new ControlledPriceRefreshGuardError("INACTIVE_OFFERING");
+          }
+          if (
+            state?.currentRevision?.authority ===
+              CanonicalOfferingAuthority.BRAND_CONFIRMED ||
+            state?.currentRevision?.origin ===
+              CanonicalOfferingOrigin.BRAND_EDIT ||
+            state?.currentRevision?.origin ===
+              CanonicalOfferingOrigin.BRAND_UPLOAD
+          ) {
+            throw new ControlledPriceRefreshGuardError(
+              "MANUAL_PRICE_PROTECTED",
+            );
+          }
+        }
         if (!state) {
           if (expectedStateRevision !== null) this.casConflict();
           state = await tx.offeringPriceState.create({
             data: { brandProfileId, offeringId },
+            include: { currentRevision: true },
           });
         } else if (
           expectedStateRevision === null ||
@@ -274,6 +312,12 @@ export class CanonicalOfferingStateService {
     expectedStateRevision: number,
     freshness: Extract<OfferingPriceFreshness, "STALE" | "UNKNOWN">,
     evaluatedAt: Date,
+    options: Readonly<{
+      controlledRefresh?: boolean;
+      sourceRef?: string;
+      observedAt?: Date;
+      provenance?: Prisma.InputJsonValue;
+    }> = {},
   ) {
     const current = await this.prisma.offeringPriceState.findFirst({
       where: { offeringId, brandProfileId },
@@ -298,14 +342,25 @@ export class CanonicalOfferingStateService {
         regularMaxAmount: value.regularMaxAmount,
         currency: value.currency,
         freshness,
-        authority: value.authority,
-        origin: value.origin,
-        sourceClass: value.sourceClass,
-        sourceRef: value.sourceRef,
-        observedAt: value.observedAt,
+        authority: options.controlledRefresh
+          ? CanonicalOfferingAuthority.APPLICATION_CANONICAL
+          : value.authority,
+        origin: options.controlledRefresh
+          ? CanonicalOfferingOrigin.CONTROLLED_PRICE_REFRESH
+          : value.origin,
+        sourceClass: options.controlledRefresh
+          ? "OWNED_WEBSITE_COMMERCIAL_EVIDENCE"
+          : value.sourceClass,
+        sourceRef: options.sourceRef ?? value.sourceRef,
+        observedAt: options.observedAt ?? value.observedAt,
         freshnessEvaluatedAt: evaluatedAt,
-        provenance: { transition: "PUBLIC_PRICE_DISAPPEARED_VALUE_RETAINED" },
+        provenance:
+          options.provenance ??
+          ({
+            transition: "PUBLIC_PRICE_DISAPPEARED_VALUE_RETAINED",
+          } as Prisma.InputJsonValue),
       },
+      { controlledRefresh: options.controlledRefresh },
     );
   }
 
@@ -472,9 +527,14 @@ export class CanonicalOfferingStateService {
         ? null
         : new Prisma.Decimal(input.currentMaxAmount);
     if (input.mode === OfferingPriceMode.NOT_PUBLICLY_LISTED) {
-      if (min !== null || max !== null)
+      if (
+        min !== null ||
+        max !== null ||
+        input.regularMinAmount != null ||
+        input.regularMaxAmount != null
+      )
         throw new ConflictException(
-          "Non-public price cannot carry current amounts",
+          "Non-public price cannot carry amount fields",
         );
       return;
     }

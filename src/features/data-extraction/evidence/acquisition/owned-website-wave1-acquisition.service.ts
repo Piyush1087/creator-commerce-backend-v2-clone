@@ -265,6 +265,14 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
         existing.resourceScope,
         exactOfferingScope,
       );
+      if (request.executionClaim === "REQUIRE_CREATOR") {
+        return {
+          capabilityExecutionRef: existing.capabilityExecutionRef,
+          evidenceRefs: [],
+          resourceRefs: existing.resourceScope,
+          executionClaim: "EXISTING",
+        };
+      }
       if (existing.completedAt) {
         const exactOfferingResources = await this.exactOfferingResources(
           request.brandId,
@@ -303,19 +311,31 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
       ].join("|"),
     );
 
-    const execution =
-      existing ??
-      (await repositories.capabilityExecutions.createOrGet({
-        brandId: request.brandId,
-        capabilityExecutionRef,
-        capabilityId: request.capabilityId,
-        normalizationContractVersion: request.normalizationContractVersion,
-        resourceScopeHash: executionScopeHash,
-        freshnessIntent: request.freshnessIntent,
-        sourceRevisionRef: request.sourceRevisionRef,
-        requestKey: request.requestKey,
-        coverage: "SINGLE_RESOURCE",
-      }));
+    const executionClaim = existing
+      ? { record: existing, created: false }
+      : await repositories.capabilityExecutions.createOrGetClaimed({
+          brandId: request.brandId,
+          capabilityExecutionRef,
+          capabilityId: request.capabilityId,
+          normalizationContractVersion: request.normalizationContractVersion,
+          resourceScopeHash: executionScopeHash,
+          freshnessIntent: request.freshnessIntent,
+          sourceRevisionRef: request.sourceRevisionRef,
+          requestKey: request.requestKey,
+          coverage: "SINGLE_RESOURCE",
+        });
+    const execution = executionClaim.record;
+    if (
+      request.executionClaim === "REQUIRE_CREATOR" &&
+      !executionClaim.created
+    ) {
+      return {
+        capabilityExecutionRef: execution.capabilityExecutionRef,
+        evidenceRefs: [],
+        resourceRefs: execution.resourceScope,
+        executionClaim: "EXISTING",
+      };
+    }
 
     // Retained first-party captures are examined before any new network acquisition.
     // The same execution proceeds to the existing E normalizer; no Evidence is emitted here.
@@ -392,6 +412,45 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
       reasonCodes: readonly string[];
       pageRole: EvidencePageRole;
     }> = [];
+
+    if (request.acquisitionMode === "EXACT_RESOURCES_ONLY") {
+      for (const exactUrl of exactOfferingScope!.resourceUrls) {
+        acquired.push(
+          await this.prepareResource(
+            request,
+            execution.capabilityExecutionRef,
+            exactUrl,
+            "OFFERING_DETAIL",
+            exactOfferingScope!.canonicalOfferingRef,
+          ),
+        );
+      }
+      if (
+        acquired.every(
+          (entry) => entry.acquisitionQuality.state === "UNAVAILABLE",
+        )
+      ) {
+        await this.completeExecution(
+          request,
+          execution.capabilityExecutionRef,
+          acquired,
+        );
+      }
+      return {
+        capabilityExecutionRef: execution.capabilityExecutionRef,
+        evidenceRefs: [],
+        resourceRefs: acquired.map((entry) => entry.resource.resourceRef),
+        captureRefs: acquired.map((entry) => entry.captureRef),
+        exactOfferingResources: acquired.map((entry) => ({
+          canonicalOfferingRef: exactOfferingScope!.canonicalOfferingRef,
+          resourceRef: entry.resource.resourceRef,
+          captureRef: entry.captureRef,
+        })),
+        ...(request.executionClaim === "REQUIRE_CREATOR"
+          ? { executionClaim: "CREATED" as const }
+          : {}),
+      };
+    }
 
     const root = await this.prepareResource(
       request,
@@ -771,7 +830,9 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
       const rootMatches = resources.some(
         (resource) => resource?.canonicalUrl === rootUrl,
       );
-      if (!rootMatches) throw persistenceError("IDEMPOTENCY_CONFLICT");
+      if (request.acquisitionMode !== "EXACT_RESOURCES_ONLY" && !rootMatches) {
+        throw persistenceError("IDEMPOTENCY_CONFLICT");
+      }
       for (const exactUrl of exactOfferingScope?.resourceUrls ?? []) {
         const expected = resourceIdentity(
           request.brandId,
@@ -856,6 +917,19 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
     ) {
       throw persistenceError("PERSISTENCE_INVARIANT");
     }
+    if (
+      request.acquisitionMode === "EXACT_RESOURCES_ONLY" &&
+      (request.capabilityId !== "owned_website.offering_commercial_evidence" ||
+        !request.exactOfferingScope)
+    ) {
+      throw persistenceError("PERSISTENCE_INVARIANT");
+    }
+    if (
+      request.executionClaim === "REQUIRE_CREATOR" &&
+      request.acquisitionMode !== "EXACT_RESOURCES_ONLY"
+    ) {
+      throw persistenceError("PERSISTENCE_INVARIANT");
+    }
   }
 }
 
@@ -895,6 +969,18 @@ function resourceIdentity(
       `resource:${hash(`${brandId}|OWNED_WEBSITE|${canonicalResourceKey}`).slice(0, 32)}`,
     ),
   };
+}
+
+export function exactOfferingResourceIdentity(
+  brandId: BrandId,
+  canonicalUrl: string,
+  canonicalOfferingRef: string,
+) {
+  return resourceIdentity(
+    brandId,
+    normalizeOwnedWebsiteUrl(canonicalUrl),
+    canonicalOfferingRef,
+  );
 }
 
 function normalizeExactOfferingScope(

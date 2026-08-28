@@ -555,5 +555,106 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         }),
       ).rejects.toThrow();
     });
+
+    it("keeps a Brand manual revision current when automatic refresh commits later", async () => {
+      const b = await brand();
+      const item = await offering(b.id);
+      await service.advancePrice(
+        b.id,
+        item.id,
+        null,
+        price(OfferingPriceMode.EXACT, {
+          currentMinAmount: 100,
+          currentMaxAmount: 100,
+        }),
+      );
+      const automaticExpectedRevision = 1;
+      await service.advancePrice(b.id, item.id, 1, {
+        ...price(OfferingPriceMode.EXACT, {
+          currentMinAmount: 110,
+          currentMaxAmount: 110,
+        }),
+        authority: CanonicalOfferingAuthority.BRAND_CONFIRMED,
+        origin: CanonicalOfferingOrigin.BRAND_EDIT,
+        sourceClass: "APPLICATION",
+      });
+      await expect(
+        service.advancePrice(
+          b.id,
+          item.id,
+          automaticExpectedRevision,
+          price(OfferingPriceMode.EXACT, {
+            currentMinAmount: 120,
+            currentMaxAmount: 120,
+          }),
+          { controlledRefresh: true },
+        ),
+      ).rejects.toThrow("MANUAL_PRICE_PROTECTED");
+      const winning = await prisma.offeringPriceState.findUniqueOrThrow({
+        where: { offeringId: item.id },
+        include: { currentRevision: true },
+      });
+      expect(winning.currentRevision).toMatchObject({
+        authority: CanonicalOfferingAuthority.BRAND_CONFIRMED,
+        origin: CanonicalOfferingOrigin.BRAND_EDIT,
+      });
+      expect(winning.currentRevision?.currentMinAmount?.toString()).toBe("110");
+    });
+
+    it("fails controlled refresh closed for inconsistent manual origin", async () => {
+      const b = await brand();
+      const item = await offering(b.id);
+      await service.advancePrice(b.id, item.id, null, {
+        ...price(OfferingPriceMode.EXACT, {
+          currentMinAmount: 100,
+          currentMaxAmount: 100,
+        }),
+        authority: CanonicalOfferingAuthority.APPLICATION_CANONICAL,
+        origin: CanonicalOfferingOrigin.BRAND_UPLOAD,
+      });
+      await expect(
+        service.advancePrice(
+          b.id,
+          item.id,
+          1,
+          price(OfferingPriceMode.EXACT, {
+            currentMinAmount: 120,
+            currentMaxAmount: 120,
+          }),
+          { controlledRefresh: true },
+        ),
+      ).rejects.toThrow("MANUAL_PRICE_PROTECTED");
+    });
+
+    it("re-checks ACTIVE lifecycle in the final controlled transaction", async () => {
+      const b = await brand();
+      const item = await offering(b.id);
+      await service.advancePrice(
+        b.id,
+        item.id,
+        null,
+        price(OfferingPriceMode.EXACT, {
+          currentMinAmount: 100,
+          currentMaxAmount: 100,
+        }),
+      );
+      await service.setLifecycle(
+        b.id,
+        item.id,
+        OfferingLifecycle.PAUSED_INACTIVE,
+      );
+      await expect(
+        service.advancePrice(
+          b.id,
+          item.id,
+          1,
+          price(OfferingPriceMode.EXACT, {
+            currentMinAmount: 120,
+            currentMaxAmount: 120,
+          }),
+          { controlledRefresh: true },
+        ),
+      ).rejects.toThrow("INACTIVE_OFFERING");
+    });
   },
 );
