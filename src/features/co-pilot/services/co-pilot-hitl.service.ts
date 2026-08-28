@@ -1735,16 +1735,11 @@ export class CoPilotHitlService {
       staged,
       run: async (authUser) => {
         const input = BrandBillingProfileSchema.parse({
-          registeredCompanyName: staged.registeredCompanyName,
-          corporateBillingAddress: staged.corporateBillingAddress,
+          legalEntityName: staged.legalEntityName,
+          legalEntityType: staged.legalEntityType,
+          billingCountryCode: staged.billingCountryCode,
+          billingAddress: staged.billingAddress,
           gstin: this.optionalString(staged.gstin),
-          pan: this.optionalString(staged.pan),
-          defaultTdsPercentage:
-            typeof staged.defaultTdsPercentage === "number"
-              ? staged.defaultTdsPercentage
-              : Number(staged.defaultTdsPercentage ?? 2),
-          currencyPreference:
-            this.optionalString(staged.currencyPreference) ?? "INR",
         });
         await this.brandSettings.upsertBillingProfile(authUser, input);
         return "Billing profile saved.";

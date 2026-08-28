@@ -108,9 +108,7 @@ export class BrandSettingsCoPilotToolsService {
         : "No GSTIN is saved on the billing profile yet.";
     }
     if (/\bpan\b/.test(n)) {
-      return profile?.pan
-        ? `PAN on file: ${profile.pan}.`
-        : "No PAN is saved on the billing profile yet.";
+      return "PAN is not part of the canonical Billing Profile.";
     }
     if (n.includes("withdrawal") || n.includes("bank") || n.includes("ifsc")) {
       if (!account) {
@@ -120,10 +118,10 @@ export class BrandSettingsCoPilotToolsService {
     }
 
     if (!profile) {
-      return "No billing profile is set up yet. I can help create one (company name, address, GST/PAN) after you confirm.";
+      return "No billing profile is set up yet. I can help create one (legal entity name/type, billing country/address, and optional GSTIN) after you confirm.";
     }
 
-    return `Finance / billing: “${profile.registered_company_name}”, GST ${profile.gstin ?? "—"}, PAN ${profile.pan ?? "—"}, TDS default ${profile.default_tds_percentage}%, currency ${profile.currency_preference}.${
+    return `Finance / billing: “${profile.legal_entity_name}” (${profile.legal_entity_type ?? "entity type missing"}), ${profile.billing_country_code ?? "billing country missing"}, GSTIN ${profile.gstin ?? "—"}. Paid-conversion readiness: ${billing.is_complete_for_paid_conversion ? "complete" : `missing ${billing.missing_required_fields.join(", ")}`}.${
       account
         ? ` Withdrawal bank linked (****${account.account_last_4}).`
         : " No withdrawal bank linked yet."
@@ -206,24 +204,24 @@ export class BrandSettingsCoPilotToolsService {
     const account = withdrawal.withdrawal_account;
     return [
       {
-        label: "Registered company",
-        value: profile?.registered_company_name ?? "Not set",
+        label: "Legal entity",
+        value: profile?.legal_entity_name ?? "Not set",
         statusColor: profile ? "GREEN" : "YELLOW",
+      },
+      {
+        label: "Entity type",
+        value: profile?.legal_entity_type ?? "Not set",
+        statusColor: profile?.legal_entity_type ? "GREEN" : "YELLOW",
+      },
+      {
+        label: "Billing country",
+        value: profile?.billing_country_code ?? "Not set",
+        statusColor: profile?.billing_country_code ? "GREEN" : "YELLOW",
       },
       {
         label: "GSTIN",
         value: profile?.gstin ?? "—",
         statusColor: profile?.gstin ? "GREEN" : "YELLOW",
-      },
-      {
-        label: "PAN",
-        value: profile?.pan ?? "—",
-        statusColor: profile?.pan ? "GREEN" : "YELLOW",
-      },
-      {
-        label: "Default TDS %",
-        value: profile ? String(profile.default_tds_percentage) : "—",
-        statusColor: "NEUTRAL",
       },
       {
         label: "Withdrawal bank",

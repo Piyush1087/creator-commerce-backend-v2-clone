@@ -537,12 +537,11 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
             settings.updateGeneral(w.user, { organizationLegalName: "Denied" }),
           () =>
             settings.upsertBillingProfile(w.user, {
-              registeredCompanyName: "Denied",
-              corporateBillingAddress: "Denied address",
+              legalEntityName: "Denied Entity",
+              legalEntityType: "Corporation",
+              billingCountryCode: "IN",
+              billingAddress: "Denied address",
               gstin: null,
-              pan: null,
-              defaultTdsPercentage: 2,
-              currencyPreference: "INR",
             }),
           () =>
             settings.linkWithdrawalAccount(w.user, {

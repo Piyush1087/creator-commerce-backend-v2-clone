@@ -2470,18 +2470,27 @@ model BrandTeamMember {
 }
 
 model BrandBillingProfile {
-  id                      String       @id @default(uuid()) @map("profile_id")
-  brandProfileId          String       @unique @map("brand_id")
-  brandProfile            BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  registeredCompanyName   String       @map("registered_company_name") @db.VarChar(255)
-  corporateBillingAddress String       @map("corporate_billing_address") @db.Text
-  gstin                   String?      @db.VarChar(15)
-  pan                     String?      @db.VarChar(10)
-  defaultTdsPercentage    Decimal      @default(2.00) @map("default_tds_percentage") @db.Decimal(5, 2)
-  currencyPreference      String       @default("INR") @map("currency_preference") @db.VarChar(3)
-  updatedAt               DateTime     @updatedAt @map("updated_at")
+  id                      String              @id @default(uuid()) @map("profile_id")
+  brandProfileId          String              @unique @map("brand_id")
+  brandProfile            BrandProfile        @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  registeredCompanyName   String              @map("registered_company_name") @db.VarChar(255)
+  corporateBillingAddress String              @map("corporate_billing_address") @db.Text
+  legalEntityType         String?             @map("legal_entity_type") @db.VarChar(100)
+  billingCountryCode      String?             @map("billing_country_code") @db.Char(2)
+  gstin                   String?             @db.VarChar(15)
+  pan                     String?             @db.VarChar(10)
+  defaultTdsPercentage    Decimal             @default(2.00) @map("default_tds_percentage") @db.Decimal(5, 2)
+  currencyPreference      String              @default("INR") @map("currency_preference") @db.VarChar(3)
+  profileState            BillingProfileState @default(CONFIGURED) @map("profile_state")
+  configuredAt            DateTime?           @map("configured_at")
+  updatedAt               DateTime            @updatedAt @map("updated_at")
 
   @@map("brand_billing_profiles")
+}
+
+enum BillingProfileState {
+  CONFIGURED
+  UPDATED
 }
 
 model BrandWithdrawalAccount {

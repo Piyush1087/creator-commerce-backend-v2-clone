@@ -206,22 +206,30 @@ export function detectBrandSettingsWrite(
   if (
     (/\b(update|set|change|save)\b/.test(n) &&
       (/\bgst(in)?\b/.test(n) ||
-        /\bpan\b/.test(n) ||
         n.includes("billing profile") ||
         n.includes("billing address") ||
         n.includes("registered company"))) ||
-    n.includes("update gst") ||
-    n.includes("update pan")
+    n.includes("update gst")
   ) {
     const missingSlots: SlotFillingData["missingSlots"] = [
       textSlot(
-        "registeredCompanyName",
-        "Registered company name",
+        "legalEntityName",
+        "Legal entity name",
         "Legal company name on invoices",
       ),
       textSlot(
-        "corporateBillingAddress",
-        "Corporate billing address",
+        "legalEntityType",
+        "Legal entity type",
+        "For example LLC, Corporation, LLP, or Sole Proprietorship",
+      ),
+      textSlot(
+        "billingCountryCode",
+        "Billing country",
+        "Two-letter country code, for example IN or US",
+      ),
+      textSlot(
+        "billingAddress",
+        "Billing address",
         "Full address (min 10 characters)",
       ),
     ];
@@ -230,17 +238,9 @@ export function detectBrandSettingsWrite(
         textSlot("gstin", "GSTIN (optional)", "15-character GSTIN or blank"),
       );
     }
-    if (/\bpan\b/.test(n) || n.includes("billing")) {
-      missingSlots.push(
-        textSlot("pan", "PAN (optional)", "10-character PAN or blank"),
-      );
-    }
     return {
       kind: "SETTINGS_UPDATE_BILLING",
-      stagedPayload: {
-        defaultTdsPercentage: 2,
-        currencyPreference: "INR",
-      },
+      stagedPayload: {},
       missingSlots,
     };
   }

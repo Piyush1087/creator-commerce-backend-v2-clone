@@ -20,16 +20,10 @@ export const NotificationCategoryEnum = z.enum([
 ]);
 
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
 const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 
 const optionalGstin = z
   .union([z.string().trim().toUpperCase().regex(GSTIN_REGEX), z.literal("")])
-  .optional()
-  .transform((val) => (!val ? null : val));
-
-const optionalPan = z
-  .union([z.string().trim().toUpperCase().regex(PAN_REGEX), z.literal("")])
   .optional()
   .transform((val) => (!val ? null : val));
 
@@ -43,18 +37,28 @@ export const InviteTeamMemberSchema = z.object({
   role: BrandRoleEnum.default("CAMPAIGN_MANAGER"),
 });
 
-export const BrandBillingProfileSchema = z.object({
-  registeredCompanyName: z.string().min(2).max(255),
-  corporateBillingAddress: z.string().min(10),
-  gstin: optionalGstin,
-  pan: optionalPan,
-  defaultTdsPercentage: z.number().min(0).max(10).default(2),
-  currencyPreference: z
-    .string()
-    .length(3)
-    .default("INR")
-    .transform((val) => val.toUpperCase()),
-});
+export const BrandBillingProfileSchema = z
+  .object({
+    legalEntityName: z.string().trim().min(2).max(255),
+    legalEntityType: z.string().trim().min(2).max(100),
+    billingCountryCode: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z]{2}$/, "Use an ISO-3166-1 alpha-2 country code"),
+    billingAddress: z.string().trim().min(10).max(2000),
+    gstin: optionalGstin,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.gstin && value.billingCountryCode !== "IN") {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["gstin"],
+        message: "GSTIN is supported only when billing country is IN",
+      });
+    }
+  });
 
 export const BrandWithdrawalAccountSchema = z
   .object({

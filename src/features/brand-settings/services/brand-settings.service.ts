@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -32,7 +33,20 @@ import {
   BRAND_SETTINGS_MAX_SEATS,
   BrandSettingsAccessService,
 } from "./brand-settings-access.service";
-import { decimalToNumber } from "../../brand-uce/utils/uce-decimal.util";
+
+export const BILLING_REQUIRED_FIELDS = [
+  "legal_entity_name",
+  "legal_entity_type",
+  "billing_country_code",
+  "billing_address",
+] as const;
+
+type BillingReadinessSource = {
+  registeredCompanyName: string | null;
+  legalEntityType: string | null;
+  billingCountryCode: string | null;
+  corporateBillingAddress: string | null;
+} | null;
 
 const DEFAULT_NOTIFICATION_MATRIX: Array<{
   category: SettingsNotificationCategory;
@@ -246,24 +260,57 @@ export class BrandSettingsService {
       where: { brandProfileId },
     });
 
-    if (!profile) {
-      return { billing_profile: null, is_read_only: readOnly };
-    }
+    const readiness = billingReadiness(profile);
+
+    if (!profile)
+      return {
+        billing_profile: null,
+        profile_state: "NOT_CONFIGURED" as const,
+        is_read_only: readOnly,
+        ...readiness,
+      };
 
     return {
       is_read_only: readOnly,
+      profile_state: profile.profileState,
       billing_profile: {
-        registered_company_name: profile.registeredCompanyName,
-        corporate_billing_address: profile.corporateBillingAddress,
+        legal_entity_name: profile.registeredCompanyName,
+        legal_entity_type: profile.legalEntityType,
+        billing_country_code: profile.billingCountryCode,
+        billing_address: profile.corporateBillingAddress,
         gstin: readOnly
           ? maskSensitiveString(profile.gstin, 2, 4)
           : profile.gstin,
-        pan: readOnly ? maskSensitiveString(profile.pan, 1, 1) : profile.pan,
-        default_tds_percentage: decimalToNumber(profile.defaultTdsPercentage),
-        currency_preference: profile.currencyPreference,
+        profile_state: profile.profileState,
+        configured_at: profile.configuredAt?.toISOString() ?? null,
         updated_at: profile.updatedAt.toISOString(),
       },
+      ...readiness,
     };
+  }
+
+  async getBillingReadiness(brandProfileId: string) {
+    const profile = await this.prisma.brandBillingProfile.findUnique({
+      where: { brandProfileId },
+      select: {
+        registeredCompanyName: true,
+        legalEntityType: true,
+        billingCountryCode: true,
+        corporateBillingAddress: true,
+      },
+    });
+    return billingReadiness(profile);
+  }
+
+  async requireCompleteBillingProfile(brandProfileId: string) {
+    const readiness = await this.getBillingReadiness(brandProfileId);
+    if (!readiness.is_complete_for_paid_conversion) {
+      throw new BadRequestException({
+        message: "A complete Billing Profile is required for paid conversion.",
+        ...readiness,
+      });
+    }
+    return readiness;
   }
 
   async upsertBillingProfile(user: AuthUser, input: BrandBillingProfileInput) {
@@ -271,34 +318,54 @@ export class BrandSettingsService {
       await this.access.resolveBrandContext(user);
     this.access.assertFinancialMutation(membership.role);
 
+    const existing = await this.prisma.brandBillingProfile.findUnique({
+      where: { brandProfileId },
+    });
+    const isMaterialUpdate =
+      !!existing &&
+      (existing.registeredCompanyName !== input.legalEntityName ||
+        existing.legalEntityType !== input.legalEntityType ||
+        existing.billingCountryCode !== input.billingCountryCode ||
+        existing.corporateBillingAddress !== input.billingAddress ||
+        existing.gstin !== input.gstin);
+    const now = new Date();
     const profile = await this.prisma.brandBillingProfile.upsert({
       where: { brandProfileId },
       create: {
         brandProfileId,
-        registeredCompanyName: input.registeredCompanyName,
-        corporateBillingAddress: input.corporateBillingAddress,
+        registeredCompanyName: input.legalEntityName,
+        legalEntityType: input.legalEntityType,
+        billingCountryCode: input.billingCountryCode,
+        corporateBillingAddress: input.billingAddress,
         gstin: input.gstin,
-        pan: input.pan,
-        defaultTdsPercentage: input.defaultTdsPercentage,
-        currencyPreference: input.currencyPreference,
+        profileState: "CONFIGURED",
+        configuredAt: now,
       },
       update: {
-        registeredCompanyName: input.registeredCompanyName,
-        corporateBillingAddress: input.corporateBillingAddress,
+        registeredCompanyName: input.legalEntityName,
+        legalEntityType: input.legalEntityType,
+        billingCountryCode: input.billingCountryCode,
+        corporateBillingAddress: input.billingAddress,
         gstin: input.gstin,
-        pan: input.pan,
-        defaultTdsPercentage: input.defaultTdsPercentage,
-        currencyPreference: input.currencyPreference,
+        ...(isMaterialUpdate ? { profileState: "UPDATED" as const } : {}),
       },
     });
 
     return {
+      is_read_only: false,
+      profile_state: profile.profileState,
       billing_profile: {
         profile_id: profile.id,
-        registered_company_name: profile.registeredCompanyName,
-        default_tds_percentage: decimalToNumber(profile.defaultTdsPercentage),
+        legal_entity_name: profile.registeredCompanyName,
+        legal_entity_type: profile.legalEntityType,
+        billing_country_code: profile.billingCountryCode,
+        billing_address: profile.corporateBillingAddress,
+        gstin: profile.gstin,
+        profile_state: profile.profileState,
+        configured_at: profile.configuredAt?.toISOString() ?? null,
         updated_at: profile.updatedAt.toISOString(),
       },
+      ...billingReadiness(profile),
     };
   }
 
@@ -465,6 +532,22 @@ export class BrandSettingsService {
   cancelTeamInvitation(user: AuthUser, invitationId: string) {
     return this.team.cancel(user, invitationId);
   }
+}
+
+export function billingReadiness(profile: BillingReadinessSource) {
+  const missingRequiredFields: (typeof BILLING_REQUIRED_FIELDS)[number][] = [];
+  if (!profile?.registeredCompanyName?.trim())
+    missingRequiredFields.push("legal_entity_name");
+  if (!profile?.legalEntityType?.trim())
+    missingRequiredFields.push("legal_entity_type");
+  if (!profile?.billingCountryCode?.trim())
+    missingRequiredFields.push("billing_country_code");
+  if (!profile?.corporateBillingAddress?.trim())
+    missingRequiredFields.push("billing_address");
+  return {
+    is_complete_for_paid_conversion: missingRequiredFields.length === 0,
+    missing_required_fields: missingRequiredFields,
+  };
 }
 
 function splitDisplayName(name: string | null | undefined): {
