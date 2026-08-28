@@ -20,6 +20,14 @@
       {
         "include": "features/brand-onboarding/gatekeeper/runtime/artifacts/**/*.yaml",
         "watchAssets": true
+      },
+      {
+        "include": "features/brand-onboarding/brand-preview/runtime/artifacts/**/*.yaml",
+        "watchAssets": true
+      },
+      {
+        "include": "features/brand-intelligence/generated/contract-bundles/**/*.{json,yaml}",
+        "watchAssets": true
       }
     ]
   }

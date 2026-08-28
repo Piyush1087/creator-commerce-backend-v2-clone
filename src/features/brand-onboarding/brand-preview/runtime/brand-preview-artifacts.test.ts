@@ -50,7 +50,7 @@ describe("frozen Brand Preview runtime artifacts", () => {
     expect(fallback).toMatchObject({
       model_profile: "brand_preview_fast_reasoning_fallback",
       provider_adapter: "openai",
-      model_id: "gpt-5.6-luna",
+      model_id: "gpt-4o",
     });
   });
 

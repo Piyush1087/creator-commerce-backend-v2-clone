@@ -121,6 +121,26 @@ export class BrandPreviewRunService {
   }
 }
 
+function navigableWebsiteUrl(value: unknown): unknown {
+  if (typeof value !== "string" || !value.trim()) return value;
+  const raw = value.trim();
+  try {
+    return new URL(raw.includes("://") ? raw : `https://${raw}`).toString();
+  } catch {
+    return raw;
+  }
+}
+
+function publicIdentity(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const identity = value as Record<string, unknown>;
+  const website = identity.website_url ?? identity.websiteUrl;
+  return {
+    ...identity,
+    website_url: navigableWebsiteUrl(website),
+  };
+}
+
 function publicPreview(value: Prisma.JsonValue | null): unknown {
   if (!value || typeof value !== "object" || Array.isArray(value))
     return undefined;
@@ -138,7 +158,7 @@ function publicPreview(value: Prisma.JsonValue | null): unknown {
     return publicItem;
   };
   return {
-    identity: raw.identity,
+    identity: publicIdentity(raw.identity),
     brand_descriptor: raw.brand_descriptor,
     brand_understanding_narrative: raw.brand_understanding_narrative,
     audience_groups: Array.isArray(raw.audience_groups)
