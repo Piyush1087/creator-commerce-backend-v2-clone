@@ -3,14 +3,45 @@ import { describe, expect, it, vi } from "vitest";
 import { BrandEscrowInterlockService } from "./brand-escrow-interlock.service";
 
 describe("BS09 P2C1 collaboration refund idempotency", () => {
+  const refundInterlockMocks = () => ({
+    $queryRaw: vi.fn(),
+    escrowCreatorPayout: {
+      findMany: vi.fn().mockResolvedValue([]),
+      updateMany: vi.fn(),
+    },
+    escrowCreatorPayoutAttempt: { updateMany: vi.fn() },
+  });
   const input = {
     collaborationId: "collab-1",
     reasonCode: "MUTUAL_TERMINATION" as const,
     diagnosticNotes: "test",
   };
 
+  it("blocks refund without mutation while a creator payout is PROCESSING", async () => {
+    const tx = {
+      ...refundInterlockMocks(),
+      collaborationEscrowLock: { findUnique: vi.fn() },
+      brandEscrowVault: { update: vi.fn() },
+      escrowTransactionLedger: { create: vi.fn() },
+    };
+    tx.escrowCreatorPayout.findMany.mockResolvedValue([
+      { id: "payout-1", status: "PROCESSING" },
+    ]);
+    const service = new BrandEscrowInterlockService({
+      $transaction: (callback: (value: typeof tx) => unknown) => callback(tx),
+    } as never);
+
+    await expect(service.executeAutomatedRefund(input)).rejects.toThrow(
+      "Refund unavailable while creator payout is processing",
+    );
+    expect(tx.collaborationEscrowLock.findUnique).not.toHaveBeenCalled();
+    expect(tx.brandEscrowVault.update).not.toHaveBeenCalled();
+    expect(tx.escrowTransactionLedger.create).not.toHaveBeenCalled();
+  });
+
   it("moves the full unused reserve from locked to available exactly once", async () => {
     const tx = {
+      ...refundInterlockMocks(),
       collaborationEscrowLock: {
         findUnique: vi.fn().mockResolvedValue({
           id: "lock-1",
@@ -34,6 +65,9 @@ describe("BS09 P2C1 collaboration refund idempotency", () => {
       collaborationCommercial: { updateMany: vi.fn() },
       collaborationMessage: { create: vi.fn() },
     };
+    tx.escrowCreatorPayout.findMany.mockResolvedValue([
+      { id: "payout-approved", status: "APPROVED" },
+    ]);
     const service = new BrandEscrowInterlockService(
       {
         $transaction: (callback: (value: typeof tx) => unknown) => callback(tx),
@@ -56,16 +90,28 @@ describe("BS09 P2C1 collaboration refund idempotency", () => {
       data: { lockReleasedViaRefund: true },
     });
     expect(tx.escrowTransactionLedger.create).toHaveBeenCalledTimes(1);
-    expect(tx.escrowTransactionLedger.create.mock.calls[0][0].data).toMatchObject(
-      {
-        transactionType: "COLLAB_REFUND",
-        idempotencyKey: "collab-refund:collab-1",
-      },
+    expect(tx.escrowCreatorPayoutAttempt.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: "CREATED" }),
+        data: expect.objectContaining({ status: "FAILED" }),
+      }),
     );
+    expect(tx.escrowCreatorPayout.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "FAILED" }),
+      }),
+    );
+    expect(
+      tx.escrowTransactionLedger.create.mock.calls[0][0].data,
+    ).toMatchObject({
+      transactionType: "COLLAB_REFUND",
+      idempotencyKey: "collab-refund:collab-1",
+    });
   });
 
   it("returns ALREADY_REVERSED without a second mutation or ledger entry", async () => {
     const tx = {
+      ...refundInterlockMocks(),
       collaborationEscrowLock: {
         findUnique: vi.fn().mockResolvedValue({ lockReleasedViaRefund: true }),
       },
@@ -101,6 +147,7 @@ describe("BS09 P2C1 collaboration refund idempotency", () => {
     ({ contractedAdvance, expectedRefund }) => {
       it("refunds the reserve remainder without recomputing 30%", async () => {
         const tx = {
+          ...refundInterlockMocks(),
           collaborationEscrowLock: {
             findUnique: vi.fn().mockResolvedValue({
               id: "lock-1",
@@ -162,6 +209,7 @@ describe("BS09 P2C1 collaboration refund idempotency", () => {
     "fails before mutation for corrupt contracted advance %s",
     async (contractedAdvance) => {
       const tx = {
+        ...refundInterlockMocks(),
         collaborationEscrowLock: {
           findUnique: vi.fn().mockResolvedValue({
             id: "lock-1",
@@ -211,6 +259,7 @@ describe("BS09 P2C1 collaboration refund idempotency", () => {
 
   it("keeps settled locks unavailable for collaboration refund", async () => {
     const tx = {
+      ...refundInterlockMocks(),
       collaborationEscrowLock: {
         findUnique: vi.fn().mockResolvedValue({
           lockReleasedViaRefund: false,

@@ -101,6 +101,38 @@ export class BrandEscrowInterlockService {
 
   async executeAutomatedRefund(input: TriggerCancellationRefundInput) {
     return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-obligation:${input.collaborationId}`}))`;
+      const payouts = await tx.escrowCreatorPayout.findMany({
+        where: { collaborationId: input.collaborationId },
+      });
+      if (payouts.some((payout) => payout.status === "PROCESSING"))
+        throw new ConflictException(
+          "Refund unavailable while creator payout is processing",
+        );
+      const approvedIds = payouts
+        .filter((payout) => payout.status === "APPROVED")
+        .map((payout) => payout.id);
+      if (approvedIds.length) {
+        const diagnosticPayload = {
+          reason: "COLLABORATION_REFUNDED_BEFORE_PROVIDER_START",
+        };
+        await tx.escrowCreatorPayoutAttempt.updateMany({
+          where: { payoutId: { in: approvedIds }, status: "CREATED" },
+          data: {
+            status: "FAILED",
+            terminalAt: new Date(),
+            diagnosticPayload,
+          },
+        });
+        await tx.escrowCreatorPayout.updateMany({
+          where: { id: { in: approvedIds }, status: "APPROVED" },
+          data: {
+            status: "FAILED",
+            failedAt: new Date(),
+            diagnosticPayload,
+          },
+        });
+      }
       const lock = await tx.collaborationEscrowLock.findUnique({
         where: { collaborationId: input.collaborationId },
       });

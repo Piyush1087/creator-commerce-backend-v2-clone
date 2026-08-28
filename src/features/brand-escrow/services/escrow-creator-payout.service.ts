@@ -27,6 +27,22 @@ export class EscrowCreatorPayoutService {
     tranche: Tranche;
   }) {
     const approved = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-obligation:${input.collaborationId}`}))`;
+      const membership = await tx.brandTeamMember.findUnique({
+        where: {
+          brandProfileId_userId: {
+            brandProfileId: input.brandProfileId,
+            userId: input.approvedByUserId,
+          },
+        },
+      });
+      if (
+        !membership?.isActive ||
+        !["BRAND_OWNER", "FINANCE_ADMIN", "CAMPAIGN_MANAGER"].includes(
+          membership.role,
+        )
+      )
+        throw new ForbiddenException("Active Brand payout authority required");
       const collaboration = await tx.collaboration.findUnique({
         where: { id: input.collaborationId },
         include: { commercials: true, escrowLock: true, finalization: true },
@@ -75,6 +91,20 @@ export class EscrowCreatorPayoutService {
       } else {
         if (!collaboration.finalization?.isComplianceVerified)
           throw new BadRequestException("Final compliance is required");
+        if (commercial.advance30Amount.greaterThan(0)) {
+          const advancePayout = await tx.escrowCreatorPayout.findUnique({
+            where: {
+              collaborationId_tranche: {
+                collaborationId: input.collaborationId,
+                tranche: "ADVANCE_30",
+              },
+            },
+          });
+          if (advancePayout?.status !== "PAID" || !lock.advanceTrancheDisbursed)
+            throw new ConflictException(
+              "Contracted advance must be paid before final payout",
+            );
+        }
       }
       const creator = await tx.creatorProfile.findUnique({
         where: { userId: collaboration.creatorUserId },
@@ -156,18 +186,7 @@ export class EscrowCreatorPayoutService {
         approved.settlement,
         payout.creatorProfileId,
       );
-      await this.prisma.escrowCreatorPayout.update({
-        where: { id: payout.id },
-        data: {
-          status: "PROCESSING",
-          processingAt: new Date(),
-          currentProvider: "RAZORPAYX",
-        },
-      });
-      await this.prisma.escrowCreatorPayoutAttempt.update({
-        where: { id: attempt.id },
-        data: { status: "PROCESSING", providerStatus: "requesting" },
-      });
+      await this.startProviderAttempt(payout, attempt);
       const result = await this.provider.createPayout({
         fundAccountId: route,
         amountPaise: new Decimal(payout.contractedAmount).mul(100).toNumber(),
@@ -212,6 +231,44 @@ export class EscrowCreatorPayoutService {
       return this.setPaid(providerPayoutId, normalized);
     if (normalized === "reversed")
       return this.setReversed(providerPayoutId, normalized);
+  }
+
+  private async startProviderAttempt(
+    payout: { id: string; collaborationId: string },
+    attempt: { id: string },
+  ) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-obligation:${payout.collaborationId}`}))`;
+      const [currentPayout, currentAttempt, lock] = await Promise.all([
+        tx.escrowCreatorPayout.findUnique({ where: { id: payout.id } }),
+        tx.escrowCreatorPayoutAttempt.findUnique({ where: { id: attempt.id } }),
+        tx.collaborationEscrowLock.findUnique({
+          where: { collaborationId: payout.collaborationId },
+        }),
+      ]);
+      if (
+        !lock ||
+        lock.lockReleasedViaRefund ||
+        currentPayout?.status !== "APPROVED" ||
+        currentAttempt?.status !== "CREATED"
+      )
+        throw new ConflictException(
+          "Payout obligation changed before provider initiation",
+        );
+      const now = new Date();
+      await tx.escrowCreatorPayout.update({
+        where: { id: payout.id },
+        data: {
+          status: "PROCESSING",
+          processingAt: now,
+          currentProvider: "RAZORPAYX",
+        },
+      });
+      await tx.escrowCreatorPayoutAttempt.update({
+        where: { id: attempt.id },
+        data: { status: "PROCESSING", providerStatus: "requesting" },
+      });
+    });
   }
 
   private async ensureRoute(settlement: any, creatorProfileId: string) {
@@ -302,6 +359,8 @@ export class EscrowCreatorPayoutService {
         where: { providerPayoutId: providerId },
         include: { payout: true },
       });
+      if (attempt)
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-obligation:${attempt.payout.collaborationId}`}))`;
       if (
         !attempt ||
         attempt.status === "FAILED" ||
@@ -313,14 +372,26 @@ export class EscrowCreatorPayoutService {
       const lock = await tx.collaborationEscrowLock.findUniqueOrThrow({
         where: { id: payout.escrowLockId },
       });
+      if (lock.lockReleasedViaRefund)
+        throw new ConflictException(
+          "Cannot settle a refunded Escrow obligation",
+        );
       const vault = await tx.brandEscrowVault.findUniqueOrThrow({
         where: { brandProfileId: payout.brandProfileId },
+      });
+      const commercial = await tx.collaborationCommercial.findUniqueOrThrow({
+        where: { collaborationId: payout.collaborationId },
       });
       const platform =
         payout.tranche === "FINAL_70"
           ? lock.platformCommissionFee.add(lock.platformCommissionGst)
           : new Decimal(0);
       const consumed = payout.contractedAmount.add(platform);
+      if (
+        vault.lockedCampaignFunds.lessThan(consumed) ||
+        vault.totalPooledBalance.lessThan(consumed)
+      )
+        throw new ConflictException("Escrow locked balance is insufficient");
       await tx.brandEscrowVault.update({
         where: { id: vault.id },
         data: {
@@ -339,7 +410,14 @@ export class EscrowCreatorPayoutService {
         where: { collaborationId: payout.collaborationId },
         data: {
           escrowStatus:
-            payout.tranche === "ADVANCE_30" ? "PARTIAL_RELEASE" : "SETTLED",
+            payout.tranche === "ADVANCE_30"
+              ? lock.finalTrancheDisbursed
+                ? "SETTLED"
+                : "PARTIAL_RELEASE"
+              : commercial.advance30Amount.greaterThan(0) &&
+                  !lock.advanceTrancheDisbursed
+                ? "PARTIAL_RELEASE"
+                : "SETTLED",
         },
       });
       if (payout.tranche === "FINAL_70")
@@ -356,7 +434,7 @@ export class EscrowCreatorPayoutService {
           payoutTrancheTarget: payout.tranche,
           amount: payout.contractedAmount,
           currency: payout.currency,
-          idempotencyKey: `creator-payout:${payout.id}`,
+          idempotencyKey: `creator-payout:${payout.id}:${attempt.id}`,
           gatewayReferenceId: providerId,
           transactionStatus: "CLEARED",
         },
@@ -370,7 +448,7 @@ export class EscrowCreatorPayoutService {
             transactionType: "PLATFORM_COMMISSION",
             amount: lock.platformCommissionFee,
             currency: payout.currency,
-            idempotencyKey: `platform-commission:${payout.id}`,
+            idempotencyKey: `platform-commission:${payout.id}:${attempt.id}`,
             transactionStatus: "CLEARED",
           },
         });
@@ -383,7 +461,7 @@ export class EscrowCreatorPayoutService {
               transactionType: "GST",
               amount: lock.platformCommissionGst,
               currency: payout.currency,
-              idempotencyKey: `commission-gst:${payout.id}`,
+              idempotencyKey: `commission-gst:${payout.id}:${attempt.id}`,
               transactionStatus: "CLEARED",
             },
           });
@@ -413,6 +491,8 @@ export class EscrowCreatorPayoutService {
         where: { providerPayoutId: providerId },
         include: { payout: true },
       });
+      if (attempt)
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-obligation:${attempt.payout.collaborationId}`}))`;
       if (!attempt || attempt.status === "REVERSED") return;
       if (attempt.status !== "PAID") {
         if (attempt.status === "FAILED") return;
@@ -458,9 +538,13 @@ export class EscrowCreatorPayoutService {
             : { finalTrancheDisbursed: false },
       });
       const escrowStatus =
-        payout.tranche === "FINAL_70" && lock.advanceTrancheDisbursed
-          ? "PARTIAL_RELEASE"
-          : "FUNDED";
+        payout.tranche === "ADVANCE_30"
+          ? lock.finalTrancheDisbursed
+            ? "PARTIAL_RELEASE"
+            : "FUNDED"
+          : lock.advanceTrancheDisbursed
+            ? "PARTIAL_RELEASE"
+            : "FUNDED";
       await tx.collaborationCommercial.update({
         where: { collaborationId: payout.collaborationId },
         data: { escrowStatus },
@@ -480,8 +564,8 @@ export class EscrowCreatorPayoutService {
           amount: restored,
           currency: payout.currency,
           idempotencyKey: `reversal:${attempt.id}`,
-          gatewayReferenceId: providerId,
           transactionStatus: "REVERSED",
+          errorDiagnosticPayload: { providerPayoutId: providerId },
         },
       });
       const now = new Date();
@@ -526,14 +610,25 @@ export class EscrowCreatorPayoutService {
 
   private async settleZeroFinal(payoutId: string) {
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`creator-payout:${payoutId}`}))`;
       const payout = await tx.escrowCreatorPayout.findUniqueOrThrow({
         where: { id: payoutId },
       });
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-obligation:${payout.collaborationId}`}))`;
       if (payout.status === "PAID") return this.map(payout);
       const lock = await tx.collaborationEscrowLock.findUniqueOrThrow({
         where: { id: payout.escrowLockId },
       });
+      const commercial = await tx.collaborationCommercial.findUniqueOrThrow({
+        where: { collaborationId: payout.collaborationId },
+      });
+      if (
+        lock.lockReleasedViaRefund ||
+        (commercial.advance30Amount.greaterThan(0) &&
+          !lock.advanceTrancheDisbursed)
+      )
+        throw new ConflictException(
+          "Creator obligations must be paid before final settlement",
+        );
       const vault = await tx.brandEscrowVault.findUniqueOrThrow({
         where: { brandProfileId: payout.brandProfileId },
       });

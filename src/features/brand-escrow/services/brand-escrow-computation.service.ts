@@ -245,7 +245,10 @@ export class BrandEscrowComputationService {
         const state = existing.lockReleasedViaRefund
           ? "REFUNDED"
           : existing.finalTrancheDisbursed
-            ? "SETTLED"
+            ? collaboration.commercials!.advance30Amount.greaterThan(0) &&
+              !existing.advanceTrancheDisbursed
+              ? "PARTIAL_RELEASE"
+              : "SETTLED"
             : existing.advanceTrancheDisbursed
               ? "PARTIAL_RELEASE"
               : "FUNDED";

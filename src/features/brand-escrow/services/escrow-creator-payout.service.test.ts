@@ -3,6 +3,35 @@ import { describe, expect, it, vi } from "vitest";
 import { EscrowCreatorPayoutService } from "./escrow-creator-payout.service";
 
 describe("BS09 P3 creator payout lifecycle", () => {
+  it("denies inactive membership inside the canonical payout service", async () => {
+    const tx = {
+      $queryRaw: vi.fn(),
+      brandTeamMember: {
+        findUnique: vi.fn().mockResolvedValue({
+          isActive: false,
+          role: "CAMPAIGN_MANAGER",
+        }),
+      },
+      collaboration: { findUnique: vi.fn() },
+    };
+    const service = new EscrowCreatorPayoutService(
+      {
+        $transaction: (callback: (value: typeof tx) => unknown) => callback(tx),
+      } as never,
+      {} as never,
+    );
+
+    await expect(
+      service.approveAndStart({
+        collaborationId: "collab-1",
+        brandProfileId: "brand-1",
+        approvedByUserId: "user-1",
+        tranche: "ADVANCE_30",
+      }),
+    ).rejects.toThrow("Active Brand payout authority required");
+    expect(tx.collaboration.findUnique).not.toHaveBeenCalled();
+  });
+
   it("persists approval and attempt before provider processing without moving funds", async () => {
     const logical = {
       id: "payout-1",
@@ -24,6 +53,13 @@ describe("BS09 P3 creator payout lifecycle", () => {
       status: "CREATED",
     };
     const tx = {
+      $queryRaw: vi.fn(),
+      brandTeamMember: {
+        findUnique: vi.fn().mockResolvedValue({
+          isActive: true,
+          role: "CAMPAIGN_MANAGER",
+        }),
+      },
       collaboration: {
         findUnique: vi.fn().mockResolvedValue({
           id: "collab-1",
@@ -53,7 +89,11 @@ describe("BS09 P3 creator payout lifecycle", () => {
         findUnique: vi.fn().mockResolvedValue({ currency: "INR" }),
         update: vi.fn(),
       },
-      escrowCreatorPayout: { upsert: vi.fn().mockResolvedValue(logical) },
+      escrowCreatorPayout: {
+        upsert: vi.fn().mockResolvedValue(logical),
+        findUnique: vi.fn().mockResolvedValue(logical),
+        update: vi.fn(),
+      },
       creatorSettlementProfile: {
         findUnique: vi.fn().mockResolvedValue({
           id: "settlement-1",
@@ -66,7 +106,14 @@ describe("BS09 P3 creator payout lifecycle", () => {
       },
       escrowCreatorPayoutAttempt: {
         findFirst: vi.fn().mockResolvedValue(null),
+        findUnique: vi.fn().mockResolvedValue(attempt),
         create: vi.fn().mockResolvedValue(attempt),
+        update: vi.fn(),
+      },
+      collaborationEscrowLock: {
+        findUnique: vi.fn().mockResolvedValue({
+          lockReleasedViaRefund: false,
+        }),
       },
     };
     const prisma = {
@@ -155,10 +202,19 @@ describe("BS09 P3 creator payout lifecycle", () => {
         update: vi.fn(),
       },
       brandEscrowVault: {
-        findUniqueOrThrow: vi.fn().mockResolvedValue({ id: "vault-1" }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          id: "vault-1",
+          lockedCampaignFunds: new Decimal(108260),
+          totalPooledBalance: new Decimal(108260),
+        }),
         update: vi.fn(),
       },
-      collaborationCommercial: { update: vi.fn() },
+      collaborationCommercial: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          advance30Amount: new Decimal(20000),
+        }),
+        update: vi.fn(),
+      },
       collaborationFinalization: { update: vi.fn() },
       escrowTransactionLedger: { create: vi.fn() },
       escrowCreatorPayout: {
