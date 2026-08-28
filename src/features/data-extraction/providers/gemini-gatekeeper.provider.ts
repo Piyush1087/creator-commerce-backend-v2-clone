@@ -10,6 +10,12 @@ import {
   type ProviderEvidenceResult,
 } from "../contracts/provider-execution.contract";
 import { withBoundedTechnicalRetry } from "../utils/provider-retry.util";
+import {
+  credentialFingerprint,
+  extractProviderHttpStatus,
+  extractProviderMessage,
+  sanitizeProviderMessage,
+} from "../utils/provider-error-diagnostics.util";
 
 const CAPABILITY_ID = "gatekeeper_primary_web_assessment";
 /** Max chars of model text kept in diagnostic logs (no full payload dump). */
@@ -43,10 +49,7 @@ type GeminiInteractionLike = {
 };
 
 function statusFromError(error: unknown): number | undefined {
-  if (!error || typeof error !== "object") return undefined;
-  const value = error as { status?: unknown; statusCode?: unknown };
-  const candidate = value.status ?? value.statusCode;
-  return typeof candidate === "number" ? candidate : undefined;
+  return extractProviderHttpStatus(error);
 }
 
 function isTimeout(error: unknown): boolean {
@@ -140,6 +143,35 @@ function stripMarkdownJsonFence(rawText: string): {
   return { text: trimmed, strippedFence: false };
 }
 
+function extractJsonObject(text: string): string {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end <= start) return text;
+  return text.slice(start, end + 1);
+}
+
+function parseJsonPayload(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch (firstError) {
+    const extracted = extractJsonObject(text);
+    if (extracted === text) throw firstError;
+    return JSON.parse(extracted);
+  }
+}
+
+function isRetryableStructuredOutput(
+  capabilityId: string,
+  error: unknown,
+): boolean {
+  return (
+    capabilityId === "brand_preview.public_web_enrichment" &&
+    error instanceof DataExtractionProviderError &&
+    (error.detail.code === "STRUCTURED_OUTPUT_INVALID" ||
+      error.detail.code === "EMPTY_RESULT")
+  );
+}
+
 function safeZodIssueDiagnostics(error: {
   issues: Array<{ path: PropertyKey[]; code: string; message: string }>;
 }): Array<{ path: string; code: string; message: string }> {
@@ -191,6 +223,18 @@ export class GeminiGatekeeperProvider {
     const capabilityId = args.capabilityId ?? CAPABILITY_ID;
     const apiKey = this.config.get<string>("GEMINI_API_KEY", "").trim();
     if (!apiKey) {
+      this.logger.warn({
+        msg: "data_extraction.provider_failure",
+        provider: "GOOGLE_GEMINI",
+        capabilityId,
+        modelId: args.modelId,
+        credentialEnv: "GEMINI_API_KEY",
+        credentialPresent: false,
+        credentialFingerprint: "missing",
+        mappedCode: "CONFIGURATION_ERROR",
+        providerMessage: "GEMINI_API_KEY is not configured",
+        acquisitionRunId: args.acquisitionRunId,
+      });
       throw new DataExtractionProviderError({
         code: "CONFIGURATION_ERROR",
         provider: "GOOGLE_GEMINI",
@@ -224,6 +268,7 @@ export class GeminiGatekeeperProvider {
           const status = statusFromError(error);
           return {
             retry:
+              isRetryableStructuredOutput(capabilityId, error) ||
               isTimeout(error) ||
               status === 408 ||
               status === 429 ||
@@ -259,112 +304,116 @@ export class GeminiGatekeeperProvider {
             );
             timer.unref?.();
           });
-          return (await Promise.race([
+          const interaction = (await Promise.race([
             responsePromise,
             timeoutPromise,
           ])) as GeminiInteractionLike;
+          const stepSummary = interactionStepSummary(interaction);
+          const rawText = interactionOutputText(interaction);
+          if (!rawText) {
+            this.logger.warn({
+              msg: "gatekeeper.gemini.structured_output_diagnostic",
+              failureKind: "EMPTY_MODEL_TEXT",
+              acquisitionRunId: args.acquisitionRunId,
+              modelId: args.modelId,
+              attemptCount,
+              ...stepSummary,
+            });
+            throw new DataExtractionProviderError({
+              code: "EMPTY_RESULT",
+              provider: "GOOGLE_GEMINI",
+              capabilityId,
+              modelId: args.modelId,
+              message: "Gemini returned an empty assessment",
+              retryable: false,
+              attemptCount,
+              acquisitionRunId: args.acquisitionRunId,
+            });
+          }
+
+          const { text: jsonText, strippedFence } =
+            stripMarkdownJsonFence(rawText);
+          if (strippedFence) {
+            this.logger.warn({
+              msg: "gatekeeper.gemini.structured_output_diagnostic",
+              failureKind: "MARKDOWN_FENCE_STRIPPED",
+              acquisitionRunId: args.acquisitionRunId,
+              modelId: args.modelId,
+              attemptCount,
+              ...safeRawTextDiagnostics(rawText),
+              strippedLength: jsonText.length,
+              ...stepSummary,
+            });
+          }
+
+          let parsed: unknown;
+          try {
+            parsed = parseJsonPayload(jsonText);
+          } catch (parseError) {
+            this.logger.warn({
+              msg: "gatekeeper.gemini.structured_output_diagnostic",
+              failureKind: "JSON_PARSE",
+              acquisitionRunId: args.acquisitionRunId,
+              modelId: args.modelId,
+              attemptCount,
+              strippedFence,
+              parseError:
+                parseError instanceof Error
+                  ? parseError.message.slice(0, 160)
+                  : "unknown",
+              ...safeRawTextDiagnostics(rawText),
+              ...stepSummary,
+            });
+            throw new DataExtractionProviderError({
+              code: "STRUCTURED_OUTPUT_INVALID",
+              provider: "GOOGLE_GEMINI",
+              capabilityId,
+              modelId: args.modelId,
+              message: "Gemini grounded assessment was not valid JSON",
+              retryable: false,
+              attemptCount,
+              acquisitionRunId: args.acquisitionRunId,
+            });
+          }
+
+          const validated = args.outputSchema.safeParse(parsed);
+          if (!validated.success) {
+            this.logger.warn({
+              msg: "gatekeeper.gemini.structured_output_diagnostic",
+              failureKind: "SCHEMA_VALIDATION",
+              acquisitionRunId: args.acquisitionRunId,
+              modelId: args.modelId,
+              attemptCount,
+              topLevelKeys: topLevelKeys(parsed),
+              issueCount: validated.error.issues.length,
+              issues: safeZodIssueDiagnostics(validated.error),
+              ...safeRawTextDiagnostics(rawText),
+              ...stepSummary,
+            });
+            throw new DataExtractionProviderError({
+              code: "STRUCTURED_OUTPUT_INVALID",
+              provider: "GOOGLE_GEMINI",
+              capabilityId,
+              modelId: args.modelId,
+              message:
+                "Gemini grounded assessment failed structural validation",
+              retryable: false,
+              attemptCount,
+              acquisitionRunId: args.acquisitionRunId,
+            });
+          }
+
+          return { interaction, payload: validated.data };
         },
       });
 
       attemptCount = execution.attemptCount;
-      const stepSummary = interactionStepSummary(execution.value);
-      const rawText = interactionOutputText(execution.value);
-      if (!rawText) {
-        this.logger.warn({
-          msg: "gatekeeper.gemini.structured_output_diagnostic",
-          failureKind: "EMPTY_MODEL_TEXT",
-          acquisitionRunId: args.acquisitionRunId,
-          modelId: args.modelId,
-          attemptCount,
-          ...stepSummary,
-        });
-        throw new DataExtractionProviderError({
-          code: "EMPTY_RESULT",
-          provider: "GOOGLE_GEMINI",
-          capabilityId,
-          modelId: args.modelId,
-          message: "Gemini returned an empty assessment",
-          retryable: false,
-          attemptCount,
-          acquisitionRunId: args.acquisitionRunId,
-        });
-      }
-
-      const { text: jsonText, strippedFence } = stripMarkdownJsonFence(rawText);
-      if (strippedFence) {
-        this.logger.warn({
-          msg: "gatekeeper.gemini.structured_output_diagnostic",
-          failureKind: "MARKDOWN_FENCE_STRIPPED",
-          acquisitionRunId: args.acquisitionRunId,
-          modelId: args.modelId,
-          attemptCount,
-          ...safeRawTextDiagnostics(rawText),
-          strippedLength: jsonText.length,
-          ...stepSummary,
-        });
-      }
-
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(jsonText);
-      } catch (parseError) {
-        this.logger.warn({
-          msg: "gatekeeper.gemini.structured_output_diagnostic",
-          failureKind: "JSON_PARSE",
-          acquisitionRunId: args.acquisitionRunId,
-          modelId: args.modelId,
-          attemptCount,
-          strippedFence,
-          parseError:
-            parseError instanceof Error
-              ? parseError.message.slice(0, 160)
-              : "unknown",
-          ...safeRawTextDiagnostics(rawText),
-          ...stepSummary,
-        });
-        throw new DataExtractionProviderError({
-          code: "STRUCTURED_OUTPUT_INVALID",
-          provider: "GOOGLE_GEMINI",
-          capabilityId,
-          modelId: args.modelId,
-          message: "Gemini grounded assessment was not valid JSON",
-          retryable: false,
-          attemptCount,
-          acquisitionRunId: args.acquisitionRunId,
-        });
-      }
-
-      const validated = args.outputSchema.safeParse(parsed);
-      if (!validated.success) {
-        this.logger.warn({
-          msg: "gatekeeper.gemini.structured_output_diagnostic",
-          failureKind: "SCHEMA_VALIDATION",
-          acquisitionRunId: args.acquisitionRunId,
-          modelId: args.modelId,
-          attemptCount,
-          topLevelKeys: topLevelKeys(parsed),
-          issueCount: validated.error.issues.length,
-          issues: safeZodIssueDiagnostics(validated.error),
-          ...safeRawTextDiagnostics(rawText),
-          ...stepSummary,
-        });
-        throw new DataExtractionProviderError({
-          code: "STRUCTURED_OUTPUT_INVALID",
-          provider: "GOOGLE_GEMINI",
-          capabilityId,
-          modelId: args.modelId,
-          message: "Gemini grounded assessment failed structural validation",
-          retryable: false,
-          attemptCount,
-          acquisitionRunId: args.acquisitionRunId,
-        });
-      }
-
+      const interaction = execution.value.interaction;
       const acquiredAt = new Date().toISOString();
       const provenance: EvidenceProvenance[] = [];
       const ownedUrls = new Set<string>();
 
-      for (const step of execution.value.steps ?? []) {
+      for (const step of interaction.steps ?? []) {
         if (step.type !== "url_context_result" || step.is_error) continue;
         for (const row of step.result ?? []) {
           if (!row.url || row.status !== "success") continue;
@@ -380,12 +429,12 @@ export class GeminiGatekeeperProvider {
         }
       }
 
-      const searchCompleted = (execution.value.steps ?? []).some(
+      const searchCompleted = (interaction.steps ?? []).some(
         (step) => step.type === "google_search_result" && !step.is_error,
       );
       const searchUrls = new Set<string>();
       if (searchCompleted) {
-        const citedSources = (execution.value.steps ?? [])
+        const citedSources = (interaction.steps ?? [])
           .filter((step) => step.type === "model_output")
           .flatMap((step) => step.content ?? [])
           .flatMap((content) => content.annotations ?? [])
@@ -397,7 +446,7 @@ export class GeminiGatekeeperProvider {
             url: annotation.url as string,
             title: annotation.title,
           }));
-        const suggestionSources = (execution.value.steps ?? [])
+        const suggestionSources = (interaction.steps ?? [])
           .filter((step) => step.type === "google_search_result")
           .flatMap((step) => step.result ?? [])
           .flatMap((result) =>
@@ -437,7 +486,7 @@ export class GeminiGatekeeperProvider {
         availability: complete ? "AVAILABLE" : "PARTIALLY_AVAILABLE",
         quality: complete ? "VALID" : "DEGRADED",
         qualityFlags,
-        payload: validated.data,
+        payload: execution.value.payload,
         provenance,
         connectionState: complete ? "CONNECTED" : "DEGRADED",
         telemetry: {
@@ -450,12 +499,15 @@ export class GeminiGatekeeperProvider {
           durationMs: completed - started,
           attemptCount,
           rateLimited: false,
-          usage: execution.value.usage,
+          usage: interaction.usage,
         },
       };
     } catch (error) {
       if (error instanceof DataExtractionProviderError) throw error;
       const status = statusFromError(error);
+      const providerMessage = sanitizeProviderMessage(
+        extractProviderMessage(error),
+      );
       const code = isTimeout(error)
         ? "REQUEST_TIMEOUT"
         : status === 401 || status === 403
@@ -467,12 +519,28 @@ export class GeminiGatekeeperProvider {
               : status && status >= 500
                 ? "PROVIDER_UNAVAILABLE"
                 : "PROVIDER_ERROR";
+      const credential = credentialFingerprint(apiKey);
+      this.logger.warn({
+        msg: "data_extraction.provider_failure",
+        provider: "GOOGLE_GEMINI",
+        capabilityId,
+        modelId: args.modelId,
+        credentialEnv: "GEMINI_API_KEY",
+        credentialPresent: credential.present,
+        credentialFingerprint: credential.fingerprint,
+        httpStatus: status ?? null,
+        mappedCode: code,
+        providerMessage,
+        errorName: error instanceof Error ? error.name : typeof error,
+        acquisitionRunId: args.acquisitionRunId,
+        attemptCount,
+      });
       throw new DataExtractionProviderError({
         code,
         provider: "GOOGLE_GEMINI",
         capabilityId,
         modelId: args.modelId,
-        message: `Gemini capability execution failed (${code})`,
+        message: `Gemini capability execution failed (${code}): ${providerMessage}`,
         retryable: false,
         attemptCount,
         providerStatusCode: status,
