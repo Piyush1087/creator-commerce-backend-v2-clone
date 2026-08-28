@@ -48,6 +48,7 @@ describe("P3 domain commit-boundary enforcement", () => {
       {} as never,
       {} as never,
       restrictedCapability() as never,
+      {} as never,
     );
     await expect(
       service.createCardTopUpIntent("brand-1", 100, "key-1"),

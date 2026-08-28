@@ -43,7 +43,10 @@ export class RazorpayClient {
     return `Basic ${Buffer.from(`${this.apiKeyId}:${this.apiKeySecret}`).toString("base64")}`;
   }
 
-  private async postJson<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  private async postJson<T>(
+    path: string,
+    body: Record<string, unknown>,
+  ): Promise<T> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
 
@@ -74,9 +77,7 @@ export class RazorpayClient {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new ServiceUnavailableException(
-        "Payment gateway handshake failed",
-      );
+      throw new ServiceUnavailableException("Payment gateway handshake failed");
     } finally {
       clearTimeout(timeout);
     }
@@ -119,14 +120,11 @@ export class RazorpayClient {
 
 export function extractBankReceiver(
   receivers: RazorpayReceiver[] | undefined,
-): RazorpayReceiver {
-  const bankAccount = receivers?.find((receiver) => receiver.entity === "bank_account");
-  if (!bankAccount?.account_number || !bankAccount.ifsc) {
-    throw new BadRequestException(
-      "Partner gateway did not return virtual account bank routing details",
-    );
-  }
-  return bankAccount;
+): RazorpayReceiver | null {
+  const bankAccount = receivers?.find(
+    (receiver) => receiver.entity === "bank_account",
+  );
+  return bankAccount ?? null;
 }
 
 export function extractVpaReceiver(

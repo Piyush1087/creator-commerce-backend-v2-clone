@@ -9,6 +9,7 @@ export function mapEscrowVault(vault: BrandEscrowVault) {
     ifsc_code: vault.ifscCode,
     upi_vpa: vault.upiVpa,
     bank_name: vault.bankName,
+    virtual_account_enabled: vault.virtualAccountEnabled,
     currency: vault.currency,
     total_pooled_balance: vault.totalPooledBalance.toNumber(),
     locked_campaign_funds: vault.lockedCampaignFunds.toNumber(),

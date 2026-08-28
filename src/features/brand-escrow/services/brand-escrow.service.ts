@@ -1,8 +1,9 @@
 import {
-  ConflictException,
+  BadRequestException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { Decimal } from "@prisma/client/runtime/library";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
@@ -24,88 +25,80 @@ export class BrandEscrowService {
     private readonly computationEngine: EscrowComputationEngine,
     private readonly escrowBilling: EscrowSubscriptionContextService,
     private readonly subscriptionCapabilities: SubscriptionCapabilityService,
+    private readonly config: ConfigService,
   ) {}
 
-  async initializeSecureVault(brandProfileId: string) {
+  private virtualAccountsEnabled(): boolean {
+    return (
+      this.config
+        .get<string>("RAZORPAY_VIRTUAL_ACCOUNTS_ENABLED", "false")
+        .toLowerCase() === "true"
+    );
+  }
+
+  async ensureVault(brandProfileId: string, provisionVirtualAccount = false) {
     const brand = await this.prisma.brandProfile.findUnique({
       where: { id: brandProfileId },
     });
-
-    if (!brand) {
-      throw new NotFoundException("Brand profile not found");
-    }
-
-    const existingVault = await this.prisma.brandEscrowVault.findUnique({
-      where: { brandProfileId },
-    });
-
-    if (existingVault) {
-      throw new ConflictException(
-        "A secure escrow vault is already bound to this brand workspace",
-      );
-    }
-
+    if (!brand) throw new NotFoundException("Brand profile not found");
     const currency = resolveEscrowCurrency(brand);
-    const rzpData = await this.razorpay.createVirtualAccount({
-      description: `Escrow vault for ${brand.name}`,
+    let vault = await this.prisma.brandEscrowVault.upsert({
+      where: { brandProfileId },
+      create: { brandProfileId, currency },
+      update: {},
     });
-    const bankAccount = extractBankReceiver(rzpData.receivers);
-    const upiVpa =
-      extractVpaReceiver(rzpData.receivers) ??
-      `${brand.domain.replace(/[^a-z0-9]/gi, "").toLowerCase()}.escrow@razorpay`;
+    if (
+      provisionVirtualAccount &&
+      currency === "INR" &&
+      this.virtualAccountsEnabled() &&
+      !vault.razorpayVirtualAccountId
+    ) {
+      const account = await this.razorpay.createVirtualAccount({
+        description: `Treasury funding account for ${brand.name}`,
+      });
+      const bank = extractBankReceiver(account.receivers);
+      vault = await this.prisma.brandEscrowVault.update({
+        where: { id: vault.id },
+        data: {
+          razorpayVirtualAccountId: account.id,
+          virtualAccountNumber: bank?.account_number ?? null,
+          ifscCode: bank?.ifsc ?? null,
+          upiVpa: extractVpaReceiver(account.receivers),
+          bankName: bank?.bank_name ?? null,
+          virtualAccountEnabled: true,
+        },
+      });
+    }
+    return vault;
+  }
 
-    const vault = await this.prisma.brandEscrowVault.create({
-      data: {
-        brandProfileId,
-        razorpayVirtualAccountId: rzpData.id,
-        virtualAccountNumber: bankAccount.account_number!,
-        ifscCode: bankAccount.ifsc!,
-        upiVpa,
-        bankName:
-          bankAccount.bank_name ?? "RBL Bank (Razorpay Escrow Partner Node)",
-        currency,
-        totalPooledBalance: new Decimal(0),
-        lockedCampaignFunds: new Decimal(0),
-        availableBalance: new Decimal(0),
-        tdsBufferBalance: new Decimal(0),
-      },
-    });
-
-    return mapEscrowVault(vault);
+  /** Deprecated compatibility adapter; all normal reads/funding provision lazily. */
+  async initializeSecureVault(brandProfileId: string) {
+    return mapEscrowVault(await this.ensureVault(brandProfileId, true));
   }
 
   async getVault(brandProfileId: string) {
-    const vault = await this.prisma.brandEscrowVault.findUnique({
-      where: { brandProfileId },
+    const vault = await this.ensureVault(brandProfileId);
+    const pending = await this.prisma.escrowFundingLoad.aggregate({
+      where: {
+        vaultId: vault.id,
+        state: { in: ["LOAD_INITIATED", "PENDING"] },
+      },
+      _sum: { principalAmount: true },
     });
-
-    if (!vault) {
-      throw new NotFoundException(
-        "Escrow vault not initialized for this brand",
-      );
-    }
-
-    return mapEscrowVault(vault);
+    return {
+      ...mapEscrowVault(vault),
+      pending_funding: pending._sum.principalAmount?.toNumber() ?? 0,
+    };
   }
 
   async listLedger(brandProfileId: string, limit = 50) {
-    const vault = await this.prisma.brandEscrowVault.findUnique({
-      where: { brandProfileId },
-      select: { id: true },
-    });
-
-    if (!vault) {
-      throw new NotFoundException(
-        "Escrow vault not initialized for this brand",
-      );
-    }
-
+    const vault = await this.ensureVault(brandProfileId);
     const entries = await this.prisma.escrowTransactionLedger.findMany({
       where: { vaultId: vault.id },
       orderBy: { createdAt: "desc" },
       take: Math.min(limit, 100),
     });
-
     return entries.map((entry) => ({
       transaction_id: entry.id,
       transaction_type: entry.transactionType,
@@ -130,68 +123,91 @@ export class BrandEscrowService {
       brandProfileId,
       "ESCROW_TOP_UP",
     );
-    const vault = await this.prisma.brandEscrowVault.findUnique({
-      where: { brandProfileId },
+    const vault = await this.ensureVault(brandProfileId);
+    const principal = new Decimal(targetAllocation);
+    if (vault.currency === "INR" && principal.lessThan(5000))
+      throw new BadRequestException("Minimum INR treasury top-up is 5000");
+    const existing = await this.prisma.escrowFundingLoad.findUnique({
+      where: { idempotencyKey },
     });
-
-    if (!vault) {
-      throw new NotFoundException(
-        "Escrow vault must be initialized before funding",
-      );
-    }
-
-    const allocationAmount = new Decimal(targetAllocation);
-    let gatewayProcessingSurcharge = new Decimal(0);
-    let gatewaySurchargeGst = new Decimal(0);
-
-    if (vault.currency === "INR") {
-      gatewayProcessingSurcharge = allocationAmount.mul(0.02);
-      gatewaySurchargeGst = gatewayProcessingSurcharge.mul(0.18);
-    } else {
-      gatewayProcessingSurcharge = allocationAmount.mul(0.02);
-    }
-
-    const totalInvoiceChargeAmount = allocationAmount
-      .add(gatewayProcessingSurcharge)
-      .add(gatewaySurchargeGst);
-
-    const transactionRecord = await this.prisma.escrowTransactionLedger.create({
+    if (existing) return this.mapCheckout(existing);
+    const fee =
+      vault.currency === "INR" ? principal.mul("0.02") : new Decimal(0);
+    const feeTax = vault.currency === "INR" ? fee.mul("0.18") : new Decimal(0);
+    const load = await this.prisma.escrowFundingLoad.create({
       data: {
         vaultId: vault.id,
         brandProfileId,
-        transactionType: "GATEWAY_TOPUP_CARD",
-        amount: allocationAmount,
+        sourceType: "GATEWAY",
         currency: vault.currency,
-        gatewayProcessingSurcharge,
-        gatewaySurchargeGst,
+        principalAmount: principal,
+        processingFee: fee,
+        processingFeeTax: feeTax,
+        state: "LOAD_INITIATED",
         idempotencyKey,
-        transactionStatus: "PROCESSING_GATEWAY",
+        initiatedAt: new Date(),
       },
     });
-
+    await this.prisma.escrowTransactionLedger.create({
+      data: {
+        vaultId: vault.id,
+        brandProfileId,
+        transactionType: "LOAD",
+        amount: principal,
+        currency: vault.currency,
+        idempotencyKey: `load:${idempotencyKey}`,
+        transactionStatus: "PENDING",
+      },
+    });
+    if (fee.greaterThan(0))
+      await this.prisma.escrowTransactionLedger.create({
+        data: {
+          vaultId: vault.id,
+          brandProfileId,
+          transactionType: "LOAD_FEE",
+          amount: fee.add(feeTax),
+          currency: vault.currency,
+          gatewayProcessingSurcharge: fee,
+          gatewaySurchargeGst: feeTax,
+          idempotencyKey: `load-fee:${idempotencyKey}`,
+          transactionStatus: "PENDING",
+        },
+      });
     const order = await this.razorpay.createOrder({
-      amountPaise: Math.round(totalInvoiceChargeAmount.toNumber() * 100),
+      amountPaise: Math.round(principal.add(fee).add(feeTax).toNumber() * 100),
       currency: vault.currency,
-      receipt: transactionRecord.id,
+      receipt: load.id,
       notes: {
         vault_id: vault.id,
         idempotency_key: idempotencyKey,
-        internal_transaction_id: transactionRecord.id,
+        funding_load_id: load.id,
       },
     });
+    return this.mapCheckout(
+      await this.prisma.escrowFundingLoad.update({
+        where: { id: load.id },
+        data: { providerOrderId: order.id, state: "PENDING" },
+      }),
+    );
+  }
 
-    await this.prisma.escrowTransactionLedger.update({
-      where: { id: transactionRecord.id },
-      data: { gatewayReferenceId: order.id },
-    });
-
+  private mapCheckout(load: {
+    id: string;
+    providerOrderId: string | null;
+    principalAmount: Decimal;
+    processingFee: Decimal;
+    processingFeeTax: Decimal;
+  }) {
     return {
-      checkout_order_id: order.id,
-      internal_transaction_id: transactionRecord.id,
-      total_invoice_charge_amount: totalInvoiceChargeAmount.toNumber(),
-      allocation_amount: allocationAmount.toNumber(),
-      gateway_surcharge: gatewayProcessingSurcharge.toNumber(),
-      surcharge_gst: gatewaySurchargeGst.toNumber(),
+      checkout_order_id: load.providerOrderId,
+      funding_load_id: load.id,
+      total_invoice_charge_amount: load.principalAmount
+        .add(load.processingFee)
+        .add(load.processingFeeTax)
+        .toNumber(),
+      allocation_amount: load.principalAmount.toNumber(),
+      gateway_surcharge: load.processingFee.toNumber(),
+      surcharge_gst: load.processingFeeTax.toNumber(),
     };
   }
 

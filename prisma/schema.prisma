@@ -671,6 +671,16 @@ enum CreatorCoPilotLinkedEntityType {
 // ============================================================================
 
 enum EscrowTransactionType {
+  LOAD
+  LOAD_FEE
+  RESERVE
+  RELEASE
+  CREATOR_PAYOUT
+  PLATFORM_COMMISSION
+  GST
+  COLLAB_REFUND
+  BRAND_RETURN
+  REVERSAL_CORRECTION
   VBA_TOPUP_WIRE
   GATEWAY_TOPUP_CARD
   CONTRACT_LOCK_RESERVE
@@ -682,10 +692,25 @@ enum EscrowTransactionType {
 }
 
 enum EscrowTransactionStatus {
+  PENDING
+  CREDITED
   PROCESSING_GATEWAY
   CLEARED
   FAILED
   REVERSED
+}
+
+enum EscrowFundingSourceType {
+  GATEWAY
+  VIRTUAL_ACCOUNT
+  BANK_TRANSFER
+}
+
+enum EscrowFundingState {
+  LOAD_INITIATED
+  PENDING
+  CREDITED
+  FAILED
 }
 
 enum EscrowPayoutTranche {
@@ -2901,11 +2926,12 @@ model BrandEscrowVault {
   id                       String       @id @default(uuid()) @map("vault_id")
   brandProfileId           String       @unique @map("brand_id")
   brandProfile             BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
-  razorpayVirtualAccountId String       @unique @map("razorpay_virtual_account_id")
-  virtualAccountNumber     String       @unique @map("virtual_account_number")
-  ifscCode                 String       @map("ifsc_code")
+  razorpayVirtualAccountId String?      @unique @map("razorpay_virtual_account_id")
+  virtualAccountNumber     String?      @unique @map("virtual_account_number")
+  ifscCode                 String?      @map("ifsc_code")
   upiVpa                   String?      @map("upi_vpa")
-  bankName                 String       @default("RBL Bank (Razorpay Escrow Partner Node)") @map("bank_name")
+  bankName                 String?      @map("bank_name")
+  virtualAccountEnabled    Boolean      @default(false) @map("virtual_account_enabled")
   currency                 String       @default("INR") @db.VarChar(3)
   totalPooledBalance       Decimal      @default(0) @map("total_pooled_balance") @db.Decimal(15, 4)
   lockedCampaignFunds      Decimal      @default(0) @map("locked_campaign_funds") @db.Decimal(15, 4)
@@ -2915,9 +2941,37 @@ model BrandEscrowVault {
   updatedAt                DateTime     @updatedAt @map("updated_at")
 
   ledgerEntries EscrowTransactionLedger[]
+  fundingLoads  EscrowFundingLoad[]
 
   @@index([brandProfileId])
   @@map("brand_escrow_vaults")
+}
+
+model EscrowFundingLoad {
+  id                    String                  @id @default(uuid()) @map("funding_load_id")
+  vaultId               String                  @map("vault_id")
+  vault                 BrandEscrowVault        @relation(fields: [vaultId], references: [id], onDelete: Restrict)
+  brandProfileId        String                  @map("brand_id")
+  sourceType            EscrowFundingSourceType @map("source_type")
+  currency              String                  @db.VarChar(3)
+  principalAmount       Decimal                 @map("principal_amount") @db.Decimal(15, 4)
+  processingFee         Decimal                 @default(0) @map("processing_fee") @db.Decimal(15, 4)
+  processingFeeTax      Decimal                 @default(0) @map("processing_fee_tax") @db.Decimal(15, 4)
+  state                 EscrowFundingState      @default(LOAD_INITIATED)
+  idempotencyKey        String?                 @unique @map("idempotency_key")
+  providerOrderId       String?                 @unique @map("provider_order_id")
+  providerPaymentId     String?                 @unique @map("provider_payment_id")
+  providerCreditId      String?                 @unique @map("provider_credit_id")
+  sourceReference       String?                 @map("source_reference")
+  initiatedAt           DateTime?               @map("initiated_at")
+  creditedAt            DateTime?               @map("credited_at")
+  failedAt              DateTime?               @map("failed_at")
+  createdAt             DateTime                @default(now()) @map("created_at")
+  updatedAt             DateTime                @updatedAt @map("updated_at")
+
+  @@index([vaultId, state])
+  @@index([brandProfileId, createdAt])
+  @@map("escrow_funding_loads")
 }
 
 model CollaborationEscrowLock {

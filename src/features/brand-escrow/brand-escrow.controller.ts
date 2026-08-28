@@ -16,6 +16,7 @@ import { ThrottlerGuard } from "@nestjs/throttler";
 import type { RequestWithAuthUser } from "../auth/auth.controller";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { BrandCentreAuthService } from "../brand-centre/brand-centre-auth.service";
+import { BrandWorkspaceAuthorizationService } from "../brand-centre/brand-workspace-authorization.service";
 import {
   CalculateEscrowBreakdownDto,
   ExecuteLockAllocationDto,
@@ -39,6 +40,7 @@ const UUID_REGEX =
 export class BrandEscrowController {
   constructor(
     private readonly brandAuth: BrandCentreAuthService,
+    private readonly workspaceAuth: BrandWorkspaceAuthorizationService,
     private readonly access: BrandEscrowAccessService,
     private readonly escrow: BrandEscrowService,
     private readonly computation: BrandEscrowComputationService,
@@ -49,13 +51,17 @@ export class BrandEscrowController {
   @Post("initialize")
   @HttpCode(HttpStatus.CREATED)
   async initializeVault(@Req() req: RequestWithAuthUser) {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const { brandProfileId } = await this.workspaceAuth.assertFinancialMutation(
+      req.user,
+    );
     return this.escrow.initializeSecureVault(brandProfileId);
   }
 
   @Get("vault")
   async getVault(@Req() req: RequestWithAuthUser) {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const { brandProfileId } = await this.workspaceAuth.resolveBrandContext(
+      req.user,
+    );
     return this.escrow.getVault(brandProfileId);
   }
 
@@ -64,7 +70,9 @@ export class BrandEscrowController {
     @Req() req: RequestWithAuthUser,
     @Query() query: ListEscrowLedgerQueryDto,
   ) {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const { brandProfileId } = await this.workspaceAuth.resolveBrandContext(
+      req.user,
+    );
     return this.escrow.listLedger(brandProfileId, query.limit ?? 50);
   }
 
@@ -74,7 +82,9 @@ export class BrandEscrowController {
     @Req() req: RequestWithAuthUser,
     @Body() body: TopUpIntentDto,
   ) {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const { brandProfileId } = await this.workspaceAuth.assertFinancialMutation(
+      req.user,
+    );
     return this.escrow.createCardTopUpIntent(
       brandProfileId,
       body.target_allocation,
@@ -88,7 +98,9 @@ export class BrandEscrowController {
     @Req() req: RequestWithAuthUser,
     @Body() body: CalculateEscrowBreakdownDto,
   ) {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(req.user);
+    const { brandProfileId } = await this.workspaceAuth.resolveBrandContext(
+      req.user,
+    );
     return this.escrow.calculateBreakdown(brandProfileId, {
       grossCreatorQuote: body.gross_creator_quote,
       currency: body.currency,
