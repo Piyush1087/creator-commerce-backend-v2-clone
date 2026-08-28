@@ -571,7 +571,7 @@ export class BrandVerificationService {
   ): Promise<void> {
     try {
       const { jobId } =
-        await this.brandCentreScan.enqueueDeepScan(brandProfileId);
+        await this.brandCentreScan.enqueueOnboardingDeepScan(brandProfileId);
       this.logger.log(
         `deep-scan.enqueued brandProfileId=${brandProfileId} jobId=${jobId}`,
       );

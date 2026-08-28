@@ -43,3 +43,9 @@ export type EntitlementFeatureKey = Exclude<
   FeatureLimitKey,
   "ESCROW_AGGREGATE_CAP"
 >;
+
+export { SUBSCRIPTION_CAPABILITIES } from "./types/subscription-capability.types";
+export type {
+  SubscriptionCapability,
+  SubscriptionCapabilityDecision,
+} from "./types/subscription-capability.types";

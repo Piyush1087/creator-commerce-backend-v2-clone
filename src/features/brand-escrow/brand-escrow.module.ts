@@ -4,6 +4,7 @@ import { PrismaModule } from "../../prisma/prisma.module";
 import { AuthModule } from "../auth/auth.module";
 import { BrandCentreModule } from "../brand-centre/brand-centre.module";
 import { PricingModule } from "../pricing/pricing.module";
+import { SubscriptionCapabilityModule } from "../pricing/subscription-capability.module";
 import { BrandEscrowController } from "./brand-escrow.controller";
 import {
   BrandEscrowEngineController,
@@ -23,7 +24,13 @@ import { IdempotencyManager } from "./services/idempotency.manager";
 import { RazorpayClient } from "./services/razorpay.client";
 
 @Module({
-  imports: [PrismaModule, AuthModule, BrandCentreModule, PricingModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    BrandCentreModule,
+    PricingModule,
+    SubscriptionCapabilityModule,
+  ],
   controllers: [
     BrandEscrowController,
     BrandEscrowEngineController,

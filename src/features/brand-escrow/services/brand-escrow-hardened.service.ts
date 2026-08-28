@@ -6,6 +6,7 @@ import {
 import { Decimal } from "@prisma/client/runtime/library";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
 import type { EscrowCurrency, VaultRowLock } from "../types";
 import type { ExecuteLockAllocationInput } from "./brand-escrow-computation.service";
 import { EscrowComputationEngine } from "./escrow-computation.engine";
@@ -19,6 +20,7 @@ export class BrandEscrowHardenedService {
     private readonly idempotencyManager: IdempotencyManager,
     private readonly computationEngine: EscrowComputationEngine,
     private readonly escrowBilling: EscrowSubscriptionContextService,
+    private readonly subscriptionCapabilities: SubscriptionCapabilityService,
   ) {}
 
   async secureCollaborationFundsHardened(
@@ -26,6 +28,10 @@ export class BrandEscrowHardenedService {
     idempotencyKey: string,
   ): Promise<Record<string, unknown>> {
     const routePath = "/api/v1/hardened-escrow/lock-funds";
+    await this.subscriptionCapabilities.assertCapability(
+      input.brandProfileId,
+      "ESCROW_RESERVE",
+    );
     await this.idempotencyManager.registerIntent(idempotencyKey, routePath);
 
     try {
@@ -38,7 +44,9 @@ export class BrandEscrowHardenedService {
         `;
 
         if (!rows.length) {
-          throw new NotFoundException("Escrow vault not initialized for this brand");
+          throw new NotFoundException(
+            "Escrow vault not initialized for this brand",
+          );
         }
 
         const rawVault = rows[0];
@@ -78,7 +86,9 @@ export class BrandEscrowHardenedService {
         const targetNewAvailable = availableBalance.sub(
           metrics.totalEscrowLockedAmount,
         );
-        const targetNewLocked = lockedFunds.add(metrics.totalEscrowLockedAmount);
+        const targetNewLocked = lockedFunds.add(
+          metrics.totalEscrowLockedAmount,
+        );
 
         await tx.$executeRaw`
           UPDATE brand_escrow_vaults

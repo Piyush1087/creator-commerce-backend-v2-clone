@@ -9,6 +9,7 @@ import { gateAndNormalizeBrandUrl } from "../../brand-onboarding/discovery-url.u
 import { ParallelExtractClient } from "../../brand-onboarding/integrations/parallel/parallel-extract.client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { BrandVisualStateService } from "../../brand-canonical-state/brand-visual-state.service";
+import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
 import { getIndustryRoutingTemplate } from "../config/industry-routing-templates";
 
 const COLLECTION_TYPES: OfferingType[] = [OfferingType.COLLECTION];
@@ -26,6 +27,7 @@ export class BrandCentreDnaService {
     private readonly prisma: PrismaService,
     private readonly parallel: ParallelExtractClient,
     private readonly visuals: BrandVisualStateService,
+    private readonly subscriptionCapabilities: SubscriptionCapabilityService,
   ) {}
 
   async getDnaAggregate(brandProfileId: string) {
@@ -334,6 +336,10 @@ export class BrandCentreDnaService {
   }
 
   async scanOfferingUrl(brandProfileId: string, url: string) {
+    await this.subscriptionCapabilities.assertCapability(
+      brandProfileId,
+      "AI_SCAN_START",
+    );
     const profile = await this.prisma.brandProfile.findUnique({
       where: { id: brandProfileId },
     });
@@ -571,6 +577,10 @@ export class BrandCentreDnaService {
   }
 
   async scanCompetitorUrl(brandProfileId: string, url: string) {
+    await this.subscriptionCapabilities.assertCapability(
+      brandProfileId,
+      "AI_SCAN_START",
+    );
     const profile = await this.prisma.brandProfile.findUnique({
       where: { id: brandProfileId },
     });

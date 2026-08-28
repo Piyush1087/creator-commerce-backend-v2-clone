@@ -12,6 +12,7 @@ import { Decimal } from "@prisma/client/runtime/library";
 import { randomUUID } from "crypto";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
 import type { EscrowCurrency, EscrowTdsPercentage } from "../types";
 import { EscrowComputationEngine } from "./escrow-computation.engine";
 import { EscrowSubscriptionContextService } from "./escrow-subscription-context.service";
@@ -34,16 +35,23 @@ export class BrandEscrowComputationService {
     private readonly prisma: PrismaService,
     private readonly computationEngine: EscrowComputationEngine,
     private readonly escrowBilling: EscrowSubscriptionContextService,
+    private readonly subscriptionCapabilities: SubscriptionCapabilityService,
   ) {}
 
   async executeStage2Lock(input: ExecuteLockAllocationInput) {
+    await this.subscriptionCapabilities.assertCapability(
+      input.brandProfileId,
+      "ESCROW_RESERVE",
+    );
     return this.prisma.$transaction(async (tx) => {
       const vault = await tx.brandEscrowVault.findUnique({
         where: { brandProfileId: input.brandProfileId },
       });
 
       if (!vault) {
-        throw new NotFoundException("Escrow vault not initialized for this brand");
+        throw new NotFoundException(
+          "Escrow vault not initialized for this brand",
+        );
       }
 
       const collaboration = await tx.collaboration.findUnique({
@@ -56,11 +64,15 @@ export class BrandEscrowComputationService {
       }
 
       if (collaboration.brandProfileId !== input.brandProfileId) {
-        throw new BadRequestException("Collaboration does not belong to this brand");
+        throw new BadRequestException(
+          "Collaboration does not belong to this brand",
+        );
       }
 
       if (collaboration.payoutMode !== CollaborationPayoutMode.ESCROW) {
-        throw new BadRequestException("Collaboration is not in ESCROW payout mode");
+        throw new BadRequestException(
+          "Collaboration is not in ESCROW payout mode",
+        );
       }
 
       const existingLock = await tx.collaborationEscrowLock.findUnique({
@@ -191,7 +203,8 @@ export class BrandEscrowComputationService {
           throw new ConflictException("Advance tranche already disbursed");
         }
 
-        const advancePayoutAmount = lock.netCreatorPayoutPool.mul(advanceMultiplier);
+        const advancePayoutAmount =
+          lock.netCreatorPayoutPool.mul(advanceMultiplier);
 
         await tx.brandEscrowVault.update({
           where: { id: vault.id },

@@ -1,4 +1,4 @@
-import { ConflictException } from "@nestjs/common";
+import { ConflictException, ForbiddenException } from "@nestjs/common";
 import { UceApplicationStatus, UceCampaignStatus } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
@@ -6,7 +6,7 @@ import { CampaignApplicationService } from "./campaign-application.service";
 
 const applicationId = "3dc7e4b2-6b69-4c58-b5f0-0ed03256e451";
 
-function approvalHarness(claimCount = 1) {
+function approvalHarness(claimCount = 1, capabilityError?: Error) {
   const application = {
     id: applicationId,
     campaignId: "campaign-1",
@@ -65,6 +65,11 @@ function approvalHarness(claimCount = 1) {
     }),
     broadcastProvisioned: vi.fn().mockResolvedValue(undefined),
   };
+  const subscriptionCapabilities = {
+    assertCapability: capabilityError
+      ? vi.fn().mockRejectedValue(capabilityError)
+      : vi.fn().mockResolvedValue(undefined),
+  };
   return {
     tx,
     prisma,
@@ -74,11 +79,26 @@ function approvalHarness(claimCount = 1) {
       access as never,
       pipeline as never,
       collaborationProvision as never,
+      subscriptionCapabilities as never,
     ),
   };
 }
 
 describe("CampaignApplicationService development authority", () => {
+  it("denies Collaboration creation before claiming or mutating an Application", async () => {
+    const { service, prisma, tx, collaborationProvision } = approvalHarness(
+      1,
+      new ForbiddenException("SUBSCRIPTION_RESTRICTED"),
+    );
+    await expect(
+      service.approve("brand-1", "campaign-1", applicationId, "actor-1"),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(tx.uceApplication.updateMany).not.toHaveBeenCalled();
+    expect(
+      collaborationProvision.provisionFromUceApprovalInTransaction,
+    ).not.toHaveBeenCalled();
+  });
   it("lists UceApplications without invoking legacy synchronization", async () => {
     const { service, prisma } = approvalHarness();
     prisma.uceApplication.findMany.mockResolvedValue([

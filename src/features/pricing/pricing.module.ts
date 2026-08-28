@@ -16,9 +16,16 @@ import { PricingWebhookService } from "./services/pricing-webhook.service";
 import { RazorpayPlanProvisioningService } from "./services/razorpay-plan-provisioning.service";
 import { SubscriptionLifecycleService } from "./services/subscription-lifecycle.service";
 import { SubscriptionAccessService } from "./services/subscription-access.service";
+import { SubscriptionCapabilityModule } from "./subscription-capability.module";
 
 @Module({
-  imports: [PrismaModule, AuthModule, BrandCentreModule, BrandSettingsModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    BrandCentreModule,
+    BrandSettingsModule,
+    SubscriptionCapabilityModule,
+  ],
   controllers: [PricingController, PricingWebhookController],
   providers: [
     GeoRoutingService,
@@ -33,6 +40,7 @@ import { SubscriptionAccessService } from "./services/subscription-access.servic
     SubscriptionLifecycleReconciliationScheduler,
   ],
   exports: [
+    SubscriptionCapabilityModule,
     EntitlementService,
     PlanCatalogService,
     SubscriptionLifecycleService,

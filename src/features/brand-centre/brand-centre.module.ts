@@ -6,6 +6,7 @@ import { BrandCanonicalStateModule } from "../brand-canonical-state/brand-canoni
 import { BrandIntelligenceModule } from "../brand-intelligence/brand-intelligence.module";
 import { GeminiJsonClient } from "../brand-onboarding/integrations/gemini/gemini-json.client";
 import { ParallelExtractClient } from "../brand-onboarding/integrations/parallel/parallel-extract.client";
+import { SubscriptionCapabilityModule } from "../pricing/subscription-capability.module";
 import { BrandCentreAuthService } from "./brand-centre-auth.service";
 import { BrandCentreController } from "./brand-centre.controller";
 import { BrandWorkspaceAuthorizationService } from "./brand-workspace-authorization.service";
@@ -30,6 +31,7 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
     AuthModule,
     BrandCanonicalStateModule,
     BrandIntelligenceModule,
+    SubscriptionCapabilityModule,
   ],
   controllers: [BrandCentreController, BrandConsumerController],
   providers: [

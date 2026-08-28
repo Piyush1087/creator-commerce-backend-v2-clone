@@ -27,11 +27,9 @@ import type {
 } from "../dto/brand-uce-pipeline.dto";
 import { normalizeInstagramHandle } from "../utils/instagram-handle.util";
 import { mapCollaborationRow } from "../utils/uce-collaboration-row.mapper";
-import {
-  decimalToNumber,
-  splitEscrowQuote,
-} from "../utils/uce-decimal.util";
+import { decimalToNumber, splitEscrowQuote } from "../utils/uce-decimal.util";
 import { CollaborationProvisionService } from "../../collaboration/services/collaboration-provision.service";
+import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
 import { BrandUceAccessService } from "./brand-uce-access.service";
 
 const PROSPECT_STATUSES: UceCollabStatus[] = [
@@ -56,6 +54,7 @@ export class BrandUcePipelineService {
     private readonly prisma: PrismaService,
     private readonly access: BrandUceAccessService,
     private readonly collaborationProvision: CollaborationProvisionService,
+    private readonly subscriptionCapabilities: SubscriptionCapabilityService,
   ) {}
 
   async listProspects(
@@ -176,6 +175,10 @@ export class BrandUcePipelineService {
     dto: CreateProspectDto,
     actorId: string,
   ) {
+    await this.subscriptionCapabilities.assertCapability(
+      brandProfileId,
+      "COLLABORATION_CREATE",
+    );
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
 
     const handle = normalizeInstagramHandle(dto.instagram_handle);
@@ -185,7 +188,9 @@ export class BrandUcePipelineService {
       },
     });
     if (existing) {
-      throw new ConflictException("Creator already exists in this campaign pipeline");
+      throw new ConflictException(
+        "Creator already exists in this campaign pipeline",
+      );
     }
 
     const brief = await this.prisma.uceCampaignBrief.findFirst({
@@ -252,7 +257,10 @@ export class BrandUcePipelineService {
     }
 
     if (outreachMessage) {
-      const wordCount = outreachMessage.trim().split(/\s+/).filter(Boolean).length;
+      const wordCount = outreachMessage
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean).length;
       if (wordCount > 20) {
         throw new BadRequestException(
           "Outreach templates must stay under 20 words (PIC-03)",
@@ -269,7 +277,8 @@ export class BrandUcePipelineService {
         data: {
           collabStatus: UceCollabStatus.PROSPECT_INVITED,
           invitationToken,
-          invitationSourceChannel: collab.invitationSourceChannel ?? "BRAND_UCE_PIPELINE",
+          invitationSourceChannel:
+            collab.invitationSourceChannel ?? "BRAND_UCE_PIPELINE",
         },
         include: COLLAB_INCLUDE,
       });
@@ -297,6 +306,10 @@ export class BrandUcePipelineService {
     dto: ApproveApplicantDto,
     actorId: string,
   ) {
+    await this.subscriptionCapabilities.assertCapability(
+      brandProfileId,
+      "COLLABORATION_CREATE",
+    );
     const collab = await this.access.assertCollaborationOwned(
       brandProfileId,
       campaignId,
@@ -389,22 +402,23 @@ export class BrandUcePipelineService {
       return row;
     });
 
-    const creatorUserId =
-      await this.collaborationProvision.ensureCreatorUser(
-        collab.creatorEmail,
-        collab.instagramHandle,
-      );
+    const creatorUserId = await this.collaborationProvision.ensureCreatorUser(
+      collab.creatorEmail,
+      collab.instagramHandle,
+    );
 
-    const workflow = await this.collaborationProvision.provisionFromUceApproval({
-      brandProfileId,
-      campaignId,
-      briefId: collab.briefId,
-      creatorUserId,
-      productId: productId ?? collab.productId,
-      ucePipelineCollaborationId: collaborationId,
-      initialQuote: totalQuote,
-      welcomeMessage: `Congrats @${collab.instagramHandle}! You're approved. View your brief and secure your spot.`,
-    });
+    const workflow = await this.collaborationProvision.provisionFromUceApproval(
+      {
+        brandProfileId,
+        campaignId,
+        briefId: collab.briefId,
+        creatorUserId,
+        productId: productId ?? collab.productId,
+        ucePipelineCollaborationId: collaborationId,
+        initialQuote: totalQuote,
+        welcomeMessage: `Congrats @${collab.instagramHandle}! You're approved. View your brief and secure your spot.`,
+      },
+    );
 
     const row = mapCollaborationRow(updated);
     row.workflow_collaboration_id = workflow.collaboration_id;
@@ -763,7 +777,10 @@ export class BrandUcePipelineService {
   }
 
   private async enrichRowsWithWorkflowIds<
-    T extends { collaboration_id: string; workflow_collaboration_id: string | null },
+    T extends {
+      collaboration_id: string;
+      workflow_collaboration_id: string | null;
+    },
   >(rows: T[]): Promise<T[]> {
     if (rows.length === 0) {
       return rows;
@@ -780,8 +797,7 @@ export class BrandUcePipelineService {
     );
     return rows.map((row) => ({
       ...row,
-      workflow_collaboration_id:
-        byPipelineId.get(row.collaboration_id) ?? null,
+      workflow_collaboration_id: byPipelineId.get(row.collaboration_id) ?? null,
     }));
   }
 

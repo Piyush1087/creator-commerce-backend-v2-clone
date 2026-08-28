@@ -5,11 +5,16 @@ import {
 } from "@nestjs/common";
 import { Decimal } from "@prisma/client/runtime/library";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
 import { mapEscrowVault } from "../utils/map-escrow-vault.util";
 import { resolveEscrowCurrency } from "../utils/resolve-escrow-currency.util";
 import { EscrowComputationEngine } from "./escrow-computation.engine";
 import { EscrowSubscriptionContextService } from "./escrow-subscription-context.service";
-import { extractBankReceiver, extractVpaReceiver, RazorpayClient } from "./razorpay.client";
+import {
+  extractBankReceiver,
+  extractVpaReceiver,
+  RazorpayClient,
+} from "./razorpay.client";
 
 @Injectable()
 export class BrandEscrowService {
@@ -18,6 +23,7 @@ export class BrandEscrowService {
     private readonly razorpay: RazorpayClient,
     private readonly computationEngine: EscrowComputationEngine,
     private readonly escrowBilling: EscrowSubscriptionContextService,
+    private readonly subscriptionCapabilities: SubscriptionCapabilityService,
   ) {}
 
   async initializeSecureVault(brandProfileId: string) {
@@ -74,7 +80,9 @@ export class BrandEscrowService {
     });
 
     if (!vault) {
-      throw new NotFoundException("Escrow vault not initialized for this brand");
+      throw new NotFoundException(
+        "Escrow vault not initialized for this brand",
+      );
     }
 
     return mapEscrowVault(vault);
@@ -87,7 +95,9 @@ export class BrandEscrowService {
     });
 
     if (!vault) {
-      throw new NotFoundException("Escrow vault not initialized for this brand");
+      throw new NotFoundException(
+        "Escrow vault not initialized for this brand",
+      );
     }
 
     const entries = await this.prisma.escrowTransactionLedger.findMany({
@@ -116,6 +126,10 @@ export class BrandEscrowService {
     targetAllocation: number,
     idempotencyKey: string,
   ) {
+    await this.subscriptionCapabilities.assertCapability(
+      brandProfileId,
+      "ESCROW_TOP_UP",
+    );
     const vault = await this.prisma.brandEscrowVault.findUnique({
       where: { brandProfileId },
     });
