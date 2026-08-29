@@ -40,7 +40,10 @@ export function classifyInstagramProviderError(
     classification = "AUTHORIZATION_REVALIDATION_REQUIRED";
   } else if ([10, 200, 294].includes(providerCode ?? -1)) {
     classification = "PERMISSION_LOSS";
-  } else if ([368, 360, 459].includes(providerCode ?? -1)) {
+  } else if (
+    [368, 360, 459].includes(providerCode ?? -1) ||
+    (providerCode === 25 && providerSubcode === 2207050)
+  ) {
     classification = "PROVIDER_ACCESS_BLOCKED";
   } else if ([100].includes(providerCode ?? -1)) {
     classification = "CONTENT_OR_METRIC_UNAVAILABLE";

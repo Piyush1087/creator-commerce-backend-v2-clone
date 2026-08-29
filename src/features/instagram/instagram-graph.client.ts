@@ -180,7 +180,10 @@ export class InstagramGraphClient {
         };
       }
       this.logger.warn(renderSafeInstagramError("media_insights", metadata));
-      return { ...ZERO_MEDIA_INSIGHTS };
+      throw new InstagramProviderRequestError(
+        "Failed to read Instagram media insights.",
+        metadata.classification,
+      );
     }
 
     const data = (await res.json()) as {

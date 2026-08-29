@@ -104,6 +104,104 @@ describe("Instagram provider reconciliation primitives", () => {
     );
   });
 
+  it("classifies only the frozen code-25 blocked subcode as provider blocked", () => {
+    expect(
+      classifyInstagramProviderError(400, {
+        error: { code: 25, error_subcode: 2207050 },
+      }).classification,
+    ).toBe("PROVIDER_ACCESS_BLOCKED");
+    expect(
+      classifyInstagramProviderError(400, {
+        error: { code: 25, error_subcode: 2207051 },
+      }).classification,
+    ).toBe("UNKNOWN");
+  });
+
+  it.each([
+    [503, null, "TRANSIENT"],
+    [401, { error: { code: 190 } }, "AUTHORIZATION_REVALIDATION_REQUIRED"],
+    [403, { error: { code: 10 } }, "PERMISSION_LOSS"],
+    [
+      400,
+      { error: { code: 25, error_subcode: 2207050 } },
+      "PROVIDER_ACCESS_BLOCKED",
+    ],
+    [400, { error: { code: 100 } }, "CONTENT_OR_METRIC_UNAVAILABLE"],
+    [418, { error: { code: 999 } }, "UNKNOWN"],
+  ] as const)(
+    "keeps provider taxonomy member %s/%j distinct as %s",
+    (status, body, classification) => {
+      expect(classifyInstagramProviderError(status, body).classification).toBe(
+        classification,
+      );
+    },
+  );
+
+  it.each([
+    [
+      "authorization",
+      401,
+      { error: { code: 190 } },
+      "AUTHORIZATION_REVALIDATION_REQUIRED",
+    ],
+    ["permission", 403, { error: { code: 10 } }, "PERMISSION_LOSS"],
+    [
+      "provider blocked",
+      400,
+      { error: { code: 25, error_subcode: 2207050 } },
+      "PROVIDER_ACCESS_BLOCKED",
+    ],
+    ["transient", 503, { error: { code: 2, is_transient: true } }, "TRANSIENT"],
+    ["unknown", 418, { error: { code: 999 } }, "UNKNOWN"],
+  ] as const)(
+    "throws a typed %s media-insight failure instead of returning zero metrics",
+    async (_label, status, body, classification) => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValue(new Response(JSON.stringify(body), { status })),
+      );
+      await expect(
+        new InstagramGraphClient().fetchMediaInsights(
+          "media-1",
+          "provider-token",
+          "IMAGE",
+        ),
+      ).rejects.toMatchObject({ classification });
+    },
+  );
+
+  it.each([
+    [
+      "invalid_metric",
+      "The following metric[likes] must be one of reach,saved,shares",
+    ],
+    [
+      "pre_business_conversion",
+      "Media posted before the most recent time this account was converted to a business account",
+    ],
+  ] as const)(
+    "returns explicit %s metric unavailability",
+    async (unavailableReason, message) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(
+          new Response(JSON.stringify({ error: { code: 100, message } }), {
+            status: 400,
+          }),
+        ),
+      );
+      await expect(
+        new InstagramGraphClient().fetchMediaInsights(
+          "media-1",
+          "provider-token",
+          "IMAGE",
+        ),
+      ).resolves.toMatchObject({ unavailableReason });
+    },
+  );
+
   it("exchanges the authorization code for the authoritative long-lived token", async () => {
     vi.stubEnv("INSTAGRAM_API_ID", "1180027506417007");
     vi.stubEnv("INSTAGRAM_APP_SECRET", "test-secret");

@@ -707,6 +707,22 @@ describe.skipIf(process.env.BS06_DATABASE_TEST !== "true")(
 
       await makeDue();
       refresh.mockRejectedValueOnce(
+        new InstagramTokenRefreshError("PROVIDER_ACCESS_BLOCKED"),
+      );
+      await service.refreshDueTokens();
+      expect(
+        await prisma.brandIntegration.findUniqueOrThrow({
+          where: { id: integration.id },
+        }),
+      ).toMatchObject({
+        authorizationHealth: "PROVIDER_ACCESS_BLOCKED",
+        humanActionRequired: false,
+        authorizationLossTransitionId: null,
+      });
+      expect(notifications.dispatch).not.toHaveBeenCalled();
+
+      await makeDue();
+      refresh.mockRejectedValueOnce(
         new InstagramTokenRefreshError("AUTHORIZATION_REVALIDATION_REQUIRED"),
       );
       await service.refreshDueTokens();
