@@ -1043,6 +1043,7 @@ model User {
   notificationRecipients        NotificationRecipient[]
   notificationPreferences       UserBrandNotificationPreference[]
   notificationEmailDeliveries   NotificationEmailDelivery[]
+  notificationJobRecipients     NotificationJobRecipient[]
   gatekeeperRecoveryRequests    GatekeeperRecoveryRequest[]
 
   @@index([organizationId])
@@ -3439,25 +3440,27 @@ model NotificationRecipient {
 }
 
 model NotificationEmailDelivery {
-  id                String                          @id @default(uuid())
-  notificationId    String                          @map("notification_id")
-  notification      Notification                    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
-  userId            String                          @map("user_id")
-  user              User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  recipientId       String?                         @unique @map("recipient_id")
-  recipient         NotificationRecipient?          @relation(fields: [recipientId], references: [id], onDelete: SetNull)
-  targetEmail       String                          @map("target_email")
-  status            NotificationEmailDeliveryStatus @default(PENDING)
-  attempts          Int                             @default(0)
-  maxAttempts       Int                             @default(5) @map("max_attempts")
-  scheduledAt       DateTime                        @default(now()) @map("scheduled_at")
-  lockedAt          DateTime?                       @map("locked_at")
-  lockedBy          String?                         @map("locked_by") @db.VarChar(100)
-  lastError         String?                         @map("last_error") @db.Text
-  providerMessageId String?                         @map("provider_message_id") @db.VarChar(200)
-  sentAt            DateTime?                       @map("sent_at")
-  createdAt         DateTime                        @default(now()) @map("created_at")
-  updatedAt         DateTime                        @updatedAt @map("updated_at")
+  id                    String                          @id @default(uuid())
+  notificationId        String                          @map("notification_id")
+  notification          Notification                    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  userId                String                          @map("user_id")
+  user                  User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipientId           String?                         @unique @map("recipient_id")
+  recipient             NotificationRecipient?          @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  targetEmail           String                          @map("target_email")
+  status                NotificationEmailDeliveryStatus @default(PENDING)
+  attempts              Int                             @default(0)
+  maxAttempts           Int                             @default(5) @map("max_attempts")
+  scheduledAt           DateTime                        @default(now()) @map("scheduled_at")
+  lockedAt              DateTime?                       @map("locked_at")
+  lockedBy              String?                         @map("locked_by") @db.VarChar(100)
+  claimToken            String?                         @map("claim_token") @db.VarChar(100)
+  providerSendStartedAt DateTime?                       @map("provider_send_started_at")
+  lastError             String?                         @map("last_error") @db.Text
+  providerMessageId     String?                         @map("provider_message_id") @db.VarChar(200)
+  sentAt                DateTime?                       @map("sent_at")
+  createdAt             DateTime                        @default(now()) @map("created_at")
+  updatedAt             DateTime                        @updatedAt @map("updated_at")
 
   @@unique([notificationId, userId])
   @@index([status, scheduledAt])
@@ -3465,27 +3468,49 @@ model NotificationEmailDelivery {
 }
 
 model NotificationJob {
-  id               String                   @id @default(uuid())
-  workspaceId      String                   @map("workspace_id")
-  eventType        String                   @map("event_type") @db.VarChar(100)
-  urgencyLevel     NotificationUrgencyLevel @map("urgency_level")
-  semanticEventKey String                   @map("semantic_event_key") @db.VarChar(200)
-  triggerUserId    String?                  @map("trigger_user_id")
-  payload          Json
-  actorName        String?                  @map("actor_name") @db.VarChar(200)
-  status           NotificationJobStatus    @default(PENDING)
-  attempts         Int                      @default(0)
-  maxAttempts      Int                      @default(5) @map("max_attempts")
-  scheduledAt      DateTime                 @default(now()) @map("scheduled_at")
-  lockedAt         DateTime?                @map("locked_at")
-  lockedBy         String?                  @map("locked_by") @db.VarChar(100)
-  lastError        String?                  @map("last_error") @db.Text
-  completedAt      DateTime?                @map("completed_at")
-  createdAt        DateTime                 @default(now()) @map("created_at")
+  id                  String                   @id @default(uuid())
+  workspaceId         String                   @map("workspace_id")
+  eventType           String                   @map("event_type") @db.VarChar(100)
+  urgencyLevel        NotificationUrgencyLevel @map("urgency_level")
+  semanticEventKey    String                   @map("semantic_event_key") @db.VarChar(200)
+  triggerUserId       String?                  @map("trigger_user_id")
+  payload             Json
+  actorName           String?                  @map("actor_name") @db.VarChar(200)
+  status              NotificationJobStatus    @default(PENDING)
+  attempts            Int                      @default(0)
+  maxAttempts         Int                      @default(5) @map("max_attempts")
+  scheduledAt         DateTime                 @default(now()) @map("scheduled_at")
+  lockedAt            DateTime?                @map("locked_at")
+  lockedBy            String?                  @map("locked_by") @db.VarChar(100)
+  claimToken          String?                  @map("claim_token") @db.VarChar(100)
+  lastError           String?                  @map("last_error") @db.Text
+  completedAt         DateTime?                @map("completed_at")
+  snapshotFinalizedAt DateTime?                @map("snapshot_finalized_at")
+  materializedAt      DateTime?                @map("materialized_at")
+  createdAt           DateTime                 @default(now()) @map("created_at")
+
+  recipientSnapshots NotificationJobRecipient[]
 
   @@unique([workspaceId, eventType, semanticEventKey])
   @@index([status, scheduledAt])
   @@map("notification_jobs")
+}
+
+model NotificationJobRecipient {
+  id              String                          @id @default(uuid())
+  jobId           String                          @map("job_id")
+  job             NotificationJob                 @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  userId          String                          @map("user_id")
+  user            User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetEmail     String                          @map("target_email")
+  recipientName   String?                         @map("recipient_name")
+  inboxObligation Boolean                         @map("inbox_obligation")
+  emailStatus     NotificationEmailDeliveryStatus @map("email_status")
+  createdAt       DateTime                        @default(now()) @map("created_at")
+
+  @@unique([jobId, userId])
+  @@index([jobId])
+  @@map("notification_job_recipients")
 }
 
 // ============================================================================

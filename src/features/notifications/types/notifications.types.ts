@@ -75,6 +75,7 @@ export type ClaimedNotificationJob = {
   workspaceId: string;
   eventType: string;
   semanticEventKey: string;
+  claimToken: string;
   triggerUserId: string | null;
   payload: NotificationPayload;
   actorName: string | null;

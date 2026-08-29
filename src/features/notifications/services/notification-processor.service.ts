@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { NotificationEmailDeliveryStatus, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type { Server } from "socket.io";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { getEventDefinition } from "../config/notification-event-registry";
@@ -7,17 +7,12 @@ import type {
   ClaimedNotificationJob,
   NotificationRealtimePayload,
 } from "../types/notifications.types";
-import { NotificationRecipientPolicyService } from "./notification-recipient-policy.service";
 
 @Injectable()
 export class NotificationProcessorService {
   private readonly logger = new Logger(NotificationProcessorService.name);
   private server: Server | null = null;
-
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly recipientPolicies: NotificationRecipientPolicyService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   attachServer(server: Server): void {
     this.server = server;
@@ -28,22 +23,20 @@ export class NotificationProcessorService {
     const definition = getEventDefinition(job.eventType);
     if (!definition)
       throw new Error(`Unknown notification event: ${job.eventType}`);
-    const affectedUserId =
-      typeof job.payload._affected_user_id === "string"
-        ? job.payload._affected_user_id
-        : null;
-    const members = await this.recipientPolicies.resolve({
-      workspaceId: job.workspaceId,
-      policy: definition.recipientPolicy,
-      triggerUserId: job.triggerUserId,
-      affectedUserId,
-    });
-
-    let created = false;
-    let notification;
-    try {
-      notification = await this.prisma.notification.create({
-        data: {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const snapshots = await tx.notificationJobRecipient.findMany({
+        where: { jobId: job.id },
+        orderBy: { createdAt: "asc" },
+      });
+      const notification = await tx.notification.upsert({
+        where: {
+          workspaceId_eventType_semanticEventKey: {
+            workspaceId: job.workspaceId,
+            eventType: definition.eventType,
+            semanticEventKey: job.semanticEventKey,
+          },
+        },
+        create: {
           workspaceId: job.workspaceId,
           triggerUserId: job.triggerUserId,
           eventType: definition.eventType,
@@ -55,92 +48,66 @@ export class NotificationProcessorService {
           inAppPolicy: definition.inAppPolicy,
           payload: job.payload as Prisma.InputJsonValue,
         },
+        update: {},
       });
-      created = true;
-    } catch (error: unknown) {
-      if (
-        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-        error.code !== "P2002"
-      )
-        throw error;
-      notification = await this.prisma.notification.findUniqueOrThrow({
-        where: {
-          workspaceId_eventType_semanticEventKey: {
-            workspaceId: job.workspaceId,
-            eventType: definition.eventType,
-            semanticEventKey: job.semanticEventKey,
-          },
-        },
-      });
-    }
-
-    const preferences =
-      await this.prisma.userBrandNotificationPreference.findMany({
-        where: {
-          brandProfileId: job.workspaceId,
-          userId: { in: members.map((member) => member.userId) },
-          category: definition.category,
-        },
-      });
-    const preferenceByUser = new Map(
-      preferences.map((row) => [row.userId, row.optionalEmailEnabled]),
-    );
-
-    await this.prisma.$transaction(async (tx) => {
-      for (const member of members) {
-        const recipient =
-          member.inbox && definition.inAppPolicy !== "NONE"
-            ? await tx.notificationRecipient.upsert({
-                where: {
-                  notificationId_userId: {
-                    notificationId: notification.id,
-                    userId: member.userId,
-                  },
-                },
-                create: {
+      for (const snapshot of snapshots) {
+        const recipient = snapshot.inboxObligation
+          ? await tx.notificationRecipient.upsert({
+              where: {
+                notificationId_userId: {
                   notificationId: notification.id,
-                  userId: member.userId,
+                  userId: snapshot.userId,
                 },
-                update: {},
-              })
-            : null;
-        const emailDue =
-          definition.emailPolicy === "MANDATORY" ||
-          (definition.emailPolicy === "OPTIONAL" &&
-            (preferenceByUser.get(member.userId) ?? true));
+              },
+              create: {
+                notificationId: notification.id,
+                userId: snapshot.userId,
+              },
+              update: {},
+            })
+          : null;
         await tx.notificationEmailDelivery.upsert({
           where: {
             notificationId_userId: {
               notificationId: notification.id,
-              userId: member.userId,
+              userId: snapshot.userId,
             },
           },
           create: {
             notificationId: notification.id,
-            userId: member.userId,
+            userId: snapshot.userId,
             recipientId: recipient?.id ?? null,
-            targetEmail: member.email,
-            status: emailDue
-              ? NotificationEmailDeliveryStatus.PENDING
-              : NotificationEmailDeliveryStatus.NOT_REQUIRED,
+            targetEmail: snapshot.targetEmail,
+            status: snapshot.emailStatus,
           },
           update: {},
         });
       }
+      const first = await tx.notificationJob.updateMany({
+        where: { id: job.id, materializedAt: null },
+        data: { materializedAt: new Date() },
+      });
+      return {
+        notification,
+        snapshots,
+        firstMaterialization: first.count === 1,
+      };
     });
 
-    if (created && definition.inAppPolicy !== "NONE") {
+    if (result.firstMaterialization && definition.inAppPolicy !== "NONE") {
       const payload: NotificationRealtimePayload = {
-        id: notification.id,
+        id: result.notification.id,
         event_type: definition.eventType,
         category: definition.category,
         urgency_level: definition.urgencyLevel,
         actionable: definition.actionable,
-        payload: notification.payload as Record<string, unknown>,
-        created_at: notification.createdAt.toISOString(),
+        payload: result.notification.payload as Record<string, unknown>,
+        created_at: result.notification.createdAt.toISOString(),
       };
       await this.pushRealtime(
-        members.filter((member) => member.inbox).map((member) => member.userId),
+        result.snapshots
+          .filter((row) => row.inboxObligation)
+          .map((row) => row.userId),
         payload,
       );
     }

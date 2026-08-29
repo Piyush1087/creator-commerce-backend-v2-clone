@@ -48,19 +48,22 @@ export class NotificationWorkerService implements OnModuleInit {
   }
 
   private async reclaimStaleJobs(): Promise<void> {
-    await this.prisma.notificationJob.updateMany({
-      where: {
-        status: NotificationJobStatus.PROCESSING,
-        lockedAt: { lt: new Date(Date.now() - LEASE_MS) },
-      },
-      data: {
-        status: NotificationJobStatus.PENDING,
-        scheduledAt: new Date(),
-        lockedAt: null,
-        lockedBy: null,
-        lastError: "Processing lease expired before completion",
-      },
-    });
+    const staleBefore = new Date(Date.now() - LEASE_MS);
+    await this.prisma.$executeRaw`
+      UPDATE notification_jobs
+      SET status = 'PENDING', scheduled_at = NOW(), locked_at = NULL,
+          locked_by = NULL, claim_token = NULL,
+          last_error = 'PROCESSING_LEASE_EXPIRED'
+      WHERE status = 'PROCESSING' AND locked_at < ${staleBefore}
+        AND attempts < max_attempts
+    `;
+    await this.prisma.$executeRaw`
+      UPDATE notification_jobs
+      SET status = 'FAILED', locked_at = NULL, locked_by = NULL,
+          claim_token = NULL, last_error = 'MAX_ATTEMPTS_EXHAUSTED'
+      WHERE status = 'PROCESSING' AND locked_at < ${staleBefore}
+        AND attempts >= max_attempts
+    `;
   }
 
   private async claimJobs(): Promise<ClaimedNotificationJob[]> {
@@ -77,20 +80,17 @@ export class NotificationWorkerService implements OnModuleInit {
     const claimed: ClaimedNotificationJob[] = [];
 
     for (const candidate of candidates) {
-      const updated = await this.prisma.notificationJob.updateMany({
-        where: {
-          id: candidate.id,
-          status: NotificationJobStatus.PENDING,
-        },
-        data: {
-          status: NotificationJobStatus.PROCESSING,
-          lockedAt: new Date(),
-          lockedBy: WORKER_ID,
-          attempts: { increment: 1 },
-        },
-      });
+      const claimToken = randomUUID();
+      const updated = await this.prisma.$queryRaw<Array<{ id: string }>>`
+        UPDATE notification_jobs
+        SET status = 'PROCESSING', locked_at = NOW(), locked_by = ${WORKER_ID},
+            claim_token = ${claimToken}, attempts = attempts + 1
+        WHERE id = ${candidate.id} AND status = 'PENDING'
+          AND scheduled_at <= NOW() AND attempts < max_attempts
+        RETURNING id
+      `;
 
-      if (updated.count === 0) {
+      if (updated.length === 0) {
         continue;
       }
 
@@ -107,6 +107,7 @@ export class NotificationWorkerService implements OnModuleInit {
         workspaceId: job.workspaceId,
         eventType: job.eventType,
         semanticEventKey: job.semanticEventKey,
+        claimToken,
         triggerUserId: job.triggerUserId,
         payload: job.payload as ClaimedNotificationJob["payload"],
         actorName: job.actorName,
@@ -121,24 +122,40 @@ export class NotificationWorkerService implements OnModuleInit {
   private async processClaimedJob(job: ClaimedNotificationJob): Promise<void> {
     try {
       await this.processor.processJob(job);
-      await this.prisma.notificationJob.update({
-        where: { id: job.id },
+      await this.prisma.notificationJob.updateMany({
+        where: {
+          id: job.id,
+          status: NotificationJobStatus.PROCESSING,
+          lockedBy: WORKER_ID,
+          claimToken: job.claimToken,
+        },
         data: {
           status: NotificationJobStatus.COMPLETED,
           completedAt: new Date(),
           lastError: null,
+          lockedAt: null,
+          lockedBy: null,
+          claimToken: null,
         },
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       const shouldFail = job.attempts >= job.maxAttempts;
 
-      await this.prisma.notificationJob.update({
-        where: { id: job.id },
+      await this.prisma.notificationJob.updateMany({
+        where: {
+          id: job.id,
+          status: NotificationJobStatus.PROCESSING,
+          lockedBy: WORKER_ID,
+          claimToken: job.claimToken,
+        },
         data: shouldFail
           ? {
               status: NotificationJobStatus.FAILED,
               lastError: message,
+              lockedAt: null,
+              lockedBy: null,
+              claimToken: null,
             }
           : {
               status: NotificationJobStatus.PENDING,
@@ -152,6 +169,7 @@ export class NotificationWorkerService implements OnModuleInit {
               lastError: message,
               lockedAt: null,
               lockedBy: null,
+              claimToken: null,
             },
       });
 

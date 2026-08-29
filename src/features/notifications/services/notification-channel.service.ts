@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { MailService } from "../../../mail/mail.service";
+import { resolveNotificationTemplateIdFromEnv } from "../config/notification-postmark-env";
 import {
   getEventDefinition,
   resolveDeepLinkPath,
@@ -12,6 +13,10 @@ export class NotificationChannelService {
     private readonly mail: MailService,
     private readonly config: ConfigService,
   ) {}
+
+  assertEmailConfigured(eventType: string): void {
+    resolveNotificationTemplateIdFromEnv(eventType);
+  }
 
   async deliverEmail(args: {
     targetEmail: string;

@@ -47,14 +47,12 @@ describe("NotificationRecipientPolicyService", () => {
   it("uses direct email without an inbox for an affected account user", async () => {
     const prisma = {
       brandTeamMember: { findMany: vi.fn(), findFirst: vi.fn() },
-      user: {
-        findUnique: vi.fn().mockResolvedValue({
-          id: "former",
-          email: "former@example.com",
-          name: null,
-        }),
-      },
+      user: { findUnique: vi.fn() },
     };
+    prisma.brandTeamMember.findFirst.mockResolvedValue({
+      userId: "former",
+      user: { id: "former", email: "former@example.com", name: null },
+    });
     const service = new NotificationRecipientPolicyService(prisma as never);
     await expect(
       service.resolve({

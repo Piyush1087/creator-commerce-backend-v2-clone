@@ -24,7 +24,7 @@ export type NotificationPostmarkTemplateEnvKey =
 
 /**
  * Resolves Postmark template ID for a notification event.
- * Per-event env → default notification template → OTP template.
+ * Per-event env → default notification template.
  */
 export function resolveNotificationTemplateIdFromEnv(
   eventType: string,
@@ -32,8 +32,7 @@ export function resolveNotificationTemplateIdFromEnv(
   const envKey = eventTypeToPostmarkEnvKey(eventType);
   const specific = process.env[envKey]?.trim();
   const fallback =
-    process.env.POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID?.trim() ??
-    process.env.POSTMARK_OTP_TEMPLATE_ID?.trim();
+    process.env.POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID?.trim();
 
   const raw = specific && specific.length > 0 ? specific : fallback;
 
