@@ -17,6 +17,7 @@ import { RazorpayPlanProvisioningService } from "./services/razorpay-plan-provis
 import { SubscriptionLifecycleService } from "./services/subscription-lifecycle.service";
 import { SubscriptionAccessService } from "./services/subscription-access.service";
 import { SubscriptionCapabilityModule } from "./subscription-capability.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { SubscriptionCapabilityModule } from "./subscription-capability.module";
     BrandCentreModule,
     BrandSettingsModule,
     SubscriptionCapabilityModule,
+    NotificationsModule,
   ],
   controllers: [PricingController, PricingWebhookController],
   providers: [

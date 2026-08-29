@@ -22,6 +22,7 @@ import { EscrowComputationEngine } from "./services/escrow-computation.engine";
 import { EscrowSubscriptionContextService } from "./services/escrow-subscription-context.service";
 import { IdempotencyManager } from "./services/idempotency.manager";
 import { RazorpayClient } from "./services/razorpay.client";
+import { NotificationsModule } from "../notifications/notifications.module";
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { RazorpayClient } from "./services/razorpay.client";
     BrandCentreModule,
     PricingModule,
     SubscriptionCapabilityModule,
+    NotificationsModule,
   ],
   controllers: [
     BrandEscrowController,

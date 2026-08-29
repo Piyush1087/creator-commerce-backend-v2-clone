@@ -14,6 +14,7 @@ import { Decimal } from "@prisma/client/runtime/library";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import { BrandEscrowComputationService } from "./brand-escrow-computation.service";
+import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
 
 export type EscrowRefundReasonCode =
   | "BR_03_LOGISTICS_STRIKE"
@@ -37,6 +38,7 @@ export class BrandEscrowInterlockService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly computationService: BrandEscrowComputationService,
+    private readonly notifications: NotificationDispatchService,
   ) {}
 
   async transitionCollaborationStage(input: TransitionStageInput) {
@@ -223,6 +225,18 @@ export class BrandEscrowInterlockService {
           systemEventTag: "ESCROW_REFUND",
           body: `Collaboration terminated under [${input.reasonCode}]. Refunding ${vault.currency} ${refundAmount.toFixed(2)} to available balance.`,
         },
+      });
+
+      await this.notifications?.enqueueWithinTransaction(tx, {
+        workspaceId: lock.brandProfileId,
+        eventType: "escrow.collaboration_refunded",
+        source: {
+          sourceType: "collaboration_escrow_refund",
+          sourceId: input.collaborationId,
+          transitionId: `collab-refund:${input.collaborationId}`,
+        },
+        payload: { collaboration_id: input.collaborationId },
+        triggerUserId: null,
       });
 
       return {

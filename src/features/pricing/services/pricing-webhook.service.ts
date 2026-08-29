@@ -9,6 +9,8 @@ import type { RazorpaySubscriptionNotes } from "../types/razorpay-plan.types";
 import { PricingInvoiceService } from "./pricing-invoice.service";
 import { PricingRazorpayClient } from "./pricing-razorpay.client";
 import { RazorpayPlanProvisioningService } from "./razorpay-plan-provisioning.service";
+import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
+import { runNotificationTransaction } from "../../notifications/services/notification-transaction";
 
 interface RazorpaySubscriptionWebhookPayload {
   event: string;
@@ -51,6 +53,7 @@ export class PricingWebhookService {
     private readonly invoices: PricingInvoiceService,
     private readonly razorpay: PricingRazorpayClient,
     private readonly planProvisioning: RazorpayPlanProvisioningService,
+    private readonly notifications: NotificationDispatchService,
   ) {}
 
   verifySignature(
@@ -203,20 +206,41 @@ export class PricingWebhookService {
       return;
     }
 
-    const updated = await this.prisma.brandSubscription.update({
-      where: { razorpaySubscriptionId },
-      data: {
-        status: targetStatus,
-        providerStatus:
-          targetStatus === SubscriptionStatus.CANCELED
-            ? "cancelled"
-            : undefined,
-      },
-    });
-
-    await this.prisma.brandProfile.update({
-      where: { id: updated.brandProfileId },
-      data: { subscriptionStatus: targetStatus },
+    await runNotificationTransaction(this.prisma, async (tx) => {
+      const transitioned = await tx.brandSubscription.updateMany({
+        where: {
+          id: existing.id,
+          status: SubscriptionStatus.CANCEL_SCHEDULED,
+          cancelEffectiveAt: { lte: new Date() },
+        },
+        data: {
+          status: targetStatus,
+          providerStatus:
+            targetStatus === SubscriptionStatus.CANCELED
+              ? "cancelled"
+              : undefined,
+        },
+      });
+      if (transitioned.count === 0) return;
+      await tx.brandProfile.update({
+        where: { id: existing.brandProfileId },
+        data: { subscriptionStatus: targetStatus },
+      });
+      if (
+        targetStatus === SubscriptionStatus.CANCELED &&
+        existing.cancelEffectiveAt
+      ) {
+        await this.notifications?.enqueueWithinTransaction(tx, {
+          workspaceId: existing.brandProfileId,
+          eventType: "billing.cancellation_effective",
+          source: {
+            sourceType: "brand_subscription",
+            sourceId: existing.id,
+            transitionId: `cancel_effective:${existing.cancelEffectiveAt.toISOString()}`,
+          },
+          payload: { subscription_id: existing.id },
+        });
+      }
     });
   }
 
@@ -428,51 +452,95 @@ export class PricingWebhookService {
       ? SubscriptionStatus.CANCEL_SCHEDULED
       : SubscriptionStatus.ACTIVE;
 
-    const subscription = await this.prisma.brandSubscription.update({
-      where: isContinuation
-        ? { brandProfileId: existing.brandProfileId }
-        : { razorpaySubscriptionId },
-      data: {
-        status: productStatus,
-        tier: SubscriptionTier.FOUNDERS_BETA,
-        razorpaySubscriptionId: isContinuation
-          ? razorpaySubscriptionId
-          : existing.razorpaySubscriptionId,
-        razorpayPlanId:
-          resolvedEntity.plan_id ??
-          (isContinuation
-            ? existing.continuationRazorpayPlanId
-            : existing.razorpayPlanId),
-        providerStatus: resolvedEntity.status ?? "active",
-        currentPeriodStart: periodStart,
-        currentPeriodEnd: periodEnd,
-        trialEndsAt: null,
-        firstPaymentFailureAt: null,
-        paymentGraceEndsAt: null,
-        cancelScheduledAt: cancellationStillScheduled
-          ? existing.cancelScheduledAt
-          : null,
-        cancelEffectiveAt: cancellationStillScheduled
-          ? existing.cancelEffectiveAt
-          : null,
-        providerCancellationState: cancellationStillScheduled
-          ? existing.providerCancellationState
-          : null,
-        continuationRazorpaySubscriptionId: null,
-        continuationRazorpayPlanId: null,
-        continuationProviderStatus: null,
-        continuationStartsAt: null,
+    const wasRecovery =
+      existing.status === SubscriptionStatus.PAST_DUE ||
+      existing.status === SubscriptionStatus.HALTED;
+    const failureEpisode = existing.firstPaymentFailureAt;
+    const cancellationCycle = existing.cancelScheduledAt;
+    const subscription = await runNotificationTransaction(
+      this.prisma,
+      async (tx) => {
+        const updated = await tx.brandSubscription.update({
+          where: isContinuation
+            ? { brandProfileId: existing.brandProfileId }
+            : { razorpaySubscriptionId },
+          data: {
+            status: productStatus,
+            tier: SubscriptionTier.FOUNDERS_BETA,
+            razorpaySubscriptionId: isContinuation
+              ? razorpaySubscriptionId
+              : existing.razorpaySubscriptionId,
+            razorpayPlanId:
+              resolvedEntity.plan_id ??
+              (isContinuation
+                ? existing.continuationRazorpayPlanId
+                : existing.razorpayPlanId),
+            providerStatus: resolvedEntity.status ?? "active",
+            currentPeriodStart: periodStart,
+            currentPeriodEnd: periodEnd,
+            trialEndsAt: null,
+            firstPaymentFailureAt: null,
+            paymentGraceEndsAt: null,
+            cancelScheduledAt: cancellationStillScheduled
+              ? existing.cancelScheduledAt
+              : null,
+            cancelEffectiveAt: cancellationStillScheduled
+              ? existing.cancelEffectiveAt
+              : null,
+            providerCancellationState: cancellationStillScheduled
+              ? existing.providerCancellationState
+              : null,
+            continuationRazorpaySubscriptionId: null,
+            continuationRazorpayPlanId: null,
+            continuationProviderStatus: null,
+            continuationStartsAt: null,
+          },
+        });
+        await tx.brandProfile.update({
+          where: { id: updated.brandProfileId },
+          data: {
+            subscriptionStatus: productStatus,
+            planType: this.mapTierToLegacyPlanType(
+              SubscriptionTier.FOUNDERS_BETA,
+            ),
+            trialEndsAt: null,
+          },
+        });
+        if (
+          productStatus === SubscriptionStatus.ACTIVE &&
+          wasRecovery &&
+          failureEpisode
+        ) {
+          await this.notifications?.enqueueWithinTransaction(tx, {
+            workspaceId: updated.brandProfileId,
+            eventType: "billing.subscription_payment_recovered",
+            source: {
+              sourceType: "brand_subscription",
+              sourceId: updated.id,
+              transitionId: `recovered:${failureEpisode.toISOString()}:${razorpaySubscriptionId}:${periodStart.toISOString()}`,
+            },
+            payload: { subscription_id: updated.id },
+          });
+        }
+        if (
+          productStatus === SubscriptionStatus.ACTIVE &&
+          isContinuation &&
+          cancellationCycle
+        ) {
+          await this.notifications?.enqueueWithinTransaction(tx, {
+            workspaceId: updated.brandProfileId,
+            eventType: "billing.cancellation_reactivated",
+            source: {
+              sourceType: "brand_subscription",
+              sourceId: updated.id,
+              transitionId: `reactivated:${cancellationCycle.toISOString()}:${razorpaySubscriptionId}:${periodStart.toISOString()}`,
+            },
+            payload: { subscription_id: updated.id },
+          });
+        }
+        return updated;
       },
-    });
-
-    await this.prisma.brandProfile.update({
-      where: { id: subscription.brandProfileId },
-      data: {
-        subscriptionStatus: productStatus,
-        planType: this.mapTierToLegacyPlanType(SubscriptionTier.FOUNDERS_BETA),
-        trialEndsAt: null,
-      },
-    });
+    );
   }
 
   private mapTierToLegacyPlanType(
@@ -597,18 +665,40 @@ export class PricingWebhookService {
     const graceEndsAt =
       subscription.paymentGraceEndsAt ??
       new Date(firstFailureAt.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const updated = await this.prisma.brandSubscription.update({
-      where: { razorpaySubscriptionId },
-      data: {
-        status: SubscriptionStatus.PAST_DUE,
-        providerStatus,
-        firstPaymentFailureAt: firstFailureAt,
-        paymentGraceEndsAt: graceEndsAt,
-      },
-    });
-    await this.prisma.brandProfile.update({
-      where: { id: updated.brandProfileId },
-      data: { subscriptionStatus: SubscriptionStatus.PAST_DUE },
+    await runNotificationTransaction(this.prisma, async (tx) => {
+      const transitioned = await tx.brandSubscription.updateMany({
+        where: { id: subscription.id, status: SubscriptionStatus.ACTIVE },
+        data: {
+          status: SubscriptionStatus.PAST_DUE,
+          providerStatus,
+          firstPaymentFailureAt: firstFailureAt,
+          paymentGraceEndsAt: graceEndsAt,
+        },
+      });
+      if (transitioned.count === 0) return;
+      await tx.brandSubscription.update({
+        where: { id: subscription.id },
+        data: {
+          status: SubscriptionStatus.PAST_DUE,
+          providerStatus,
+          firstPaymentFailureAt: firstFailureAt,
+          paymentGraceEndsAt: graceEndsAt,
+        },
+      });
+      await tx.brandProfile.update({
+        where: { id: subscription.brandProfileId },
+        data: { subscriptionStatus: SubscriptionStatus.PAST_DUE },
+      });
+      await this.notifications?.enqueueWithinTransaction(tx, {
+        workspaceId: subscription.brandProfileId,
+        eventType: "billing.subscription_payment_failed",
+        source: {
+          sourceType: "brand_subscription",
+          sourceId: subscription.id,
+          transitionId: `past_due:${firstFailureAt.toISOString()}`,
+        },
+        payload: { subscription_id: subscription.id },
+      });
     });
   }
 

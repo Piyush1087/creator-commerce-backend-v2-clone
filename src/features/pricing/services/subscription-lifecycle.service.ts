@@ -25,6 +25,8 @@ import { GeoRoutingService } from "./geo-routing.service";
 import { PricingRazorpayClient } from "./pricing-razorpay.client";
 import { RazorpayPlanProvisioningService } from "./razorpay-plan-provisioning.service";
 import { SubscriptionAccessService } from "./subscription-access.service";
+import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
+import { runNotificationTransaction } from "../../notifications/services/notification-transaction";
 
 @Injectable()
 export class SubscriptionLifecycleService {
@@ -38,6 +40,7 @@ export class SubscriptionLifecycleService {
     private readonly planProvisioning: RazorpayPlanProvisioningService,
     private readonly subscriptionAccess: SubscriptionAccessService,
     private readonly brandSettings: BrandSettingsService,
+    private readonly notifications: NotificationDispatchService,
   ) {}
 
   async getSubscription(brandProfileId: string) {
@@ -368,19 +371,45 @@ export class SubscriptionLifecycleService {
       subscription.razorpaySubscriptionId,
       true,
     );
-    const confirmed = await this.prisma.brandSubscription.updateMany({
-      where: {
-        id: intent.id,
-        status: SubscriptionStatus.ACTIVE,
-        providerCancellationState: PROVIDER_CANCELLATION_PENDING,
+    const confirmed = await runNotificationTransaction(
+      this.prisma,
+      async (tx) => {
+        const result = await tx.brandSubscription.updateMany({
+          where: {
+            id: intent.id,
+            status: SubscriptionStatus.ACTIVE,
+            providerCancellationState: PROVIDER_CANCELLATION_PENDING,
+          },
+          data: {
+            status: SubscriptionStatus.CANCEL_SCHEDULED,
+            providerCancellationState: PROVIDER_CANCELLATION_SCHEDULED,
+            providerStatus: provider.status ?? subscription.providerStatus,
+          },
+        });
+        if (result.count > 0) {
+          const updated = await tx.brandSubscription.findUniqueOrThrow({
+            where: { id: intent.id },
+          });
+          await tx.brandProfile.update({
+            where: { id: brandProfileId },
+            data: { subscriptionStatus: SubscriptionStatus.CANCEL_SCHEDULED },
+          });
+          await this.notifications?.enqueueWithinTransaction(tx, {
+            workspaceId: brandProfileId,
+            eventType: "billing.cancellation_scheduled",
+            source: {
+              sourceType: "brand_subscription",
+              sourceId: intent.id,
+              transitionId: `cancel_scheduled:${cancelScheduledAt.toISOString()}`,
+            },
+            payload: { subscription_id: intent.id },
+          });
+          return updated;
+        }
+        return null;
       },
-      data: {
-        status: SubscriptionStatus.CANCEL_SCHEDULED,
-        providerCancellationState: PROVIDER_CANCELLATION_SCHEDULED,
-        providerStatus: provider.status ?? subscription.providerStatus,
-      },
-    });
-    if (confirmed.count === 0) {
+    );
+    if (!confirmed) {
       throw new ConflictException(
         "Provider cancellation was scheduled but local confirmation requires reconciliation.",
       );

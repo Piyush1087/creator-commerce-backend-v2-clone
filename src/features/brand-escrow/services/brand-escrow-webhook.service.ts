@@ -5,6 +5,7 @@ import { Decimal } from "@prisma/client/runtime/library";
 import { createHmac } from "crypto";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { RazorpayClient } from "./razorpay.client";
+import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
 
 interface Payload {
   event: string;
@@ -22,6 +23,7 @@ export class BrandEscrowWebhookService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly razorpay: RazorpayClient,
+    private readonly notifications: NotificationDispatchService,
   ) {}
 
   verifySignature(
@@ -90,11 +92,14 @@ export class BrandEscrowWebhookService {
     const paymentId = typeof payment?.id === "string" ? payment.id : undefined;
     if (!loadId && !orderId) return;
     await this.prisma.$transaction(async (tx) => {
-      const load = loadId
+      let load = loadId
         ? await tx.escrowFundingLoad.findUnique({ where: { id: loadId } })
         : await tx.escrowFundingLoad.findUnique({
             where: { providerOrderId: orderId },
           });
+      if (!load) return;
+      await tx.$queryRaw`SELECT id FROM escrow_funding_loads WHERE id = ${load.id} FOR UPDATE`;
+      load = await tx.escrowFundingLoad.findUnique({ where: { id: load.id } });
       if (!load) return;
       if (orderId && load.providerOrderId && orderId !== load.providerOrderId)
         return;
@@ -135,6 +140,16 @@ export class BrandEscrowWebhookService {
           totalPooledBalance: { increment: load.principalAmount },
           availableBalance: { increment: load.principalAmount },
         },
+      });
+      await this.notifications?.enqueueWithinTransaction(tx, {
+        workspaceId: load.brandProfileId,
+        eventType: "escrow.funding_credited",
+        source: {
+          sourceType: "escrow_funding_load",
+          sourceId: load.id,
+          transitionId: "credited",
+        },
+        payload: { funding_load_id: load.id },
       });
     });
   }
@@ -229,7 +244,7 @@ export class BrandEscrowWebhookService {
           ? payment.currency
           : vault.currency;
       if (currency !== vault.currency) return;
-      await tx.escrowFundingLoad.create({
+      const load = await tx.escrowFundingLoad.create({
         data: {
           vaultId: vault.id,
           brandProfileId: vault.brandProfileId,
@@ -261,6 +276,16 @@ export class BrandEscrowWebhookService {
           totalPooledBalance: { increment: principal },
           availableBalance: { increment: principal },
         },
+      });
+      await this.notifications?.enqueueWithinTransaction(tx, {
+        workspaceId: vault.brandProfileId,
+        eventType: "escrow.funding_credited",
+        source: {
+          sourceType: "escrow_funding_load",
+          sourceId: load.id,
+          transitionId: "credited",
+        },
+        payload: { funding_load_id: load.id },
       });
     });
   }

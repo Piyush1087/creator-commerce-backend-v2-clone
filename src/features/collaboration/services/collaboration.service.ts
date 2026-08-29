@@ -59,6 +59,7 @@ import { SubscriptionCapabilityService } from "../../pricing/services/subscripti
 import { CollaborationRealtimeService } from "./collaboration-realtime.service";
 import { BrandEscrowComputationService } from "../../brand-escrow/services/brand-escrow-computation.service";
 import { BrandWorkspaceAuthorizationService } from "../../brand-centre/brand-workspace-authorization.service";
+import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
 
 const LIVE_URL_DOMAINS = [/instagram\.com/i, /tiktok\.com/i, /youtube\.com/i];
 
@@ -72,6 +73,7 @@ export class CollaborationService {
     private readonly realtime: CollaborationRealtimeService,
     private readonly escrowReserve: BrandEscrowComputationService,
     private readonly brandWorkspace: BrandWorkspaceAuthorizationService,
+    private readonly notifications: NotificationDispatchService,
   ) {}
 
   async listThreads(user: AuthUser, query: ListCollaborationThreadsQueryDto) {
@@ -377,7 +379,9 @@ export class CollaborationService {
     const context = await this.brandWorkspace.resolveBrandContext(user);
     const thread = await this.access.assertThreadForUser(user, collaborationId);
     if (thread.brandProfileId !== context.brandProfileId) {
-      throw new ForbiddenException("Collaboration is outside this Brand workspace");
+      throw new ForbiddenException(
+        "Collaboration is outside this Brand workspace",
+      );
     }
     const alreadyAdvanced =
       thread.currentStage === UceMilestoneStage.STAGE_3_LOGISTICS;
@@ -396,6 +400,28 @@ export class CollaborationService {
       expectedTdsPercentage: 0,
     });
     if (reserve.state !== "FUNDED") {
+      if (reserve.state === "AWAITING_FUNDS") {
+        const commercial =
+          await this.prisma.collaborationCommercial.findUniqueOrThrow({
+            where: { collaborationId },
+            select: { finalQuote: true },
+          });
+        const requiredReserve = String(reserve.required_reserve);
+        await this.notifications?.dispatch({
+          workspaceId: thread.brandProfileId,
+          eventType: "escrow.collaboration_awaiting_funds",
+          source: {
+            sourceType: "collaboration_escrow_requirement",
+            sourceId: collaborationId,
+            transitionId: `awaiting_funds:${commercial.finalQuote?.toString() ?? "unknown"}:${requiredReserve}`,
+          },
+          payload: {
+            collaboration_id: collaborationId,
+            required_reserve: reserve.required_reserve,
+          },
+          triggerUserId: user.id,
+        });
+      }
       return this.broadcastAndReturnThread(user, collaborationId);
     }
     if (alreadyAdvanced) {

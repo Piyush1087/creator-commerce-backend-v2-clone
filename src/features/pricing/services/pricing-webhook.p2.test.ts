@@ -74,6 +74,9 @@ function harness(overrides: Partial<BrandSubscription> = {}) {
       notes: { target_tier: "FOUNDERS_BETA" },
     }),
   };
+  const notifications = {
+    enqueueWithinTransaction: vi.fn().mockResolvedValue({ job_id: "job-1" }),
+  };
   const service = new PricingWebhookService(
     prisma as never,
     {} as never,
@@ -84,8 +87,9 @@ function harness(overrides: Partial<BrandSubscription> = {}) {
         .fn()
         .mockReturnValue(SubscriptionTier.FOUNDERS_BETA),
     } as never,
+    notifications as never,
   );
-  return { service, prisma, invoices, getRow: () => row };
+  return { service, prisma, invoices, notifications, getRow: () => row };
 }
 
 const failurePayload = (
@@ -119,6 +123,13 @@ describe("PricingWebhookService P2 reconciliation", () => {
     const firstFailure = h.getRow().firstPaymentFailureAt;
     const graceEnd = h.getRow().paymentGraceEndsAt;
     expect(h.getRow().status).toBe(SubscriptionStatus.PAST_DUE);
+    expect(h.notifications.enqueueWithinTransaction).toHaveBeenCalledTimes(1);
+    expect(h.notifications.enqueueWithinTransaction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventType: "billing.subscription_payment_failed",
+      }),
+    );
     expect(graceEnd?.getTime()).toBe(
       firstFailure!.getTime() + 7 * 24 * 60 * 60 * 1000,
     );
@@ -168,6 +179,12 @@ describe("PricingWebhookService P2 reconciliation", () => {
       paymentGraceEndsAt: null,
       trialEndsAt: null,
     });
+    expect(h.notifications.enqueueWithinTransaction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventType: "billing.subscription_payment_recovered",
+      }),
+    );
   });
 
   it("ignores delayed webhook from a replaced provider subscription", async () => {
@@ -216,6 +233,12 @@ describe("PricingWebhookService P2 reconciliation", () => {
       cancelEffectiveAt: null,
       continuationRazorpaySubscriptionId: null,
     });
+    expect(h.notifications.enqueueWithinTransaction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventType: "billing.cancellation_reactivated",
+      }),
+    );
 
     await h.service.handleWebhook(
       failurePayload(1_777_593_600, "provider-current"),
