@@ -12,6 +12,8 @@ import { S3Module } from "../../shared/s3/s3.module";
 import { DataExtractionModule } from "../data-extraction/data-extraction.module";
 import { BrandSocialSyncController } from "./social-sync/brand-social-sync.controller";
 import { BrandSocialSyncService } from "./social-sync/brand-social-sync.service";
+import { BrandSettingsAccessService } from "../brand-settings/services/brand-settings-access.service";
+import { BrandInstagramOAuthStateService } from "../brand-settings/services/brand-instagram-oauth-state.service";
 import { BrandOnboardingPurgeScheduler } from "./brand-onboarding-purge.scheduler";
 import { BrandOnboardingPurgeService } from "./brand-onboarding-purge.service";
 import { BrandIntelligenceJobService } from "./brand-intelligence-job.service";
@@ -100,6 +102,8 @@ import { CanonicalBrandStateService } from "./canonical-brand-state/canonical-br
   ],
   providers: [
     BrandSocialSyncService,
+    BrandSettingsAccessService,
+    BrandInstagramOAuthStateService,
     BrandScanGateService,
     DiscoveryReachabilityService,
     BrandOnboardingPurgeService,

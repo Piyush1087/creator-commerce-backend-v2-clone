@@ -611,6 +611,59 @@ enum BrandIntegrationScope {
   TARGETED_OUTREACH
 }
 
+enum InstagramAuthorizationHealth {
+  DISCONNECTED
+  CONNECTED_FULL
+  PARTIALLY_CONNECTED
+  NEEDS_REVALIDATION
+  PROVIDER_ACCESS_BLOCKED
+  UNKNOWN
+}
+
+enum InstagramCapabilityState {
+  YES
+  NO
+  UNKNOWN
+  DEFERRED
+}
+
+enum InstagramIdentityVerification {
+  UNVERIFIED
+  VERIFIED
+}
+
+enum InstagramOAuthIntent {
+  INITIAL_CONNECT
+  RECONNECT
+  ACCOUNT_CHANGE
+  LEGACY_IDENTITY_RECONCILIATION
+}
+
+enum InstagramIgHandleProvenance {
+  META_DIRECT
+  USER_ENTERED
+  WEBSITE_DERIVED
+  LEGACY_UNKNOWN
+}
+
+enum InstagramSyncHealth {
+  NOT_CONFIGURED
+}
+
+enum InstagramDeletionState {
+  REQUESTED
+  FENCED
+  IN_PROGRESS
+  COMPLETED
+  FAILED_RETRYABLE
+  FAILED_TERMINAL
+}
+
+enum InstagramDeletionSource {
+  USER
+  META_CALLBACK
+}
+
 enum InstagramSyncInvitationStatus {
   PENDING
   VERIFIED
@@ -1327,13 +1380,14 @@ model BrandProfile {
   outreachCount   Int @default(0) @map("outreach_count")
 
   // Brand Centre — Tab 1 routing & DNA
-  brandRoutingType    BrandRoutingType @default(D2C_SKINCARE) @map("brand_routing_type")
-  lifecycleStage      String           @default("GROWTH_STAGE") @map("lifecycle_stage")
-  strategicDna        Json?            @map("strategic_dna")
-  igHandle            String?          @map("ig_handle")
-  ytHandle            String?          @map("yt_handle")
-  tiktokHandle        String?          @map("tiktok_handle")
-  deepScanCompletedAt DateTime?        @map("deep_scan_completed_at")
+  brandRoutingType    BrandRoutingType            @default(D2C_SKINCARE) @map("brand_routing_type")
+  lifecycleStage      String                      @default("GROWTH_STAGE") @map("lifecycle_stage")
+  strategicDna        Json?                       @map("strategic_dna")
+  igHandle            String?                     @map("ig_handle")
+  igHandleProvenance  InstagramIgHandleProvenance @default(LEGACY_UNKNOWN) @map("ig_handle_provenance")
+  ytHandle            String?                     @map("yt_handle")
+  tiktokHandle        String?                     @map("tiktok_handle")
+  deepScanCompletedAt DateTime?                   @map("deep_scan_completed_at")
 
   isUserEdited Json?    @map("is_user_edited")
   createdAt    DateTime @default(now()) @map("created_at")
@@ -1392,32 +1446,37 @@ model BrandProfile {
   coPilotInteractionLogs CoPilotInteractionLog[]
   coPilotMessageFeedback CoPilotMessageFeedback[]
 
-  teamMembers              BrandTeamMember[]
-  billingProfile           BrandBillingProfile?
-  billingProfileVersions   BrandBillingProfileVersion[]
-  withdrawalAccounts       BrandWithdrawalAccount[]
-  notificationSettings     BrandNotificationSetting[]
-  notifications            Notification[]
-  notificationPreferences  UserBrandNotificationPreference[]
-  integrations             BrandIntegration[]
-  instagramOAuthStates     BrandInstagramOAuthState[]
-  instagramSyncInvitations InstagramSyncInvitation[]
+  teamMembers               BrandTeamMember[]
+  billingProfile            BrandBillingProfile?
+  billingProfileVersions    BrandBillingProfileVersion[]
+  withdrawalAccounts        BrandWithdrawalAccount[]
+  notificationSettings      BrandNotificationSetting[]
+  notifications             Notification[]
+  notificationPreferences   UserBrandNotificationPreference[]
+  integrations              BrandIntegration[]
+  instagramOAuthStates      BrandInstagramOAuthState[]
+  instagramSyncInvitations  InstagramSyncInvitation[]
+  instagramDeletionRequests BrandInstagramDeletionRequest[]
 
   @@map("brand_profiles")
 }
 
 /// One-time, hashed state for authenticated Instagram Settings OAuth only.
 model BrandInstagramOAuthState {
-  id                String       @id @default(uuid())
-  brandProfileId    String       @map("brand_profile_id")
-  brandProfile      BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  initiatedByUserId String       @map("initiated_by_user_id")
-  initiatedByUser   User         @relation(fields: [initiatedByUserId], references: [id], onDelete: Cascade)
-  stateHash         String       @unique @map("state_hash") @db.VarChar(64)
-  redirectUri       String       @map("redirect_uri")
-  expiresAt         DateTime     @map("expires_at")
-  consumedAt        DateTime?    @map("consumed_at")
-  createdAt         DateTime     @default(now()) @map("created_at")
+  id                        String               @id @default(uuid())
+  brandProfileId            String               @map("brand_profile_id")
+  brandProfile              BrandProfile         @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  initiatedByUserId         String               @map("initiated_by_user_id")
+  initiatedByUser           User                 @relation(fields: [initiatedByUserId], references: [id], onDelete: Cascade)
+  stateHash                 String               @unique @map("state_hash") @db.VarChar(64)
+  redirectUri               String               @map("redirect_uri")
+  intent                    InstagramOAuthIntent @default(INITIAL_CONNECT)
+  initiatedByRole           BrandRole            @default(BRAND_OWNER) @map("initiated_by_role")
+  expectedGeneration        Int                  @default(0) @map("expected_generation")
+  expectedProviderAccountId String?              @map("expected_provider_account_id") @db.VarChar(100)
+  expiresAt                 DateTime             @map("expires_at")
+  consumedAt                DateTime?            @map("consumed_at")
+  createdAt                 DateTime             @default(now()) @map("created_at")
 
   @@index([expiresAt, consumedAt])
   @@index([brandProfileId])
@@ -1427,45 +1486,104 @@ model BrandInstagramOAuthState {
 
 /// Brand OAuth connections (Instagram Login + optional Meta Business Suite in Settings).
 model BrandIntegration {
-  id                          String                   @id @default(uuid()) @map("integration_id")
-  brandProfileId              String                   @map("brand_id")
-  brandProfile                BrandProfile             @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  provider                    BrandIntegrationProvider
-  status                      BrandIntegrationStatus   @default(DISCONNECTED)
-  currentPlatformHandle       String                   @map("current_platform_handle") @db.VarChar(255)
-  inboundOauthHandle          String?                  @map("inbound_oauth_handle") @db.VarChar(255)
-  accessTokenEncrypted        String?                  @map("access_token_encrypted") @db.Text
-  refreshTokenEncrypted       String?                  @map("refresh_token_encrypted") @db.Text
-  pendingAccessTokenEncrypted String?                  @map("pending_access_token_encrypted") @db.Text
-  pendingGrantedScopes        BrandIntegrationScope[]  @default([]) @map("pending_granted_scopes")
-  pendingTokenExpiresAt       DateTime?                @map("pending_token_expires_at")
-  grantedScopes               BrandIntegrationScope[]  @default([]) @map("granted_scopes")
-  tokenExpiresAt              DateTime?                @map("token_expires_at")
-  isActive                    Boolean                  @default(true) @map("is_active")
-  createdAt                   DateTime                 @default(now()) @map("created_at")
-  updatedAt                   DateTime                 @updatedAt @map("updated_at")
+  id                             String                        @id @default(uuid()) @map("integration_id")
+  brandProfileId                 String                        @map("brand_id")
+  brandProfile                   BrandProfile                  @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  provider                       BrandIntegrationProvider
+  status                         BrandIntegrationStatus        @default(DISCONNECTED)
+  currentPlatformHandle          String?                       @map("current_platform_handle") @db.VarChar(255)
+  inboundOauthHandle             String?                       @map("inbound_oauth_handle") @db.VarChar(255)
+  accessTokenEncrypted           String?                       @map("access_token_encrypted") @db.Text
+  refreshTokenEncrypted          String?                       @map("refresh_token_encrypted") @db.Text
+  pendingAccessTokenEncrypted    String?                       @map("pending_access_token_encrypted") @db.Text
+  pendingGrantedScopes           BrandIntegrationScope[]       @default([]) @map("pending_granted_scopes")
+  pendingTokenExpiresAt          DateTime?                     @map("pending_token_expires_at")
+  grantedScopes                  BrandIntegrationScope[]       @default([]) @map("granted_scopes")
+  tokenExpiresAt                 DateTime?                     @map("token_expires_at")
+  isActive                       Boolean                       @default(true) @map("is_active")
+  providerAccountId              String?                       @map("provider_account_id") @db.VarChar(100)
+  providerAppScopedUserId        String?                       @map("provider_app_scoped_user_id") @db.VarChar(100)
+  identityVerification           InstagramIdentityVerification @default(UNVERIFIED) @map("identity_verification")
+  authorizationHealth            InstagramAuthorizationHealth  @default(NEEDS_REVALIDATION) @map("authorization_health")
+  firstPartyProfileCapability    InstagramCapabilityState      @default(UNKNOWN) @map("first_party_profile_capability")
+  firstPartyInsightsCapability   InstagramCapabilityState      @default(UNKNOWN) @map("first_party_insights_capability")
+  businessDiscoveryCapability    InstagramCapabilityState      @default(DEFERRED) @map("business_discovery_capability")
+  creatorMarketplaceCapability   InstagramCapabilityState      @default(DEFERRED) @map("creator_marketplace_capability")
+  humanActionRequired            Boolean                       @default(false) @map("human_action_required")
+  syncHealth                     InstagramSyncHealth           @default(NOT_CONFIGURED) @map("sync_health")
+  authorizationGeneration        Int                           @default(0) @map("authorization_generation")
+  credentialVersion              Int                           @default(0) @map("credential_version")
+  tokenIssuedAt                  DateTime?                     @map("token_issued_at")
+  tokenLastRefreshedAt           DateTime?                     @map("token_last_refreshed_at")
+  tokenRefreshAttemptedAt        DateTime?                     @map("token_refresh_attempted_at")
+  pendingProviderAccountId       String?                       @map("pending_provider_account_id") @db.VarChar(100)
+  pendingProviderAppScopedUserId String?                       @map("pending_provider_app_scoped_user_id") @db.VarChar(100)
+  pendingOauthIntent             InstagramOAuthIntent?         @map("pending_oauth_intent")
+  pendingExpectedGeneration      Int?                          @map("pending_expected_generation")
+  authorizationLossTransitionId  String?                       @map("authorization_loss_transition_id") @db.Uuid
+  authorizationLossOpenedAt      DateTime?                     @map("authorization_loss_opened_at")
+  createdAt                      DateTime                      @default(now()) @map("created_at")
+  updatedAt                      DateTime                      @updatedAt @map("updated_at")
 
   @@unique([brandProfileId, provider], map: "uq_brand_provider_pair")
   @@index([brandProfileId, provider, status], map: "idx_brand_integrations_lookup")
   @@index([status, tokenExpiresAt], map: "idx_integrations_token_expiration")
+  @@index([provider, providerAppScopedUserId], map: "idx_integrations_callback_subject")
+  @@index([provider, authorizationHealth, tokenExpiresAt], map: "idx_instagram_refresh_candidates")
   @@map("brand_integrations")
+}
+
+model BrandInstagramDeletionRequest {
+  id                      String                  @id @default(uuid()) @map("deletion_request_id")
+  brandProfileId          String                  @map("brand_profile_id")
+  brandProfile            BrandProfile            @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  providerAccountId       String?                 @map("provider_account_id") @db.VarChar(100)
+  providerAppScopedUserId String?                 @map("provider_app_scoped_user_id") @db.VarChar(100)
+  source                  InstagramDeletionSource
+  requesterUserId         String?                 @map("requester_user_id")
+  state                   InstagramDeletionState  @default(REQUESTED)
+  requestedGeneration     Int                     @map("requested_generation")
+  fenceGeneration         Int?                    @map("fence_generation")
+  callbackRequestHash     String?                 @map("callback_request_hash") @db.Char(64)
+  confirmationCode        String                  @map("confirmation_code") @db.VarChar(80)
+  policyVersion           String                  @default("BS06_P1_V1") @map("policy_version") @db.VarChar(40)
+  resultSummary           Json?                   @map("result_summary")
+  attemptCount            Int                     @default(0) @map("attempt_count")
+  lastErrorCode           String?                 @map("last_error_code") @db.VarChar(100)
+  requestedAt             DateTime                @default(now()) @map("requested_at")
+  fencedAt                DateTime?               @map("fenced_at")
+  startedAt               DateTime?               @map("started_at")
+  completedAt             DateTime?               @map("completed_at")
+  updatedAt               DateTime                @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, source, requestedGeneration], map: "uq_instagram_delete_effective_request")
+  @@unique([brandProfileId, callbackRequestHash], map: "uq_instagram_delete_callback_replay")
+  @@index([confirmationCode], map: "idx_instagram_delete_confirmation")
+  @@index([state, requestedAt], map: "idx_instagram_delete_worker")
+  @@map("brand_instagram_deletion_requests")
 }
 
 /// Temporary agent invites for onboarding Instagram sync (no permanent User).
 model InstagramSyncInvitation {
-  id             String                        @id @default(uuid())
-  email          String
-  status         InstagramSyncInvitationStatus @default(PENDING)
-  token          String                        @unique
-  otpCode        String?                       @map("otp_code")
-  otpExpiresAt   DateTime?                     @map("otp_expires_at")
-  brandProfileId String                        @map("brand_id")
-  brandProfile   BrandProfile                  @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  createdAt      DateTime                      @default(now()) @map("created_at")
-  expiresAt      DateTime                      @map("expires_at")
+  id                      String                        @id @default(uuid())
+  email                   String
+  status                  InstagramSyncInvitationStatus @default(PENDING)
+  token                   String                        @unique
+  otpCode                 String?                       @map("otp_code")
+  otpExpiresAt            DateTime?                     @map("otp_expires_at")
+  oauthStateHash          String?                       @map("oauth_state_hash") @db.VarChar(64)
+  oauthRedirectUri        String?                       @map("oauth_redirect_uri") @db.Text
+  oauthExpectedGeneration Int?                          @map("oauth_expected_generation")
+  oauthStateExpiresAt     DateTime?                     @map("oauth_state_expires_at")
+  oauthStateConsumedAt    DateTime?                     @map("oauth_state_consumed_at")
+  brandProfileId          String                        @map("brand_id")
+  brandProfile            BrandProfile                  @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                      @default(now()) @map("created_at")
+  expiresAt               DateTime                      @map("expires_at")
 
   @@index([token])
   @@index([brandProfileId])
+  @@index([oauthStateHash, oauthStateExpiresAt])
   @@map("instagram_sync_invitations")
 }
 

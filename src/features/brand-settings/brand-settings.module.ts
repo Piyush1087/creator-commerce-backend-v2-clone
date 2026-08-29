@@ -14,6 +14,10 @@ import { BrandSettingsIntegrationsService } from "./services/brand-settings-inte
 import { BrandSettingsService } from "./services/brand-settings.service";
 import { BrandInstagramOAuthStateService } from "./services/brand-instagram-oauth-state.service";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { MetaInstagramDeletionController } from "./meta-instagram-deletion.controller";
+import { BrandInstagramDeletionScheduler } from "./schedulers/brand-instagram-deletion.scheduler";
+import { BrandInstagramDeletionService } from "./services/brand-instagram-deletion.service";
+import { MetaInstagramDeletionCallbackService } from "./services/meta-instagram-deletion-callback.service";
 
 @Module({
   imports: [
@@ -23,7 +27,11 @@ import { NotificationsModule } from "../notifications/notifications.module";
     MailModule,
     forwardRef(() => NotificationsModule),
   ],
-  controllers: [BrandSettingsController, BrandTeamInvitationsController],
+  controllers: [
+    BrandSettingsController,
+    BrandTeamInvitationsController,
+    MetaInstagramDeletionController,
+  ],
   providers: [
     BrandTeamService,
     BrandTeamInvitationsService,
@@ -32,6 +40,9 @@ import { NotificationsModule } from "../notifications/notifications.module";
     BrandSettingsIntegrationsService,
     BrandInstagramOAuthStateService,
     BrandIntegrationTokenExpiryScheduler,
+    BrandInstagramDeletionScheduler,
+    BrandInstagramDeletionService,
+    MetaInstagramDeletionCallbackService,
   ],
   exports: [
     BrandSettingsService,

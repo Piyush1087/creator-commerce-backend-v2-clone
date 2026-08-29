@@ -47,8 +47,8 @@ describe("BS-06 callback schema", () => {
   );
 });
 
-describe.skipIf(process.env.BS06_DATABASE_TEST !== "true")(
-  "BS-06 disposable PostgreSQL",
+describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
+  "BS-06 legacy disposable PostgreSQL expectations",
   () => {
     const prisma = new PrismaClient();
     const db = prisma as unknown as PrismaService;
@@ -112,6 +112,7 @@ describe.skipIf(process.env.BS06_DATABASE_TEST !== "true")(
         .mockResolvedValue(["instagram_business_manage_insights"]);
       me.mockReset().mockResolvedValue({
         userId: "synthetic-ig",
+        appScopedUserId: "synthetic-app-user",
         username: "brand",
         name: null,
         accountType: "BUSINESS",

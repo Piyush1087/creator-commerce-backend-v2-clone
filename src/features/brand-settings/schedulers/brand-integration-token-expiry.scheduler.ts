@@ -13,7 +13,7 @@ export class BrandIntegrationTokenExpiryScheduler {
     private readonly integrations: BrandSettingsIntegrationsService,
   ) {}
 
-  /** Daily midnight sweep: flip expired active tokens to TOKEN_EXPIRED. */
+  /** Daily sweep: proactively refresh due tokens; timestamp alone never requires reconnect. */
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, {
     name: "brand-instagram-token-expiry",
   })
@@ -21,7 +21,7 @@ export class BrandIntegrationTokenExpiryScheduler {
     try {
       const result = await this.integrations.markExpiredTokens();
       this.logger.log(
-        `token expiry sweep complete scanned=${result.scanned} expired=${result.expired}`,
+        `instagram token lifecycle sweep complete scanned=${result.scanned} reauthorizationRequired=${result.expired}`,
       );
     } catch (err) {
       // Never rethrow — a failed sweep must not take down the process.

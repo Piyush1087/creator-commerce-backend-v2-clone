@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
+import { BrandRole, InstagramOAuthIntent } from "@prisma/client";
 import { createHash, randomBytes } from "node:crypto";
 import { PrismaService } from "../../../prisma/prisma.service";
 
@@ -10,9 +11,13 @@ type AttemptContext = {
   brandProfileId: string;
   initiatedByUserId: string;
   redirectUri: string;
+  intent?: InstagramOAuthIntent;
+  initiatedByRole?: BrandRole;
+  expectedGeneration?: number;
+  expectedProviderAccountId?: string | null;
 };
 
-/** Only the authenticated Brand Settings Instagram handshake uses this store. */
+/** Durable authenticated Brand Instagram OAuth attempt store. */
 @Injectable()
 export class BrandInstagramOAuthStateService {
   constructor(private readonly prisma: PrismaService) {}
@@ -40,6 +45,10 @@ export class BrandInstagramOAuthStateService {
     await this.prisma.brandInstagramOAuthState.create({
       data: {
         ...context,
+        intent: context.intent ?? InstagramOAuthIntent.INITIAL_CONNECT,
+        initiatedByRole: context.initiatedByRole ?? BrandRole.BRAND_OWNER,
+        expectedGeneration: context.expectedGeneration ?? 0,
+        expectedProviderAccountId: context.expectedProviderAccountId ?? null,
         stateHash: hashInstagramSettingsState(state),
         expiresAt: new Date(Date.now() + INSTAGRAM_SETTINGS_STATE_TTL_MS),
       },
@@ -47,7 +56,7 @@ export class BrandInstagramOAuthStateService {
     return state;
   }
 
-  async consume(context: AttemptContext, state: string): Promise<void> {
+  async consume(context: AttemptContext, state: string) {
     const invalid = () =>
       new BadRequestException({
         code: "INVALID_INSTAGRAM_OAUTH_STATE",
@@ -63,7 +72,9 @@ export class BrandInstagramOAuthStateService {
     // Commit before provider I/O, and never undo consumption on exchange failure.
     const result = await this.prisma.brandInstagramOAuthState.updateMany({
       where: {
-        ...context,
+        brandProfileId: context.brandProfileId,
+        initiatedByUserId: context.initiatedByUserId,
+        redirectUri: context.redirectUri,
         stateHash: hashInstagramSettingsState(state),
         consumedAt: null,
         expiresAt: { gt: now },
@@ -71,5 +82,8 @@ export class BrandInstagramOAuthStateService {
       data: { consumedAt: now },
     });
     if (result.count !== 1) throw invalid();
+    return this.prisma.brandInstagramOAuthState.findUniqueOrThrow({
+      where: { stateHash: hashInstagramSettingsState(state) },
+    });
   }
 }

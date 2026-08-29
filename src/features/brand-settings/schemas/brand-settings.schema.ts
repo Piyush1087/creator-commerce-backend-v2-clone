@@ -141,7 +141,8 @@ export const IntegrationConnectionSchema = z.object({
   currentPlatformHandle: z
     .string()
     .min(1)
-    .startsWith("@", { message: 'Handle must start with "@".' }),
+    .startsWith("@", { message: 'Handle must start with "@".' })
+    .nullable(),
   inboundOauthHandle: z
     .string()
     .startsWith("@", { message: 'Inbound handle must start with "@".' })

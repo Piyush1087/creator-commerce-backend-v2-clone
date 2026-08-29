@@ -3,7 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { OfferingType, Prisma } from "@prisma/client";
+import {
+  InstagramIgHandleProvenance,
+  OfferingType,
+  Prisma,
+} from "@prisma/client";
 
 import { gateAndNormalizeBrandUrl } from "../../brand-onboarding/discovery-url.util";
 import { ParallelExtractClient } from "../../brand-onboarding/integrations/parallel/parallel-extract.client";
@@ -142,6 +146,11 @@ export class BrandCentreDnaService {
           logoUrl: data.logoUrl,
           name: data.brandName,
           igHandle: data.igHandle,
+          ...(data.igHandle !== undefined
+            ? {
+                igHandleProvenance: InstagramIgHandleProvenance.USER_ENTERED,
+              }
+            : {}),
           ytHandle: data.ytHandle,
           tiktokHandle: data.tiktokHandle,
           lifecycleStage: data.lifecycleStage,

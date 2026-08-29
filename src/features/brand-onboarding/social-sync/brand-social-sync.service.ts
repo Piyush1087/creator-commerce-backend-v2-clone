@@ -10,7 +10,13 @@ import {
   BrandIntegrationProvider,
   BrandIntegrationScope,
   BrandRole,
+  InstagramAuthorizationHealth,
+  InstagramCapabilityState,
+  InstagramIdentityVerification,
+  InstagramIgHandleProvenance,
+  InstagramOAuthIntent,
   InstagramProfessionalAccountType,
+  InstagramSyncHealth,
   InstagramSyncInvitationStatus,
 } from "@prisma/client";
 import { addHours, addMinutes, addSeconds } from "date-fns";
@@ -22,8 +28,15 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { encryptField } from "../../../shared/crypto/field-encryption.util";
 import { BrandCentreAuthService } from "../../brand-centre/brand-centre-auth.service";
 import { InstagramGraphClient } from "../../instagram/instagram-graph.client";
+import { InstagramPermissionEvidenceError } from "../../instagram/instagram-graph.client";
 import { InstagramOAuthClient } from "../../instagram/instagram-oauth.client";
 import { resolveInstagramScopesFromPermissions } from "../../instagram/instagram-scope.util";
+import {
+  BrandInstagramOAuthStateService,
+  hashInstagramSettingsState,
+  INSTAGRAM_SETTINGS_STATE_TTL_MS,
+} from "../../brand-settings/services/brand-instagram-oauth-state.service";
+import { BrandSettingsAccessService } from "../../brand-settings/services/brand-settings-access.service";
 
 function normalizeHandle(raw: string): string {
   return raw.trim().replace(/^@/, "").toLowerCase();
@@ -32,6 +45,27 @@ function normalizeHandle(raw: string): string {
 function withAt(handle: string): string {
   const bare = normalizeHandle(handle);
   return bare ? `@${bare}` : "@";
+}
+
+function assertSafeRedirectUri(redirectUri: string): void {
+  let redirect: URL;
+  try {
+    redirect = new URL(redirectUri);
+  } catch {
+    throw new BadRequestException(
+      "A valid Instagram redirect URI is required.",
+    );
+  }
+  if (
+    !["https:", "http:"].includes(redirect.protocol) ||
+    redirect.username ||
+    redirect.password ||
+    redirect.hash
+  ) {
+    throw new BadRequestException(
+      "A valid HTTP(S) Instagram redirect URI without credentials or fragment is required.",
+    );
+  }
 }
 
 @Injectable()
@@ -44,28 +78,88 @@ export class BrandSocialSyncService {
     private readonly graph: InstagramGraphClient,
     private readonly mail: MailService,
     private readonly brandAuth: BrandCentreAuthService,
+    private readonly access: BrandSettingsAccessService,
+    private readonly oauthState: BrandInstagramOAuthStateService,
   ) {}
 
   async getOauthUrl(user: AuthUser, redirectUri: string) {
-    const brand = await this.brandAuth.resolveBrandProfile(user);
+    const context = await this.access.resolveBrandContext(user);
+    const brand = await this.prisma.brandProfile.findUniqueOrThrow({
+      where: { id: context.brandProfileId },
+    });
     const finalized = this.requireFinalizedHandle(brand.igHandle);
-    const state = Buffer.from(
-      JSON.stringify({
-        brandProfileId: brand.id,
-        finalizedHandle: finalized,
-        t: Date.now(),
-      }),
-    ).toString("base64url");
+    const integration = await this.prisma.brandIntegration.findUnique({
+      where: {
+        brandProfileId_provider: {
+          brandProfileId: brand.id,
+          provider: BrandIntegrationProvider.INSTAGRAM,
+        },
+      },
+    });
+    await this.assertNoActiveDeletion(brand.id);
+    if (integration && !integration.providerAccountId) {
+      throw new BadRequestException({
+        code: "LEGACY_IDENTITY_RECONCILIATION_REQUIRED",
+        message:
+          "Reconcile the existing Instagram identity in Brand Settings before onboarding reconnect.",
+      });
+    }
+    const intent = integration
+      ? InstagramOAuthIntent.RECONNECT
+      : InstagramOAuthIntent.INITIAL_CONNECT;
+    this.access.assertInstagramAction(
+      context.membership.role,
+      integration ? "SAME_ID_RECONNECT" : "INITIAL_CONNECT",
+    );
+    const state = await this.oauthState.issue({
+      brandProfileId: brand.id,
+      initiatedByUserId: user.id,
+      redirectUri,
+      intent,
+      initiatedByRole: context.membership.role,
+      expectedGeneration: integration?.authorizationGeneration ?? 0,
+      expectedProviderAccountId: integration?.providerAccountId ?? null,
+    });
     const url = this.oauth.buildAuthorizeUrl(redirectUri, state);
     return { url, state, finalizedHandle: finalized };
   }
 
   async connectInstagram(
     user: AuthUser,
-    args: { code: string; redirectUri: string },
+    args: { code: string; redirectUri: string; state: string },
   ) {
-    const brand = await this.brandAuth.resolveBrandProfile(user);
-    return this.persistInstagramConnection(brand.id, args);
+    const context = await this.access.resolveBrandContext(user);
+    const attempt = await this.oauthState.consume(
+      {
+        brandProfileId: context.brandProfileId,
+        initiatedByUserId: user.id,
+        redirectUri: args.redirectUri,
+      },
+      args.state,
+    );
+    if (attempt.initiatedByRole !== context.membership.role) {
+      throw new ForbiddenException("Instagram OAuth role authority changed");
+    }
+    if (
+      attempt.intent !== InstagramOAuthIntent.INITIAL_CONNECT &&
+      attempt.intent !== InstagramOAuthIntent.RECONNECT
+    ) {
+      throw new BadRequestException({
+        code: "INVALID_INSTAGRAM_OAUTH_INTENT",
+        message: "This OAuth attempt must complete in Brand Settings.",
+      });
+    }
+    this.access.assertInstagramAction(
+      context.membership.role,
+      attempt.intent === InstagramOAuthIntent.INITIAL_CONNECT
+        ? "INITIAL_CONNECT"
+        : "SAME_ID_RECONNECT",
+    );
+    return this.persistInstagramConnection(context.brandProfileId, {
+      ...args,
+      expectedGeneration: attempt.expectedGeneration,
+      expectedProviderAccountId: attempt.expectedProviderAccountId,
+    });
   }
 
   async skipSocialSync(user: AuthUser) {
@@ -78,18 +172,10 @@ export class BrandSocialSyncService {
   }
 
   async inviteTeammate(user: AuthUser, emailRaw: string) {
-    const brand = await this.brandAuth.resolveBrandProfile(user);
-    const membership = await this.prisma.brandTeamMember.findUnique({
-      where: {
-        brandProfileId_userId: {
-          brandProfileId: brand.id,
-          userId: user.id,
-        },
-      },
-    });
-    if (membership && membership.role === BrandRole.CAMPAIGN_MANAGER) {
+    const context = await this.access.resolveBrandContext(user);
+    if (context.membership.role !== BrandRole.BRAND_OWNER) {
       throw new ForbiddenException(
-        "Only brand owners/admins can invite teammates for Instagram sync.",
+        "Only a Brand Owner can delegate Instagram sync.",
       );
     }
     const email = emailRaw.trim().toLowerCase();
@@ -104,7 +190,7 @@ export class BrandSocialSyncService {
         email,
         token,
         expiresAt,
-        brandProfileId: brand.id,
+        brandProfileId: context.brandProfileId,
         status: InstagramSyncInvitationStatus.PENDING,
       },
     });
@@ -116,7 +202,7 @@ export class BrandSocialSyncService {
 
     // Invite email template TBD — log the secure link for local/dev.
     this.logger.log(
-      `Instagram sync invite brand=${brand.id} email=${email} link=${link}`,
+      `Instagram sync invite brand=${context.brandProfileId} email=${email} link=${link}`,
     );
 
     return { sent: true, expiresAt: expiresAt.toISOString() };
@@ -178,9 +264,58 @@ export class BrandSocialSyncService {
     };
   }
 
+  async getInviteOauthUrl(token: string, redirectUri: string) {
+    assertSafeRedirectUri(redirectUri);
+    const invite = await this.findValidInvite(token);
+    if (invite.status !== InstagramSyncInvitationStatus.VERIFIED) {
+      throw new UnauthorizedException(
+        "Complete OTP verification before connecting Instagram.",
+      );
+    }
+    const integration = await this.prisma.brandIntegration.findUnique({
+      where: {
+        brandProfileId_provider: {
+          brandProfileId: invite.brandProfileId,
+          provider: BrandIntegrationProvider.INSTAGRAM,
+        },
+      },
+    });
+    await this.assertNoActiveDeletion(invite.brandProfileId);
+    if (integration && !integration.providerAccountId) {
+      throw new BadRequestException({
+        code: "LEGACY_IDENTITY_RECONCILIATION_REQUIRED",
+        message:
+          "The Brand Owner must reconcile the existing Instagram identity in Brand Settings.",
+      });
+    }
+    const state = randomBytes(32).toString("base64url");
+    const issued = await this.prisma.instagramSyncInvitation.updateMany({
+      where: {
+        id: invite.id,
+        status: InstagramSyncInvitationStatus.VERIFIED,
+      },
+      data: {
+        oauthStateHash: hashInstagramSettingsState(state),
+        oauthRedirectUri: redirectUri,
+        oauthExpectedGeneration: integration?.authorizationGeneration ?? 0,
+        oauthStateExpiresAt: new Date(
+          Date.now() + INSTAGRAM_SETTINGS_STATE_TTL_MS,
+        ),
+        oauthStateConsumedAt: null,
+      },
+    });
+    if (issued.count !== 1) {
+      throw new UnauthorizedException("Invitation authority changed");
+    }
+    return {
+      url: this.oauth.buildAuthorizeUrl(redirectUri, state),
+      state,
+    };
+  }
+
   async connectInstagramForInvite(
     token: string,
-    args: { code: string; redirectUri: string },
+    args: { code: string; redirectUri: string; state: string },
   ) {
     const invite = await this.findValidInvite(token);
     if (invite.status !== InstagramSyncInvitationStatus.VERIFIED) {
@@ -188,20 +323,62 @@ export class BrandSocialSyncService {
         "Complete OTP verification before connecting Instagram.",
       );
     }
+    if (!/^[A-Za-z0-9_-]{43}$/.test(args.state)) {
+      throw new UnauthorizedException("Invalid Instagram OAuth state");
+    }
+    const consumedAt = new Date();
+    const consumed = await this.prisma.instagramSyncInvitation.updateMany({
+      where: {
+        id: invite.id,
+        status: InstagramSyncInvitationStatus.VERIFIED,
+        oauthStateHash: hashInstagramSettingsState(args.state),
+        oauthRedirectUri: args.redirectUri,
+        oauthStateExpiresAt: { gt: consumedAt },
+        oauthStateConsumedAt: null,
+      },
+      data: { oauthStateConsumedAt: consumedAt },
+    });
+    if (consumed.count !== 1) {
+      throw new UnauthorizedException(
+        "Invalid or expired Instagram OAuth state",
+      );
+    }
+    const consumedInvite =
+      await this.prisma.instagramSyncInvitation.findUniqueOrThrow({
+        where: { id: invite.id },
+      });
     const result = await this.persistInstagramConnection(
       invite.brandProfileId,
-      args,
+      {
+        ...args,
+        expectedGeneration: consumedInvite.oauthExpectedGeneration ?? 0,
+        expectedProviderAccountId: null,
+      },
     );
-    await this.prisma.instagramSyncInvitation.update({
-      where: { id: invite.id },
+    const completed = await this.prisma.instagramSyncInvitation.updateMany({
+      where: {
+        id: invite.id,
+        status: InstagramSyncInvitationStatus.VERIFIED,
+        oauthStateConsumedAt: consumedAt,
+      },
       data: { status: InstagramSyncInvitationStatus.COMPLETED },
     });
+    if (completed.count !== 1) {
+      throw new BadRequestException(
+        "Invitation authority changed before completion",
+      );
+    }
     return { ...result, inviteCompleted: true };
   }
 
   private async persistInstagramConnection(
     brandProfileId: string,
-    args: { code: string; redirectUri: string },
+    args: {
+      code: string;
+      redirectUri: string;
+      expectedGeneration: number;
+      expectedProviderAccountId: string | null;
+    },
   ) {
     const brand = await this.prisma.brandProfile.findUnique({
       where: { id: brandProfileId },
@@ -211,6 +388,31 @@ export class BrandSocialSyncService {
       throw new NotFoundException("Brand profile not found");
     }
     const finalized = this.requireFinalizedHandle(brand.igHandle);
+    const existing = await this.prisma.brandIntegration.findUnique({
+      where: {
+        brandProfileId_provider: {
+          brandProfileId,
+          provider: BrandIntegrationProvider.INSTAGRAM,
+        },
+      },
+    });
+    const expectedGeneration = args.expectedGeneration;
+    if ((existing?.authorizationGeneration ?? 0) !== expectedGeneration) {
+      throw new BadRequestException({
+        code: "STALE_INSTAGRAM_AUTHORIZATION_GENERATION",
+        message: "Instagram state changed. Start a fresh connection.",
+      });
+    }
+    if (
+      args.expectedProviderAccountId &&
+      existing?.providerAccountId !== args.expectedProviderAccountId
+    ) {
+      throw new BadRequestException({
+        code: "STALE_INSTAGRAM_ACCOUNT_IDENTITY",
+        message:
+          "Instagram account identity changed. Start a fresh connection.",
+      });
+    }
 
     const tokenResult = await this.oauth.exchangeAuthorizationCode(
       args.code,
@@ -226,63 +428,150 @@ export class BrandSocialSyncService {
       });
     }
 
-    if (normalizeHandle(me.username) !== finalized) {
+    if (
+      !existing?.providerAccountId &&
+      normalizeHandle(me.username) !== finalized
+    ) {
       throw new BadRequestException({
         code: "HANDLE_MISMATCH",
         message: `Connection Failed: The authenticated Instagram account (@${me.username}) does not match the finalized brand handle (@${finalized}).`,
       });
     }
 
+    if (existing?.isActive && !existing.providerAccountId) {
+      throw new BadRequestException({
+        code: "LEGACY_IDENTITY_RECONCILIATION_REQUIRED",
+        message:
+          "Reconcile the existing Instagram identity in Brand Settings before onboarding reconnect.",
+      });
+    }
+    if (
+      existing?.providerAccountId &&
+      existing.providerAccountId !== me.userId
+    ) {
+      throw new BadRequestException({
+        code: "ACCOUNT_CHANGE_REQUIRED",
+        message:
+          "A different Instagram account requires the Owner account-change flow in Brand Settings.",
+      });
+    }
+
+    let providerPermissions: string[] | null = null;
+    try {
+      providerPermissions = await this.graph.fetchGrantedPermissions(
+        tokenResult.accessToken,
+      );
+    } catch (error) {
+      if (!(error instanceof InstagramPermissionEvidenceError)) throw error;
+    }
     const permissionNames = [
       ...tokenResult.permissions,
-      ...(await this.graph.fetchGrantedPermissions(tokenResult.accessToken)),
+      ...(providerPermissions ?? []),
     ];
     const { scopes, status } =
       resolveInstagramScopesFromPermissions(permissionNames);
 
-    if (!scopes.includes(BrandIntegrationScope.BASIC_PROFILE)) {
-      throw new BadRequestException({
-        code: "MISSING_BASIC_SCOPE",
-        message:
-          "Connection Rejected: Basic Instagram profile permission is required.",
-      });
-    }
+    if (!scopes.includes(BrandIntegrationScope.BASIC_PROFILE))
+      scopes.unshift(BrandIntegrationScope.BASIC_PROFILE);
+
+    const hasInsights = scopes.includes(
+      BrandIntegrationScope.ENGAGEMENT_INSIGHTS,
+    );
+    const insightsCapability = hasInsights
+      ? InstagramCapabilityState.YES
+      : providerPermissions
+        ? InstagramCapabilityState.NO
+        : InstagramCapabilityState.UNKNOWN;
+    const authorizationHealth = hasInsights
+      ? InstagramAuthorizationHealth.CONNECTED_FULL
+      : providerPermissions
+        ? InstagramAuthorizationHealth.PARTIALLY_CONNECTED
+        : InstagramAuthorizationHealth.NEEDS_REVALIDATION;
 
     const expiresAt = addSeconds(new Date(), tokenResult.expiresInSeconds);
     const handle = withAt(me.username);
 
-    await this.prisma.brandIntegration.upsert({
-      where: {
-        brandProfileId_provider: {
-          brandProfileId: brand.id,
-          provider: BrandIntegrationProvider.INSTAGRAM,
+    await this.prisma.$transaction(async (tx) => {
+      const token = encryptField(tokenResult.accessToken);
+      if (!existing) {
+        await tx.brandIntegration.create({
+          data: {
+            brandProfileId: brand.id,
+            provider: BrandIntegrationProvider.INSTAGRAM,
+            status,
+            currentPlatformHandle: handle,
+            inboundOauthHandle: handle,
+            accessTokenEncrypted: token,
+            grantedScopes: scopes,
+            tokenExpiresAt: expiresAt,
+            tokenIssuedAt: new Date(),
+            providerAccountId: me.userId,
+            providerAppScopedUserId: me.appScopedUserId,
+            identityVerification: InstagramIdentityVerification.VERIFIED,
+            authorizationHealth,
+            firstPartyProfileCapability: InstagramCapabilityState.YES,
+            firstPartyInsightsCapability: insightsCapability,
+            humanActionRequired: false,
+            syncHealth: InstagramSyncHealth.NOT_CONFIGURED,
+            credentialVersion: 1,
+            authorizationGeneration: 1,
+            isActive: true,
+          },
+        });
+      } else {
+        const updated = await tx.brandIntegration.updateMany({
+          where: {
+            id: existing.id,
+            authorizationGeneration: expectedGeneration,
+          },
+          data: {
+            status,
+            currentPlatformHandle: handle,
+            inboundOauthHandle: handle,
+            accessTokenEncrypted: token,
+            refreshTokenEncrypted: null,
+            grantedScopes: scopes,
+            tokenExpiresAt: expiresAt,
+            tokenIssuedAt: new Date(),
+            providerAccountId: me.userId,
+            providerAppScopedUserId: me.appScopedUserId,
+            identityVerification: InstagramIdentityVerification.VERIFIED,
+            authorizationHealth,
+            firstPartyProfileCapability: InstagramCapabilityState.YES,
+            firstPartyInsightsCapability: insightsCapability,
+            humanActionRequired: false,
+            syncHealth: InstagramSyncHealth.NOT_CONFIGURED,
+            credentialVersion: { increment: 1 },
+            authorizationGeneration: { increment: 1 },
+            isActive: true,
+            pendingAccessTokenEncrypted: null,
+            pendingGrantedScopes: [],
+            pendingTokenExpiresAt: null,
+            pendingProviderAccountId: null,
+            pendingProviderAppScopedUserId: null,
+            pendingOauthIntent: null,
+            pendingExpectedGeneration: null,
+            tokenLastRefreshedAt: null,
+            tokenRefreshAttemptedAt: null,
+            authorizationLossTransitionId: null,
+            authorizationLossOpenedAt: null,
+          },
+        });
+        if (updated.count !== 1) {
+          throw new BadRequestException({
+            code: "STALE_INSTAGRAM_AUTHORIZATION_GENERATION",
+            message: "Instagram state changed. Start a fresh connection.",
+          });
+        }
+      }
+      await tx.brandProfile.update({
+        where: { id: brand.id },
+        data: {
+          socialSyncSkipped: false,
+          igHandle: normalizeHandle(me.username),
+          igHandleProvenance: InstagramIgHandleProvenance.META_DIRECT,
         },
-      },
-      create: {
-        brandProfileId: brand.id,
-        provider: BrandIntegrationProvider.INSTAGRAM,
-        status,
-        currentPlatformHandle: handle,
-        inboundOauthHandle: handle,
-        accessTokenEncrypted: encryptField(tokenResult.accessToken),
-        grantedScopes: scopes,
-        tokenExpiresAt: expiresAt,
-        isActive: true,
-      },
-      update: {
-        status,
-        currentPlatformHandle: handle,
-        inboundOauthHandle: handle,
-        accessTokenEncrypted: encryptField(tokenResult.accessToken),
-        grantedScopes: scopes,
-        tokenExpiresAt: expiresAt,
-        isActive: true,
-      },
-    });
-
-    await this.prisma.brandProfile.update({
-      where: { id: brand.id },
-      data: { socialSyncSkipped: false, igHandle: normalizeHandle(me.username) },
+      });
     });
 
     this.logger.log(
@@ -329,5 +618,20 @@ export class BrandSocialSyncService {
       );
     }
     return invite;
+  }
+
+  private async assertNoActiveDeletion(brandProfileId: string): Promise<void> {
+    const active = await this.prisma.brandInstagramDeletionRequest.count({
+      where: {
+        brandProfileId,
+        state: { notIn: ["COMPLETED", "FAILED_TERMINAL"] },
+      },
+    });
+    if (active) {
+      throw new BadRequestException({
+        code: "INSTAGRAM_DELETION_IN_PROGRESS",
+        message: "Instagram data deletion is in progress.",
+      });
+    }
   }
 }

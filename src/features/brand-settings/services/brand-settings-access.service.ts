@@ -16,6 +16,32 @@ const FINANCIAL_MUTATION_ROLES: BrandRole[] = [
   BrandRole.FINANCE_ADMIN,
 ];
 
+export type InstagramIntegrationAction =
+  | "READ"
+  | "INITIAL_CONNECT"
+  | "SAME_ID_RECONNECT"
+  | "CONTROLLED_ACCOUNT_CHANGE"
+  | "LEGACY_IDENTITY_RECONCILIATION"
+  | "DISCONNECT"
+  | "DELETE_MY_DATA";
+
+const INSTAGRAM_ACTIONS: Record<
+  BrandRole,
+  readonly InstagramIntegrationAction[]
+> = {
+  [BrandRole.BRAND_OWNER]: [
+    "READ",
+    "INITIAL_CONNECT",
+    "SAME_ID_RECONNECT",
+    "CONTROLLED_ACCOUNT_CHANGE",
+    "LEGACY_IDENTITY_RECONCILIATION",
+    "DISCONNECT",
+    "DELETE_MY_DATA",
+  ],
+  [BrandRole.CAMPAIGN_MANAGER]: ["READ", "SAME_ID_RECONNECT"],
+  [BrandRole.FINANCE_ADMIN]: ["READ"],
+};
+
 @Injectable()
 export class BrandSettingsAccessService {
   constructor(
@@ -25,6 +51,17 @@ export class BrandSettingsAccessService {
 
   async resolveBrandContext(user: AuthUser) {
     return this.workspace.resolveBrandContext(user);
+  }
+
+  assertInstagramAction(
+    role: BrandRole,
+    action: InstagramIntegrationAction,
+  ): void {
+    if (!INSTAGRAM_ACTIONS[role].includes(action)) {
+      throw new ForbiddenException(
+        `Brand role ${role} cannot perform Instagram action ${action}.`,
+      );
+    }
   }
 
   async ensureMembership(brandProfileId: string, user: AuthUser) {
