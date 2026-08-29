@@ -21,12 +21,14 @@ import {
   TEAM_INVITATION_STATUS,
 } from "../team/team-invitation-lifecycle";
 import { BrandSettingsAccessService } from "./brand-settings-access.service";
+import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
 
 @Injectable()
 export class BrandTeamService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: BrandSettingsAccessService,
+    private readonly notifications?: NotificationDispatchService,
   ) {}
 
   private async mutate<T>(
@@ -79,9 +81,21 @@ export class BrandTeamService {
         throw new BadRequestException("You cannot revoke your own access.");
       if (target.role === "BRAND_OWNER")
         await protectOrganizationalAnchor(tx, brandProfileId, target.id);
-      await tx.brandTeamMember.update({
+      const revoked = await tx.brandTeamMember.update({
         where: { id: target.id },
         data: { isActive: false },
+      });
+      await this.notifications?.enqueueWithinTransaction(tx, {
+        workspaceId: brandProfileId,
+        eventType: "team.member_access_revoked",
+        source: {
+          sourceType: "brand_team_membership",
+          sourceId: revoked.id,
+          transitionId: `revoked:${revoked.updatedAt.toISOString()}`,
+        },
+        payload: {},
+        triggerUserId: actor.id,
+        affectedUserId: revoked.userId,
       });
       return { revoked: true, membership_id: membershipId };
     });

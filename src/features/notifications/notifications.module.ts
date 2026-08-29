@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 import { ScheduleModule } from "@nestjs/schedule";
 
 import { MailModule } from "../../mail/mail.module";
@@ -15,7 +15,12 @@ import { NotificationEmailWorkerService } from "./services/notification-email-wo
 import { NotificationRecipientPolicyService } from "./services/notification-recipient-policy.service";
 
 @Module({
-  imports: [ScheduleModule, MailModule, BrandCentreModule, BrandSettingsModule],
+  imports: [
+    ScheduleModule,
+    MailModule,
+    BrandCentreModule,
+    forwardRef(() => BrandSettingsModule),
+  ],
   controllers: [NotificationsController],
   providers: [
     NotificationAccessService,

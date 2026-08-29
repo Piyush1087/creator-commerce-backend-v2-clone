@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
 import { MailModule } from "../../mail/mail.module";
 import { BrandTeamInvitationsController } from "./brand-team-invitations.controller";
@@ -13,9 +13,16 @@ import { BrandSettingsAccessService } from "./services/brand-settings-access.ser
 import { BrandSettingsIntegrationsService } from "./services/brand-settings-integrations.service";
 import { BrandSettingsService } from "./services/brand-settings.service";
 import { BrandInstagramOAuthStateService } from "./services/brand-instagram-oauth-state.service";
+import { NotificationsModule } from "../notifications/notifications.module";
 
 @Module({
-  imports: [BrandCentreModule, InstagramModule, AuthModule, MailModule],
+  imports: [
+    BrandCentreModule,
+    InstagramModule,
+    AuthModule,
+    MailModule,
+    forwardRef(() => NotificationsModule),
+  ],
   controllers: [BrandSettingsController, BrandTeamInvitationsController],
   providers: [
     BrandTeamService,

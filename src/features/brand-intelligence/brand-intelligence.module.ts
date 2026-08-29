@@ -8,6 +8,7 @@ import {
 } from "./processors/audience-persona/audience-persona-model.provider";
 
 import { DataExtractionModule } from "../data-extraction/data-extraction.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { DataExtractionIntelligenceEvidenceAdapter } from "../data-extraction/evidence/intelligence/data-extraction-intelligence-evidence.adapter";
 import { ContractBundleIntegrityVerifier } from "./contracts/bundle/contract-bundle.integrity";
 import { BundlePathOwnershipRegistry } from "./contracts/registry/bundle-path-ownership.registry";
@@ -138,7 +139,7 @@ const internalProviders = [
 ];
 
 @Module({
-  imports: [DataExtractionModule],
+  imports: [DataExtractionModule, NotificationsModule],
   providers: internalProviders,
   exports: internalProviders,
 })
