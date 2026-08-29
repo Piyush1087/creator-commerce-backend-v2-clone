@@ -537,12 +537,41 @@ enum SettingsNotificationCategory {
   MILESTONE_RELEASE_REQUEST
   TAX_COMPLIANCE_ALERT
   CAMPAIGN_BUDGET_OVERRUN
+  BILLING_SUBSCRIPTION
+  ESCROW_PAYOUTS
+  CAMPAIGNS_APPLICATIONS
+  COLLABORATIONS
+  BRAND_INTELLIGENCE
+  TEAM_ACCOUNT_INTEGRATIONS
 }
 
 enum NotificationUrgencyLevel {
   CRITICAL
   MEDIUM
   LOW
+  ACTION_REQUIRED
+  INFORMATIONAL
+}
+
+enum NotificationEmailPolicy {
+  MANDATORY
+  OPTIONAL
+  NONE
+}
+
+enum NotificationInAppPolicy {
+  REQUIRED
+  YES
+  NONE
+}
+
+enum NotificationEmailDeliveryStatus {
+  NOT_REQUIRED
+  PENDING
+  PROCESSING
+  SENT
+  FAILED_RETRYABLE
+  FAILED_TERMINAL
 }
 
 enum NotificationJobStatus {
@@ -983,35 +1012,37 @@ model Organization {
 }
 
 model User {
-  id                            String                          @id @default(uuid())
-  email                         String                          @unique
+  id                            String                            @id @default(uuid())
+  email                         String                            @unique
   /// Display name; brand onboarding sets local-part of work email.
   name                          String?
   /// Scrypt hash for creator email/password signup.
-  hashedPassword                String?                         @map("hashed_password")
+  hashedPassword                String?                           @map("hashed_password")
   /// Google OAuth subject (`sub` claim) for creator Google signup/sign-in.
-  googleSubjectId               String?                         @unique @map("google_subject_id")
-  emailVerifiedAt               DateTime?                       @map("email_verified_at")
+  googleSubjectId               String?                           @unique @map("google_subject_id")
+  emailVerifiedAt               DateTime?                         @map("email_verified_at")
   role                          UserRole
-  organizationId                String?                         @map("organization_id")
-  organization                  Organization?                   @relation(fields: [organizationId], references: [id])
-  createdAt                     DateTime                        @default(now()) @map("created_at")
-  updatedAt                     DateTime                        @updatedAt @map("updated_at")
+  organizationId                String?                           @map("organization_id")
+  organization                  Organization?                     @relation(fields: [organizationId], references: [id])
+  createdAt                     DateTime                          @default(now()) @map("created_at")
+  updatedAt                     DateTime                          @updatedAt @map("updated_at")
   discoveryLeads                DiscoveryLead[]
   creatorProfile                CreatorProfile?
   creatorOnboardingTrack        CreatorOnboardingTrack?
   userProfile                   UserProfile?
   historicChatThreads           HistoricChatThread[]
   metricPostPulses              MetricPostPulse[]
-  collaborationsAsCreator       Collaboration[]                 @relation("CollaborationCreator")
+  collaborationsAsCreator       Collaboration[]                   @relation("CollaborationCreator")
   coPilotThreads                CoPilotThread[]
   coPilotMessageFeedback        CoPilotMessageFeedback[]
-  creatorCoPilotThreadsAuthored CreatorCoPilotThread[]          @relation("CreatorCoPilotThreadAuthor")
+  creatorCoPilotThreadsAuthored CreatorCoPilotThread[]            @relation("CreatorCoPilotThreadAuthor")
   creatorCoPilotMessageFeedback CreatorCoPilotMessageFeedback[]
   brandTeamMemberships          BrandTeamMember[]
   brandInstagramOAuthStates     BrandInstagramOAuthState[]
-  triggeredNotifications        Notification[]                  @relation("NotificationTriggerUser")
+  triggeredNotifications        Notification[]                    @relation("NotificationTriggerUser")
   notificationRecipients        NotificationRecipient[]
+  notificationPreferences       UserBrandNotificationPreference[]
+  notificationEmailDeliveries   NotificationEmailDelivery[]
   gatekeeperRecoveryRequests    GatekeeperRecoveryRequest[]
 
   @@index([organizationId])
@@ -1366,6 +1397,7 @@ model BrandProfile {
   withdrawalAccounts       BrandWithdrawalAccount[]
   notificationSettings     BrandNotificationSetting[]
   notifications            Notification[]
+  notificationPreferences  UserBrandNotificationPreference[]
   integrations             BrandIntegration[]
   instagramOAuthStates     BrandInstagramOAuthState[]
   instagramSyncInvitations InstagramSyncInvitation[]
@@ -1394,23 +1426,23 @@ model BrandInstagramOAuthState {
 
 /// Brand OAuth connections (Instagram Login + optional Meta Business Suite in Settings).
 model BrandIntegration {
-  id                    String                   @id @default(uuid()) @map("integration_id")
-  brandProfileId        String                   @map("brand_id")
-  brandProfile          BrandProfile             @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  provider              BrandIntegrationProvider
-  status                BrandIntegrationStatus   @default(DISCONNECTED)
-  currentPlatformHandle String                   @map("current_platform_handle") @db.VarChar(255)
-  inboundOauthHandle    String?                  @map("inbound_oauth_handle") @db.VarChar(255)
-  accessTokenEncrypted  String?                  @map("access_token_encrypted") @db.Text
-  refreshTokenEncrypted String?                  @map("refresh_token_encrypted") @db.Text
-  pendingAccessTokenEncrypted String?            @map("pending_access_token_encrypted") @db.Text
-  pendingGrantedScopes BrandIntegrationScope[]   @default([]) @map("pending_granted_scopes")
-  pendingTokenExpiresAt DateTime?                @map("pending_token_expires_at")
-  grantedScopes         BrandIntegrationScope[]  @default([]) @map("granted_scopes")
-  tokenExpiresAt        DateTime?                @map("token_expires_at")
-  isActive              Boolean                  @default(true) @map("is_active")
-  createdAt             DateTime                 @default(now()) @map("created_at")
-  updatedAt             DateTime                 @updatedAt @map("updated_at")
+  id                          String                   @id @default(uuid()) @map("integration_id")
+  brandProfileId              String                   @map("brand_id")
+  brandProfile                BrandProfile             @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  provider                    BrandIntegrationProvider
+  status                      BrandIntegrationStatus   @default(DISCONNECTED)
+  currentPlatformHandle       String                   @map("current_platform_handle") @db.VarChar(255)
+  inboundOauthHandle          String?                  @map("inbound_oauth_handle") @db.VarChar(255)
+  accessTokenEncrypted        String?                  @map("access_token_encrypted") @db.Text
+  refreshTokenEncrypted       String?                  @map("refresh_token_encrypted") @db.Text
+  pendingAccessTokenEncrypted String?                  @map("pending_access_token_encrypted") @db.Text
+  pendingGrantedScopes        BrandIntegrationScope[]  @default([]) @map("pending_granted_scopes")
+  pendingTokenExpiresAt       DateTime?                @map("pending_token_expires_at")
+  grantedScopes               BrandIntegrationScope[]  @default([]) @map("granted_scopes")
+  tokenExpiresAt              DateTime?                @map("token_expires_at")
+  isActive                    Boolean                  @default(true) @map("is_active")
+  createdAt                   DateTime                 @default(now()) @map("created_at")
+  updatedAt                   DateTime                 @updatedAt @map("updated_at")
 
   @@unique([brandProfileId, provider], map: "uq_brand_provider_pair")
   @@index([brandProfileId, provider, status], map: "idx_brand_integrations_lookup")
@@ -2517,17 +2549,17 @@ model BrandBillingProfile {
 }
 
 model BrandBillingProfileVersion {
-  id                      String       @id @default(uuid()) @map("version_id")
-  brandProfileId          String       @map("brand_id")
-  brandProfile            BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  legalEntityName         String       @map("legal_entity_name") @db.VarChar(255)
-  legalEntityType         String?      @map("legal_entity_type") @db.VarChar(100)
-  billingCountryCode      String?      @map("billing_country_code") @db.Char(2)
-  billingAddress          String       @map("billing_address") @db.Text
-  gstin                   String?      @db.VarChar(15)
-  effectiveFrom           DateTime     @map("effective_from")
-  createdAt               DateTime     @default(now()) @map("created_at")
-  invoices                BrandBillingInvoice[]
+  id                 String                @id @default(uuid()) @map("version_id")
+  brandProfileId     String                @map("brand_id")
+  brandProfile       BrandProfile          @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  legalEntityName    String                @map("legal_entity_name") @db.VarChar(255)
+  legalEntityType    String?               @map("legal_entity_type") @db.VarChar(100)
+  billingCountryCode String?               @map("billing_country_code") @db.Char(2)
+  billingAddress     String                @map("billing_address") @db.Text
+  gstin              String?               @db.VarChar(15)
+  effectiveFrom      DateTime              @map("effective_from")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  invoices           BrandBillingInvoice[]
 
   @@index([brandProfileId, effectiveFrom])
   @@map("brand_billing_profile_versions")
@@ -2567,6 +2599,22 @@ model BrandNotificationSetting {
   @@unique([brandProfileId, category, channel])
   @@index([brandProfileId, category])
   @@map("brand_notification_settings")
+}
+
+model UserBrandNotificationPreference {
+  id                   String                       @id @default(uuid())
+  brandProfileId       String                       @map("brand_profile_id")
+  brandProfile         BrandProfile                 @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  userId               String                       @map("user_id")
+  user                 User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category             SettingsNotificationCategory
+  optionalEmailEnabled Boolean                      @default(true) @map("optional_email_enabled")
+  createdAt            DateTime                     @default(now()) @map("created_at")
+  updatedAt            DateTime                     @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, userId, category])
+  @@index([userId, brandProfileId])
+  @@map("user_brand_notification_preferences")
 }
 
 model CreatorWorkspace {
@@ -2948,26 +2996,26 @@ model BrandEscrowVault {
 }
 
 model EscrowFundingLoad {
-  id                    String                  @id @default(uuid()) @map("funding_load_id")
-  vaultId               String                  @map("vault_id")
-  vault                 BrandEscrowVault        @relation(fields: [vaultId], references: [id], onDelete: Restrict)
-  brandProfileId        String                  @map("brand_id")
-  sourceType            EscrowFundingSourceType @map("source_type")
-  currency              String                  @db.VarChar(3)
-  principalAmount       Decimal                 @map("principal_amount") @db.Decimal(15, 4)
-  processingFee         Decimal                 @default(0) @map("processing_fee") @db.Decimal(15, 4)
-  processingFeeTax      Decimal                 @default(0) @map("processing_fee_tax") @db.Decimal(15, 4)
-  state                 EscrowFundingState      @default(LOAD_INITIATED)
-  idempotencyKey        String?                 @unique @map("idempotency_key")
-  providerOrderId       String?                 @unique @map("provider_order_id")
-  providerPaymentId     String?                 @unique @map("provider_payment_id")
-  providerCreditId      String?                 @unique @map("provider_credit_id")
-  sourceReference       String?                 @map("source_reference")
-  initiatedAt           DateTime?               @map("initiated_at")
-  creditedAt            DateTime?               @map("credited_at")
-  failedAt              DateTime?               @map("failed_at")
-  createdAt             DateTime                @default(now()) @map("created_at")
-  updatedAt             DateTime                @updatedAt @map("updated_at")
+  id                String                  @id @default(uuid()) @map("funding_load_id")
+  vaultId           String                  @map("vault_id")
+  vault             BrandEscrowVault        @relation(fields: [vaultId], references: [id], onDelete: Restrict)
+  brandProfileId    String                  @map("brand_id")
+  sourceType        EscrowFundingSourceType @map("source_type")
+  currency          String                  @db.VarChar(3)
+  principalAmount   Decimal                 @map("principal_amount") @db.Decimal(15, 4)
+  processingFee     Decimal                 @default(0) @map("processing_fee") @db.Decimal(15, 4)
+  processingFeeTax  Decimal                 @default(0) @map("processing_fee_tax") @db.Decimal(15, 4)
+  state             EscrowFundingState      @default(LOAD_INITIATED)
+  idempotencyKey    String?                 @unique @map("idempotency_key")
+  providerOrderId   String?                 @unique @map("provider_order_id")
+  providerPaymentId String?                 @unique @map("provider_payment_id")
+  providerCreditId  String?                 @unique @map("provider_credit_id")
+  sourceReference   String?                 @map("source_reference")
+  initiatedAt       DateTime?               @map("initiated_at")
+  creditedAt        DateTime?               @map("credited_at")
+  failedAt          DateTime?               @map("failed_at")
+  createdAt         DateTime                @default(now()) @map("created_at")
+  updatedAt         DateTime                @updatedAt @map("updated_at")
 
   @@index([vaultId, state])
   @@index([brandProfileId, createdAt])
@@ -3055,30 +3103,30 @@ model IdempotencyRegistry {
 // ---------------------------------------------------------------------------
 
 model BrandSubscription {
-  id                     String               @id @default(uuid()) @map("subscription_id")
-  brandProfileId         String               @unique @map("brand_id")
-  brandProfile           BrandProfile         @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  tier                   SubscriptionTier     @default(FOUNDERS_BETA)
-  status                 SubscriptionStatus   @default(TRIALING)
-  currency               SubscriptionCurrency @default(USD)
-  razorpayCustomerId     String?              @map("razorpay_customer_id")
-  razorpaySubscriptionId String?              @unique @map("razorpay_subscription_id")
-  razorpayPlanId         String?              @map("razorpay_plan_id")
-  trialEndsAt            DateTime?            @map("trial_ends_at")
-  currentPeriodStart     DateTime             @default(now()) @map("current_period_start")
-  currentPeriodEnd       DateTime             @map("current_period_end")
-  cancelScheduledAt      DateTime?            @map("cancel_scheduled_at")
-  cancelEffectiveAt      DateTime?            @map("cancel_effective_at")
-  firstPaymentFailureAt  DateTime?            @map("first_payment_failure_at")
-  paymentGraceEndsAt     DateTime?            @map("payment_grace_ends_at")
-  providerStatus         String?              @map("provider_status")
-  providerCancellationState String? @map("provider_cancellation_state")
-  continuationRazorpaySubscriptionId String? @unique @map("continuation_razorpay_subscription_id")
-  continuationRazorpayPlanId String? @map("continuation_razorpay_plan_id")
-  continuationProviderStatus String? @map("continuation_provider_status")
-  continuationStartsAt DateTime? @map("continuation_starts_at")
-  createdAt              DateTime             @default(now()) @map("created_at")
-  updatedAt              DateTime             @updatedAt @map("updated_at")
+  id                                 String               @id @default(uuid()) @map("subscription_id")
+  brandProfileId                     String               @unique @map("brand_id")
+  brandProfile                       BrandProfile         @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  tier                               SubscriptionTier     @default(FOUNDERS_BETA)
+  status                             SubscriptionStatus   @default(TRIALING)
+  currency                           SubscriptionCurrency @default(USD)
+  razorpayCustomerId                 String?              @map("razorpay_customer_id")
+  razorpaySubscriptionId             String?              @unique @map("razorpay_subscription_id")
+  razorpayPlanId                     String?              @map("razorpay_plan_id")
+  trialEndsAt                        DateTime?            @map("trial_ends_at")
+  currentPeriodStart                 DateTime             @default(now()) @map("current_period_start")
+  currentPeriodEnd                   DateTime             @map("current_period_end")
+  cancelScheduledAt                  DateTime?            @map("cancel_scheduled_at")
+  cancelEffectiveAt                  DateTime?            @map("cancel_effective_at")
+  firstPaymentFailureAt              DateTime?            @map("first_payment_failure_at")
+  paymentGraceEndsAt                 DateTime?            @map("payment_grace_ends_at")
+  providerStatus                     String?              @map("provider_status")
+  providerCancellationState          String?              @map("provider_cancellation_state")
+  continuationRazorpaySubscriptionId String?              @unique @map("continuation_razorpay_subscription_id")
+  continuationRazorpayPlanId         String?              @map("continuation_razorpay_plan_id")
+  continuationProviderStatus         String?              @map("continuation_provider_status")
+  continuationStartsAt               DateTime?            @map("continuation_starts_at")
+  createdAt                          DateTime             @default(now()) @map("created_at")
+  updatedAt                          DateTime             @updatedAt @map("updated_at")
 
   featureUsages   FeatureUsage[]
   billingInvoices BrandBillingInvoice[]
@@ -3089,32 +3137,32 @@ model BrandSubscription {
 }
 
 model BrandBillingInvoice {
-  id                     String            @id @default(uuid()) @map("invoice_row_id")
-  brandProfileId         String            @map("brand_id")
-  brandSubscriptionId    String            @map("subscription_id")
-  brandSubscription      BrandSubscription @relation(fields: [brandSubscriptionId], references: [id], onDelete: Cascade)
-  razorpayInvoiceId      String            @unique @map("razorpay_invoice_id")
-  razorpaySubscriptionId String            @map("razorpay_subscription_id")
-  razorpayPaymentId      String?           @map("razorpay_payment_id")
-  shortUrl               String?           @map("short_url")
-  status                 String
-  amount                 Int
-  amountPaid             Int               @default(0) @map("amount_paid")
-  currency               String            @default("USD")
-  invoiceNumber          String?           @map("invoice_number")
-  paidAt                 DateTime?         @map("paid_at")
-  billingPeriodStart     DateTime?         @map("billing_period_start")
-  billingPeriodEnd       DateTime?         @map("billing_period_end")
-  issuedAt               DateTime?         @map("issued_at")
-  billingProfileVersionId String?          @map("billing_profile_version_id")
+  id                      String                      @id @default(uuid()) @map("invoice_row_id")
+  brandProfileId          String                      @map("brand_id")
+  brandSubscriptionId     String                      @map("subscription_id")
+  brandSubscription       BrandSubscription           @relation(fields: [brandSubscriptionId], references: [id], onDelete: Cascade)
+  razorpayInvoiceId       String                      @unique @map("razorpay_invoice_id")
+  razorpaySubscriptionId  String                      @map("razorpay_subscription_id")
+  razorpayPaymentId       String?                     @map("razorpay_payment_id")
+  shortUrl                String?                     @map("short_url")
+  status                  String
+  amount                  Int
+  amountPaid              Int                         @default(0) @map("amount_paid")
+  currency                String                      @default("USD")
+  invoiceNumber           String?                     @map("invoice_number")
+  paidAt                  DateTime?                   @map("paid_at")
+  billingPeriodStart      DateTime?                   @map("billing_period_start")
+  billingPeriodEnd        DateTime?                   @map("billing_period_end")
+  issuedAt                DateTime?                   @map("issued_at")
+  billingProfileVersionId String?                     @map("billing_profile_version_id")
   billingProfileVersion   BrandBillingProfileVersion? @relation(fields: [billingProfileVersionId], references: [id], onDelete: SetNull)
-  billingLegalEntityName  String?           @map("billing_legal_entity_name") @db.VarChar(255)
-  billingLegalEntityType  String?           @map("billing_legal_entity_type") @db.VarChar(100)
-  billingCountryCode      String?           @map("billing_country_code") @db.Char(2)
-  billingAddress          String?           @map("billing_address") @db.Text
-  billingGstin            String?           @map("billing_gstin") @db.VarChar(15)
-  createdAt              DateTime          @default(now()) @map("created_at")
-  updatedAt              DateTime          @updatedAt @map("updated_at")
+  billingLegalEntityName  String?                     @map("billing_legal_entity_name") @db.VarChar(255)
+  billingLegalEntityType  String?                     @map("billing_legal_entity_type") @db.VarChar(100)
+  billingCountryCode      String?                     @map("billing_country_code") @db.Char(2)
+  billingAddress          String?                     @map("billing_address") @db.Text
+  billingGstin            String?                     @map("billing_gstin") @db.VarChar(15)
+  createdAt               DateTime                    @default(now()) @map("created_at")
+  updatedAt               DateTime                    @updatedAt @map("updated_at")
 
   @@index([brandProfileId])
   @@index([brandSubscriptionId])
@@ -3349,57 +3397,93 @@ model CreatorCoPilotInteractionLog {
 // ============================================================================
 
 model Notification {
-  id            String                   @id @default(uuid())
-  workspaceId   String                   @map("workspace_id")
-  brandProfile  BrandProfile             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  triggerUserId String?                  @map("trigger_user_id")
-  triggerUser   User?                    @relation("NotificationTriggerUser", fields: [triggerUserId], references: [id], onDelete: SetNull)
-  eventType     String                   @map("event_type") @db.VarChar(100)
-  urgencyLevel  NotificationUrgencyLevel @map("urgency_level")
-  payload       Json
-  createdAt     DateTime                 @default(now()) @map("created_at")
-  updatedAt     DateTime                 @updatedAt @map("updated_at")
+  id               String                        @id @default(uuid())
+  workspaceId      String                        @map("workspace_id")
+  brandProfile     BrandProfile                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  triggerUserId    String?                       @map("trigger_user_id")
+  triggerUser      User?                         @relation("NotificationTriggerUser", fields: [triggerUserId], references: [id], onDelete: SetNull)
+  eventType        String                        @map("event_type") @db.VarChar(100)
+  urgencyLevel     NotificationUrgencyLevel      @map("urgency_level")
+  semanticEventKey String?                       @map("semantic_event_key") @db.VarChar(200)
+  category         SettingsNotificationCategory?
+  actionable       Boolean?
+  emailPolicy      NotificationEmailPolicy?      @map("email_policy")
+  inAppPolicy      NotificationInAppPolicy?      @map("in_app_policy")
+  payload          Json
+  createdAt        DateTime                      @default(now()) @map("created_at")
+  updatedAt        DateTime                      @updatedAt @map("updated_at")
 
-  recipients NotificationRecipient[]
+  recipients      NotificationRecipient[]
+  emailDeliveries NotificationEmailDelivery[]
 
+  @@unique([workspaceId, eventType, semanticEventKey])
   @@index([workspaceId])
   @@index([workspaceId, eventType, createdAt])
   @@map("notifications")
 }
 
 model NotificationRecipient {
-  id             String       @id @default(uuid())
-  notificationId String       @map("notification_id")
-  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
-  userId         String       @map("user_id")
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  isRead         Boolean      @default(false) @map("is_read")
-  isEmailed      Boolean      @default(false) @map("is_emailed")
-  readAt         DateTime?    @map("read_at")
+  id             String                     @id @default(uuid())
+  notificationId String                     @map("notification_id")
+  notification   Notification               @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  userId         String                     @map("user_id")
+  user           User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isRead         Boolean                    @default(false) @map("is_read")
+  isEmailed      Boolean                    @default(false) @map("is_emailed")
+  readAt         DateTime?                  @map("read_at")
+  emailDelivery  NotificationEmailDelivery?
 
   @@unique([notificationId, userId])
   @@index([userId, isRead])
   @@map("notification_recipients")
 }
 
-model NotificationJob {
-  id            String                   @id @default(uuid())
-  workspaceId   String                   @map("workspace_id")
-  eventType     String                   @map("event_type") @db.VarChar(100)
-  urgencyLevel  NotificationUrgencyLevel @map("urgency_level")
-  triggerUserId String?                  @map("trigger_user_id")
-  payload       Json
-  actorName     String?                  @map("actor_name") @db.VarChar(200)
-  status        NotificationJobStatus    @default(PENDING)
-  attempts      Int                      @default(0)
-  maxAttempts   Int                      @default(5) @map("max_attempts")
-  scheduledAt   DateTime                 @default(now()) @map("scheduled_at")
-  lockedAt      DateTime?                @map("locked_at")
-  lockedBy      String?                  @map("locked_by") @db.VarChar(100)
-  lastError     String?                  @map("last_error") @db.Text
-  completedAt   DateTime?                @map("completed_at")
-  createdAt     DateTime                 @default(now()) @map("created_at")
+model NotificationEmailDelivery {
+  id                String                          @id @default(uuid())
+  notificationId    String                          @map("notification_id")
+  notification      Notification                    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  userId            String                          @map("user_id")
+  user              User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipientId       String?                         @unique @map("recipient_id")
+  recipient         NotificationRecipient?          @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  targetEmail       String                          @map("target_email")
+  status            NotificationEmailDeliveryStatus @default(PENDING)
+  attempts          Int                             @default(0)
+  maxAttempts       Int                             @default(5) @map("max_attempts")
+  scheduledAt       DateTime                        @default(now()) @map("scheduled_at")
+  lockedAt          DateTime?                       @map("locked_at")
+  lockedBy          String?                         @map("locked_by") @db.VarChar(100)
+  lastError         String?                         @map("last_error") @db.Text
+  providerMessageId String?                         @map("provider_message_id") @db.VarChar(200)
+  sentAt            DateTime?                       @map("sent_at")
+  createdAt         DateTime                        @default(now()) @map("created_at")
+  updatedAt         DateTime                        @updatedAt @map("updated_at")
 
+  @@unique([notificationId, userId])
+  @@index([status, scheduledAt])
+  @@map("notification_email_deliveries")
+}
+
+model NotificationJob {
+  id               String                   @id @default(uuid())
+  workspaceId      String                   @map("workspace_id")
+  eventType        String                   @map("event_type") @db.VarChar(100)
+  urgencyLevel     NotificationUrgencyLevel @map("urgency_level")
+  semanticEventKey String                   @map("semantic_event_key") @db.VarChar(200)
+  triggerUserId    String?                  @map("trigger_user_id")
+  payload          Json
+  actorName        String?                  @map("actor_name") @db.VarChar(200)
+  status           NotificationJobStatus    @default(PENDING)
+  attempts         Int                      @default(0)
+  maxAttempts      Int                      @default(5) @map("max_attempts")
+  scheduledAt      DateTime                 @default(now()) @map("scheduled_at")
+  lockedAt         DateTime?                @map("locked_at")
+  lockedBy         String?                  @map("locked_by") @db.VarChar(100)
+  lastError        String?                  @map("last_error") @db.Text
+  completedAt      DateTime?                @map("completed_at")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+
+  @@unique([workspaceId, eventType, semanticEventKey])
   @@index([status, scheduledAt])
   @@map("notification_jobs")
 }

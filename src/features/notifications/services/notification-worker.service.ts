@@ -11,6 +11,7 @@ const WORKER_ID = `notifications-${randomUUID().slice(0, 8)}`;
 const POLL_INTERVAL_MS = 5_000;
 const BATCH_SIZE = 10;
 const RETRY_DELAY_MS = 30_000;
+const LEASE_MS = 5 * 60_000;
 
 @Injectable()
 export class NotificationWorkerService implements OnModuleInit {
@@ -36,6 +37,7 @@ export class NotificationWorkerService implements OnModuleInit {
 
     this.isPolling = true;
     try {
+      await this.reclaimStaleJobs();
       const jobs = await this.claimJobs();
       for (const job of jobs) {
         await this.processClaimedJob(job);
@@ -43,6 +45,22 @@ export class NotificationWorkerService implements OnModuleInit {
     } finally {
       this.isPolling = false;
     }
+  }
+
+  private async reclaimStaleJobs(): Promise<void> {
+    await this.prisma.notificationJob.updateMany({
+      where: {
+        status: NotificationJobStatus.PROCESSING,
+        lockedAt: { lt: new Date(Date.now() - LEASE_MS) },
+      },
+      data: {
+        status: NotificationJobStatus.PENDING,
+        scheduledAt: new Date(),
+        lockedAt: null,
+        lockedBy: null,
+        lastError: "Processing lease expired before completion",
+      },
+    });
   }
 
   private async claimJobs(): Promise<ClaimedNotificationJob[]> {
@@ -88,7 +106,7 @@ export class NotificationWorkerService implements OnModuleInit {
         id: job.id,
         workspaceId: job.workspaceId,
         eventType: job.eventType,
-        urgencyLevel: job.urgencyLevel,
+        semanticEventKey: job.semanticEventKey,
         triggerUserId: job.triggerUserId,
         payload: job.payload as ClaimedNotificationJob["payload"],
         actorName: job.actorName,
@@ -124,7 +142,13 @@ export class NotificationWorkerService implements OnModuleInit {
             }
           : {
               status: NotificationJobStatus.PENDING,
-              scheduledAt: new Date(Date.now() + RETRY_DELAY_MS),
+              scheduledAt: new Date(
+                Date.now() +
+                  Math.min(
+                    RETRY_DELAY_MS * 2 ** Math.max(job.attempts - 1, 0),
+                    30 * 60_000,
+                  ),
+              ),
               lastError: message,
               lockedAt: null,
               lockedBy: null,

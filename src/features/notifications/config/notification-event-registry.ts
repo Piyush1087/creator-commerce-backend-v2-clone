@@ -1,210 +1,210 @@
 import type { NotificationEventDefinition } from "../types/notifications.types";
 
-/**
- * Platform activity routing matrix from product docs.
- * `workspace_id` in storage maps to `brandProfileId`.
- */
-export const NOTIFICATION_EVENT_REGISTRY: Record<
-  string,
-  NotificationEventDefinition
-> = {
-  "integration.meta_token_expired": {
-    eventType: "integration.meta_token_expired",
-    urgencyLevel: "CRITICAL",
-    inApp: true,
-    email: true,
-    deepLinkPath: "/brand/settings/integrations?state=token_error",
-    title: "Meta connection expired",
+type EventSeed = Omit<
+  NotificationEventDefinition,
+  "semanticIdentityContract" | "aggregatable"
+>;
+const event = (definition: EventSeed): Readonly<NotificationEventDefinition> =>
+  Object.freeze({
+    ...definition,
+    semanticIdentityContract: "SOURCE_TYPE_SOURCE_ID_TRANSITION_ID",
     aggregatable: false,
-  },
-  "team.invite_pending": {
-    eventType: "team.invite_pending",
-    urgencyLevel: "MEDIUM",
-    inApp: true,
-    email: true,
-    deepLinkPath: "/brand/settings/general?focus=team",
-    title: "Team invitation pending",
-    aggregatable: false,
-  },
-  "workspace.seat_capacity_bounded": {
-    eventType: "workspace.seat_capacity_bounded",
-    urgencyLevel: "LOW",
-    inApp: true,
-    email: false,
-    deepLinkPath: "/brand/settings/general?focus=capacity",
-    title: "Workspace seat limit reached",
-    aggregatable: false,
-  },
-  "escrow.low_balance": {
-    eventType: "escrow.low_balance",
-    urgencyLevel: "CRITICAL",
-    inApp: true,
-    email: true,
-    deepLinkPath: "/brand/settings/billing?action=top_up",
-    title: "Escrow balance is low",
-    settingsCategory: "ESCROW_LOW_BALANCE",
-    aggregatable: false,
-  },
-  "billing.invoice_payment_failed": {
-    eventType: "billing.invoice_payment_failed",
-    urgencyLevel: "CRITICAL",
-    inApp: true,
-    email: true,
-    deepLinkPath: "/brand/settings/billing?action=dunning",
-    title: "Invoice payment failed",
-    settingsCategory: "TAX_COMPLIANCE_ALERT",
-    aggregatable: false,
-  },
-  "billing.tax_invoice_compiled": {
-    eventType: "billing.tax_invoice_compiled",
-    urgencyLevel: "LOW",
-    inApp: false,
-    email: true,
-    deepLinkPath: "/brand/settings/billing?focus=invoices",
-    title: "Tax invoice ready",
-    settingsCategory: "TAX_COMPLIANCE_ALERT",
-    aggregatable: false,
-  },
-  "pricing.trial_expiring": {
-    eventType: "pricing.trial_expiring",
-    urgencyLevel: "CRITICAL",
-    inApp: true,
-    email: true,
-    deepLinkPath: "/brand/settings/billing?view=pricing_matrix",
-    title: "Trial expiring soon",
-    settingsCategory: "TAX_COMPLIANCE_ALERT",
-    aggregatable: false,
-  },
-  "pricing.subscription_renewed": {
-    eventType: "pricing.subscription_renewed",
-    urgencyLevel: "LOW",
-    inApp: true,
-    email: true,
-    deepLinkPath: "/brand/settings/billing?focus=plan",
-    title: "Subscription renewed",
-    settingsCategory: "TAX_COMPLIANCE_ALERT",
-    aggregatable: false,
-  },
-  "pricing.usage_cap_approaching": {
-    eventType: "pricing.usage_cap_approaching",
-    urgencyLevel: "MEDIUM",
-    inApp: true,
-    email: true,
-    deepLinkPath: "/brand/settings/billing?focus=usage",
-    title: "Usage cap approaching",
-    settingsCategory: "CAMPAIGN_BUDGET_OVERRUN",
-    aggregatable: false,
-  },
-  "planner.competitive_scan_complete": {
-    eventType: "planner.competitive_scan_complete",
-    urgencyLevel: "LOW",
-    inApp: true,
-    email: true,
-    deepLinkPath: "/brand/planner/dashboard",
-    title: "Competitive scan complete",
-    aggregatable: false,
-  },
-  "outreach.creator_accepted": {
-    eventType: "outreach.creator_accepted",
-    urgencyLevel: "MEDIUM",
-    inApp: true,
-    email: false,
-    deepLinkPath: "/brand/campaigns/{campaign_id}/outreach?filter=accepted",
-    title: "Creator accepted invitation",
-    settingsCategory: "CAMPAIGN_BUDGET_OVERRUN",
-    aggregatable: true,
-  },
-  "outreach.milestone_counter_offer": {
-    eventType: "outreach.milestone_counter_offer",
-    urgencyLevel: "MEDIUM",
-    inApp: true,
-    email: true,
-    deepLinkPath:
-      "/brand/campaigns/{campaign_id}/outreach/{creator_id}?view=negotiation",
-    title: "Creator sent a counter-offer",
-    settingsCategory: "MILESTONE_RELEASE_REQUEST",
-    aggregatable: true,
-  },
-  "outreach.offer_expired": {
-    eventType: "outreach.offer_expired",
-    urgencyLevel: "LOW",
-    inApp: true,
-    email: false,
-    deepLinkPath: "/brand/campaigns/{campaign_id}/outreach?filter=expired",
-    title: "Allocation offer expired",
-    settingsCategory: "CAMPAIGN_BUDGET_OVERRUN",
-    aggregatable: true,
-  },
-  "workflow.asset_draft_submitted": {
-    eventType: "workflow.asset_draft_submitted",
-    urgencyLevel: "MEDIUM",
-    inApp: true,
-    email: true,
-    deepLinkPath:
-      "/brand/campaigns/{campaign_id}/workflow/{creator_id}?view=asset_review",
-    title: "Creator submitted asset draft",
-    settingsCategory: "MILESTONE_RELEASE_REQUEST",
-    aggregatable: true,
-  },
-  "workflow.post_cleared_automated_check": {
-    eventType: "workflow.post_cleared_automated_check",
-    urgencyLevel: "LOW",
-    inApp: true,
-    email: false,
-    deepLinkPath: "/brand/campaigns/{campaign_id}/dashboard",
-    title: "Post cleared automated check",
-    settingsCategory: "MILESTONE_RELEASE_REQUEST",
-    aggregatable: true,
-  },
-  "workflow.milestone_overdue_creator": {
-    eventType: "workflow.milestone_overdue_creator",
-    urgencyLevel: "CRITICAL",
-    inApp: true,
-    email: true,
-    deepLinkPath:
-      "/brand/campaigns/{campaign_id}/workflow/{creator_id}?state=delayed",
-    title: "Creator missed submission deadline",
-    settingsCategory: "MILESTONE_RELEASE_REQUEST",
-    aggregatable: true,
-  },
-  "workflow.brand_review_overdue": {
-    eventType: "workflow.brand_review_overdue",
-    urgencyLevel: "CRITICAL",
-    inApp: true,
-    email: true,
-    deepLinkPath:
-      "/brand/campaigns/{campaign_id}/workflow/{creator_id}?state=review_backlog",
-    title: "Asset review overdue",
-    settingsCategory: "MILESTONE_RELEASE_REQUEST",
-    aggregatable: true,
-  },
-  "workflow.compliance_failure": {
-    eventType: "workflow.compliance_failure",
-    urgencyLevel: "CRITICAL",
-    inApp: true,
-    email: true,
-    deepLinkPath:
-      "/brand/campaigns/{campaign_id}/workflow/{creator_id}?state=compliance_error",
-    title: "Compliance check failed",
-    settingsCategory: "MILESTONE_RELEASE_REQUEST",
-    aggregatable: true,
-  },
-};
+  });
+const billing = (seed: Omit<EventSeed, "category" | "recipientPolicy">) =>
+  event({
+    ...seed,
+    category: "BILLING_SUBSCRIPTION",
+    recipientPolicy: "OWNER_FINANCE",
+  });
 
-export const AGGREGATION_WINDOW_MS = 15 * 60 * 1000;
+export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
+  "billing.subscription_payment_failed": billing({
+    eventType: "billing.subscription_payment_failed",
+    urgencyLevel: "CRITICAL",
+    actionable: true,
+    inAppPolicy: "REQUIRED",
+    emailPolicy: "MANDATORY",
+    deepLinkPath: "/brand/settings/billing?action=dunning",
+    title: "Subscription payment failed",
+  }),
+  "billing.subscription_payment_recovered": billing({
+    eventType: "billing.subscription_payment_recovered",
+    urgencyLevel: "INFORMATIONAL",
+    actionable: false,
+    inAppPolicy: "YES",
+    emailPolicy: "OPTIONAL",
+    deepLinkPath: "/brand/settings/billing?focus=plan",
+    title: "Subscription payment recovered",
+  }),
+  "billing.trial_expired": billing({
+    eventType: "billing.trial_expired",
+    urgencyLevel: "ACTION_REQUIRED",
+    actionable: true,
+    inAppPolicy: "REQUIRED",
+    emailPolicy: "MANDATORY",
+    deepLinkPath: "/brand/settings/billing?view=pricing_matrix",
+    title: "Trial expired",
+  }),
+  "billing.subscription_halted": billing({
+    eventType: "billing.subscription_halted",
+    urgencyLevel: "CRITICAL",
+    actionable: true,
+    inAppPolicy: "REQUIRED",
+    emailPolicy: "MANDATORY",
+    deepLinkPath: "/brand/settings/billing?action=update_payment",
+    title: "Subscription halted",
+  }),
+  "billing.cancellation_scheduled": billing({
+    eventType: "billing.cancellation_scheduled",
+    urgencyLevel: "INFORMATIONAL",
+    actionable: false,
+    inAppPolicy: "YES",
+    emailPolicy: "MANDATORY",
+    deepLinkPath: "/brand/settings/billing?focus=plan",
+    title: "Cancellation scheduled",
+  }),
+  "billing.cancellation_effective": billing({
+    eventType: "billing.cancellation_effective",
+    urgencyLevel: "INFORMATIONAL",
+    actionable: false,
+    inAppPolicy: "YES",
+    emailPolicy: "MANDATORY",
+    deepLinkPath: "/brand/settings/billing?focus=plan",
+    title: "Cancellation effective",
+  }),
+  "billing.cancellation_reactivated": billing({
+    eventType: "billing.cancellation_reactivated",
+    urgencyLevel: "INFORMATIONAL",
+    actionable: false,
+    inAppPolicy: "YES",
+    emailPolicy: "MANDATORY",
+    deepLinkPath: "/brand/settings/billing?focus=plan",
+    title: "Subscription reactivated",
+  }),
+  "billing.invoice_ready": billing({
+    eventType: "billing.invoice_ready",
+    urgencyLevel: "INFORMATIONAL",
+    actionable: false,
+    inAppPolicy: "YES",
+    emailPolicy: "OPTIONAL",
+    deepLinkPath: "/brand/settings/billing?focus=invoices",
+    title: "Invoice ready",
+  }),
+  "escrow.funding_credited": event({
+    eventType: "escrow.funding_credited",
+    category: "ESCROW_PAYOUTS",
+    urgencyLevel: "INFORMATIONAL",
+    actionable: false,
+    inAppPolicy: "YES",
+    emailPolicy: "OPTIONAL",
+    recipientPolicy: "OWNER_FINANCE",
+    deepLinkPath: "/brand/settings/billing?focus=escrow",
+    title: "Escrow funding credited",
+  }),
+  "escrow.collaboration_awaiting_funds": event({
+    eventType: "escrow.collaboration_awaiting_funds",
+    category: "ESCROW_PAYOUTS",
+    urgencyLevel: "ACTION_REQUIRED",
+    actionable: true,
+    inAppPolicy: "REQUIRED",
+    emailPolicy: "OPTIONAL",
+    recipientPolicy: "OWNER_FINANCE_PLUS_ACTIVE_TRIGGERING_CM",
+    deepLinkPath: "/brand/collaborations/{collaboration_id}",
+    title: "Collaboration awaiting funds",
+  }),
+  "escrow.collaboration_refunded": event({
+    eventType: "escrow.collaboration_refunded",
+    category: "ESCROW_PAYOUTS",
+    urgencyLevel: "INFORMATIONAL",
+    actionable: false,
+    inAppPolicy: "YES",
+    emailPolicy: "OPTIONAL",
+    recipientPolicy: "OWNER_FINANCE_PLUS_ACTIVE_TRIGGERING_CM",
+    deepLinkPath: "/brand/collaborations/{collaboration_id}",
+    title: "Collaboration funds refunded",
+  }),
+  "campaigns.application_received": event({
+    eventType: "campaigns.application_received",
+    category: "CAMPAIGNS_APPLICATIONS",
+    urgencyLevel: "ACTION_REQUIRED",
+    actionable: true,
+    inAppPolicy: "REQUIRED",
+    emailPolicy: "OPTIONAL",
+    recipientPolicy: "OWNER_CAMPAIGN_MANAGERS",
+    deepLinkPath: "/brand/campaigns/{campaign_id}/applications",
+    title: "Campaign application received",
+  }),
+  "collaborations.media_submitted_for_review": event({
+    eventType: "collaborations.media_submitted_for_review",
+    category: "COLLABORATIONS",
+    urgencyLevel: "ACTION_REQUIRED",
+    actionable: true,
+    inAppPolicy: "REQUIRED",
+    emailPolicy: "OPTIONAL",
+    recipientPolicy: "OWNER_CAMPAIGN_MANAGERS",
+    deepLinkPath: "/brand/collaborations/{collaboration_id}",
+    title: "Media submitted for review",
+  }),
+  "intelligence.execution_completed": event({
+    eventType: "intelligence.execution_completed",
+    category: "BRAND_INTELLIGENCE",
+    urgencyLevel: "INFORMATIONAL",
+    actionable: false,
+    inAppPolicy: "YES",
+    emailPolicy: "OPTIONAL",
+    recipientPolicy: "OWNER_CAMPAIGN_MANAGERS",
+    deepLinkPath: "/brand/intelligence",
+    title: "Brand Intelligence execution completed",
+  }),
+  "intelligence.execution_failed": event({
+    eventType: "intelligence.execution_failed",
+    category: "BRAND_INTELLIGENCE",
+    urgencyLevel: "ACTION_REQUIRED",
+    actionable: true,
+    inAppPolicy: "REQUIRED",
+    emailPolicy: "OPTIONAL",
+    recipientPolicy: "OWNER_CAMPAIGN_MANAGERS",
+    deepLinkPath: "/brand/intelligence",
+    title: "Brand Intelligence execution failed",
+  }),
+  "team.member_access_revoked": event({
+    eventType: "team.member_access_revoked",
+    category: "TEAM_ACCOUNT_INTEGRATIONS",
+    urgencyLevel: "INFORMATIONAL",
+    actionable: false,
+    inAppPolicy: "NONE",
+    emailPolicy: "MANDATORY",
+    recipientPolicy: "AFFECTED_USER_EMAIL_ONLY",
+    deepLinkPath: "/",
+    title: "Brand workspace access revoked",
+  }),
+  "integration.instagram_token_expired": event({
+    eventType: "integration.instagram_token_expired",
+    category: "TEAM_ACCOUNT_INTEGRATIONS",
+    urgencyLevel: "ACTION_REQUIRED",
+    actionable: true,
+    inAppPolicy: "REQUIRED",
+    emailPolicy: "OPTIONAL",
+    recipientPolicy: "OWNER_CAMPAIGN_MANAGERS",
+    deepLinkPath: "/brand/settings/integrations?state=token_error",
+    title: "Instagram connection expired",
+  }),
+} satisfies Record<string, Readonly<NotificationEventDefinition>>);
 
 export function getEventDefinition(
   eventType: string,
-): NotificationEventDefinition | null {
-  return NOTIFICATION_EVENT_REGISTRY[eventType] ?? null;
+): Readonly<NotificationEventDefinition> | null {
+  return (
+    NOTIFICATION_EVENT_REGISTRY[
+      eventType as keyof typeof NOTIFICATION_EVENT_REGISTRY
+    ] ?? null
+  );
 }
-
 export function resolveDeepLinkPath(
   template: string,
   payload: Record<string, unknown>,
 ): string {
-  return template.replace(/\{(\w+)\}/g, (_match, key: string) => {
-    const value = payload[key];
-    return value === undefined || value === null ? "" : String(value);
-  });
+  return template.replace(/\{(\w+)\}/g, (_match, key: string) =>
+    payload[key] == null ? "" : String(payload[key]),
+  );
 }

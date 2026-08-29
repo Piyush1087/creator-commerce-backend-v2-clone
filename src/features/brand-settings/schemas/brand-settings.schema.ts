@@ -7,17 +7,13 @@ export const BrandRoleEnum = z.enum([
   "CAMPAIGN_MANAGER",
 ]);
 
-export const NotificationChannelEnum = z.enum([
-  "EMAIL",
-  "IN_APP",
-  "SLACK_WEBHOOK",
-]);
-
 export const NotificationCategoryEnum = z.enum([
-  "ESCROW_LOW_BALANCE",
-  "MILESTONE_RELEASE_REQUEST",
-  "TAX_COMPLIANCE_ALERT",
-  "CAMPAIGN_BUDGET_OVERRUN",
+  "BILLING_SUBSCRIPTION",
+  "ESCROW_PAYOUTS",
+  "CAMPAIGNS_APPLICATIONS",
+  "COLLABORATIONS",
+  "BRAND_INTELLIGENCE",
+  "TEAM_ACCOUNT_INTEGRATIONS",
 ]);
 
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
@@ -81,34 +77,15 @@ export const BrandWithdrawalAccountSchema = z
 export const NotificationSettingLineSchema = z
   .object({
     category: NotificationCategoryEnum,
-    channel: NotificationChannelEnum,
-    isEnabled: z.boolean().default(true),
-    slackWebhookUrl: z
-      .union([z.string().url(), z.literal(""), z.null()])
-      .optional()
-      .transform((val) => val || null),
+    optionalEmailEnabled: z.boolean(),
   })
-  .refine(
-    (data) => {
-      if (
-        data.channel === "SLACK_WEBHOOK" &&
-        data.isEnabled &&
-        !data.slackWebhookUrl
-      ) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message:
-        "A target webhook URL is required when Slack webhooks are enabled.",
-      path: ["slackWebhookUrl"],
-    },
-  );
+  .strict();
 
-export const BulkNotificationSettingsSchema = z.object({
-  settings: z.array(NotificationSettingLineSchema),
-});
+export const BulkNotificationSettingsSchema = z
+  .object({
+    settings: z.array(NotificationSettingLineSchema),
+  })
+  .strict();
 
 export const UpdateBrandGeneralProfileSchema = z
   .object({

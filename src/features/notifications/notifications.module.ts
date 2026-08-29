@@ -11,14 +11,11 @@ import { NotificationDispatchService } from "./services/notification-dispatch.se
 import { NotificationProcessorService } from "./services/notification-processor.service";
 import { NotificationQueryService } from "./services/notification-query.service";
 import { NotificationWorkerService } from "./services/notification-worker.service";
+import { NotificationEmailWorkerService } from "./services/notification-email-worker.service";
+import { NotificationRecipientPolicyService } from "./services/notification-recipient-policy.service";
 
 @Module({
-  imports: [
-    ScheduleModule,
-    MailModule,
-    BrandCentreModule,
-    BrandSettingsModule,
-  ],
+  imports: [ScheduleModule, MailModule, BrandCentreModule, BrandSettingsModule],
   controllers: [NotificationsController],
   providers: [
     NotificationAccessService,
@@ -26,6 +23,8 @@ import { NotificationWorkerService } from "./services/notification-worker.servic
     NotificationProcessorService,
     NotificationChannelService,
     NotificationWorkerService,
+    NotificationEmailWorkerService,
+    NotificationRecipientPolicyService,
     NotificationQueryService,
   ],
   exports: [NotificationDispatchService, NotificationProcessorService],

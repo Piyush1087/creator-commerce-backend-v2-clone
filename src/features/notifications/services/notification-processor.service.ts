@@ -1,16 +1,13 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { NotificationEmailDeliveryStatus, Prisma } from "@prisma/client";
 import type { Server } from "socket.io";
-
 import { PrismaService } from "../../../prisma/prisma.service";
 import { getEventDefinition } from "../config/notification-event-registry";
 import type {
   ClaimedNotificationJob,
   NotificationRealtimePayload,
 } from "../types/notifications.types";
-import { aggregatePayload } from "../utils/notification-aggregation.util";
-import { AGGREGATION_WINDOW_MS } from "../config/notification-event-registry";
-import { NotificationChannelService } from "./notification-channel.service";
+import { NotificationRecipientPolicyService } from "./notification-recipient-policy.service";
 
 @Injectable()
 export class NotificationProcessorService {
@@ -19,7 +16,7 @@ export class NotificationProcessorService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly channels: NotificationChannelService,
+    private readonly recipientPolicies: NotificationRecipientPolicyService,
   ) {}
 
   attachServer(server: Server): void {
@@ -29,137 +26,132 @@ export class NotificationProcessorService {
 
   async processJob(job: ClaimedNotificationJob): Promise<void> {
     const definition = getEventDefinition(job.eventType);
-    if (!definition) {
+    if (!definition)
       throw new Error(`Unknown notification event: ${job.eventType}`);
-    }
-
-    const members = await this.resolveWorkspaceMembers(job.workspaceId);
-    if (members.length === 0) {
-      this.logger.warn(
-        `notification.processor.no-recipients workspace=${job.workspaceId} event=${job.eventType}`,
-      );
-      return;
-    }
-
-    const windowStart = new Date(Date.now() - AGGREGATION_WINDOW_MS);
-    const shouldAggregate = definition.aggregatable;
-
-    if (shouldAggregate) {
-      const existing = await this.prisma.notification.findFirst({
-        where: {
-          workspaceId: job.workspaceId,
-          eventType: job.eventType,
-          createdAt: { gte: windowStart },
-        },
-        orderBy: { createdAt: "desc" },
-      });
-
-      if (existing) {
-        const updatedPayload = aggregatePayload(
-          existing.payload as Record<string, unknown>,
-          job.actorName,
-          job.payload,
-        );
-
-        const updated = await this.prisma.notification.update({
-          where: { id: existing.id },
-          data: {
-            payload: updatedPayload as Prisma.InputJsonValue,
-            updatedAt: new Date(),
-          },
-        });
-
-        await this.pushRealtime(
-          members.map((member) => member.userId),
-          {
-            id: updated.id,
-            event_type: definition.eventType,
-            urgency_level: updated.urgencyLevel,
-            payload: updatedPayload,
-            created_at: updated.updatedAt.toISOString(),
-            is_aggregated: true,
-          },
-        );
-
-        return;
-      }
-    }
-
-    const notification = await this.prisma.notification.create({
-      data: {
-        workspaceId: job.workspaceId,
-        triggerUserId: job.triggerUserId,
-        eventType: job.eventType,
-        urgencyLevel: job.urgencyLevel,
-        payload: job.payload as Prisma.InputJsonValue,
-      },
-    });
-
-    await this.prisma.notificationRecipient.createMany({
-      data: members.map((member) => ({
-        notificationId: notification.id,
-        userId: member.userId,
-      })),
-      skipDuplicates: true,
-    });
-
-    const payload = notification.payload as Record<string, unknown>;
-
-    const inAppEnabled =
-      definition.inApp &&
-      (await this.channels.isInAppEnabled(
-        job.workspaceId,
-        definition.settingsCategory,
-      ));
-
-    if (inAppEnabled) {
-      await this.pushRealtime(
-        members.map((member) => member.userId),
-        {
-          id: notification.id,
-          event_type: definition.eventType,
-          urgency_level: notification.urgencyLevel,
-          payload,
-          created_at: notification.createdAt.toISOString(),
-        },
-      );
-    }
-
-    await this.channels.deliverChannels({
+    const affectedUserId =
+      typeof job.payload._affected_user_id === "string"
+        ? job.payload._affected_user_id
+        : null;
+    const members = await this.recipientPolicies.resolve({
       workspaceId: job.workspaceId,
-      notificationId: notification.id,
-      eventType: definition.eventType,
-      payload,
-      members,
-    });
-  }
-
-  private async resolveWorkspaceMembers(workspaceId: string) {
-    const rows = await this.prisma.brandTeamMember.findMany({
-      where: { brandProfileId: workspaceId, isActive: true },
-      include: {
-        user: { select: { id: true, email: true, name: true } },
-      },
-      orderBy: { joinedAt: "asc" },
+      policy: definition.recipientPolicy,
+      triggerUserId: job.triggerUserId,
+      affectedUserId,
     });
 
-    return rows.map((row) => ({
-      userId: row.userId,
-      email: row.user.email,
-      name: row.user.name,
-    }));
+    let created = false;
+    let notification;
+    try {
+      notification = await this.prisma.notification.create({
+        data: {
+          workspaceId: job.workspaceId,
+          triggerUserId: job.triggerUserId,
+          eventType: definition.eventType,
+          urgencyLevel: definition.urgencyLevel,
+          semanticEventKey: job.semanticEventKey,
+          category: definition.category,
+          actionable: definition.actionable,
+          emailPolicy: definition.emailPolicy,
+          inAppPolicy: definition.inAppPolicy,
+          payload: job.payload as Prisma.InputJsonValue,
+        },
+      });
+      created = true;
+    } catch (error: unknown) {
+      if (
+        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+        error.code !== "P2002"
+      )
+        throw error;
+      notification = await this.prisma.notification.findUniqueOrThrow({
+        where: {
+          workspaceId_eventType_semanticEventKey: {
+            workspaceId: job.workspaceId,
+            eventType: definition.eventType,
+            semanticEventKey: job.semanticEventKey,
+          },
+        },
+      });
+    }
+
+    const preferences =
+      await this.prisma.userBrandNotificationPreference.findMany({
+        where: {
+          brandProfileId: job.workspaceId,
+          userId: { in: members.map((member) => member.userId) },
+          category: definition.category,
+        },
+      });
+    const preferenceByUser = new Map(
+      preferences.map((row) => [row.userId, row.optionalEmailEnabled]),
+    );
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const member of members) {
+        const recipient =
+          member.inbox && definition.inAppPolicy !== "NONE"
+            ? await tx.notificationRecipient.upsert({
+                where: {
+                  notificationId_userId: {
+                    notificationId: notification.id,
+                    userId: member.userId,
+                  },
+                },
+                create: {
+                  notificationId: notification.id,
+                  userId: member.userId,
+                },
+                update: {},
+              })
+            : null;
+        const emailDue =
+          definition.emailPolicy === "MANDATORY" ||
+          (definition.emailPolicy === "OPTIONAL" &&
+            (preferenceByUser.get(member.userId) ?? true));
+        await tx.notificationEmailDelivery.upsert({
+          where: {
+            notificationId_userId: {
+              notificationId: notification.id,
+              userId: member.userId,
+            },
+          },
+          create: {
+            notificationId: notification.id,
+            userId: member.userId,
+            recipientId: recipient?.id ?? null,
+            targetEmail: member.email,
+            status: emailDue
+              ? NotificationEmailDeliveryStatus.PENDING
+              : NotificationEmailDeliveryStatus.NOT_REQUIRED,
+          },
+          update: {},
+        });
+      }
+    });
+
+    if (created && definition.inAppPolicy !== "NONE") {
+      const payload: NotificationRealtimePayload = {
+        id: notification.id,
+        event_type: definition.eventType,
+        category: definition.category,
+        urgency_level: definition.urgencyLevel,
+        actionable: definition.actionable,
+        payload: notification.payload as Record<string, unknown>,
+        created_at: notification.createdAt.toISOString(),
+      };
+      await this.pushRealtime(
+        members.filter((member) => member.inbox).map((member) => member.userId),
+        payload,
+      );
+    }
   }
 
   private async pushRealtime(
     userIds: string[],
     payload: NotificationRealtimePayload,
   ): Promise<void> {
-    if (!this.server) {
-      return;
-    }
-
-    for (const userId of userIds) {
+    if (!this.server) return;
+    for (const userId of userIds)
       this.server.to(`user:${userId}`).emit("notification:new", payload);
-    }
   }
 }

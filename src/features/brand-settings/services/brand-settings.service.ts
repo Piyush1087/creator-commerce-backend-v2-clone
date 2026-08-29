@@ -4,11 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import {
-  BrandRole,
-  SettingsNotificationCategory,
-  SettingsNotificationChannel,
-} from "@prisma/client";
+import { BrandRole, SettingsNotificationCategory } from "@prisma/client";
 import { BrandTeamService } from "./brand-team.service";
 import { BrandTeamInvitationsService } from "./brand-team-invitations.service";
 import {
@@ -56,26 +52,20 @@ type BillingReadinessSource = {
   corporateBillingAddress: string | null;
 } | null;
 
-const DEFAULT_NOTIFICATION_MATRIX: Array<{
-  category: SettingsNotificationCategory;
-  channel: SettingsNotificationChannel;
-  isEnabled: boolean;
-}> = [
-  { category: "ESCROW_LOW_BALANCE", channel: "IN_APP", isEnabled: true },
-  { category: "ESCROW_LOW_BALANCE", channel: "EMAIL", isEnabled: true },
-  { category: "MILESTONE_RELEASE_REQUEST", channel: "IN_APP", isEnabled: true },
-  {
-    category: "TAX_COMPLIANCE_ALERT",
-    channel: "IN_APP",
-    isEnabled: true,
-  },
-  { category: "TAX_COMPLIANCE_ALERT", channel: "EMAIL", isEnabled: true },
-  {
-    category: "CAMPAIGN_BUDGET_OVERRUN",
-    channel: "IN_APP",
-    isEnabled: true,
-  },
-];
+const CANONICAL_NOTIFICATION_CATEGORIES = [
+  [SettingsNotificationCategory.BILLING_SUBSCRIPTION, "Billing & Subscription"],
+  [SettingsNotificationCategory.ESCROW_PAYOUTS, "Escrow & Payouts"],
+  [
+    SettingsNotificationCategory.CAMPAIGNS_APPLICATIONS,
+    "Campaigns & Applications",
+  ],
+  [SettingsNotificationCategory.COLLABORATIONS, "Collaborations"],
+  [SettingsNotificationCategory.BRAND_INTELLIGENCE, "Brand Intelligence"],
+  [
+    SettingsNotificationCategory.TEAM_ACCOUNT_INTEGRATIONS,
+    "Team, Account & Integrations",
+  ],
+] as const;
 
 @Injectable()
 export class BrandSettingsService {
@@ -479,33 +469,22 @@ export class BrandSettingsService {
 
   async getNotifications(user: AuthUser) {
     const { brandProfileId } = await this.access.resolveBrandContext(user);
-
-    let settings = await this.prisma.brandNotificationSetting.findMany({
-      where: { brandProfileId },
-      orderBy: [{ category: "asc" }, { channel: "asc" }],
-    });
-
-    if (settings.length === 0) {
-      await this.prisma.brandNotificationSetting.createMany({
-        data: DEFAULT_NOTIFICATION_MATRIX.map((row) => ({
-          brandProfileId,
-          ...row,
-        })),
-      });
-      settings = await this.prisma.brandNotificationSetting.findMany({
-        where: { brandProfileId },
-        orderBy: [{ category: "asc" }, { channel: "asc" }],
-      });
-    }
+    const settings = await this.prisma.userBrandNotificationPreference.findMany(
+      {
+        where: { brandProfileId, userId: user.id },
+      },
+    );
+    const persisted = new Map(
+      settings.map((row) => [row.category, row.optionalEmailEnabled]),
+    );
 
     return {
-      settings: settings.map((row) => ({
-        setting_id: row.id,
-        category: row.category,
-        channel: row.channel,
-        is_enabled: row.isEnabled,
-        slack_webhook_url: row.slackWebhookUrl,
+      settings: CANONICAL_NOTIFICATION_CATEGORIES.map(([category, label]) => ({
+        category,
+        label,
+        optional_email_enabled: persisted.get(category) ?? true,
       })),
+      mandatory_system_email_unaffected: true,
     };
   }
 
@@ -513,41 +492,26 @@ export class BrandSettingsService {
     user: AuthUser,
     input: BulkNotificationSettingsInput,
   ) {
-    const { brandProfileId, membership } =
-      await this.access.resolveBrandContext(user);
-
-    if (membership.role === BrandRole.CAMPAIGN_MANAGER) {
-      throw new ForbiddenException(
-        "Campaign Managers cannot modify notification settings.",
-      );
-    }
+    const { brandProfileId } = await this.access.resolveBrandContext(user);
 
     await this.prisma.$transaction(
       input.settings.map((line) =>
-        this.prisma.brandNotificationSetting.upsert({
+        this.prisma.userBrandNotificationPreference.upsert({
           where: {
-            brandProfileId_category_channel: {
+            brandProfileId_userId_category: {
               brandProfileId,
+              userId: user.id,
               category: line.category,
-              channel: line.channel,
             },
           },
           create: {
             brandProfileId,
+            userId: user.id,
             category: line.category,
-            channel: line.channel,
-            isEnabled: line.isEnabled,
-            slackWebhookUrl:
-              line.channel === "SLACK_WEBHOOK"
-                ? (line.slackWebhookUrl ?? null)
-                : null,
+            optionalEmailEnabled: line.optionalEmailEnabled,
           },
           update: {
-            isEnabled: line.isEnabled,
-            slackWebhookUrl:
-              line.channel === "SLACK_WEBHOOK"
-                ? (line.slackWebhookUrl ?? null)
-                : null,
+            optionalEmailEnabled: line.optionalEmailEnabled,
           },
         }),
       ),
