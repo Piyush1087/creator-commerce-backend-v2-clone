@@ -51,6 +51,16 @@ async function main() {
         expiresAt: new Date(Date.now() + 86400000),
       },
     });
+    const expiredRaw = randomBytes(32).toString("hex");
+    const expired = await db.teamInvitation.create({
+      data: {
+        brandProfileId: brand.id,
+        email: `${randomUUID()}@example.test`,
+        token: hashInvitationToken(expiredRaw),
+        role: "CAMPAIGN_MANAGER",
+        expiresAt: new Date(Date.now() - 1000),
+      },
+    });
     const module = await Test.createTestingModule({
       imports: [
         ThrottlerModule.forRoot([{ name: "default", ttl: 60000, limit: 120 }]),
@@ -80,6 +90,12 @@ async function main() {
     assert.equal(jwt.verify(accepted.accessToken).sub, accepted.user.id);
     assert.equal((await post("accept", { token: raw })).status, 409);
     assert.equal((await post("inspect", {})).status, 400);
+    assert.equal((await post("inspect", { token: expiredRaw })).status, 410);
+    assert.equal(
+      (await db.teamInvitation.findUnique({ where: { id: expired.id } }))
+        .status,
+      "EXPIRED",
+    );
     assert.equal(
       (await post("inspect", { token: hashInvitationToken(raw) })).status,
       400,
@@ -93,7 +109,7 @@ async function main() {
         limited = true;
     assert.equal(limited, true);
     console.log(
-      "BS-02 HTTP smoke: 6 checks passed (inspect/no-store, accept/JWT, replay, missing token, digest rejection, throttle).",
+      "BS-02 HTTP smoke: 7 checks passed (inspect/no-store, accept/JWT, replay, committed expiry, missing token, digest rejection, throttle).",
     );
   } finally {
     if (app) await app.close();

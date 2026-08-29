@@ -30,6 +30,7 @@ import {
   hashInvitationToken,
 } from "../services/brand-team-invitations.service";
 import { establishInitialBrandOwner } from "./initial-brand-owner";
+import { recognizedAnchorOwnerCount } from "./brand-team-policy";
 
 describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
   "BS-02 disposable PostgreSQL",
@@ -60,6 +61,7 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
       orgIds: string[] = [];
     const roles = Object.values(BrandRole);
     const freshEmail = () => `${randomUUID()}@example.test`;
+    const externalEmail = () => `${randomUUID()}@agency.invalid`;
     const password = () => randomBytes(18).toString("base64url");
 
     beforeAll(() => {
@@ -123,9 +125,10 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
       w: Awaited<ReturnType<typeof workspace>>,
       role: BrandRole,
       active = true,
+      email = freshEmail(),
     ) {
       const user = await prisma.user.create({
-        data: { email: freshEmail(), role: "BRAND", organizationId: w.org.id },
+        data: { email, role: "BRAND", organizationId: w.org.id },
       });
       userIds.push(user.id);
       const membership = await prisma.brandTeamMember.create({
@@ -137,6 +140,11 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
         },
       });
       return { user, membership };
+    }
+    async function anchorCount(brandProfileId: string) {
+      return prisma.$transaction((tx) =>
+        recognizedAnchorOwnerCount(tx, brandProfileId),
+      );
     }
     async function legacy(
       w: Awaited<ReturnType<typeof workspace>>,
@@ -218,6 +226,21 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
           where: { brandProfileId: w.brand.id },
         }),
       ).toBe(1);
+      expect(
+        await prisma.teamInvitation.findFirstOrThrow({
+          where: { brandProfileId: w.brand.id },
+        }),
+      ).toMatchObject({ status: "PENDING" });
+      expect(
+        await prisma.brandTeamMember.count({
+          where: { brandProfileId: w.brand.id, isActive: true },
+        }),
+      ).toBe(1);
+      expect(await anchorCount(w.brand.id)).toBe(1);
+      expect(
+        (await prisma.user.findUniqueOrThrow({ where: { id: w.user.id } }))
+          .organizationId,
+      ).toBe(w.org.id);
     });
     it.each(["throw", "provider-code", "missing-config"])(
       "mail %s rolls back without leaking raw payloads",
@@ -315,6 +338,7 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
           where: { brandProfileId: w.brand.id },
         }),
       ).toBe(1);
+      expect(await anchorCount(w.brand.id)).toBe(1);
     });
     it("rejects invalid raw token, digest-as-token and missing new-account password", async () => {
       const w = await workspace();
@@ -394,6 +418,21 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
       expect(
         await prisma.user.count({ where: { email: invite.row.email } }),
       ).toBe(1);
+      expect(
+        await prisma.teamInvitation.findUniqueOrThrow({
+          where: { id: invite.row.id },
+        }),
+      ).toMatchObject({ status: "ACCEPTED" });
+      const admitted = await prisma.user.findUniqueOrThrow({
+        where: { email: invite.row.email },
+      });
+      expect(admitted.organizationId).toBe(w.org.id);
+      expect(
+        await prisma.brandTeamMember.count({
+          where: { brandProfileId: w.brand.id, isActive: true },
+        }),
+      ).toBe(2);
+      expect(await anchorCount(w.brand.id)).toBe(1);
     });
     it("serializes unassigned recipient accepting across different organizations", async () => {
       const a = await workspace(),
@@ -413,6 +452,22 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
       ).toHaveLength(1);
       expect(
         await prisma.brandTeamMember.count({ where: { userId: user.id } }),
+      ).toBe(1);
+      expect(
+        (await prisma.user.findUniqueOrThrow({ where: { id: user.id } }))
+          .organizationId,
+      ).toMatch(new RegExp(`^(${a.org.id}|${b.org.id})$`));
+      expect(await anchorCount(a.brand.id)).toBe(1);
+      expect(await anchorCount(b.brand.id)).toBe(1);
+      expect(
+        await prisma.teamInvitation.count({
+          where: { id: { in: [ia.row.id, ib.row.id] }, status: "ACCEPTED" },
+        }),
+      ).toBe(1);
+      expect(
+        await prisma.teamInvitation.count({
+          where: { id: { in: [ia.row.id, ib.row.id] }, status: "PENDING" },
+        }),
       ).toBe(1);
     });
     it.each(
@@ -496,6 +551,7 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
           },
         }),
       ).toBe(1);
+      expect(await anchorCount(w.brand.id)).toBe(1);
     });
     it("denies cross-Brand member and invitation targets", async () => {
       const a = await workspace(),
@@ -620,7 +676,7 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
             db,
             mail,
             {
-              enqueueDeepScan: vi
+              enqueueOnboardingDeepScan: vi
                 .fn()
                 .mockResolvedValue({ jobId: randomUUID() }),
             } as unknown as BrandCentreScanService,
@@ -663,6 +719,8 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
           where: { brandProfileId: w.brand.id },
         }),
       ).toBe(row.status === "ACCEPTED" ? 2 : 1);
+      expect(["ACCEPTED", "CANCELLED"]).toContain(row.status);
+      expect(await anchorCount(w.brand.id)).toBe(1);
     });
 
     it("concurrent Owner removals preserve an active Owner and recheck actor authority", async () => {
@@ -684,6 +742,7 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
           },
         }),
       ).toBe(1);
+      expect(await anchorCount(w.brand.id)).toBe(1);
     });
 
     it("expired pending invites do not permanently consume seats", async () => {
@@ -716,7 +775,9 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
         db,
         mail,
         {
-          enqueueDeepScan: vi.fn().mockResolvedValue({ jobId: randomUUID() }),
+          enqueueOnboardingDeepScan: vi
+            .fn()
+            .mockResolvedValue({ jobId: randomUUID() }),
         } as unknown as BrandCentreScanService,
         auth,
         {} as GoogleAuthService,
@@ -761,7 +822,9 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
     it("setPasswordAndActivate creates the initial Owner in the activation transaction", async () => {
       const { profile, email } = await activationProfile(false);
       const scan = {
-        enqueueDeepScan: vi.fn().mockResolvedValue({ jobId: randomUUID() }),
+        enqueueOnboardingDeepScan: vi
+          .fn()
+          .mockResolvedValue({ jobId: randomUUID() }),
       };
       const verify = new BrandVerificationService(
         db,
@@ -786,6 +849,7 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
         role: "BRAND_OWNER",
         isActive: true,
       });
+      expect(await anchorCount(profile.id)).toBe(1);
       await expect(
         verify.setPasswordAndActivate(profile.id, email, password()),
       ).rejects.toThrow("already activated");
@@ -803,6 +867,7 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
           where: { brandProfileId: profile.id },
         }),
       ).toBe(1);
+      expect(await anchorCount(profile.id)).toBe(1);
       await prisma.brandTeamMember.updateMany({
         where: { brandProfileId: profile.id },
         data: { role: "CAMPAIGN_MANAGER" },
@@ -854,6 +919,404 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
           establishInitialBrandOwner(tx, w.brand.id, w.user.id),
         ),
       ).toBe("AMBIGUOUS_IDENTITY");
+    });
+
+    it.each([
+      ["BRAND_OWNER", true],
+      ["FINANCE_ADMIN", true],
+      ["CAMPAIGN_MANAGER", false],
+    ] as const)(
+      "projects can_manage_team for %s",
+      async (role, canManageTeam) => {
+        const w = await workspace(role);
+        await expect(settings.getOverview(w.user)).resolves.toMatchObject({
+          current_user_role: role,
+          can_manage_team: canManageTeam,
+        });
+        await expect(settings.getGeneral(w.user)).resolves.toMatchObject({
+          current_user_role: role,
+          can_manage_team: canManageTeam,
+        });
+      },
+    );
+
+    it("blocks final anchor reduction even when an external Owner remains", async () => {
+      const w = await workspace();
+      const external = await member(w, "BRAND_OWNER", true, externalEmail());
+      await expect(
+        team.updateRole(w.user, {
+          membershipId: w.membership.id,
+          role: "FINANCE_ADMIN",
+        }),
+      ).rejects.toMatchObject({
+        response: { code: "TEAM_ANCHOR_OWNER_REQUIRED" },
+      });
+      await expect(
+        team.revoke(external.user, w.membership.id),
+      ).rejects.toMatchObject({
+        response: { code: "TEAM_ANCHOR_OWNER_REQUIRED" },
+      });
+      await expect(
+        team.revoke(w.user, external.membership.id),
+      ).resolves.toMatchObject({ revoked: true });
+      expect(await anchorCount(w.brand.id)).toBe(1);
+      expect(
+        await prisma.brandTeamMember.count({
+          where: { brandProfileId: w.brand.id, isActive: true },
+        }),
+      ).toBe(1);
+    });
+
+    it("allows one of two anchors to be reduced and preserves the successor", async () => {
+      const w = await workspace();
+      const second = await member(w, "BRAND_OWNER");
+      const external = await member(w, "BRAND_OWNER", true, externalEmail());
+      await expect(
+        team.updateRole(w.user, {
+          membershipId: w.membership.id,
+          role: "FINANCE_ADMIN",
+        }),
+      ).resolves.toMatchObject({ role: "FINANCE_ADMIN" });
+      expect(await anchorCount(w.brand.id)).toBe(1);
+      await expect(
+        team.revoke(second.user, external.membership.id),
+      ).resolves.toMatchObject({ revoked: true });
+      expect(await anchorCount(w.brand.id)).toBe(1);
+    });
+
+    it("fails closed when no anchor exists or Brand domain authority is malformed", async () => {
+      const w = await workspace();
+      const second = await member(w, "BRAND_OWNER", true, externalEmail());
+      await prisma.user.update({
+        where: { id: w.user.id },
+        data: { email: externalEmail() },
+      });
+      expect(await anchorCount(w.brand.id)).toBe(0);
+      await expect(
+        team.updateRole(w.user, {
+          membershipId: second.membership.id,
+          role: "FINANCE_ADMIN",
+        }),
+      ).rejects.toMatchObject({
+        response: { code: "TEAM_ANCHOR_OWNER_REQUIRED" },
+      });
+      await prisma.brandProfile.update({
+        where: { id: w.brand.id },
+        data: { domain: `malformed-${randomUUID()}` },
+      });
+      await expect(
+        team.updateRole(w.user, {
+          membershipId: second.membership.id,
+          role: "FINANCE_ADMIN",
+        }),
+      ).rejects.toMatchObject({
+        response: { code: "TEAM_ANCHOR_AUTHORITY_UNRESOLVED" },
+      });
+    });
+
+    it("uses canonical domain matching and ignores verificationEmail mutation", async () => {
+      const w = await workspace();
+      const domain = `${randomUUID()}.brand.example`;
+      await prisma.brandProfile.update({
+        where: { id: w.brand.id },
+        data: { domain, verificationEmail: externalEmail() },
+      });
+      await prisma.user.update({
+        where: { id: w.user.id },
+        data: { email: `founder@corp.${domain}` },
+      });
+      expect(await anchorCount(w.brand.id)).toBe(1);
+      await prisma.brandProfile.update({
+        where: { id: w.brand.id },
+        data: { verificationEmail: freshEmail() },
+      });
+      expect(await anchorCount(w.brand.id)).toBe(1);
+    });
+
+    it.each(["overview", "general", "create", "inspect", "accept", "cancel"])(
+      "persists lazy expiry through %s",
+      async (flow) => {
+        const w = await workspace();
+        const expired = await legacy(w, freshEmail(), "CAMPAIGN_MANAGER", {
+          expired: true,
+          hashed: true,
+        });
+        if (flow === "overview") await settings.getOverview(w.user);
+        if (flow === "general") await settings.getGeneral(w.user);
+        if (flow === "create")
+          await invitations.create(w.user, {
+            email: freshEmail(),
+            role: "CAMPAIGN_MANAGER",
+          });
+        if (flow === "inspect")
+          await expect(invitations.inspect(expired.raw)).rejects.toThrow();
+        if (flow === "accept")
+          await expect(
+            invitations.accept({ token: expired.raw, password: password() }),
+          ).rejects.toThrow();
+        if (flow === "cancel")
+          await expect(team.cancel(w.user, expired.row.id)).rejects.toThrow();
+        expect(
+          await prisma.teamInvitation.findUniqueOrThrow({
+            where: { id: expired.row.id },
+          }),
+        ).toMatchObject({ status: "EXPIRED" });
+      },
+    );
+
+    it("keeps terminal lifecycle states immutable and creates fresh invitations", async () => {
+      const w = await workspace();
+      const email = freshEmail();
+      const first = await invitations.create(w.user, {
+        email,
+        role: "CAMPAIGN_MANAGER",
+      });
+      const firstRaw = sentToken();
+      const firstStored = await prisma.teamInvitation.findUniqueOrThrow({
+        where: { id: first.invitation_id },
+      });
+      await team.cancel(w.user, first.invitation_id);
+      const second = await invitations.create(w.user, {
+        email,
+        role: "CAMPAIGN_MANAGER",
+      });
+      const secondRaw = sentToken();
+      const secondStored = await prisma.teamInvitation.findUniqueOrThrow({
+        where: { id: second.invitation_id },
+      });
+      expect(first.invitation_id).not.toBe(second.invitation_id);
+      expect(firstRaw).not.toBe(secondRaw);
+      expect(firstStored.token).not.toBe(secondStored.token);
+      expect(secondStored.expiresAt.getTime()).toBeGreaterThan(
+        firstStored.createdAt.getTime(),
+      );
+      await prisma.teamInvitation.update({
+        where: { id: first.invitation_id },
+        data: { expiresAt: new Date(Date.now() - 1000) },
+      });
+      await settings.getOverview(w.user);
+      expect(
+        await prisma.teamInvitation.findUniqueOrThrow({
+          where: { id: first.invitation_id },
+        }),
+      ).toMatchObject({ status: "CANCELLED" });
+      await expect(invitations.inspect(firstRaw)).rejects.toThrow();
+      const historicalExpired = await legacy(w, freshEmail(), "FINANCE_ADMIN", {
+        status: "EXPIRED",
+      });
+      await settings.getGeneral(w.user);
+      expect(
+        await prisma.teamInvitation.findUniqueOrThrow({
+          where: { id: historicalExpired.row.id },
+        }),
+      ).toMatchObject({ status: "EXPIRED" });
+    });
+
+    it("enforces seats across valid, cancelled, expired, and accepted states", async () => {
+      const w = await workspace();
+      await member(w, "FINANCE_ADMIN");
+      await member(w, "CAMPAIGN_MANAGER");
+      await member(w, "CAMPAIGN_MANAGER");
+      const invited = await prisma.user.create({
+        data: { email: freshEmail(), role: "BRAND" },
+      });
+      userIds.push(invited.id);
+      const fifth = await invitations.create(w.user, {
+        email: invited.email,
+        role: "CAMPAIGN_MANAGER",
+      });
+      await expect(
+        invitations.create(w.user, {
+          email: freshEmail(),
+          role: "CAMPAIGN_MANAGER",
+        }),
+      ).rejects.toThrow("5/5");
+      const accepted = await invitations.accept({ token: sentToken() });
+      expect(accepted.user.id).toBe(invited.id);
+      expect((await settings.getOverview(w.user)).seat_usage).toMatchObject({
+        active_members: 5,
+        pending_invitations: 0,
+        is_at_capacity: true,
+      });
+      expect(
+        await prisma.teamInvitation.findUniqueOrThrow({
+          where: { id: fifth.invitation_id },
+        }),
+      ).toMatchObject({ status: "ACCEPTED" });
+      expect(await anchorCount(w.brand.id)).toBe(1);
+    });
+
+    it("serializes simultaneous invitations filling the fifth seat", async () => {
+      const w = await workspace();
+      await member(w, "FINANCE_ADMIN");
+      await member(w, "CAMPAIGN_MANAGER");
+      await member(w, "CAMPAIGN_MANAGER");
+      const results = await Promise.allSettled([
+        invitations.create(w.user, {
+          email: freshEmail(),
+          role: "CAMPAIGN_MANAGER",
+        }),
+        invitations.create(w.user, {
+          email: freshEmail(),
+          role: "CAMPAIGN_MANAGER",
+        }),
+      ]);
+      expect(
+        results.filter((result) => result.status === "fulfilled"),
+      ).toHaveLength(1);
+      expect(
+        await prisma.teamInvitation.count({
+          where: {
+            brandProfileId: w.brand.id,
+            status: "PENDING",
+            expiresAt: { gt: new Date() },
+          },
+        }),
+      ).toBe(1);
+      expect(
+        await prisma.brandTeamMember.count({
+          where: { brandProfileId: w.brand.id, isActive: true },
+        }),
+      ).toBe(4);
+      expect(await anchorCount(w.brand.id)).toBe(1);
+    });
+
+    it("serializes two valid candidates converting the fourth and fifth seats", async () => {
+      const w = await workspace();
+      await member(w, "FINANCE_ADMIN");
+      await member(w, "CAMPAIGN_MANAGER");
+      const users = await Promise.all(
+        [freshEmail(), freshEmail()].map((email) =>
+          prisma.user.create({ data: { email, role: "BRAND" } }),
+        ),
+      );
+      userIds.push(...users.map((user) => user.id));
+      const inviteA = await legacy(w, users[0].email, "CAMPAIGN_MANAGER", {
+        hashed: true,
+      });
+      const inviteB = await legacy(w, users[1].email, "CAMPAIGN_MANAGER", {
+        hashed: true,
+      });
+      const results = await Promise.allSettled([
+        invitations.accept({ token: inviteA.raw }),
+        invitations.accept({ token: inviteB.raw }),
+      ]);
+      expect(
+        results.filter((result) => result.status === "fulfilled"),
+      ).toHaveLength(2);
+      expect(
+        await prisma.teamInvitation.count({
+          where: {
+            id: { in: [inviteA.row.id, inviteB.row.id] },
+            status: "ACCEPTED",
+          },
+        }),
+      ).toBe(2);
+      expect(
+        await prisma.brandTeamMember.count({
+          where: { brandProfileId: w.brand.id, isActive: true },
+        }),
+      ).toBe(5);
+      expect(await anchorCount(w.brand.id)).toBe(1);
+      for (const user of users)
+        expect(
+          (await prisma.user.findUniqueOrThrow({ where: { id: user.id } }))
+            .organizationId,
+        ).toBe(w.org.id);
+    });
+
+    it("serializes expiry against acceptance and cancellation", async () => {
+      for (const operation of ["accept", "cancel"] as const) {
+        const w = await workspace();
+        const invite = await legacy(w, freshEmail(), "CAMPAIGN_MANAGER", {
+          expired: true,
+          hashed: true,
+        });
+        const results = await Promise.allSettled([
+          settings.getGeneral(w.user),
+          operation === "accept"
+            ? invitations.accept({ token: invite.raw, password: password() })
+            : team.cancel(w.user, invite.row.id),
+        ]);
+        expect(
+          results.filter((result) => result.status === "fulfilled"),
+        ).toHaveLength(1);
+        expect(
+          await prisma.teamInvitation.findUniqueOrThrow({
+            where: { id: invite.row.id },
+          }),
+        ).toMatchObject({ status: "EXPIRED" });
+        expect(
+          await prisma.brandTeamMember.count({
+            where: { brandProfileId: w.brand.id, isActive: true },
+          }),
+        ).toBe(1);
+        expect(await anchorCount(w.brand.id)).toBe(1);
+      }
+    });
+
+    it("serializes concurrent anchor demotion and revocation", async () => {
+      const w = await workspace();
+      const second = await member(w, "BRAND_OWNER");
+      const external = await member(w, "BRAND_OWNER", true, externalEmail());
+      const results = await Promise.allSettled([
+        team.updateRole(w.user, {
+          membershipId: w.membership.id,
+          role: "FINANCE_ADMIN",
+        }),
+        team.revoke(external.user, second.membership.id),
+      ]);
+      expect(
+        results.filter((result) => result.status === "fulfilled"),
+      ).toHaveLength(1);
+      expect(await anchorCount(w.brand.id)).toBe(1);
+      expect(
+        await prisma.brandTeamMember.count({
+          where: {
+            brandProfileId: w.brand.id,
+            role: "BRAND_OWNER",
+            isActive: true,
+          },
+        }),
+      ).toBe(2);
+    });
+
+    it("reactivates the same former-member row while capacity changes", async () => {
+      const w = await workspace();
+      const removable = await member(w, "CAMPAIGN_MANAGER");
+      await member(w, "FINANCE_ADMIN");
+      await member(w, "CAMPAIGN_MANAGER");
+      const former = await member(w, "CAMPAIGN_MANAGER", false);
+      const invite = await legacy(w, former.user.email, "FINANCE_ADMIN", {
+        hashed: true,
+      });
+      const results = await Promise.allSettled([
+        invitations.accept({ token: invite.raw }),
+        team.revoke(w.user, removable.membership.id),
+      ]);
+      expect(
+        results.filter((result) => result.status === "fulfilled"),
+      ).toHaveLength(2);
+      expect(
+        await prisma.teamInvitation.findUniqueOrThrow({
+          where: { id: invite.row.id },
+        }),
+      ).toMatchObject({ status: "ACCEPTED" });
+      expect(
+        await prisma.brandTeamMember.findUniqueOrThrow({
+          where: { id: former.membership.id },
+        }),
+      ).toMatchObject({ isActive: true, role: "FINANCE_ADMIN" });
+      expect(
+        await prisma.brandTeamMember.count({
+          where: { brandProfileId: w.brand.id, isActive: true },
+        }),
+      ).toBe(4);
+      expect(await anchorCount(w.brand.id)).toBe(1);
+      expect(
+        (await prisma.user.findUniqueOrThrow({ where: { id: former.user.id } }))
+          .organizationId,
+      ).toBe(w.org.id);
     });
   },
 );

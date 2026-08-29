@@ -2,8 +2,10 @@
 
 ## Reviewed base and scope
 
-Base: `program/brand-settings-mvp` at `c8105e9983a13f65f45ee9e6c3d0023941a0bcce`.
-Branch: `settings-mvp/bs-02-team-admission`. No schema or migration change.
+Original BS-02 base: `program/brand-settings-mvp` at
+`c8105e9983a13f65f45ee9e6c3d0023941a0bcce`. Stage-B P1 reconciles from the
+canonical program head `7d35c0b2f70d9783bace55cf355952ee44b02007`.
+Branch: `settings-mvp/bs-02-team-admission`. No database schema or migration change.
 BS-07's financial authorization service/contract, Pricing, Escrow, Withdrawal,
 Notifications/Slack, Instagram, Data Extraction, and OTP remediation are unchanged.
 Settings consumers now require explicit active membership, including the existing
@@ -20,7 +22,8 @@ notification caller of the retained, read-only `ensureMembership` method.
   per minute per endpoint/IP using the existing Throttler. Responses are no-store.
 - Team writes lock the existing BrandProfile row in PostgreSQL. Actor role and
   active membership are rechecked inside the transaction. This serializes
-  last-owner checks, invitation creation/cancellation and acceptance.
+  organizational-anchor checks, invitation creation/cancellation, lazy expiry
+  and acceptance.
 - Admission also takes a transaction-scoped recipient-email advisory lock, so
   two Brands cannot simultaneously associate the same unassigned recipient.
 - `AuthService` retains password hashing, JWT signing and the existing response
@@ -30,8 +33,8 @@ notification caller of the retained, read-only `ensureMembership` method.
 
 Owners administer all canonical roles, including other Owners. Finance Admins
 administer only non-Owners and cannot assign Owner. Campaign Managers cannot
-administer the team. Self-revoke remains prohibited. Final-owner demotion and
-removal cannot succeed, including concurrent requests.
+administer the team. Self-revoke remains prohibited. Owner reduction must retain
+a recognized organizational anchor, including during concurrent requests.
 
 ## Invitation lifecycle
 
@@ -40,7 +43,8 @@ is persisted in the existing unbounded text field. New role writes are canonical
 legacy `ADMIN` reads as `BRAND_OWNER`. Existing plaintext tokens remain consumable.
 Stored hash representations are rejected as bearer tokens.
 
-Expiry is seven days. Duplicate active-member emails and unexpired pending
+Expiry is seven days. Cancellation and natural expiry retain distinct terminal
+states. Duplicate active-member emails and unexpired pending
 invitations are rejected case-insensitively. The legacy five-seat limit remains;
 expired pending rows no longer occupy seats or appear as actionable invitations.
 
@@ -64,6 +68,32 @@ Existing non-Brand or other-organization accounts are rejected. Already active
 members retain their current role; a legacy invite cannot overwrite authority.
 Signing failure rolls back admission. Replay cannot mutate membership or issue
 another session; a client that lost the successful response must sign in.
+
+## Stage-B Team state reconciliation
+
+An Owner-reducing mutation must retain an active Brand-domain Owner. Anchor
+recognition reuses the accepted onboarding semantic
+`emailDomainMatchesBrandDomain(user.email, BrandProfile.domain)`, including the
+accepted corporate-subdomain relationship. External Owners do not satisfy the
+minimum unless their own email matches that rule. A malformed domain fails
+Owner reduction closed with `TEAM_ANCHOR_AUTHORITY_UNRESOLVED`; removal of the
+last resolved anchor fails with `TEAM_ANCHOR_OWNER_REQUIRED`. Mutable
+`verificationEmail` is not Team anchor authority.
+
+New cancellation persists `CANCELLED`; natural expiry persists `EXPIRED`.
+Existing historical `EXPIRED` rows are not reinterpreted. Overview, General
+Team read, creation, inspection, acceptance and cancellation use one lazy expiry
+helper under the Brand lock and one captured time boundary. Terminal endpoint
+errors are thrown only after the expiry transaction commits. Both Settings read
+surfaces add top-level `can_manage_team`: true for Owners and Finance Admins,
+false for Campaign Managers.
+
+Historical plaintext-token lookup remains temporarily available as
+`LEGACY_SECURITY_COMPATIBILITY`; every new token remains digest-only. Production
+inventory is required before any later removal. The pre-production Brand OTP
+path can rewrite verification identity state; this is a `CROSS_UNIT_DEPENDENCY`
+for BS-12 / Brand verification security reconciliation. BS-02 does not change
+OTP, Google, password bootstrap, JWT/session behavior, or Brand claim state.
 
 ## Initial Owner and historical rollout
 

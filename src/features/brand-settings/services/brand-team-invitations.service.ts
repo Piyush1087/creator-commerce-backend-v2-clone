@@ -7,7 +7,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { Prisma, UserRole, type TeamInvitation } from "@prisma/client";
+import { Prisma, UserRole } from "@prisma/client";
 import { createHash, randomBytes } from "node:crypto";
 import { MailService } from "../../../mail/mail.service";
 import { PrismaService } from "../../../prisma/prisma.service";
@@ -26,6 +26,12 @@ import {
   lockBrandTeam,
   requireTeamActor,
 } from "../team/brand-team-policy";
+import {
+  type EffectiveTeamInvitationStatus,
+  effectiveTeamInvitationStatus,
+  reconcileExpiredTeamInvitations,
+  TEAM_INVITATION_STATUS,
+} from "../team/team-invitation-lifecycle";
 import {
   BRAND_SETTINGS_MAX_SEATS,
   BrandSettingsAccessService,
@@ -47,9 +53,11 @@ export class BrandTeamInvitationsService {
   async create(actor: AuthUser, input: InviteTeamMemberInput) {
     const { brandProfileId } = await this.access.resolveBrandContext(actor);
     const email = input.email.trim().toLowerCase();
-    return this.prisma.$transaction(
+    const outcome = await this.prisma.$transaction(
       async (tx) => {
         await lockBrandTeam(tx, brandProfileId);
+        const now = new Date();
+        await reconcileExpiredTeamInvitations(tx, brandProfileId, now);
         const member = await requireTeamActor(tx, brandProfileId, actor);
         assertTeamAuthority(member.role, undefined, input.role);
         const brand = await tx.brandProfile.findUniqueOrThrow({
@@ -70,13 +78,12 @@ export class BrandTeamInvitationsService {
             "This email is already an active workspace member.",
           );
         }
-        const now = new Date();
         if (
           await tx.teamInvitation.findFirst({
             where: {
               brandProfileId,
               email: { equals: email, mode: "insensitive" },
-              status: "PENDING",
+              status: TEAM_INVITATION_STATUS.PENDING,
               expiresAt: { gt: now },
             },
           })
@@ -89,7 +96,11 @@ export class BrandTeamInvitationsService {
           where: { brandProfileId, isActive: true },
         });
         const pending = await tx.teamInvitation.count({
-          where: { brandProfileId, status: "PENDING", expiresAt: { gt: now } },
+          where: {
+            brandProfileId,
+            status: TEAM_INVITATION_STATUS.PENDING,
+            expiresAt: { gt: now },
+          },
         });
         if (active + pending >= BRAND_SETTINGS_MAX_SEATS)
           throw new BadRequestException(
@@ -131,6 +142,7 @@ export class BrandTeamInvitationsService {
       },
       { timeout: 20_000 },
     );
+    return outcome;
   }
 
   private async lookup(tx: Prisma.TransactionClient, raw: string) {
@@ -150,17 +162,16 @@ export class BrandTeamInvitationsService {
     return invite;
   }
 
-  private assertPending(invite: TeamInvitation) {
-    if (invite.status === "ACCEPTED")
+  private throwTerminalInvitation(state: EffectiveTeamInvitationStatus): never {
+    if (state === TEAM_INVITATION_STATUS.ACCEPTED)
       throw new ConflictException({
         code: "INVITATION_CONSUMED",
         message: "This invitation has already been accepted.",
       });
-    if (invite.status !== "PENDING" || invite.expiresAt.getTime() <= Date.now())
-      throw new GoneException({
-        code: "INVITATION_EXPIRED",
-        message: "This invitation has expired or was cancelled.",
-      });
+    throw new GoneException({
+      code: "INVITATION_EXPIRED",
+      message: "This invitation has expired or was cancelled.",
+    });
   }
 
   private async recipient(
@@ -188,36 +199,58 @@ export class BrandTeamInvitationsService {
   }
 
   async inspect(raw: string) {
-    const invite = await this.lookup(this.prisma, raw);
-    this.assertPending(invite);
-    const brand = await this.prisma.brandProfile.findUniqueOrThrow({
-      where: { id: invite.brandProfileId },
+    const initial = await this.lookup(this.prisma, raw);
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      await lockBrandTeam(tx, initial.brandProfileId);
+      const capturedNow = new Date();
+      await reconcileExpiredTeamInvitations(
+        tx,
+        initial.brandProfileId,
+        capturedNow,
+      );
+      const invite = await this.lookup(tx, raw);
+      const state = effectiveTeamInvitationStatus(invite, capturedNow);
+      if (state !== TEAM_INVITATION_STATUS.PENDING)
+        return { kind: "TERMINAL" as const, state };
+      const brand = await tx.brandProfile.findUniqueOrThrow({
+        where: { id: invite.brandProfileId },
+      });
+      if (!brand.organizationId)
+        throw new ConflictException("Brand workspace is not activated");
+      const user = await this.recipient(tx, invite.email, brand.organizationId);
+      return {
+        kind: "PENDING" as const,
+        value: {
+          brand_name: brand.name,
+          email: invite.email,
+          role: canonicalInvitationRole(invite.role),
+          expires_at: invite.expiresAt.toISOString(),
+          requires_account_bootstrap: !user,
+        },
+      };
     });
-    if (!brand.organizationId)
-      throw new ConflictException("Brand workspace is not activated");
-    const user = await this.recipient(
-      this.prisma,
-      invite.email,
-      brand.organizationId,
-    );
-    return {
-      brand_name: brand.name,
-      email: invite.email,
-      role: canonicalInvitationRole(invite.role),
-      expires_at: invite.expiresAt.toISOString(),
-      requires_account_bootstrap: !user,
-    };
+    if (outcome.kind === "TERMINAL")
+      this.throwTerminalInvitation(outcome.state);
+    return outcome.value;
   }
 
   async accept(input: AcceptTeamInvitationInput) {
     if (!AcceptTeamInvitationSchema.safeParse(input).success)
       throw new BadRequestException("Invalid invitation acceptance input");
     const initial = await this.lookup(this.prisma, input.token);
-    return this.prisma.$transaction(
+    const outcome = await this.prisma.$transaction(
       async (tx) => {
         await lockBrandTeam(tx, initial.brandProfileId);
+        const capturedNow = new Date();
+        await reconcileExpiredTeamInvitations(
+          tx,
+          initial.brandProfileId,
+          capturedNow,
+        );
         const invite = await this.lookup(tx, input.token);
-        this.assertPending(invite);
+        const state = effectiveTeamInvitationStatus(invite, capturedNow);
+        if (state !== TEAM_INVITATION_STATUS.PENDING)
+          return { kind: "TERMINAL" as const, state };
         const role = canonicalInvitationRole(invite.role);
         const brand = await tx.brandProfile.findUniqueOrThrow({
           where: { id: invite.brandProfileId },
@@ -299,21 +332,27 @@ export class BrandTeamInvitationsService {
         const consumed = await tx.teamInvitation.updateMany({
           where: {
             id: invite.id,
-            status: "PENDING",
-            expiresAt: { gt: new Date() },
+            status: TEAM_INVITATION_STATUS.PENDING,
+            expiresAt: { gt: capturedNow },
           },
-          data: { status: "ACCEPTED" },
+          data: { status: TEAM_INVITATION_STATUS.ACCEPTED },
         });
         if (consumed.count !== 1)
           throw new ConflictException("Invitation cannot be consumed");
         // Signing failure rolls back admission too. Reuse the existing AuthService.
         return {
-          ...(await this.auth.issueTokenForUser(user)),
-          brandProfileId: brand.id,
-          organizationId: brand.organizationId,
+          kind: "ADMITTED" as const,
+          value: {
+            ...(await this.auth.issueTokenForUser(user)),
+            brandProfileId: brand.id,
+            organizationId: brand.organizationId,
+          },
         };
       },
       { timeout: 15_000 },
     );
+    if (outcome.kind === "TERMINAL")
+      this.throwTerminalInvitation(outcome.state);
+    return outcome.value;
   }
 }

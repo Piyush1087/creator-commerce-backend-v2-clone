@@ -11,7 +11,15 @@ import {
 } from "@prisma/client";
 import { BrandTeamService } from "./brand-team.service";
 import { BrandTeamInvitationsService } from "./brand-team-invitations.service";
-import { canonicalInvitationRole } from "../team/brand-team-policy";
+import {
+  canonicalInvitationRole,
+  lockBrandTeam,
+  requireActiveTeamMember,
+} from "../team/brand-team-policy";
+import {
+  reconcileExpiredTeamInvitations,
+  TEAM_INVITATION_STATUS,
+} from "../team/team-invitation-lifecycle";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import {
@@ -79,36 +87,43 @@ export class BrandSettingsService {
   ) {}
 
   async getOverview(user: AuthUser) {
-    const { brandProfileId, membership } =
-      await this.access.resolveBrandContext(user);
+    const { brandProfileId } = await this.access.resolveBrandContext(user);
 
-    const [profile, teamCount, pendingInvites] = await Promise.all([
-      this.prisma.brandProfile.findUnique({
-        where: { id: brandProfileId },
-        select: {
-          id: true,
-          name: true,
-          domain: true,
-          countryCode: true,
-          currencyCode: true,
-          logoUrl: true,
-        },
-      }),
-      this.prisma.brandTeamMember.count({
-        where: { brandProfileId, isActive: true },
-      }),
-      this.prisma.teamInvitation.count({
-        where: {
-          brandProfileId,
-          status: "PENDING",
-          expiresAt: { gt: new Date() },
-        },
-      }),
-    ]);
+    const capturedNow = new Date();
+    const [membership, profile, teamCount, pendingInvites] =
+      await this.prisma.$transaction(async (tx) => {
+        await lockBrandTeam(tx, brandProfileId);
+        await reconcileExpiredTeamInvitations(tx, brandProfileId, capturedNow);
+        return Promise.all([
+          requireActiveTeamMember(tx, brandProfileId, user),
+          tx.brandProfile.findUnique({
+            where: { id: brandProfileId },
+            select: {
+              id: true,
+              name: true,
+              domain: true,
+              countryCode: true,
+              currencyCode: true,
+              logoUrl: true,
+            },
+          }),
+          tx.brandTeamMember.count({
+            where: { brandProfileId, isActive: true },
+          }),
+          tx.teamInvitation.count({
+            where: {
+              brandProfileId,
+              status: TEAM_INVITATION_STATUS.PENDING,
+              expiresAt: { gt: capturedNow },
+            },
+          }),
+        ]);
+      });
 
     return {
       brand_profile_id: brandProfileId,
       current_user_role: membership.role,
+      can_manage_team: this.access.canManageTeam(membership.role),
       is_financial_read_only: this.access.isFinancialReadOnly(membership.role),
       brand_identity: profile,
       seat_usage: {
@@ -121,29 +136,35 @@ export class BrandSettingsService {
   }
 
   async getGeneral(user: AuthUser) {
-    const { brandProfileId, membership } =
-      await this.access.resolveBrandContext(user);
+    const { brandProfileId } = await this.access.resolveBrandContext(user);
 
-    const [userRow, profile, team, invitations] = await Promise.all([
-      this.prisma.user.findUnique({ where: { id: user.id } }),
-      this.prisma.brandProfile.findUnique({
-        where: { id: brandProfileId },
-        include: { organization: { select: { name: true } } },
-      }),
-      this.prisma.brandTeamMember.findMany({
-        where: { brandProfileId, isActive: true },
-        include: { user: true },
-        orderBy: { joinedAt: "asc" },
-      }),
-      this.prisma.teamInvitation.findMany({
-        where: {
-          brandProfileId,
-          status: "PENDING",
-          expiresAt: { gt: new Date() },
-        },
-        orderBy: { createdAt: "desc" },
-      }),
-    ]);
+    const capturedNow = new Date();
+    const [membership, userRow, profile, team, invitations] =
+      await this.prisma.$transaction(async (tx) => {
+        await lockBrandTeam(tx, brandProfileId);
+        await reconcileExpiredTeamInvitations(tx, brandProfileId, capturedNow);
+        return Promise.all([
+          requireActiveTeamMember(tx, brandProfileId, user),
+          tx.user.findUnique({ where: { id: user.id } }),
+          tx.brandProfile.findUnique({
+            where: { id: brandProfileId },
+            include: { organization: { select: { name: true } } },
+          }),
+          tx.brandTeamMember.findMany({
+            where: { brandProfileId, isActive: true },
+            include: { user: true },
+            orderBy: { joinedAt: "asc" },
+          }),
+          tx.teamInvitation.findMany({
+            where: {
+              brandProfileId,
+              status: TEAM_INVITATION_STATUS.PENDING,
+              expiresAt: { gt: capturedNow },
+            },
+            orderBy: { createdAt: "desc" },
+          }),
+        ]);
+      });
 
     if (!profile) {
       throw new NotFoundException("Brand profile not found");
@@ -153,6 +174,7 @@ export class BrandSettingsService {
 
     return {
       current_user_role: membership.role,
+      can_manage_team: this.access.canManageTeam(membership.role),
       personal_profile: {
         first_name: firstName,
         last_name: lastName,

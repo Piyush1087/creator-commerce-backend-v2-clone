@@ -52,6 +52,10 @@ export class BrandSettingsAccessService {
     }
   }
 
+  canManageTeam(role: BrandRole): boolean {
+    return role !== BrandRole.CAMPAIGN_MANAGER;
+  }
+
   async getMembershipOrThrow(membershipId: string, brandProfileId: string) {
     const membership = await this.prisma.brandTeamMember.findFirst({
       where: { id: membershipId, brandProfileId, isActive: true },

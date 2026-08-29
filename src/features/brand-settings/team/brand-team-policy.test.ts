@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertTeamAuthority,
   canonicalInvitationRole,
+  isRecognizedAnchorEmail,
 } from "./brand-team-policy";
 import {
   AcceptTeamInvitationSchema,
@@ -34,6 +35,16 @@ describe("BS-02 role and token boundaries", () => {
   );
   it("fails closed on unknown legacy roles", () =>
     expect(() => canonicalInvitationRole("unexpected")).toThrow());
+  it.each([
+    ["owner@brand.com", "brand.com", true],
+    ["owner@corp.brand.com", "brand.com", true],
+    ["owner@brand.com", "corp.brand.com", true],
+    ["owner@agency.com", "brand.com", false],
+    ["owner@brand.com", "https://brand.com", false],
+    ["owner@brand.com", "", false],
+  ])("classifies anchor email %s against %s", (email, domain, recognized) =>
+    expect(isRecognizedAnchorEmail(email, domain)).toBe(recognized),
+  );
   it("hashes random raw tokens and rejects the digest as a bearer", () => {
     const raw = randomBytes(32).toString("hex");
     const hash = hashInvitationToken(raw);

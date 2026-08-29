@@ -1696,7 +1696,7 @@ model TeamInvitation {
   id             String       @id @default(uuid())
   email          String
   role           String       @default("ADMIN")
-  status         String       @default("PENDING") // PENDING, ACCEPTED, EXPIRED
+  status         String       @default("PENDING") // PENDING, ACCEPTED, CANCELLED, EXPIRED
   brandProfileId String       @map("brand_profile_id")
   brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id])
   token          String       @unique
