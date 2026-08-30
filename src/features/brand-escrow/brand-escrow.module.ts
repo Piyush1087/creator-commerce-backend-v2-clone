@@ -12,6 +12,7 @@ import {
   BrandEscrowInterlockController,
 } from "./brand-escrow.controller";
 import { BrandEscrowWebhookController } from "./brand-escrow-webhook.controller";
+import { RouteWebhookController } from "./route-webhook.controller";
 import { BrandEscrowAccessService } from "./services/brand-escrow-access.service";
 import { BrandEscrowComputationService } from "./services/brand-escrow-computation.service";
 import { BrandEscrowHardenedService } from "./services/brand-escrow-hardened.service";
@@ -23,6 +24,13 @@ import { EscrowSubscriptionContextService } from "./services/escrow-subscription
 import { IdempotencyManager } from "./services/idempotency.manager";
 import { RazorpayClient } from "./services/razorpay.client";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { CreatorPayoutObligationService } from "./services/creator-payout-obligation.service";
+import { CreatorPayoutProfileService } from "./services/creator-payout-profile.service";
+import { RazorpayRouteAdapter } from "./services/razorpay-route.adapter";
+import { RouteReconciliationService } from "./services/route-reconciliation.service";
+import { RouteTransferService } from "./services/route-transfer.service";
+import { RouteWebhookEventParser } from "./services/route-webhook-event.parser";
+import { RouteWebhookService } from "./services/route-webhook.service";
 
 @Module({
   imports: [
@@ -39,6 +47,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
     BrandEscrowInterlockController,
     BrandEscrowHardenedController,
     BrandEscrowWebhookController,
+    RouteWebhookController,
   ],
   providers: [
     BrandEscrowAccessService,
@@ -51,12 +60,23 @@ import { NotificationsModule } from "../notifications/notifications.module";
     EscrowSubscriptionContextService,
     IdempotencyManager,
     RazorpayClient,
+    CreatorPayoutProfileService,
+    CreatorPayoutObligationService,
+    RazorpayRouteAdapter,
+    RouteTransferService,
+    RouteReconciliationService,
+    RouteWebhookEventParser,
+    RouteWebhookService,
   ],
   exports: [
     BrandEscrowService,
     BrandEscrowComputationService,
     BrandEscrowInterlockService,
     BrandEscrowHardenedService,
+    CreatorPayoutProfileService,
+    CreatorPayoutObligationService,
+    RouteTransferService,
+    RouteReconciliationService,
   ],
 })
 export class BrandEscrowModule {}

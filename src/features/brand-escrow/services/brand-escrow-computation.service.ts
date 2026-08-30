@@ -35,6 +35,7 @@ export interface ExecuteTrancheDisbursalInput {
 
 @Injectable()
 export class BrandEscrowComputationService {
+  private readonly legacyTrancheDisbursalDisabled = true;
   constructor(
     private readonly prisma: PrismaService,
     private readonly computationEngine: EscrowComputationEngine,
@@ -351,6 +352,11 @@ export class BrandEscrowComputationService {
   }
 
   async executeTrancheDisbursal(input: ExecuteTrancheDisbursalInput) {
+    if (this.legacyTrancheDisbursalDisabled) {
+      throw new ConflictException(
+        "Legacy fixed-tranche disbursal is disabled; consume a Collaboration settlement instruction",
+      );
+    }
     return this.prisma.$transaction(async (tx) => {
       const lock = await tx.collaborationEscrowLock.findUnique({
         where: { collaborationId: input.collaborationId },

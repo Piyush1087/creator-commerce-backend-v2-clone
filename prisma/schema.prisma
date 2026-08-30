@@ -771,6 +771,8 @@ enum EscrowTransactionType {
   PLATFORM_FEE_CAPTURE
   TDS_BUFFER_REVERSAL
   FAILED_COLLAB_REFUND
+  CREATOR_PAYOUT_SETTLEMENT
+  CREATOR_PAYOUT_REVERSAL
 }
 
 enum EscrowTransactionStatus {
@@ -805,6 +807,85 @@ enum IdempotencyExecutionState {
   IN_FLIGHT
   COMPLETED
   FAILED
+}
+
+enum CreatorPayoutOnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  NEEDS_INFORMATION
+  UNDER_REVIEW
+  VERIFIED
+  RESTRICTED
+  UNKNOWN
+}
+
+enum CreatorPayoutBankStatus {
+  BANK_NOT_CONFIGURED
+  BANK_VALIDATION_PENDING
+  BANK_VALIDATED
+  BANK_VALIDATION_FAILED
+  UNKNOWN
+}
+
+enum CreatorPayoutOperationalEligibility {
+  NO_LINKED_ACCOUNT
+  ACCOUNT_CREATED
+  STAKEHOLDER_COMPLETE
+  ROUTE_CONFIGURATION_REQUESTED
+  NEEDS_CLARIFICATION
+  UNDER_REVIEW
+  BANK_CONFIGURATION_PENDING
+  BANK_VALIDATION_PENDING
+  ACTIVATED
+  COOLING_PERIOD
+  ELIGIBLE_FOR_TRANSFER
+  SUSPENDED_OR_RESTRICTED
+  UNKNOWN
+}
+
+enum CreatorPayoutObligationType {
+  ADVANCE
+  BALANCE
+  FULL
+  RESOLUTION
+}
+
+enum CreatorPayoutObligationStatus {
+  ELIGIBLE
+  EXECUTING
+  BLOCKED
+  SETTLED
+  PARTIALLY_REVERSED
+  REVERSED
+}
+
+enum RouteTransferState {
+  CREATED
+  PENDING
+  PROCESSED
+  FAILED
+  REVERSED
+  PARTIALLY_REVERSED
+  UNKNOWN
+}
+
+enum RouteSettlementState {
+  PENDING
+  HELD
+  RELEASE_ELIGIBLE
+  RELEASE_PROCESSING
+  RELEASED
+  SETTLED
+  BLOCKED
+  UNKNOWN
+}
+
+enum RouteReversalState {
+  CREATED
+  PENDING
+  PROCESSED
+  FAILED
+  UNKNOWN
 }
 
 // ============================================================================
@@ -1393,23 +1474,24 @@ model BrandProfile {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  offerings              Offering[]
-  competitors            Competitor[]
-  locations              Location[]
-  visualState            BrandVisualState?
-  locationObservations   BrandLocationObservation[]
-  subscriptions          Subscription[]
-  teamInvitations        TeamInvitation[]
-  brandCentreJobs        BrandCentreJob[]
-  budgetConfiguration    BrandBudgetConfiguration?
-  audiencePersonas       BrandAudiencePersona[]
-  brandOffers            BrandOffer[]
-  budgetModificationLogs BrandBudgetModificationLog[]
-  intelligenceBaseline   BrandIntelligenceBaseline?
-  performanceLeaks       BrandPerformanceLeak[]
-  plannerCards           BrandPlannerCard[]
-  brandIntelligenceScans BrandIntelligenceScan[]
-  brandPreviewRuns       BrandPreviewRun[]
+  offerings                Offering[]
+  competitors              Competitor[]
+  locations                Location[]
+  visualState              BrandVisualState?
+  locationObservations     BrandLocationObservation[]
+  subscriptions            Subscription[]
+  teamInvitations          TeamInvitation[]
+  brandCentreJobs          BrandCentreJob[]
+  budgetConfiguration      BrandBudgetConfiguration?
+  audiencePersonas         BrandAudiencePersona[]
+  brandOffers              BrandOffer[]
+  budgetModificationLogs   BrandBudgetModificationLog[]
+  intelligenceBaseline     BrandIntelligenceBaseline?
+  performanceLeaks         BrandPerformanceLeak[]
+  plannerCards             BrandPlannerCard[]
+  brandIntelligenceScans   BrandIntelligenceScan[]
+  brandPreviewRuns         BrandPreviewRun[]
+  creatorPayoutObligations CreatorPayoutObligation[]
 
   intelligenceExecutions              IntelligenceExecution[]
   intelligenceProcessorExecutions     IntelligenceProcessorExecution[]
@@ -2576,6 +2658,8 @@ model CreatorProfile {
   bankDetails            CreatorBankDetails[]
   shippingAddresses      CreatorShippingAddress[]
   settlementProfile      CreatorSettlementProfile?
+  payoutProfile          CreatorPayoutProfile?
+  payoutObligations      CreatorPayoutObligation[]
   ownedWorkspaces        CreatorWorkspace[]              @relation("CreatorWorkspaceOwner")
   workspaceSeats         CreatorWorkspaceMember[]        @relation("CreatorWorkspaceMemberProfile")
   socialIntegrations     CreatorSocialIntegration[]
@@ -2966,12 +3050,13 @@ model Collaboration {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  commercials  CollaborationCommercial?
-  logistics    CollaborationLogistics?
-  media        CollaborationMedia[]
-  finalization CollaborationFinalization?
-  messages     CollaborationMessage[]
-  escrowLock   CollaborationEscrowLock?
+  commercials              CollaborationCommercial?
+  logistics                CollaborationLogistics?
+  media                    CollaborationMedia[]
+  finalization             CollaborationFinalization?
+  messages                 CollaborationMessage[]
+  escrowLock               CollaborationEscrowLock?
+  creatorPayoutObligations CreatorPayoutObligation[]
 
   @@unique([campaignId, creatorUserId])
   @@index([brandProfileId, currentStage])
@@ -3107,8 +3192,9 @@ model BrandEscrowVault {
   createdAt                DateTime     @default(now()) @map("created_at")
   updatedAt                DateTime     @updatedAt @map("updated_at")
 
-  ledgerEntries EscrowTransactionLedger[]
-  fundingLoads  EscrowFundingLoad[]
+  ledgerEntries            EscrowTransactionLedger[]
+  fundingLoads             EscrowFundingLoad[]
+  creatorPayoutObligations CreatorPayoutObligation[]
 
   @@index([brandProfileId])
   @@map("brand_escrow_vaults")
@@ -3204,6 +3290,131 @@ model CreatorSettlementProfile {
 
   @@index([creatorProfileId])
   @@map("creator_settlement_profiles")
+}
+
+model CreatorPayoutProfile {
+  id                       String                              @id @default(uuid()) @map("payout_profile_id")
+  creatorProfileId         String                              @unique @map("creator_profile_id")
+  creatorProfile           CreatorProfile                      @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  provider                 String                              @default("RAZORPAY_ROUTE") @db.VarChar(40)
+  externalReferenceId      String                              @unique @map("external_reference_id")
+  linkedAccountId          String?                             @unique @map("linked_account_id")
+  stakeholderId            String?                             @unique @map("stakeholder_id")
+  productConfigurationId   String?                             @unique @map("product_configuration_id")
+  onboardingStatus         CreatorPayoutOnboardingStatus       @default(NOT_STARTED) @map("onboarding_status")
+  bankStatus               CreatorPayoutBankStatus             @default(BANK_NOT_CONFIGURED) @map("bank_status")
+  operationalEligibility   CreatorPayoutOperationalEligibility @default(NO_LINKED_ACCOUNT) @map("operational_eligibility")
+  providerAccountStatus    String?                             @map("provider_account_status") @db.VarChar(100)
+  providerProductStatus    String?                             @map("provider_product_status") @db.VarChar(100)
+  providerBankStatus       String?                             @map("provider_bank_status") @db.VarChar(100)
+  maskedBankDisplay        String?                             @map("masked_bank_display") @db.VarChar(64)
+  eligibilityInvalidatedAt DateTime?                           @map("eligibility_invalidated_at")
+  lastProviderReconciledAt DateTime?                           @map("last_provider_reconciled_at")
+  stateVersion             Int                                 @default(0) @map("state_version")
+  createdAt                DateTime                            @default(now()) @map("created_at")
+  updatedAt                DateTime                            @updatedAt @map("updated_at")
+  obligations              CreatorPayoutObligation[]
+
+  @@index([operationalEligibility, updatedAt])
+  @@map("creator_payout_profiles")
+}
+
+model CreatorPayoutObligation {
+  id                      String                        @id @default(uuid()) @map("obligation_id")
+  settlementInstructionId String                        @unique @map("settlement_instruction_id")
+  collaborationId         String                        @map("collaboration_id")
+  collaboration           Collaboration                 @relation(fields: [collaborationId], references: [id], onDelete: Restrict)
+  vaultId                 String                        @map("vault_id")
+  vault                   BrandEscrowVault              @relation(fields: [vaultId], references: [id], onDelete: Restrict)
+  brandProfileId          String                        @map("brand_id")
+  brandProfile            BrandProfile                  @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
+  creatorProfileId        String                        @map("creator_profile_id")
+  creatorProfile          CreatorProfile                @relation(fields: [creatorProfileId], references: [id], onDelete: Restrict)
+  payoutProfileId         String                        @map("payout_profile_id")
+  payoutProfile           CreatorPayoutProfile          @relation(fields: [payoutProfileId], references: [id], onDelete: Restrict)
+  obligationType          CreatorPayoutObligationType   @map("obligation_type")
+  entitlementAmount       Decimal                       @map("entitlement_amount") @db.Decimal(15, 4)
+  currency                String                        @db.VarChar(3)
+  status                  CreatorPayoutObligationStatus @default(ELIGIBLE)
+  instructionIssuedAt     DateTime                      @map("instruction_issued_at")
+  paymentDueAt            DateTime?                     @map("payment_due_at")
+  blockedReason           String?                       @map("blocked_reason") @db.VarChar(100)
+  settledAt               DateTime?                     @map("settled_at")
+  terminalAt              DateTime?                     @map("terminal_at")
+  createdAt               DateTime                      @default(now()) @map("created_at")
+  updatedAt               DateTime                      @updatedAt @map("updated_at")
+  transfers               RouteTransferAttempt[]
+
+  @@index([brandProfileId, status, createdAt])
+  @@index([collaborationId, status])
+  @@index([creatorProfileId, status])
+  @@map("creator_payout_obligations")
+}
+
+model RouteTransferAttempt {
+  id                  String                  @id @default(uuid()) @map("transfer_attempt_id")
+  obligationId        String                  @map("obligation_id")
+  obligation          CreatorPayoutObligation @relation(fields: [obligationId], references: [id], onDelete: Restrict)
+  attemptSequence     Int                     @map("attempt_sequence")
+  profileStateVersion Int                     @map("profile_state_version")
+  provider            String                  @default("RAZORPAY_ROUTE") @db.VarChar(40)
+  idempotencyKey      String                  @unique @map("idempotency_key")
+  transferId          String?                 @unique @map("transfer_id")
+  amount              Decimal                 @db.Decimal(15, 4)
+  currency            String                  @db.VarChar(3)
+  state               RouteTransferState      @default(CREATED)
+  settlementState     RouteSettlementState    @default(PENDING) @map("settlement_state")
+  onHold              Boolean                 @default(false) @map("on_hold")
+  onHoldUntil         DateTime?               @map("on_hold_until")
+  providerState       String?                 @map("provider_state") @db.VarChar(100)
+  settlementId        String?                 @unique @map("settlement_id")
+  diagnosticPayload   Json?                   @map("diagnostic_payload")
+  initiatedAt         DateTime                @default(now()) @map("initiated_at")
+  providerAcceptedAt  DateTime?               @map("provider_accepted_at")
+  processedAt         DateTime?               @map("processed_at")
+  releasedAt          DateTime?               @map("released_at")
+  settledAt           DateTime?               @map("settled_at")
+  failedAt            DateTime?               @map("failed_at")
+  createdAt           DateTime                @default(now()) @map("created_at")
+  updatedAt           DateTime                @updatedAt @map("updated_at")
+  reversals           RouteTransferReversal[]
+
+  @@unique([obligationId, attemptSequence])
+  @@index([obligationId, state, createdAt])
+  @@map("route_transfer_attempts")
+}
+
+model RouteTransferReversal {
+  id                String               @id @default(uuid()) @map("route_reversal_record_id")
+  transferAttemptId String               @map("transfer_attempt_id")
+  transferAttempt   RouteTransferAttempt @relation(fields: [transferAttemptId], references: [id], onDelete: Restrict)
+  reversalId        String?              @unique @map("reversal_id")
+  idempotencyKey    String               @unique @map("idempotency_key")
+  amount            Decimal              @db.Decimal(15, 4)
+  currency          String               @db.VarChar(3)
+  state             RouteReversalState   @default(CREATED)
+  providerState     String?              @map("provider_state") @db.VarChar(100)
+  diagnosticPayload Json?                @map("diagnostic_payload")
+  initiatedAt       DateTime             @default(now()) @map("initiated_at")
+  processedAt       DateTime?            @map("processed_at")
+  failedAt          DateTime?            @map("failed_at")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+
+  @@index([transferAttemptId, state, createdAt])
+  @@map("route_transfer_reversals")
+}
+
+model RouteWebhookReceipt {
+  id               String   @id @default(uuid()) @map("webhook_receipt_id")
+  eventIdentity    String   @unique @map("event_identity")
+  eventType        String   @map("event_type") @db.VarChar(120)
+  payloadHash      String   @map("payload_hash") @db.VarChar(64)
+  providerObjectId String?  @map("provider_object_id")
+  processedAt      DateTime @default(now()) @map("processed_at")
+
+  @@index([providerObjectId, processedAt])
+  @@map("route_webhook_receipts")
 }
 
 model IdempotencyRegistry {

@@ -5,11 +5,7 @@ import {
   NotFoundException,
   PreconditionFailedException,
 } from "@nestjs/common";
-import {
-  CollaborationMessageKind,
-  CollaborationPayoutMode,
-  UceMilestoneStage,
-} from "@prisma/client";
+import { CollaborationMessageKind, UceMilestoneStage } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 
 import { PrismaService } from "../../../prisma/prisma.service";
@@ -92,23 +88,6 @@ export class BrandEscrowInterlockService {
         },
       });
 
-      if (
-        collab.payoutMode === CollaborationPayoutMode.ESCROW &&
-        (targetStage === UceMilestoneStage.STAGE_3_LOGISTICS ||
-          targetStage === UceMilestoneStage.STAGE_4_CONTENT_REVIEW)
-      ) {
-        const lock = await tx.collaborationEscrowLock.findUnique({
-          where: { collaborationId: input.collaborationId },
-        });
-
-        if (lock && !lock.advanceTrancheDisbursed) {
-          await this.computationService.executeTrancheDisbursal({
-            collaborationId: input.collaborationId,
-            tranche: "ADVANCE_30",
-          });
-        }
-      }
-
       await tx.collaborationMessage.create({
         data: {
           collaborationId: input.collaborationId,
@@ -128,6 +107,17 @@ export class BrandEscrowInterlockService {
 
   async executeAutomatedRefund(input: TriggerCancellationRefundInput) {
     return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-obligation:${input.collaborationId}`}))`;
+      const creatorPayoutObligation =
+        await tx.creatorPayoutObligation.findFirst({
+          where: { collaborationId: input.collaborationId },
+          select: { id: true },
+        });
+      if (creatorPayoutObligation) {
+        throw new ConflictException(
+          "COLLAB_REFUND cannot replace or bypass a Creator payout obligation",
+        );
+      }
       const lock = await tx.collaborationEscrowLock.findUnique({
         where: { collaborationId: input.collaborationId },
       });

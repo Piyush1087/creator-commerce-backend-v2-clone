@@ -2,6 +2,14 @@ import { Decimal } from "@prisma/client/runtime/library";
 import { describe, expect, it, vi } from "vitest";
 import { BrandEscrowInterlockService } from "./brand-escrow-interlock.service";
 
+const withPayoutGuard = <T extends object>(tx: T) =>
+  Object.assign(tx, {
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    creatorPayoutObligation: {
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
+  });
+
 describe("BS09 P2C1 collaboration refund idempotency", () => {
   const input = {
     collaborationId: "collab-1",
@@ -36,7 +44,8 @@ describe("BS09 P2C1 collaboration refund idempotency", () => {
     };
     const service = new BrandEscrowInterlockService(
       {
-        $transaction: (callback: (value: typeof tx) => unknown) => callback(tx),
+        $transaction: (callback: (value: typeof tx) => unknown) =>
+          callback(withPayoutGuard(tx)),
       } as never,
       {} as never,
     );
@@ -56,12 +65,12 @@ describe("BS09 P2C1 collaboration refund idempotency", () => {
       data: { lockReleasedViaRefund: true },
     });
     expect(tx.escrowTransactionLedger.create).toHaveBeenCalledTimes(1);
-    expect(tx.escrowTransactionLedger.create.mock.calls[0][0].data).toMatchObject(
-      {
-        transactionType: "COLLAB_REFUND",
-        idempotencyKey: "collab-refund:collab-1",
-      },
-    );
+    expect(
+      tx.escrowTransactionLedger.create.mock.calls[0][0].data,
+    ).toMatchObject({
+      transactionType: "COLLAB_REFUND",
+      idempotencyKey: "collab-refund:collab-1",
+    });
   });
 
   it("returns ALREADY_REVERSED without a second mutation or ledger entry", async () => {
@@ -76,7 +85,8 @@ describe("BS09 P2C1 collaboration refund idempotency", () => {
     };
     const service = new BrandEscrowInterlockService(
       {
-        $transaction: (callback: (value: typeof tx) => unknown) => callback(tx),
+        $transaction: (callback: (value: typeof tx) => unknown) =>
+          callback(withPayoutGuard(tx)),
       } as never,
       {} as never,
     );
@@ -135,7 +145,7 @@ describe("BS09 P2C1 collaboration refund idempotency", () => {
         const service = new BrandEscrowInterlockService(
           {
             $transaction: (callback: (value: typeof tx) => unknown) =>
-              callback(tx),
+              callback(withPayoutGuard(tx)),
           } as never,
           {} as never,
         );
@@ -195,7 +205,7 @@ describe("BS09 P2C1 collaboration refund idempotency", () => {
       const service = new BrandEscrowInterlockService(
         {
           $transaction: (callback: (value: typeof tx) => unknown) =>
-            callback(tx),
+            callback(withPayoutGuard(tx)),
         } as never,
         {} as never,
       );
@@ -223,7 +233,8 @@ describe("BS09 P2C1 collaboration refund idempotency", () => {
     };
     const service = new BrandEscrowInterlockService(
       {
-        $transaction: (callback: (value: typeof tx) => unknown) => callback(tx),
+        $transaction: (callback: (value: typeof tx) => unknown) =>
+          callback(withPayoutGuard(tx)),
       } as never,
       {} as never,
     );
@@ -233,5 +244,26 @@ describe("BS09 P2C1 collaboration refund idempotency", () => {
     );
     expect(tx.brandEscrowVault.update).not.toHaveBeenCalled();
     expect(tx.escrowTransactionLedger.create).not.toHaveBeenCalled();
+  });
+
+  it("cannot substitute COLLAB_REFUND for a Creator payout obligation", async () => {
+    const tx = withPayoutGuard({
+      collaborationEscrowLock: { findUnique: vi.fn() },
+    });
+    tx.creatorPayoutObligation.findFirst.mockResolvedValue({
+      id: "obligation-1",
+    });
+    const service = new BrandEscrowInterlockService(
+      {
+        $transaction: (callback: (value: typeof tx) => unknown) => callback(tx),
+      } as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.executeAutomatedRefund(input)).rejects.toThrow(
+      "COLLAB_REFUND cannot replace or bypass a Creator payout obligation",
+    );
+    expect(tx.collaborationEscrowLock.findUnique).not.toHaveBeenCalled();
   });
 });

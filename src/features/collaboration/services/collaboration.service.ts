@@ -822,16 +822,8 @@ export class CollaborationService {
         where: { collaborationId },
         data: {
           isComplianceVerified: true,
-          isFinalPayoutReleased:
-            thread.payoutMode === CollaborationPayoutMode.ESCROW,
         },
       });
-      if (thread.payoutMode === CollaborationPayoutMode.ESCROW) {
-        await tx.collaborationCommercial.update({
-          where: { collaborationId },
-          data: { escrowStatus: CollaborationEscrowStatus.SETTLED },
-        });
-      }
       await tx.collaboration.update({
         where: { id: collaborationId },
         data: { currentStage: UceMilestoneStage.STAGE_6_FEEDBACK_SYNC },

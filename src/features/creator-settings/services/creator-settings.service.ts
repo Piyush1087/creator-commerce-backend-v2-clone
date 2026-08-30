@@ -30,12 +30,14 @@ import {
   CREATOR_SETTINGS_MAX_SEATS,
   CreatorSettingsAccessService,
 } from "./creator-settings-access.service";
+import { CreatorPayoutProfileService } from "../../brand-escrow/services/creator-payout-profile.service";
 
 @Injectable()
 export class CreatorSettingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: CreatorSettingsAccessService,
+    private readonly payoutProfiles: CreatorPayoutProfileService,
   ) {}
 
   async getProfile(user: AuthUser) {
@@ -538,12 +540,15 @@ export class CreatorSettingsService {
     );
     const readOnly = this.access.isAssistantReadOnly(role);
 
-    const [bank, settlement] = await Promise.all([
+    const [bank, settlement, payoutProfile] = await Promise.all([
       this.prisma.creatorBankDetails.findFirst({
         where: { creatorProfileId: profile.id, isPrimary: true },
         orderBy: { updatedAt: "desc" },
       }),
       this.prisma.creatorSettlementProfile.findUnique({
+        where: { creatorProfileId: profile.id },
+      }),
+      this.prisma.creatorPayoutProfile.findUnique({
         where: { creatorProfileId: profile.id },
       }),
     ]);
@@ -573,6 +578,27 @@ export class CreatorSettingsService {
             is_settlement_route_active: settlement.isSettlementRouteActive,
           }
         : null,
+      route_payout_profile: payoutProfile
+        ? {
+            setup_status: payoutProfile.onboardingStatus,
+            bank_status: payoutProfile.bankStatus,
+            operational_eligibility: payoutProfile.operationalEligibility,
+            is_ready:
+              payoutProfile.operationalEligibility ===
+                "ELIGIBLE_FOR_TRANSFER" &&
+              payoutProfile.bankStatus === "BANK_VALIDATED",
+            masked_bank_display: payoutProfile.maskedBankDisplay,
+            last_provider_reconciled_at:
+              payoutProfile.lastProviderReconciledAt?.toISOString() ?? null,
+          }
+        : {
+            setup_status: "NOT_STARTED",
+            bank_status: "BANK_NOT_CONFIGURED",
+            operational_eligibility: "NO_LINKED_ACCOUNT",
+            is_ready: false,
+            masked_bank_display: null,
+            last_provider_reconciled_at: null,
+          },
     };
   }
 
@@ -623,6 +649,8 @@ export class CreatorSettingsService {
         ifscCode: input.routingIfscSwift,
       },
     });
+
+    await this.payoutProfiles.invalidateReadiness(profile.id, "BANK_CHANGED");
 
     return {
       bank_id: bank.id,

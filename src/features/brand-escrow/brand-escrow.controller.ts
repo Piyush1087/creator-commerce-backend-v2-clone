@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  GoneException,
   Headers,
   HttpCode,
   HttpStatus,
@@ -154,11 +155,9 @@ export class BrandEscrowEngineController {
       body.collaboration_id,
       brandProfileId,
     );
-
-    return this.computation.executeTrancheDisbursal({
-      collaborationId: body.collaboration_id,
-      tranche: body.tranche,
-    });
+    throw new GoneException(
+      "Legacy tranche disbursal is disabled; Creator payouts require an immutable Collaboration settlement instruction",
+    );
   }
 }
 

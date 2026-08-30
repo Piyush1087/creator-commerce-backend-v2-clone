@@ -37,12 +37,22 @@ describe("BS-05 P2A financial producer boundaries", () => {
       source(
         "src/features/brand-escrow/services/brand-escrow-interlock.service.ts",
       ),
+      source(
+        "src/features/brand-escrow/services/creator-payout-obligation.service.ts",
+      ),
+      source(
+        "src/features/brand-escrow/services/route-reconciliation.service.ts",
+      ),
+      source("src/features/brand-escrow/services/route-transfer.service.ts"),
       source("src/features/collaboration/services/collaboration.service.ts"),
     ].join("\n");
     for (const event of [
       "escrow.funding_credited",
       "escrow.collaboration_awaiting_funds",
       "escrow.collaboration_refunded",
+      "escrow.creator_payout_action_required",
+      "escrow.creator_payout_settled",
+      "escrow.creator_payout_reversed",
     ]) {
       expect(escrow).toContain(`eventType: \"${event}\"`);
     }
