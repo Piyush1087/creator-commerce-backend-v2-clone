@@ -37,19 +37,20 @@ Apply existing migrations manually to a target database:
 npm run db:migrate:deploy
 ```
 
-## Dev RDS migrations
+## Dev and prod RDS migrations
 
-**Default (routine dev deploy):** migrations apply automatically when ECS starts the API
-container after `npx sst deploy --stage dev`. The entrypoint runs `prisma migrate deploy`
-when `RUN_MIGRATIONS_ON_START=true` (dev only). See
-[../deployment/README.md](../deployment/README.md#default-dev-release-current-workflow).
+**Default (routine deploy):** migrations apply automatically when ECS starts the API
+container after `npx sst deploy --stage dev` or `--stage prod`. The entrypoint runs `prisma migrate deploy`
+when `RUN_MIGRATIONS_ON_START=true`. See
+[../deployment/README.md](../deployment/README.md#default-dev-release-current-workflow) (dev) and
+[../deployment/README.md](../deployment/README.md#prod-go-live) (prod).
 
-**Fallback (jumpbox):** open the SSM tunnel, export `DATABASE_URL` to `localhost:5435`, then
+**Fallback (jumpbox / bastion):** open the SSM tunnel, export `DATABASE_URL` to `localhost:5435`, then
 run `npm run db:migrate:deploy` or `npm run db:studio`. Use when debugging migrations,
-inspecting dev RDS directly, or if auto-migrate is disabled. Tunnel steps:
+inspecting RDS directly, or if auto-migrate is disabled. Tunnel steps:
 [../deployment/README.md](../deployment/README.md#fallback--dev-rds-via-jumpbox--tunnel-manual-migrate).
 
-**Prod:** manual `migrate deploy` after review — never auto-migrate on container start.
+Review migration SQL before prod deploy — auto-migrate still applies schema changes to prod data on task start.
 
 ## Dev deploy database URL
 

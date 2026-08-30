@@ -10,6 +10,8 @@ Run **install, Prisma, and `sst deploy` from WSL** (`~/Work/creator-commerce-bac
 
 Stop deploying the **old v1 backend** for the same stage before v2 cutover.
 
+**Cost optimization:** see [../aws-optimization/creator-dev.md](../aws-optimization/creator-dev.md) for dev audit, savings estimates, and scheduler notes.
+
 ---
 
 ## Default dev release (current workflow)
@@ -40,7 +42,7 @@ curl -s https://api.dev.thecreatorshop.in/health/live
 
 1. SST builds the Docker image (includes `prisma/migrations`).
 2. ECS rolls out new API task(s) in the VPC with `DATABASE_URL` = `DEV_DATABASE_URL` from `.env`.
-3. Container entrypoint (`scripts/docker-entrypoint.sh`) runs **`npx prisma migrate deploy`** when `RUN_MIGRATIONS_ON_START=true` (dev stage only).
+3. Container entrypoint (`scripts/docker-entrypoint.sh`) runs **`npx prisma migrate deploy`** when `RUN_MIGRATIONS_ON_START=true` (dev and prod).
 4. App starts (`node dist/main.js`).
 5. ALB health check passes (`healthCheckGracePeriodSeconds` = 120s to allow migrate time).
 
@@ -57,7 +59,7 @@ Watch ECS logs for:
 | `npx sst deploy --stage dev` | No |
 | `prisma migrate deploy` on dev RDS | **Automatic** inside ECS on task start |
 
-**Prod** does not auto-migrate (`RUN_MIGRATIONS_ON_START=false`). Prod still uses manual migrate after review (tunnel or approved process).
+**Prod** uses the same auto-migrate on ECS task start (`RUN_MIGRATIONS_ON_START=true`). Review migration SQL before prod deploy; use the jumpbox/tunnel path only as a fallback.
 
 ---
 
@@ -79,7 +81,8 @@ Details: `docs/campaigns-creator-view/engineering/MARKETPLACE_BACKEND.md`.
 | **Local Docker DB only** | `npm run db:migrate:dev` or `db:migrate:deploy` against `localhost:5432` |
 | **Dev RDS manual migrate** (fallback) | Jumpbox tunnel → `DATABASE_URL=localhost:5435` → `db:migrate:deploy` |
 | **Prisma Studio on dev RDS** (fallback) | Jumpbox tunnel + `DATABASE_URL=localhost:5435` → `npm run db:studio` |
-| **Prod deploy** | Manual migrate (reviewed) → `sst deploy --stage prod` |
+| **Prod deploy** (schema + code) | `prisma:generate` → `build` → `sst deploy --stage prod` |
+| **Prod RDS manual migrate** (fallback) | Bastion tunnel → `DATABASE_URL=localhost:5435` → `db:migrate:deploy` |
 
 ---
 
@@ -300,9 +303,109 @@ Frontend deploy (`creator-commerce-frontend-v2`): set `VITE_RAZORPAY_KEY_ID` in 
 
 ---
 
-## Prod (outline)
+## Prod go-live
 
-- `aws sso login --profile creator-prod`
-- **Manual** `prisma migrate deploy` after review (tunnel: `.\scripts\start-db-tunnel.ps1 -Stage prod`)
-- Do not run `migrate reset` on prod without explicit approval
-- `npx sst deploy --stage prod` (`RUN_MIGRATIONS_ON_START=false` — no auto-migrate)
+**Profile:** `creator-prod` · **Stage:** `prod` (not the profile name)  
+**API:** `api.thecreatorshop.in` · **DB:** Aurora Serverless v2 (0–2 ACU, pause after 15 min) — already in [`sst.config.ts`](../../sst.config.ts).  
+**DNS:** `thecreatorshop.in` is on **Wix**, not AWS Route 53. SST has `dns: false` — you must point `api` at the ALB yourself after deploy.
+
+Run install, build, and `sst deploy` from **WSL** (`~/Work/creator-commerce-backend-v2`), not `/mnt/c/`.
+
+**Cost note:** Prod placeholder is ~$2/mo. First backend prod deploy turns on ECS + ALB + Aurora (~$25–40+/mo). See [../aws-optimization/creator-prod.md](../aws-optimization/creator-prod.md).
+
+### Prerequisites
+
+1. `.env` with prod secrets (`JWT_SECRET_PROD`, Postmark, Razorpay, etc.) — see `sst.config.ts` `apiEnvironment`.
+2. Migrations reviewed and merged before deploy (ECS runs `prisma migrate deploy` on task start, same as dev).
+3. Stop deploying the **old v1 backend** for prod before v2 cutover.
+4. `aws sso login --profile creator-prod`
+
+### 1. Deploy backend
+
+```bash
+cd ~/Work/creator-commerce-backend-v2
+export AWS_PROFILE=creator-prod
+export SST_SKIP_DEPENDENCY_CHECK=1
+aws sso login --profile creator-prod
+
+git pull
+npm install
+npm run prisma:generate
+npm run build
+
+npx sst deploy --stage prod --print-logs
+```
+
+From deploy output, note the **ALB DNS name** (for Wix CNAME below). Aurora is created automatically.
+
+On rollout, each new ECS task runs `prisma migrate deploy` before the app starts (`healthCheckGracePeriodSeconds` = 120s). Watch ECS logs for:
+
+```text
+[entrypoint] RUN_MIGRATIONS_ON_START=true — prisma migrate deploy
+[entrypoint] prisma migrate deploy complete
+```
+
+> **Do not** run `npx prisma migrate reset --force` on prod without explicit approval.
+
+**Fallback — manual migrate via bastion:** if auto-migrate fails or you need to inspect prod DB directly, use `.\scripts\start-db-tunnel.ps1 -Stage prod` (update bastion instance id and Aurora host in that script after first deploy), then `npm run db:migrate:deploy` against `localhost:5435`. See [Fallback — dev RDS via jumpbox + tunnel](#fallback--dev-rds-via-jumpbox--tunnel-manual-migrate) for the same tunnel pattern.
+
+### 2. API DNS (Wix)
+
+SST does **not** update Wix. After deploy:
+
+| Field | Value |
+|-------|-------|
+| Host / name | `api` |
+| Type | CNAME |
+| Points to | `<alb-dns-name>.elb.amazonaws.com` from deploy output |
+
+Wix → Domains → `thecreatorshop.in` → DNS records.
+
+While prod is idle, `api` may have **no record** (NXDOMAIN) — that is fine. Add or update the CNAME only when go-live.
+
+ACM cert for `api.thecreatorshop.in` is already in `sst.config.ts`; SST attaches it to the new ALB.
+
+### 3. Verify API
+
+```bash
+curl -s https://api.thecreatorshop.in/health/live
+# expect: {"status":"ok"}
+```
+
+Allow a few minutes for Wix DNS propagation after the CNAME change.
+
+### 4. Deploy frontend (when ready)
+
+From `creator-commerce-frontend-v2` (see that repo’s [deployment README](../../../creator-commerce-frontend-v2/docs/deployment/README.md)):
+
+```bash
+cd ~/Work/creator-commerce-frontend-v2
+export AWS_PROFILE=creator-prod
+export SST_SKIP_DEPENDENCY_CHECK=1
+aws sso login --profile creator-prod
+npx sst deploy --stage prod --print-logs
+```
+
+This wires CloudFront → S3 for `dashboard.thecreatorshop.in` (off SST placeholder if still showing).
+
+### 5. Third-party cutover (checklist)
+
+After API + dashboard are live:
+
+- [ ] Razorpay webhooks: `https://api.thecreatorshop.in/api/v1/webhooks/...`
+- [ ] Meta OAuth redirect URIs include `https://dashboard.thecreatorshop.in/...`
+- [ ] Google OAuth origins / redirect URIs for prod dashboard
+- [ ] Postmark sender domain still valid
+
+Details: [../account-migration/THIRD_PARTY_SERVICES.md](../account-migration/THIRD_PARTY_SERVICES.md)
+
+### Prod quick reference
+
+| Goal | Command / action |
+|------|------------------|
+| Deploy backend | `npx sst deploy --stage prod` (WSL) — migrate runs on ECS task start |
+| Apply schema (fallback) | Bastion tunnel → `npm run db:migrate:deploy` |
+| Wire API URL | Wix CNAME `api` → ALB hostname |
+| Deploy frontend | `npx sst deploy --stage prod` in frontend-v2 repo |
+
+---
