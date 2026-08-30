@@ -14,7 +14,12 @@ import {
 import { UserRole } from "@prisma/client";
 import type { Server, Socket } from "socket.io";
 
-import { resolveJwtSecret } from "../auth/auth-jwt.config";
+import {
+  resolveJwtAudience,
+  resolveJwtIssuer,
+  resolveJwtSecret,
+} from "../auth/auth-jwt.config";
+import { AuthSessionService } from "../auth/auth-session.service";
 import type { AuthUser, JwtPayload } from "../auth/types/auth-user";
 import { NotificationProcessorService } from "../notifications/services/notification-processor.service";
 import { CollaborationAccessService } from "./services/collaboration-access.service";
@@ -42,6 +47,7 @@ export class CollaborationGateway
   constructor(
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly sessions: AuthSessionService,
     private readonly access: CollaborationAccessService,
     private readonly realtime: CollaborationRealtimeService,
     private readonly notificationProcessor: NotificationProcessorService,
@@ -53,7 +59,7 @@ export class CollaborationGateway
   }
 
   async handleConnection(client: Socket): Promise<void> {
-    const user = this.authenticateSocket(client);
+    const user = await this.authenticateSocket(client);
     if (!user) {
       client.disconnect(true);
       return;
@@ -96,7 +102,7 @@ export class CollaborationGateway
     return { ok: true };
   }
 
-  private authenticateSocket(client: Socket): AuthUser | null {
+  private async authenticateSocket(client: Socket): Promise<AuthUser | null> {
     const token = this.extractToken(client);
     if (!token) {
       return null;
@@ -104,20 +110,20 @@ export class CollaborationGateway
     try {
       const payload = this.jwt.verify<JwtPayload>(token, {
         secret: resolveJwtSecret(this.config),
+        algorithms: ["HS256"],
+        issuer: resolveJwtIssuer(this.config),
+        audience: resolveJwtAudience(this.config),
       });
-      if (!payload?.sub || !payload.email || !payload.role) {
+      if (!payload?.sub || !payload.sid || !payload.email || !payload.role) {
         return null;
       }
-      if (payload.role !== UserRole.BRAND && payload.role !== UserRole.CREATOR) {
+      if (
+        payload.role !== UserRole.BRAND &&
+        payload.role !== UserRole.CREATOR
+      ) {
         return null;
       }
-      return {
-        id: payload.sub,
-        email: payload.email,
-        name: payload.name ?? null,
-        role: payload.role,
-        organizationId: payload.organizationId ?? null,
-      };
+      return await this.sessions.validate(payload.sub, payload.sid);
     } catch {
       return null;
     }

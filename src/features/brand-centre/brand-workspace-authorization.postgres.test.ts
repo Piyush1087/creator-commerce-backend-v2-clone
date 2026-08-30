@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { ForbiddenException } from "@nestjs/common";
-import { BrandRole, PrismaClient, UserRole } from "@prisma/client";
+import {
+  BrandRole,
+  PrismaClient,
+  UserAuthState,
+  UserRole,
+} from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { PrismaService } from "../../prisma/prisma.service";
@@ -79,6 +84,7 @@ describe.skipIf(process.env.BRAND_WORKSPACE_DATABASE_TEST !== "true")(
           organizationId: organization.id,
           email: `${randomUUID()}@example.test`,
           role,
+          authState: UserAuthState.ACTIVE,
         },
       });
       userIds.push(user.id);
@@ -209,6 +215,7 @@ describe.skipIf(process.env.BRAND_WORKSPACE_DATABASE_TEST !== "true")(
           organizationId: user.organizationId,
           email: `${randomUUID()}@example.test`,
           role: UserRole.BRAND,
+          authState: UserAuthState.ACTIVE,
         },
       });
       userIds.push(teammate.id);

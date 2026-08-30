@@ -7,11 +7,22 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { Prisma, UserRole } from "@prisma/client";
+import {
+  AuthMethodType,
+  EmailOtpPurpose,
+  Prisma,
+  SecurityEventType,
+  UserAuthState,
+  UserRole,
+} from "@prisma/client";
 import { createHash, randomBytes } from "node:crypto";
 import { MailService } from "../../../mail/mail.service";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { hashPasswordAsync } from "../../../shared/crypto/password.util";
+import { normalizeEmail } from "../../../shared/identity/normalize-email";
 import { AuthService } from "../../auth/auth.service";
+import { EmailOtpService } from "../../auth/email-otp.service";
+import { GoogleAuthService } from "../../auth/google-auth.service";
 import type { AuthUser } from "../../auth/types/auth-user";
 import type { InviteTeamMemberInput } from "../schemas/brand-settings.schema";
 import {
@@ -48,6 +59,8 @@ export class BrandTeamInvitationsService {
     private readonly access: BrandSettingsAccessService,
     private readonly auth: AuthService,
     private readonly mail: MailService,
+    private readonly googleAuth: GoogleAuthService,
+    private readonly emailOtp: EmailOtpService,
   ) {}
 
   async create(actor: AuthUser, input: InviteTeamMemberInput) {
@@ -234,10 +247,50 @@ export class BrandTeamInvitationsService {
     return outcome.value;
   }
 
-  async accept(input: AcceptTeamInvitationInput) {
+  async requestAcceptanceOtp(raw: string) {
+    await this.inspect(raw);
+    const invite = await this.lookup(this.prisma, raw);
+    await this.emailOtp.issue({
+      email: invite.email,
+      purpose: EmailOtpPurpose.TEAM_INVITE,
+      eligible: true,
+      displayName: invite.email.split("@")[0] ?? "there",
+    });
+    return {
+      message: "A verification code has been sent to the invited email.",
+    };
+  }
+
+  async accept(input: AcceptTeamInvitationInput, actor?: AuthUser) {
     if (!AcceptTeamInvitationSchema.safeParse(input).success)
       throw new BadRequestException("Invalid invitation acceptance input");
     const initial = await this.lookup(this.prisma, input.token);
+    const invitedEmail = normalizeEmail(initial.email);
+    let googleIdentity: { sub: string; email: string } | undefined;
+    let otpIdentity = false;
+    if (input.googleIdToken) {
+      const payload = await this.googleAuth.verifyIdTokenPayload(
+        input.googleIdToken,
+      );
+      const providerEmail = normalizeEmail(payload.email!);
+      if (providerEmail !== invitedEmail) {
+        throw new ForbiddenException(
+          "Google account must exactly match the invited email.",
+        );
+      }
+      googleIdentity = { sub: payload.sub, email: providerEmail };
+    }
+    if (input.otpCode) {
+      await this.emailOtp.consume({
+        email: invitedEmail,
+        purpose: EmailOtpPurpose.TEAM_INVITE,
+        code: input.otpCode,
+      });
+      otpIdentity = true;
+    }
+    const bootstrapPasswordHash = input.password
+      ? await hashPasswordAsync(input.password)
+      : undefined;
     const outcome = await this.prisma.$transaction(
       async (tx) => {
         await lockBrandTeam(tx, initial.brandProfileId);
@@ -257,25 +310,116 @@ export class BrandTeamInvitationsService {
         });
         if (!brand.organizationId)
           throw new ConflictException("Brand workspace is not activated");
-        const email = invite.email.trim().toLowerCase();
+        const email = normalizeEmail(invite.email);
         await lockAdmissionEmail(tx, email);
         let user = await this.recipient(tx, email, brand.organizationId);
         if (!user) {
-          if (!input.password)
+          if (!bootstrapPasswordHash && !googleIdentity && !otpIdentity)
             throw new BadRequestException(
-              "An initial password is required for this invitation.",
+              "Enroll a password or verify the invited Google/email identity.",
             );
+          if (googleIdentity) {
+            const subjectOwner = await tx.userAuthMethod.findUnique({
+              where: { providerSubjectId: googleIdentity.sub },
+            });
+            if (subjectOwner) {
+              throw new ConflictException(
+                "Google identity is already linked to another account.",
+              );
+            }
+          }
           user = await tx.user.create({
             data: {
               email,
+              normalizedEmail: email,
               name: email.split("@")[0],
               role: UserRole.BRAND,
               organizationId: brand.organizationId,
               emailVerifiedAt: new Date(),
-              hashedPassword: this.auth.hashPassword(input.password),
+              hashedPassword: bootstrapPasswordHash,
+              googleSubjectId: googleIdentity?.sub,
+              authState: UserAuthState.ACTIVE,
+              authMethods: {
+                create: bootstrapPasswordHash
+                  ? {
+                      type: AuthMethodType.PASSWORD,
+                      credentialHash: bootstrapPasswordHash,
+                    }
+                  : googleIdentity
+                    ? {
+                        type: AuthMethodType.GOOGLE,
+                        providerSubjectId: googleIdentity.sub,
+                        providerEmailNormalized: email,
+                      }
+                    : { type: AuthMethodType.EMAIL_OTP },
+              },
             },
           });
         } else {
+          const actorMatches =
+            actor?.id === user.id && normalizeEmail(actor.email) === email;
+          if (!actorMatches && !googleIdentity && !otpIdentity) {
+            throw new ForbiddenException(
+              "Sign in as the invited account before accepting this invitation.",
+            );
+          }
+          if (googleIdentity) {
+            const userGoogle = await tx.userAuthMethod.findUnique({
+              where: {
+                userId_type: { userId: user.id, type: AuthMethodType.GOOGLE },
+              },
+            });
+            if (
+              userGoogle?.providerSubjectId &&
+              userGoogle.providerSubjectId !== googleIdentity.sub
+            ) {
+              throw new ConflictException(
+                "This account is linked to a different Google identity.",
+              );
+            }
+            const subjectOwner = await tx.userAuthMethod.findUnique({
+              where: { providerSubjectId: googleIdentity.sub },
+            });
+            if (subjectOwner && subjectOwner.userId !== user.id) {
+              throw new ConflictException(
+                "Google identity is already linked to another account.",
+              );
+            }
+            await tx.userAuthMethod.upsert({
+              where: {
+                userId_type: { userId: user.id, type: AuthMethodType.GOOGLE },
+              },
+              create: {
+                userId: user.id,
+                type: AuthMethodType.GOOGLE,
+                providerSubjectId: googleIdentity.sub,
+                providerEmailNormalized: email,
+              },
+              update: {
+                providerSubjectId: googleIdentity.sub,
+                providerEmailNormalized: email,
+                verifiedAt: new Date(),
+                disabledAt: null,
+              },
+            });
+            await tx.securityEvent.create({
+              data: {
+                userId: user.id,
+                type: SecurityEventType.GOOGLE_LINKED,
+              },
+            });
+          } else if (otpIdentity) {
+            await tx.userAuthMethod.upsert({
+              where: {
+                userId_type: {
+                  userId: user.id,
+                  type: AuthMethodType.EMAIL_OTP,
+                },
+              },
+              create: { userId: user.id, type: AuthMethodType.EMAIL_OTP },
+              update: { verifiedAt: new Date(), disabledAt: null },
+            });
+          }
           const associated = await tx.user.updateMany({
             where: {
               id: user.id,
@@ -339,11 +483,10 @@ export class BrandTeamInvitationsService {
         });
         if (consumed.count !== 1)
           throw new ConflictException("Invitation cannot be consumed");
-        // Signing failure rolls back admission too. Reuse the existing AuthService.
         return {
           kind: "ADMITTED" as const,
           value: {
-            ...(await this.auth.issueTokenForUser(user)),
+            userId: user.id,
             brandProfileId: brand.id,
             organizationId: brand.organizationId,
           },
@@ -353,6 +496,10 @@ export class BrandTeamInvitationsService {
     );
     if (outcome.kind === "TERMINAL")
       this.throwTerminalInvitation(outcome.state);
-    return outcome.value;
+    const { userId, ...workspace } = outcome.value;
+    return {
+      ...(await this.auth.issueTokenForUserId(userId)),
+      ...workspace,
+    };
   }
 }

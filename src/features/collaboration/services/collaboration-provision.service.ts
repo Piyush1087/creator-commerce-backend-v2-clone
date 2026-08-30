@@ -9,10 +9,12 @@ import {
   CollaborationPayoutMode,
   Prisma,
   UceMilestoneStage,
+  UserAuthState,
   UserRole,
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import { normalizeEmail } from "../../../shared/identity/normalize-email";
 import { splitEscrowQuote } from "../../brand-uce/utils/uce-decimal.util";
 import { mapBrandIndustryToCollaborationIndustry } from "../utils/map-collaboration-industry.util";
 import {
@@ -60,9 +62,9 @@ export class CollaborationProvisionService {
     email: string,
     instagramHandle?: string,
   ): Promise<string> {
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = normalizeEmail(email);
     const existing = await tx.user.findUnique({
-      where: { email: normalizedEmail },
+      where: { normalizedEmail },
       include: { creatorProfile: true },
     });
     if (existing) {
@@ -85,7 +87,9 @@ export class CollaborationProvisionService {
     const user = await tx.user.create({
       data: {
         email: normalizedEmail,
+        normalizedEmail,
         role: UserRole.CREATOR,
+        authState: UserAuthState.PROVISIONAL,
         creatorProfile: instagramHandle
           ? {
               create: {
@@ -158,11 +162,12 @@ export class CollaborationProvisionService {
       throw new BadRequestException("Creator user not found");
     }
 
-    const payoutMode =
-      input.payoutMode ?? CollaborationPayoutMode.ESCROW;
+    const payoutMode = input.payoutMode ?? CollaborationPayoutMode.ESCROW;
 
     const advancePercent =
-      input.advancePercent ?? campaign.commercials?.advancePaymentPercentage ?? 30;
+      input.advancePercent ??
+      campaign.commercials?.advancePaymentPercentage ??
+      30;
     const quote = input.initialQuote ?? 0;
     const { advance30Value, balance70Value } = splitEscrowQuote(
       quote,

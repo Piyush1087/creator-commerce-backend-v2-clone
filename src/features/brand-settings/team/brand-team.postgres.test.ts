@@ -1,8 +1,14 @@
 import "reflect-metadata";
 import { randomBytes, randomUUID } from "node:crypto";
 import { Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
-import { BrandRole, PrismaClient, UserRole } from "@prisma/client";
+import {
+  BrandRole,
+  PrismaClient,
+  UserAuthState,
+  UserRole,
+} from "@prisma/client";
 import type { ServerClient } from "postmark";
 import {
   afterAll,
@@ -15,7 +21,9 @@ import {
 } from "vitest";
 import { MailService } from "../../../mail/mail.service";
 import type { PrismaService } from "../../../prisma/prisma.service";
+import { AuthSessionService } from "../../auth/auth-session.service";
 import { AuthService } from "../../auth/auth.service";
+import type { EmailOtpService } from "../../auth/email-otp.service";
 import { BrandVerificationService } from "../../brand-onboarding/verification/brand-verification.service";
 import type { GoogleAuthService } from "../../auth/google-auth.service";
 import type { BrandCentreScanService } from "../../brand-centre/services/brand-centre-scan.service";
@@ -41,8 +49,21 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
     const queries: string[] = [];
     prisma.$on("query", (event) => queries.push(event.query));
     const db = prisma as unknown as PrismaService;
-    const jwt = new JwtService({ secret: randomBytes(32).toString("hex") });
-    const auth = new AuthService(db, jwt);
+    const jwtSecret = randomBytes(32).toString("hex");
+    const jwt = new JwtService({ secret: jwtSecret });
+    const config = new ConfigService({
+      JWT_SECRET: jwtSecret,
+      JWT_ISSUER: "bs02-test",
+      JWT_AUDIENCE: "bs02-test",
+      AUTH_OTP_PEPPER: randomBytes(32).toString("hex"),
+    });
+    const sessions = new AuthSessionService(db, jwt, config);
+    const emailOtp = {
+      issue: vi.fn(),
+      consume: vi.fn(),
+    } as unknown as EmailOtpService;
+    const googleAuth = {} as GoogleAuthService;
+    const auth = new AuthService(db, sessions, emailOtp);
     const workspaceAuth = new BrandWorkspaceAuthorizationService(
       db,
       new BrandCentreAuthService(db, new BrandCentreSessionEvictionService(db)),
@@ -53,7 +74,14 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
     const mail = new MailService({
       sendEmailWithTemplate: send,
     } as unknown as ServerClient);
-    const invitations = new BrandTeamInvitationsService(db, access, auth, mail);
+    const invitations = new BrandTeamInvitationsService(
+      db,
+      access,
+      auth,
+      mail,
+      googleAuth,
+      emailOtp,
+    );
     const team = new BrandTeamService(db, access);
     const settings = new BrandSettingsService(db, access, team, invitations);
     const brandIds: string[] = [],
@@ -113,7 +141,12 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
       });
       brandIds.push(brand.id);
       const user = await prisma.user.create({
-        data: { email: freshEmail(), role: "BRAND", organizationId: org.id },
+        data: {
+          email: freshEmail(),
+          role: "BRAND",
+          organizationId: org.id,
+          authState: UserAuthState.ACTIVE,
+        },
       });
       userIds.push(user.id);
       const membership = await prisma.brandTeamMember.create({
@@ -128,7 +161,12 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
       email = freshEmail(),
     ) {
       const user = await prisma.user.create({
-        data: { email, role: "BRAND", organizationId: w.org.id },
+        data: {
+          email,
+          role: "BRAND",
+          organizationId: w.org.id,
+          authState: UserAuthState.ACTIVE,
+        },
       });
       userIds.push(user.id);
       const membership = await prisma.brandTeamMember.create({
@@ -352,7 +390,7 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
         "Invalid invitation",
       );
       await expect(invitations.accept({ token: invite.raw })).rejects.toThrow(
-        "initial password",
+        "Enroll a password",
       );
     });
     it.each([
@@ -371,6 +409,7 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
           role: kind === "non-brand" ? "CREATOR" : "BRAND",
           organizationId:
             kind === "unassigned" ? null : (other?.org.id ?? w.org.id),
+          authState: UserAuthState.ACTIVE,
         },
       });
       userIds.push(user.id);
@@ -393,7 +432,7 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
       expect(
         (await invitations.inspect(invite.raw)).requires_account_bootstrap,
       ).toBe(false);
-      const result = await invitations.accept({ token: invite.raw });
+      const result = await invitations.accept({ token: invite.raw }, user);
       expect(result.user.organizationId).toBe(w.org.id);
       const memberships = await prisma.brandTeamMember.findMany({
         where: { brandProfileId: w.brand.id, userId: user.id },
@@ -438,14 +477,18 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
       const a = await workspace(),
         b = await workspace();
       const user = await prisma.user.create({
-        data: { email: freshEmail(), role: "BRAND" },
+        data: {
+          email: freshEmail(),
+          role: "BRAND",
+          authState: UserAuthState.ACTIVE,
+        },
       });
       userIds.push(user.id);
       const ia = await legacy(a, user.email),
         ib = await legacy(b, user.email);
       const results = await Promise.allSettled([
-        invitations.accept({ token: ia.raw }),
-        invitations.accept({ token: ib.raw }),
+        invitations.accept({ token: ia.raw }, user),
+        invitations.accept({ token: ib.raw }, user),
       ]);
       expect(
         results.filter((result) => result.status === "fulfilled"),
@@ -645,61 +688,62 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
       return { profile, email };
     }
 
-    it.each(["password", "complete"])(
-      "%s activation reuses an unclaimed organization but rejects another Brand's organization",
-      async (path) => {
-        for (const claimed of [false, true]) {
-          const { profile, email } = await activationProfile(
-            path === "complete",
-          );
-          const org = await prisma.organization.create({
-            data: { name: "Existing activation organization" },
+    it("password activation reuses an unclaimed organization but rejects another Brand's organization", async () => {
+      for (const claimed of [false, true]) {
+        const { profile, email } = await activationProfile(false);
+        const org = await prisma.organization.create({
+          data: { name: "Existing activation organization" },
+        });
+        orgIds.push(org.id);
+        const user = await prisma.user.create({
+          data: {
+            email,
+            role: "BRAND",
+            organizationId: org.id,
+            authState: UserAuthState.ACTIVE,
+          },
+        });
+        userIds.push(user.id);
+        if (claimed) {
+          const other = await prisma.brandProfile.create({
+            data: {
+              name: "Other Brand",
+              domain: `${randomUUID()}.example.test`,
+              industry: "D2C",
+              organizationId: org.id,
+              isVerified: true,
+            },
           });
-          orgIds.push(org.id);
-          const user = await prisma.user.create({
-            data: { email, role: "BRAND", organizationId: org.id },
-          });
-          userIds.push(user.id);
-          if (claimed) {
-            const other = await prisma.brandProfile.create({
-              data: {
-                name: "Other Brand",
-                domain: `${randomUUID()}.example.test`,
-                industry: "D2C",
-                organizationId: org.id,
-                isVerified: true,
-              },
-            });
-            brandIds.push(other.id);
-          }
-          const verify = new BrandVerificationService(
-            db,
-            mail,
-            {
-              enqueueOnboardingDeepScan: vi
-                .fn()
-                .mockResolvedValue({ jobId: randomUUID() }),
-            } as unknown as BrandCentreScanService,
-            auth,
-            {} as GoogleAuthService,
-          );
-          const operation =
-            path === "complete"
-              ? auth.completeBrandRegistration({ brandProfileId: profile.id })
-              : verify.setPasswordAndActivate(profile.id, email, password());
-          if (claimed)
-            await expect(operation).rejects.toThrow("another Brand workspace");
-          else {
-            expect((await operation).organizationId).toBe(org.id);
-            expect(
-              await prisma.brandTeamMember.findFirst({
-                where: { brandProfileId: profile.id, userId: user.id },
-              }),
-            ).toMatchObject({ role: "BRAND_OWNER", isActive: true });
-          }
+          brandIds.push(other.id);
         }
-      },
-    );
+        const verify = new BrandVerificationService(
+          db,
+          {
+            enqueueOnboardingDeepScan: vi
+              .fn()
+              .mockResolvedValue({ jobId: randomUUID() }),
+          } as unknown as BrandCentreScanService,
+          auth,
+          googleAuth,
+          emailOtp,
+        );
+        const operation = verify.setPasswordAndActivate(
+          profile.id,
+          email,
+          password(),
+        );
+        if (claimed)
+          await expect(operation).rejects.toThrow("another Brand workspace");
+        else {
+          expect((await operation).organizationId).toBe(org.id);
+          expect(
+            await prisma.brandTeamMember.findFirst({
+              where: { brandProfileId: profile.id, userId: user.id },
+            }),
+          ).toMatchObject({ role: "BRAND_OWNER", isActive: true });
+        }
+      }
+    });
 
     it("concurrent cancellation and acceptance cannot both consume an invitation", async () => {
       const w = await workspace();
@@ -773,29 +817,23 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
       });
       const verify = new BrandVerificationService(
         db,
-        mail,
         {
           enqueueOnboardingDeepScan: vi
             .fn()
             .mockResolvedValue({ jobId: randomUUID() }),
         } as unknown as BrandCentreScanService,
         auth,
-        {} as GoogleAuthService,
+        googleAuth,
+        emailOtp,
       );
-      const result = await verify.setPasswordAndActivate(
-        w.brand.id,
-        email,
-        password(),
-      );
-      userIds.push(result.user.id);
+      await expect(
+        verify.setPasswordAndActivate(w.brand.id, email, password()),
+      ).rejects.toThrow("already active");
       expect(
         await prisma.brandTeamMember.count({
           where: { brandProfileId: w.brand.id },
         }),
       ).toBe(1);
-      await expect(access.resolveBrandContext(result.user)).rejects.toThrow(
-        "Active Brand team membership required",
-      );
     });
 
     it("successful dispatch does not log the bearer token or expose it in the API", async () => {
@@ -828,10 +866,10 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
       };
       const verify = new BrandVerificationService(
         db,
-        mail,
         scan as unknown as BrandCentreScanService,
         auth,
-        {} as GoogleAuthService,
+        googleAuth,
+        emailOtp,
       );
       const result = await verify.setPasswordAndActivate(
         profile.id,
@@ -852,30 +890,16 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
       expect(await anchorCount(profile.id)).toBe(1);
       await expect(
         verify.setPasswordAndActivate(profile.id, email, password()),
-      ).rejects.toThrow("already activated");
+      ).rejects.toThrow("already active");
     });
-    it("completeBrandRegistration bootstraps once, preserving an existing active team's role", async () => {
+    it("completeBrandRegistration is permanently retired", async () => {
       const { profile } = await activationProfile(true);
-      const result = await auth.completeBrandRegistration({
-        brandProfileId: profile.id,
+      await expect(auth.completeBrandRegistration()).rejects.toMatchObject({
+        status: 410,
       });
-      orgIds.push(result.organizationId);
-      userIds.push(result.user.id);
-      await auth.completeBrandRegistration({ brandProfileId: profile.id });
       expect(
         await prisma.brandTeamMember.count({
           where: { brandProfileId: profile.id },
-        }),
-      ).toBe(1);
-      expect(await anchorCount(profile.id)).toBe(1);
-      await prisma.brandTeamMember.updateMany({
-        where: { brandProfileId: profile.id },
-        data: { role: "CAMPAIGN_MANAGER" },
-      });
-      await auth.completeBrandRegistration({ brandProfileId: profile.id });
-      expect(
-        await prisma.brandTeamMember.count({
-          where: { brandProfileId: profile.id, role: "BRAND_OWNER" },
         }),
       ).toBe(0);
     });
@@ -1118,7 +1142,11 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
       await member(w, "CAMPAIGN_MANAGER");
       await member(w, "CAMPAIGN_MANAGER");
       const invited = await prisma.user.create({
-        data: { email: freshEmail(), role: "BRAND" },
+        data: {
+          email: freshEmail(),
+          role: "BRAND",
+          authState: UserAuthState.ACTIVE,
+        },
       });
       userIds.push(invited.id);
       const fifth = await invitations.create(w.user, {
@@ -1131,7 +1159,10 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
           role: "CAMPAIGN_MANAGER",
         }),
       ).rejects.toThrow("5/5");
-      const accepted = await invitations.accept({ token: sentToken() });
+      const accepted = await invitations.accept(
+        { token: sentToken() },
+        invited,
+      );
       expect(accepted.user.id).toBe(invited.id);
       expect((await settings.getOverview(w.user)).seat_usage).toMatchObject({
         active_members: 5,
@@ -1187,7 +1218,13 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
       await member(w, "CAMPAIGN_MANAGER");
       const users = await Promise.all(
         [freshEmail(), freshEmail()].map((email) =>
-          prisma.user.create({ data: { email, role: "BRAND" } }),
+          prisma.user.create({
+            data: {
+              email,
+              role: "BRAND",
+              authState: UserAuthState.ACTIVE,
+            },
+          }),
         ),
       );
       userIds.push(...users.map((user) => user.id));
@@ -1198,8 +1235,8 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
         hashed: true,
       });
       const results = await Promise.allSettled([
-        invitations.accept({ token: inviteA.raw }),
-        invitations.accept({ token: inviteB.raw }),
+        invitations.accept({ token: inviteA.raw }, users[0]),
+        invitations.accept({ token: inviteB.raw }, users[1]),
       ]);
       expect(
         results.filter((result) => result.status === "fulfilled"),
@@ -1291,7 +1328,7 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
         hashed: true,
       });
       const results = await Promise.allSettled([
-        invitations.accept({ token: invite.raw }),
+        invitations.accept({ token: invite.raw }, former.user),
         team.revoke(w.user, removable.membership.id),
       ]);
       expect(

@@ -59,10 +59,18 @@ export default $config({
         ? devDatabaseUrlOverride
         : $interpolate`postgresql://${aurora.username}:${aurora.password}@${aurora.host}:${aurora.port}/${aurora.database}`;
 
-    const JWT_SECRET_DEV =
-      process.env.JWT_SECRET_DEV ?? "ccs-jwt-dev-placeholder-change-me";
-    const JWT_SECRET_PROD =
-      process.env.JWT_SECRET_PROD ?? "ccs-jwt-prod-placeholder-change-me";
+    const requiredEnv = (name: string): string => {
+      const value = process.env[name]?.trim();
+      if (!value || /placeholder|replace-me|not-for-deploy/i.test(value)) {
+        throw new Error(
+          `${name} must be configured with a non-placeholder value`,
+        );
+      }
+      return value;
+    };
+    const authSuffix = $app.stage === "prod" ? "PROD" : "DEV";
+    const JWT_SECRET = requiredEnv(`JWT_SECRET_${authSuffix}`);
+    const AUTH_OTP_PEPPER = requiredEnv(`AUTH_OTP_PEPPER_${authSuffix}`);
 
     const defaultFrontendUrl =
       $app.stage === "prod"
@@ -104,11 +112,27 @@ export default $config({
           ? "https://api.thecreatorshop.in"
           : "https://api.dev.thecreatorshop.in",
       CORS_ORIGINS: process.env.CORS_ORIGINS?.trim() || defaultCorsOrigins,
-      JWT_SECRET: $app.stage === "prod" ? JWT_SECRET_PROD : JWT_SECRET_DEV,
+      JWT_SECRET,
+      JWT_ISSUER:
+        process.env.JWT_ISSUER?.trim() || `creatorshop-api-${$app.stage}`,
+      JWT_AUDIENCE: process.env.JWT_AUDIENCE?.trim() || "creatorshop-dashboard",
+      JWT_ACCESS_TTL: "15m",
+      AUTH_REFRESH_TTL: "30d",
+      AUTH_OTP_TTL: "10m",
+      AUTH_RESET_TTL: "30m",
+      AUTH_OTP_PEPPER,
       S3_BUCKET_NAME: filesBucket.name,
       AWS_REGION: process.env.AWS_REGION ?? "ap-south-1",
       POSTMARK_SERVER_TOKEN: process.env.POSTMARK_SERVER_TOKEN as string,
       POSTMARK_OTP_TEMPLATE_ID: process.env.POSTMARK_OTP_TEMPLATE_ID as string,
+      POSTMARK_AUTH_OTP_TEMPLATE_ID: process.env
+        .POSTMARK_AUTH_OTP_TEMPLATE_ID as string,
+      POSTMARK_PASSWORD_RESET_TEMPLATE_ID: process.env
+        .POSTMARK_PASSWORD_RESET_TEMPLATE_ID as string,
+      POSTMARK_AUTH_FROM:
+        process.env.POSTMARK_AUTH_FROM ?? "no-reply@thecreatorshop.in",
+      POSTMARK_AUTH_MESSAGE_STREAM:
+        process.env.POSTMARK_AUTH_MESSAGE_STREAM ?? "outbound",
       POSTMARK_NOTIFICATION_FROM:
         process.env.POSTMARK_NOTIFICATION_FROM ?? "no-reply@thecreatorshop.in",
       POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID:

@@ -13,8 +13,13 @@ export const AcceptTeamInvitationSchema = InspectTeamInvitationSchema.extend({
   password: z
     .string()
     .min(8)
-    .max(256)
+    .max(128)
     .refine((value) => value.trim().length > 0, "Password cannot be blank")
+    .optional(),
+  googleIdToken: z.string().min(1).max(8192).optional(),
+  otpCode: z
+    .string()
+    .regex(/^\d{6}$/)
     .optional(),
 });
 export type AcceptTeamInvitationInput = z.infer<

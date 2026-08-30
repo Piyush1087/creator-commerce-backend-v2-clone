@@ -18,12 +18,13 @@ import {
   InstagramProfessionalAccountType,
   InstagramSyncHealth,
   InstagramSyncInvitationStatus,
+  EmailOtpPurpose,
 } from "@prisma/client";
-import { addHours, addMinutes, addSeconds } from "date-fns";
-import { randomBytes, randomInt } from "node:crypto";
+import { addHours, addSeconds } from "date-fns";
+import { randomBytes } from "node:crypto";
 
 import type { AuthUser } from "../../auth/types/auth-user";
-import { MailService } from "../../../mail/mail.service";
+import { EmailOtpService } from "../../auth/email-otp.service";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { encryptField } from "../../../shared/crypto/field-encryption.util";
 import { BrandCentreAuthService } from "../../brand-centre/brand-centre-auth.service";
@@ -76,7 +77,7 @@ export class BrandSocialSyncService {
     private readonly prisma: PrismaService,
     private readonly oauth: InstagramOAuthClient,
     private readonly graph: InstagramGraphClient,
-    private readonly mail: MailService,
+    private readonly emailOtp: EmailOtpService,
     private readonly brandAuth: BrandCentreAuthService,
     private readonly access: BrandSettingsAccessService,
     private readonly oauthState: BrandInstagramOAuthStateService,
@@ -195,42 +196,17 @@ export class BrandSocialSyncService {
       },
     });
 
-    const base =
-      process.env.FRONTEND_APP_URL?.replace(/\/$/, "") ||
-      "http://localhost:5173";
-    const link = `${base}/brand/onboarding/sync-verify?token=${token}`;
-
-    // Invite email template TBD — log the secure link for local/dev.
-    this.logger.log(
-      `Instagram sync invite brand=${context.brandProfileId} email=${email} link=${link}`,
-    );
-
     return { sent: true, expiresAt: expiresAt.toISOString() };
   }
 
   async startInviteVerification(token: string) {
     const invite = await this.findValidInvite(token);
-    const otp = String(randomInt(100_000, 999_999));
-    await this.prisma.instagramSyncInvitation.update({
-      where: { id: invite.id },
-      data: {
-        otpCode: otp,
-        otpExpiresAt: addMinutes(new Date(), 10),
-        status: InstagramSyncInvitationStatus.PENDING,
-      },
+    await this.emailOtp.issue({
+      email: invite.email,
+      purpose: EmailOtpPurpose.SOCIAL_SYNC_INVITE,
+      eligible: true,
+      displayName: invite.email.split("@")[0] ?? "there",
     });
-    this.logger.warn(
-      `[SYNC INVITE OTP] email=${invite.email} code=${otp} token=${token.slice(0, 8)}…`,
-    );
-    try {
-      await this.mail.sendOtp(
-        invite.email,
-        otp,
-        invite.email.split("@")[0] ?? "there",
-      );
-    } catch {
-      /* logged OTP above for local/dev */
-    }
     return {
       email: invite.email,
       brandProfileId: invite.brandProfileId,
@@ -240,19 +216,11 @@ export class BrandSocialSyncService {
 
   async verifyInviteOtp(token: string, otp: string) {
     const invite = await this.findValidInvite(token);
-    if (!invite.otpCode || !invite.otpExpiresAt) {
-      throw new BadRequestException("Request a verification code first.");
-    }
-    if (invite.otpExpiresAt < new Date()) {
-      throw new UnauthorizedException(
-        "Invalid or expired code. Please generate a new secure OTP.",
-      );
-    }
-    if (invite.otpCode !== otp.trim()) {
-      throw new UnauthorizedException(
-        "Invalid or expired code. Please verify the numbers or click Resend OTP.",
-      );
-    }
+    await this.emailOtp.consume({
+      email: invite.email,
+      purpose: EmailOtpPurpose.SOCIAL_SYNC_INVITE,
+      code: otp.trim(),
+    });
     await this.prisma.instagramSyncInvitation.update({
       where: { id: invite.id },
       data: { status: InstagramSyncInvitationStatus.VERIFIED },
