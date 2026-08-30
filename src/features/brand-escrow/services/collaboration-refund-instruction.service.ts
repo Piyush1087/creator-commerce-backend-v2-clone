@@ -10,6 +10,7 @@ import { Decimal } from "@prisma/client/runtime/library";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
 import { EscrowFinancialAllocationService } from "./escrow-financial-allocation.service";
+import { EscrowFundingAttributionService } from "./escrow-funding-attribution.service";
 
 export type CollaborationRefundInstruction = {
   instructionId: string;
@@ -28,6 +29,7 @@ export class CollaborationRefundInstructionService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationDispatchService,
     private readonly allocations: EscrowFinancialAllocationService,
+    private readonly attribution: EscrowFundingAttributionService,
   ) {}
 
   async consumeRefundInstruction(input: CollaborationRefundInstruction) {
@@ -38,12 +40,21 @@ export class CollaborationRefundInstructionService {
       throw new BadRequestException(
         "Trusted financial resolution reference is required",
       );
-    if (!amount.isPositive())
+    if (!amount.greaterThan(0))
       throw new BadRequestException("Refund amount must be positive");
     if (input.currency !== "INR")
       throw new BadRequestException("Refund currency is not supported");
 
     return this.prisma.$transaction(async (tx) => {
+      let vault = await tx.brandEscrowVault.findUnique({
+        where: { brandProfileId: input.brandProfileId },
+      });
+      if (!vault || vault.currency !== input.currency)
+        throw new ConflictException("Brand vault currency authority mismatch");
+      await tx.$queryRaw`SELECT vault_id FROM brand_escrow_vaults WHERE vault_id = ${vault.id} FOR UPDATE`;
+      vault = await tx.brandEscrowVault.findUniqueOrThrow({
+        where: { id: vault.id },
+      });
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`collaboration-refund-instruction:${input.instructionId}`}))::text`;
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-obligation:${input.collaborationId}`}))::text`;
 
@@ -83,12 +94,6 @@ export class CollaborationRefundInstructionService {
       if (!lock || lock.lockReleasedViaRefund)
         throw new ConflictException("Active Collaboration reserve is required");
 
-      const vault = await tx.brandEscrowVault.findUnique({
-        where: { brandProfileId: input.brandProfileId },
-      });
-      if (!vault || vault.currency !== input.currency)
-        throw new ConflictException("Brand vault currency authority mismatch");
-
       await this.allocations.assertRefundAllocation(
         tx,
         input.collaborationId,
@@ -97,6 +102,13 @@ export class CollaborationRefundInstructionService {
       );
       if (vault.lockedCampaignFunds.lessThan(amount))
         throw new ConflictException("Locked vault authority is insufficient");
+
+      await this.attribution.releaseCollaborationLocked(tx, {
+        vaultId: vault.id,
+        collaborationId: input.collaborationId,
+        currency: input.currency,
+        amount,
+      });
 
       await tx.brandEscrowVault.update({
         where: { id: vault.id },

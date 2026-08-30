@@ -195,6 +195,7 @@ describe("BS09 P1C1 provider truth and recovery", () => {
       sourceReference: null,
       idempotencyKey: "key",
       state: "PENDING",
+      currency: "INR",
       principalAmount: new Decimal(10000),
       processingFee: new Decimal(200),
       processingFeeTax: new Decimal(36),
@@ -228,6 +229,8 @@ describe("BS09 P1C1 provider truth and recovery", () => {
       prisma as never,
       {} as never,
       {} as never,
+      { enqueueWithinTransaction: vi.fn() } as never,
+      { recordFundingCredit: vi.fn() } as never,
     );
     await service.handleWebhook({
       event: "payment.failed",
@@ -261,6 +264,7 @@ describe("BS09 P1C1 provider truth and recovery", () => {
       sourceReference: null,
       idempotencyKey: "key",
       state: "PENDING",
+      currency: "INR",
       principalAmount: new Decimal(5000),
       processingFee: new Decimal(100),
       processingFeeTax: new Decimal(18),
@@ -293,6 +297,8 @@ describe("BS09 P1C1 provider truth and recovery", () => {
       } as never,
       {} as never,
       {} as never,
+      { enqueueWithinTransaction: vi.fn() } as never,
+      { recordFundingCredit: vi.fn() } as never,
     );
     await service.handleWebhook({
       event: "order.paid",

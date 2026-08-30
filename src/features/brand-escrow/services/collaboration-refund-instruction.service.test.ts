@@ -40,6 +40,11 @@ const successHarness = () => {
         currency: "INR",
         lockedCampaignFunds: new Decimal(100),
       }),
+      findUniqueOrThrow: vi.fn().mockResolvedValue({
+        id: "vault-1",
+        currency: "INR",
+        lockedCampaignFunds: new Decimal(100),
+      }),
       update: vi.fn(),
     },
     escrowTransactionLedger: {
@@ -55,6 +60,7 @@ const successHarness = () => {
     } as never,
     notifications as never,
     allocations as never,
+    { releaseCollaborationLocked: vi.fn() } as never,
   );
   return { allocations, executed, notifications, service, tx };
 };
@@ -109,7 +115,17 @@ describe("trusted Collaboration refund instruction", () => {
       collaborationRefundInstruction: {
         findUnique: vi.fn().mockResolvedValue(existing),
       },
-      brandEscrowVault: { update: vi.fn() },
+      brandEscrowVault: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "vault-1",
+          currency: "INR",
+        }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          id: "vault-1",
+          currency: "INR",
+        }),
+        update: vi.fn(),
+      },
       escrowTransactionLedger: { create: vi.fn() },
     };
     const service = new CollaborationRefundInstructionService(
@@ -119,6 +135,7 @@ describe("trusted Collaboration refund instruction", () => {
       } as never,
       {} as never,
       {} as never,
+      { releaseCollaborationLocked: vi.fn() } as never,
     );
 
     await expect(service.consumeRefundInstruction(instruction)).resolves.toBe(
@@ -141,6 +158,16 @@ describe("trusted Collaboration refund instruction", () => {
       collaborationRefundInstruction: {
         findUnique: vi.fn().mockResolvedValue(existing),
       },
+      brandEscrowVault: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "vault-1",
+          currency: "INR",
+        }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          id: "vault-1",
+          currency: "INR",
+        }),
+      },
     };
     const service = new CollaborationRefundInstructionService(
       {
@@ -149,6 +176,7 @@ describe("trusted Collaboration refund instruction", () => {
       } as never,
       {} as never,
       {} as never,
+      { releaseCollaborationLocked: vi.fn() } as never,
     );
 
     await expect(service.consumeRefundInstruction(instruction)).rejects.toThrow(

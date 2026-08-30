@@ -6,6 +6,7 @@ import { createHmac } from "crypto";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { RazorpayClient } from "./razorpay.client";
 import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
+import { EscrowFundingAttributionService } from "./escrow-funding-attribution.service";
 
 interface Payload {
   event: string;
@@ -24,6 +25,7 @@ export class BrandEscrowWebhookService {
     private readonly config: ConfigService,
     private readonly razorpay: RazorpayClient,
     private readonly notifications: NotificationDispatchService,
+    private readonly attribution: EscrowFundingAttributionService,
   ) {}
 
   verifySignature(
@@ -98,19 +100,85 @@ export class BrandEscrowWebhookService {
             where: { providerOrderId: orderId },
           });
       if (!load) return;
+      await tx.$queryRaw`SELECT vault_id FROM brand_escrow_vaults WHERE vault_id = ${load.vaultId} FOR UPDATE`;
       await tx.$queryRaw`SELECT id FROM escrow_funding_loads WHERE id = ${load.id} FOR UPDATE`;
       load = await tx.escrowFundingLoad.findUnique({ where: { id: load.id } });
       if (!load) return;
       if (orderId && load.providerOrderId && orderId !== load.providerOrderId)
         return;
       await this.ensureGatewayLedgerFoundation(tx, load);
+      const expectedCaptured = load.principalAmount
+        .add(load.processingFee)
+        .add(load.processingFeeTax);
+      const paymentAmount =
+        typeof payment?.amount === "number"
+          ? new Decimal(payment.amount).div(100)
+          : null;
+      const paymentCurrency =
+        typeof payment?.currency === "string"
+          ? payment.currency.toUpperCase()
+          : null;
+      const paymentCaptured =
+        payment?.captured === true || payment?.status === "captured";
+      const paymentOrderId =
+        typeof payment?.order_id === "string" ? payment.order_id : null;
+      const orderCorrelated =
+        Boolean(orderId) &&
+        Boolean(load.providerOrderId) &&
+        orderId === load.providerOrderId &&
+        (!paymentOrderId || paymentOrderId === load.providerOrderId);
+      const proven = Boolean(
+        paymentId &&
+        paymentAmount?.equals(expectedCaptured) &&
+        paymentCurrency === load.currency.toUpperCase() &&
+        paymentCaptured &&
+        orderCorrelated,
+      );
+      const provenanceStatus = proven ? "PROVEN_SOURCE" : "SOURCE_UNRESOLVED";
+      const provenanceDiagnostic = proven
+        ? { validation: "PAYMENT_CAPTURE_MATCHED" }
+        : {
+            validation: "SOURCE_UNRESOLVED",
+            payment_id_present: Boolean(paymentId),
+            amount_matches: paymentAmount?.equals(expectedCaptured) ?? false,
+            currency_matches: paymentCurrency === load.currency.toUpperCase(),
+            captured: paymentCaptured,
+            order_correlated: orderCorrelated,
+          };
+      const creditedAt = load.creditedAt ?? new Date();
       if (load.state === "CREDITED") {
-        if (paymentId && !load.providerPaymentId) {
-          await tx.escrowFundingLoad.update({
-            where: { id: load.id },
-            data: { providerPaymentId: paymentId },
-          });
-        }
+        const resolvedStatus =
+          load.provenanceStatus === "PROVEN_SOURCE"
+            ? "PROVEN_SOURCE"
+            : provenanceStatus;
+        await tx.escrowFundingLoad.update({
+          where: { id: load.id },
+          data: {
+            providerPaymentId: paymentId ?? load.providerPaymentId,
+            capturedAmount: paymentAmount ?? load.capturedAmount,
+            paymentCurrency: paymentCurrency ?? load.paymentCurrency,
+            paymentCaptured: payment ? paymentCaptured : load.paymentCaptured,
+            provenanceStatus: resolvedStatus,
+          },
+        });
+        await this.attribution.recordFundingCredit(tx, {
+          loadId: load.id,
+          vaultId: load.vaultId,
+          brandProfileId: load.brandProfileId,
+          sourceType: "GATEWAY",
+          currency: load.currency,
+          requestedPrincipal: load.principalAmount,
+          creditedPrincipal: load.creditedPrincipal ?? load.principalAmount,
+          capturedAmount: paymentAmount ?? load.capturedAmount,
+          providerOrderId: load.providerOrderId ?? orderId,
+          providerPaymentId: paymentId ?? load.providerPaymentId,
+          providerPaymentCaptured: payment
+            ? paymentCaptured
+            : load.paymentCaptured,
+          provenanceStatus: resolvedStatus,
+          provenanceDiagnostic,
+          creditedAt,
+        });
         return;
       }
       await tx.escrowFundingLoad.update({
@@ -118,9 +186,30 @@ export class BrandEscrowWebhookService {
         data: {
           state: "CREDITED",
           providerPaymentId: paymentId,
-          creditedAt: new Date(),
+          creditedPrincipal: load.principalAmount,
+          capturedAmount: paymentAmount,
+          paymentCurrency,
+          paymentCaptured: payment ? paymentCaptured : null,
+          provenanceStatus,
+          creditedAt,
           sourceReference: load.sourceReference ?? paymentId ?? orderId,
         },
+      });
+      await this.attribution.recordFundingCredit(tx, {
+        loadId: load.id,
+        vaultId: load.vaultId,
+        brandProfileId: load.brandProfileId,
+        sourceType: "GATEWAY",
+        currency: load.currency,
+        requestedPrincipal: load.principalAmount,
+        creditedPrincipal: load.principalAmount,
+        capturedAmount: paymentAmount,
+        providerOrderId: load.providerOrderId ?? orderId,
+        providerPaymentId: paymentId,
+        providerPaymentCaptured: payment ? paymentCaptured : null,
+        provenanceStatus,
+        provenanceDiagnostic,
+        creditedAt,
       });
       await tx.escrowTransactionLedger.update({
         where: { idempotencyKey: `load:${load.idempotencyKey}` },
@@ -234,6 +323,7 @@ export class BrandEscrowWebhookService {
         where: { razorpayVirtualAccountId: accountId },
       });
       if (!vault?.virtualAccountEnabled || vault.currency !== "INR") return;
+      await tx.$queryRaw`SELECT vault_id FROM brand_escrow_vaults WHERE vault_id = ${vault.id} FOR UPDATE`;
       const existing = await tx.escrowFundingLoad.findUnique({
         where: { providerCreditId: paymentId },
       });
@@ -251,12 +341,35 @@ export class BrandEscrowWebhookService {
           sourceType: "VIRTUAL_ACCOUNT",
           currency,
           principalAmount: principal,
+          creditedPrincipal: principal,
+          capturedAmount: principal,
+          paymentCurrency: currency,
+          paymentCaptured: null,
+          provenanceStatus: "PROVEN_SOURCE",
           state: "CREDITED",
           providerPaymentId: paymentId,
           providerCreditId: paymentId,
           sourceReference: paymentId,
           creditedAt: new Date(),
         },
+      });
+      await this.attribution.recordFundingCredit(tx, {
+        loadId: load.id,
+        vaultId: vault.id,
+        brandProfileId: vault.brandProfileId,
+        sourceType: "VIRTUAL_ACCOUNT",
+        currency,
+        requestedPrincipal: principal,
+        creditedPrincipal: principal,
+        capturedAmount: principal,
+        providerPaymentId: paymentId,
+        providerPaymentCaptured: null,
+        provenanceStatus: "PROVEN_SOURCE",
+        provenanceDiagnostic: {
+          validation: "VIRTUAL_ACCOUNT_CREDIT_RECORDED",
+          return_provider_capability: "DISABLED",
+        },
+        creditedAt: load.creditedAt ?? new Date(),
       });
       await tx.escrowTransactionLedger.create({
         data: {

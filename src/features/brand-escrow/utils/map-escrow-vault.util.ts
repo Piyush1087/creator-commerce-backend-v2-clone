@@ -14,6 +14,7 @@ export function mapEscrowVault(vault: BrandEscrowVault) {
     total_pooled_balance: vault.totalPooledBalance.toNumber(),
     locked_campaign_funds: vault.lockedCampaignFunds.toNumber(),
     available_balance: vault.availableBalance.toNumber(),
+    active_return_commitment: vault.activeReturnCommitment.toNumber(),
     tds_buffer_balance: vault.tdsBufferBalance.toNumber(),
     created_at: vault.createdAt.toISOString(),
     updated_at: vault.updatedAt.toISOString(),

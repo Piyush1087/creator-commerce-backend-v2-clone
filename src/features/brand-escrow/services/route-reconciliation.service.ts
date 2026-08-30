@@ -7,6 +7,7 @@ import { Decimal } from "@prisma/client/runtime/library";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
+import { EscrowFundingAttributionService } from "./escrow-funding-attribution.service";
 import {
   normalizeReversalState,
   normalizeTransferState,
@@ -27,6 +28,7 @@ export class RouteReconciliationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationDispatchService,
+    private readonly attribution: EscrowFundingAttributionService,
   ) {}
 
   async reconcileTransfer(input: {
@@ -76,6 +78,12 @@ export class RouteReconciliationService {
     providerState: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
+      const authority = await tx.routeTransferAttempt.findUnique({
+        where: { transferId: input.transferId },
+        include: { obligation: true },
+      });
+      if (!authority) throw new NotFoundException("Route transfer not found");
+      await tx.$queryRaw`SELECT vault_id FROM brand_escrow_vaults WHERE vault_id = ${authority.obligation.vaultId} FOR UPDATE`;
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer-provider:${input.transferId}`}))::text`;
       let transfer = await tx.routeTransferAttempt.findUnique({
         where: { transferId: input.transferId },
@@ -113,6 +121,13 @@ export class RouteReconciliationService {
       });
       if (vault.lockedCampaignFunds.lessThan(transfer.amount))
         throw new ConflictException("Locked vault authority is insufficient");
+      await this.attribution.consumeCreatorSettlement(tx, {
+        obligationId: obligation.id,
+        vaultId: obligation.vaultId,
+        collaborationId: obligation.collaborationId,
+        currency: transfer.currency,
+        amount: transfer.amount,
+      });
       await tx.brandEscrowVault.update({
         where: { id: vault.id },
         data: {
@@ -178,6 +193,7 @@ export class RouteReconciliationService {
         },
       });
       if (!reversal) throw new NotFoundException("Route reversal not found");
+      await tx.$queryRaw`SELECT vault_id FROM brand_escrow_vaults WHERE vault_id = ${reversal.transferAttempt.obligation.vaultId} FOR UPDATE`;
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer:${reversal.transferAttemptId}`}))::text`;
       reversal = await tx.routeTransferReversal.findUnique({
         where: { id: reversal.id },
@@ -210,6 +226,11 @@ export class RouteReconciliationService {
         );
       const full = confirmed.equals(transfer.amount);
       if (transfer.settlementState === "SETTLED") {
+        await this.attribution.restoreCreatorReversal(
+          tx,
+          obligation.id,
+          reversal.amount,
+        );
         await tx.brandEscrowVault.update({
           where: { id: obligation.vaultId },
           data: {

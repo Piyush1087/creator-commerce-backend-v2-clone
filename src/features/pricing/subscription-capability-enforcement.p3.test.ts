@@ -48,6 +48,7 @@ describe("P3 domain commit-boundary enforcement", () => {
       {} as never,
       {} as never,
       restrictedCapability() as never,
+      { reserveAvailable: vi.fn() } as never,
       {} as never,
     );
     await expect(

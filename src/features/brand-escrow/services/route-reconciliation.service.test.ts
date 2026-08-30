@@ -28,6 +28,10 @@ describe("Route reconciliation invariants", () => {
           callback(tx),
       } as never,
       {} as never,
+      {
+        consumeCreatorSettlement: vi.fn(),
+        restoreCreatorReversal: vi.fn(),
+      } as never,
     );
 
     await service.reconcileTransfer({
@@ -135,6 +139,10 @@ describe("Route reconciliation invariants", () => {
           callback(tx),
       } as never,
       notifications as never,
+      {
+        consumeCreatorSettlement: vi.fn(),
+        restoreCreatorReversal: vi.fn(),
+      } as never,
     );
 
     await service.reconcileReversal({

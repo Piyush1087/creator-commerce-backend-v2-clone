@@ -92,6 +92,7 @@ describe.skipIf(process.env.RUN_BS09_POSTGRES_TESTS !== "true")(
         db as never,
         { enqueueWithinTransaction: async () => undefined } as never,
         new EscrowFinancialAllocationService(),
+        { allocateCreatorObligation: async () => undefined } as never,
       );
     });
 

@@ -82,6 +82,7 @@ describe("BS09 P2 canonical reserve economics", () => {
       engine,
       {} as never,
       { assertCapability: vi.fn() } as never,
+      { reserveAvailable: vi.fn() } as never,
     );
     const result = await service.executeStage2Lock({
       collaborationId: "collab-1",
@@ -135,6 +136,7 @@ describe("BS09 P2 canonical reserve economics", () => {
       engine,
       {} as never,
       { assertCapability: vi.fn() } as never,
+      { reserveAvailable: vi.fn() } as never,
     );
     const result = await service.executeStage2Lock({
       collaborationId: "collab-1",
@@ -237,6 +239,7 @@ describe("BS09 P2 canonical reserve economics", () => {
         engine,
         {} as never,
         { assertCapability: vi.fn() } as never,
+        { reserveAvailable: vi.fn() } as never,
       );
 
       const result = await service.executeStage2Lock({

@@ -21,6 +21,16 @@ describe("Creator payout settlement instruction identity", () => {
       creatorPayoutObligation: {
         findUnique: vi.fn().mockResolvedValue(existing),
       },
+      brandEscrowVault: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "vault-1",
+          currency: "INR",
+        }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          id: "vault-1",
+          currency: "INR",
+        }),
+      },
       collaboration: { findUnique: vi.fn() },
     };
     return {
@@ -32,6 +42,7 @@ describe("Creator payout settlement instruction identity", () => {
         } as never,
         {} as never,
         {} as never,
+        { allocateCreatorObligation: vi.fn() } as never,
       ),
     };
   };

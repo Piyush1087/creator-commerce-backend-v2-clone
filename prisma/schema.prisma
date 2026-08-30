@@ -790,11 +790,53 @@ enum EscrowFundingSourceType {
   BANK_TRANSFER
 }
 
+enum EscrowFundingLotSourceType {
+  GATEWAY
+  VIRTUAL_ACCOUNT
+  BANK_TRANSFER
+  LEGACY_SOURCE_UNKNOWN
+}
+
 enum EscrowFundingState {
   LOAD_INITIATED
   PENDING
   CREDITED
   FAILED
+}
+
+enum EscrowFundingProvenanceStatus {
+  LEGACY_SOURCE_UNKNOWN
+  SOURCE_UNRESOLVED
+  PROVEN_SOURCE
+}
+
+enum BrandReturnStatus {
+  RETURN_REQUESTED
+  ALLOCATING_SOURCES
+  PROCESSING
+  COMPLETED
+  PARTIAL
+  ACTION_REQUIRED
+  FAILED
+}
+
+enum BrandReturnAllocationState {
+  READY
+  PROCESSING
+  SUCCEEDED
+  FAILED_TERMINAL
+  ACTION_REQUIRED
+  RELEASED
+}
+
+enum BrandReturnActionRequiredReason {
+  SOURCE_PROVENANCE_REQUIRED
+  PROVIDER_SETUP_REQUIRED
+  PROVIDER_OUTCOME_AMBIGUOUS
+  SOURCE_NO_LONGER_REFUNDABLE
+  PROVIDER_RECONCILIATION_REQUIRED
+  UNSUPPORTED_SOURCE
+  UNSUPPORTED_CURRENCY
 }
 
 enum EscrowPayoutTranche {
@@ -1493,6 +1535,8 @@ model BrandProfile {
   brandPreviewRuns                BrandPreviewRun[]
   creatorPayoutObligations        CreatorPayoutObligation[]
   collaborationRefundInstructions CollaborationRefundInstruction[]
+  escrowFundingLots               EscrowFundingLot[]
+  brandReturnRequests             BrandReturnRequest[]
 
   intelligenceExecutions              IntelligenceExecution[]
   intelligenceProcessorExecutions     IntelligenceProcessorExecution[]
@@ -3059,6 +3103,7 @@ model Collaboration {
   escrowLock                      CollaborationEscrowLock?
   creatorPayoutObligations        CreatorPayoutObligation[]
   collaborationRefundInstructions CollaborationRefundInstruction[]
+  fundingLotAllocations           CollaborationFundingLotAllocation[]
 
   @@unique([campaignId, creatorUserId])
   @@index([brandProfileId, currentStage])
@@ -3190,6 +3235,7 @@ model BrandEscrowVault {
   totalPooledBalance       Decimal      @default(0) @map("total_pooled_balance") @db.Decimal(15, 4)
   lockedCampaignFunds      Decimal      @default(0) @map("locked_campaign_funds") @db.Decimal(15, 4)
   availableBalance         Decimal      @default(0) @map("available_balance") @db.Decimal(15, 4)
+  activeReturnCommitment   Decimal      @default(0) @map("active_return_commitment") @db.Decimal(15, 4)
   tdsBufferBalance         Decimal      @default(0) @map("tds_buffer_balance") @db.Decimal(15, 4)
   createdAt                DateTime     @default(now()) @map("created_at")
   updatedAt                DateTime     @updatedAt @map("updated_at")
@@ -3198,36 +3244,100 @@ model BrandEscrowVault {
   fundingLoads             EscrowFundingLoad[]
   creatorPayoutObligations CreatorPayoutObligation[]
   refundInstructions       CollaborationRefundInstruction[]
+  fundingLots              EscrowFundingLot[]
+  brandReturnRequests      BrandReturnRequest[]
 
   @@index([brandProfileId])
   @@map("brand_escrow_vaults")
 }
 
 model EscrowFundingLoad {
-  id                String                  @id @default(uuid()) @map("funding_load_id")
-  vaultId           String                  @map("vault_id")
-  vault             BrandEscrowVault        @relation(fields: [vaultId], references: [id], onDelete: Restrict)
-  brandProfileId    String                  @map("brand_id")
-  sourceType        EscrowFundingSourceType @map("source_type")
-  currency          String                  @db.VarChar(3)
-  principalAmount   Decimal                 @map("principal_amount") @db.Decimal(15, 4)
-  processingFee     Decimal                 @default(0) @map("processing_fee") @db.Decimal(15, 4)
-  processingFeeTax  Decimal                 @default(0) @map("processing_fee_tax") @db.Decimal(15, 4)
-  state             EscrowFundingState      @default(LOAD_INITIATED)
-  idempotencyKey    String?                 @unique @map("idempotency_key")
-  providerOrderId   String?                 @unique @map("provider_order_id")
-  providerPaymentId String?                 @unique @map("provider_payment_id")
-  providerCreditId  String?                 @unique @map("provider_credit_id")
-  sourceReference   String?                 @map("source_reference")
-  initiatedAt       DateTime?               @map("initiated_at")
-  creditedAt        DateTime?               @map("credited_at")
-  failedAt          DateTime?               @map("failed_at")
-  createdAt         DateTime                @default(now()) @map("created_at")
-  updatedAt         DateTime                @updatedAt @map("updated_at")
+  id                String                        @id @default(uuid()) @map("funding_load_id")
+  vaultId           String                        @map("vault_id")
+  vault             BrandEscrowVault              @relation(fields: [vaultId], references: [id], onDelete: Restrict)
+  brandProfileId    String                        @map("brand_id")
+  sourceType        EscrowFundingSourceType       @map("source_type")
+  currency          String                        @db.VarChar(3)
+  principalAmount   Decimal                       @map("principal_amount") @db.Decimal(15, 4)
+  processingFee     Decimal                       @default(0) @map("processing_fee") @db.Decimal(15, 4)
+  processingFeeTax  Decimal                       @default(0) @map("processing_fee_tax") @db.Decimal(15, 4)
+  creditedPrincipal Decimal?                      @map("credited_principal") @db.Decimal(15, 4)
+  capturedAmount    Decimal?                      @map("captured_amount") @db.Decimal(15, 4)
+  paymentCurrency   String?                       @map("payment_currency") @db.VarChar(3)
+  paymentCaptured   Boolean?                      @map("payment_captured")
+  provenanceStatus  EscrowFundingProvenanceStatus @default(SOURCE_UNRESOLVED) @map("provenance_status")
+  state             EscrowFundingState            @default(LOAD_INITIATED)
+  idempotencyKey    String?                       @unique @map("idempotency_key")
+  providerOrderId   String?                       @unique @map("provider_order_id")
+  providerPaymentId String?                       @unique @map("provider_payment_id")
+  providerCreditId  String?                       @unique @map("provider_credit_id")
+  sourceReference   String?                       @map("source_reference")
+  initiatedAt       DateTime?                     @map("initiated_at")
+  creditedAt        DateTime?                     @map("credited_at")
+  failedAt          DateTime?                     @map("failed_at")
+  createdAt         DateTime                      @default(now()) @map("created_at")
+  updatedAt         DateTime                      @updatedAt @map("updated_at")
+  fundingLot        EscrowFundingLot?
 
   @@index([vaultId, state])
   @@index([brandProfileId, createdAt])
   @@map("escrow_funding_loads")
+}
+
+model EscrowFundingLot {
+  id                       String                              @id @default(uuid()) @map("funding_lot_id")
+  vaultId                  String                              @map("vault_id")
+  vault                    BrandEscrowVault                    @relation(fields: [vaultId], references: [id], onDelete: Restrict)
+  brandProfileId           String                              @map("brand_id")
+  brandProfile             BrandProfile                        @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
+  fundingLoadId            String?                             @unique @map("funding_load_id")
+  fundingLoad              EscrowFundingLoad?                  @relation(fields: [fundingLoadId], references: [id], onDelete: Restrict)
+  sourceType               EscrowFundingLotSourceType          @map("source_type")
+  provenanceStatus         EscrowFundingProvenanceStatus       @map("provenance_status")
+  currency                 String                              @db.VarChar(3)
+  requestedPrincipal       Decimal                             @map("requested_principal") @db.Decimal(15, 4)
+  creditedPrincipal        Decimal                             @map("credited_principal") @db.Decimal(15, 4)
+  capturedAmount           Decimal?                            @map("captured_amount") @db.Decimal(15, 4)
+  providerRefundableAmount Decimal                             @default(0) @map("provider_refundable_amount") @db.Decimal(15, 4)
+  providerOrderId          String?                             @map("provider_order_id")
+  providerPaymentId        String?                             @unique @map("provider_payment_id")
+  providerPaymentCaptured  Boolean?                            @map("provider_payment_captured")
+  availableAmount          Decimal                             @default(0) @map("available_amount") @db.Decimal(15, 4)
+  lockedAmount             Decimal                             @default(0) @map("locked_amount") @db.Decimal(15, 4)
+  returnCommittedAmount    Decimal                             @default(0) @map("return_committed_amount") @db.Decimal(15, 4)
+  consumedAmount           Decimal                             @default(0) @map("consumed_amount") @db.Decimal(15, 4)
+  externallyReturnedAmount Decimal                             @default(0) @map("externally_returned_amount") @db.Decimal(15, 4)
+  economicAt               DateTime                            @map("economic_at")
+  creditedAt               DateTime?                           @map("credited_at")
+  provenanceDiagnostic     Json?                               @map("provenance_diagnostic")
+  createdAt                DateTime                            @default(now()) @map("created_at")
+  updatedAt                DateTime                            @updatedAt @map("updated_at")
+  collaborationAllocations CollaborationFundingLotAllocation[]
+  creatorPayoutAllocations CreatorPayoutFundingAllocation[]
+  returnAllocations        BrandReturnAllocation[]
+
+  @@index([vaultId, economicAt, id])
+  @@index([brandProfileId, provenanceStatus, currency])
+  @@map("escrow_funding_lots")
+}
+
+model CollaborationFundingLotAllocation {
+  id                String                           @id @default(uuid()) @map("collaboration_lot_allocation_id")
+  collaborationId   String                           @map("collaboration_id")
+  collaboration     Collaboration                    @relation(fields: [collaborationId], references: [id], onDelete: Restrict)
+  fundingLotId      String                           @map("funding_lot_id")
+  fundingLot        EscrowFundingLot                 @relation(fields: [fundingLotId], references: [id], onDelete: Restrict)
+  reservedAmount    Decimal                          @map("reserved_amount") @db.Decimal(15, 4)
+  lockedAmount      Decimal                          @map("locked_amount") @db.Decimal(15, 4)
+  consumedAmount    Decimal                          @default(0) @map("consumed_amount") @db.Decimal(15, 4)
+  releasedAmount    Decimal                          @default(0) @map("released_amount") @db.Decimal(15, 4)
+  createdAt         DateTime                         @default(now()) @map("created_at")
+  updatedAt         DateTime                         @updatedAt @map("updated_at")
+  payoutAllocations CreatorPayoutFundingAllocation[]
+
+  @@unique([collaborationId, fundingLotId])
+  @@index([fundingLotId, createdAt])
+  @@map("collaboration_funding_lot_allocations")
 }
 
 model CollaborationEscrowLock {
@@ -3349,35 +3459,55 @@ model CreatorPayoutProfile {
 }
 
 model CreatorPayoutObligation {
-  id                      String                        @id @default(uuid()) @map("obligation_id")
-  settlementInstructionId String                        @unique @map("settlement_instruction_id")
-  collaborationId         String                        @map("collaboration_id")
-  collaboration           Collaboration                 @relation(fields: [collaborationId], references: [id], onDelete: Restrict)
-  vaultId                 String                        @map("vault_id")
-  vault                   BrandEscrowVault              @relation(fields: [vaultId], references: [id], onDelete: Restrict)
-  brandProfileId          String                        @map("brand_id")
-  brandProfile            BrandProfile                  @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
-  creatorProfileId        String                        @map("creator_profile_id")
-  creatorProfile          CreatorProfile                @relation(fields: [creatorProfileId], references: [id], onDelete: Restrict)
-  payoutProfileId         String                        @map("payout_profile_id")
-  payoutProfile           CreatorPayoutProfile          @relation(fields: [payoutProfileId], references: [id], onDelete: Restrict)
-  obligationType          CreatorPayoutObligationType   @map("obligation_type")
-  entitlementAmount       Decimal                       @map("entitlement_amount") @db.Decimal(15, 4)
-  currency                String                        @db.VarChar(3)
-  status                  CreatorPayoutObligationStatus @default(ELIGIBLE)
-  instructionIssuedAt     DateTime                      @map("instruction_issued_at")
-  paymentDueAt            DateTime?                     @map("payment_due_at")
-  blockedReason           String?                       @map("blocked_reason") @db.VarChar(100)
-  settledAt               DateTime?                     @map("settled_at")
-  terminalAt              DateTime?                     @map("terminal_at")
-  createdAt               DateTime                      @default(now()) @map("created_at")
-  updatedAt               DateTime                      @updatedAt @map("updated_at")
+  id                      String                           @id @default(uuid()) @map("obligation_id")
+  settlementInstructionId String                           @unique @map("settlement_instruction_id")
+  collaborationId         String                           @map("collaboration_id")
+  collaboration           Collaboration                    @relation(fields: [collaborationId], references: [id], onDelete: Restrict)
+  vaultId                 String                           @map("vault_id")
+  vault                   BrandEscrowVault                 @relation(fields: [vaultId], references: [id], onDelete: Restrict)
+  brandProfileId          String                           @map("brand_id")
+  brandProfile            BrandProfile                     @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
+  creatorProfileId        String                           @map("creator_profile_id")
+  creatorProfile          CreatorProfile                   @relation(fields: [creatorProfileId], references: [id], onDelete: Restrict)
+  payoutProfileId         String                           @map("payout_profile_id")
+  payoutProfile           CreatorPayoutProfile             @relation(fields: [payoutProfileId], references: [id], onDelete: Restrict)
+  obligationType          CreatorPayoutObligationType      @map("obligation_type")
+  entitlementAmount       Decimal                          @map("entitlement_amount") @db.Decimal(15, 4)
+  currency                String                           @db.VarChar(3)
+  status                  CreatorPayoutObligationStatus    @default(ELIGIBLE)
+  instructionIssuedAt     DateTime                         @map("instruction_issued_at")
+  paymentDueAt            DateTime?                        @map("payment_due_at")
+  blockedReason           String?                          @map("blocked_reason") @db.VarChar(100)
+  settledAt               DateTime?                        @map("settled_at")
+  terminalAt              DateTime?                        @map("terminal_at")
+  createdAt               DateTime                         @default(now()) @map("created_at")
+  updatedAt               DateTime                         @updatedAt @map("updated_at")
   transfers               RouteTransferAttempt[]
+  fundingAllocations      CreatorPayoutFundingAllocation[]
 
   @@index([brandProfileId, status, createdAt])
   @@index([collaborationId, status])
   @@index([creatorProfileId, status])
   @@map("creator_payout_obligations")
+}
+
+model CreatorPayoutFundingAllocation {
+  id                        String                            @id @default(uuid()) @map("creator_payout_funding_allocation_id")
+  obligationId              String                            @map("obligation_id")
+  obligation                CreatorPayoutObligation           @relation(fields: [obligationId], references: [id], onDelete: Restrict)
+  collaborationAllocationId String                            @map("collaboration_lot_allocation_id")
+  collaborationAllocation   CollaborationFundingLotAllocation @relation(fields: [collaborationAllocationId], references: [id], onDelete: Restrict)
+  fundingLotId              String                            @map("funding_lot_id")
+  fundingLot                EscrowFundingLot                  @relation(fields: [fundingLotId], references: [id], onDelete: Restrict)
+  allocatedAmount           Decimal                           @map("allocated_amount") @db.Decimal(15, 4)
+  consumedAmount            Decimal                           @default(0) @map("consumed_amount") @db.Decimal(15, 4)
+  reversedAmount            Decimal                           @default(0) @map("reversed_amount") @db.Decimal(15, 4)
+  createdAt                 DateTime                          @default(now()) @map("created_at")
+  updatedAt                 DateTime                          @updatedAt @map("updated_at")
+
+  @@unique([obligationId, fundingLotId])
+  @@index([collaborationAllocationId, createdAt])
+  @@map("creator_payout_funding_allocations")
 }
 
 model RouteTransferAttempt {
@@ -3444,6 +3574,74 @@ model RouteWebhookReceipt {
 
   @@index([providerObjectId, processedAt])
   @@map("route_webhook_receipts")
+}
+
+model BrandReturnRequest {
+  id                   String                           @id @default(uuid()) @map("brand_return_request_id")
+  requestIdentity      String                           @unique @map("request_identity")
+  vaultId              String                           @map("vault_id")
+  vault                BrandEscrowVault                 @relation(fields: [vaultId], references: [id], onDelete: Restrict)
+  brandProfileId       String                           @map("brand_id")
+  brandProfile         BrandProfile                     @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
+  requestedAmount      Decimal                          @map("requested_amount") @db.Decimal(15, 4)
+  committedAmount      Decimal                          @default(0) @map("committed_amount") @db.Decimal(15, 4)
+  successfulAmount     Decimal                          @default(0) @map("successful_amount") @db.Decimal(15, 4)
+  unresolvedAmount     Decimal                          @default(0) @map("unresolved_amount") @db.Decimal(15, 4)
+  releasedAmount       Decimal                          @default(0) @map("released_amount") @db.Decimal(15, 4)
+  currency             String                           @db.VarChar(3)
+  status               BrandReturnStatus                @default(RETURN_REQUESTED)
+  actionRequiredReason BrandReturnActionRequiredReason? @map("action_required_reason")
+  requestedByUserId    String                           @map("requested_by_user_id")
+  requestedAt          DateTime                         @default(now()) @map("requested_at")
+  processingAt         DateTime?                        @map("processing_at")
+  completedAt          DateTime?                        @map("completed_at")
+  createdAt            DateTime                         @default(now()) @map("created_at")
+  updatedAt            DateTime                         @updatedAt @map("updated_at")
+  allocations          BrandReturnAllocation[]
+
+  @@index([brandProfileId, createdAt])
+  @@index([vaultId, status, createdAt])
+  @@map("brand_return_requests")
+}
+
+model BrandReturnAllocation {
+  id                   String                           @id @default(uuid()) @map("brand_return_allocation_id")
+  requestId            String                           @map("brand_return_request_id")
+  request              BrandReturnRequest               @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  fundingLotId         String                           @map("funding_lot_id")
+  fundingLot           EscrowFundingLot                 @relation(fields: [fundingLotId], references: [id], onDelete: Restrict)
+  semanticIdentity     String                           @unique @map("semantic_identity")
+  providerPaymentId    String                           @map("provider_payment_id")
+  amount               Decimal                          @db.Decimal(15, 4)
+  currency             String                           @db.VarChar(3)
+  state                BrandReturnAllocationState       @default(READY)
+  actionRequiredReason BrandReturnActionRequiredReason? @map("action_required_reason")
+  providerRefundId     String?                          @unique @map("provider_refund_id")
+  providerState        String?                          @map("provider_state") @db.VarChar(100)
+  attemptCount         Int                              @default(0) @map("attempt_count")
+  diagnosticPayload    Json?                            @map("diagnostic_payload")
+  lastAttemptAt        DateTime?                        @map("last_attempt_at")
+  succeededAt          DateTime?                        @map("succeeded_at")
+  releasedAt           DateTime?                        @map("released_at")
+  createdAt            DateTime                         @default(now()) @map("created_at")
+  updatedAt            DateTime                         @updatedAt @map("updated_at")
+
+  @@unique([requestId, fundingLotId])
+  @@index([requestId, state, createdAt])
+  @@index([fundingLotId, state, createdAt])
+  @@map("brand_return_allocations")
+}
+
+model BrandReturnWebhookReceipt {
+  id               String   @id @default(uuid()) @map("brand_return_webhook_receipt_id")
+  eventIdentity    String   @unique @map("event_identity")
+  eventType        String   @map("event_type") @db.VarChar(120)
+  payloadHash      String   @map("payload_hash") @db.VarChar(64)
+  providerRefundId String?  @map("provider_refund_id")
+  processedAt      DateTime @default(now()) @map("processed_at")
+
+  @@index([providerRefundId, processedAt])
+  @@map("brand_return_webhook_receipts")
 }
 
 model IdempotencyRegistry {

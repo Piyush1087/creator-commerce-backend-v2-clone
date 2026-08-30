@@ -10,6 +10,7 @@ import { Decimal } from "@prisma/client/runtime/library";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
 import { EscrowFinancialAllocationService } from "./escrow-financial-allocation.service";
+import { EscrowFundingAttributionService } from "./escrow-funding-attribution.service";
 
 export type CollaborationSettlementInstruction = {
   instructionId: string;
@@ -30,6 +31,7 @@ export class CreatorPayoutObligationService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationDispatchService,
     private readonly allocations: EscrowFinancialAllocationService,
+    private readonly attribution: EscrowFundingAttributionService,
   ) {}
 
   async consumeSettlementInstruction(
@@ -38,12 +40,21 @@ export class CreatorPayoutObligationService {
     const amount = new Decimal(input.entitlementAmount);
     if (!input.instructionId.trim())
       throw new BadRequestException("Settlement instruction ID is required");
-    if (!amount.isPositive())
+    if (!amount.greaterThan(0))
       throw new BadRequestException("Entitlement amount must be positive");
     if (input.currency !== "INR")
       throw new BadRequestException("Route payout currency is not supported");
 
     return this.prisma.$transaction(async (tx) => {
+      let vault = await tx.brandEscrowVault.findUnique({
+        where: { brandProfileId: input.brandProfileId },
+      });
+      if (!vault || vault.currency !== input.currency)
+        throw new ConflictException("Brand vault currency authority mismatch");
+      await tx.$queryRaw`SELECT vault_id FROM brand_escrow_vaults WHERE vault_id = ${vault.id} FOR UPDATE`;
+      vault = await tx.brandEscrowVault.findUniqueOrThrow({
+        where: { id: vault.id },
+      });
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`creator-payout-instruction:${input.instructionId}`}))::text`;
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-obligation:${input.collaborationId}`}))::text`;
       const existing = await tx.creatorPayoutObligation.findUnique({
@@ -91,12 +102,6 @@ export class CreatorPayoutObligationService {
         lock,
         amount,
       );
-      const vault = await tx.brandEscrowVault.findUnique({
-        where: { brandProfileId: input.brandProfileId },
-      });
-      if (!vault || vault.currency !== input.currency)
-        throw new ConflictException("Brand vault currency authority mismatch");
-
       const profile = await tx.creatorPayoutProfile.upsert({
         where: { creatorProfileId: input.creatorProfileId },
         create: {
@@ -124,6 +129,13 @@ export class CreatorPayoutObligationService {
           status: ready ? "ELIGIBLE" : "BLOCKED",
           blockedReason: ready ? null : "PROVIDER_SETUP_REQUIRED",
         },
+      });
+      await this.attribution.allocateCreatorObligation(tx, {
+        obligationId: obligation.id,
+        vaultId: vault.id,
+        collaborationId: input.collaborationId,
+        currency: input.currency,
+        amount,
       });
       if (!ready) {
         await this.notifications.enqueueWithinTransaction(tx, {

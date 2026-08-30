@@ -19,5 +19,6 @@ export interface VaultRowLock {
   total_pooled_balance: string | number;
   locked_campaign_funds: string | number;
   available_balance: string | number;
+  active_return_commitment?: string | number;
   currency: string;
 }

@@ -20,6 +20,7 @@ import type {
 } from "../types";
 import { EscrowComputationEngine } from "./escrow-computation.engine";
 import { EscrowSubscriptionContextService } from "./escrow-subscription-context.service";
+import { EscrowFundingAttributionService } from "./escrow-funding-attribution.service";
 
 export interface ExecuteLockAllocationInput {
   collaborationId: string;
@@ -41,6 +42,7 @@ export class BrandEscrowComputationService {
     private readonly computationEngine: EscrowComputationEngine,
     private readonly escrowBilling: EscrowSubscriptionContextService,
     private readonly subscriptionCapabilities: SubscriptionCapabilityService,
+    private readonly attribution: EscrowFundingAttributionService,
   ) {}
 
   async executeStage2Lock(
@@ -282,6 +284,13 @@ export class BrandEscrowComputationService {
           availableBalance: { decrement: metrics.totalEscrowLockedAmount },
           lockedCampaignFunds: { increment: metrics.totalEscrowLockedAmount },
         },
+      });
+      await this.attribution.reserveAvailable(tx, {
+        vaultId,
+        brandProfileId: input.brandProfileId,
+        collaborationId: input.collaborationId,
+        currency,
+        amount: metrics.totalEscrowLockedAmount,
       });
       const lock = await tx.collaborationEscrowLock.create({
         data: {

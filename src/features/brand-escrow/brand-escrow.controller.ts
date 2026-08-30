@@ -7,6 +7,7 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   Query,
   Req,
@@ -20,9 +21,11 @@ import { BrandCentreAuthService } from "../brand-centre/brand-centre-auth.servic
 import { BrandWorkspaceAuthorizationService } from "../brand-centre/brand-workspace-authorization.service";
 import {
   CalculateEscrowBreakdownDto,
+  CreateBrandReturnDto,
   ExecuteLockAllocationDto,
   ExecuteTrancheDisbursalDto,
   ListEscrowLedgerQueryDto,
+  ListBrandReturnsQueryDto,
   TopUpIntentDto,
   TransitionStageDto,
   TriggerCancellationRefundDto,
@@ -32,6 +35,7 @@ import { BrandEscrowComputationService } from "./services/brand-escrow-computati
 import { BrandEscrowHardenedService } from "./services/brand-escrow-hardened.service";
 import { BrandEscrowInterlockService } from "./services/brand-escrow-interlock.service";
 import { BrandEscrowService } from "./services/brand-escrow.service";
+import { BrandReturnService } from "./services/brand-return.service";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -47,6 +51,7 @@ export class BrandEscrowController {
     private readonly computation: BrandEscrowComputationService,
     private readonly interlock: BrandEscrowInterlockService,
     private readonly hardened: BrandEscrowHardenedService,
+    private readonly brandReturns: BrandReturnService,
   ) {}
 
   @Post("initialize")
@@ -106,6 +111,53 @@ export class BrandEscrowController {
       grossCreatorQuote: body.gross_creator_quote,
       currency: body.currency,
       expectedTdsPercentage: body.expected_tds_percentage,
+    });
+  }
+
+  @Get("brand-returns/summary")
+  async getBrandReturnSummary(@Req() req: RequestWithAuthUser) {
+    const { brandProfileId } = await this.workspaceAuth.resolveBrandContext(
+      req.user,
+    );
+    return this.brandReturns.getSummary(brandProfileId);
+  }
+
+  @Get("brand-returns")
+  async listBrandReturns(
+    @Req() req: RequestWithAuthUser,
+    @Query() query: ListBrandReturnsQueryDto,
+  ) {
+    const { brandProfileId } = await this.workspaceAuth.resolveBrandContext(
+      req.user,
+    );
+    return this.brandReturns.listRequests(brandProfileId, query.limit ?? 50);
+  }
+
+  @Get("brand-returns/:requestId")
+  async getBrandReturn(
+    @Req() req: RequestWithAuthUser,
+    @Param("requestId") requestId: string,
+  ) {
+    const { brandProfileId } = await this.workspaceAuth.resolveBrandContext(
+      req.user,
+    );
+    return this.brandReturns.getRequest(brandProfileId, requestId);
+  }
+
+  @Post("brand-returns")
+  @HttpCode(HttpStatus.ACCEPTED)
+  async requestBrandReturn(
+    @Req() req: RequestWithAuthUser,
+    @Body() body: CreateBrandReturnDto,
+  ) {
+    const { brandProfileId } = await this.workspaceAuth.assertFinancialMutation(
+      req.user,
+    );
+    return this.brandReturns.requestReturn({
+      brandProfileId,
+      requestedByUserId: req.user.id,
+      amount: body.amount,
+      requestIdentity: body.idempotency_identity,
     });
   }
 }

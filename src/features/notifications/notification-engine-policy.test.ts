@@ -17,7 +17,7 @@ const categories = new Set([
 
 describe("BS-05 canonical notification policy", () => {
   it("registers only complete immutable canonical policies", () => {
-    expect(Object.keys(NOTIFICATION_EVENT_REGISTRY)).toHaveLength(20);
+    expect(Object.keys(NOTIFICATION_EVENT_REGISTRY)).toHaveLength(23);
     for (const definition of Object.values(NOTIFICATION_EVENT_REGISTRY)) {
       expect(categories.has(definition.category)).toBe(true);
       expect(["CRITICAL", "ACTION_REQUIRED", "INFORMATIONAL"]).toContain(
