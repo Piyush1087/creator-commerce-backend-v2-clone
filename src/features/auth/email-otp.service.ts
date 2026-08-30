@@ -18,7 +18,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 
-import { MailService } from "../../mail/mail.service";
+import { AuthMailDeliveryError, MailService } from "../../mail/mail.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { normalizeEmail } from "../../shared/identity/normalize-email";
 import {
@@ -127,14 +127,12 @@ export class EmailOtpService {
         },
       });
     } catch (error: unknown) {
-      const statusCode = (error as { statusCode?: number })?.statusCode;
       await this.prisma.emailOtpChallenge.updateMany({
         where: { id: challenge.id, deliveryStatus: AuthDeliveryStatus.PENDING },
         data: {
           deliveryStatus:
-            typeof statusCode === "number" &&
-            statusCode >= 400 &&
-            statusCode < 500
+            error instanceof AuthMailDeliveryError &&
+            error.classification === "REJECTED"
               ? AuthDeliveryStatus.REJECTED
               : AuthDeliveryStatus.DELIVERY_UNKNOWN,
         },
@@ -150,7 +148,7 @@ export class EmailOtpService {
     userId?: string;
   }): Promise<string> {
     const normalizedEmail = normalizeEmail(args.email);
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       await this.lock(tx, `${args.purpose}:${normalizedEmail}`);
       const challenge = await tx.emailOtpChallenge.findFirst({
         where: {
@@ -163,9 +161,7 @@ export class EmailOtpService {
         orderBy: { createdAt: "desc" },
       });
       if (!challenge || challenge.expiresAt <= new Date()) {
-        throw new UnauthorizedException(
-          "Invalid or expired verification code.",
-        );
+        return { consumed: false } as const;
       }
       const actual = Buffer.from(
         this.digest(challenge.id, normalizedEmail, args.purpose, args.code),
@@ -175,28 +171,28 @@ export class EmailOtpService {
       const matches =
         actual.length === expected.length && timingSafeEqual(actual, expected);
       if (!matches) {
-        const updated = await tx.emailOtpChallenge.update({
-          where: { id: challenge.id },
-          data: { attemptCount: { increment: 1 } },
-        });
-        if (updated.attemptCount >= updated.maxAttempts) {
-          await tx.emailOtpChallenge.update({
-            where: { id: challenge.id },
-            data: { supersededAt: new Date() },
-          });
-        }
-        throw new UnauthorizedException(
-          "Invalid or expired verification code.",
+        const nextAttemptCount = Math.min(
+          challenge.attemptCount + 1,
+          challenge.maxAttempts,
         );
+        await tx.emailOtpChallenge.update({
+          where: { id: challenge.id },
+          data: {
+            attemptCount: nextAttemptCount,
+            supersededAt:
+              nextAttemptCount >= challenge.maxAttempts
+                ? new Date()
+                : undefined,
+          },
+        });
+        return { consumed: false } as const;
       }
       const consumed = await tx.emailOtpChallenge.updateMany({
         where: { id: challenge.id, consumedAt: null, supersededAt: null },
         data: { consumedAt: new Date() },
       });
       if (consumed.count !== 1) {
-        throw new UnauthorizedException(
-          "Invalid or expired verification code.",
-        );
+        return { consumed: false } as const;
       }
       await tx.securityEvent.create({
         data: {
@@ -205,8 +201,12 @@ export class EmailOtpService {
           context: { purpose: args.purpose },
         },
       });
-      return normalizedEmail;
+      return { consumed: true } as const;
     });
+    if (!result.consumed) {
+      throw new UnauthorizedException("Invalid or expired verification code.");
+    }
+    return normalizedEmail;
   }
 
   private digest(

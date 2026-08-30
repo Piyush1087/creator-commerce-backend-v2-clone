@@ -3,6 +3,15 @@ import { Models, ServerClient } from "postmark";
 
 import { resolveNotificationTemplateIdFromEnv } from "../features/notifications/config/notification-postmark-env";
 
+export type AuthMailDeliveryClassification = "REJECTED" | "DELIVERY_UNKNOWN";
+
+export class AuthMailDeliveryError extends Error {
+  constructor(readonly classification: AuthMailDeliveryClassification) {
+    super("Authentication email dispatch failed");
+    this.name = "AuthMailDeliveryError";
+  }
+}
+
 /** ANSI colors for Postmark logs in dev terminals (request vs response vs error). */
 const MAIL_LOG = {
   reset: "\x1b[0m",
@@ -29,23 +38,21 @@ export class MailService {
     expiresInMinutes: number;
   }): Promise<string> {
     const templateId = this.requiredTemplateId("POSTMARK_AUTH_OTP_TEMPLATE_ID");
-    const response = await this.postmarkClient.sendEmailWithTemplate({
-      From: process.env.POSTMARK_AUTH_FROM ?? "no-reply@thecreatorshop.in",
-      To: args.to,
-      TemplateId: templateId,
-      TemplateModel: {
-        name: args.displayName,
-        otp: args.code,
-        expires_in_minutes: args.expiresInMinutes,
-      },
-      MessageStream: process.env.POSTMARK_AUTH_MESSAGE_STREAM ?? "outbound",
-      TrackLinks: Models.LinkTrackingOptions.None,
-      TrackOpens: false,
-    });
-    if (response.ErrorCode !== 0 || !response.MessageID) {
-      throw new Error("Authentication email provider rejected the message");
-    }
-    return response.MessageID;
+    return this.sendAuthenticationMessage(() =>
+      this.postmarkClient.sendEmailWithTemplate({
+        From: process.env.POSTMARK_AUTH_FROM ?? "no-reply@thecreatorshop.in",
+        To: args.to,
+        TemplateId: templateId,
+        TemplateModel: {
+          name: args.displayName,
+          otp: args.code,
+          expires_in_minutes: args.expiresInMinutes,
+        },
+        MessageStream: process.env.POSTMARK_AUTH_MESSAGE_STREAM ?? "outbound",
+        TrackLinks: Models.LinkTrackingOptions.None,
+        TrackOpens: false,
+      }),
+    );
   }
 
   async sendPasswordReset(args: {
@@ -61,23 +68,21 @@ export class MailService {
     if (!frontend) throw new Error("APP_FRONTEND_URL is not configured");
     const url = new URL("/reset-password", frontend);
     url.hash = new URLSearchParams({ token: args.rawToken }).toString();
-    const response = await this.postmarkClient.sendEmailWithTemplate({
-      From: process.env.POSTMARK_AUTH_FROM ?? "no-reply@thecreatorshop.in",
-      To: args.to,
-      TemplateId: templateId,
-      TemplateModel: {
-        name: args.displayName,
-        reset_url: url.toString(),
-        expires_in_minutes: args.expiresInMinutes,
-      },
-      MessageStream: process.env.POSTMARK_AUTH_MESSAGE_STREAM ?? "outbound",
-      TrackLinks: Models.LinkTrackingOptions.None,
-      TrackOpens: false,
-    });
-    if (response.ErrorCode !== 0 || !response.MessageID) {
-      throw new Error("Authentication email provider rejected the message");
-    }
-    return response.MessageID;
+    return this.sendAuthenticationMessage(() =>
+      this.postmarkClient.sendEmailWithTemplate({
+        From: process.env.POSTMARK_AUTH_FROM ?? "no-reply@thecreatorshop.in",
+        To: args.to,
+        TemplateId: templateId,
+        TemplateModel: {
+          name: args.displayName,
+          reset_url: url.toString(),
+          expires_in_minutes: args.expiresInMinutes,
+        },
+        MessageStream: process.env.POSTMARK_AUTH_MESSAGE_STREAM ?? "outbound",
+        TrackLinks: Models.LinkTrackingOptions.None,
+        TrackOpens: false,
+      }),
+    );
   }
 
   async sendTeamInvitation(args: {
@@ -193,5 +198,28 @@ export class MailService {
       throw new Error(`${name} is missing or invalid`);
     }
     return value;
+  }
+
+  private async sendAuthenticationMessage(
+    send: () => Promise<{ ErrorCode: number; MessageID: string }>,
+  ): Promise<string> {
+    try {
+      const response = await send();
+      if (response.ErrorCode !== 0) {
+        throw new AuthMailDeliveryError("REJECTED");
+      }
+      if (!response.MessageID) {
+        throw new AuthMailDeliveryError("DELIVERY_UNKNOWN");
+      }
+      return response.MessageID;
+    } catch (error: unknown) {
+      if (error instanceof AuthMailDeliveryError) throw error;
+      const statusCode = (error as { statusCode?: number })?.statusCode;
+      throw new AuthMailDeliveryError(
+        typeof statusCode === "number" && statusCode >= 400 && statusCode < 500
+          ? "REJECTED"
+          : "DELIVERY_UNKNOWN",
+      );
+    }
   }
 }

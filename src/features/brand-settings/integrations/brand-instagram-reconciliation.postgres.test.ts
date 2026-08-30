@@ -1,6 +1,11 @@
 import "reflect-metadata";
 
-import { BrandRole, InstagramOAuthIntent, PrismaClient } from "@prisma/client";
+import {
+  BrandRole,
+  InstagramOAuthIntent,
+  PrismaClient,
+  UserAuthState,
+} from "@prisma/client";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import {
   afterAll,
@@ -191,6 +196,7 @@ describe.skipIf(process.env.BS06_DATABASE_TEST !== "true")(
         data: {
           email: `${randomUUID()}@example.test`,
           role: "BRAND",
+          authState: UserAuthState.ACTIVE,
           organizationId,
         },
       });

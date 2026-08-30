@@ -2,7 +2,7 @@ import { ConfigService } from "@nestjs/config";
 import { Models } from "postmark";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { MailService } from "../../mail/mail.service";
+import { AuthMailDeliveryError, MailService } from "../../mail/mail.service";
 import {
   hashPasswordAsync,
   isRecognizedPasswordHash,
@@ -112,5 +112,75 @@ describe("BS-12 authentication security contracts", () => {
     expect(request.TemplateModel.reset_url).toContain(
       "#token=high-entropy-reset-token",
     );
+  });
+
+  it("classifies a nonzero Postmark ErrorCode as deterministic rejection", async () => {
+    vi.stubEnv("POSTMARK_AUTH_OTP_TEMPLATE_ID", "101");
+    const mail = new MailService({
+      sendEmailWithTemplate: vi.fn().mockResolvedValue({
+        ErrorCode: 300,
+        MessageID: "",
+      }),
+    } as never);
+    await expect(
+      mail.sendAuthenticationOtp({
+        to: "user@example.test",
+        code: "839201",
+        displayName: "User",
+        expiresInMinutes: 10,
+      }),
+    ).rejects.toMatchObject<AuthMailDeliveryError>({
+      classification: "REJECTED",
+    });
+  });
+
+  it("distinguishes deterministic 4xx rejection from ambiguous delivery", async () => {
+    vi.stubEnv("POSTMARK_AUTH_OTP_TEMPLATE_ID", "101");
+    const request = {
+      to: "user@example.test",
+      code: "839201",
+      displayName: "User",
+      expiresInMinutes: 10,
+    };
+    const rejected = new MailService({
+      sendEmailWithTemplate: vi.fn().mockRejectedValue({ statusCode: 422 }),
+    } as never);
+    await expect(rejected.sendAuthenticationOtp(request)).rejects.toMatchObject(
+      { classification: "REJECTED" },
+    );
+
+    const ambiguous = new MailService({
+      sendEmailWithTemplate: vi.fn().mockRejectedValue(new Error("timeout")),
+    } as never);
+    await expect(
+      ambiguous.sendAuthenticationOtp(request),
+    ).rejects.toMatchObject({ classification: "DELIVERY_UNKNOWN" });
+  });
+
+  it("applies the same rejection distinction to password-reset transport", async () => {
+    vi.stubEnv("POSTMARK_PASSWORD_RESET_TEMPLATE_ID", "202");
+    vi.stubEnv("APP_FRONTEND_URL", "https://dashboard.example.test");
+    const request = {
+      to: "user@example.test",
+      rawToken: "high-entropy-reset-token",
+      displayName: "User",
+      expiresInMinutes: 30,
+    };
+    const rejected = new MailService({
+      sendEmailWithTemplate: vi.fn().mockResolvedValue({
+        ErrorCode: 300,
+        MessageID: "",
+      }),
+    } as never);
+    await expect(rejected.sendPasswordReset(request)).rejects.toMatchObject({
+      classification: "REJECTED",
+    });
+
+    const ambiguous = new MailService({
+      sendEmailWithTemplate: vi.fn().mockRejectedValue(new Error("timeout")),
+    } as never);
+    await expect(ambiguous.sendPasswordReset(request)).rejects.toMatchObject({
+      classification: "DELIVERY_UNKNOWN",
+    });
   });
 });

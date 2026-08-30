@@ -8,7 +8,7 @@ import {
 } from "@prisma/client";
 import { createHash, randomBytes } from "node:crypto";
 
-import { MailService } from "../../mail/mail.service";
+import { AuthMailDeliveryError, MailService } from "../../mail/mail.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import {
   hashPasswordAsync,
@@ -92,14 +92,12 @@ export class PasswordResetService {
         },
       });
     } catch (error: unknown) {
-      const statusCode = (error as { statusCode?: number })?.statusCode;
       await this.prisma.passwordResetChallenge.updateMany({
         where: { id: challenge.id, deliveryStatus: AuthDeliveryStatus.PENDING },
         data: {
           deliveryStatus:
-            typeof statusCode === "number" &&
-            statusCode >= 400 &&
-            statusCode < 500
+            error instanceof AuthMailDeliveryError &&
+            error.classification === "REJECTED"
               ? AuthDeliveryStatus.REJECTED
               : AuthDeliveryStatus.DELIVERY_UNKNOWN,
         },

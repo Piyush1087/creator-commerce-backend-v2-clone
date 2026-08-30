@@ -200,15 +200,6 @@ export default $config({
       INSTAGRAM_API_ID: process.env.INSTAGRAM_API_ID as string,
       INSTAGRAM_APP_SECRET: process.env.INSTAGRAM_APP_SECRET as string,
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? "",
-      // Static/stub OTP on local + dev; prod may opt into real Postmark OTP later.
-      CREATOR_VERIFICATION_USE_REAL_OTP:
-        $app.stage === "prod"
-          ? (process.env.CREATOR_VERIFICATION_USE_REAL_OTP ?? "false")
-          : "false",
-      BRAND_VERIFICATION_USE_REAL_OTP:
-        $app.stage === "prod"
-          ? (process.env.BRAND_VERIFICATION_USE_REAL_OTP ?? "false")
-          : "false",
       // QA apply/eligibility bypass — default test@creator.com on non-prod; empty on prod unless set.
       CREATOR_APPLY_BYPASS_EMAILS:
         $app.stage === "prod"

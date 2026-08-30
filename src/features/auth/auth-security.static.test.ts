@@ -14,6 +14,11 @@ function runtimeTypeScriptFiles(directory: string): string[] {
 describe("BS-12 runtime backdoor reconciliation", () => {
   const project = resolve(__dirname, "../../..");
   const sources = runtimeTypeScriptFiles(join(project, "src"));
+  const deployment = readFileSync(join(project, "sst.config.ts"), "utf8");
+  const environmentExample = readFileSync(
+    join(project, ".env.example"),
+    "utf8",
+  );
 
   it("contains no fixed six-digit legacy authentication bypass", () => {
     const legacyFixedCode = ["123", "456"].join("");
@@ -21,12 +26,25 @@ describe("BS-12 runtime backdoor reconciliation", () => {
       readFileSync(file, "utf8").includes(legacyFixedCode),
     );
     expect(offenders).toEqual([]);
+    expect(`${deployment}\n${environmentExample}`).not.toContain(
+      legacyFixedCode,
+    );
   });
 
   it("contains no deterministic JWT signing fallback", () => {
-    const deployment = readFileSync(join(project, "sst.config.ts"), "utf8");
     expect(deployment).not.toMatch(/JWT_SECRET[^\n]+\?\?[^\n]+placeholder/i);
     expect(deployment).toContain("requiredEnv(`JWT_SECRET_${authSuffix}`)");
+  });
+
+  it("contains no deployable legacy fixed-OTP feature flags", () => {
+    const deployableConfiguration = `${deployment}\n${environmentExample}`;
+    expect(deployableConfiguration).not.toContain(
+      "CREATOR_VERIFICATION_USE_REAL_OTP",
+    );
+    expect(deployableConfiguration).not.toContain(
+      "BRAND_VERIFICATION_USE_REAL_OTP",
+    );
+    expect(deployableConfiguration).not.toMatch(/static\/stub OTP/i);
   });
 
   it("uses official Google verification and server-backed sid validation", () => {
