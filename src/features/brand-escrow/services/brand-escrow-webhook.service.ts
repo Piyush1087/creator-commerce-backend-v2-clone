@@ -169,7 +169,7 @@ export class BrandEscrowWebhookService {
     },
   ): Promise<void> {
     if (!load.idempotencyKey) return;
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-ledger:${load.id}`}))`;
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-ledger:${load.id}`}))::text`;
     const principal = await tx.escrowTransactionLedger.upsert({
       where: { idempotencyKey: `load:${load.idempotencyKey}` },
       create: {

@@ -35,7 +35,7 @@ export class CreatorPayoutProfileService {
     const normalized = normalizeRouteProfile(evidence);
     await this.ensureProfile(creatorProfileId);
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`creator-payout-profile:${creatorProfileId}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`creator-payout-profile:${creatorProfileId}`}))::text`;
       return tx.creatorPayoutProfile.update({
         where: { creatorProfileId },
         data: {
@@ -64,7 +64,7 @@ export class CreatorPayoutProfileService {
   ) {
     await this.ensureProfile(creatorProfileId);
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`creator-payout-profile:${creatorProfileId}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`creator-payout-profile:${creatorProfileId}`}))::text`;
       const profile = await tx.creatorPayoutProfile.findUniqueOrThrow({
         where: { creatorProfileId },
       });

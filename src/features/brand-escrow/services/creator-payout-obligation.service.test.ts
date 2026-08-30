@@ -31,6 +31,7 @@ describe("Creator payout settlement instruction identity", () => {
             callback(tx),
         } as never,
         {} as never,
+        {} as never,
       ),
     };
   };

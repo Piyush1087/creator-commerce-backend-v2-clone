@@ -38,6 +38,9 @@ describe("BS-05 P2A financial producer boundaries", () => {
         "src/features/brand-escrow/services/brand-escrow-interlock.service.ts",
       ),
       source(
+        "src/features/brand-escrow/services/collaboration-refund-instruction.service.ts",
+      ),
+      source(
         "src/features/brand-escrow/services/creator-payout-obligation.service.ts",
       ),
       source(
@@ -73,6 +76,9 @@ describe("BS-05 P2A financial producer boundaries", () => {
       ),
       source(
         "src/features/brand-escrow/services/brand-escrow-interlock.service.ts",
+      ),
+      source(
+        "src/features/brand-escrow/services/collaboration-refund-instruction.service.ts",
       ),
     ].join("\n");
     expect(transactional).toContain("enqueueWithinTransaction");

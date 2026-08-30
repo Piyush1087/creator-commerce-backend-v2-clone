@@ -31,6 +31,8 @@ import { RouteReconciliationService } from "./services/route-reconciliation.serv
 import { RouteTransferService } from "./services/route-transfer.service";
 import { RouteWebhookEventParser } from "./services/route-webhook-event.parser";
 import { RouteWebhookService } from "./services/route-webhook.service";
+import { EscrowFinancialAllocationService } from "./services/escrow-financial-allocation.service";
+import { CollaborationRefundInstructionService } from "./services/collaboration-refund-instruction.service";
 
 @Module({
   imports: [
@@ -61,7 +63,9 @@ import { RouteWebhookService } from "./services/route-webhook.service";
     IdempotencyManager,
     RazorpayClient,
     CreatorPayoutProfileService,
+    EscrowFinancialAllocationService,
     CreatorPayoutObligationService,
+    CollaborationRefundInstructionService,
     RazorpayRouteAdapter,
     RouteTransferService,
     RouteReconciliationService,
@@ -75,6 +79,7 @@ import { RouteWebhookService } from "./services/route-webhook.service";
     BrandEscrowHardenedService,
     CreatorPayoutProfileService,
     CreatorPayoutObligationService,
+    CollaborationRefundInstructionService,
     RouteTransferService,
     RouteReconciliationService,
   ],

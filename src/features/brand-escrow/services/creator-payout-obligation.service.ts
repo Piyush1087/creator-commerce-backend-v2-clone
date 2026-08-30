@@ -9,6 +9,7 @@ import { Decimal } from "@prisma/client/runtime/library";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
+import { EscrowFinancialAllocationService } from "./escrow-financial-allocation.service";
 
 export type CollaborationSettlementInstruction = {
   instructionId: string;
@@ -28,6 +29,7 @@ export class CreatorPayoutObligationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationDispatchService,
+    private readonly allocations: EscrowFinancialAllocationService,
   ) {}
 
   async consumeSettlementInstruction(
@@ -42,8 +44,8 @@ export class CreatorPayoutObligationService {
       throw new BadRequestException("Route payout currency is not supported");
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`creator-payout-instruction:${input.instructionId}`}))`;
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-obligation:${input.collaborationId}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`creator-payout-instruction:${input.instructionId}`}))::text`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-obligation:${input.collaborationId}`}))::text`;
       const existing = await tx.creatorPayoutObligation.findUnique({
         where: { settlementInstructionId: input.instructionId },
       });
@@ -83,10 +85,12 @@ export class CreatorPayoutObligationService {
       const lock = collaboration.escrowLock;
       if (!lock || lock.lockReleasedViaRefund)
         throw new ConflictException("Active Collaboration reserve is required");
-      if (amount.greaterThan(lock.netCreatorPayoutPool))
-        throw new ConflictException(
-          "Instruction exceeds the canonical Creator payout reserve",
-        );
+      await this.allocations.assertCreatorAllocation(
+        tx,
+        input.collaborationId,
+        lock,
+        amount,
+      );
       const vault = await tx.brandEscrowVault.findUnique({
         where: { brandProfileId: input.brandProfileId },
       });
@@ -144,7 +148,7 @@ export class CreatorPayoutObligationService {
 
   async refreshBusinessExecutionReadiness(obligationId: string) {
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`creator-payout-obligation:${obligationId}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`creator-payout-obligation:${obligationId}`}))::text`;
       const obligation = await tx.creatorPayoutObligation.findUnique({
         where: { id: obligationId },
         include: { payoutProfile: true },

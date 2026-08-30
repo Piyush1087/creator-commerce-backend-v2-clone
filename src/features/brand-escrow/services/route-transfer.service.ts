@@ -36,7 +36,7 @@ export class RouteTransferService {
     onHoldUntil?: Date | null;
   }) {
     const prepared = await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`creator-payout-obligation:${input.obligationId}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`creator-payout-obligation:${input.obligationId}`}))::text`;
       const existingByKey = await tx.routeTransferAttempt.findUnique({
         where: { idempotencyKey: input.idempotencyKey },
         include: { obligation: { include: { payoutProfile: true } } },
@@ -54,8 +54,8 @@ export class RouteTransferService {
       });
       if (!obligation)
         throw new NotFoundException("Payout obligation not found");
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-obligation:${obligation.collaborationId}`}))`;
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`creator-payout-profile:${obligation.creatorProfileId}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-obligation:${obligation.collaborationId}`}))::text`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`creator-payout-profile:${obligation.creatorProfileId}`}))::text`;
       if (obligation.status !== "ELIGIBLE")
         throw new ConflictException("Payout obligation is not executable");
       if (
@@ -135,7 +135,7 @@ export class RouteTransferService {
         onHoldUntil: prepared.onHoldUntil,
       });
       return this.prisma.$transaction(async (tx) => {
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`creator-payout-obligation:${prepared.obligationId}`}))`;
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`creator-payout-obligation:${prepared.obligationId}`}))::text`;
         return tx.routeTransferAttempt.update({
           where: { id: prepared.id },
           data: {
@@ -237,7 +237,7 @@ export class RouteTransferService {
 
   async markReleaseEligible(transferAttemptId: string) {
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer:${transferAttemptId}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer:${transferAttemptId}`}))::text`;
       const transfer = await tx.routeTransferAttempt.findUnique({
         where: { id: transferAttemptId },
         include: { obligation: { include: { payoutProfile: true } } },
@@ -264,7 +264,7 @@ export class RouteTransferService {
     if (!trustedResolutionReference.trim())
       throw new BadRequestException("Trusted resolution reference is required");
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer:${transferAttemptId}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer:${transferAttemptId}`}))::text`;
       const transfer = await tx.routeTransferAttempt.findUnique({
         where: { id: transferAttemptId },
       });
@@ -301,7 +301,7 @@ export class RouteTransferService {
       throw new BadRequestException("Reversal amount must be positive");
     const prepared = await this.prisma.$transaction(
       async (tx) => {
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer:${input.transferAttemptId}`}))`;
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer:${input.transferAttemptId}`}))::text`;
         const byKey = await tx.routeTransferReversal.findUnique({
           where: { idempotencyKey: input.idempotencyKey },
         });
@@ -370,7 +370,7 @@ export class RouteTransferService {
 
   private async getReleaseCandidate(transferAttemptId: string) {
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer:${transferAttemptId}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer:${transferAttemptId}`}))::text`;
       const transfer = await tx.routeTransferAttempt.findUnique({
         where: { id: transferAttemptId },
         include: { obligation: { include: { payoutProfile: true } } },

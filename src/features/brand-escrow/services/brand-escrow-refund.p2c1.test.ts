@@ -1,269 +1,31 @@
-import { Decimal } from "@prisma/client/runtime/library";
+import { GoneException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
+
 import { BrandEscrowInterlockService } from "./brand-escrow-interlock.service";
 
-const withPayoutGuard = <T extends object>(tx: T) =>
-  Object.assign(tx, {
-    $queryRaw: vi.fn().mockResolvedValue([]),
-    creatorPayoutObligation: {
-      findFirst: vi.fn().mockResolvedValue(null),
-    },
-  });
-
-describe("BS09 P2C1 collaboration refund idempotency", () => {
-  const input = {
-    collaborationId: "collab-1",
-    reasonCode: "MUTUAL_TERMINATION" as const,
-    diagnosticNotes: "test",
-  };
-
-  it("moves the full unused reserve from locked to available exactly once", async () => {
-    const tx = {
-      collaborationEscrowLock: {
-        findUnique: vi.fn().mockResolvedValue({
-          id: "lock-1",
-          brandProfileId: "brand-1",
-          totalEscrowLockedAmount: new Decimal(108260),
-          netCreatorPayoutPool: new Decimal(100000),
-          advanceTrancheDisbursed: false,
-          finalTrancheDisbursed: false,
-          lockReleasedViaRefund: false,
-        }),
-        update: vi.fn(),
-      },
-      brandEscrowVault: {
-        findUnique: vi.fn().mockResolvedValue({
-          id: "vault-1",
-          currency: "INR",
-        }),
-        update: vi.fn(),
-      },
+describe("BS09 legacy collaboration refund compatibility boundary", () => {
+  it("returns 410 without opening a transaction or mutating financial state", async () => {
+    const prisma = {
+      $transaction: vi.fn(),
+      brandEscrowVault: { update: vi.fn() },
+      collaborationEscrowLock: { update: vi.fn() },
       escrowTransactionLedger: { create: vi.fn() },
-      collaborationCommercial: { updateMany: vi.fn() },
-      collaborationMessage: { create: vi.fn() },
     };
-    const service = new BrandEscrowInterlockService(
-      {
-        $transaction: (callback: (value: typeof tx) => unknown) =>
-          callback(withPayoutGuard(tx)),
-      } as never,
-      {} as never,
-    );
+    const service = new BrandEscrowInterlockService(prisma as never);
 
-    const result = await service.executeAutomatedRefund(input);
-
-    expect(result.amount_returned).toBe(108260);
-    expect(tx.brandEscrowVault.update).toHaveBeenCalledWith({
-      where: { id: "vault-1" },
-      data: {
-        lockedCampaignFunds: { decrement: new Decimal(108260) },
-        availableBalance: { increment: new Decimal(108260) },
-      },
+    const result = service.executeAutomatedRefund({
+      collaborationId: "collab-1",
+      reasonCode: "MUTUAL_TERMINATION",
+      diagnosticNotes: "legacy caller",
     });
-    expect(tx.collaborationEscrowLock.update).toHaveBeenCalledWith({
-      where: { id: "lock-1" },
-      data: { lockReleasedViaRefund: true },
-    });
-    expect(tx.escrowTransactionLedger.create).toHaveBeenCalledTimes(1);
-    expect(
-      tx.escrowTransactionLedger.create.mock.calls[0][0].data,
-    ).toMatchObject({
-      transactionType: "COLLAB_REFUND",
-      idempotencyKey: "collab-refund:collab-1",
-    });
-  });
 
-  it("returns ALREADY_REVERSED without a second mutation or ledger entry", async () => {
-    const tx = {
-      collaborationEscrowLock: {
-        findUnique: vi.fn().mockResolvedValue({ lockReleasedViaRefund: true }),
-      },
-      brandEscrowVault: { findUnique: vi.fn(), update: vi.fn() },
-      escrowTransactionLedger: { create: vi.fn() },
-      collaborationCommercial: { updateMany: vi.fn() },
-      collaborationMessage: { create: vi.fn() },
-    };
-    const service = new BrandEscrowInterlockService(
-      {
-        $transaction: (callback: (value: typeof tx) => unknown) =>
-          callback(withPayoutGuard(tx)),
-      } as never,
-      {} as never,
+    await expect(result).rejects.toBeInstanceOf(GoneException);
+    await expect(result).rejects.toThrow(
+      "canonical Collaboration financial resolution is required",
     );
-
-    const result = await service.executeAutomatedRefund(input);
-
-    expect(result).toEqual({
-      collaboration_id: "collab-1",
-      refund_status: "ALREADY_REVERSED",
-      amount_returned: 0,
-    });
-    expect(tx.brandEscrowVault.update).not.toHaveBeenCalled();
-    expect(tx.escrowTransactionLedger.create).not.toHaveBeenCalled();
-    expect(tx.collaborationCommercial.updateMany).not.toHaveBeenCalled();
-  });
-
-  describe.each([
-    { contractedAdvance: 20000, expectedRefund: 88260 },
-    { contractedAdvance: 50000, expectedRefund: 58260 },
-  ])(
-    "contracted advance $contractedAdvance",
-    ({ contractedAdvance, expectedRefund }) => {
-      it("refunds the reserve remainder without recomputing 30%", async () => {
-        const tx = {
-          collaborationEscrowLock: {
-            findUnique: vi.fn().mockResolvedValue({
-              id: "lock-1",
-              brandProfileId: "brand-1",
-              grossCreatorQuote: new Decimal(100000),
-              totalEscrowLockedAmount: new Decimal(108260),
-              netCreatorPayoutPool: new Decimal(100000),
-              advanceTrancheDisbursed: true,
-              finalTrancheDisbursed: false,
-              lockReleasedViaRefund: false,
-            }),
-            update: vi.fn(),
-          },
-          brandEscrowVault: {
-            findUnique: vi.fn().mockResolvedValue({
-              id: "vault-1",
-              currency: "INR",
-              totalPooledBalance: new Decimal(108260),
-            }),
-            update: vi.fn(),
-          },
-          escrowTransactionLedger: { create: vi.fn() },
-          collaborationCommercial: {
-            findUnique: vi.fn().mockResolvedValue({
-              finalQuote: new Decimal(100000),
-              advance30Amount: new Decimal(contractedAdvance),
-            }),
-            updateMany: vi.fn(),
-          },
-          collaborationMessage: { create: vi.fn() },
-        };
-        const service = new BrandEscrowInterlockService(
-          {
-            $transaction: (callback: (value: typeof tx) => unknown) =>
-              callback(withPayoutGuard(tx)),
-          } as never,
-          {} as never,
-        );
-
-        const result = await service.executeAutomatedRefund(input);
-
-        expect(result.amount_returned).toBe(expectedRefund);
-        const mutation = tx.brandEscrowVault.update.mock.calls[0][0].data;
-        expect(mutation.lockedCampaignFunds.decrement.toNumber()).toBe(
-          expectedRefund,
-        );
-        expect(mutation.availableBalance.increment.toNumber()).toBe(
-          expectedRefund,
-        );
-        expect(mutation).not.toHaveProperty("totalPooledBalance");
-        expect(
-          tx.escrowTransactionLedger.create.mock.calls[0][0].data.amount.toNumber(),
-        ).toBe(expectedRefund);
-      });
-    },
-  );
-
-  it.each([null, -1, 100001])(
-    "fails before mutation for corrupt contracted advance %s",
-    async (contractedAdvance) => {
-      const tx = {
-        collaborationEscrowLock: {
-          findUnique: vi.fn().mockResolvedValue({
-            id: "lock-1",
-            brandProfileId: "brand-1",
-            grossCreatorQuote: new Decimal(100000),
-            totalEscrowLockedAmount: new Decimal(108260),
-            advanceTrancheDisbursed: true,
-            finalTrancheDisbursed: false,
-            lockReleasedViaRefund: false,
-          }),
-        },
-        brandEscrowVault: {
-          findUnique: vi.fn().mockResolvedValue({
-            id: "vault-1",
-            currency: "INR",
-          }),
-          update: vi.fn(),
-        },
-        escrowTransactionLedger: { create: vi.fn() },
-        collaborationCommercial: {
-          findUnique: vi.fn().mockResolvedValue({
-            finalQuote: new Decimal(100000),
-            advance30Amount:
-              contractedAdvance === null
-                ? null
-                : new Decimal(contractedAdvance),
-          }),
-          updateMany: vi.fn(),
-        },
-      };
-      const service = new BrandEscrowInterlockService(
-        {
-          $transaction: (callback: (value: typeof tx) => unknown) =>
-            callback(withPayoutGuard(tx)),
-        } as never,
-        {} as never,
-      );
-
-      await expect(service.executeAutomatedRefund(input)).rejects.toThrow(
-        "Disbursed advance lacks valid contracted commercial authority",
-      );
-      expect(tx.brandEscrowVault.update).not.toHaveBeenCalled();
-      expect(tx.escrowTransactionLedger.create).not.toHaveBeenCalled();
-      expect(tx.collaborationCommercial.updateMany).not.toHaveBeenCalled();
-    },
-  );
-
-  it("keeps settled locks unavailable for collaboration refund", async () => {
-    const tx = {
-      collaborationEscrowLock: {
-        findUnique: vi.fn().mockResolvedValue({
-          lockReleasedViaRefund: false,
-          finalTrancheDisbursed: true,
-        }),
-      },
-      brandEscrowVault: { findUnique: vi.fn(), update: vi.fn() },
-      escrowTransactionLedger: { create: vi.fn() },
-      collaborationCommercial: { findUnique: vi.fn(), updateMany: vi.fn() },
-    };
-    const service = new BrandEscrowInterlockService(
-      {
-        $transaction: (callback: (value: typeof tx) => unknown) =>
-          callback(withPayoutGuard(tx)),
-      } as never,
-      {} as never,
-    );
-
-    await expect(service.executeAutomatedRefund(input)).rejects.toThrow(
-      "Escrow lock has already been settled or reversed",
-    );
-    expect(tx.brandEscrowVault.update).not.toHaveBeenCalled();
-    expect(tx.escrowTransactionLedger.create).not.toHaveBeenCalled();
-  });
-
-  it("cannot substitute COLLAB_REFUND for a Creator payout obligation", async () => {
-    const tx = withPayoutGuard({
-      collaborationEscrowLock: { findUnique: vi.fn() },
-    });
-    tx.creatorPayoutObligation.findFirst.mockResolvedValue({
-      id: "obligation-1",
-    });
-    const service = new BrandEscrowInterlockService(
-      {
-        $transaction: (callback: (value: typeof tx) => unknown) => callback(tx),
-      } as never,
-      {} as never,
-      {} as never,
-    );
-
-    await expect(service.executeAutomatedRefund(input)).rejects.toThrow(
-      "COLLAB_REFUND cannot replace or bypass a Creator payout obligation",
-    );
-    expect(tx.collaborationEscrowLock.findUnique).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.brandEscrowVault.update).not.toHaveBeenCalled();
+    expect(prisma.collaborationEscrowLock.update).not.toHaveBeenCalled();
+    expect(prisma.escrowTransactionLedger.create).not.toHaveBeenCalled();
   });
 });

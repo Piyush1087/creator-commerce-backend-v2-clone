@@ -56,7 +56,7 @@ export class BrandEscrowService {
     ) {
       return this.prisma.$transaction(
         async (tx) => {
-          await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-va:${brandProfileId}`}))`;
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-va:${brandProfileId}`}))::text`;
           const authoritative = await tx.brandEscrowVault.findUniqueOrThrow({
             where: { id: vault.id },
           });
@@ -193,7 +193,7 @@ export class BrandEscrowService {
         where: { id: loadId },
       });
       if (load.sourceType !== "GATEWAY" || !load.idempotencyKey) return;
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-ledger:${load.id}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-ledger:${load.id}`}))::text`;
       const principal = await tx.escrowTransactionLedger.upsert({
         where: { idempotencyKey: `load:${load.idempotencyKey}` },
         create: this.loadLedgerData(load),
@@ -274,7 +274,7 @@ export class BrandEscrowService {
   private async ensureProviderOrder(loadId: string) {
     return this.prisma.$transaction(
       async (tx) => {
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-order:${loadId}`}))`;
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`escrow-order:${loadId}`}))::text`;
         const load = await tx.escrowFundingLoad.findUniqueOrThrow({
           where: { id: loadId },
         });

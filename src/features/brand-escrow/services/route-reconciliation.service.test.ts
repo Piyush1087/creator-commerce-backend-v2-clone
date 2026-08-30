@@ -83,4 +83,78 @@ describe("Route reconciliation invariants", () => {
     ).rejects.toThrow("Cumulative reversal exceeds transfer amount");
     expect(createReversal).not.toHaveBeenCalled();
   });
+
+  it("restores settled accounting exactly once after provider-confirmed partial reversal", async () => {
+    const reversalRecord = {
+      id: "reversal-record-1",
+      reversalId: "rev_provider_1",
+      transferAttemptId: "attempt-1",
+      amount: new Decimal(25),
+      currency: "INR",
+      state: "PENDING",
+      transferAttempt: {
+        id: "attempt-1",
+        transferId: "tr_provider_1",
+        amount: new Decimal(100),
+        state: "PROCESSED",
+        settlementState: "SETTLED",
+        obligation: {
+          id: "obligation-1",
+          vaultId: "vault-1",
+          brandProfileId: "brand-1",
+          collaborationId: "collab-1",
+        },
+        reversals: [] as Array<{
+          id: string;
+          state: string;
+          amount: Decimal;
+        }>,
+      },
+    };
+    const vaultUpdate = vi.fn();
+    const ledgerCreate = vi.fn();
+    const reversalUpdate = vi.fn().mockImplementation(({ data }) => {
+      Object.assign(reversalRecord, data);
+      return reversalRecord;
+    });
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      routeTransferReversal: {
+        findUnique: vi.fn().mockImplementation(() => reversalRecord),
+        update: reversalUpdate,
+      },
+      brandEscrowVault: { update: vaultUpdate },
+      escrowTransactionLedger: { create: ledgerCreate },
+      routeTransferAttempt: { update: vi.fn() },
+      creatorPayoutObligation: { update: vi.fn() },
+    };
+    const notifications = { enqueueWithinTransaction: vi.fn() };
+    const service = new RouteReconciliationService(
+      {
+        $transaction: (callback: (client: typeof tx) => unknown) =>
+          callback(tx),
+      } as never,
+      notifications as never,
+    );
+
+    await service.reconcileReversal({
+      reversalId: "rev_provider_1",
+      providerState: "processed",
+    });
+    await service.reconcileReversal({
+      reversalId: "rev_provider_1",
+      providerState: "processed",
+    });
+
+    expect(vaultUpdate).toHaveBeenCalledTimes(1);
+    expect(vaultUpdate).toHaveBeenCalledWith({
+      where: { id: "vault-1" },
+      data: {
+        totalPooledBalance: { increment: new Decimal(25) },
+        lockedCampaignFunds: { increment: new Decimal(25) },
+      },
+    });
+    expect(ledgerCreate).toHaveBeenCalledTimes(1);
+    expect(notifications.enqueueWithinTransaction).toHaveBeenCalledTimes(1);
+  });
 });

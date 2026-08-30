@@ -37,7 +37,7 @@ export class RouteReconciliationService {
   }) {
     const incoming = normalizeTransferState(input.providerState);
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer-provider:${input.transferId}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer-provider:${input.transferId}`}))::text`;
       const transfer = await tx.routeTransferAttempt.findUnique({
         where: { transferId: input.transferId },
       });
@@ -76,13 +76,13 @@ export class RouteReconciliationService {
     providerState: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer-provider:${input.transferId}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer-provider:${input.transferId}`}))::text`;
       let transfer = await tx.routeTransferAttempt.findUnique({
         where: { transferId: input.transferId },
         include: { obligation: true, reversals: true },
       });
       if (!transfer) throw new NotFoundException("Route transfer not found");
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer:${transfer.id}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer:${transfer.id}`}))::text`;
       transfer = await tx.routeTransferAttempt.findUnique({
         where: { id: transfer.id },
         include: { obligation: true, reversals: true },
@@ -178,7 +178,7 @@ export class RouteReconciliationService {
         },
       });
       if (!reversal) throw new NotFoundException("Route reversal not found");
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer:${reversal.transferAttemptId}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`route-transfer:${reversal.transferAttemptId}`}))::text`;
       reversal = await tx.routeTransferReversal.findUnique({
         where: { id: reversal.id },
         include: {

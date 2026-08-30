@@ -1474,24 +1474,25 @@ model BrandProfile {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  offerings                Offering[]
-  competitors              Competitor[]
-  locations                Location[]
-  visualState              BrandVisualState?
-  locationObservations     BrandLocationObservation[]
-  subscriptions            Subscription[]
-  teamInvitations          TeamInvitation[]
-  brandCentreJobs          BrandCentreJob[]
-  budgetConfiguration      BrandBudgetConfiguration?
-  audiencePersonas         BrandAudiencePersona[]
-  brandOffers              BrandOffer[]
-  budgetModificationLogs   BrandBudgetModificationLog[]
-  intelligenceBaseline     BrandIntelligenceBaseline?
-  performanceLeaks         BrandPerformanceLeak[]
-  plannerCards             BrandPlannerCard[]
-  brandIntelligenceScans   BrandIntelligenceScan[]
-  brandPreviewRuns         BrandPreviewRun[]
-  creatorPayoutObligations CreatorPayoutObligation[]
+  offerings                       Offering[]
+  competitors                     Competitor[]
+  locations                       Location[]
+  visualState                     BrandVisualState?
+  locationObservations            BrandLocationObservation[]
+  subscriptions                   Subscription[]
+  teamInvitations                 TeamInvitation[]
+  brandCentreJobs                 BrandCentreJob[]
+  budgetConfiguration             BrandBudgetConfiguration?
+  audiencePersonas                BrandAudiencePersona[]
+  brandOffers                     BrandOffer[]
+  budgetModificationLogs          BrandBudgetModificationLog[]
+  intelligenceBaseline            BrandIntelligenceBaseline?
+  performanceLeaks                BrandPerformanceLeak[]
+  plannerCards                    BrandPlannerCard[]
+  brandIntelligenceScans          BrandIntelligenceScan[]
+  brandPreviewRuns                BrandPreviewRun[]
+  creatorPayoutObligations        CreatorPayoutObligation[]
+  collaborationRefundInstructions CollaborationRefundInstruction[]
 
   intelligenceExecutions              IntelligenceExecution[]
   intelligenceProcessorExecutions     IntelligenceProcessorExecution[]
@@ -3050,13 +3051,14 @@ model Collaboration {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  commercials              CollaborationCommercial?
-  logistics                CollaborationLogistics?
-  media                    CollaborationMedia[]
-  finalization             CollaborationFinalization?
-  messages                 CollaborationMessage[]
-  escrowLock               CollaborationEscrowLock?
-  creatorPayoutObligations CreatorPayoutObligation[]
+  commercials                     CollaborationCommercial?
+  logistics                       CollaborationLogistics?
+  media                           CollaborationMedia[]
+  finalization                    CollaborationFinalization?
+  messages                        CollaborationMessage[]
+  escrowLock                      CollaborationEscrowLock?
+  creatorPayoutObligations        CreatorPayoutObligation[]
+  collaborationRefundInstructions CollaborationRefundInstruction[]
 
   @@unique([campaignId, creatorUserId])
   @@index([brandProfileId, currentStage])
@@ -3195,6 +3197,7 @@ model BrandEscrowVault {
   ledgerEntries            EscrowTransactionLedger[]
   fundingLoads             EscrowFundingLoad[]
   creatorPayoutObligations CreatorPayoutObligation[]
+  refundInstructions       CollaborationRefundInstruction[]
 
   @@index([brandProfileId])
   @@map("brand_escrow_vaults")
@@ -3251,27 +3254,53 @@ model CollaborationEscrowLock {
 }
 
 model EscrowTransactionLedger {
-  id                         String                  @id @default(uuid()) @map("transaction_id")
-  vaultId                    String                  @map("vault_id")
-  vault                      BrandEscrowVault        @relation(fields: [vaultId], references: [id], onDelete: Restrict)
-  brandProfileId             String                  @map("brand_id")
-  collaborationId            String?                 @map("collaboration_id")
-  transactionType            EscrowTransactionType   @map("transaction_type")
-  payoutTrancheTarget        EscrowPayoutTranche?    @map("payout_tranche_target")
-  amount                     Decimal                 @db.Decimal(15, 4)
-  currency                   String                  @db.VarChar(3)
-  gatewayProcessingSurcharge Decimal                 @default(0) @map("gateway_processing_surcharge") @db.Decimal(15, 4)
-  gatewaySurchargeGst        Decimal                 @default(0) @map("gateway_surcharge_gst") @db.Decimal(15, 4)
-  idempotencyKey             String                  @unique @map("idempotency_key")
-  gatewayReferenceId         String?                 @unique @map("gateway_reference_id")
-  transactionStatus          EscrowTransactionStatus @default(PROCESSING_GATEWAY) @map("transaction_status")
-  errorDiagnosticPayload     Json?                   @map("error_diagnostic_payload")
-  createdAt                  DateTime                @default(now()) @map("created_at")
+  id                         String                          @id @default(uuid()) @map("transaction_id")
+  vaultId                    String                          @map("vault_id")
+  vault                      BrandEscrowVault                @relation(fields: [vaultId], references: [id], onDelete: Restrict)
+  brandProfileId             String                          @map("brand_id")
+  collaborationId            String?                         @map("collaboration_id")
+  transactionType            EscrowTransactionType           @map("transaction_type")
+  payoutTrancheTarget        EscrowPayoutTranche?            @map("payout_tranche_target")
+  amount                     Decimal                         @db.Decimal(15, 4)
+  currency                   String                          @db.VarChar(3)
+  gatewayProcessingSurcharge Decimal                         @default(0) @map("gateway_processing_surcharge") @db.Decimal(15, 4)
+  gatewaySurchargeGst        Decimal                         @default(0) @map("gateway_surcharge_gst") @db.Decimal(15, 4)
+  idempotencyKey             String                          @unique @map("idempotency_key")
+  gatewayReferenceId         String?                         @unique @map("gateway_reference_id")
+  transactionStatus          EscrowTransactionStatus         @default(PROCESSING_GATEWAY) @map("transaction_status")
+  errorDiagnosticPayload     Json?                           @map("error_diagnostic_payload")
+  createdAt                  DateTime                        @default(now()) @map("created_at")
+  refundInstruction          CollaborationRefundInstruction?
 
   @@index([vaultId])
   @@index([brandProfileId, collaborationId, transactionType])
   @@index([collaborationId])
   @@map("escrow_transaction_ledger")
+}
+
+model CollaborationRefundInstruction {
+  id                           String                  @id @default(uuid()) @map("refund_instruction_record_id")
+  refundInstructionId          String                  @unique @map("refund_instruction_id")
+  collaborationId              String                  @map("collaboration_id")
+  collaboration                Collaboration           @relation(fields: [collaborationId], references: [id], onDelete: Restrict)
+  vaultId                      String                  @map("vault_id")
+  vault                        BrandEscrowVault        @relation(fields: [vaultId], references: [id], onDelete: Restrict)
+  brandProfileId               String                  @map("brand_id")
+  brandProfile                 BrandProfile            @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
+  amount                       Decimal                 @db.Decimal(15, 4)
+  currency                     String                  @db.VarChar(3)
+  financialResolutionReference String                  @map("financial_resolution_reference")
+  instructionIssuedAt          DateTime                @map("instruction_issued_at")
+  triggeringUserId             String?                 @map("triggering_user_id")
+  ledgerTransactionId          String                  @unique @map("ledger_transaction_id")
+  ledgerTransaction            EscrowTransactionLedger @relation(fields: [ledgerTransactionId], references: [id], onDelete: Restrict)
+  executedAt                   DateTime                @default(now()) @map("executed_at")
+  createdAt                    DateTime                @default(now()) @map("created_at")
+  updatedAt                    DateTime                @updatedAt @map("updated_at")
+
+  @@index([collaborationId, executedAt])
+  @@index([brandProfileId, executedAt])
+  @@map("collaboration_refund_instructions")
 }
 
 model CreatorSettlementProfile {
