@@ -28,7 +28,7 @@ ALTER TABLE "creator_entry_continuations"
   ON DELETE RESTRICT ON UPDATE CASCADE,
   ADD CONSTRAINT "creator_entry_continuations_bound_user_id_fkey"
   FOREIGN KEY ("bound_user_id") REFERENCES "users"("id")
-  ON DELETE SET NULL ON UPDATE CASCADE;
+  ON DELETE RESTRICT ON UPDATE CASCADE;
 
 CREATE FUNCTION "c01_creator_entry_continuation_immutable_authority"() RETURNS trigger AS $$
 BEGIN
@@ -36,6 +36,10 @@ BEGIN
     OR NEW."intent" IS DISTINCT FROM OLD."intent"
     OR NEW."campaign_id" IS DISTINCT FROM OLD."campaign_id"
     OR NEW."created_at" IS DISTINCT FROM OLD."created_at"
+    OR (
+      OLD."bound_user_id" IS NOT NULL
+      AND NEW."bound_user_id" IS DISTINCT FROM OLD."bound_user_id"
+    )
   THEN
     RAISE EXCEPTION 'C01_CREATOR_ENTRY_CONTINUATION_AUTHORITY_IMMUTABLE';
   END IF;
@@ -44,6 +48,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER "c01_creator_entry_continuation_authority_guard"
-BEFORE UPDATE OF "token_digest", "intent", "campaign_id", "created_at"
+BEFORE UPDATE OF "token_digest", "intent", "campaign_id", "created_at", "bound_user_id"
 ON "creator_entry_continuations"
 FOR EACH ROW EXECUTE FUNCTION "c01_creator_entry_continuation_immutable_authority"();

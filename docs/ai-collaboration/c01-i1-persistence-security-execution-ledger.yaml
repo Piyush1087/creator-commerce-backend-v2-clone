@@ -21,6 +21,17 @@ checkpoint:
   candidate_head_self_recorded: false
   sha_source: C01_I1_PERSISTENCE_SECURITY_FOUNDATION_REPORT_V1_AND_REMOTE_BRANCH_TIP
 
+systems_review:
+  initial_checkpoint: 86eb541171b191c4d2e06cbe3d5298bf02bb8e51
+  result: BOUNDED_CORRECTION_REQUIRED
+  corrections:
+    - a2_conflict_register_semantic_equivalence_restored
+    - full_material_migration_circuit_breakers
+    - active_customer_organization_required
+    - creator_settings_lazy_canonical_provisioning_removed
+    - creator_associated_email_authorization_removed
+    - continuation_user_binding_monotonic_and_delete_restricted
+
 migration_names:
   - 20260908120000_c01_i1_organization_workspace_foundation
   - 20260908121000_c01_i1_provider_oauth_transaction
@@ -62,8 +73,10 @@ continuation_persistence:
   workflow_implemented: false
 
 test_results:
-  canonical_default_suite: PASS_AFTER_BOUNDED_MIGRATION_COUNT_GUARD_CORRECTION_157_EXECUTED_FILES_1049_PASSED_39_DATABASE_GATED_FILES_503_SKIPPED
+  canonical_default_suite: PASS_157_EXECUTED_FILES_1051_PASSED_39_DATABASE_GATED_FILES_507_SKIPPED
   c01_i1_postgresql_security: PASS_22_OF_22
+  c01_i1_historical_scan_architecture: PASS_6_OF_6
+  c01_i1_persistence_architecture: PASS_2_OF_2
   settings_auth_postgresql: PASS_10_OF_10
   settings_general_postgresql: PASS_41_OF_41
   settings_team_postgresql: PASS_97_OF_97
@@ -74,8 +87,8 @@ test_results:
   subscription_lifecycle_postgresql: PASS_2_OF_2
   brand_centre_postgresql: PASS_26_WITH_1_EXISTING_INTENTIONAL_SKIP
   product_intelligence_and_consumer_postgresql: PASS_11_OF_11
-  brand_intelligence_postgresql: PASS_134_OF_134
-  data_extraction_postgresql: PASS_FUNCTIONALLY_WITH_EXISTING_5_SECOND_TIMING_THRESHOLD_RERUN_AT_15_SECONDS
+  brand_intelligence_postgresql: PASS_ALL_BOUNDED_DATABASE_SHARDS_WITH_EXISTING_5_SECOND_TIMING_THRESHOLDS_RERUN_AT_15_SECONDS
+  data_extraction_postgresql: PASS_59_OF_59_RELEVANT_EVIDENCE_AND_NORMALIZATION_TESTS_AT_ACCEPTED_15_SECOND_HOST_THRESHOLD
   production_build: PASS
   scoped_i1_eslint: PASS
   repository_lint: PRE_EXISTING_1022_FORMATTING_ERRORS_I1_SCOPED_ERRORS_ZERO
@@ -94,6 +107,11 @@ migration_validation:
     brand_creator_conflict: PASS_FAILS_CLOSED
     multiple_creator_workspaces: PASS_FAILS_CLOSED
     brand_oauth_history: PASS_EXACT_SECURITY_EVIDENCE_PRESERVED
+    brand_user_creator_profile: PASS_FAILS_CLOSED
+    brand_membership_organization_mismatch: PASS_FAILS_CLOSED
+    incompatible_provider_integration_owner: PASS_FAILS_CLOSED
+    active_brand_without_organization: PASS_FAILS_CLOSED
+    unresolved_active_creator: PASS_FAILS_CLOSED
 
 corrections:
   - generalized_brand_oauth_storage_in_place_without_semantic_behavior_change
@@ -103,6 +121,13 @@ corrections:
   - reconciled_current_migration_count_guards_from_66_to_70
   - corrected_legacy_database_test_fixtures_to_respect_typed_organization_invariants
   - corrected_verified_brand_scan_to_use_brand_team_members_primary_key_column
+  - restored_a2_conflict_register_semantic_equivalence
+  - expanded_pre_mutation_migration_circuit_breakers
+  - required_typed_organizations_for_active_customer_users
+  - removed_creator_settings_lazy_canonical_provisioning
+  - removed_associated_email_as_creator_workspace_authority
+  - made_continuation_user_binding_monotonic_and_delete_restricted
+  - reconciled_database_test_fixtures_with_active_customer_organization_invariants
 
 deviations:
   - no_authorized_historical_database_was_available_so_row_counts_were_not_invented

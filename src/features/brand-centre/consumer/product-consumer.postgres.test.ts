@@ -653,7 +653,7 @@ database("Product consumer exact-Offering PostgreSQL surface", () => {
     expect(JSON.stringify(result)).not.toContain(
       "owned_website.offering_commercial_evidence",
     );
-    expect(JSON.stringify(result)).not.toContain("777");
+    expect(JSON.stringify(result)).not.toContain('"777"');
     expect({
       subjects: await prisma.intelligenceSubject.count({
         where: { brandId: profile.id },

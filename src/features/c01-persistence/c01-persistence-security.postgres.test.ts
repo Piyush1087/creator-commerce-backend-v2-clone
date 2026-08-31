@@ -17,6 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { PrismaService } from "../../prisma/prisma.service";
 import { BrandInstagramOAuthStateService } from "../brand-settings/services/brand-instagram-oauth-state.service";
+import { CreatorSettingsAccessService } from "../creator-settings/services/creator-settings-access.service";
 import {
   CreatorEntryContinuationStore,
   hashCreatorEntryContinuationToken,
@@ -40,6 +41,7 @@ database("C01-I1 persistence and shared security foundation", () => {
     transactions,
   );
   const continuations = new CreatorEntryContinuationStore(db);
+  const creatorSettingsAccess = new CreatorSettingsAccessService(db);
 
   beforeAll(async () => {
     const url = new URL(databaseUrl!);
@@ -118,6 +120,27 @@ database("C01-I1 persistence and shared security foundation", () => {
   }
 
   describe("Organization and Creator owner invariants", () => {
+    it("requires an organization for active Brand and Creator customers", async () => {
+      await expect(
+        prisma.user.create({
+          data: {
+            email: `${randomUUID()}@active-brand-without-org.example`,
+            role: UserRole.BRAND,
+            authState: UserAuthState.ACTIVE,
+          },
+        }),
+      ).rejects.toThrow(/C01_ACTIVE_BRAND_ORGANIZATION_REQUIRED/);
+      await expect(
+        prisma.user.create({
+          data: {
+            email: `${randomUUID()}@active-creator-without-org.example`,
+            role: UserRole.CREATOR,
+            authState: UserAuthState.ACTIVE,
+          },
+        }),
+      ).rejects.toThrow(/C01_ACTIVE_CREATOR_ORGANIZATION_REQUIRED/);
+    });
+
     it("rejects cross-kind Brand and Creator bindings", async () => {
       const creatorOrganization = await prisma.organization.create({
         data: { name: randomUUID(), kind: OrganizationKind.CREATOR },
@@ -203,6 +226,92 @@ database("C01-I1 persistence and shared security foundation", () => {
           data: { organizationId: organization.id },
         }),
       ).rejects.toThrow(/C01_PROVISIONAL_CREATOR_CANNOT_CLAIM_ORGANIZATION/);
+    });
+
+    it("keeps Creator Settings read access out of canonical provisioning", async () => {
+      const organization = await prisma.organization.create({
+        data: { name: randomUUID(), kind: OrganizationKind.CREATOR },
+      });
+      const user = await prisma.user.create({
+        data: {
+          email: `${randomUUID()}@settings-no-provision.example`,
+          role: UserRole.CREATOR,
+          authState: UserAuthState.ACTIVE,
+          organizationId: organization.id,
+        },
+      });
+      const authUser = {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        organizationId: user.organizationId,
+      };
+      await expect(
+        creatorSettingsAccess.resolveCreatorProfile(authUser),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "CREATOR_CANONICAL_PROFILE_MISSING",
+        }),
+      });
+      expect(
+        await prisma.creatorProfile.count({ where: { userId: user.id } }),
+      ).toBe(0);
+
+      const profile = await prisma.creatorProfile.create({
+        data: { userId: user.id, displayName: "No lazy workspace" },
+      });
+      await expect(
+        creatorSettingsAccess.resolveWorkspace(profile.id, user.email),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "CREATOR_CANONICAL_WORKSPACE_MISSING",
+        }),
+      });
+      expect(
+        await prisma.creatorWorkspace.count({
+          where: { ownerProfileId: profile.id },
+        }),
+      ).toBe(0);
+    });
+
+    it("does not authorize an email-only Creator workspace member", async () => {
+      const owner = await creatorContext("settings-membership-owner");
+      const member = await creatorContext("settings-membership-member");
+      const emailOnly = await prisma.creatorWorkspaceMember.create({
+        data: {
+          workspaceId: owner.workspace.id,
+          associatedEmail: member.user.email,
+          securityRole: "ASSISTANT",
+          isActive: true,
+        },
+      });
+      const authUser = {
+        id: member.user.id,
+        email: member.user.email,
+        name: member.user.name,
+        role: member.user.role,
+        organizationId: member.user.organizationId,
+      };
+      await expect(
+        creatorSettingsAccess.resolveWorkspaceRole(
+          owner.workspace.id,
+          authUser,
+          member.profile.id,
+        ),
+      ).rejects.toThrow(/No active workspace membership found/);
+
+      await prisma.creatorWorkspaceMember.update({
+        where: { id: emailOnly.id },
+        data: { assignedProfileId: member.profile.id },
+      });
+      await expect(
+        creatorSettingsAccess.resolveWorkspaceRole(
+          owner.workspace.id,
+          authUser,
+          member.profile.id,
+        ),
+      ).resolves.toBe("ASSISTANT");
     });
   });
 
@@ -489,6 +598,51 @@ database("C01-I1 persistence and shared security foundation", () => {
       await expect(
         prisma.uceCampaign.delete({ where: { id: first.id } }),
       ).rejects.toThrow();
+    });
+
+    it("keeps an established User binding monotonic and deletion-restricted", async () => {
+      const brand = await brandContext("continuation-binding");
+      const campaign = await prisma.uceCampaign.create({
+        data: { brandProfileId: brand.brand.id, name: "Binding" },
+      });
+      const firstUser = await creatorContext("continuation-bound-first");
+      const secondUser = await creatorContext("continuation-bound-second");
+      const issued =
+        await continuations.createResolvedCampaignApplyContinuation({
+          campaignId: campaign.id,
+          expiresAt: new Date(Date.now() + 600_000),
+        });
+
+      await prisma.creatorEntryContinuation.update({
+        where: { id: issued.continuationId },
+        data: { boundUserId: firstUser.user.id },
+      });
+      await expect(
+        prisma.creatorEntryContinuation.update({
+          where: { id: issued.continuationId },
+          data: { boundUserId: firstUser.user.id },
+        }),
+      ).resolves.toMatchObject({ boundUserId: firstUser.user.id });
+      await expect(
+        prisma.creatorEntryContinuation.update({
+          where: { id: issued.continuationId },
+          data: { boundUserId: secondUser.user.id },
+        }),
+      ).rejects.toThrow(/C01_CREATOR_ENTRY_CONTINUATION_AUTHORITY_IMMUTABLE/);
+      await expect(
+        prisma.creatorEntryContinuation.update({
+          where: { id: issued.continuationId },
+          data: { boundUserId: null },
+        }),
+      ).rejects.toThrow(/C01_CREATOR_ENTRY_CONTINUATION_AUTHORITY_IMMUTABLE/);
+      await expect(
+        prisma.user.delete({ where: { id: firstUser.user.id } }),
+      ).rejects.toThrow();
+      expect(
+        await prisma.creatorEntryContinuation.findUniqueOrThrow({
+          where: { id: issued.continuationId },
+        }),
+      ).toMatchObject({ boundUserId: firstUser.user.id });
     });
   });
 });

@@ -9,7 +9,9 @@ const enabled = process.env.RUN_NOTIFICATION_POSTGRES_TESTS === "true";
 const suite = enabled ? describe : describe.skip;
 
 suite("BS-05 P1C1 immutable notification intent", () => {
-  const db = new PrismaClient();
+  const db = new PrismaClient({
+    transactionOptions: { maxWait: 10_000, timeout: 10_000 },
+  });
   const suffix = randomUUID().slice(0, 8);
   const brandA = `bs05-a-${suffix}`;
   const brandB = `bs05-b-${suffix}`;

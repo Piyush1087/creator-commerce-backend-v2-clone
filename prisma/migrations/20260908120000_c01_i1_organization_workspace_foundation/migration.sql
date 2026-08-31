@@ -8,6 +8,48 @@ DO $$
 BEGIN
   IF EXISTS (
     SELECT 1
+    FROM "users" u
+    JOIN "creator_profiles" cp ON cp."user_id" = u."id"
+    WHERE u."role" = 'BRAND'
+  ) THEN
+    RAISE EXCEPTION 'C01_BRAND_USER_WITH_CREATOR_PROFILE';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM "creator_profiles" cp
+    JOIN "brand_team_members" btm
+      ON btm."user_id" = cp."user_id" AND btm."is_active" = true
+  ) THEN
+    RAISE EXCEPTION 'C01_CREATOR_PROFILE_USER_WITH_ACTIVE_BRAND_MEMBERSHIP';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM "creator_profiles" cp
+    JOIN "users" u ON u."id" = cp."user_id"
+    JOIN "brand_profiles" bp ON bp."organization_id" = u."organization_id"
+  ) THEN
+    RAISE EXCEPTION 'C01_CREATOR_PROFILE_USER_IN_BRAND_ORGANIZATION';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM "brand_team_members" btm
+    JOIN "users" u ON u."id" = btm."user_id"
+    JOIN "brand_profiles" bp ON bp."id" = btm."brand_id"
+    WHERE btm."is_active" = true
+      AND (
+        u."organization_id" IS NULL
+        OR bp."organization_id" IS NULL
+        OR u."organization_id" IS DISTINCT FROM bp."organization_id"
+      )
+  ) THEN
+    RAISE EXCEPTION 'C01_ACTIVE_BRAND_MEMBERSHIP_ORGANIZATION_MISMATCH';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
     FROM "organizations" o
     JOIN "brand_profiles" bp ON bp."organization_id" = o."id"
     JOIN "users" u ON u."organization_id" = o."id"
@@ -59,6 +101,43 @@ BEGIN
     HAVING count(*) > 1
   ) THEN
     RAISE EXCEPTION 'PROVIDER_IDENTITY_OWNERSHIP_CONFLICT';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM "creator_social_integrations" csi
+    JOIN "creator_profiles" cp ON cp."id" = csi."creator_profile_id"
+    JOIN "users" u ON u."id" = cp."user_id"
+    WHERE u."role" <> 'CREATOR'
+  ) THEN
+    RAISE EXCEPTION 'C01_PROVIDER_INTEGRATION_INCOMPATIBLE_USER_OWNERSHIP';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM "users" u
+    WHERE u."auth_state" = 'ACTIVE'
+      AND u."role" = 'BRAND'
+      AND (
+        u."organization_id" IS NULL
+        OR NOT EXISTS (
+          SELECT 1 FROM "brand_profiles" bp
+          WHERE bp."organization_id" = u."organization_id"
+        )
+      )
+  ) THEN
+    RAISE EXCEPTION 'C01_ACTIVE_BRAND_ORGANIZATION_UNRESOLVED';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM "users" u
+    LEFT JOIN "creator_profiles" cp ON cp."user_id" = u."id"
+    WHERE u."auth_state" = 'ACTIVE'
+      AND u."role" = 'CREATOR'
+      AND (u."email_verified_at" IS NULL OR cp."id" IS NULL)
+  ) THEN
+    RAISE EXCEPTION 'C01_ACTIVE_CREATOR_CONTEXT_UNRESOLVED';
   END IF;
 END $$;
 
@@ -274,7 +353,13 @@ BEGIN
   IF NEW."role" = 'CREATOR' AND NEW."auth_state" = 'PROVISIONAL' AND NEW."organization_id" IS NOT NULL THEN
     RAISE EXCEPTION 'C01_PROVISIONAL_CREATOR_CANNOT_CLAIM_ORGANIZATION';
   END IF;
-  IF NEW."organization_id" IS NOT NULL AND NEW."auth_state" = 'ACTIVE' THEN
+  IF NEW."auth_state" = 'ACTIVE' AND NEW."role" = 'BRAND' AND NEW."organization_id" IS NULL THEN
+    RAISE EXCEPTION 'C01_ACTIVE_BRAND_ORGANIZATION_REQUIRED';
+  END IF;
+  IF NEW."auth_state" = 'ACTIVE' AND NEW."role" = 'CREATOR' AND NEW."organization_id" IS NULL THEN
+    RAISE EXCEPTION 'C01_ACTIVE_CREATOR_ORGANIZATION_REQUIRED';
+  END IF;
+  IF NEW."auth_state" = 'ACTIVE' AND NEW."role" IN ('BRAND', 'CREATOR') THEN
     SELECT "kind" INTO organization_kind FROM "organizations" WHERE "id" = NEW."organization_id";
     IF NEW."role" = 'BRAND' AND organization_kind IS DISTINCT FROM 'BRAND'::"OrganizationKind" THEN
       RAISE EXCEPTION 'C01_ACTIVE_BRAND_USER_REQUIRES_BRAND_ORGANIZATION';

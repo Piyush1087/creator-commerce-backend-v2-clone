@@ -2639,7 +2639,7 @@ model CreatorEntryContinuation {
   campaignId  String                         @map("campaign_id")
   campaign    UceCampaign                    @relation(fields: [campaignId], references: [id], onDelete: Restrict)
   boundUserId String?                        @map("bound_user_id")
-  boundUser   User?                          @relation(fields: [boundUserId], references: [id], onDelete: SetNull)
+  boundUser   User?                          @relation(fields: [boundUserId], references: [id], onDelete: Restrict)
   createdAt   DateTime                       @default(now()) @map("created_at")
   expiresAt   DateTime                       @map("expires_at")
   consumedAt  DateTime?                      @map("consumed_at")
