@@ -4,8 +4,9 @@ import { SubscriptionStatus, SubscriptionTier } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import {
   CYCLIC_FEATURE_KEYS,
-  ESCROW_TAKE_RATES,
   FEATURE_LIMITS,
+  FOUNDERS_BETA_COMMISSION_RATE,
+  LEGACY_ESCROW_TAKE_RATES,
 } from "../constants/subscription.constants";
 import type { EntitlementFeatureKey } from "../types";
 
@@ -107,7 +108,9 @@ export class EntitlementService {
   }
 
   getEscrowTakeRate(tier: SubscriptionTier): number {
-    return ESCROW_TAKE_RATES[tier];
+    return tier === SubscriptionTier.FOUNDERS_BETA
+      ? FOUNDERS_BETA_COMMISSION_RATE
+      : LEGACY_ESCROW_TAKE_RATES[tier];
   }
 
   getEscrowAggregateCap(tier: SubscriptionTier): number {

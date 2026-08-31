@@ -16,6 +16,7 @@ import { JwtService } from "@nestjs/jwt";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { PrismaService } from "../../../prisma/prisma.service";
+import { AuthSessionService } from "../../auth/auth-session.service";
 import { JwtAuthGuard } from "../../auth/jwt-auth.guard";
 import { JwtStrategy } from "../../auth/jwt.strategy";
 import type { AuthUser } from "../../auth/types/auth-user";
@@ -116,7 +117,15 @@ database("Product consumer exact-Offering PostgreSQL surface", () => {
   const hash = (value: unknown) =>
     createHash("sha256").update(JSON.stringify(value)).digest("hex");
   const secret = randomBytes(32).toString("hex");
-  const jwt = new JwtService({ secret });
+  const authConfig = new ConfigService({
+    JWT_SECRET: secret,
+    JWT_ISSUER: "product-consumer-test-issuer",
+    JWT_AUDIENCE: "product-consumer-test-audience",
+    JWT_ACCESS_TTL: "15m",
+    AUTH_REFRESH_TTL: "30d",
+  });
+  const jwt = new JwtService();
+  const sessions = new AuthSessionService(db, jwt, authConfig);
   let app: INestApplication;
   let baseUrl: string;
 
@@ -132,13 +141,32 @@ database("Product consumer exact-Offering PostgreSQL surface", () => {
         domain: `${randomUUID()}.example.test`,
       },
     });
+    const storedUser = await prisma.user.create({
+      data: {
+        id: randomUUID(),
+        organizationId: organization.id,
+        role: "BRAND",
+        email: `${label}-${randomUUID()}@example.test`,
+        name: label,
+        authState: "ACTIVE",
+        emailVerifiedAt: new Date(),
+      },
+    });
     const user: AuthUser = {
-      id: randomUUID(),
+      sessionId: "test-session",
+      id: storedUser.id,
       organizationId: organization.id,
       role: "BRAND",
-      email: `${label}@example.test`,
+      email: storedUser.email,
       name: label,
     };
+    await prisma.brandTeamMember.create({
+      data: {
+        brandProfileId: profile.id,
+        userId: storedUser.id,
+        role: "BRAND_OWNER",
+      },
+    });
     return { profile, user };
   }
 
@@ -419,7 +447,7 @@ database("Product consumer exact-Offering PostgreSQL surface", () => {
         "src/features/brand-intelligence/generated/contract-bundles",
       ),
     );
-    new JwtStrategy(new ConfigService({ JWT_SECRET: secret }));
+    new JwtStrategy(authConfig, sessions);
     Reflect.defineMetadata(
       "design:paramtypes",
       [ProductConsumerService, CanonicalOfferingDiscoveryService],
@@ -448,7 +476,7 @@ database("Product consumer exact-Offering PostgreSQL surface", () => {
 
   it("serves an authenticated empty canonical Offering collection", async () => {
     const { user } = await brand("discovery-empty");
-    const token = jwt.sign({ sub: user.id, ...user });
+    const token = (await sessions.create(user.id)).accessToken;
     expect(
       (await fetch(`${baseUrl}/api/v1/brand-centre/offerings`)).status,
     ).toBe(401);
@@ -516,7 +544,7 @@ database("Product consumer exact-Offering PostgreSQL surface", () => {
         where: { brandProfileId: own.profile.id },
       }),
     };
-    const token = jwt.sign({ sub: own.user.id, ...own.user });
+    const token = (await sessions.create(own.user.id)).accessToken;
     const response = await fetch(
       `${baseUrl}/api/v1/brand-centre/offerings?brandId=${foreign.profile.id}`,
       { headers: { authorization: `Bearer ${token}` } },
@@ -872,7 +900,7 @@ database("Product consumer exact-Offering PostgreSQL surface", () => {
     await expect(service.read(a.user, foreign.id)).rejects.toMatchObject({
       status: 404,
     });
-    const token = jwt.sign({ sub: a.user.id, ...a.user });
+    const token = (await sessions.create(a.user.id)).accessToken;
     expect(
       (
         await fetch(

@@ -6,6 +6,7 @@ import {
 import {
   CanonicalOfferingAuthority,
   CanonicalOfferingOrigin,
+  InstagramIgHandleProvenance,
   OfferingGuidanceKind,
   OfferingLifecycle,
   OfferingPriceFreshness,
@@ -18,6 +19,7 @@ import { gateAndNormalizeBrandUrl } from "../../brand-onboarding/discovery-url.u
 import { ParallelExtractClient } from "../../brand-onboarding/integrations/parallel/parallel-extract.client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { BrandVisualStateService } from "../../brand-canonical-state/brand-visual-state.service";
+import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
 import { getIndustryRoutingTemplate } from "../config/industry-routing-templates";
 import {
   canonicalOfferingType,
@@ -40,6 +42,7 @@ export class BrandCentreDnaService {
     private readonly parallel: ParallelExtractClient,
     private readonly visuals: BrandVisualStateService,
     private readonly canonicalOfferings: CanonicalOfferingStateService,
+    private readonly subscriptionCapabilities: SubscriptionCapabilityService,
   ) {}
 
   async getDnaAggregate(brandProfileId: string) {
@@ -154,6 +157,11 @@ export class BrandCentreDnaService {
           logoUrl: data.logoUrl,
           name: data.brandName,
           igHandle: data.igHandle,
+          ...(data.igHandle !== undefined
+            ? {
+                igHandleProvenance: InstagramIgHandleProvenance.USER_ENTERED,
+              }
+            : {}),
           ytHandle: data.ytHandle,
           tiktokHandle: data.tiktokHandle,
           lifecycleStage: data.lifecycleStage,
@@ -348,6 +356,10 @@ export class BrandCentreDnaService {
   }
 
   async scanOfferingUrl(brandProfileId: string, url: string) {
+    await this.subscriptionCapabilities.assertCapability(
+      brandProfileId,
+      "AI_SCAN_START",
+    );
     const profile = await this.prisma.brandProfile.findUnique({
       where: { id: brandProfileId },
     });
@@ -765,6 +777,10 @@ export class BrandCentreDnaService {
   }
 
   async scanCompetitorUrl(brandProfileId: string, url: string) {
+    await this.subscriptionCapabilities.assertCapability(
+      brandProfileId,
+      "AI_SCAN_START",
+    );
     const profile = await this.prisma.brandProfile.findUnique({
       where: { id: brandProfileId },
     });

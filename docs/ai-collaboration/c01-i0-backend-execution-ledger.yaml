@@ -1,0 +1,70 @@
+run_id: C01-I0-BACKEND
+
+authority:
+  repository: Piyush1087/dummy_tcs
+  parent_gate: C01-GATE-A4_CLOSED_ACCEPTED
+  phase: I0_PLATFORM_LINEAGE_RECONCILIATION
+  charters:
+    - docs/organization/charters/systems_architect_ai_worker_charter.md
+    - docs/organization/charters/browser_ai_worker_codex_runner_operating_standard.md
+
+execution_mode: HYBRID_RUN
+repository: Piyush1087/creator-commerce-backend-v2-clone
+development_base_sha: 17214722dc20abf23c8dce935a58050a017f6639
+settings_source_sha: 517531682f6286d5ee45bd48ec4e145e96d583a7
+historical_merge_base_sha: a67afb5e4877605fb7a1b6401434e13f84b96cba
+branch: c01/i0-backend-platform-reconciliation
+
+checkpoint:
+  status: PENDING_SYSTEMS_ACCEPTANCE
+  sha: null
+  candidate_head_self_recorded: false
+  sha_source: C01_I0_BACKEND_PLATFORM_RECONCILIATION_REPORT_V1_AND_REMOTE_BRANCH_TIP
+
+integration:
+  method: git_merge_no_ff_no_commit
+  development_unique_commits: 23
+  settings_unique_commits: 31
+  actual_git_conflicts: 4
+  development_branch_modified: false
+  settings_branch_modified: false
+
+migration_validation:
+  base_count: 49
+  development_total: 52
+  development_only: 3
+  settings_total: 63
+  settings_only: 14
+  reconciled_union_total: 66
+  missing_from_union: 0
+  extra_vs_union: 0
+  disposable_database: docker_postgresql_empty_database
+  command: npm run db:migrate:deploy
+  result: PASS_ALL_66_MIGRATIONS
+
+tests:
+  canonical_suite: 193_FILES_155_PASSED_38_DATABASE_GATED_1043_PASSED_485_SKIPPED
+  settings_postgresql_families: PASS
+  development_product_intelligence_postgresql_families: PASS
+  development_data_extraction_postgresql_families: 79_PASSED_1_INTENTIONAL_SKIP
+  prisma_format_validate_generate: PASS
+  production_build: PASS
+  scoped_eslint: PASS
+  repository_typecheck: TEST_FIXTURE_DIAGNOSTICS_ONLY_PRODUCTION_DIAGNOSTICS_ZERO
+  repository_lint: PRE_EXISTING_FORMATTING_DEBT
+
+corrections:
+  - semantic_union_of_four_actual_git_conflicts
+  - notification_dispatch_concurrent_create_race_hardened
+  - accepted_bs12_session_contract_applied_to_legacy_postgresql_harnesses
+  - migration_count_guards_reconciled_to_66
+  - stale_architecture_guards_reconciled_to_current_exports_and_module_union
+
+deviations:
+  - specialized_bs06_pre_migration_fixture_suite_not_run_without_its_bespoke_seeded_database
+  - specialized_data_extraction_51_to_52_upgrade_suite_not_run_against_the_66_migration_reconciliation_head
+  - repository_wide_lint_retains_pre_existing_formatting_failures
+  - standalone_no_emit_typecheck_retains_accepted_test_fixture_typing_debt
+
+c01_feature_implementation_added: false
+stop_reason: STOP_FOR_SYSTEMS_AND_PARENT_I0_REVIEW

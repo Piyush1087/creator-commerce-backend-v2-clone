@@ -14,11 +14,22 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Res,
   ServiceUnavailableException,
   UnprocessableEntityException,
   UseGuards,
 } from "@nestjs/common";
+import type { Response } from "express";
 import { JwtService } from "@nestjs/jwt";
+import { ConfigService } from "@nestjs/config";
+import { setRefreshCookie } from "../auth/auth-cookie.util";
+import {
+  resolveJwtAudience,
+  resolveJwtIssuer,
+  resolveJwtSecret,
+} from "../auth/auth-jwt.config";
+import { AuthSessionService } from "../auth/auth-session.service";
+import type { JwtPayload } from "../auth/types/auth-user";
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 
 import { throwBrandScanGateHttp } from "./brand-scan-gate-http.util";
@@ -74,6 +85,8 @@ export class BrandController {
     private readonly brandAuditExport: BrandAuditExportService,
     private readonly checkpoint2: Checkpoint2Service,
     private readonly jwtService: JwtService,
+    private readonly authSessions: AuthSessionService,
+    private readonly config: ConfigService,
   ) {}
 
   @Get("surface-scan/progress/:leadId")
@@ -188,7 +201,7 @@ export class BrandController {
         leadId: body.leadId,
         force: body.force === true,
         clientIp,
-        authenticatedUserId: this.optionalUserId(authorization),
+        authenticatedUserId: await this.optionalUserId(authorization),
       });
     } catch (err: unknown) {
       throwBrandScanGateHttp(err);
@@ -357,23 +370,36 @@ export class BrandController {
     @Param("brandProfileId", new ParseUUIDPipe({ version: "4" }))
     brandProfileId: string,
     @Body() body: SetBrandPasswordDto,
+    @Res({ passthrough: true }) response: Response,
   ) {
-    return this.brandVerification.setPasswordAndActivate(
+    const result = await this.brandVerification.setPasswordAndActivate(
       brandProfileId,
       body.email,
       body.password,
     );
+    setRefreshCookie(response, result.refreshToken);
+    const { refreshToken: _refreshToken, ...publicResult } = result;
+    return publicResult;
   }
 
-  private optionalUserId(authorization?: string): string | undefined {
+  private async optionalUserId(
+    authorization?: string,
+  ): Promise<string | undefined> {
     if (!authorization?.startsWith("Bearer ")) {
       return undefined;
     }
     try {
-      const payload = this.jwtService.verify<{ sub: string }>(
+      const payload = this.jwtService.verify<JwtPayload>(
         authorization.slice(7),
+        {
+          secret: resolveJwtSecret(this.config),
+          algorithms: ["HS256"],
+          issuer: resolveJwtIssuer(this.config),
+          audience: resolveJwtAudience(this.config),
+        },
       );
-      return payload.sub;
+      if (!payload.sub || !payload.sid) return undefined;
+      return (await this.authSessions.validate(payload.sub, payload.sid)).id;
     } catch {
       return undefined;
     }

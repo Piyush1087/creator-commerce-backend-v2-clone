@@ -1,8 +1,15 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { InstagramProfessionalAccountType } from "@prisma/client";
+import { instagramGraphUrl } from "./instagram-provider.config";
+import {
+  classifyInstagramProviderError,
+  renderSafeInstagramError,
+  safeInstagramErrorMetadata,
+} from "./instagram-provider-error";
 
 export type InstagramMeProfile = {
   userId: string;
+  appScopedUserId: string | null;
   username: string;
   name: string | null;
   accountType: InstagramProfessionalAccountType;
@@ -18,51 +25,52 @@ export class InstagramGraphClient {
 
   /**
    * Returns granted Instagram Login permission names (e.g. instagram_business_basic).
-   * Failures degrade to [] so callers can apply conservative partial-scope handling.
+   * Failures remain explicit so callers cannot infer permission from missing evidence.
    */
   async fetchGrantedPermissions(accessToken: string): Promise<string[]> {
-    const url = new URL("https://graph.instagram.com/v21.0/me/permissions");
+    const url = instagramGraphUrl("me/permissions");
     url.searchParams.set("access_token", accessToken);
     try {
       const res = await fetch(url);
       if (!res.ok) {
-        const errText = await res.text();
-        this.logger.warn(
-          `Instagram /me/permissions failed: ${errText.slice(0, 200)}`,
-        );
-        return [];
+        const metadata = await safeInstagramErrorMetadata(res);
+        this.logger.warn(renderSafeInstagramError("permissions", metadata));
+        throw new InstagramPermissionEvidenceError(metadata.classification);
       }
       const data = (await res.json()) as {
         data?: Array<{ permission?: string; status?: string }>;
       };
       return (data.data ?? [])
-        .filter((row) => (row.status ?? "granted").toLowerCase() === "granted")
+        .filter((row) => row.status?.toLowerCase() === "granted")
         .map((row) => (row.permission ?? "").trim().toLowerCase())
         .filter((name) => name.length > 0);
     } catch (err) {
-      this.logger.warn(
-        `Instagram /me/permissions error: ${String(err).slice(0, 200)}`,
-      );
-      return [];
+      if (err instanceof InstagramPermissionEvidenceError) throw err;
+      this.logger.warn("Instagram /me/permissions transport error");
+      throw new InstagramPermissionEvidenceError("UNKNOWN");
     }
   }
 
   async fetchMe(accessToken: string): Promise<InstagramMeProfile> {
-    const url = new URL("https://graph.instagram.com/v21.0/me");
+    const url = instagramGraphUrl("me");
     url.searchParams.set(
       "fields",
-      "username,user_id,name,account_type,profile_picture_url,followers_count,follows_count,media_count",
+      "id,username,user_id,name,account_type,profile_picture_url,followers_count,follows_count,media_count",
     );
     url.searchParams.set("access_token", accessToken);
 
     const res = await fetch(url);
     if (!res.ok) {
-      const errText = await res.text();
-      this.logger.warn(`Instagram /me failed: ${errText.slice(0, 200)}`);
-      throw new BadRequestException("Failed to read Instagram profile.");
+      const metadata = await safeInstagramErrorMetadata(res);
+      this.logger.warn(renderSafeInstagramError("me", metadata));
+      throw new InstagramProviderRequestError(
+        "Failed to read Instagram profile.",
+        metadata.classification,
+      );
     }
 
     const data = (await res.json()) as {
+      id?: string;
       user_id?: string;
       username?: string;
       name?: string;
@@ -79,6 +87,7 @@ export class InstagramGraphClient {
 
     return {
       userId: data.user_id,
+      appScopedUserId: data.id ?? null,
       username: data.username,
       name: data.name ?? null,
       accountType: mapAccountType(data.account_type),
@@ -102,7 +111,7 @@ export class InstagramGraphClient {
       timestamp: string;
     }>
   > {
-    const url = new URL("https://graph.instagram.com/v21.0/me/media");
+    const url = instagramGraphUrl("me/media");
     url.searchParams.set(
       "fields",
       "id,media_type,media_url,thumbnail_url,caption,timestamp",
@@ -112,8 +121,8 @@ export class InstagramGraphClient {
 
     const res = await fetch(url);
     if (!res.ok) {
-      const errText = await res.text();
-      this.logger.warn(`Instagram media failed: ${errText.slice(0, 200)}`);
+      const metadata = await safeInstagramErrorMetadata(res);
+      this.logger.warn(renderSafeInstagramError("media", metadata));
       throw new BadRequestException("Failed to read Instagram media.");
     }
 
@@ -144,13 +153,20 @@ export class InstagramGraphClient {
     mediaType: string,
   ): Promise<MediaInsightsResult> {
     const metrics = pickInsightMetrics(mediaType);
-    const url = new URL(`https://graph.instagram.com/v21.0/${mediaId}/insights`);
+    const url = instagramGraphUrl(`${mediaId}/insights`);
     url.searchParams.set("metric", metrics.join(","));
     url.searchParams.set("access_token", accessToken);
 
     const res = await fetch(url);
     if (!res.ok) {
       const errText = await res.text();
+      let parsed: unknown = null;
+      try {
+        parsed = JSON.parse(errText) as unknown;
+      } catch {
+        parsed = null;
+      }
+      const metadata = classifyInstagramProviderError(res.status, parsed);
       if (isPreBusinessConversionInsightError(errText)) {
         return {
           ...ZERO_MEDIA_INSIGHTS,
@@ -163,10 +179,11 @@ export class InstagramGraphClient {
           unavailableReason: "invalid_metric",
         };
       }
-      this.logger.warn(
-        `Instagram insights failed mediaId=${mediaId}: ${errText.slice(0, 200)}`,
+      this.logger.warn(renderSafeInstagramError("media_insights", metadata));
+      throw new InstagramProviderRequestError(
+        "Failed to read Instagram media insights.",
+        metadata.classification,
       );
-      return { ...ZERO_MEDIA_INSIGHTS };
     }
 
     const data = (await res.json()) as {
@@ -185,6 +202,23 @@ export class InstagramGraphClient {
       shares: values.shares ?? 0,
       views: values.views ?? values.plays ?? values.video_views ?? 0,
     };
+  }
+}
+
+export class InstagramPermissionEvidenceError extends Error {
+  constructor(readonly classification: string) {
+    super("Instagram permission evidence unavailable");
+  }
+}
+
+export class InstagramProviderRequestError extends BadRequestException {
+  constructor(
+    message: string,
+    readonly classification: ReturnType<
+      typeof classifyInstagramProviderError
+    >["classification"],
+  ) {
+    super(message);
   }
 }
 

@@ -4,6 +4,7 @@ import { Test } from "@nestjs/testing";
 import { JwtService } from "@nestjs/jwt";
 import { Reflector } from "@nestjs/core";
 import { ThrottlerGuard } from "@nestjs/throttler";
+import { AuthSessionService } from "../../../auth/auth-session.service";
 import { JwtStrategy } from "../../../auth/jwt.strategy";
 import { JwtAuthGuard } from "../../../auth/jwt-auth.guard";
 import { BrandConsumerController } from "../../../brand-centre/consumer/brand-consumer.controller";
@@ -935,6 +936,22 @@ describe.skipIf(!enabled)(
         where: { id: f.brandId },
         data: { organizationId: org.id },
       });
+      const user = await prisma.user.create({
+        data: {
+          email: `${randomUUID()}@example.test`,
+          role: "BRAND",
+          organizationId: org.id,
+          authState: "ACTIVE",
+          emailVerifiedAt: new Date(),
+        },
+      });
+      await prisma.brandTeamMember.create({
+        data: {
+          brandProfileId: f.brandId,
+          userId: user.id,
+          role: "BRAND_OWNER",
+        },
+      });
       const consumer = new BrandConsumerService(
         new BrandCentreAuthService(
           service,
@@ -947,7 +964,16 @@ describe.skipIf(!enabled)(
         new ProcessorRuntimeProjectionService(service),
       );
       const secret = randomUUID();
-      new JwtStrategy(new ConfigService({ JWT_SECRET: secret }));
+      const authConfig = new ConfigService({
+        JWT_SECRET: secret,
+        JWT_ISSUER: "audience-test-issuer",
+        JWT_AUDIENCE: "audience-test-audience",
+        JWT_ACCESS_TTL: "15m",
+        AUTH_REFRESH_TTL: "30d",
+      });
+      const jwt = new JwtService();
+      const sessions = new AuthSessionService(service, jwt, authConfig);
+      new JwtStrategy(authConfig, sessions);
       Reflect.defineMetadata(
         "design:paramtypes",
         [BrandConsumerService],
@@ -964,11 +990,7 @@ describe.skipIf(!enabled)(
       const app = module.createNestApplication();
       await app.listen(0, "127.0.0.1");
       try {
-        const token = new JwtService({ secret }).sign({
-          sub: randomUUID(),
-          role: "BRAND",
-          organizationId: org.id,
-        });
+        const token = (await sessions.create(user.id)).accessToken;
         const read = async () => {
           const response = await fetch(
             `${await app.getUrl()}/api/v1/brand-centre/brand`,

@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
@@ -15,6 +16,7 @@ import {
   UsePipes,
 } from "@nestjs/common";
 import { ThrottlerGuard } from "@nestjs/throttler";
+import { InstagramOAuthIntent } from "@prisma/client";
 
 import type { RequestWithAuthUser } from "../auth/auth.controller";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
@@ -144,14 +146,28 @@ export class BrandSettingsController {
   }
 
   @Get("integrations/instagram/oauth-url")
+  @Header("Cache-Control", "no-store")
   getInstagramOauthUrl(
     @Req() req: RequestWithAuthUser,
     @Query("redirectUri") redirectUri: string,
+    @Query("intent") intent?: string,
   ) {
     if (!redirectUri?.trim()) {
       throw new BadRequestException("redirectUri is required");
     }
-    return this.integrations.getInstagramOauthUrl(req.user, redirectUri);
+    if (
+      intent &&
+      !Object.values(InstagramOAuthIntent).includes(
+        intent as InstagramOAuthIntent,
+      )
+    ) {
+      throw new BadRequestException("Invalid Instagram OAuth intent");
+    }
+    return this.integrations.getInstagramOauthUrl(
+      req.user,
+      redirectUri,
+      intent as InstagramOAuthIntent | undefined,
+    );
   }
 
   @Post("integrations/instagram/connect")

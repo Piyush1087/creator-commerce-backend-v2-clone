@@ -12,9 +12,18 @@ import { CollaborationRealtimeService } from "./services/collaboration-realtime.
 import { CollaborationService } from "./services/collaboration.service";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { NotificationProcessorService } from "../notifications/services/notification-processor.service";
+import { SubscriptionCapabilityModule } from "../pricing/subscription-capability.module";
+import { BrandEscrowModule } from "../brand-escrow/brand-escrow.module";
 
 @Module({
-  imports: [PrismaModule, AuthModule, BrandCentreModule, NotificationsModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    BrandCentreModule,
+    NotificationsModule,
+    SubscriptionCapabilityModule,
+    BrandEscrowModule,
+  ],
   controllers: [CollaborationController],
   providers: [
     CollaborationGateway,

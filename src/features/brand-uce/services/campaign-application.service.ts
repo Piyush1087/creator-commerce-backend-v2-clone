@@ -19,6 +19,7 @@ import {
 import { PrismaService } from "../../../prisma/prisma.service";
 import { buildPhaseSyncPatch } from "../../../shared/uce/uce-production-phase.util";
 import { CollaborationProvisionService } from "../../collaboration/services/collaboration-provision.service";
+import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
 import { decimalToNumber, splitEscrowQuote } from "../utils/uce-decimal.util";
 import {
   approveApplicationInputSchema,
@@ -42,6 +43,7 @@ export class CampaignApplicationService {
     private readonly access: BrandUceAccessService,
     private readonly pipeline: BrandUcePipelineService,
     private readonly collaborationProvision: CollaborationProvisionService,
+    private readonly subscriptionCapabilities: SubscriptionCapabilityService,
   ) {}
 
   /**
@@ -203,6 +205,10 @@ export class CampaignApplicationService {
       throw new BadRequestException(parsed.error.flatten());
     }
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
+    await this.subscriptionCapabilities.assertCapability(
+      brandProfileId,
+      "COLLABORATION_CREATE",
+    );
 
     const result = await this.prisma.$transaction(async (tx) => {
       const application = await tx.uceApplication.findFirst({

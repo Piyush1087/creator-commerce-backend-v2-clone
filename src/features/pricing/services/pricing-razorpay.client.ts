@@ -207,12 +207,21 @@ export class PricingRazorpayClient {
     planId: string,
     startAtEpochSeconds: number,
   ): Promise<RazorpaySubscriptionResponse> {
+    return this.createFutureSubscription(planId, startAtEpochSeconds);
+  }
+
+  async createFutureSubscription(
+    planId: string,
+    startAtEpochSeconds: number,
+    notes?: RazorpaySubscriptionNotes,
+  ): Promise<RazorpaySubscriptionResponse> {
     return this.request<RazorpaySubscriptionResponse>("POST", "subscriptions", {
       plan_id: planId,
       total_count: 120,
       quantity: 1,
       start_at: startAtEpochSeconds,
       customer_notify: 1,
+      ...(notes ? { notes } : {}),
     });
   }
 

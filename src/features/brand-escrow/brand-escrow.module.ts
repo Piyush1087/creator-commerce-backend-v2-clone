@@ -4,6 +4,7 @@ import { PrismaModule } from "../../prisma/prisma.module";
 import { AuthModule } from "../auth/auth.module";
 import { BrandCentreModule } from "../brand-centre/brand-centre.module";
 import { PricingModule } from "../pricing/pricing.module";
+import { SubscriptionCapabilityModule } from "../pricing/subscription-capability.module";
 import { BrandEscrowController } from "./brand-escrow.controller";
 import {
   BrandEscrowEngineController,
@@ -11,6 +12,8 @@ import {
   BrandEscrowInterlockController,
 } from "./brand-escrow.controller";
 import { BrandEscrowWebhookController } from "./brand-escrow-webhook.controller";
+import { RouteWebhookController } from "./route-webhook.controller";
+import { BrandReturnWebhookController } from "./brand-return-webhook.controller";
 import { BrandEscrowAccessService } from "./services/brand-escrow-access.service";
 import { BrandEscrowComputationService } from "./services/brand-escrow-computation.service";
 import { BrandEscrowHardenedService } from "./services/brand-escrow-hardened.service";
@@ -21,15 +24,43 @@ import { EscrowComputationEngine } from "./services/escrow-computation.engine";
 import { EscrowSubscriptionContextService } from "./services/escrow-subscription-context.service";
 import { IdempotencyManager } from "./services/idempotency.manager";
 import { RazorpayClient } from "./services/razorpay.client";
+import { NotificationsModule } from "../notifications/notifications.module";
+import { CreatorPayoutObligationService } from "./services/creator-payout-obligation.service";
+import { CreatorPayoutProfileService } from "./services/creator-payout-profile.service";
+import { RazorpayRouteAdapter } from "./services/razorpay-route.adapter";
+import { RouteReconciliationService } from "./services/route-reconciliation.service";
+import { RouteTransferService } from "./services/route-transfer.service";
+import { RouteWebhookEventParser } from "./services/route-webhook-event.parser";
+import { RouteWebhookService } from "./services/route-webhook.service";
+import { EscrowFinancialAllocationService } from "./services/escrow-financial-allocation.service";
+import { CollaborationRefundInstructionService } from "./services/collaboration-refund-instruction.service";
+import {
+  BrandReturnRefundProvider,
+  FailClosedBrandReturnRefundProvider,
+} from "./services/brand-return-provider.adapter";
+import { BrandReturnService } from "./services/brand-return.service";
+import { BrandReturnWebhookEventParser } from "./services/brand-return-webhook-event.parser";
+import { BrandReturnWebhookService } from "./services/brand-return-webhook.service";
+import { EscrowFundingAttributionService } from "./services/escrow-funding-attribution.service";
+import { EscrowFundingSourceReconciliationService } from "./services/escrow-funding-source-reconciliation.service";
 
 @Module({
-  imports: [PrismaModule, AuthModule, BrandCentreModule, PricingModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    BrandCentreModule,
+    PricingModule,
+    SubscriptionCapabilityModule,
+    NotificationsModule,
+  ],
   controllers: [
     BrandEscrowController,
     BrandEscrowEngineController,
     BrandEscrowInterlockController,
     BrandEscrowHardenedController,
     BrandEscrowWebhookController,
+    RouteWebhookController,
+    BrandReturnWebhookController,
   ],
   providers: [
     BrandEscrowAccessService,
@@ -42,12 +73,38 @@ import { RazorpayClient } from "./services/razorpay.client";
     EscrowSubscriptionContextService,
     IdempotencyManager,
     RazorpayClient,
+    CreatorPayoutProfileService,
+    EscrowFinancialAllocationService,
+    CreatorPayoutObligationService,
+    CollaborationRefundInstructionService,
+    RazorpayRouteAdapter,
+    RouteTransferService,
+    RouteReconciliationService,
+    RouteWebhookEventParser,
+    RouteWebhookService,
+    EscrowFundingAttributionService,
+    EscrowFundingSourceReconciliationService,
+    BrandReturnService,
+    FailClosedBrandReturnRefundProvider,
+    {
+      provide: BrandReturnRefundProvider,
+      useExisting: FailClosedBrandReturnRefundProvider,
+    },
+    BrandReturnWebhookEventParser,
+    BrandReturnWebhookService,
   ],
   exports: [
     BrandEscrowService,
     BrandEscrowComputationService,
     BrandEscrowInterlockService,
     BrandEscrowHardenedService,
+    CreatorPayoutProfileService,
+    CreatorPayoutObligationService,
+    CollaborationRefundInstructionService,
+    RouteTransferService,
+    RouteReconciliationService,
+    BrandReturnService,
+    EscrowFundingSourceReconciliationService,
   ],
 })
 export class BrandEscrowModule {}

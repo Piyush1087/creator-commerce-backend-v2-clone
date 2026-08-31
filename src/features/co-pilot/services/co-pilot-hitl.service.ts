@@ -1703,17 +1703,21 @@ export class CoPilotHitlService {
       action: "UPDATE_GENERAL",
       staged,
       run: async (authUser) => {
-        const input = UpdateBrandGeneralProfileSchema.parse({
-          organizationLegalName: this.optionalString(
-            staged.organizationLegalName,
+        const input = UpdateBrandGeneralProfileSchema.parse(
+          Object.fromEntries(
+            Object.entries({
+              organizationLegalName: this.optionalString(
+                staged.organizationLegalName,
+              ),
+              countryCode: staged.countryCode,
+              currencyCode: staged.currencyCode,
+              firstName: this.optionalString(staged.firstName),
+              lastName: this.optionalString(staged.lastName),
+              organizationAddress: staged.organizationAddress,
+              taxId: staged.taxId,
+            }).filter(([, value]) => value !== undefined),
           ),
-          countryCode: this.optionalString(staged.countryCode),
-          currencyCode: this.optionalString(staged.currencyCode),
-          firstName: this.optionalString(staged.firstName),
-          lastName: this.optionalString(staged.lastName),
-          organizationAddress: this.optionalString(staged.organizationAddress),
-          taxId: this.optionalString(staged.taxId) ?? null,
-        });
+        );
         await this.brandSettings.updateGeneral(authUser, input);
         return "General settings updated.";
       },
@@ -1731,16 +1735,11 @@ export class CoPilotHitlService {
       staged,
       run: async (authUser) => {
         const input = BrandBillingProfileSchema.parse({
-          registeredCompanyName: staged.registeredCompanyName,
-          corporateBillingAddress: staged.corporateBillingAddress,
+          legalEntityName: staged.legalEntityName,
+          legalEntityType: staged.legalEntityType,
+          billingCountryCode: staged.billingCountryCode,
+          billingAddress: staged.billingAddress,
           gstin: this.optionalString(staged.gstin),
-          pan: this.optionalString(staged.pan),
-          defaultTdsPercentage:
-            typeof staged.defaultTdsPercentage === "number"
-              ? staged.defaultTdsPercentage
-              : Number(staged.defaultTdsPercentage ?? 2),
-          currencyPreference:
-            this.optionalString(staged.currencyPreference) ?? "INR",
         });
         await this.brandSettings.upsertBillingProfile(authUser, input);
         return "Billing profile saved.";

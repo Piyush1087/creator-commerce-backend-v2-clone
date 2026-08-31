@@ -89,3 +89,21 @@ export class ListEscrowLedgerQueryDto {
   @Max(100)
   limit?: number;
 }
+
+export class CreateBrandReturnDto {
+  @IsNumber()
+  @Min(0.01)
+  amount!: number;
+
+  @IsUUID()
+  idempotency_identity!: string;
+}
+
+export class ListBrandReturnsQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
+}

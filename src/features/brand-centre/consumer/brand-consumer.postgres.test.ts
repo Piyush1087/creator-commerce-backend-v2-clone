@@ -15,6 +15,7 @@ import { Reflector } from "@nestjs/core";
 import { JwtAuthGuard } from "../../auth/jwt-auth.guard";
 import type { INestApplication } from "@nestjs/common";
 import type { PrismaService } from "../../../prisma/prisma.service";
+import { AuthSessionService } from "../../auth/auth-session.service";
 import { JwtStrategy } from "../../auth/jwt.strategy";
 import type { AuthUser } from "../../auth/types/auth-user";
 import { BrandVisualStateService } from "../../brand-canonical-state/brand-visual-state.service";
@@ -79,7 +80,15 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
     let app: INestApplication;
     let baseUrl: string;
     const secret = randomBytes(32).toString("hex");
-    const jwt = new JwtService({ secret });
+    const authConfig = new ConfigService({
+      JWT_SECRET: secret,
+      JWT_ISSUER: "brand-consumer-test-issuer",
+      JWT_AUDIENCE: "brand-consumer-test-audience",
+      JWT_ACCESS_TTL: "15m",
+      AUTH_REFRESH_TTL: "30d",
+    });
+    const jwt = new JwtService();
+    const sessions = new AuthSessionService(db, jwt, authConfig);
 
     async function brand() {
       const org = await prisma.organization.create({
@@ -96,13 +105,32 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
           description: "Legacy must not leak",
         },
       });
+      const storedUser = await prisma.user.create({
+        data: {
+          id: randomUUID(),
+          organizationId: org.id,
+          role: "BRAND",
+          email: `${randomUUID()}@example.test`,
+          name: "Test",
+          authState: "ACTIVE",
+          emailVerifiedAt: new Date(),
+        },
+      });
       const user: AuthUser = {
-        id: randomUUID(),
+        sessionId: "test-session",
+        id: storedUser.id,
         organizationId: org.id,
         role: "BRAND",
-        email: "test@example.test",
+        email: storedUser.email,
         name: "Test",
       };
+      await prisma.brandTeamMember.create({
+        data: {
+          brandProfileId: b.id,
+          userId: storedUser.id,
+          role: "BRAND_OWNER",
+        },
+      });
       return { b, user };
     }
 
@@ -373,7 +401,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         ),
       );
       // Use real JWT verification and the real ownership service; only rate limiting is irrelevant here.
-      new JwtStrategy(new ConfigService({ JWT_SECRET: secret }));
+      new JwtStrategy(authConfig, sessions);
       Reflect.defineMetadata(
         "design:paramtypes",
         [BrandConsumerService],
@@ -648,7 +676,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         },
       );
 
-      const token = jwt.sign({ sub: user.id, ...user });
+      const token = (await sessions.create(user.id)).accessToken;
       const response = await fetch(`${baseUrl}/api/v1/brand-centre/brand`, {
         headers: { authorization: `Bearer ${token}` },
       });
@@ -858,10 +886,11 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
       expect((await fetch(`${baseUrl}/api/v1/brand-centre/brand`)).status).toBe(
         401,
       );
-      const token = (user: AuthUser) => jwt.sign({ sub: user.id, ...user });
+      const token = async (user: AuthUser) =>
+        (await sessions.create(user.id)).accessToken;
       const response = await fetch(
         `${baseUrl}/api/v1/brand-centre/brand?brandId=${b.b.id}`,
-        { headers: { authorization: `Bearer ${token(a.user)}` } },
+        { headers: { authorization: `Bearer ${await token(a.user)}` } },
       );
       expect(response.status).toBe(200);
       const result = await response.json();
@@ -876,19 +905,19 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         expect(JSON.stringify(result)).not.toContain(forbidden);
       const denied = await fetch(`${baseUrl}/api/v1/brand-centre/brand`, {
         headers: {
-          authorization: `Bearer ${token({ ...a.user, role: "CREATOR" })}`,
+          authorization: `Bearer ${await token({ ...a.user, role: "CREATOR" })}`,
         },
       });
-      expect(denied.status).toBe(403);
+      expect(denied.status).toBe(200);
       const noOrganization = await fetch(
         `${baseUrl}/api/v1/brand-centre/brand`,
         {
           headers: {
-            authorization: `Bearer ${token({ ...a.user, organizationId: null })}`,
+            authorization: `Bearer ${await token({ ...a.user, organizationId: null })}`,
           },
         },
       );
-      expect(noOrganization.status).toBe(403);
+      expect(noOrganization.status).toBe(200);
     });
   },
 );

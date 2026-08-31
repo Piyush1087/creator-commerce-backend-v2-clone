@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { UserRole } from "@prisma/client";
+import { UserAuthState, UserRole } from "@prisma/client";
 
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../auth/types/auth-user";
@@ -17,30 +17,40 @@ export class BrandCentreAuthService {
   ) {}
 
   async resolveBrandProfileId(user: AuthUser): Promise<string> {
-    if (user.role !== UserRole.BRAND) {
-      throw new ForbiddenException(
-        "Brand Centre is available to brand users only",
-      );
-    }
-    if (!user.organizationId) {
-      throw new ForbiddenException("No organization linked to this account");
-    }
-
-    const profile = await this.prisma.brandProfile.findUnique({
-      where: { organizationId: user.organizationId },
-      select: { id: true },
+    const current = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      include: {
+        brandTeamMemberships: {
+          where: { isActive: true },
+          include: {
+            brandProfile: { select: { id: true, organizationId: true } },
+          },
+        },
+      },
     });
-
-    if (!profile) {
-      throw new NotFoundException(
-        "Brand profile not found for this organization",
+    if (
+      !current ||
+      current.role !== UserRole.BRAND ||
+      current.authState !== UserAuthState.ACTIVE
+    ) {
+      throw new ForbiddenException(
+        "Brand Centre is available to active brand users only",
       );
     }
+    const candidates = current.brandTeamMemberships.filter(
+      (membership) =>
+        !current.organizationId ||
+        membership.brandProfile.organizationId === current.organizationId,
+    );
+    if (candidates.length !== 1) {
+      throw new ForbiddenException("Active Brand team membership required");
+    }
+    const brandProfileId = candidates[0].brandProfileId;
 
-    await this.sessionEviction.evictIfInactive(profile.id);
-    await this.sessionEviction.touchActivity(profile.id);
+    await this.sessionEviction.evictIfInactive(brandProfileId);
+    await this.sessionEviction.touchActivity(brandProfileId);
 
-    return profile.id;
+    return brandProfileId;
   }
 
   async resolveBrandProfile(user: AuthUser) {
