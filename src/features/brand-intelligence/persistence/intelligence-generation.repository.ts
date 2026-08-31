@@ -7,11 +7,15 @@ import { ComponentPathCodec } from "../semantic-path/component-path.codec";
 
 export type ObjectGenerationWrite = Omit<
   Prisma.IntelligenceObjectGenerationUncheckedCreateInput,
-  "createdAt"
+  "createdAt" | "subjectId"
 >;
 export type ComponentGenerationWrite = Omit<
   Prisma.IntelligenceComponentGenerationUncheckedCreateInput,
-  "createdAt" | "objectGenerationId" | "brandId" | "objectSemanticId"
+  | "createdAt"
+  | "objectGenerationId"
+  | "brandId"
+  | "subjectId"
+  | "objectSemanticId"
 >;
 export type EvidenceReferenceWrite = Omit<
   Prisma.IntelligenceEvidenceReferenceUncheckedCreateInput,
@@ -84,6 +88,7 @@ function commandMaterial(command: PersistGenerationCommand): unknown {
 function storedMaterial(generation: PersistedGeneration): unknown {
   const {
     id: _objectId,
+    subjectId: _subjectId,
     createdAt: _objectCreatedAt,
     componentGenerations,
     evidenceReferences,
@@ -97,6 +102,7 @@ function storedMaterial(generation: PersistedGeneration): unknown {
         ({
           id: _componentId,
           brandId: _brandId,
+          subjectId: _subjectId,
           objectGenerationId: _objectGenerationId,
           objectSemanticId: _objectSemanticId,
           createdAt: _componentCreatedAt,
@@ -178,14 +184,16 @@ export class IntelligenceGenerationRepository {
     const existing = await this.findPersistenceIdentity(command, tx);
     if (existing) return this.assertReplay(existing, command);
 
+    const subjectId = await this.resolveSubjectId(tx, command.object);
     const object = await tx.intelligenceObjectGeneration.create({
-      data: command.object,
+      data: { ...command.object, subjectId },
     });
     if (command.components.length > 0) {
       await tx.intelligenceComponentGeneration.createMany({
         data: command.components.map((component) => ({
           ...component,
           brandId: object.brandId,
+          subjectId,
           objectGenerationId: object.id,
           objectSemanticId: object.objectSemanticId,
         })),
@@ -252,6 +260,43 @@ export class IntelligenceGenerationRepository {
     throw new IntelligencePersistenceError(
       "PERSISTENCE_INVARIANT",
       "Generation persistence requires a processor execution or action identity",
+    );
+  }
+
+  private async resolveSubjectId(
+    tx: Prisma.TransactionClient,
+    object: ObjectGenerationWrite,
+  ): Promise<string> {
+    if (object.processorExecutionId) {
+      const producer =
+        await tx.intelligenceProcessorExecution.findUniqueOrThrow({
+          where: { id: object.processorExecutionId },
+          select: { brandId: true, subjectId: true },
+        });
+      if (producer.brandId !== object.brandId) {
+        throw new IntelligencePersistenceError(
+          "TENANCY_VIOLATION",
+          "Generation producer belongs to another Brand",
+        );
+      }
+      return producer.subjectId;
+    }
+    if (object.actionId) {
+      const action = await tx.intelligenceAction.findUniqueOrThrow({
+        where: { id: object.actionId },
+        select: { brandId: true, subjectId: true },
+      });
+      if (action.brandId !== object.brandId) {
+        throw new IntelligencePersistenceError(
+          "TENANCY_VIOLATION",
+          "Generation action belongs to another Brand",
+        );
+      }
+      return action.subjectId;
+    }
+    throw new IntelligencePersistenceError(
+      "PERSISTENCE_INVARIANT",
+      "Generation persistence requires a durable subject-scoped root",
     );
   }
 

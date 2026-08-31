@@ -29,6 +29,7 @@ import { IntelligenceCurrentContractScopeService } from "../../brand-intelligenc
 import { IntelligenceCurrentProjectionRepository } from "../../brand-intelligence/projection/intelligence-current-projection.repository";
 import { IntelligenceCurrentProjectionService } from "../../brand-intelligence/projection/intelligence-current-projection.service";
 import { IntelligenceObjectAssembler } from "../../brand-intelligence/projection/intelligence-object-assembler";
+import { resolveIntelligenceSubject } from "../../brand-intelligence/subject/intelligence-subject";
 import { BrandCentreAuthService } from "../brand-centre-auth.service";
 import { BrandCentreSessionEvictionService } from "../services/brand-centre-session-eviction.service";
 import { BrandConsumerService } from "./brand-consumer.service";
@@ -39,7 +40,9 @@ import { ProcessorRuntimeProjectionService } from "./processor-runtime-projectio
 describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
   "Brand consumer PostgreSQL and authenticated HTTP",
   () => {
-    const prisma = new PrismaClient();
+    const prisma = new PrismaClient({
+      transactionOptions: { maxWait: 10_000 },
+    });
     const db = prisma as unknown as PrismaService;
     const runtime = new ContractRuntimeRegistry(
       new ContractBundleIntegrityVerifier(),
@@ -114,9 +117,11 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         supersedes?: { objectId: string; componentId: string };
       } = {},
     ) {
+      const subject = await resolveIntelligenceSubject(prisma, brandId);
       const action = await prisma.intelligenceAction.create({
         data: {
           brandId,
+          subjectId: subject.id,
           actionType: "CONSUMER_TEST_FIXTURE",
           actorType: "SYSTEM",
           actorRef: "test",
@@ -136,6 +141,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
       const obj = await prisma.intelligenceObjectGeneration.create({
         data: {
           brandId,
+          subjectId: subject.id,
           objectSemanticId,
           objectContractId: objectSemanticId,
           objectContractVersion: "1.0",
@@ -162,6 +168,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
       const component = await prisma.intelligenceComponentGeneration.create({
         data: {
           brandId,
+          subjectId: subject.id,
           objectGenerationId: obj.id,
           objectSemanticId,
           pathSchemeVersion: 1,
@@ -200,6 +207,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
       const row = await prisma.intelligenceCurrentComponent.create({
         data: {
           brandId,
+          subjectId: generated.action.subjectId,
           objectSemanticId: object,
           pathSchemeVersion: 1,
           componentSemanticPath: "$",
@@ -258,6 +266,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         resultReadiness?: "READY" | "PARTIAL" | "NOT_READY";
       } = {},
     ) {
+      const subject = await resolveIntelligenceSubject(prisma, brandId);
       const now = new Date();
       const running = status === "RUNNING";
       const terminal = ["COMPLETED", "FAILED_TERMINAL", "CANCELLED"].includes(
@@ -275,6 +284,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
       return prisma.intelligenceExecution.create({
         data: {
           brandId,
+          subjectId: subject.id,
           triggerType: "CONSUMER_RUNTIME_TEST",
           triggerRef: processorId,
           triggerIdempotencyKey: randomUUID(),
@@ -286,6 +296,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
           processorExecutions: {
             create: {
               brand: { connect: { id: brandId } },
+              subject: { connect: { id: subject.id } },
               processorId,
               processorVersion: "1.0",
               bundleId: `brand_intelligence.${processorId}`,
@@ -416,12 +427,23 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
           componentSemanticPath: "$",
         }),
       ).toBe(true);
+      const executableIds = runtime
+        .registrations()
+        .filter((r) => r.executionEnabled)
+        .map((r) => r.processorId)
+        .sort();
+      const productIds = executableIds.filter((processorId) =>
+        processorId.startsWith("offering_"),
+      );
+      expect(productIds).toEqual([
+        "offering_actionability_synthesis",
+        "offering_creator_communication",
+        "offering_factual_synthesis",
+      ]);
       expect(
-        runtime
-          .registrations()
-          .filter((r) => r.executionEnabled)
-          .map((r) => r.processorId)
-          .sort(),
+        executableIds.filter(
+          (processorId) => !productIds.includes(processorId),
+        ),
       ).toEqual([
         "audience_persona_synthesis",
         "brand_character",
@@ -479,6 +501,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
       await prisma.intelligenceComponentCandidate.create({
         data: {
           brandId: b.id,
+          subjectId: candidate.action.subjectId,
           objectSemanticId: "brand_description",
           pathSchemeVersion: 1,
           componentSemanticPath: "$",

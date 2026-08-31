@@ -3,13 +3,26 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { OfferingType, Prisma } from "@prisma/client";
+import {
+  CanonicalOfferingAuthority,
+  CanonicalOfferingOrigin,
+  OfferingGuidanceKind,
+  OfferingLifecycle,
+  OfferingPriceFreshness,
+  OfferingPriceMode,
+  OfferingType,
+  Prisma,
+} from "@prisma/client";
 
 import { gateAndNormalizeBrandUrl } from "../../brand-onboarding/discovery-url.util";
 import { ParallelExtractClient } from "../../brand-onboarding/integrations/parallel/parallel-extract.client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { BrandVisualStateService } from "../../brand-canonical-state/brand-visual-state.service";
 import { getIndustryRoutingTemplate } from "../config/industry-routing-templates";
+import {
+  canonicalOfferingType,
+  CanonicalOfferingStateService,
+} from "./canonical-offering-state.service";
 
 const COLLECTION_TYPES: OfferingType[] = [OfferingType.COLLECTION];
 const PRIMARY_TYPES: OfferingType[] = [
@@ -26,6 +39,7 @@ export class BrandCentreDnaService {
     private readonly prisma: PrismaService,
     private readonly parallel: ParallelExtractClient,
     private readonly visuals: BrandVisualStateService,
+    private readonly canonicalOfferings: CanonicalOfferingStateService,
   ) {}
 
   async getDnaAggregate(brandProfileId: string) {
@@ -410,10 +424,19 @@ export class BrandCentreDnaService {
         "Exactly three selling points are required",
       );
     }
-    return this.prisma.offering.create({
+    const canonical = canonicalOfferingType(data.type);
+    if (!canonical.kind) {
+      throw new BadRequestException(
+        "MODULE cannot be created as canonical Offering without explicit Product eligibility",
+      );
+    }
+    const created = await this.prisma.offering.create({
       data: {
         brandProfileId,
         type: data.type,
+        canonicalKind: canonical.kind,
+        canonicalSubtype: canonical.subtype,
+        canonicalLifecycle: OfferingLifecycle.ACTIVE,
         name: data.name,
         url: normalized,
         description: data.description,
@@ -424,6 +447,41 @@ export class BrandCentreDnaService {
         isUserEdited: true,
       },
     });
+    await this.canonicalOfferings.confirmFields(brandProfileId, created.id, {
+      name: data.name,
+      url: normalized,
+      ...(data.description !== undefined
+        ? { description: data.description }
+        : {}),
+      canonicalKind: canonical.kind,
+      ...(canonical.subtype ? { canonicalSubtype: canonical.subtype } : {}),
+    });
+    if (data.sellingPoints) {
+      await this.canonicalOfferings.replaceBrandGuidance(
+        brandProfileId,
+        created.id,
+        OfferingGuidanceKind.SELLING_POINT,
+        data.sellingPoints,
+      );
+    }
+    if (data.doNotSay) {
+      await this.canonicalOfferings.replaceBrandGuidance(
+        brandProfileId,
+        created.id,
+        OfferingGuidanceKind.DO_NOT_SAY,
+        data.doNotSay,
+      );
+    }
+    if (data.imageUrl) {
+      await this.canonicalOfferings.addMedia(brandProfileId, created.id, {
+        url: data.imageUrl,
+        makePrimary: true,
+        authority: CanonicalOfferingAuthority.BRAND_CONFIRMED,
+        origin: CanonicalOfferingOrigin.BRAND_EDIT,
+        provenance: { actor: "BRAND", operation: "OFFERING_CREATE" },
+      });
+    }
+    return created;
   }
 
   async updateOffering(
@@ -459,7 +517,7 @@ export class BrandCentreDnaService {
         "Exactly three selling points are required",
       );
     }
-    return this.prisma.offering.update({
+    const updated = await this.prisma.offering.update({
       where: { id: offeringId },
       data: {
         name: data.name,
@@ -471,6 +529,141 @@ export class BrandCentreDnaService {
         isUserEdited: true,
       },
     });
+    const touched = Object.fromEntries(
+      Object.entries({
+        name: data.name,
+        url: data.url ? url : undefined,
+        description: data.description,
+      }).filter(([, value]) => value !== undefined),
+    );
+    if (Object.keys(touched).length) {
+      await this.canonicalOfferings.confirmFields(
+        brandProfileId,
+        offeringId,
+        touched,
+      );
+    }
+    if (data.sellingPoints) {
+      await this.canonicalOfferings.replaceBrandGuidance(
+        brandProfileId,
+        offeringId,
+        OfferingGuidanceKind.SELLING_POINT,
+        data.sellingPoints,
+      );
+    }
+    if (data.doNotSay) {
+      await this.canonicalOfferings.replaceBrandGuidance(
+        brandProfileId,
+        offeringId,
+        OfferingGuidanceKind.DO_NOT_SAY,
+        data.doNotSay,
+      );
+    }
+    if (data.imageUrl) {
+      await this.canonicalOfferings.addMedia(brandProfileId, offeringId, {
+        url: data.imageUrl,
+        makePrimary: true,
+        authority: CanonicalOfferingAuthority.BRAND_CONFIRMED,
+        origin: CanonicalOfferingOrigin.BRAND_EDIT,
+        provenance: { actor: "BRAND", operation: "OFFERING_UPDATE" },
+      });
+    }
+    return updated;
+  }
+
+  async setManualOfferingPrice(
+    brandProfileId: string,
+    offeringId: string,
+    input: Readonly<{
+      mode: OfferingPriceMode;
+      currentMinAmount?: string | null;
+      currentMaxAmount?: string | null;
+      regularReferenceMinAmount?: string | null;
+      regularReferenceMaxAmount?: string | null;
+      currency: string;
+    }>,
+  ) {
+    const offering = await this.canonicalOfferings.read(
+      brandProfileId,
+      offeringId,
+    );
+    if (!offering) throw new NotFoundException("Offering not found");
+    this.assertManualPriceTuple(input);
+    const state = offering.priceState;
+    return this.canonicalOfferings.advancePrice(
+      brandProfileId,
+      offeringId,
+      state?.revision ?? null,
+      {
+        mode: input.mode,
+        currentMinAmount: input.currentMinAmount,
+        currentMaxAmount: input.currentMaxAmount,
+        regularMinAmount: input.regularReferenceMinAmount,
+        regularMaxAmount: input.regularReferenceMaxAmount,
+        currency: input.currency.toUpperCase(),
+        freshness: OfferingPriceFreshness.CURRENT,
+        authority: CanonicalOfferingAuthority.BRAND_CONFIRMED,
+        origin: CanonicalOfferingOrigin.BRAND_EDIT,
+        sourceClass: "APPLICATION",
+        freshnessEvaluatedAt: new Date(),
+        provenance: { actor: "BRAND", operation: "MANUAL_PRICE_EDIT" },
+      },
+    );
+  }
+
+  private assertManualPriceTuple(
+    input: Readonly<{
+      mode: OfferingPriceMode;
+      currentMinAmount?: string | null;
+      currentMaxAmount?: string | null;
+      regularReferenceMinAmount?: string | null;
+      regularReferenceMaxAmount?: string | null;
+    }>,
+  ): void {
+    const min = input.currentMinAmount;
+    const max = input.currentMaxAmount;
+    const regularMin = input.regularReferenceMinAmount;
+    const regularMax = input.regularReferenceMaxAmount;
+    const same = (left?: string | null, right?: string | null) =>
+      left != null &&
+      right != null &&
+      new Prisma.Decimal(left).equals(new Prisma.Decimal(right));
+    if (input.mode === OfferingPriceMode.NOT_PUBLICLY_LISTED) {
+      if ([min, max, regularMin, regularMax].some((value) => value != null)) {
+        throw new BadRequestException(
+          "NOT_PUBLICLY_LISTED cannot carry amount fields",
+        );
+      }
+      return;
+    }
+    if (min == null) throw new BadRequestException("Current minimum required");
+    if (
+      input.mode === OfferingPriceMode.EXACT &&
+      (max == null || !same(min, max))
+    ) {
+      throw new BadRequestException("EXACT requires equal min/max amounts");
+    }
+    if (input.mode === OfferingPriceMode.STARTING_AT && max != null) {
+      throw new BadRequestException("STARTING_AT cannot carry a maximum");
+    }
+    if (
+      input.mode === OfferingPriceMode.RANGE &&
+      (max == null || new Prisma.Decimal(max).lte(new Prisma.Decimal(min)))
+    ) {
+      throw new BadRequestException("RANGE requires an ascending min/max");
+    }
+    if ((regularMin == null) !== (regularMax == null)) {
+      throw new BadRequestException(
+        "Regular reference amounts must be supplied as a pair",
+      );
+    }
+    if (
+      regularMin != null &&
+      regularMax != null &&
+      new Prisma.Decimal(regularMin).gt(new Prisma.Decimal(regularMax))
+    ) {
+      throw new BadRequestException("Regular reference range is invalid");
+    }
   }
 
   async deleteOffering(brandProfileId: string, offeringId: string) {
@@ -480,10 +673,11 @@ export class BrandCentreDnaService {
     if (!row) {
       throw new NotFoundException("Offering not found");
     }
-    await this.prisma.offering.update({
-      where: { id: offeringId },
-      data: { isActive: false },
-    });
+    await this.canonicalOfferings.setLifecycle(
+      brandProfileId,
+      offeringId,
+      OfferingLifecycle.PAUSED_INACTIVE,
+    );
   }
 
   async listOffers(brandProfileId: string) {

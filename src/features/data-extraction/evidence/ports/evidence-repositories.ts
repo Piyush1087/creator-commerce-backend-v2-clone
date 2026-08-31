@@ -224,6 +224,12 @@ export interface SemanticObservationRepository {
 }
 
 export interface CapabilityExecutionRepository {
+  createOrGetClaimed(input: CreateCapabilityExecutionInput): Promise<
+    Readonly<{
+      record: DataExtractionCapabilityExecutionRecord;
+      created: boolean;
+    }>
+  >;
   createOrGet(
     input: CreateCapabilityExecutionInput,
   ): Promise<DataExtractionCapabilityExecutionRecord>;
@@ -243,12 +249,24 @@ export interface CapabilityExecutionRepository {
     brandId: BrandId,
     capabilityId: EvidenceCapabilityId,
   ): Promise<DataExtractionCapabilityExecutionRecord | null>;
+  findCompleted(
+    brandId: BrandId,
+    capabilityId: EvidenceCapabilityId,
+  ): Promise<readonly DataExtractionCapabilityExecutionRecord[]>;
   complete(
     brandId: BrandId,
     ref: CapabilityExecutionRef,
     result: CompleteCapabilityExecutionInput,
   ): Promise<DataExtractionCapabilityExecutionRecord>;
   insert(record: DataExtractionCapabilityExecutionRecord): Promise<void>;
+}
+
+export interface CanonicalOfferingScopeRepository {
+  /** Fails closed for both unknown and other-Brand Offering refs. */
+  assertOwnedByBrand(
+    brandId: BrandId,
+    canonicalOfferingRef: string,
+  ): Promise<void>;
 }
 
 export interface CapabilityResourceRepository {

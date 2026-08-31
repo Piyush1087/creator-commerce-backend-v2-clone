@@ -13,20 +13,33 @@ export const WAVE2_EVIDENCE_CAPABILITIES = [
   "owned_website.location_evidence",
 ] as const;
 
+export const OFFERING_COMMERCIAL_EVIDENCE_CAPABILITIES = [
+  "owned_website.offering_commercial_evidence",
+] as const;
+
 export const DATA_EXTRACTION_EVIDENCE_CAPABILITIES = [
   ...WAVE1_EVIDENCE_CAPABILITIES,
   ...WAVE2_EVIDENCE_CAPABILITIES,
+  ...OFFERING_COMMERCIAL_EVIDENCE_CAPABILITIES,
 ] as const;
 
 export type EvidenceCapabilityId =
   (typeof DATA_EXTRACTION_EVIDENCE_CAPABILITIES)[number];
 export type Wave2EvidenceCapabilityId =
   (typeof WAVE2_EVIDENCE_CAPABILITIES)[number];
+export type RetainedOwnedSiteEvidenceCapabilityId =
+  | Wave2EvidenceCapabilityId
+  | (typeof OFFERING_COMMERCIAL_EVIDENCE_CAPABILITIES)[number];
 
-export function isWave2Capability(
+export function isRetainedOwnedSiteCapability(
   id: EvidenceCapabilityId,
-): id is Wave2EvidenceCapabilityId {
-  return (WAVE2_EVIDENCE_CAPABILITIES as readonly string[]).includes(id);
+): id is RetainedOwnedSiteEvidenceCapabilityId {
+  return (
+    (WAVE2_EVIDENCE_CAPABILITIES as readonly string[]).includes(id) ||
+    (OFFERING_COMMERCIAL_EVIDENCE_CAPABILITIES as readonly string[]).includes(
+      id,
+    )
+  );
 }
 
 export type CapabilityAvailability =

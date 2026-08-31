@@ -2,6 +2,7 @@ import type {
   DataExtractionEvidenceNormalizer,
   DataExtractionNormalizationInput,
 } from "../owned-website-wave1-normalizers";
+import { canonicalOfferingRefForSource } from "../owned-website-wave1-normalizers";
 import {
   serviceabilityEvidenceSchema,
   type geographyAssertionSchema,
@@ -159,13 +160,17 @@ export class ServiceabilityEvidenceNormalizer implements DataExtractionEvidenceN
                         ? "SERVICE_AREA_STATEMENT"
                         : "GENERAL_BRAND_AVAILABILITY";
           const common = commonPayload(source, unit);
+          const canonicalOfferingRef = canonicalOfferingRefForSource(
+            input,
+            source,
+          );
           const payload = serviceabilityEvidenceSchema.parse({
             ...common,
             evidence_semantic: "first_party_serviceability_observation",
             observation_type: type,
             coverage_modality: modality,
             geography_assertions: geography(text),
-            offering_ref: null,
+            offering_ref: canonicalOfferingRef,
             offering_candidate_ref:
               common.subject_scope === "OFFERING_SPECIFIC"
                 ? source.resource.resourceRef

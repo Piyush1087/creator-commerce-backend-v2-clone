@@ -82,6 +82,13 @@ export class M1CanonicalBrandStateAdapter implements CanonicalBrandStateReader {
             required.includes(entry.semantic),
           ),
         );
+        if (request.exactOfferingScope) {
+          return this.readExactOffering(
+            transaction,
+            snapshot,
+            request.exactOfferingScope.canonicalOfferingRef,
+          );
+        }
         if (request.includeServiceabilityState) {
           const [locations, offerings] = await Promise.all([
             transaction.location.findMany({
@@ -180,6 +187,283 @@ export class M1CanonicalBrandStateAdapter implements CanonicalBrandStateReader {
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
   }
+
+  private async readExactOffering(
+    transaction: Prisma.TransactionClient,
+    snapshot: CanonicalBrandStateSnapshot,
+    offeringId: string,
+  ): Promise<CanonicalBrandStateSnapshot> {
+    if (!offeringId.trim()) {
+      throw new InputDependencyError(
+        "CANONICAL_INPUT_UNAVAILABLE",
+        "Exact Offering scope requires a canonical Offering reference",
+      );
+    }
+    const offering = await transaction.offering.findUnique({
+      where: {
+        brandProfileId_id: { brandProfileId: snapshot.brandId, id: offeringId },
+      },
+      select: {
+        id: true,
+        brandProfileId: true,
+        name: true,
+        type: true,
+        canonicalKind: true,
+        canonicalSubtype: true,
+        canonicalLifecycle: true,
+        description: true,
+        url: true,
+        categoryTag: true,
+        isActive: true,
+        updatedAt: true,
+        fieldStates: {
+          where: { authority: "BRAND_CONFIRMED" },
+          select: { semanticFieldPath: true, revision: true },
+          orderBy: { semanticFieldPath: "asc" },
+        },
+        guidanceItems: {
+          where: { authority: "BRAND_CONFIRMED", lifecycle: "ACTIVE" },
+          select: { id: true, kind: true, text: true, revision: true },
+          orderBy: { id: "asc" },
+        },
+        mediaState: {
+          select: {
+            primaryMediaAssetId: true,
+            assets: {
+              where: { lifecycle: "ACTIVE" },
+              select: {
+                id: true,
+                url: true,
+                authority: true,
+                origin: true,
+                revision: true,
+              },
+              orderBy: { id: "asc" },
+            },
+          },
+        },
+        bundleMemberships: {
+          where: { lifecycle: "ACTIVE" },
+          select: {
+            id: true,
+            bundleOfferingId: true,
+            productOfferingId: true,
+            revision: true,
+          },
+          orderBy: { id: "asc" },
+        },
+        productBundleMemberships: {
+          where: { lifecycle: "ACTIVE" },
+          select: {
+            id: true,
+            bundleOfferingId: true,
+            productOfferingId: true,
+            revision: true,
+          },
+          orderBy: { id: "asc" },
+        },
+        priceState: {
+          select: {
+            currentRevision: {
+              select: {
+                id: true,
+                mode: true,
+                currentMinAmount: true,
+                currentMaxAmount: true,
+                regularMinAmount: true,
+                regularMaxAmount: true,
+                currency: true,
+                freshness: true,
+                authority: true,
+                observedAt: true,
+              },
+            },
+          },
+        },
+        offerApplicability: {
+          where: { lifecycle: "ACTIVE", brandOffer: { isActive: true } },
+          select: {
+            id: true,
+            revision: true,
+            brandOffer: {
+              select: {
+                id: true,
+                offerName: true,
+                promoCode: true,
+                applicabilityScope: true,
+                validityStart: true,
+                validityEnd: true,
+                description: true,
+                entityLink: true,
+                termsText: true,
+              },
+            },
+          },
+          orderBy: { id: "asc" },
+        },
+        locationAvailability: {
+          where: { lifecycle: "ACTIVE", location: { lifecycle: "ACTIVE" } },
+          select: {
+            id: true,
+            revision: true,
+            location: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+                city: true,
+              },
+            },
+          },
+          orderBy: { id: "asc" },
+        },
+      },
+    });
+    if (!offering) {
+      throw new InputDependencyError(
+        "CANONICAL_STATE_NOT_FOUND",
+        "Exact canonical Offering was not found within the requested Brand",
+        { brandId: snapshot.brandId, offeringId },
+      );
+    }
+    const allowedValues: Readonly<Record<string, unknown>> = {
+      name: offering.name,
+      description: offering.description,
+      url: offering.url,
+      canonicalKind: offering.canonicalKind,
+      canonicalSubtype: offering.canonicalSubtype,
+      canonicalLifecycle: offering.canonicalLifecycle,
+    };
+    const brandConfirmedValues = [
+      ...offering.fieldStates.flatMap((state) =>
+        Object.prototype.hasOwnProperty.call(
+          allowedValues,
+          state.semanticFieldPath,
+        )
+          ? [
+              {
+                semanticFieldPath: state.semanticFieldPath,
+                value: allowedValues[state.semanticFieldPath],
+                revision: state.revision,
+              },
+            ]
+          : [],
+      ),
+      ...offering.guidanceItems.map((item) => ({
+        semanticFieldPath: `guidance/${item.kind}/${item.id}`,
+        value: item.text,
+        revision: item.revision,
+      })),
+    ];
+    const bundleRelationships = [
+      ...offering.bundleMemberships,
+      ...offering.productBundleMemberships,
+    ].map(({ id, ...relation }) => ({ relationId: id, ...relation }));
+    const mediaRefs = offering.mediaState?.assets ?? [];
+    const canonicalPrice = offering.priceState?.currentRevision
+      ? {
+          revisionId: offering.priceState.currentRevision.id,
+          mode: String(offering.priceState.currentRevision.mode),
+          currentMinAmount:
+            offering.priceState.currentRevision.currentMinAmount?.toString() ??
+            null,
+          currentMaxAmount:
+            offering.priceState.currentRevision.currentMaxAmount?.toString() ??
+            null,
+          regularMinAmount:
+            offering.priceState.currentRevision.regularMinAmount?.toString() ??
+            null,
+          regularMaxAmount:
+            offering.priceState.currentRevision.regularMaxAmount?.toString() ??
+            null,
+          currency: offering.priceState.currentRevision.currency,
+          freshness: String(offering.priceState.currentRevision.freshness),
+          authority: String(offering.priceState.currentRevision.authority),
+          observedAt:
+            offering.priceState.currentRevision.observedAt?.toISOString() ??
+            null,
+        }
+      : null;
+    const canonicalOffers = offering.offerApplicability.map((item) => ({
+      applicabilityId: item.id,
+      offerId: item.brandOffer.id,
+      name: item.brandOffer.offerName,
+      promoCode: item.brandOffer.promoCode,
+      applicabilityScope: item.brandOffer.applicabilityScope,
+      validityStart: item.brandOffer.validityStart.toISOString(),
+      validityEnd: item.brandOffer.validityEnd.toISOString(),
+      description: item.brandOffer.description,
+      entityLink: item.brandOffer.entityLink,
+      termsText: item.brandOffer.termsText,
+      revision: item.revision,
+    }));
+    const availableAtLocations = offering.locationAvailability.map((item) => ({
+      relationId: item.id,
+      locationId: item.location.id,
+      name: item.location.name,
+      address: item.location.address,
+      city: item.location.city,
+      revision: item.revision,
+    }));
+    const stable = {
+      id: offering.id,
+      brandProfileId: offering.brandProfileId,
+      name: offering.name,
+      type: offering.type,
+      canonicalKind: offering.canonicalKind,
+      canonicalSubtype: offering.canonicalSubtype,
+      canonicalLifecycle: offering.canonicalLifecycle,
+      description: offering.description,
+      customerDestination: offering.url,
+      categoryTag: offering.categoryTag,
+      isActive: offering.isActive,
+      primaryMediaAssetId: offering.mediaState?.primaryMediaAssetId ?? null,
+      mediaRefs,
+      bundleRelationships,
+      brandConfirmedValues,
+      canonicalPrice,
+      canonicalOffers,
+      availableAtLocations,
+      updatedAt: offering.updatedAt.toISOString(),
+    };
+    const revisionToken = sha256CanonicalExecution(stable);
+    const canonicalSnapshotRef = `canonical-snapshot:sha256:${revisionToken}`;
+    return {
+      ...snapshot,
+      canonicalSnapshotRef,
+      offeringFacts: [
+        {
+          offeringId: offering.id,
+          brandId: offering.brandProfileId,
+          name: offering.name,
+          type: String(offering.type),
+          url: offering.url,
+          categoryTag: offering.categoryTag,
+          isActive: offering.isActive,
+          canonicalKind: offering.canonicalKind,
+          canonicalSubtype: offering.canonicalSubtype,
+          canonicalLifecycle: offering.canonicalLifecycle,
+          description: offering.description,
+          customerDestination: offering.url,
+          mediaRefs,
+          bundleRelationships,
+          brandConfirmedValues,
+          canonicalPrice,
+          canonicalOffers,
+          availableAtLocations,
+          businessStateReference: {
+            entityType: "Offering",
+            entityId: offering.id,
+            semanticFieldPath: "$",
+            revisionKind: "SNAPSHOT_FINGERPRINT",
+            revisionToken,
+            observedAt: snapshot.observedAt,
+            canonicalSnapshotRef,
+          },
+        },
+      ],
+    };
+  }
 }
 
 export function assembleCanonicalBrandStateSnapshot(
@@ -272,7 +556,7 @@ function normalizeRequiredSemantics(
     CANONICAL_BRAND_STATE_SEMANTICS,
   );
   const result = [...new Set(semantics)].sort();
-  if (!result.length || result.some((semantic) => !allowed.has(semantic))) {
+  if (result.some((semantic) => !allowed.has(semantic))) {
     throw new InputDependencyError(
       "CANONICAL_INPUT_UNAVAILABLE",
       "Canonical state request contains no usable semantic scope",

@@ -1,4 +1,4 @@
-import type { Wave2EvidenceCapabilityId } from "../domain/evidence-vocabulary";
+import type { RetainedOwnedSiteEvidenceCapabilityId } from "../domain/evidence-vocabulary";
 import {
   ownedSiteObservationFragmentSchema,
   retainOwnedSiteObservations,
@@ -6,10 +6,12 @@ import {
 import type { DataExtractionContentArtifactRecord } from "../domain/evidence-records";
 
 export function wave2PageScore(
-  capability: Wave2EvidenceCapabilityId,
+  capability: RetainedOwnedSiteEvidenceCapabilityId,
   url: string,
 ): number {
   const path = new URL(url).pathname;
+  if (capability === "owned_website.offering_commercial_evidence")
+    return /pricing|plans?|products?|services?|shop|book/i.test(path) ? 5 : 0;
   if (capability === "owned_website.location_evidence")
     return /contact|locations?|stores?|clinics?|branches|offices?/i.test(path)
       ? 5
@@ -35,7 +37,7 @@ export function wave2PageScore(
 
 /** Selection hint only. Semantic classification/completion remains in normalization. */
 export function retainedMaterialForWave2(
-  capability: Wave2EvidenceCapabilityId,
+  capability: RetainedOwnedSiteEvidenceCapabilityId,
   artifacts: readonly DataExtractionContentArtifactRecord[],
 ): boolean {
   const retained = artifacts.find(
@@ -63,6 +65,8 @@ export function retainedMaterialForWave2(
     "";
   if (capability === "owned_website.visual_evidence")
     return fragment.visuals.length > 0;
+  if (capability === "owned_website.offering_commercial_evidence")
+    return fragment.commercials.length > 0;
   if (capability === "owned_website.location_evidence")
     return (
       fragment.locations.length > 0 ||

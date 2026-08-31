@@ -1,0 +1,133 @@
+{
+  "manifestSchemaVersion": 1,
+  "bundleId": "product_intelligence.offering_factual_synthesis",
+  "bundleVersion": "1.0",
+  "ownerEngine": "product_intelligence",
+  "owningBranch": "product_intelligence",
+  "architectureRepository": "Piyush1087/dummy_tcs",
+  "architectureCommitSha": "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
+  "processorId": "offering_factual_synthesis",
+  "processorVersion": "1.0",
+  "outputContractId": "offering_factual_synthesis_output_contract",
+  "outputContractVersion": "1.0",
+  "evidenceContractId": "product_intelligence_evidence_requirements",
+  "evidenceContractVersion": "1.0",
+  "ownedObjectSemanticIds": [
+    "offering_factual_profile"
+  ],
+  "ownedPathPatterns": [
+    {
+      "objectSemanticId": "offering_factual_profile",
+      "componentPathPattern": "$"
+    },
+    {
+      "objectSemanticId": "offering_factual_profile",
+      "componentPathPattern": "$/f/factual_summary"
+    },
+    {
+      "objectSemanticId": "offering_factual_profile",
+      "componentPathPattern": "$/f/key_facts"
+    },
+    {
+      "objectSemanticId": "offering_factual_profile",
+      "componentPathPattern": "$/f/key_facts/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "offering_factual_profile",
+      "componentPathPattern": "$/f/key_benefits"
+    },
+    {
+      "objectSemanticId": "offering_factual_profile",
+      "componentPathPattern": "$/f/key_benefits/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "offering_factual_profile",
+      "componentPathPattern": "$/f/proof_points"
+    },
+    {
+      "objectSemanticId": "offering_factual_profile",
+      "componentPathPattern": "$/f/proof_points/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "offering_factual_profile",
+      "componentPathPattern": "$/f/usage_context"
+    },
+    {
+      "objectSemanticId": "offering_factual_profile",
+      "componentPathPattern": "$/f/usage_context/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "offering_factual_profile",
+      "componentPathPattern": "$/f/customer_context"
+    },
+    {
+      "objectSemanticId": "offering_factual_profile",
+      "componentPathPattern": "$/f/customer_context/i/{semantic_id}"
+    }
+  ],
+  "generatedNotice": "GENERATED — DO NOT EDIT",
+  "generatorVersion": "1.0.0",
+  "artifacts": [
+    {
+      "role": "EVIDENCE_CONTRACT",
+      "path": "artifacts/evidence_contract.yaml",
+      "semanticId": "product_intelligence_evidence_requirements",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 7216,
+      "sha256": "af7d306c2ec95e79d10eeb39d72ef7ab3d1709c981e38ee7de4999a75bbf9137"
+    },
+    {
+      "role": "OBJECT_CONTRACT",
+      "path": "artifacts/object_contract.yaml",
+      "semanticId": "objects",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 13322,
+      "sha256": "d35cb66138fdc174f99678d312714cfe948056dee77438e80209d5a669c7ac4c"
+    },
+    {
+      "role": "OUTPUT_CONTRACT",
+      "path": "artifacts/output_contract.yaml",
+      "semanticId": "offering_factual_synthesis_output_contract",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 6516,
+      "sha256": "4592df2fe221f8815d3edb7d569b7a28d99c24be422f5989109a15e33dccc7d1"
+    },
+    {
+      "role": "PROCESSOR_DEFINITION",
+      "path": "artifacts/processor_definition.yaml",
+      "semanticId": "offering_factual_synthesis",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 5108,
+      "sha256": "f8db9deec4bd943095cc5a906db7108399d3e95d0d9c8b8844a21f79c3bfba86"
+    },
+    {
+      "role": "REASONING_CONTRACT",
+      "path": "artifacts/reasoning_contract.yaml",
+      "semanticId": "offering_factual_synthesis_reasoning",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 5163,
+      "sha256": "876b168d02d5875f27585f7d9c1421f177a819c2c84104bf733dbdcbf2f2d5ea"
+    },
+    {
+      "role": "SHARED_METADATA_CONTRACT",
+      "path": "artifacts/shared_metadata_contract.yaml",
+      "semanticId": "shared_intelligence_metadata",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 16996,
+      "sha256": "47dbd324d4d79136b16ade4448adf78087d93658bcb2281292c40bfe6def98bd"
+    }
+  ],
+  "bundleContentHash": "0bc42315fbb19cb9eadf79fd1ebd9b1b20511c58f73f792f5e4188b2aacc790a"
+}

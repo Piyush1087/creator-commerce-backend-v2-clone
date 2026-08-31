@@ -1,0 +1,137 @@
+run_id: product-intelligence-v1
+
+authority:
+  repository: Piyush1087/dummy_tcs
+  branch: main
+  sha: 811d63a4f81255d9082f765b7569c8b60fcae28e
+  product_intelligence_contracts:
+    branch: agent/product-intelligence-v1-contracts
+    accepted_sha: 3fc2b421826c75e98c834d0b8ea8467ff8eb7b63
+    frozen_sha: bbb0be3345c36e9cc7c4f06ca68fb491b742b83f
+  commercial_de_contract:
+    branch: agent/product-intelligence-v1-de-commercial-evidence-contract
+    accepted_sha: aef995beb5c7c8ddd5fd6442e9b6e543a051bd1c
+    frozen_sha: ef363a04a3e4bc115ac17868a3f5987e2af76d63
+
+backend:
+  repository: Piyush1087/creator-commerce-backend-v2-clone
+  base_sha: e066265d720b8f76516acb5063b9843faac5a85e
+  product_branch: phase-g/product-intelligence-v1
+  product_branch_pre_integration_sha: 6013c9df695b394e72b58628d4b1e6ffa28eeb53
+  accepted_de_branch: phase-g/product-intelligence-v1-de-commercial-evidence
+  accepted_de_checkpoint_sha: 41e7e24da52e361ebe43b584f19d22ff3e572642
+  integration_method: NORMAL_FAST_FORWARD
+
+execution_mode:
+  authorized_mode: HYBRID_RUN
+  authority: PRODUCT
+
+branch: phase-g/product-intelligence-v1
+
+current_phase: P6
+phase_status: CHECKPOINT_READY_FOR_SYSTEMS_REVIEW
+
+checkpoint:
+  status: PENDING_SYSTEMS_ACCEPTANCE
+  sha: null
+  parent_sha: f8aa9791fc61f64a52e9719df6f4c921072aa9e7
+
+previous_accepted_checkpoint_sha: f8aa9791fc61f64a52e9719df6f4c921072aa9e7
+
+resume_rule:
+  candidate_head_self_recorded: false
+  accepted_sha_source: NEXT_AUTHORIZED_SYSTEMS_RUNNER_PROMPT
+  record_as_previous_accepted_checkpoint_before_next_phase: true
+
+implementation:
+  processor_ids:
+    - offering_factual_synthesis
+    - offering_creator_communication
+    - offering_actionability_synthesis
+  processor_version: "1.0"
+  owned_objects:
+    - offering_factual_profile
+    - offering_creator_communication_profile
+    - offering_actionability_profile
+  product_executor_ids:
+    - offering_factual_synthesis
+    - offering_creator_communication
+    - offering_actionability_synthesis
+  accepted_de_checkpoint_retained: true
+  commercial_de_capability_implemented: true
+  migration_52_created: true
+  fourth_product_processor_implemented: false
+  consumer_endpoint: GET /api/v1/brand-centre/offerings/:offeringId/intelligence
+  consumer_is_read_only: true
+  canonical_price_reconciliation_implemented: false
+  frontend_changed: false
+  p6_runtime_code_changed: false
+  development_updated: false
+  migration_53_created: false
+
+files_changed:
+  - docs/ai-collaboration/product-intelligence-v1-execution-ledger.yaml
+  - docs/ai-collaboration/product-intelligence-v1-p6-final-acceptance.md
+
+migrations:
+  before: 52
+  added: []
+  current_count: 52
+
+tests:
+  passed:
+    - all_non_postgresql_source_suites_99_files_663_tests
+    - product_processor_postgresql_vertical_slice_5_tests
+    - product_consumer_postgresql_4_grouped_scenarios
+    - canonical_offering_postgresql_15_tests
+    - canonical_brand_postgresql_15_tests
+    - brand_consumer_postgresql_8_tests
+    - shared_intelligence_postgresql_26_tests
+    - seven_brand_processor_postgresql_suites_108_tests
+    - de_w1_postgresql_41_tests
+    - de_p2b2_verifier_86_tests
+    - campaign_readiness_23_tests
+    - frozen_contract_bundle_generation_and_verification
+    - prisma_generate_validate
+    - migration_51_to_52_upgrade_and_0_to_52_reset
+    - production_build_and_production_typecheck
+    - scoped_eslint
+    - source_dist_bundle_and_registry_verification
+    - fresh_dist_startup_health_200_database_up
+    - git_diff_check
+  failed: []
+  skipped:
+    - two_intentional_migration_phase_cases
+  harness_notes:
+    - PostgreSQL-heavy suites used serialized isolated cloned disposable databases.
+    - One malformed PowerShell test URL was corrected before rerunning unchanged shared-runtime suites successfully.
+    - Repository-wide lint and test-only no-emit diagnostics expose pre-existing formatting, fixture-typing, and generated SST declaration debt outside P6; scoped ESLint and the production TypeScript project pass.
+
+corrections:
+  current_phase: 0
+  total: 14
+  consecutive_same_failure: 0
+  by_phase:
+    P0: 3
+    P1A: 1
+    P1B-1: 2
+    P1B-2: 2
+    P2A: 1
+    P3: 1
+    P4: 2
+    P5: 2
+    P6: 0
+
+last_failure: null
+
+stop_reason: null
+
+next_phase: FINAL_ACCEPTANCE_PENDING_SYSTEMS_REVIEW
+
+environment:
+  node: v24.19.0
+  npm: 11.17.0
+  prisma: 6.19.3
+  postgres: PostgreSQL 16 disposable Docker harness
+
+last_updated: "2026-08-28T17:27:00+05:30"

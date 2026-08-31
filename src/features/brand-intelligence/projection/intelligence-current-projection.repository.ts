@@ -7,6 +7,10 @@ import {
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IntelligenceCurrentProjectionError } from "./intelligence-current-projection.error";
+import {
+  resolveIntelligenceSubject,
+  type IntelligenceSubjectSelector,
+} from "../subject/intelligence-subject.resolver";
 
 const currentProjectionInclude =
   Prisma.validator<Prisma.IntelligenceCurrentComponentInclude>()({
@@ -16,6 +20,7 @@ const currentProjectionInclude =
           select: {
             id: true,
             brandId: true,
+            subjectId: true,
             objectSemanticId: true,
             objectContractId: true,
             objectContractVersion: true,
@@ -33,6 +38,7 @@ const currentProjectionInclude =
       select: {
         id: true,
         brandId: true,
+        subjectId: true,
         objectSemanticId: true,
         pathSchemeVersion: true,
         componentSemanticPath: true,
@@ -53,6 +59,7 @@ type CurrentProjectionRow = Prisma.IntelligenceCurrentComponentGetPayload<{
 export interface ProjectionCandidateRecord {
   readonly id: string;
   readonly brandId: string;
+  readonly subjectId: string;
   readonly objectSemanticId: string;
   readonly componentSemanticPath: string;
   readonly pathSchemeVersion: number;
@@ -92,6 +99,7 @@ export interface ProjectionBusinessStateReferenceRecord {
 export interface ProjectionComponentRecord {
   readonly id: string;
   readonly brandId: string;
+  readonly subjectId: string;
   readonly objectSemanticId: string;
   readonly pathSchemeVersion: number;
   readonly componentSemanticPath: string;
@@ -109,6 +117,7 @@ export interface ProjectionComponentRecord {
   readonly generation: Readonly<{
     id: string;
     brandId: string;
+    subjectId: string;
     objectGenerationId: string;
     objectSemanticId: string;
     componentSemanticPath: string;
@@ -127,6 +136,7 @@ export interface ProjectionComponentRecord {
     objectGeneration: Readonly<{
       id: string;
       brandId: string;
+      subjectId: string;
       objectSemanticId: string;
       objectContractId: string;
       objectContractVersion: string;
@@ -142,6 +152,7 @@ export interface ProjectionComponentRecord {
 
 export interface ProjectionRepositorySnapshot {
   readonly brandId: string;
+  readonly subjectId: string;
   readonly objectSemanticId: string;
   readonly components: readonly ProjectionComponentRecord[];
   readonly evidenceReferences: readonly ProjectionEvidenceReferenceRecord[];
@@ -155,29 +166,43 @@ export class IntelligenceCurrentProjectionRepository {
   readObjectSnapshot(
     brandId: string,
     objectSemanticId: string,
+    subject?: IntelligenceSubjectSelector,
   ): Promise<ProjectionRepositorySnapshot> {
-    return this.readSnapshot(brandId, objectSemanticId);
+    return this.readSnapshot(brandId, objectSemanticId, undefined, subject);
   }
 
   readComponentSnapshot(
     brandId: string,
     objectSemanticId: string,
     componentSemanticPath: string,
+    subject?: IntelligenceSubjectSelector,
   ): Promise<ProjectionRepositorySnapshot> {
-    return this.readSnapshot(brandId, objectSemanticId, componentSemanticPath);
+    return this.readSnapshot(
+      brandId,
+      objectSemanticId,
+      componentSemanticPath,
+      subject,
+    );
   }
 
   private async readSnapshot(
     brandId: string,
     objectSemanticId: string,
     componentSemanticPath?: string,
+    subjectSelector?: IntelligenceSubjectSelector,
   ): Promise<ProjectionRepositorySnapshot> {
     try {
+      const subject = await resolveIntelligenceSubject(
+        this.prisma,
+        brandId,
+        subjectSelector,
+      );
       return await this.prisma.$transaction(
         async (transaction) => {
           const rows = await transaction.intelligenceCurrentComponent.findMany({
             where: {
               brandId,
+              subjectId: subject.id,
               objectSemanticId,
               lifecycle: IntelligenceCurrentComponentLifecycle.ACTIVE,
               ...(componentSemanticPath ? { componentSemanticPath } : {}),
@@ -189,6 +214,7 @@ export class IntelligenceCurrentProjectionRepository {
           if (components.length === 0) {
             return {
               brandId,
+              subjectId: subject.id,
               objectSemanticId,
               components: [],
               evidenceReferences: [],
@@ -230,6 +256,7 @@ export class IntelligenceCurrentProjectionRepository {
             ]);
           return {
             brandId,
+            subjectId: subject.id,
             objectSemanticId,
             components,
             evidenceReferences: evidenceReferences.map((reference) => ({
@@ -289,6 +316,7 @@ export class IntelligenceCurrentProjectionRepository {
       return {
         id: candidate.id,
         brandId: candidate.brandId,
+        subjectId: candidate.subjectId,
         objectSemanticId: candidate.objectSemanticId,
         componentSemanticPath: candidate.componentSemanticPath,
         pathSchemeVersion: candidate.pathSchemeVersion,
@@ -301,6 +329,7 @@ export class IntelligenceCurrentProjectionRepository {
     return {
       id: row.id,
       brandId: row.brandId,
+      subjectId: row.subjectId,
       objectSemanticId: row.objectSemanticId,
       pathSchemeVersion: row.pathSchemeVersion,
       componentSemanticPath: row.componentSemanticPath,
@@ -318,6 +347,7 @@ export class IntelligenceCurrentProjectionRepository {
       generation: {
         id: generation.id,
         brandId: generation.brandId,
+        subjectId: generation.subjectId,
         objectGenerationId: generation.objectGenerationId,
         objectSemanticId: generation.objectSemanticId,
         componentSemanticPath: generation.componentSemanticPath,
@@ -336,6 +366,7 @@ export class IntelligenceCurrentProjectionRepository {
         objectGeneration: {
           id: objectGeneration.id,
           brandId: objectGeneration.brandId,
+          subjectId: objectGeneration.subjectId,
           objectSemanticId: objectGeneration.objectSemanticId,
           objectContractId: objectGeneration.objectContractId,
           objectContractVersion: objectGeneration.objectContractVersion,
@@ -357,7 +388,9 @@ export class IntelligenceCurrentProjectionRepository {
   ): void {
     if (
       generation.brandId !== current.brandId ||
+      generation.subjectId !== current.subjectId ||
       objectGeneration.brandId !== current.brandId ||
+      objectGeneration.subjectId !== current.subjectId ||
       generation.objectSemanticId !== current.objectSemanticId ||
       objectGeneration.objectSemanticId !== current.objectSemanticId ||
       generation.pathSchemeVersion !== current.pathSchemeVersion ||

@@ -5,6 +5,7 @@ import {
   BRAND_CHARACTER_OBJECTS,
   type BrandCharacterObject,
 } from "./brand-character.types";
+import { resolveIntelligenceSubject } from "../../subject/intelligence-subject";
 
 const include = Prisma.validator<Prisma.IntelligenceCurrentComponentInclude>()({
   currentComponentGeneration: true,
@@ -17,15 +18,21 @@ export type CharacterCurrentState =
 export class BrandCharacterStateRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  read(
+  async read(
     brandId: string,
     objects: readonly BrandCharacterObject[],
     tx?: Prisma.TransactionClient,
   ): Promise<CharacterCurrentState[]> {
     if (objects.some((id) => !BRAND_CHARACTER_OBJECTS.includes(id)))
       throw new Error("CHARACTER_UNOWNED_OBJECT");
-    return (tx ?? this.prisma).intelligenceCurrentComponent.findMany({
-      where: { brandId, objectSemanticId: { in: [...objects] } },
+    const client = tx ?? this.prisma;
+    const subject = await resolveIntelligenceSubject(client, brandId);
+    return client.intelligenceCurrentComponent.findMany({
+      where: {
+        brandId,
+        subjectId: subject.id,
+        objectSemanticId: { in: [...objects] },
+      },
       include,
       orderBy: [{ objectSemanticId: "asc" }, { componentSemanticPath: "asc" }],
     });

@@ -21,6 +21,10 @@ export const DATA_EXTRACTION_EVIDENCE_QUERY_PORT_V1 = Symbol(
 export interface DataExtractionEvidenceQueryRequestV1 {
   readonly brandId: BrandId;
   readonly capabilityIds: readonly EvidenceCapabilityId[];
+  /** Explicit Product scope. Never inferred from processor identity. */
+  readonly exactOfferingScope?: Readonly<{
+    readonly canonicalOfferingRef: string;
+  }>;
   readonly consumerContext?: Readonly<{
     processorId?: string;
     processorVersion?: string;
@@ -31,6 +35,8 @@ export interface DataExtractionEvidenceQueryRequestV1 {
 export interface DataExtractionCompletedCapabilityReadResultV1 {
   readonly state: "COMPLETED";
   readonly capabilityExecution: DataExtractionCapabilityExecutionRecord;
+  /** Populated only for an exact-Offering read spanning completed executions. */
+  readonly capabilityExecutions?: readonly DataExtractionCapabilityExecutionRecord[];
   readonly evidence: readonly DataExtractionEvidenceItemRecord[];
 }
 
@@ -68,7 +74,25 @@ export interface DataExtractionCapabilityAcquisitionRequestV1 {
   readonly requestKey: string;
   /** Canonical PUBLIC_OWNED_SITE root used to resolve durable Resources. */
   readonly ownedWebsiteRoot: string;
+  /**
+   * Existing application-owned identity plus only the exact owned resources
+   * reconciled to it. DE validates and carries this identity; it never creates it.
+   */
+  readonly exactOfferingScope?: Readonly<{
+    readonly canonicalOfferingRef: string;
+    readonly resourceUrls: readonly string[];
+  }>;
+  /** Bounded refresh mode: acquire only exact resources and never rediscover navigation. */
+  readonly acquisitionMode?: "GENERIC" | "EXACT_RESOURCES_ONLY";
+  /** When set, only the atomic request-key creator may perform network work. */
+  readonly executionClaim?: "REQUIRE_CREATOR";
   readonly correlationRef?: string;
+}
+
+export interface DataExtractionExactOfferingResourceV1 {
+  readonly canonicalOfferingRef: string;
+  readonly resourceRef: ResourceRef;
+  readonly captureRef: CaptureRef;
 }
 
 export interface DataExtractionCapabilityAcquisitionResultV1 {
@@ -77,6 +101,8 @@ export interface DataExtractionCapabilityAcquisitionResultV1 {
   readonly evidenceRefs: readonly EvidenceRef[];
   readonly resourceRefs?: readonly ResourceRef[];
   readonly captureRefs?: readonly CaptureRef[];
+  readonly exactOfferingResources?: readonly DataExtractionExactOfferingResourceV1[];
+  readonly executionClaim?: "CREATED" | "EXISTING";
 }
 
 /** Separate acquisition/refresh command boundary. It must never be used by readExisting(). */

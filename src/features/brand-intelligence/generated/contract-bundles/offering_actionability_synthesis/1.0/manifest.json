@@ -1,0 +1,105 @@
+{
+  "manifestSchemaVersion": 1,
+  "bundleId": "product_intelligence.offering_actionability_synthesis",
+  "bundleVersion": "1.0",
+  "ownerEngine": "product_intelligence",
+  "owningBranch": "product_intelligence",
+  "architectureRepository": "Piyush1087/dummy_tcs",
+  "architectureCommitSha": "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
+  "processorId": "offering_actionability_synthesis",
+  "processorVersion": "1.0",
+  "outputContractId": "offering_actionability_synthesis_output_contract",
+  "outputContractVersion": "1.0",
+  "evidenceContractId": "product_intelligence_evidence_requirements",
+  "evidenceContractVersion": "1.0",
+  "ownedObjectSemanticIds": [
+    "offering_actionability_profile"
+  ],
+  "ownedPathPatterns": [
+    {
+      "objectSemanticId": "offering_actionability_profile",
+      "componentPathPattern": "$"
+    },
+    {
+      "objectSemanticId": "offering_actionability_profile",
+      "componentPathPattern": "$/f/customer_action"
+    },
+    {
+      "objectSemanticId": "offering_actionability_profile",
+      "componentPathPattern": "$/f/customer_action/i/{semantic_id}"
+    },
+    {
+      "objectSemanticId": "offering_actionability_profile",
+      "componentPathPattern": "$/f/commercial_context"
+    },
+    {
+      "objectSemanticId": "offering_actionability_profile",
+      "componentPathPattern": "$/f/commercial_context/i/{semantic_id}"
+    }
+  ],
+  "generatedNotice": "GENERATED — DO NOT EDIT",
+  "generatorVersion": "1.0.0",
+  "artifacts": [
+    {
+      "role": "EVIDENCE_CONTRACT",
+      "path": "artifacts/evidence_contract.yaml",
+      "semanticId": "product_intelligence_evidence_requirements",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 7216,
+      "sha256": "af7d306c2ec95e79d10eeb39d72ef7ab3d1709c981e38ee7de4999a75bbf9137"
+    },
+    {
+      "role": "OBJECT_CONTRACT",
+      "path": "artifacts/object_contract.yaml",
+      "semanticId": "objects",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 13322,
+      "sha256": "d35cb66138fdc174f99678d312714cfe948056dee77438e80209d5a669c7ac4c"
+    },
+    {
+      "role": "OUTPUT_CONTRACT",
+      "path": "artifacts/output_contract.yaml",
+      "semanticId": "offering_actionability_synthesis_output_contract",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 5065,
+      "sha256": "43806d45efa0516b6d545c7d933a5e1e2c91d61836cb82165a5be53e260076c2"
+    },
+    {
+      "role": "PROCESSOR_DEFINITION",
+      "path": "artifacts/processor_definition.yaml",
+      "semanticId": "offering_actionability_synthesis",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 5662,
+      "sha256": "747ab316dfe5801cfc02fe813bda1fead02417f3f47735f7b41d77be382c06a0"
+    },
+    {
+      "role": "REASONING_CONTRACT",
+      "path": "artifacts/reasoning_contract.yaml",
+      "semanticId": "offering_actionability_synthesis_reasoning",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 5233,
+      "sha256": "c6766208c0f7b87f4e2ceb86a0202b71337d52588ddc71403e6c7fe3cd40e41d"
+    },
+    {
+      "role": "SHARED_METADATA_CONTRACT",
+      "path": "artifacts/shared_metadata_contract.yaml",
+      "semanticId": "shared_intelligence_metadata",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 16996,
+      "sha256": "47dbd324d4d79136b16ade4448adf78087d93658bcb2281292c40bfe6def98bd"
+    }
+  ],
+  "bundleContentHash": "d17d9a4cb792a9449d3191415e3e3950e88b5ade91538c351c7cf871c4c65474"
+}

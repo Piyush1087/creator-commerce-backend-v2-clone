@@ -24,6 +24,7 @@ import type { IntelligenceCurrentContractScopeService } from "./intelligence-cur
 import { IntelligenceCurrentProjectionRepository } from "./intelligence-current-projection.repository";
 import { IntelligenceCurrentProjectionService } from "./intelligence-current-projection.service";
 import { IntelligenceObjectAssembler } from "./intelligence-object-assembler";
+import { resolveIntelligenceSubject } from "../subject/intelligence-subject.resolver";
 
 const databaseEnabled =
   process.env.BRAND_INTELLIGENCE_PROJECTION_DATABASE_TEST === "true";
@@ -61,6 +62,8 @@ describe.skipIf(!databaseEnabled)("W1.0F current projection database", () => {
   const otherBrandId = randomUUID();
   const objectSemanticId = "communication_profile";
   let root: IntelligenceComponentGeneration;
+  let brandSubjectId: string;
+  let otherBrandSubjectId: string;
 
   async function createGeneration(
     selectedBrandId: string,
@@ -72,11 +75,14 @@ describe.skipIf(!databaseEnabled)("W1.0F current projection database", () => {
       presentationOrder: number;
     }> = {},
   ): Promise<IntelligenceComponentGeneration> {
+    const subjectId =
+      selectedBrandId === brandId ? brandSubjectId : otherBrandSubjectId;
     const actionId = randomUUID();
     await prisma.intelligenceAction.create({
       data: {
         id: actionId,
         brandId: selectedBrandId,
+        subjectId,
         actionType: "W1_0F_DATABASE_FIXTURE",
         actorType: IntelligenceActionActorType.SYSTEM,
         actorRef: "w1.0f-database-test",
@@ -90,6 +96,7 @@ describe.skipIf(!databaseEnabled)("W1.0F current projection database", () => {
     const object = await prisma.intelligenceObjectGeneration.create({
       data: {
         brandId: selectedBrandId,
+        subjectId,
         objectSemanticId,
         objectContractId: "brand_communication",
         objectContractVersion: "1.0",
@@ -114,6 +121,7 @@ describe.skipIf(!databaseEnabled)("W1.0F current projection database", () => {
     return prisma.intelligenceComponentGeneration.create({
       data: {
         brandId: selectedBrandId,
+        subjectId,
         objectGenerationId: object.id,
         objectSemanticId,
         pathSchemeVersion: 1,
@@ -146,6 +154,7 @@ describe.skipIf(!databaseEnabled)("W1.0F current projection database", () => {
     return prisma.intelligenceCurrentComponent.create({
       data: {
         brandId: generation.brandId,
+        subjectId: generation.subjectId,
         objectSemanticId,
         pathSchemeVersion: 1,
         componentSemanticPath: generation.componentSemanticPath,
@@ -178,6 +187,12 @@ describe.skipIf(!databaseEnabled)("W1.0F current projection database", () => {
         targetAudience: {},
       })),
     });
+    [brandSubjectId, otherBrandSubjectId] = await Promise.all([
+      resolveIntelligenceSubject(prisma, brandId).then((subject) => subject.id),
+      resolveIntelligenceSubject(prisma, otherBrandId).then(
+        (subject) => subject.id,
+      ),
+    ]);
 
     root = await createGeneration(
       brandId,
@@ -234,6 +249,7 @@ describe.skipIf(!databaseEnabled)("W1.0F current projection database", () => {
           data: {
             id: resolutionActionId,
             brandId,
+            subjectId: brandSubjectId,
             actionType: "W1_0F_RESOLVE_FIXTURE",
             actorType: IntelligenceActionActorType.BRAND_ACTOR,
             actorRef: "w1.0f-database-test",
@@ -249,6 +265,7 @@ describe.skipIf(!databaseEnabled)("W1.0F current projection database", () => {
       await prisma.intelligenceComponentCandidate.create({
         data: {
           brandId,
+          subjectId: brandSubjectId,
           currentComponentId: rootCurrent.id,
           objectSemanticId,
           pathSchemeVersion: 1,
@@ -323,6 +340,9 @@ describe.skipIf(!databaseEnabled)("W1.0F current projection database", () => {
       where: { brandId: { in: [brandId, otherBrandId] } },
     });
     await prisma.intelligenceAction.deleteMany({
+      where: { brandId: { in: [brandId, otherBrandId] } },
+    });
+    await prisma.intelligenceSubject.deleteMany({
       where: { brandId: { in: [brandId, otherBrandId] } },
     });
     await prisma.brandProfile.deleteMany({

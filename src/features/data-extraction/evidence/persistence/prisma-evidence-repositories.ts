@@ -48,6 +48,7 @@ import type {
   CapabilityEvidenceRepository,
   CapabilityExecutionRepository,
   CapabilityResourceRepository,
+  CanonicalOfferingScopeRepository,
   CaptureRepository,
   CompleteCapabilityExecutionInput,
   CompleteCaptureInput,
@@ -936,16 +937,14 @@ export class PrismaContentArtifactRepository implements ContentArtifactRepositor
 export class PrismaCapabilityExecutionRepository implements CapabilityExecutionRepository {
   constructor(private readonly db: DataExtractionDb) {}
 
-  async createOrGet(
-    input: CreateCapabilityExecutionInput,
-  ): Promise<DataExtractionCapabilityExecutionRecord> {
+  async createOrGetClaimed(input: CreateCapabilityExecutionInput): Promise<
+    Readonly<{
+      record: DataExtractionCapabilityExecutionRecord;
+      created: boolean;
+    }>
+  > {
     return withPersistenceErrorMapping(async () => {
-      const existing =
-        await this.db.dataExtractionCapabilityExecution.findFirst({
-          where: { brandId: input.brandId, requestKey: input.requestKey },
-          include: { resourceScope: true, evidenceMemberships: true },
-        });
-      if (existing) {
+      const validateExisting = (existing: CapabilityExecutionRow) => {
         if (
           existing.capabilityId !== input.capabilityId ||
           existing.normalizationContractVersion !==
@@ -958,30 +957,63 @@ export class PrismaCapabilityExecutionRepository implements CapabilityExecutionR
           throw persistenceError("IDEMPOTENCY_CONFLICT");
         }
         return toCapabilityExecution(existing);
+      };
+
+      const existing =
+        await this.db.dataExtractionCapabilityExecution.findFirst({
+          where: { brandId: input.brandId, requestKey: input.requestKey },
+          include: { resourceScope: true, evidenceMemberships: true },
+        });
+      if (existing) {
+        return { record: validateExisting(existing), created: false };
       }
 
-      const row = await this.db.dataExtractionCapabilityExecution.create({
-        data: {
-          capabilityExecutionRef: input.capabilityExecutionRef,
-          brandId: input.brandId,
-          capabilityId: input.capabilityId,
-          normalizationContractVersion: input.normalizationContractVersion,
-          resourceScopeHash: input.resourceScopeHash,
-          freshnessIntent: input.freshnessIntent,
-          sourceRevisionRef: input.sourceRevisionRef,
-          requestKey: input.requestKey,
-          availability: "NOT_REQUESTED",
-          retryability: "NOT_APPLICABLE",
-          reasonCodes: [],
-          coverage: input.coverage,
-          acquisitionQuality: "UNAVAILABLE",
-          qualityFailureCategories: [],
-          qualityDetailCodes: [],
-        },
-        include: { resourceScope: true, evidenceMemberships: true },
-      });
-      return toCapabilityExecution(row);
+      try {
+        const row = await this.db.dataExtractionCapabilityExecution.create({
+          data: {
+            capabilityExecutionRef: input.capabilityExecutionRef,
+            brandId: input.brandId,
+            capabilityId: input.capabilityId,
+            normalizationContractVersion: input.normalizationContractVersion,
+            resourceScopeHash: input.resourceScopeHash,
+            freshnessIntent: input.freshnessIntent,
+            sourceRevisionRef: input.sourceRevisionRef,
+            requestKey: input.requestKey,
+            availability: "NOT_REQUESTED",
+            retryability: "NOT_APPLICABLE",
+            reasonCodes: [],
+            coverage: input.coverage,
+            acquisitionQuality: "UNAVAILABLE",
+            qualityFailureCategories: [],
+            qualityDetailCodes: [],
+          },
+          include: { resourceScope: true, evidenceMemberships: true },
+        });
+        return { record: toCapabilityExecution(row), created: true };
+      } catch (error) {
+        if (
+          !(
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === "P2002"
+          )
+        ) {
+          throw error;
+        }
+        const winner =
+          await this.db.dataExtractionCapabilityExecution.findFirst({
+            where: { brandId: input.brandId, requestKey: input.requestKey },
+            include: { resourceScope: true, evidenceMemberships: true },
+          });
+        if (!winner) throw persistenceError("PERSISTENCE_INVARIANT");
+        return { record: validateExisting(winner), created: false };
+      }
     });
+  }
+
+  async createOrGet(
+    input: CreateCapabilityExecutionInput,
+  ): Promise<DataExtractionCapabilityExecutionRecord> {
+    return (await this.createOrGetClaimed(input)).record;
   }
 
   async findByRef(
@@ -1053,6 +1085,25 @@ export class PrismaCapabilityExecutionRepository implements CapabilityExecutionR
     });
   }
 
+  async findCompleted(
+    brandId: BrandId,
+    capabilityId: EvidenceCapabilityId,
+  ): Promise<readonly DataExtractionCapabilityExecutionRecord[]> {
+    return withPersistenceErrorMapping(async () =>
+      (
+        await this.db.dataExtractionCapabilityExecution.findMany({
+          where: { brandId, capabilityId, completedAt: { not: null } },
+          orderBy: [
+            { completedAt: "desc" },
+            { createdAt: "desc" },
+            { capabilityExecutionRef: "asc" },
+          ],
+          include: { resourceScope: true, evidenceMemberships: true },
+        })
+      ).map(toCapabilityExecution),
+    );
+  }
+
   async complete(
     brandId: BrandId,
     ref: CapabilityExecutionRef,
@@ -1121,6 +1172,26 @@ export class PrismaCapabilityExecutionRepository implements CapabilityExecutionR
         completedAt: record.completedAt,
       });
     }
+  }
+}
+
+export class PrismaCanonicalOfferingScopeRepository implements CanonicalOfferingScopeRepository {
+  constructor(private readonly db: DataExtractionDb) {}
+
+  async assertOwnedByBrand(
+    brandId: BrandId,
+    canonicalOfferingRef: string,
+  ): Promise<void> {
+    await withPersistenceErrorMapping(async () => {
+      if (!canonicalOfferingRef.trim()) {
+        throw persistenceError("PERSISTENCE_INVARIANT");
+      }
+      const offering = await this.db.offering.findFirst({
+        where: { id: canonicalOfferingRef, brandProfileId: brandId },
+        select: { id: true },
+      });
+      if (!offering) throw persistenceError("PERSISTENCE_INVARIANT");
+    });
   }
 }
 
@@ -1814,6 +1885,7 @@ export interface DataExtractionRepositorySet {
   readonly semanticObservations: PrismaSemanticObservationRepository;
   readonly freshnessAssessments: PrismaFreshnessAssessmentRepository;
   readonly providerExecutionLinks: PrismaProviderExecutionLinkRepository;
+  readonly canonicalOfferings: PrismaCanonicalOfferingScopeRepository;
 }
 
 export function createDataExtractionRepositorySet(
@@ -1830,6 +1902,7 @@ export function createDataExtractionRepositorySet(
     semanticObservations: new PrismaSemanticObservationRepository(db),
     freshnessAssessments: new PrismaFreshnessAssessmentRepository(db),
     providerExecutionLinks: new PrismaProviderExecutionLinkRepository(db),
+    canonicalOfferings: new PrismaCanonicalOfferingScopeRepository(db),
   };
 }
 

@@ -1,0 +1,128 @@
+id: offering_factual_synthesis_output_contract
+version: "1.0"
+status: FROZEN
+processor: offering_factual_synthesis
+object: offering_factual_profile
+strict: true
+additional_properties: false
+processor_definition: intelligence/engines/product_intelligence/processors/offering_factual_synthesis.yaml
+reasoning_authority: intelligence/engines/product_intelligence/artifacts/offering_factual_synthesis/reasoning.yaml
+object_authority: intelligence/engines/product_intelligence/objects.yaml#offering_factual_profile
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define machine-valid factual-profile output for one exact canonical Offering while preserving PD-07 families,
+  partial output, semantic item identity, exact-Offering lineage, mixed authority, and claim/proof safety.
+
+subject:
+  required: [brand_ref, offering_ref]
+  exact_canonical_offering_match_required: true
+
+response:
+  type: object
+  required: [offering_factual_profile, output_metadata]
+  additional_properties: false
+  properties:
+    offering_factual_profile:
+      type: [object, "null"]
+      nullable: true
+      additional_properties: false
+      fields:
+        factual_summary: {type: [string, "null"], nullable: true, min_length_when_non_null: 1}
+        key_facts:
+          type: [array, "null"]
+          nullable: true
+          item: {additional_properties: false, required: [semantic_id, fact], fields: {semantic_id: {type: string, min_length: 1}, fact: {type: string, min_length: 1}}}
+        key_benefits:
+          type: [array, "null"]
+          nullable: true
+          item: {additional_properties: false, required: [semantic_id, benefit], fields: {semantic_id: {type: string, min_length: 1}, benefit: {type: string, min_length: 1}}}
+        proof_points:
+          type: [array, "null"]
+          nullable: true
+          item: {additional_properties: false, required: [semantic_id, statement], fields: {semantic_id: {type: string, min_length: 1}, statement: {type: string, min_length: 1}}}
+        usage_context:
+          type: [array, "null"]
+          nullable: true
+          item: {additional_properties: false, required: [semantic_id, context], fields: {semantic_id: {type: string, min_length: 1}, context: {type: string, min_length: 1}}}
+        customer_context:
+          type: [array, "null"]
+          nullable: true
+          item: {additional_properties: false, required: [semantic_id, context], fields: {semantic_id: {type: string, min_length: 1}, context: {type: string, min_length: 1}}}
+    output_metadata:
+      type: object
+      additional_properties: false
+      required: [factual_summary, key_facts, key_benefits, proof_points, usage_context, customer_context]
+      fields:
+        factual_summary: {type: [object, "null"], nullable: true, schema: shared_generated_metadata}
+        key_facts: {type: [array, "null"], nullable: true, keyed_by: semantic_id, item: shared_item_metadata}
+        key_benefits: {type: [array, "null"], nullable: true, keyed_by: semantic_id, item: shared_item_metadata}
+        proof_points: {type: [array, "null"], nullable: true, keyed_by: semantic_id, item: shared_item_metadata}
+        usage_context: {type: [array, "null"], nullable: true, keyed_by: semantic_id, item: shared_item_metadata}
+        customer_context: {type: [array, "null"], nullable: true, keyed_by: semantic_id, item: shared_item_metadata}
+
+shared_generated_metadata:
+  additional_properties: false
+  required: [authority, source_class, freshness, evidence_refs, business_state_refs]
+  fields:
+    authority: {type: enum, values: [OBSERVED, CREATOR_SHOP_DERIVED, SYSTEM_DERIVED], forbidden: [BRAND_CONFIRMED, SUPPORT_CONTROLLED]}
+    source_class: {type: enum, values: [OWNED_WEBSITE, BRAND_USER_INPUT, CANONICAL_BUSINESS_STATE, MULTI_SOURCE, SYSTEM_DERIVATION_INPUT]}
+    freshness: {type: enum, values: [CURRENT, STALE, UNKNOWN]}
+    evidence_refs: {type: array, unique_items: true, item_type: string}
+    business_state_refs: {type: array, unique_items: true, item_type: string}
+
+shared_item_metadata:
+  additional_properties: false
+  required: [semantic_id, authority, source_class, freshness, evidence_refs, business_state_refs]
+  fields:
+    semantic_id: {type: string, min_length: 1}
+    authority: {type: enum, values: [OBSERVED, CREATOR_SHOP_DERIVED, SYSTEM_DERIVED], forbidden: [BRAND_CONFIRMED, SUPPORT_CONTROLLED]}
+    source_class: {type: enum, values: [OWNED_WEBSITE, BRAND_USER_INPUT, CANONICAL_BUSINESS_STATE, MULTI_SOURCE, SYSTEM_DERIVATION_INPUT]}
+    freshness: {type: enum, values: [CURRENT, STALE, UNKNOWN]}
+    evidence_refs: {type: array, unique_items: true, item_type: string}
+    business_state_refs: {type: array, unique_items: true, item_type: string}
+
+partial_shape_rules:
+  profile_may_be_null: true
+  component_level_nullability: true
+  all_families_non_null_required: false
+  no_list_cardinality_frozen: true
+  no_filler_to_force_ready: true
+  metadata_alignment:
+    - null semantic path requires null metadata
+    - non-null scalar requires non-null metadata
+    - every emitted semantic item has exactly one metadata item with the same semantic_id
+
+semantic_validation:
+  factual_summary:
+    - exact Offering scope only
+    - canonical identity and lifecycle are referenced, not redefined
+    - no final Campaign Brief copy
+  key_facts:
+    - directly supported same-Offering facts only
+    - observed statement is not external verification
+  key_benefits:
+    - benefit must be a defensible interpretation of same-Offering facts
+    - unsupported outcome, efficacy, safety, success, or superiority is invalid
+  proof_points:
+    - same-Offering support required
+    - testimonial is not proof
+    - credential occurrence is not credential verification
+    - Brand confirmation is not external verification
+  usage_context: [same_Offering_grounding_required, unsupported_use_case_invalid]
+  customer_context: [same_Offering_grounding_required, no_mandatory_Offering_level_Audience_created]
+
+authority_and_protection_validation:
+  processor_emitted_brand_confirmed: invalid
+  processor_emitted_support_controlled: invalid
+  ordinary_refresh_must_not_replace_protected_non_price_truth: true
+  price_refresh_or_mutation_in_this_output: invalid
+
+scope_validation:
+  every_evidence_ref_must_match_subject_offering: true
+  sibling_offering_evidence: invalid
+  same_brand_alone_is_insufficient_scope: true
+
+readiness:
+  bounded_partial_output_supported: true
+  invalid_or_failed_output_replaces_current: false

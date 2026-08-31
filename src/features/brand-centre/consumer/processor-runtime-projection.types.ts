@@ -46,7 +46,7 @@ export interface ProcessorRuntimeFailure {
 }
 
 export interface ProcessorRuntimeProjection {
-  readonly processorId: BrandProcessorId;
+  readonly processorId: string;
   readonly activity: ProcessorRuntimeActivity;
   /** Readiness captured by the latest durable execution, not current dependency reevaluation. */
   readonly readiness: ProcessorExecutionReadiness;

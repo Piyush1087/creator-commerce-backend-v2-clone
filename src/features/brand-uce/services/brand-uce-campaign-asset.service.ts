@@ -8,6 +8,7 @@ import {
   UceCampaignAssetKind,
   UceCampaignAssetStatus,
   UceCampaignStatus,
+  OfferingLifecycle,
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
@@ -36,9 +37,22 @@ export class BrandUceCampaignAssetService {
         select: { id: true, name: true, logoUrl: true },
       }),
       this.prisma.offering.findMany({
-        where: { brandProfileId, isActive: true },
+        where: {
+          brandProfileId,
+          canonicalLifecycle: OfferingLifecycle.ACTIVE,
+          canonicalKind: { not: null },
+        },
         orderBy: { name: "asc" },
-        select: { id: true, name: true, type: true, imageUrl: true },
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          canonicalKind: true,
+          imageUrl: true,
+          mediaState: {
+            select: { primaryMediaAsset: { select: { url: true } } },
+          },
+        },
       }),
       this.prisma.brandOffer.findMany({
         where: { brandProfileId, isActive: true },
@@ -63,8 +77,9 @@ export class BrandUceCampaignAssetService {
         kind: CampaignAssetSelectionKind.OFFERING,
         entity_id: offering.id,
         label: offering.name,
-        subtype: offering.type,
-        image_url: offering.imageUrl,
+        subtype: offering.canonicalKind ?? offering.type,
+        image_url:
+          offering.mediaState?.primaryMediaAsset?.url ?? offering.imageUrl,
       })),
       ...offers.map((offer) => ({
         kind: CampaignAssetSelectionKind.OFFER,
@@ -145,7 +160,12 @@ export class BrandUceCampaignAssetService {
     }
     if (input.kind === CampaignAssetSelectionKind.OFFERING) {
       const offering = await this.prisma.offering.findFirst({
-        where: { id: input.entity_id, brandProfileId, isActive: true },
+        where: {
+          id: input.entity_id,
+          brandProfileId,
+          canonicalLifecycle: OfferingLifecycle.ACTIVE,
+          canonicalKind: { not: null },
+        },
         select: { id: true },
       });
       if (!offering) {
@@ -172,7 +192,17 @@ export class BrandUceCampaignAssetService {
 
   private readonly assetInclude = {
     brandProfile: { select: { name: true, logoUrl: true } },
-    offering: { select: { name: true, type: true, imageUrl: true } },
+    offering: {
+      select: {
+        name: true,
+        type: true,
+        canonicalKind: true,
+        imageUrl: true,
+        mediaState: {
+          select: { primaryMediaAsset: { select: { url: true } } },
+        },
+      },
+    },
     brandOffer: { select: { offerName: true } },
   } as const;
 
@@ -184,7 +214,13 @@ export class BrandUceCampaignAssetService {
     offeringId: string | null;
     brandOfferId: string | null;
     brandProfile: { name: string; logoUrl: string | null } | null;
-    offering: { name: string; type: string; imageUrl: string | null } | null;
+    offering: {
+      name: string;
+      type: string;
+      canonicalKind: string | null;
+      imageUrl: string | null;
+      mediaState: { primaryMediaAsset: { url: string } | null } | null;
+    } | null;
     brandOffer: { offerName: string } | null;
   }) {
     return {
@@ -197,9 +233,12 @@ export class BrandUceCampaignAssetService {
         asset.offering?.name ??
         asset.brandOffer?.offerName ??
         "Brand Centre Asset",
-      subtype: asset.offering?.type ?? null,
+      subtype: asset.offering?.canonicalKind ?? asset.offering?.type ?? null,
       image_url:
-        asset.brandProfile?.logoUrl ?? asset.offering?.imageUrl ?? null,
+        asset.brandProfile?.logoUrl ??
+        asset.offering?.mediaState?.primaryMediaAsset?.url ??
+        asset.offering?.imageUrl ??
+        null,
     };
   }
 }

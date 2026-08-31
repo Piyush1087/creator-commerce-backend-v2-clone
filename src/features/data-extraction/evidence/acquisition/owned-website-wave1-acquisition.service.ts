@@ -20,7 +20,7 @@ import type {
 } from "../domain/evidence-records";
 import {
   DATA_EXTRACTION_EVIDENCE_CAPABILITIES,
-  isWave2Capability,
+  isRetainedOwnedSiteCapability,
   type CapabilityAvailability,
   type EvidenceAcquisitionQuality,
   type EvidenceCapabilityId,
@@ -245,15 +245,40 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
     this.assertRequest(request);
     const rootUrl = normalizeOwnedWebsiteUrl(request.ownedWebsiteRoot);
     assertSafeOwnedWebsiteUrl(rootUrl);
+    const exactOfferingScope = normalizeExactOfferingScope(request, rootUrl);
 
     const repositories = this.persistence.repositories();
+    if (exactOfferingScope) {
+      await repositories.canonicalOfferings.assertOwnedByBrand(
+        request.brandId,
+        exactOfferingScope.canonicalOfferingRef,
+      );
+    }
     const existing = await repositories.capabilityExecutions.findByRequestKey(
       request.brandId,
       request.requestKey,
     );
     if (existing) {
-      await this.assertReplayMatches(request, rootUrl, existing.resourceScope);
+      await this.assertReplayMatches(
+        request,
+        rootUrl,
+        existing.resourceScope,
+        exactOfferingScope,
+      );
+      if (request.executionClaim === "REQUIRE_CREATOR") {
+        return {
+          capabilityExecutionRef: existing.capabilityExecutionRef,
+          evidenceRefs: [],
+          resourceRefs: existing.resourceScope,
+          executionClaim: "EXISTING",
+        };
+      }
       if (existing.completedAt) {
+        const exactOfferingResources = await this.exactOfferingResources(
+          request.brandId,
+          existing.resourceScope,
+          exactOfferingScope,
+        );
         return {
           capabilityExecutionRef: existing.capabilityExecutionRef,
           evidenceRefs: [],
@@ -262,36 +287,61 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
             request.brandId,
             existing.resourceScope,
           ),
+          ...(exactOfferingResources.length ? { exactOfferingResources } : {}),
         };
       }
     }
 
-    const rootIdentity = resourceIdentity(request.brandId, rootUrl);
+    const rootIsExact = exactOfferingScope?.resourceUrls.includes(rootUrl);
+    const rootIdentity = resourceIdentity(
+      request.brandId,
+      rootUrl,
+      rootIsExact ? exactOfferingScope!.canonicalOfferingRef : undefined,
+    );
     const capabilityExecutionRef =
       existing?.capabilityExecutionRef ??
       asCapabilityExecutionRef(`capability-execution:${randomUUID()}`);
     const executionScopeHash = hash(
-      `${request.brandId}|${request.capabilityId}|${rootIdentity.canonicalResourceKey}`,
+      [
+        request.brandId,
+        request.capabilityId,
+        rootIdentity.canonicalResourceKey,
+        ...(exactOfferingScope?.resourceUrls ?? []),
+        exactOfferingScope?.canonicalOfferingRef ?? "",
+      ].join("|"),
     );
 
-    const execution =
-      existing ??
-      (await repositories.capabilityExecutions.createOrGet({
-        brandId: request.brandId,
-        capabilityExecutionRef,
-        capabilityId: request.capabilityId,
-        normalizationContractVersion: request.normalizationContractVersion,
-        resourceScopeHash: executionScopeHash,
-        freshnessIntent: request.freshnessIntent,
-        sourceRevisionRef: request.sourceRevisionRef,
-        requestKey: request.requestKey,
-        coverage: "SINGLE_RESOURCE",
-      }));
+    const executionClaim = existing
+      ? { record: existing, created: false }
+      : await repositories.capabilityExecutions.createOrGetClaimed({
+          brandId: request.brandId,
+          capabilityExecutionRef,
+          capabilityId: request.capabilityId,
+          normalizationContractVersion: request.normalizationContractVersion,
+          resourceScopeHash: executionScopeHash,
+          freshnessIntent: request.freshnessIntent,
+          sourceRevisionRef: request.sourceRevisionRef,
+          requestKey: request.requestKey,
+          coverage: "SINGLE_RESOURCE",
+        });
+    const execution = executionClaim.record;
+    if (
+      request.executionClaim === "REQUIRE_CREATOR" &&
+      !executionClaim.created
+    ) {
+      return {
+        capabilityExecutionRef: execution.capabilityExecutionRef,
+        evidenceRefs: [],
+        resourceRefs: execution.resourceScope,
+        executionClaim: "EXISTING",
+      };
+    }
 
     // Retained first-party captures are examined before any new network acquisition.
     // The same execution proceeds to the existing E normalizer; no Evidence is emitted here.
     if (
-      isWave2Capability(request.capabilityId) &&
+      isRetainedOwnedSiteCapability(request.capabilityId) &&
+      !exactOfferingScope &&
       request.freshnessIntent !== "FORCE_RECAPTURE"
     ) {
       const capabilityId = request.capabilityId;
@@ -363,11 +413,51 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
       pageRole: EvidencePageRole;
     }> = [];
 
+    if (request.acquisitionMode === "EXACT_RESOURCES_ONLY") {
+      for (const exactUrl of exactOfferingScope!.resourceUrls) {
+        acquired.push(
+          await this.prepareResource(
+            request,
+            execution.capabilityExecutionRef,
+            exactUrl,
+            "OFFERING_DETAIL",
+            exactOfferingScope!.canonicalOfferingRef,
+          ),
+        );
+      }
+      if (
+        acquired.every(
+          (entry) => entry.acquisitionQuality.state === "UNAVAILABLE",
+        )
+      ) {
+        await this.completeExecution(
+          request,
+          execution.capabilityExecutionRef,
+          acquired,
+        );
+      }
+      return {
+        capabilityExecutionRef: execution.capabilityExecutionRef,
+        evidenceRefs: [],
+        resourceRefs: acquired.map((entry) => entry.resource.resourceRef),
+        captureRefs: acquired.map((entry) => entry.captureRef),
+        exactOfferingResources: acquired.map((entry) => ({
+          canonicalOfferingRef: exactOfferingScope!.canonicalOfferingRef,
+          resourceRef: entry.resource.resourceRef,
+          captureRef: entry.captureRef,
+        })),
+        ...(request.executionClaim === "REQUIRE_CREATOR"
+          ? { executionClaim: "CREATED" as const }
+          : {}),
+      };
+    }
+
     const root = await this.prepareResource(
       request,
       execution.capabilityExecutionRef,
       rootUrl,
-      "HOMEPAGE",
+      reconciledPageRole(rootUrl, Boolean(rootIsExact)),
+      rootIsExact ? exactOfferingScope!.canonicalOfferingRef : undefined,
     );
     acquired.push(root);
 
@@ -382,7 +472,31 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
         evidenceRefs: [],
         resourceRefs: acquired.map((entry) => entry.resource.resourceRef),
         captureRefs: acquired.map((entry) => entry.captureRef),
+        ...(rootIsExact
+          ? {
+              exactOfferingResources: [
+                {
+                  canonicalOfferingRef:
+                    exactOfferingScope!.canonicalOfferingRef,
+                  resourceRef: root.resource.resourceRef,
+                  captureRef: root.captureRef,
+                },
+              ],
+            }
+          : {}),
       };
+    }
+
+    for (const exactUrl of exactOfferingScope?.resourceUrls ?? []) {
+      if (exactUrl === rootUrl) continue;
+      const prepared = await this.prepareResource(
+        request,
+        execution.capabilityExecutionRef,
+        exactUrl,
+        reconciledPageRole(exactUrl, true),
+        exactOfferingScope!.canonicalOfferingRef,
+      );
+      acquired.push(prepared);
     }
 
     const rootArtifacts = await repositories.contentArtifacts.listForCapture(
@@ -401,7 +515,15 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
     const selected = selectSecondaryUrls(
       rootContext?.internal_links ?? [],
       request.capabilityId,
-    ).slice(0, OWNED_WEBSITE_WAVE1_BOUNDS.maximumSelectedSecondaryPages);
+    )
+      .filter(
+        (entry) =>
+          !acquired.some(
+            (acquiredEntry) =>
+              acquiredEntry.resource.canonicalUrl === entry.url,
+          ),
+      )
+      .slice(0, OWNED_WEBSITE_WAVE1_BOUNDS.maximumSelectedSecondaryPages);
 
     for (const selectedPage of selected) {
       const prepared = await this.prepareResource(
@@ -413,11 +535,21 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
       acquired.push(prepared);
     }
 
+    const exactOfferingResources = exactOfferingScope
+      ? acquired
+          .filter((entry) => entry.pageRole === "OFFERING_DETAIL")
+          .map((entry) => ({
+            canonicalOfferingRef: exactOfferingScope.canonicalOfferingRef,
+            resourceRef: entry.resource.resourceRef,
+            captureRef: entry.captureRef,
+          }))
+      : [];
     return {
       capabilityExecutionRef: execution.capabilityExecutionRef,
       evidenceRefs: [],
       resourceRefs: acquired.map((entry) => entry.resource.resourceRef),
       captureRefs: acquired.map((entry) => entry.captureRef),
+      ...(exactOfferingResources.length ? { exactOfferingResources } : {}),
     };
   }
 
@@ -426,10 +558,15 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
     capabilityExecutionRef: ReturnType<typeof asCapabilityExecutionRef>,
     rawUrl: string,
     pageRole: EvidencePageRole,
+    canonicalOfferingRef?: string,
   ) {
     const canonicalUrl = normalizeOwnedWebsiteUrl(rawUrl);
     assertSameOwnedWebsiteRoot(request.ownedWebsiteRoot, canonicalUrl);
-    const identity = resourceIdentity(request.brandId, canonicalUrl);
+    const identity = resourceIdentity(
+      request.brandId,
+      canonicalUrl,
+      canonicalOfferingRef,
+    );
     const repositories = this.persistence.repositories();
     const resource = await repositories.resources.createOrGet({
       brandId: request.brandId,
@@ -668,6 +805,7 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
     request: DataExtractionCapabilityAcquisitionRequestV1,
     rootUrl: string,
     resourceScope: readonly ResourceRef[],
+    exactOfferingScope: ReturnType<typeof normalizeExactOfferingScope>,
   ) {
     const repositories = this.persistence.repositories();
     const existing = await repositories.capabilityExecutions.findByRequestKey(
@@ -690,12 +828,62 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
         ),
       );
       const rootMatches = resources.some(
-        (resource) =>
-          resource?.pageRole === "HOMEPAGE" &&
-          resource.canonicalUrl === rootUrl,
+        (resource) => resource?.canonicalUrl === rootUrl,
       );
-      if (!rootMatches) throw persistenceError("IDEMPOTENCY_CONFLICT");
+      if (request.acquisitionMode !== "EXACT_RESOURCES_ONLY" && !rootMatches) {
+        throw persistenceError("IDEMPOTENCY_CONFLICT");
+      }
+      for (const exactUrl of exactOfferingScope?.resourceUrls ?? []) {
+        const expected = resourceIdentity(
+          request.brandId,
+          exactUrl,
+          exactOfferingScope!.canonicalOfferingRef,
+        );
+        if (
+          !resources.some(
+            (resource) =>
+              resource?.resourceRef === expected.resourceRef &&
+              resource.pageRole === "OFFERING_DETAIL" &&
+              resource.canonicalUrl === exactUrl,
+          )
+        ) {
+          throw persistenceError("IDEMPOTENCY_CONFLICT");
+        }
+      }
     }
+  }
+
+  private async exactOfferingResources(
+    brandId: BrandId,
+    resourceRefs: readonly ResourceRef[],
+    exactOfferingScope: ReturnType<typeof normalizeExactOfferingScope>,
+  ) {
+    if (!exactOfferingScope) return [];
+    const repositories = this.persistence.repositories();
+    const results = [];
+    for (const resourceRef of resourceRefs) {
+      const resource = await repositories.resources.findByRef(
+        brandId,
+        resourceRef,
+      );
+      if (
+        !resource ||
+        resource.pageRole !== "OFFERING_DETAIL" ||
+        !exactOfferingScope.resourceUrls.includes(resource.canonicalUrl)
+      )
+        continue;
+      const capture = await repositories.captures.findLatestForResource(
+        brandId,
+        resourceRef,
+      );
+      if (!capture) continue;
+      results.push({
+        canonicalOfferingRef: exactOfferingScope.canonicalOfferingRef,
+        resourceRef,
+        captureRef: capture.captureRef,
+      });
+    }
+    return results;
   }
 
   private async captureRefsForResources(
@@ -723,6 +911,25 @@ export class OwnedWebsiteWave1AcquisitionService implements DataExtractionCapabi
     if (!request.requestKey?.trim() || !request.ownedWebsiteRoot?.trim()) {
       throw persistenceError("PERSISTENCE_INVARIANT");
     }
+    if (
+      request.capabilityId === "owned_website.offering_commercial_evidence" &&
+      !request.exactOfferingScope
+    ) {
+      throw persistenceError("PERSISTENCE_INVARIANT");
+    }
+    if (
+      request.acquisitionMode === "EXACT_RESOURCES_ONLY" &&
+      (request.capabilityId !== "owned_website.offering_commercial_evidence" ||
+        !request.exactOfferingScope)
+    ) {
+      throw persistenceError("PERSISTENCE_INVARIANT");
+    }
+    if (
+      request.executionClaim === "REQUIRE_CREATOR" &&
+      request.acquisitionMode !== "EXACT_RESOURCES_ONLY"
+    ) {
+      throw persistenceError("PERSISTENCE_INVARIANT");
+    }
   }
 }
 
@@ -748,14 +955,60 @@ function artifact(
   };
 }
 
-function resourceIdentity(brandId: BrandId, canonicalUrl: string) {
-  const canonicalResourceKey = canonicalUrl;
+function resourceIdentity(
+  brandId: BrandId,
+  canonicalUrl: string,
+  canonicalOfferingRef?: string,
+) {
+  const canonicalResourceKey = canonicalOfferingRef
+    ? `${canonicalUrl}|exact-offering:${canonicalOfferingRef}`
+    : canonicalUrl;
   return {
     canonicalResourceKey,
     resourceRef: asResourceRef(
       `resource:${hash(`${brandId}|OWNED_WEBSITE|${canonicalResourceKey}`).slice(0, 32)}`,
     ),
   };
+}
+
+export function exactOfferingResourceIdentity(
+  brandId: BrandId,
+  canonicalUrl: string,
+  canonicalOfferingRef: string,
+) {
+  return resourceIdentity(
+    brandId,
+    normalizeOwnedWebsiteUrl(canonicalUrl),
+    canonicalOfferingRef,
+  );
+}
+
+function normalizeExactOfferingScope(
+  request: DataExtractionCapabilityAcquisitionRequestV1,
+  rootUrl: string,
+) {
+  const scope = request.exactOfferingScope;
+  if (!scope) return undefined;
+  if (
+    !scope.canonicalOfferingRef?.trim() ||
+    scope.resourceUrls.length === 0 ||
+    scope.resourceUrls.length > 8
+  ) {
+    throw persistenceError("PERSISTENCE_INVARIANT");
+  }
+  const resourceUrls = scope.resourceUrls.map((value) => {
+    const normalized = normalizeOwnedWebsiteUrl(value);
+    assertSafeOwnedWebsiteUrl(normalized);
+    assertSameOwnedWebsiteRoot(rootUrl, normalized);
+    return normalized;
+  });
+  if (new Set(resourceUrls).size !== resourceUrls.length) {
+    throw persistenceError("PERSISTENCE_INVARIANT");
+  }
+  return {
+    canonicalOfferingRef: scope.canonicalOfferingRef.trim(),
+    resourceUrls,
+  } as const;
 }
 
 function selectSecondaryUrls(
@@ -771,7 +1024,7 @@ function selectSecondaryUrls(
     .filter((entry) => entry.pageRole !== "HOMEPAGE")
     .map((entry) => ({
       ...entry,
-      score: isWave2Capability(capabilityId)
+      score: isRetainedOwnedSiteCapability(capabilityId)
         ? wave2PageScore(capabilityId, entry.url)
         : pageScore(capabilityId, entry.pageRole),
     }))
@@ -831,6 +1084,16 @@ export function inferPageRole(value: string): EvidencePageRole {
   if (/collections?|categories?/.test(path)) return "CATEGORY_OVERVIEW";
   if (/products?|shop/.test(path)) return "PORTFOLIO_OVERVIEW";
   return "OTHER";
+}
+
+/** Exact detail is an application reconciliation decision, never a URL-shape inference. */
+export function reconciledPageRole(
+  value: string,
+  hasExactCanonicalOfferingReconciliation: boolean,
+): EvidencePageRole {
+  return hasExactCanonicalOfferingReconciliation
+    ? "OFFERING_DETAIL"
+    : inferPageRole(value);
 }
 
 function capabilityAvailability(

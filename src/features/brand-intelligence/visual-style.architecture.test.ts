@@ -14,7 +14,11 @@ describe("visual_style_synthesis architecture boundaries", () => {
     const runtime = contracts(),
       bundle = runtime.getVerifiedBundle(registryKey);
     expect(
-      runtime.registrations().filter((r) => r.executionEnabled),
+      runtime
+        .registrations()
+        .filter(
+          (r) => r.executionEnabled && !r.processorId.startsWith("offering_"),
+        ),
     ).toHaveLength(7);
     expect(
       runtime

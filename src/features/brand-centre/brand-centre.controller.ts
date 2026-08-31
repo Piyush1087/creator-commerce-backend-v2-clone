@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -30,12 +31,16 @@ import {
   PatchDnaIdentityDto,
   PatchDnaNarrativeDto,
   PatchDnaProfileDto,
+  ManualOfferingPriceDto,
   ScanUrlDto,
   UpdateOfferDto,
   UpdateOfferingDto,
   UpdatePersonaDto,
 } from "./dto/brand-centre-dna.dto";
-import { LeaksQueryDto, PatchLeakDto } from "./dto/brand-centre-intelligence.dto";
+import {
+  LeaksQueryDto,
+  PatchLeakDto,
+} from "./dto/brand-centre-intelligence.dto";
 import { PatchPlannerCardDto } from "./dto/brand-centre-planner.dto";
 import { BrandCentreBudgetService } from "./services/brand-centre-budget.service";
 import { BrandCentreDnaService } from "./services/brand-centre-dna.service";
@@ -207,6 +212,16 @@ export class BrandCentreController {
   ) {
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
     return this.dna.updateOffering(brandProfileId, offeringId, body);
+  }
+
+  @Put("dna/offerings/:offeringId/price")
+  async setOfferingPrice(
+    @Req() req: RequestWithAuthUser,
+    @Param("offeringId") offeringId: string,
+    @Body() body: ManualOfferingPriceDto,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.dna.setManualOfferingPrice(brandProfileId, offeringId, body);
   }
 
   @Delete("dna/offerings/:offeringId")
@@ -392,11 +407,7 @@ export class BrandCentreController {
     @Param("leakId") leakId: string,
   ) {
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
-    return this.intelligence.moveToPlanner(
-      brandProfileId,
-      leakId,
-      req.user.id,
-    );
+    return this.intelligence.moveToPlanner(brandProfileId, leakId, req.user.id);
   }
 
   @Get("planner")

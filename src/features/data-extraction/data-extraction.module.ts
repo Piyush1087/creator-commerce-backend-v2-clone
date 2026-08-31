@@ -47,6 +47,7 @@ import { StructuredEvidenceExecutionService } from "./services/structured-eviden
     StructuredEvidenceExecutionService,
     OwnedWebsiteWave1AcquisitionService,
     OwnedWebsiteWave1NormalizationService,
+    DataExtractionPersistenceService,
     DATA_EXTRACTION_EVIDENCE_QUERY_PORT_V1,
     DataExtractionIntelligenceEvidenceAdapter,
   ],

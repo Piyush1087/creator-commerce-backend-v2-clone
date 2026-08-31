@@ -14,6 +14,7 @@ import type {
 import { SYNTHETIC_PROCESSOR_ID } from "./domain/intelligence-execution.types";
 import { ProcessorExecutorFailure } from "./executor/processor-executor";
 import type { ProcessorSuccessPersistenceHook } from "./processor-persistence.hook";
+import { OfferingFactualPersistenceHook } from "../processors/offering-factual/offering-factual-persistence.hook";
 
 /** Bounded dispatch only; finalization still owns the transaction and live lease. */
 @Injectable()
@@ -28,6 +29,8 @@ export class ProcessorPersistenceRouter implements ProcessorSuccessPersistenceHo
     @Optional() private readonly visualStyle?: VisualStylePersistenceHook,
     @Optional()
     private readonly serviceability?: ServiceabilityPersistenceHook,
+    @Optional()
+    private readonly offeringFactual?: OfferingFactualPersistenceHook,
   ) {}
   async persistBeforeCompletion(
     tx: Prisma.TransactionClient,
@@ -35,6 +38,15 @@ export class ProcessorPersistenceRouter implements ProcessorSuccessPersistenceHo
     result: ProcessorExecutionResult,
   ): Promise<void> {
     switch (claim.processorExecution.processorId) {
+      case "offering_factual_synthesis":
+      case "offering_creator_communication":
+      case "offering_actionability_synthesis":
+        if (!this.offeringFactual)
+          throw new ProcessorExecutorFailure({
+            category: "CONFIGURATION_DRIFT",
+            code: "PERSISTENCE_HOOK_REGISTRATION_MISSING",
+          });
+        return this.offeringFactual.persistBeforeCompletion(tx, claim, result);
       case "serviceability_synthesis":
         if (!this.serviceability)
           throw new ProcessorExecutorFailure({

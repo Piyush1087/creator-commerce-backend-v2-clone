@@ -74,7 +74,9 @@ const enabled = process.env.BRAND_MEANING_DATABASE_TEST === "true";
 describe.skipIf(!enabled)(
   "brand_meaning real PostgreSQL vertical slice",
   () => {
-    const prisma = new PrismaClient();
+    const prisma = new PrismaClient({
+      transactionOptions: { maxWait: 10_000 },
+    });
     const service = prisma as unknown as PrismaService;
     afterAll(async () => {
       await prisma.$disconnect();
