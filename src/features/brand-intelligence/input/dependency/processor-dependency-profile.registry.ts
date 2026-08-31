@@ -14,7 +14,10 @@ export interface ProcessorDependencyProfile {
     | "brand_meaning"
     | "audience_persona_synthesis"
     | "brand_character"
-    | "serviceability_synthesis";
+    | "serviceability_synthesis"
+    | "offering_factual_synthesis"
+    | "offering_creator_communication"
+    | "offering_actionability_synthesis";
   readonly processorVersion: "1.0";
   readonly outputContractId:
     | "brand_communication_output_contract"
@@ -23,7 +26,10 @@ export interface ProcessorDependencyProfile {
     | "brand_character_output_contract"
     | "audience_persona_synthesis_output_contract"
     | "brand_meaning_output_contract"
-    | "serviceability_synthesis_output_contract";
+    | "serviceability_synthesis_output_contract"
+    | "offering_factual_synthesis_output_contract"
+    | "offering_creator_communication_output_contract"
+    | "offering_actionability_synthesis_output_contract";
   readonly outputContractVersion: "1.0";
   readonly evidenceContractId:
     | "brand_communication_evidence"
@@ -32,7 +38,8 @@ export interface ProcessorDependencyProfile {
     | "brand_character_evidence"
     | "audience_persona_synthesis_evidence"
     | "brand_meaning_evidence"
-    | "serviceability_evidence";
+    | "serviceability_evidence"
+    | "product_intelligence_evidence_requirements";
   readonly requiredCanonicalSemantics: readonly CanonicalBrandStateSemantic[];
   readonly nonNullableCanonicalAnchors: readonly CanonicalBrandStateSemantic[];
   readonly blockingConflictSemantics: readonly CanonicalBrandStateSemantic[];
@@ -43,11 +50,61 @@ export interface ProcessorDependencyProfile {
   readonly includeOfferingFacts?: boolean;
   readonly includeVisualState?: boolean;
   readonly includeServiceabilityState?: boolean;
+  readonly requiredCurrentIntelligenceObject?: string;
 }
 
 const ARCHITECTURE_REPOSITORY = "Piyush1087/dummy_tcs";
 
 const PROFILES: readonly ProcessorDependencyProfile[] = [
+  {
+    processorId: "offering_creator_communication",
+    processorVersion: "1.0",
+    outputContractId: "offering_creator_communication_output_contract",
+    outputContractVersion: "1.0",
+    evidenceContractId: "product_intelligence_evidence_requirements",
+    requiredCanonicalSemantics: [],
+    nonNullableCanonicalAnchors: [],
+    blockingConflictSemantics: [],
+    capabilityIds: [
+      "explicit_factual_proof_or_claim_evidence",
+      "derived_communication_constraint_evidence",
+    ],
+    representativeEvidenceAnyOf: [],
+    includeOfferingFacts: true,
+    requiredCurrentIntelligenceObject: "offering_factual_profile",
+  },
+  {
+    processorId: "offering_actionability_synthesis",
+    processorVersion: "1.0",
+    outputContractId: "offering_actionability_synthesis_output_contract",
+    outputContractVersion: "1.0",
+    evidenceContractId: "product_intelligence_evidence_requirements",
+    requiredCanonicalSemantics: [],
+    nonNullableCanonicalAnchors: [],
+    blockingConflictSemantics: [],
+    capabilityIds: [
+      "owned_website.serviceability_evidence",
+      "owned_website.location_evidence",
+    ],
+    representativeEvidenceAnyOf: [],
+    includeOfferingFacts: true,
+  },
+  {
+    processorId: "offering_factual_synthesis",
+    processorVersion: "1.0",
+    outputContractId: "offering_factual_synthesis_output_contract",
+    outputContractVersion: "1.0",
+    evidenceContractId: "product_intelligence_evidence_requirements",
+    requiredCanonicalSemantics: [],
+    nonNullableCanonicalAnchors: [],
+    blockingConflictSemantics: [],
+    capabilityIds: [
+      "owned_website.offering_context",
+      "explicit_factual_proof_or_claim_evidence",
+    ],
+    representativeEvidenceAnyOf: ["owned_website.offering_context"],
+    includeOfferingFacts: true,
+  },
   {
     processorId: "serviceability_synthesis",
     processorVersion: "1.0",

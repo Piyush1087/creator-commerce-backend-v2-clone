@@ -52,6 +52,9 @@ describe("brand_character architecture", () => {
       ["brand_differentiation", true, true, true],
       ["visual_style_synthesis", true, true, true],
       ["serviceability_synthesis", true, true, true],
+      ["offering_factual_synthesis", true, true, true],
+      ["offering_creator_communication", true, true, true],
+      ["offering_actionability_synthesis", true, true, true],
     ]);
     expect(PROCESSOR_ARCHITECTURE_COMMITS).toEqual({
       brand_communication: "017dbceac494f0861ec9a6bea7af3129b70fa5cb",
@@ -61,6 +64,11 @@ describe("brand_character architecture", () => {
       brand_differentiation: "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
       visual_style_synthesis: "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
       serviceability_synthesis: "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
+      offering_factual_synthesis: "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
+      offering_creator_communication:
+        "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
+      offering_actionability_synthesis:
+        "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
     });
     expect(bundle.manifest.architectureCommitSha).toBe(
       PROCESSOR_ARCHITECTURE_COMMITS.brand_character,

@@ -1,0 +1,119 @@
+id: offering_factual_synthesis_reasoning
+version: "1.0"
+status: FROZEN
+processor: offering_factual_synthesis
+engine: product_intelligence
+processor_definition: intelligence/engines/product_intelligence/processors/offering_factual_synthesis.yaml
+object_authority: intelligence/engines/product_intelligence/objects.yaml#offering_factual_profile
+evidence_authority: intelligence/engines/product_intelligence/evidence/product_intelligence_evidence_requirements.yaml
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define grounded reasoning for the six factual-profile semantic families while preserving exact Offering scope,
+  canonical application ownership, protected truth, partial output, and claim/proof safety.
+
+model_capability_requirement: structured_grounded_reasoning_with_claim_safety
+provider_or_model_selection: deferred_to_model_registry
+
+inputs:
+  subject: [brand_ref, exact canonical offering_ref]
+  canonical:
+    - kind and industry-aware subtype
+    - lifecycle
+    - customer destination when relevant
+    - canonical media refs when relevant
+    - Collection/BUNDLE relationships when relevant
+    - Brand-confirmed Offering values
+  evidence:
+    required:
+      - owned_website.offering_context reconciled to the exact Offering
+    conditional:
+      - exact-Offering factual proof or claim Evidence
+    optional:
+      - explicitly relevant canonical Brand context
+
+scope_policy:
+  same_brand_does_not_imply_same_offering: true
+  exact_offering_match_required: true
+  sibling_offering_evidence: reject
+  Collection_or_BUNDLE_context:
+    allowed_only_when: canonical relationship is relevant and referenced
+    child_product_fact_becomes_bundle_fact_automatically: false
+
+protected_current_state:
+  brand_confirmed_non_price_truth: comparison_only_during_ordinary_refresh
+  silent_replacement: forbidden
+  price_exception_executed_by_processor: false
+  conflict_behavior: preserve protected current and retain candidate/discrepancy lineage
+
+reasoning_sequence:
+  - validate Brand and exact canonical Offering scope across canonical and Evidence inputs
+  - identify requested unprotected semantic paths
+  - separate canonical application facts, observed statements, and Creator Shop interpretation
+  - synthesize a concise factual_summary only from defensible same-Offering context
+  - emit key_facts only for directly supported same-Offering facts
+  - derive key_benefits only where facts support a customer-relevant implication without inventing outcomes
+  - emit proof_points only where support quality and exact-Offering scope are sufficient
+  - derive usage_context and customer_context without creating a mandatory Offering-level Audience
+  - apply regulated and high-risk claim fail-closed rules
+  - preserve semantic item identity across wording-only refresh
+  - return each family independently as grounded value, null, or absent according to active scope
+
+semantic_family_rules:
+  factual_summary:
+    meaning: concise reusable statement of what the exact Offering is and principally provides
+    excludes: [Brand summary, sibling Offering summary, Campaign copy, promotional slogan]
+  key_facts:
+    authority_default: OBSERVED
+    rule: statement must have exact-Offering Evidence or canonical business-state lineage
+  key_benefits:
+    authority_default: CREATOR_SHOP_DERIVED
+    rule: benefit must be a defensible interpretation and must not upgrade a feature into an unsupported outcome
+  proof_points:
+    authority_default: OBSERVED
+    rules:
+      - proof must support this exact Offering
+      - testimonial is not proof
+      - credential occurrence is not credential verification
+      - Brand confirmation is not external verification
+  usage_context:
+    authority_default: CREATOR_SHOP_DERIVED
+    rule: supported use situations only; speculative use cases are omitted
+  customer_context:
+    authority_default: CREATOR_SHOP_DERIVED
+    rule: describe supported customer relevance without creating canonical Audience or required Offering-level Persona
+
+claim_safety:
+  observed_statement_is_externally_verified_fact: false
+  brand_confirmation_is_external_verification: false
+  regulated_or_high_risk_categories: [efficacy, safety, success, superiority]
+  insufficient_approved_support: fail_closed_and_omit
+  compliance_engine_created: false
+
+partial_output:
+  supported: true
+  independent_families: true
+  arbitrary_list_cardinality: not_frozen
+  unsupported_family: null_or_omit
+  filler: forbidden
+
+refresh_and_invalidation:
+  directed_only: true
+  exact_offering_only: true
+  triggers:
+    - material canonical Offering state change
+    - material same-Offering context change
+    - material same-Offering proof or claim Evidence change
+    - Brand-confirmed same-Offering factual edit
+  non_triggers:
+    - sibling Offering change without declared relationship impact
+    - unrelated Brand visual change
+    - unrelated Campaign copy change
+
+non_goals:
+  - canonical Offering reconciliation by AI
+  - canonical state mutation
+  - final Campaign Brief copy
+  - Product change history
+  - provider or model selection
+  - runtime or persistence design

@@ -5,6 +5,7 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { BrandLocationService } from "../../brand-canonical-state/brand-location.service";
 import { BrandCentreColdStartService } from "../../brand-centre/services/brand-centre-cold-start.service";
+import { canonicalOfferingType } from "../../brand-centre/services/canonical-offering-state.service";
 import {
   BrandScanGateException,
   BrandScanGateService,
@@ -505,12 +506,17 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
           "USD",
         );
         for (const item of payload.products) {
+          const canonical = canonicalOfferingType(item.type);
           const existing = await tx.offering.findMany({
             where: { brandProfileId: profile.id, url: item.url },
+            include: { fieldStates: true },
           });
           const observed = {
             brandProfileId: profile.id,
             type: item.type,
+            canonicalKind: canonical.kind,
+            canonicalSubtype: canonical.subtype,
+            canonicalLifecycle: "ACTIVE" as const,
             name: item.name,
             description: null,
             imageUrl: item.imageUrl ?? null,
@@ -522,9 +528,27 @@ export class HttpBrandSurfaceScanRunner implements BrandSurfaceScanRunner {
           };
           if (!existing.length) await tx.offering.create({ data: observed });
           else if (existing.length === 1 && !existing[0].isUserEdited) {
+            const protectedPaths = new Set(
+              existing[0].fieldStates
+                .filter((state) => state.protectionState === "BRAND_CONFIRMED")
+                .map((state) => state.semanticFieldPath),
+            );
             await tx.offering.update({
               where: { id: existing[0].id },
-              data: observed,
+              data: {
+                ...observed,
+                name: protectedPaths.has("name") ? undefined : observed.name,
+                description: protectedPaths.has("description")
+                  ? undefined
+                  : observed.description,
+                url: protectedPaths.has("url") ? undefined : observed.url,
+                canonicalKind: protectedPaths.has("canonicalKind")
+                  ? undefined
+                  : observed.canonicalKind,
+                canonicalSubtype: protectedPaths.has("canonicalSubtype")
+                  ? undefined
+                  : observed.canonicalSubtype,
+              },
             });
           }
         }

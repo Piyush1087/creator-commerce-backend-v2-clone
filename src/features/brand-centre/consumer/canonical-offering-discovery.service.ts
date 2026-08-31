@@ -1,0 +1,50 @@
+import { Injectable } from "@nestjs/common";
+
+import { PrismaService } from "../../../prisma/prisma.service";
+import type { AuthUser } from "../../auth/types/auth-user";
+import { BrandCentreAuthService } from "../brand-centre-auth.service";
+import { CanonicalOfferingIndexResponseSchema } from "./canonical-offering-discovery.schema";
+
+@Injectable()
+export class CanonicalOfferingDiscoveryService {
+  constructor(
+    private readonly auth: BrandCentreAuthService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  async list(user: AuthUser) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(user);
+    const rows = await this.prisma.offering.findMany({
+      where: {
+        brandProfileId,
+        canonicalKind: { not: null },
+        canonicalLifecycle: { not: null },
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        canonicalKind: true,
+        canonicalSubtype: true,
+        canonicalLifecycle: true,
+      },
+    });
+
+    return CanonicalOfferingIndexResponseSchema.parse({
+      offerings: rows.map((row) => {
+        if (!row.canonicalKind || !row.canonicalLifecycle) {
+          throw new Error(
+            "Canonical Offering discovery returned unresolved state",
+          );
+        }
+        return {
+          offeringId: row.id,
+          name: row.name,
+          kind: row.canonicalKind,
+          subtype: row.canonicalSubtype,
+          lifecycle: row.canonicalLifecycle,
+        };
+      }),
+    });
+  }
+}

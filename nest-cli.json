@@ -26,7 +26,7 @@
         "watchAssets": true
       },
       {
-        "include": "features/brand-intelligence/generated/contract-bundles/**/*.{json,yaml}",
+        "include": "features/brand-intelligence/generated/contract-bundles/**/*",
         "watchAssets": true
       }
     ]

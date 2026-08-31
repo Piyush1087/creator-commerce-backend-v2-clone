@@ -89,7 +89,9 @@ const enabled = process.env.AUDIENCE_PERSONA_DATABASE_TEST === "true";
 describe.skipIf(!enabled)(
   "audience_persona_synthesis real PostgreSQL vertical slice",
   () => {
-    const prisma = new PrismaClient();
+    const prisma = new PrismaClient({
+      transactionOptions: { maxWait: 10_000 },
+    });
     const service = prisma as unknown as PrismaService;
     afterAll(async () => {
       await prisma.$disconnect();

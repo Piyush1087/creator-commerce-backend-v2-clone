@@ -23,6 +23,7 @@ import { BrandOnboardingService } from "./brand-onboarding.service";
 import { DiscoveryReachabilityService } from "./discovery-reachability.service";
 import { BrandProfileService } from "./brand-profile.service";
 import { BrandOfferingsService } from "./brand-offerings.service";
+import { CanonicalOfferingStateService } from "../brand-centre/services/canonical-offering-state.service";
 import { BrandCompetitorsService } from "./brand-competitors.service";
 import { GeminiJsonClient } from "./integrations/gemini/gemini-json.client";
 import { ParallelExtractClient } from "./integrations/parallel/parallel-extract.client";
@@ -141,6 +142,7 @@ import { CanonicalBrandStateService } from "./canonical-brand-state/canonical-br
     },
     BrandProfileService,
     BrandOfferingsService,
+    CanonicalOfferingStateService,
     BrandCompetitorsService,
     BrandVerificationService,
     SurfaceScanProgressStore,

@@ -11,6 +11,7 @@ import {
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { ComponentSemanticAddress } from "../semantic-path/component-path.types";
+import { resolveIntelligenceSubject } from "../subject/intelligence-subject.resolver";
 
 export interface FreshnessMutation {
   readonly freshness: IntelligenceFreshness;
@@ -26,6 +27,7 @@ export function compareSemanticAddresses(
 ): number {
   return (
     left.brandId.localeCompare(right.brandId) ||
+    (left.subjectId ?? "").localeCompare(right.subjectId ?? "") ||
     left.objectSemanticId.localeCompare(right.objectSemanticId) ||
     left.pathSchemeVersion - right.pathSchemeVersion ||
     left.componentSemanticPath.localeCompare(right.componentSemanticPath)
@@ -54,13 +56,14 @@ function protectionFor(
 export class IntelligenceCurrentStateRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  getCurrent(
+  async getCurrent(
     address: ComponentSemanticAddress,
   ): Promise<IntelligenceCurrentComponent | null> {
+    const scoped = await this.scopeAddress(this.prisma, address);
     return this.prisma.intelligenceCurrentComponent.findUnique({
       where: {
-        brandId_objectSemanticId_pathSchemeVersion_componentSemanticPath:
-          address,
+        brandId_subjectId_objectSemanticId_pathSchemeVersion_componentSemanticPath:
+          scoped,
       },
     });
   }
@@ -70,7 +73,16 @@ export class IntelligenceCurrentStateRepository {
     addresses: readonly ComponentSemanticAddress[],
   ): Promise<Map<string, IntelligenceCurrentComponent>> {
     const locked = new Map<string, IntelligenceCurrentComponent>();
-    for (const address of sortSemanticAddresses(addresses)) {
+    const scopedAddresses = await Promise.all(
+      addresses.map(async (address) => ({
+        original: address,
+        scoped: await this.scopeAddress(tx, address),
+      })),
+    );
+    scopedAddresses.sort((left, right) =>
+      compareSemanticAddresses(left.scoped, right.scoped),
+    );
+    for (const { original, scoped: address } of scopedAddresses) {
       const addressKey = this.key(address);
       await tx.$queryRaw<Array<{ locked: number }>>(Prisma.sql`
         SELECT 1 AS "locked"
@@ -80,6 +92,7 @@ export class IntelligenceCurrentStateRepository {
         SELECT "current_component_id" AS "id"
         FROM "intelligence_current_components"
         WHERE "brand_id" = ${address.brandId}
+          AND "subject_id" = ${address.subjectId}
           AND "object_semantic_id" = ${address.objectSemanticId}
           AND "path_scheme_version" = ${address.pathSchemeVersion}
           AND "component_semantic_path" = ${address.componentSemanticPath}
@@ -92,6 +105,7 @@ export class IntelligenceCurrentStateRepository {
           },
         );
         locked.set(addressKey, current);
+        if (!original.subjectId) locked.set(this.key(original), current);
       }
     }
     return locked;
@@ -102,10 +116,17 @@ export class IntelligenceCurrentStateRepository {
     address: ComponentSemanticAddress,
     generation: IntelligenceComponentGeneration,
   ): Promise<IntelligenceCurrentComponent | null> {
+    const scoped = await this.scopeAddress(tx, address);
+    if (scoped.subjectId !== generation.subjectId) {
+      throw new Error(
+        "Current component generation belongs to another Intelligence subject",
+      );
+    }
     try {
       return await tx.intelligenceCurrentComponent.create({
         data: {
           brandId: address.brandId,
+          subjectId: scoped.subjectId,
           objectSemanticId: address.objectSemanticId,
           pathSchemeVersion: address.pathSchemeVersion,
           componentSemanticPath: address.componentSemanticPath,
@@ -217,9 +238,19 @@ export class IntelligenceCurrentStateRepository {
   key(address: ComponentSemanticAddress): string {
     return JSON.stringify([
       address.brandId,
+      address.subjectId,
       address.objectSemanticId,
       address.pathSchemeVersion,
       address.componentSemanticPath,
     ]);
+  }
+
+  private async scopeAddress(
+    client: Pick<Prisma.TransactionClient, "intelligenceSubject" | "offering">,
+    address: ComponentSemanticAddress,
+  ): Promise<ComponentSemanticAddress & { readonly subjectId: string }> {
+    if (address.subjectId) return { ...address, subjectId: address.subjectId };
+    const subject = await resolveIntelligenceSubject(client, address.brandId);
+    return { ...address, subjectId: subject.id };
   }
 }

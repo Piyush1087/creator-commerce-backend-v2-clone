@@ -1,0 +1,117 @@
+id: offering_actionability_synthesis_reasoning
+version: "1.0"
+status: FROZEN
+processor: offering_actionability_synthesis
+engine: product_intelligence
+processor_definition: intelligence/engines/product_intelligence/processors/offering_actionability_synthesis.yaml
+object_authority: intelligence/engines/product_intelligence/objects.yaml#offering_actionability_profile
+evidence_authority: intelligence/engines/product_intelligence/evidence/product_intelligence_evidence_requirements.yaml
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define reasoning that cleanly separates deterministic canonical Offering inputs from derived customer-action,
+  commercial, and broader observed actionability interpretation.
+
+model_capability_requirement: hybrid_semantic_resolution
+provider_or_model_selection: deferred_to_model_registry
+
+inputs:
+  subject: [brand_ref, exact canonical offering_ref]
+  deterministic_canonical:
+    - lifecycle
+    - customer destination
+    - canonical price and currency commercial tuple
+    - canonical Offer refs when available
+    - OFFERING_AVAILABLE_AT_LOCATION refs
+  optional_evidence:
+    - exact-Offering owned_website.serviceability_evidence
+    - exact-Offering owned_website.location_evidence
+    - exact-Offering first-party actionability observations
+
+scope_policy:
+  exact_offering_match_required: true
+  sibling_offering_evidence: reject
+  same_brand_does_not_imply_shared_availability: true
+  broader_brand_serviceability_as_offering_truth: forbidden
+
+canonical_input_boundary:
+  lifecycle: referenced_not_mutated
+  customer_destination: referenced_not_mutated
+  commercial_tuple:
+    price_and_currency_are_one_tuple: true
+    referenced_not_mutated: true
+    reliable_first_party_refresh_exception_executed_here: false
+    formerly_public_price_disappears: retain_stale_or_unknown_not_zero_or_silent_null
+  canonical_offer_refs: separate_commercial_entity_referenced_not_created
+  OFFERING_AVAILABLE_AT_LOCATION:
+    meaning: customer_can_obtain_receive_or_use_subject_Offering_at_exact_canonical_Location
+    does_not_mean: [delivery_origin, warehouse_origin, service_radius, marketing_geography, Brand_wide_serviceability]
+
+reasoning_sequence:
+  - validate exact Brand and canonical Offering scope
+  - load deterministic canonical inputs with their business-state lineage and freshness
+  - reject any attempt to infer or mutate missing canonical state
+  - determine whether lifecycle and destination support a defensible customer action
+  - interpret canonical commercial tuple and Offer refs without copying them into Intelligence ownership
+  - interpret exact Location relations under their narrow canonical meaning
+  - use same-Offering serviceability or location Evidence only for broader observed context
+  - keep broader observed availability derived and non-canonical
+  - preserve stale or unknown commercial semantics instead of manufacturing current truth
+  - return each output family independently as value, null, or absent
+
+customer_action:
+  semantic_role: reusable_interpretation_of_how_customer_can_act
+  rules:
+    - must be grounded in current canonical destination, exact Location relation, or qualified same-Offering Evidence
+    - inactive lifecycle must not be presented as eligible for new Campaign use
+    - interpretation is not final Campaign CTA copy
+    - broad delivery, booking, or serviceability statement remains derived unless canonicalized elsewhere
+
+commercial_context:
+  semantic_role: reusable_interpretation_of_current_commercial_context
+  rules:
+    - price and currency must remain a coherent referenced tuple
+    - EXACT, STARTING_AT, RANGE, and NOT_PUBLICLY_LISTED semantics must not be collapsed
+    - previously public price disappearance must not become zero or silent null
+    - canonical Offer refs remain separate from Offering identity
+    - observed promotions remain Evidence/derived context until canonical Offer state exists
+
+geography_safety:
+  broad_canonical_geography_creation: forbidden
+  exact_location_relation_broadening: forbidden
+  optional_serviceability_evidence_role: derived_actionability_enrichment_only
+  unsupported_breadth: omit_or_null
+
+commercial_evidence_boundary:
+  product_commercial_price_evidence_sufficiency: P2_DE_CAPABILITY_PREFLIGHT_REQUIRED
+  bounded_price_capability_may_be_required: possible_not_frozen
+  new_P0_capability_definition: forbidden
+
+partial_output:
+  supported: true
+  valid_examples:
+    - customer_action only
+    - commercial_context only
+    - both families
+  arbitrary_list_cardinality: not_frozen
+  missing_or_stale_price: preserve_unknown_or_stale_semantics
+  filler: forbidden
+
+refresh_and_invalidation:
+  directed_only: true
+  exact_offering_only: true
+  triggers:
+    - lifecycle change
+    - customer destination change
+    - commercial tuple change
+    - canonical Offer ref change
+    - exact Location relation change
+    - material same-Offering serviceability, location, or actionability Evidence change
+
+non_goals:
+  - canonical price refresh or mutation
+  - canonical Offer creation
+  - broad canonical geography
+  - final Campaign CTA or Brief copy
+  - provider or model selection
+  - runtime or persistence design

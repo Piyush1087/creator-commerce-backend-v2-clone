@@ -124,7 +124,17 @@ export class CampaignQueryService {
           orderBy: { createdAt: "asc" },
           include: {
             brandProfile: { select: { name: true, logoUrl: true } },
-            offering: { select: { name: true, type: true, imageUrl: true } },
+            offering: {
+              select: {
+                name: true,
+                type: true,
+                canonicalKind: true,
+                imageUrl: true,
+                mediaState: {
+                  select: { primaryMediaAsset: { select: { url: true } } },
+                },
+              },
+            },
             brandOffer: { select: { offerName: true } },
             canonicalBriefs: {
               orderBy: { createdAt: "asc" },
@@ -175,8 +185,12 @@ export class CampaignQueryService {
         asset.offering?.name ??
         asset.brandOffer?.offerName ??
         "Brand Centre Asset",
-      subtype: asset.offering?.type ?? null,
-      imageUrl: asset.brandProfile?.logoUrl ?? asset.offering?.imageUrl ?? null,
+      subtype: asset.offering?.canonicalKind ?? asset.offering?.type ?? null,
+      imageUrl:
+        asset.brandProfile?.logoUrl ??
+        asset.offering?.mediaState?.primaryMediaAsset?.url ??
+        asset.offering?.imageUrl ??
+        null,
       briefs: asset.canonicalBriefs.map((brief) => ({
         briefId: brief.id,
         name: brief.title,

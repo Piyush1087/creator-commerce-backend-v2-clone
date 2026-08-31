@@ -24,6 +24,7 @@ export interface EvidenceDependencyManifest {
       failureCategories: readonly string[];
       detailCodes: readonly string[];
     }>;
+    capabilityExecutionRefs?: readonly string[];
     evidence: readonly Readonly<{
       evidenceRef: string;
       resourceRef: string;
@@ -62,6 +63,7 @@ export interface EvidenceDependencyManifest {
       contentHash: string;
       polarity?: string;
       conflictGroupRef?: string;
+      capabilityExecutionRefs?: readonly string[];
     }>[];
   }>[];
 }
@@ -209,6 +211,13 @@ export class EvidenceManifestBuilder {
             ...(item.conflictGroupRef
               ? { conflictGroupRef: item.conflictGroupRef }
               : {}),
+            ...(item.capabilityExecutionRefs
+              ? {
+                  capabilityExecutionRefs: [
+                    ...new Set(item.capabilityExecutionRefs),
+                  ].sort(),
+                }
+              : {}),
           };
         })
         .sort((left, right) =>
@@ -239,6 +248,13 @@ export class EvidenceManifestBuilder {
           ].sort(),
           detailCodes: [...result.acquisitionQuality.detailCodes].sort(),
         },
+        ...(result.capabilityExecutionRefs
+          ? {
+              capabilityExecutionRefs: [
+                ...new Set(result.capabilityExecutionRefs),
+              ].sort(),
+            }
+          : {}),
         evidence,
       };
     });

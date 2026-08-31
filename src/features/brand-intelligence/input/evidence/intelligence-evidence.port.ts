@@ -12,6 +12,7 @@ export const NORMALIZED_EVIDENCE_CAPABILITIES = [
   "owned_website.visual_evidence",
   "owned_website.serviceability_evidence",
   "owned_website.location_evidence",
+  "owned_website.offering_commercial_evidence",
 ] as const;
 
 export type NormalizedEvidenceCapabilityId =
@@ -123,6 +124,8 @@ export interface NormalizedEvidenceReference {
   readonly contentHash: string;
   readonly polarity?: EvidencePolarity;
   readonly conflictGroupRef?: string;
+  /** Present for exact Offering reads; preserves all qualifying memberships. */
+  readonly capabilityExecutionRefs?: readonly string[];
 }
 
 export interface NormalizedEvidenceCapabilityResult {
@@ -136,10 +139,13 @@ export interface NormalizedEvidenceCapabilityResult {
   readonly coverage: EvidenceCoverage;
   readonly acquisitionQuality: EvidenceAcquisitionQuality;
   readonly evidence: readonly NormalizedEvidenceReference[];
+  /** Present for exact Offering reads spanning completed executions. */
+  readonly capabilityExecutionRefs?: readonly string[];
 }
 
 export interface NormalizedEvidenceSet {
   readonly brandId: string;
+  readonly canonicalOfferingRef?: string;
   readonly capabilityResults: readonly NormalizedEvidenceCapabilityResult[];
 }
 
@@ -148,6 +154,10 @@ export interface IntelligenceEvidenceReadRequest {
   readonly processorId: string;
   readonly processorVersion: string;
   readonly capabilityIds: readonly NormalizedEvidenceCapabilityId[];
+  /** Explicit Product scope. Brand callers omit this and retain legacy behavior. */
+  readonly exactOfferingScope?: Readonly<{
+    readonly canonicalOfferingRef: string;
+  }>;
 }
 
 export interface IntelligenceEvidenceReader {

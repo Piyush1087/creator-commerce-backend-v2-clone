@@ -40,6 +40,7 @@ export interface BusinessStateReference {
   readonly entityType:
     | "BrandProfile"
     | "Offering"
+    | "IntelligenceCurrentObject"
     | "Location"
     | "BrandVisualState"
     | "BrandVisualAsset"
@@ -112,6 +113,62 @@ export interface CanonicalOfferingFact {
   readonly url: string;
   readonly categoryTag: string | null;
   readonly isActive: boolean;
+  readonly canonicalKind?: string | null;
+  readonly canonicalSubtype?: string | null;
+  readonly canonicalLifecycle?: string | null;
+  readonly description?: string | null;
+  readonly customerDestination?: string;
+  readonly mediaRefs?: readonly Readonly<{
+    id: string;
+    url: string;
+    authority: string;
+    origin: string;
+    revision: number;
+  }>[];
+  readonly bundleRelationships?: readonly Readonly<{
+    relationId: string;
+    bundleOfferingId: string;
+    productOfferingId: string;
+    revision: number;
+  }>[];
+  readonly brandConfirmedValues?: readonly Readonly<{
+    semanticFieldPath: string;
+    value: unknown;
+    revision: number;
+  }>[];
+  readonly canonicalPrice?: Readonly<{
+    revisionId: string;
+    mode: string;
+    currentMinAmount: string | null;
+    currentMaxAmount: string | null;
+    regularMinAmount: string | null;
+    regularMaxAmount: string | null;
+    currency: string;
+    freshness: string;
+    authority: string;
+    observedAt: string | null;
+  }> | null;
+  readonly canonicalOffers?: readonly Readonly<{
+    applicabilityId: string;
+    offerId: string;
+    name: string;
+    promoCode: string;
+    applicabilityScope: string;
+    validityStart: string;
+    validityEnd: string;
+    description: string | null;
+    entityLink: string | null;
+    termsText: string | null;
+    revision: number;
+  }>[];
+  readonly availableAtLocations?: readonly Readonly<{
+    relationId: string;
+    locationId: string;
+    name: string | null;
+    address: string;
+    city: string | null;
+    revision: number;
+  }>[];
   readonly businessStateReference: BusinessStateReference;
 }
 
@@ -148,6 +205,10 @@ export interface CanonicalBrandStateReadRequest {
   readonly includeOfferingFacts?: boolean;
   readonly includeVisualState?: boolean;
   readonly includeServiceabilityState?: boolean;
+  /** Exact Product input scope; never inferred from URL or Evidence. */
+  readonly exactOfferingScope?: Readonly<{
+    readonly canonicalOfferingRef: string;
+  }>;
 }
 
 export interface CanonicalBrandStateReader {

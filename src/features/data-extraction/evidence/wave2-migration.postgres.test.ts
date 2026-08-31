@@ -8,10 +8,15 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   DATA_EXTRACTION_EVIDENCE_CAPABILITIES,
   WAVE1_EVIDENCE_CAPABILITIES,
+  WAVE2_EVIDENCE_CAPABILITIES,
 } from "./domain/evidence-vocabulary";
 
 const migrationName =
   "20260826180000_data_extraction_wave2_supported_capabilities";
+const preCommercialCapabilities = [
+  ...WAVE1_EVIDENCE_CAPABILITIES,
+  ...WAVE2_EVIDENCE_CAPABILITIES,
+] as const;
 const pairs = [
   ["data_extraction_capability_executions", "capexec"],
   ["data_extraction_capability_resources", "capresource"],
@@ -51,7 +56,7 @@ describe("DE-W2 approved migration shape", () => {
     expect(checks).toHaveLength(7);
     for (const check of checks)
       expect([...check[1].matchAll(/'([^']+)'/g)].map((m) => m[1])).toEqual(
-        DATA_EXTRACTION_EVIDENCE_CAPABILITIES,
+        preCommercialCapabilities,
       );
     for (const [table, key] of pairs) {
       expect(sql).toContain(`ALTER TABLE "${table}"`);
@@ -288,11 +293,11 @@ database("DE-W2 seven-constraint PostgreSQL compatibility", () => {
       expect(upgradeAfter).toEqual(upgradeBefore);
     },
   );
-  it("has exactly 49 applied migrations and seven renamed explicit nine-ID checks", async () => {
+  it("retains the seven renamed explicit nine-ID checks through the current migration set", async () => {
     const migrations = await prisma.$queryRaw<
       Array<{ count: bigint }>
     >`SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`;
-    expect(Number(migrations[0].count)).toBe(49);
+    expect(Number(migrations[0].count)).toBe(52);
     const constraints = await prisma.$queryRaw<
       Array<{ conname: string; definition: string }>
     >`SELECT conname, pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname LIKE 'ck_de_%capability'`;

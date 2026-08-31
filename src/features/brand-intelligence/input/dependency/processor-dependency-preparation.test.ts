@@ -170,4 +170,144 @@ describe("W1.0E dependency preparation boundary", () => {
       "CANONICAL_CONFLICT_RESOLVED",
     ]);
   });
+
+  it("waits for the exact-subject current factual Object and hashes its lineage when available", async () => {
+    const offeringId = "00000000-0000-4000-8000-0000000000f1";
+    const key = {
+      processorId: "offering_creator_communication",
+      processorVersion: "1.0",
+      outputContractId: "offering_creator_communication_output_contract",
+      outputContractVersion: "1.0",
+    };
+    const bundle = {
+      manifest: {
+        ...key,
+        evidenceContractId: "product_intelligence_evidence_requirements",
+        architectureRepository: "Piyush1087/dummy_tcs",
+        architectureCommitSha: "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
+      },
+    } as VerifiedContractBundle;
+    const canonical = {
+      ...assembleCanonicalBrandStateSnapshot(
+        brandId,
+        new Date("2026-08-25T10:00:00.000Z"),
+        [],
+      ),
+      offeringFacts: [
+        {
+          offeringId,
+          brandId,
+          name: "Offering A",
+          type: "PRODUCT",
+          url: "https://example.test/a",
+          categoryTag: null,
+          isActive: true,
+          businessStateReference: {
+            entityType: "Offering" as const,
+            entityId: offeringId,
+            semanticFieldPath: "$",
+            revisionKind: "SNAPSHOT_FINGERPRINT" as const,
+            revisionToken: "canonical-revision-1",
+            observedAt: "2026-08-25T10:00:00.000Z",
+            canonicalSnapshotRef: "canonical:offering-a:1",
+          },
+        },
+      ],
+    };
+    const evidenceReader = {
+      read: vi.fn().mockImplementation(async (request) => ({
+        brandId,
+        canonicalOfferingRef: request.exactOfferingScope.canonicalOfferingRef,
+        capabilityResults: request.capabilityIds.map(
+          (capabilityId: NormalizedEvidenceCapabilityId) => ({
+            capabilityId,
+            capabilityExecutionRef: null,
+            normalizationContractVersion: "1.0",
+            status: "NOT_REQUESTED",
+            retryability: "NOT_APPLICABLE",
+            reasonCodes: [],
+            coverage: "NONE",
+            acquisitionQuality: {
+              state: "UNAVAILABLE",
+              failureCategories: [],
+              detailCodes: [],
+            },
+            evidence: [],
+          }),
+        ),
+      })),
+    };
+    const projection = {
+      readObject: vi.fn().mockResolvedValue({
+        brandId,
+        subjectId: "subject-offering-a",
+        objectSemanticId: "offering_factual_profile",
+        objectState: "NO_CURRENT",
+        consumerReadiness: "NOT_READY",
+        assembledValue: null,
+        components: [],
+      }),
+    };
+    const service = new ProcessorDependencyPreparationService(
+      { getVerifiedBundle: vi.fn().mockReturnValue(bundle) } as never,
+      new ProcessorDependencyProfileRegistry(),
+      { read: vi.fn().mockResolvedValue(canonical) },
+      evidenceReader,
+      new CanonicalStateManifestBuilder(),
+      new EvidenceManifestBuilder(),
+      new ProcessorDependencyReadinessEvaluator(),
+      projection as never,
+    );
+    const request = {
+      brandId,
+      registryKey: key,
+      activeScope: [
+        {
+          brandId,
+          subjectId: "subject-offering-a",
+          objectSemanticId: "offering_creator_communication_profile",
+          pathSchemeVersion: 1 as const,
+          componentSemanticPath: "$",
+        },
+      ],
+      subject: { type: "OFFERING" as const, ref: offeringId },
+    };
+    const waiting = await service.prepare(request);
+    expect(waiting).toMatchObject({
+      dependencyEligible: false,
+      readiness: { reasonCodes: ["CURRENT_FACTUAL_PROFILE_NOT_AVAILABLE"] },
+    });
+
+    projection.readObject.mockResolvedValue({
+      brandId,
+      subjectId: "subject-offering-a",
+      objectSemanticId: "offering_factual_profile",
+      objectState: "CURRENT",
+      consumerReadiness: "READY",
+      assembledValue: { factual_summary: "Exact Offering A" },
+      components: [
+        {
+          componentSemanticPath: "$",
+          revision: "1",
+          currentContractId: "offering_factual_profile",
+          currentContractVersion: "1.0",
+          generationCreatedAt: "2026-08-25T10:00:00.000Z",
+        },
+      ],
+    });
+    const ready = await service.prepare(request);
+    expect(ready).toMatchObject({
+      dependencyEligible: true,
+      intelligenceObjectDependencies: [
+        {
+          subjectId: "subject-offering-a",
+          objectSemanticId: "offering_factual_profile",
+          assembledValue: { factual_summary: "Exact Offering A" },
+        },
+      ],
+    });
+    expect(ready.dependencyManifestHash).not.toBe(
+      waiting.dependencyManifestHash,
+    );
+  });
 });

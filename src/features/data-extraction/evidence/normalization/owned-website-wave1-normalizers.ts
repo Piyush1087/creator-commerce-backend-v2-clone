@@ -40,6 +40,21 @@ export interface DataExtractionNormalizationInput {
     readonly sourceLocator: string;
     readonly canonicalLocationRef: string;
   }[];
+  readonly exactOfferingScope?: Readonly<{
+    readonly canonicalOfferingRef: string;
+    readonly captureRefs: readonly string[];
+  }>;
+}
+
+export function canonicalOfferingRefForSource(
+  input: DataExtractionNormalizationInput,
+  source: DataExtractionNormalizationSource,
+): string | null {
+  return input.exactOfferingScope?.captureRefs.includes(
+    source.capture.captureRef,
+  )
+    ? input.exactOfferingScope.canonicalOfferingRef
+    : null;
 }
 
 export interface NormalizedEvidenceDraft {
@@ -478,6 +493,7 @@ export class OfferingContextNormalizer implements DataExtractionEvidenceNormaliz
     const drafts: NormalizedEvidenceDraft[] = [];
     for (const source of input.sources) {
       const role = source.resource.pageRole ?? "OTHER";
+      const canonicalOfferingRef = canonicalOfferingRefForSource(input, source);
       if (["LEGAL", "TESTIMONIAL", "POLICY"].includes(role)) continue;
       for (const text of sentences(source.normalizedText).slice(0, 80)) {
         if (!offeringCandidate(text, source)) continue;
@@ -504,7 +520,7 @@ export class OfferingContextNormalizer implements DataExtractionEvidenceNormaliz
           feature_or_value_language: price ? [price] : [],
           portfolio_breadth_observation: null,
           repeated_offering_themes: [],
-          canonical_offering_ref: null,
+          canonical_offering_ref: canonicalOfferingRef,
         } as const;
         drafts.push(
           draft(
@@ -675,6 +691,7 @@ export class CommunicationConstraintEvidenceNormalizer implements DataExtraction
     }
 
     for (const source of input.sources) {
+      const canonicalOfferingRef = canonicalOfferingRefForSource(input, source);
       const parents =
         parentsBySource.get(
           `${source.resource.resourceRef}|${source.capture.captureRef}`,
@@ -706,6 +723,10 @@ export class CommunicationConstraintEvidenceNormalizer implements DataExtraction
               : representativePage(source.resource)
                 ? "BRAND_LEVEL"
                 : "CONTEXT_SPECIFIC",
+          canonical_offering_ref:
+            source.resource.pageRole === "OFFERING_DETAIL"
+              ? canonicalOfferingRef
+              : null,
         } as const;
         drafts.push(
           draft(

@@ -4,6 +4,7 @@ import type { IntelligenceProcessorExecutionStatus } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { CurrentIntelligenceObjectProjection } from "../../brand-intelligence/projection/intelligence-current-projection.types";
 import type { ConsumerRuntimeActivity } from "./brand-consumer.types";
+import { resolveIntelligenceSubject } from "../../brand-intelligence/subject/intelligence-subject.resolver";
 import {
   BRAND_PROCESSOR_IDS,
   BRAND_PROCESSOR_OBJECT_OWNERSHIP,
@@ -53,6 +54,7 @@ export class ProcessorRuntimeProjectionService {
     brandId: string,
     objects: readonly CurrentIntelligenceObjectProjection[],
   ): Promise<BrandProcessorRuntimeProjection> {
+    const subject = await resolveIntelligenceSubject(this.prisma, brandId);
     const currentObjects = new Set(
       objects
         .filter((object) => object.objectState !== "NO_CURRENT")
@@ -61,7 +63,7 @@ export class ProcessorRuntimeProjectionService {
     const latest = await Promise.all(
       BRAND_PROCESSOR_IDS.map((processorId) =>
         this.prisma.intelligenceProcessorExecution.findFirst({
-          where: { brandId, processorId },
+          where: { brandId, subjectId: subject.id, processorId },
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
           select: executionSelect,
         }),
@@ -80,8 +82,29 @@ export class ProcessorRuntimeProjectionService {
     ) as BrandProcessorRuntimeProjection;
   }
 
+  async readExact(
+    brandId: string,
+    subjectId: string,
+    processorId: string,
+    hasCurrent: boolean,
+  ): Promise<ProcessorRuntimeProjection> {
+    const subject = await this.prisma.intelligenceSubject.findUnique({
+      where: { id_brandId: { id: subjectId, brandId } },
+      select: { id: true },
+    });
+    if (!subject) {
+      throw new Error("Intelligence runtime subject does not belong to Brand");
+    }
+    const latest = await this.prisma.intelligenceProcessorExecution.findFirst({
+      where: { brandId, subjectId, processorId },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: executionSelect,
+    });
+    return this.project(processorId, latest, hasCurrent);
+  }
+
   private project(
-    processorId: BrandProcessorId,
+    processorId: string,
     execution: LatestExecution | null,
     hasCurrent: boolean,
   ): ProcessorRuntimeProjection {

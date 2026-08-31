@@ -4,7 +4,12 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import {
+  CanonicalOfferingAuthority,
+  CanonicalOfferingOrigin,
+  OfferingLifecycle,
+  Prisma,
+} from "@prisma/client";
 
 import { PrismaService } from "../../prisma/prisma.service";
 import { S3Service } from "../../shared/s3/s3.service";
@@ -15,6 +20,10 @@ import type {
 } from "./dto/brand-offerings.dto";
 import { BrandProfileService } from "./brand-profile.service";
 import { gateAndNormalizeBrandUrl } from "./discovery-url.util";
+import {
+  canonicalOfferingType,
+  CanonicalOfferingStateService,
+} from "../brand-centre/services/canonical-offering-state.service";
 
 function domainSlug(domain: string): string {
   const slug = domain
@@ -34,6 +43,7 @@ export class BrandOfferingsService {
     private readonly prisma: PrismaService,
     private readonly profiles: BrandProfileService,
     private readonly s3: S3Service,
+    private readonly canonicalOfferings: CanonicalOfferingStateService,
   ) {}
 
   async sync(brandProfileId: string, dto: SyncOfferingsDto) {
@@ -59,7 +69,7 @@ export class BrandOfferingsService {
       }
     }
 
-    await this.prisma.$transaction(async (tx) => {
+    const synced = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.offering.findMany({
         where: { brandProfileId },
         select: { id: true },
@@ -76,13 +86,29 @@ export class BrandOfferingsService {
       if (toDeactivate.length > 0) {
         await tx.offering.updateMany({
           where: { id: { in: toDeactivate }, brandProfileId },
-          data: { isActive: false, isUserEdited: true },
+          data: {
+            canonicalLifecycle: OfferingLifecycle.PAUSED_INACTIVE,
+            isActive: false,
+            isUserEdited: true,
+          },
         });
       }
 
+      const syncedItems: Array<{
+        id: string;
+        item: SyncOfferingsDto["offerings"][number];
+      }> = [];
       for (const item of dto.offerings) {
+        const canonical = canonicalOfferingType(item.type);
         const data = {
           type: item.type,
+          canonicalKind: canonical.kind ?? undefined,
+          canonicalSubtype: canonical.subtype ?? undefined,
+          canonicalLifecycle: canonical.kind
+            ? item.isActive === false
+              ? OfferingLifecycle.PAUSED_INACTIVE
+              : OfferingLifecycle.ACTIVE
+            : undefined,
           name: item.name,
           description: item.description ?? null,
           imageUrl: item.imageUrl ?? null,
@@ -93,20 +119,39 @@ export class BrandOfferingsService {
           isUserEdited: true,
         };
         if (item.id) {
-          await tx.offering.updateMany({
+          const updated = await tx.offering.updateMany({
             where: { id: item.id, brandProfileId },
             data,
           });
+          if (updated.count !== 1) {
+            throw new NotFoundException("Offering not found");
+          }
+          syncedItems.push({ id: item.id, item });
         } else {
-          await tx.offering.create({
+          const created = await tx.offering.create({
             data: {
               brandProfileId,
               ...data,
             },
           });
+          syncedItems.push({ id: created.id, item });
         }
       }
+      return syncedItems;
     });
+
+    for (const { id, item } of synced) {
+      const canonical = canonicalOfferingType(item.type);
+      await this.canonicalOfferings.confirmFields(brandProfileId, id, {
+        name: item.name,
+        url: item.url,
+        ...(item.description !== undefined
+          ? { description: item.description }
+          : {}),
+        ...(canonical.kind ? { canonicalKind: canonical.kind } : {}),
+        ...(canonical.subtype ? { canonicalSubtype: canonical.subtype } : {}),
+      });
+    }
 
     return this.profiles.getById(brandProfileId);
   }
@@ -141,9 +186,16 @@ export class BrandOfferingsService {
     );
     const publicUrl = this.s3.getPublicUrl(uploaded.key);
 
+    await this.canonicalOfferings.addMedia(brandProfileId, offeringId, {
+      url: publicUrl,
+      makePrimary: true,
+      authority: CanonicalOfferingAuthority.BRAND_CONFIRMED,
+      origin: CanonicalOfferingOrigin.BRAND_UPLOAD,
+      provenance: { actor: "BRAND", storageKey: uploaded.key },
+    });
     await this.prisma.offering.update({
       where: { id: offeringId },
-      data: { imageUrl: publicUrl, isUserEdited: true },
+      data: { isUserEdited: true },
     });
 
     this.logger.log(

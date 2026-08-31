@@ -61,7 +61,9 @@ describe("Brand consumer boundaries", () => {
     expect(source).toContain(
       "this.prisma.intelligenceProcessorExecution.findFirst",
     );
-    expect(source).toContain("where: { brandId, processorId }");
+    expect(source).toContain(
+      "where: { brandId, subjectId: subject.id, processorId }",
+    );
     expect(source).not.toContain("synthetic_test_processor");
     expect(source).not.toContain("intelligenceExecution.findFirst");
     expect(source).not.toContain("brandCentreJob.findFirst");

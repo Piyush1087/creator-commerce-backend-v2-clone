@@ -134,7 +134,9 @@ class VerticalSliceWebsiteMechanics implements OwnedWebsitePageAcquisitionMechan
 describe.skipIf(!databaseEnabled)(
   "brand_communication W1.0D persistence and projection PostgreSQL slice",
   () => {
-    const prisma = new PrismaClient();
+    const prisma = new PrismaClient({
+      transactionOptions: { maxWait: 10_000 },
+    });
     const prismaService = prisma as unknown as PrismaService;
     const brandId = randomUUID();
     const codec = new ComponentPathCodec();
@@ -544,11 +546,8 @@ describe.skipIf(!databaseEnabled)(
     });
 
     it("preserves protected current and exposes only a conflict summary", async () => {
-      const root = await prisma.intelligenceCurrentComponent.findUniqueOrThrow({
-        where: {
-          brandId_objectSemanticId_pathSchemeVersion_componentSemanticPath:
-            address("$"),
-        },
+      const root = await prisma.intelligenceCurrentComponent.findFirstOrThrow({
+        where: address("$"),
       });
       await prisma.$transaction([
         prisma.intelligenceComponentGeneration.update({
@@ -570,11 +569,8 @@ describe.skipIf(!databaseEnabled)(
       const protectedGenerationId = root.currentComponentGenerationId;
       await run(output("Conflicting derived guidance"), [address("$")]);
       const current =
-        await prisma.intelligenceCurrentComponent.findUniqueOrThrow({
-          where: {
-            brandId_objectSemanticId_pathSchemeVersion_componentSemanticPath:
-              address("$"),
-          },
+        await prisma.intelligenceCurrentComponent.findFirstOrThrow({
+          where: address("$"),
         });
       expect(current.currentComponentGenerationId).toBe(protectedGenerationId);
       expect(
