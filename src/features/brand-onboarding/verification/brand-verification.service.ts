@@ -92,8 +92,7 @@ export class BrandVerificationService {
       throw new BadRequestException("Google account must include an email.");
     }
     const email = normalizeVerificationEmail(payload.email);
-    const emailVerified =
-      payload.email_verified === true || payload.email_verified === "true";
+    const emailVerified = payload.email_verified === true;
     if (!emailVerified) {
       throw new BadRequestException("Google email is not verified.");
     }

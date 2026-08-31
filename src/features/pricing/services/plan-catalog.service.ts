@@ -1,59 +1,106 @@
 import { Injectable } from "@nestjs/common";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import {
+  FOUNDERS_BETA_COMMISSION_RATE,
+  RAZORPAY_PLAN_DEFINITIONS,
+  TRIAL_DURATION_DAYS,
+  type RazorpayPlanCurrency,
+} from "../constants/subscription.constants";
 import type { CatalogPlanView } from "../types";
+import { GeoRoutingService } from "./geo-routing.service";
 
 @Injectable()
 export class PlanCatalogService {
-  private static readonly MASTER_CATALOG: Record<string, CatalogPlanView> = {
-    FOUNDERS_BETA: {
-      tierKey: "FOUNDERS_BETA",
-      name: "Founder's Beta",
-      priceDescriptor: "$99/mo",
-      isPubliclyAvailable: false,
-    },
-    GROWTH_STARTER: {
+  private static readonly UPCOMING_CATALOG: CatalogPlanView[] = [
+    {
       tierKey: "GROWTH_STARTER",
       name: "Growth Starter",
-      priceDescriptor: "$149/mo",
+      priceDescriptor: "Upcoming",
       isPubliclyAvailable: true,
+      availability: "UPCOMING",
+      isPurchasable: false,
+      currency: null,
+      amountMinor: null,
+      billingInterval: null,
+      trialDays: null,
+      platformCommissionRate: null,
+      taxInclusive: null,
     },
-    PROFESSIONAL: {
+    {
       tierKey: "PROFESSIONAL",
       name: "Professional",
-      priceDescriptor: "$399/mo",
+      priceDescriptor: "Upcoming",
       isPubliclyAvailable: true,
+      availability: "UPCOMING",
+      isPurchasable: false,
+      currency: null,
+      amountMinor: null,
+      billingInterval: null,
+      trialDays: null,
+      platformCommissionRate: null,
+      taxInclusive: null,
     },
-    ENTERPRISE: {
+    {
       tierKey: "ENTERPRISE",
       name: "Enterprise",
-      priceDescriptor: "Custom Rate",
+      priceDescriptor: "Upcoming",
       isPubliclyAvailable: true,
+      availability: "UPCOMING",
+      isPurchasable: false,
+      currency: null,
+      amountMinor: null,
+      billingInterval: null,
+      trialDays: null,
+      platformCommissionRate: null,
+      taxInclusive: null,
     },
-  };
+  ];
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly geoRouting: GeoRoutingService,
+  ) {}
 
-  async getVisiblePlans(brandProfileId: string | null): Promise<CatalogPlanView[]> {
-    const allPlans = Object.values(PlanCatalogService.MASTER_CATALOG);
+  async getVisiblePlans(
+    brandProfileId: string | null,
+  ): Promise<CatalogPlanView[]> {
+    const currency = await this.resolveCurrency(brandProfileId);
+    return [
+      this.foundersPlan(currency),
+      ...PlanCatalogService.UPCOMING_CATALOG,
+    ];
+  }
 
+  private foundersPlan(currency: RazorpayPlanCurrency): CatalogPlanView {
+    const definition = RAZORPAY_PLAN_DEFINITIONS.FOUNDERS_BETA[currency];
+    return {
+      tierKey: "FOUNDERS_BETA",
+      name: "Founder's Beta",
+      priceDescriptor: currency === "INR" ? "₹9,990/mo" : "$99/mo",
+      isPubliclyAvailable: true,
+      availability: "PURCHASABLE",
+      isPurchasable: true,
+      currency,
+      amountMinor: definition.amountMinor,
+      billingInterval: "MONTH",
+      trialDays: TRIAL_DURATION_DAYS,
+      platformCommissionRate: FOUNDERS_BETA_COMMISSION_RATE,
+      taxInclusive: currency === "INR",
+    };
+  }
+
+  private async resolveCurrency(
+    brandProfileId: string | null,
+  ): Promise<RazorpayPlanCurrency> {
     if (!brandProfileId) {
-      return allPlans.filter((plan) => plan.isPubliclyAvailable);
+      return "USD";
     }
 
-    const currentSub = await this.prisma.brandSubscription.findUnique({
-      where: { brandProfileId },
+    const profile = await this.prisma.brandProfile.findUnique({
+      where: { id: brandProfileId },
+      select: { countryCode: true },
     });
-
-    if (!currentSub) {
-      return allPlans.filter((plan) => plan.isPubliclyAvailable);
-    }
-
-    return allPlans.filter((plan) => {
-      if (plan.isPubliclyAvailable) {
-        return true;
-      }
-      return plan.tierKey === currentSub.tier;
-    });
+    return this.geoRouting.resolveGeoContext(profile?.countryCode).currency;
   }
 }

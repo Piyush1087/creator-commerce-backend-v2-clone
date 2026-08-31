@@ -61,9 +61,9 @@ export class NotificationsController {
   markRead(
     @Req() req: RequestWithAuthUser,
     @Param("notificationId") notificationId: string,
-    @Body() body: { is_read?: boolean },
+    @Body() _body: Record<string, never>,
   ) {
-    return this.query.markRead(req.user, notificationId, body.is_read ?? true);
+    return this.query.markRead(req.user, notificationId);
   }
 
   @Post("mark-all-read")
@@ -89,19 +89,28 @@ export class NotificationsController {
       );
     }
 
-    const { brandProfileId } = await this.access.resolveBrandWorkspace(req.user);
+    const { brandProfileId } = await this.access.resolveBrandWorkspace(
+      req.user,
+    );
     const definition = getEventDefinition(body.event_type);
     if (!definition) {
       throw new ForbiddenException(`Unknown event type: ${body.event_type}`);
     }
 
     return this.dispatch.dispatch({
-      workspaceId: body.workspace_id ?? brandProfileId,
+      workspaceId: brandProfileId,
       eventType: body.event_type as NotificationEventType,
-      urgencyLevel: definition.urgencyLevel,
+      source: {
+        sourceType: body.source_type,
+        sourceId: body.source_id,
+        transitionId: body.transition_id,
+      },
       payload: body.payload ?? {},
-      actorName: body.actor_name ?? null,
-      triggerUserId: body.trigger_user_id ?? req.user.id,
+      triggerUserId: req.user.id,
+      affectedUserId:
+        definition.recipientPolicy === "AFFECTED_USER_EMAIL_ONLY"
+          ? req.user.id
+          : null,
     });
   }
 }

@@ -3,35 +3,24 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { UserRole } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
+import { BrandWorkspaceAuthorizationService } from "../../brand-centre/brand-workspace-authorization.service";
 
 @Injectable()
 export class BrandEscrowAccessService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly workspace: BrandWorkspaceAuthorizationService,
+  ) {}
 
   async assertBrandProfileAccess(
     user: AuthUser,
     brandProfileId: string,
   ): Promise<void> {
-    if (user.role !== UserRole.BRAND) {
-      throw new ForbiddenException("Brand access required");
-    }
-    if (!user.organizationId) {
-      throw new ForbiddenException("No organization linked to this account");
-    }
-
-    const profile = await this.prisma.brandProfile.findFirst({
-      where: {
-        id: brandProfileId,
-        organizationId: user.organizationId,
-      },
-      select: { id: true },
-    });
-
-    if (!profile) {
+    const context = await this.workspace.resolveBrandContext(user);
+    if (context.brandProfileId !== brandProfileId) {
       throw new ForbiddenException("Brand profile access denied");
     }
   }

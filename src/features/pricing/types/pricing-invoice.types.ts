@@ -12,6 +12,14 @@ export type BillingInvoiceView = {
   issuedAt: string | null;
   billingPeriodStart: string | null;
   billingPeriodEnd: string | null;
+  billingIdentity: {
+    legalEntityName: string;
+    legalEntityType: string | null;
+    billingCountryCode: string | null;
+    billingAddress: string;
+    gstin: string | null;
+  } | null;
+  historicalBillingIdentityAvailable: boolean;
   lineItems: Array<{
     name: string;
     amount: number;

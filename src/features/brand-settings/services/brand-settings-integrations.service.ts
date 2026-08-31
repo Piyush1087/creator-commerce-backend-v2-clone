@@ -1,25 +1,52 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import {
   BrandIntegrationProvider,
   BrandIntegrationScope,
   BrandIntegrationStatus,
+  BrandRole,
+  InstagramAuthorizationHealth,
+  InstagramCapabilityState,
+  InstagramIdentityVerification,
+  InstagramIgHandleProvenance,
+  InstagramOAuthIntent,
   InstagramProfessionalAccountType,
-  UceCampaignStatus,
+  InstagramSyncHealth,
+  Prisma,
 } from "@prisma/client";
 import { addSeconds } from "date-fns";
+import { randomUUID } from "node:crypto";
 
 import type { AuthUser } from "../../auth/types/auth-user";
 import { PrismaService } from "../../../prisma/prisma.service";
-import { encryptField } from "../../../shared/crypto/field-encryption.util";
-import { InstagramGraphClient } from "../../instagram/instagram-graph.client";
-import { InstagramOAuthClient } from "../../instagram/instagram-oauth.client";
+import {
+  decryptField,
+  encryptField,
+} from "../../../shared/crypto/field-encryption.util";
+import {
+  InstagramGraphClient,
+  InstagramPermissionEvidenceError,
+  InstagramProviderRequestError,
+} from "../../instagram/instagram-graph.client";
+import {
+  InstagramOAuthClient,
+  InstagramTokenRefreshError,
+} from "../../instagram/instagram-oauth.client";
 import { resolveInstagramScopesFromPermissions } from "../../instagram/instagram-scope.util";
+import type { InstagramProviderErrorClass } from "../../instagram/instagram-provider-error";
+import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
+import { BrandInstagramDeletionService } from "./brand-instagram-deletion.service";
 import { BrandSettingsAccessService } from "./brand-settings-access.service";
+import { BrandInstagramOAuthStateService } from "./brand-instagram-oauth-state.service";
+
+export const INSTAGRAM_REFRESH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+export const INSTAGRAM_MIN_REFRESH_AGE_MS = 24 * 60 * 60 * 1000;
 
 function normalizeHandle(raw: string): string {
   return raw.trim().replace(/^@/, "").toLowerCase();
@@ -30,6 +57,21 @@ function withAt(handle: string): string {
   return bare ? `@${bare}` : "@";
 }
 
+type Promotion = {
+  brandProfileId: string;
+  expectedGeneration: number;
+  intent: InstagramOAuthIntent;
+  inbound: string;
+  encrypted: string;
+  scopes: BrandIntegrationScope[];
+  expiresAt: Date;
+  legacyStatus: BrandIntegrationStatus;
+  authorizationHealth: InstagramAuthorizationHealth;
+  insightsCapability: InstagramCapabilityState;
+  providerAccountId: string;
+  providerAppScopedUserId: string | null;
+};
+
 @Injectable()
 export class BrandSettingsIntegrationsService {
   private readonly logger = new Logger(BrandSettingsIntegrationsService.name);
@@ -39,27 +81,38 @@ export class BrandSettingsIntegrationsService {
     private readonly access: BrandSettingsAccessService,
     private readonly oauth: InstagramOAuthClient,
     private readonly graph: InstagramGraphClient,
+    private readonly states: BrandInstagramOAuthStateService,
+    @Optional() private readonly deletion?: BrandInstagramDeletionService,
+    @Optional() private readonly notifications?: NotificationDispatchService,
   ) {}
 
   async getIntegrations(user: AuthUser) {
-    const { brandProfileId } = await this.access.resolveBrandContext(user);
+    const { brandProfileId, membership } =
+      await this.access.resolveBrandContext(user);
+    this.access.assertInstagramAction(membership.role, "READ");
     const brand = await this.prisma.brandProfile.findUnique({
       where: { id: brandProfileId },
       select: {
         id: true,
         igHandle: true,
+        igHandleProvenance: true,
         socialSyncSkipped: true,
       },
     });
-    if (!brand) {
-      throw new NotFoundException("Brand profile not found");
-    }
-
+    if (!brand) throw new NotFoundException("Brand profile not found");
     const rows = await this.prisma.brandIntegration.findMany({
       where: { brandProfileId },
       orderBy: { createdAt: "asc" },
     });
-
+    const activeDeletion =
+      await this.prisma.brandInstagramDeletionRequest.findFirst({
+        where: {
+          brandProfileId,
+          state: { notIn: ["COMPLETED", "FAILED_TERMINAL"] },
+        },
+        orderBy: { requestedAt: "desc" },
+        select: { id: true, state: true, requestedAt: true },
+      });
     const integrations = rows.map((row) => ({
       id: row.id,
       provider: row.provider,
@@ -68,209 +121,193 @@ export class BrandSettingsIntegrationsService {
       inboundOauthHandle: row.inboundOauthHandle,
       scopes: row.grantedScopes,
       tokenExpiresAt: row.tokenExpiresAt?.toISOString() ?? null,
+      tokenIssuedAt: row.tokenIssuedAt?.toISOString() ?? null,
+      tokenLastRefreshedAt: row.tokenLastRefreshedAt?.toISOString() ?? null,
       isActive: row.isActive,
+      authorizationHealth: row.authorizationHealth,
+      identityVerification: row.identityVerification,
+      providerAccountId: row.providerAccountId,
+      providerAppScopedUserId: row.providerAppScopedUserId,
+      currentProviderDisplayIdentity: row.currentPlatformHandle,
+      capabilities: {
+        firstPartyProfile: row.firstPartyProfileCapability,
+        firstPartyInsights: row.firstPartyInsightsCapability,
+        businessDiscovery: row.businessDiscoveryCapability,
+        creatorMarketplaceDiscovery: row.creatorMarketplaceCapability,
+      },
+      humanActionRequired: row.humanActionRequired,
+      syncHealth: row.syncHealth,
+      authorizationGeneration: row.authorizationGeneration,
+      allowedActions: this.allowedActions(membership.role, row),
     }));
-
     const instagram = integrations.find(
-      (i) => i.provider === BrandIntegrationProvider.INSTAGRAM,
+      (row) => row.provider === BrandIntegrationProvider.INSTAGRAM,
     );
     const metaSuite = integrations.find(
-      (i) => i.provider === BrandIntegrationProvider.META_BUSINESS_SUITE,
+      (row) => row.provider === BrandIntegrationProvider.META_BUSINESS_SUITE,
     );
-
-    let layoutCase: "PARTIAL_INSTAGRAM" | "FULL_INSTAGRAM" | "SKIPPED" =
-      "SKIPPED";
-    if (instagram?.status === BrandIntegrationStatus.PARTIALLY_CONNECTED) {
-      layoutCase = "PARTIAL_INSTAGRAM";
-    } else if (
-      instagram?.status === BrandIntegrationStatus.CONNECTED ||
-      instagram?.status === BrandIntegrationStatus.TOKEN_EXPIRED
-    ) {
-      layoutCase = instagram.scopes.includes(
-        BrandIntegrationScope.ENGAGEMENT_INSIGHTS,
-      )
+    const layoutCase =
+      instagram?.authorizationHealth ===
+      InstagramAuthorizationHealth.CONNECTED_FULL
         ? "FULL_INSTAGRAM"
-        : "PARTIAL_INSTAGRAM";
-    } else if (brand.socialSyncSkipped || !instagram) {
-      layoutCase = "SKIPPED";
-    }
-
-    const scrapedHandle =
-      brand.igHandle != null
-        ? `@${brand.igHandle.replace(/^@/, "")}`
-        : null;
-
+        : instagram?.authorizationHealth ===
+            InstagramAuthorizationHealth.PARTIALLY_CONNECTED
+          ? "PARTIAL_INSTAGRAM"
+          : "SKIPPED";
     return {
       layoutCase,
-      scrapedHandle,
+      scrapedHandle: brand.igHandle ? withAt(brand.igHandle) : null,
+      igHandleProvenance: brand.igHandleProvenance,
       socialSyncSkipped: brand.socialSyncSkipped,
       integrations,
       instagram: instagram ?? null,
       metaBusinessSuite: metaSuite ?? null,
+      deletion: activeDeletion
+        ? {
+            requestId: activeDeletion.id,
+            state: activeDeletion.state,
+            requestedAt: activeDeletion.requestedAt.toISOString(),
+          }
+        : null,
     };
   }
 
-  async getInstagramOauthUrl(user: AuthUser, redirectUri: string) {
-    const { brandProfileId } = await this.access.resolveBrandContext(user);
+  async getInstagramOauthUrl(
+    user: AuthUser,
+    redirectUri: string,
+    requestedIntent?: InstagramOAuthIntent,
+  ) {
+    const { brandProfileId, membership } =
+      await this.access.resolveBrandContext(user);
     const brand = await this.prisma.brandProfile.findUnique({
       where: { id: brandProfileId },
       select: { id: true, igHandle: true },
     });
-    if (!brand) {
-      throw new NotFoundException("Brand profile not found");
-    }
-    const finalized = brand.igHandle
-      ? normalizeHandle(brand.igHandle)
-      : "pending";
-    const state = Buffer.from(
-      JSON.stringify({
-        brandProfileId: brand.id,
-        finalizedHandle: finalized,
-        source: "settings",
-        t: Date.now(),
-      }),
-    ).toString("base64url");
-    const url = this.oauth.buildAuthorizeUrl(redirectUri, state);
+    if (!brand) throw new NotFoundException("Brand profile not found");
+    const integration = await this.findInstagram(brandProfileId);
+    await this.assertNoActiveDeletion(brandProfileId);
+    const intent =
+      requestedIntent ??
+      (!integration
+        ? InstagramOAuthIntent.INITIAL_CONNECT
+        : InstagramOAuthIntent.RECONNECT);
+    this.assertIntentState(integration, intent);
+    this.assertIntentRole(membership.role, intent);
+    const state = await this.states.issue({
+      brandProfileId,
+      initiatedByUserId: user.id,
+      redirectUri,
+      intent,
+      initiatedByRole: membership.role,
+      expectedGeneration: integration?.authorizationGeneration ?? 0,
+      expectedProviderAccountId: integration?.providerAccountId ?? null,
+    });
     return {
-      url,
+      url: this.oauth.buildAuthorizeUrl(redirectUri, state),
       state,
       finalizedHandle: brand.igHandle ? withAt(brand.igHandle) : null,
+      intent,
+      expectedGeneration: integration?.authorizationGeneration ?? 0,
     };
   }
 
-  /**
-   * Settings Instagram connect. Handle mismatch returns an identity-conflict
-   * payload (staged token) instead of hard-failing like onboarding.
-   */
   async connectInstagram(
     user: AuthUser,
-    args: { code: string; redirectUri: string },
+    args: { code: string; redirectUri: string; state: string },
   ) {
-    const { brandProfileId } = await this.access.resolveBrandContext(user);
+    const { brandProfileId, membership } =
+      await this.access.resolveBrandContext(user);
     const brand = await this.prisma.brandProfile.findUnique({
       where: { id: brandProfileId },
-      select: { id: true, igHandle: true },
+      select: { id: true },
     });
-    if (!brand) {
-      throw new NotFoundException("Brand profile not found");
+    if (!brand) throw new NotFoundException("Brand profile not found");
+    const attempt = await this.states.consume(
+      {
+        brandProfileId,
+        initiatedByUserId: user.id,
+        redirectUri: args.redirectUri,
+      },
+      args.state,
+    );
+    if (attempt.initiatedByRole !== membership.role) {
+      throw new ForbiddenException("Instagram OAuth role authority changed");
     }
-
+    this.assertIntentRole(membership.role, attempt.intent);
+    let existing = await this.findInstagram(brandProfileId);
+    if ((existing?.authorizationGeneration ?? 0) !== attempt.expectedGeneration)
+      throw staleAttempt();
     const tokenResult = await this.oauth.exchangeAuthorizationCode(
       args.code,
       args.redirectUri,
     );
     const me = await this.graph.fetchMe(tokenResult.accessToken);
-
     if (me.accountType === InstagramProfessionalAccountType.PERSONAL) {
       throw new BadRequestException({
         code: "PERSONAL_ACCOUNT",
-        message:
-          "Connection Rejected: The platform requires an Instagram Business or Creator account to track engagement data.",
+        message: "A Professional Instagram account is required.",
       });
     }
-
-    const permissionNames = [
-      ...tokenResult.permissions,
-      ...(await this.graph.fetchGrantedPermissions(tokenResult.accessToken)),
-    ];
-    const { scopes, status } =
-      resolveInstagramScopesFromPermissions(permissionNames);
-    if (!scopes.includes(BrandIntegrationScope.BASIC_PROFILE)) {
-      throw new BadRequestException({
-        code: "MISSING_BASIC_SCOPE",
-        message:
-          "Connection Rejected: Basic Instagram profile permission is required.",
-      });
-    }
-
+    const evidence = await this.permissionEvidence(
+      tokenResult.permissions,
+      tokenResult.accessToken,
+    );
     const inbound = withAt(me.username);
-    const current = brand.igHandle ? withAt(brand.igHandle) : inbound;
     const expiresAt = addSeconds(new Date(), tokenResult.expiresInSeconds);
-    const encrypted = encryptField(tokenResult.accessToken);
-
-    if (brand.igHandle && normalizeHandle(me.username) !== normalizeHandle(brand.igHandle)) {
-      const row = await this.prisma.brandIntegration.upsert({
-        where: {
-          brandProfileId_provider: {
-            brandProfileId: brand.id,
-            provider: BrandIntegrationProvider.INSTAGRAM,
-          },
-        },
-        create: {
-          brandProfileId: brand.id,
-          provider: BrandIntegrationProvider.INSTAGRAM,
-          status: BrandIntegrationStatus.DISCONNECTED,
-          currentPlatformHandle: current,
-          inboundOauthHandle: inbound,
-          accessTokenEncrypted: encrypted,
-          grantedScopes: scopes,
-          tokenExpiresAt: expiresAt,
-          isActive: false,
-        },
-        update: {
-          inboundOauthHandle: inbound,
-          accessTokenEncrypted: encrypted,
-          grantedScopes: scopes,
-          tokenExpiresAt: expiresAt,
-          // Keep prior active status until user resolves conflict.
-        },
+    if (
+      existing?.providerAccountId === null &&
+      attempt.intent === InstagramOAuthIntent.RECONNECT
+    ) {
+      existing = await this.revalidateLegacyIdentity(existing, membership.role);
+    }
+    if (
+      attempt.intent === InstagramOAuthIntent.RECONNECT &&
+      existing?.providerAccountId !== me.userId
+    ) {
+      if (!existing) throw staleAttempt();
+      await this.stageDifferentAccount({
+        integrationId: existing.id,
+        expectedGeneration: attempt.expectedGeneration,
+        inbound,
+        encrypted: encryptField(tokenResult.accessToken),
+        scopes: evidence.scopes,
+        expiresAt,
+        providerAccountId: me.userId,
+        providerAppScopedUserId: me.appScopedUserId,
       });
-
       return {
         conflict: true as const,
-        code: "IDENTITY_CONFLICT",
-        integrationId: row.id,
-        currentPlatformHandle: withAt(row.currentPlatformHandle),
+        code: "ACCOUNT_CHANGE_REQUIRED",
+        integrationId: existing.id,
+        currentPlatformHandle: existing.currentPlatformHandle,
         inboundOauthHandle: inbound,
         message:
-          "Meta Identity Conflict Detected: inbound authenticated handle does not match the active Instagram handle.",
+          "A different Instagram account requires an Owner account-change authorization.",
       };
     }
-
-    const row = await this.prisma.brandIntegration.upsert({
-      where: {
-        brandProfileId_provider: {
-          brandProfileId: brand.id,
-          provider: BrandIntegrationProvider.INSTAGRAM,
-        },
-      },
-      create: {
-        brandProfileId: brand.id,
-        provider: BrandIntegrationProvider.INSTAGRAM,
-        status,
-        currentPlatformHandle: inbound,
-        inboundOauthHandle: inbound,
-        accessTokenEncrypted: encrypted,
-        grantedScopes: scopes,
-        tokenExpiresAt: expiresAt,
-        isActive: true,
-      },
-      update: {
-        status,
-        currentPlatformHandle: inbound,
-        inboundOauthHandle: inbound,
-        accessTokenEncrypted: encrypted,
-        grantedScopes: scopes,
-        tokenExpiresAt: expiresAt,
-        isActive: true,
-      },
+    const row = await this.promoteConnection({
+      brandProfileId,
+      expectedGeneration: attempt.expectedGeneration,
+      intent: attempt.intent,
+      inbound,
+      encrypted: encryptField(tokenResult.accessToken),
+      scopes: evidence.scopes,
+      expiresAt,
+      legacyStatus: evidence.legacyStatus,
+      authorizationHealth: evidence.authorizationHealth,
+      insightsCapability: evidence.insightsCapability,
+      providerAccountId: me.userId,
+      providerAppScopedUserId: me.appScopedUserId,
     });
-
-    await this.prisma.brandProfile.update({
-      where: { id: brand.id },
-      data: {
-        socialSyncSkipped: false,
-        igHandle: normalizeHandle(me.username),
-      },
-    });
-
     return {
       conflict: false as const,
       connected: true,
       integrationId: row.id,
       handle: inbound,
-      status,
-      scopes,
+      status: row.status,
+      authorizationHealth: row.authorizationHealth,
+      scopes: row.grantedScopes,
+      providerAccountId: row.providerAccountId,
     };
   }
 
@@ -283,7 +320,8 @@ export class BrandSettingsIntegrationsService {
       resolution: "OVERWRITE_HANDLE" | "CANCEL_CONNECT";
     },
   ) {
-    const { brandProfileId } = await this.access.resolveBrandContext(user);
+    const { brandProfileId, membership } =
+      await this.access.resolveBrandContext(user);
     const row = await this.prisma.brandIntegration.findFirst({
       where: {
         id: body.integrationId,
@@ -291,77 +329,32 @@ export class BrandSettingsIntegrationsService {
         provider: BrandIntegrationProvider.INSTAGRAM,
       },
     });
-    if (!row) {
-      throw new NotFoundException("Integration not found");
-    }
-    if (!row.inboundOauthHandle || !row.accessTokenEncrypted) {
-      throw new BadRequestException(
-        "No staged identity conflict to resolve. Reconnect Instagram first.",
+    if (!row) throw new NotFoundException("Integration not found");
+    if (body.resolution === "OVERWRITE_HANDLE") {
+      this.access.assertInstagramAction(
+        membership.role,
+        "CONTROLLED_ACCOUNT_CHANGE",
       );
-    }
-
-    const current = withAt(body.currentPlatformHandle);
-    const inbound = withAt(body.inboundOauthHandle);
-    if (
-      withAt(row.currentPlatformHandle) !== current ||
-      withAt(row.inboundOauthHandle) !== inbound
-    ) {
-      throw new BadRequestException(
-        "Identity vectors do not match the staged conflict payload.",
-      );
-    }
-
-    if (body.resolution === "CANCEL_CONNECT") {
-      await this.prisma.brandIntegration.update({
-        where: { id: row.id },
-        data: {
-          inboundOauthHandle: null,
-          // Drop staged token if the prior connection was not active.
-          ...(row.isActive
-            ? {}
-            : {
-                accessTokenEncrypted: null,
-                refreshTokenEncrypted: null,
-                tokenExpiresAt: null,
-                grantedScopes: [],
-                status: BrandIntegrationStatus.DISCONNECTED,
-              }),
-        },
+      throw new BadRequestException({
+        code: "FRESH_ACCOUNT_CHANGE_OAUTH_REQUIRED",
+        message:
+          "Start a fresh Instagram authorization with ACCOUNT_CHANGE intent.",
       });
-      return { ok: true, resolution: body.resolution, cancelled: true };
     }
-
-    const status = row.grantedScopes.includes(
-      BrandIntegrationScope.ENGAGEMENT_INSIGHTS,
-    )
-      ? BrandIntegrationStatus.CONNECTED
-      : BrandIntegrationStatus.PARTIALLY_CONNECTED;
-
-    await this.prisma.$transaction([
-      this.prisma.brandIntegration.update({
-        where: { id: row.id },
-        data: {
-          currentPlatformHandle: inbound,
-          inboundOauthHandle: inbound,
-          status,
-          isActive: true,
-        },
-      }),
-      this.prisma.brandProfile.update({
-        where: { id: brandProfileId },
-        data: {
-          igHandle: normalizeHandle(inbound),
-          socialSyncSkipped: false,
-        },
-      }),
-    ]);
-
-    return {
-      ok: true,
-      resolution: body.resolution,
-      handle: inbound,
-      status,
-    };
+    await this.prisma.brandIntegration.update({
+      where: { id: row.id },
+      data: {
+        inboundOauthHandle: null,
+        pendingAccessTokenEncrypted: null,
+        pendingGrantedScopes: [],
+        pendingTokenExpiresAt: null,
+        pendingProviderAccountId: null,
+        pendingProviderAppScopedUserId: null,
+        pendingOauthIntent: null,
+        pendingExpectedGeneration: null,
+      },
+    });
+    return { ok: true, resolution: "CANCEL_CONNECT", cancelled: true };
   }
 
   async manageAction(
@@ -372,110 +365,596 @@ export class BrandSettingsIntegrationsService {
       confirmDeleteData?: boolean;
     },
   ) {
-    const { brandProfileId } = await this.access.resolveBrandContext(user);
+    const { brandProfileId, membership } =
+      await this.access.resolveBrandContext(user);
     const row = await this.prisma.brandIntegration.findFirst({
       where: { id: body.integrationId, brandProfileId },
     });
-    if (!row) {
-      throw new NotFoundException("Integration not found");
+    if (!row) throw new NotFoundException("Integration not found");
+    if (body.action === "RECONNECT") {
+      this.access.assertInstagramAction(membership.role, "SAME_ID_RECONNECT");
+      return {
+        ok: true,
+        action: body.action,
+        next: "START_OAUTH",
+        intent: InstagramOAuthIntent.RECONNECT,
+        provider: row.provider,
+      };
     }
-
-    if (
-      body.action === "DISCONNECT_INTEGRATION" ||
-      body.action === "DELETE_INGESTED_DATA"
-    ) {
-      await this.assertNoActiveCampaigns(brandProfileId);
-    }
-
     if (body.action === "DISCONNECT_INTEGRATION") {
-      await this.prisma.brandIntegration.update({
-        where: { id: row.id },
-        data: {
-          isActive: false,
-          status: BrandIntegrationStatus.DISCONNECTED,
-          accessTokenEncrypted: null,
-          refreshTokenEncrypted: null,
-        },
-      });
+      this.access.assertInstagramAction(membership.role, "DISCONNECT");
+      await this.disconnect(row.id, row.authorizationGeneration);
       return { ok: true, action: body.action };
     }
-
-    if (body.action === "DELETE_INGESTED_DATA") {
-      if (!body.confirmDeleteData) {
-        throw new BadRequestException(
-          'Explicit confirmation required to execute "Delete Ingested Social Data".',
-        );
-      }
-      // Analytics purge deferred until those stores exist; clear tokens for now.
-      await this.prisma.brandIntegration.update({
-        where: { id: row.id },
-        data: {
-          isActive: false,
-          status: BrandIntegrationStatus.DISCONNECTED,
-          accessTokenEncrypted: null,
-          refreshTokenEncrypted: null,
-          grantedScopes: [],
-        },
-      });
-      return { ok: true, action: body.action, purged: true };
-    }
-
-    return {
-      ok: true,
-      action: body.action,
-      next: "START_OAUTH",
-      provider: row.provider,
-    };
+    this.access.assertInstagramAction(membership.role, "DELETE_MY_DATA");
+    if (!body.confirmDeleteData)
+      throw new BadRequestException("Explicit deletion confirmation required");
+    if (!this.deletion)
+      throw new Error("Instagram deletion service unavailable");
+    return this.deletion.requestByUser(user, row.id);
   }
 
-  /** Marks expired Instagram/Meta tokens TOKEN_EXPIRED. Safe per-row errors. */
   async markExpiredTokens(): Promise<{ scanned: number; expired: number }> {
+    const result = await this.refreshDueTokens();
+    return { scanned: result.scanned, expired: result.reauthorizationRequired };
+  }
+
+  async refreshDueTokens(): Promise<{
+    scanned: number;
+    refreshed: number;
+    reauthorizationRequired: number;
+  }> {
     const now = new Date();
     const candidates = await this.prisma.brandIntegration.findMany({
       where: {
+        provider: BrandIntegrationProvider.INSTAGRAM,
         isActive: true,
-        tokenExpiresAt: { lte: now },
-        status: {
-          in: [
-            BrandIntegrationStatus.CONNECTED,
-            BrandIntegrationStatus.PARTIALLY_CONNECTED,
-          ],
+        accessTokenEncrypted: { not: null },
+        tokenExpiresAt: {
+          lte: new Date(now.getTime() + INSTAGRAM_REFRESH_WINDOW_MS),
+        },
+        tokenIssuedAt: {
+          lte: new Date(now.getTime() - INSTAGRAM_MIN_REFRESH_AGE_MS),
         },
       },
-      select: { id: true, brandProfileId: true, provider: true },
+      orderBy: { tokenExpiresAt: "asc" },
+      take: 100,
     });
-
-    let expired = 0;
+    let refreshed = 0;
+    let reauthorizationRequired = 0;
     for (const row of candidates) {
+      const generation = row.authorizationGeneration;
+      const version = row.credentialVersion;
+      const accessToken = decryptField(row.accessTokenEncrypted as string);
+      await this.prisma.brandIntegration.updateMany({
+        where: {
+          id: row.id,
+          authorizationGeneration: generation,
+          credentialVersion: version,
+          isActive: true,
+        },
+        data: { tokenRefreshAttemptedAt: now },
+      });
+      if (row.tokenExpiresAt && row.tokenExpiresAt <= now) {
+        try {
+          // Timestamp is evidence, not authority: probe before deciding whether
+          // the token is still valid enough for a provider-compliant refresh.
+          await this.graph.fetchMe(accessToken);
+        } catch (error) {
+          await this.applyProviderFailure(
+            row.id,
+            generation,
+            version,
+            providerFailureClassification(error),
+          );
+          if (isHumanReauthorizationFailure(error)) {
+            reauthorizationRequired += 1;
+          }
+          continue;
+        }
+      }
       try {
-        await this.prisma.brandIntegration.update({
-          where: { id: row.id },
-          data: { status: BrandIntegrationStatus.TOKEN_EXPIRED },
+        const token = await this.oauth.refreshLongLivedToken(accessToken);
+        const update = await this.prisma.brandIntegration.updateMany({
+          where: {
+            id: row.id,
+            authorizationGeneration: generation,
+            credentialVersion: version,
+            isActive: true,
+          },
+          data: {
+            accessTokenEncrypted: encryptField(token.accessToken),
+            tokenExpiresAt: addSeconds(now, token.expiresInSeconds),
+            tokenIssuedAt: now,
+            tokenLastRefreshedAt: now,
+            credentialVersion: { increment: 1 },
+            authorizationHealth: healthFromCapabilities(row),
+            humanActionRequired: false,
+            authorizationLossTransitionId: null,
+            authorizationLossOpenedAt: null,
+          },
         });
-        expired += 1;
-      } catch (err) {
-        this.logger.error(
-          `token expiry update failed integration=${row.id} brand=${row.brandProfileId} err=${String(err)}`,
+        refreshed += update.count;
+      } catch (error) {
+        await this.applyProviderFailure(
+          row.id,
+          generation,
+          version,
+          providerFailureClassification(error),
         );
+        if (isHumanReauthorizationFailure(error)) reauthorizationRequired += 1;
       }
     }
-
-    return { scanned: candidates.length, expired };
+    return { scanned: candidates.length, refreshed, reauthorizationRequired };
   }
 
-  private async assertNoActiveCampaigns(brandProfileId: string): Promise<void> {
-    const activeCount = await this.prisma.uceCampaign.count({
+  private async applyProviderFailure(
+    integrationId: string,
+    generation: number,
+    credentialVersion: number,
+    classification: InstagramProviderErrorClass,
+  ): Promise<void> {
+    if (classification === "PROVIDER_ACCESS_BLOCKED") {
+      await this.prisma.brandIntegration.updateMany({
+        where: {
+          id: integrationId,
+          authorizationGeneration: generation,
+          credentialVersion,
+          isActive: true,
+        },
+        data: {
+          authorizationHealth:
+            InstagramAuthorizationHealth.PROVIDER_ACCESS_BLOCKED,
+          humanActionRequired: false,
+          authorizationLossTransitionId: null,
+          authorizationLossOpenedAt: null,
+        },
+      });
+      return;
+    }
+    if (
+      classification === "AUTHORIZATION_REVALIDATION_REQUIRED" ||
+      classification === "PERMISSION_LOSS"
+    ) {
+      await this.openAuthorizationLoss(integrationId, generation);
+      return;
+    }
+    await this.prisma.brandIntegration.updateMany({
       where: {
-        brandProfileId,
-        status: UceCampaignStatus.LIVE,
+        id: integrationId,
+        authorizationGeneration: generation,
+        credentialVersion,
+        isActive: true,
+        authorizationLossTransitionId: null,
+      },
+      data: {
+        authorizationHealth: InstagramAuthorizationHealth.UNKNOWN,
+        humanActionRequired: false,
       },
     });
-    if (activeCount > 0) {
+  }
+
+  private async permissionEvidence(
+    tokenPermissions: string[],
+    accessToken: string,
+  ) {
+    let permissionReadSucceeded = true;
+    let providerPermissions: string[] = [];
+    try {
+      providerPermissions =
+        await this.graph.fetchGrantedPermissions(accessToken);
+    } catch (error) {
+      if (!(error instanceof InstagramPermissionEvidenceError)) throw error;
+      permissionReadSucceeded = false;
+    }
+    const resolved = resolveInstagramScopesFromPermissions([
+      ...tokenPermissions,
+      ...providerPermissions,
+    ]);
+    if (!resolved.scopes.includes(BrandIntegrationScope.BASIC_PROFILE))
+      resolved.scopes.unshift(BrandIntegrationScope.BASIC_PROFILE);
+    const insightsCapability = resolved.scopes.includes(
+      BrandIntegrationScope.ENGAGEMENT_INSIGHTS,
+    )
+      ? InstagramCapabilityState.YES
+      : permissionReadSucceeded
+        ? InstagramCapabilityState.NO
+        : InstagramCapabilityState.UNKNOWN;
+    return {
+      scopes: resolved.scopes,
+      insightsCapability,
+      legacyStatus:
+        insightsCapability === InstagramCapabilityState.YES
+          ? BrandIntegrationStatus.CONNECTED
+          : BrandIntegrationStatus.PARTIALLY_CONNECTED,
+      authorizationHealth:
+        insightsCapability === InstagramCapabilityState.YES
+          ? InstagramAuthorizationHealth.CONNECTED_FULL
+          : insightsCapability === InstagramCapabilityState.NO
+            ? InstagramAuthorizationHealth.PARTIALLY_CONNECTED
+            : InstagramAuthorizationHealth.NEEDS_REVALIDATION,
+    };
+  }
+
+  private async promoteConnection(input: Promotion) {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.brandIntegration.findUnique({
+        where: {
+          brandProfileId_provider: {
+            brandProfileId: input.brandProfileId,
+            provider: BrandIntegrationProvider.INSTAGRAM,
+          },
+        },
+      });
+      let row;
+      if (!existing) {
+        if (
+          input.intent !== InstagramOAuthIntent.INITIAL_CONNECT ||
+          input.expectedGeneration !== 0
+        )
+          throw staleAttempt();
+        row = await tx.brandIntegration.create({
+          data: {
+            brandProfileId: input.brandProfileId,
+            provider: BrandIntegrationProvider.INSTAGRAM,
+            status: input.legacyStatus,
+            currentPlatformHandle: input.inbound,
+            inboundOauthHandle: input.inbound,
+            accessTokenEncrypted: input.encrypted,
+            grantedScopes: input.scopes,
+            tokenExpiresAt: input.expiresAt,
+            tokenIssuedAt: new Date(),
+            credentialVersion: 1,
+            authorizationGeneration: 1,
+            providerAccountId: input.providerAccountId,
+            providerAppScopedUserId: input.providerAppScopedUserId,
+            identityVerification: InstagramIdentityVerification.VERIFIED,
+            authorizationHealth: input.authorizationHealth,
+            firstPartyProfileCapability: InstagramCapabilityState.YES,
+            firstPartyInsightsCapability: input.insightsCapability,
+            humanActionRequired: false,
+            syncHealth: InstagramSyncHealth.NOT_CONFIGURED,
+            isActive: true,
+          },
+        });
+      } else {
+        const updated = await tx.brandIntegration.updateMany({
+          where: {
+            id: existing.id,
+            authorizationGeneration: input.expectedGeneration,
+          },
+          data: {
+            status: input.legacyStatus,
+            currentPlatformHandle: input.inbound,
+            inboundOauthHandle: input.inbound,
+            accessTokenEncrypted: input.encrypted,
+            refreshTokenEncrypted: null,
+            grantedScopes: input.scopes,
+            tokenExpiresAt: input.expiresAt,
+            tokenIssuedAt: new Date(),
+            tokenLastRefreshedAt: null,
+            tokenRefreshAttemptedAt: null,
+            credentialVersion: { increment: 1 },
+            authorizationGeneration: { increment: 1 },
+            providerAccountId: input.providerAccountId,
+            providerAppScopedUserId: input.providerAppScopedUserId,
+            identityVerification: InstagramIdentityVerification.VERIFIED,
+            authorizationHealth: input.authorizationHealth,
+            firstPartyProfileCapability: InstagramCapabilityState.YES,
+            firstPartyInsightsCapability: input.insightsCapability,
+            humanActionRequired: false,
+            syncHealth: InstagramSyncHealth.NOT_CONFIGURED,
+            isActive: true,
+            pendingAccessTokenEncrypted: null,
+            pendingGrantedScopes: [],
+            pendingTokenExpiresAt: null,
+            pendingProviderAccountId: null,
+            pendingProviderAppScopedUserId: null,
+            pendingOauthIntent: null,
+            pendingExpectedGeneration: null,
+            authorizationLossTransitionId: null,
+            authorizationLossOpenedAt: null,
+          },
+        });
+        if (updated.count !== 1) throw staleAttempt();
+        row = await tx.brandIntegration.findUniqueOrThrow({
+          where: { id: existing.id },
+        });
+      }
+      await tx.brandProfile.update({
+        where: { id: input.brandProfileId },
+        data: {
+          socialSyncSkipped: false,
+          igHandle: normalizeHandle(input.inbound),
+          igHandleProvenance: InstagramIgHandleProvenance.META_DIRECT,
+        },
+      });
+      return row;
+    });
+  }
+
+  private async stageDifferentAccount(args: {
+    integrationId: string;
+    expectedGeneration: number;
+    inbound: string;
+    encrypted: string;
+    scopes: BrandIntegrationScope[];
+    expiresAt: Date;
+    providerAccountId: string;
+    providerAppScopedUserId: string | null;
+  }) {
+    const result = await this.prisma.brandIntegration.updateMany({
+      where: {
+        id: args.integrationId,
+        authorizationGeneration: args.expectedGeneration,
+      },
+      data: {
+        inboundOauthHandle: args.inbound,
+        pendingAccessTokenEncrypted: args.encrypted,
+        pendingGrantedScopes: args.scopes,
+        pendingTokenExpiresAt: args.expiresAt,
+        pendingProviderAccountId: args.providerAccountId,
+        pendingProviderAppScopedUserId: args.providerAppScopedUserId,
+        pendingOauthIntent: InstagramOAuthIntent.RECONNECT,
+        pendingExpectedGeneration: args.expectedGeneration,
+      },
+    });
+    if (result.count !== 1) throw staleAttempt();
+  }
+
+  private async revalidateLegacyIdentity(
+    row: Prisma.BrandIntegrationGetPayload<object>,
+    role: BrandRole,
+  ) {
+    if (!row.accessTokenEncrypted || !row.isActive) {
+      this.assertLegacyReconciliationOwner(role);
       throw new BadRequestException({
-        code: "ACTIVE_CAMPAIGNS_BLOCK_DISCONNECT",
+        code: "LEGACY_IDENTITY_RECONCILIATION_REQUIRED",
+        message: "Start an Owner legacy identity reconciliation.",
+      });
+    }
+    try {
+      const me = await this.graph.fetchMe(
+        decryptField(row.accessTokenEncrypted),
+      );
+      const result = await this.prisma.brandIntegration.updateMany({
+        where: {
+          id: row.id,
+          authorizationGeneration: row.authorizationGeneration,
+          providerAccountId: null,
+        },
+        data: {
+          providerAccountId: me.userId,
+          providerAppScopedUserId: me.appScopedUserId,
+          identityVerification: InstagramIdentityVerification.VERIFIED,
+        },
+      });
+      if (result.count !== 1) throw staleAttempt();
+      return this.prisma.brandIntegration.findUniqueOrThrow({
+        where: { id: row.id },
+      });
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        this.assertLegacyReconciliationOwner(role);
+        throw new BadRequestException({
+          code: "LEGACY_IDENTITY_RECONCILIATION_REQUIRED",
+          message:
+            "The existing Instagram identity could not be revalidated. Start an Owner legacy reconciliation.",
+        });
+      }
+      throw error;
+    }
+  }
+
+  private assertLegacyReconciliationOwner(role: BrandRole): void {
+    if (role !== BrandRole.BRAND_OWNER)
+      throw new ForbiddenException(
+        "Only a Brand Owner can reconcile an unverified legacy Instagram identity.",
+      );
+  }
+
+  private async disconnect(id: string, expectedGeneration: number) {
+    const current = await this.prisma.brandIntegration.findUniqueOrThrow({
+      where: { id },
+    });
+    const result = await this.prisma.brandIntegration.updateMany({
+      where: { id, authorizationGeneration: expectedGeneration },
+      data: {
+        authorizationGeneration: { increment: 1 },
+        credentialVersion: { increment: 1 },
+        isActive: false,
+        status: BrandIntegrationStatus.DISCONNECTED,
+        authorizationHealth: InstagramAuthorizationHealth.DISCONNECTED,
+        humanActionRequired: false,
+        accessTokenEncrypted: null,
+        refreshTokenEncrypted: null,
+        pendingAccessTokenEncrypted: null,
+        pendingGrantedScopes: [],
+        pendingTokenExpiresAt: null,
+        pendingProviderAccountId: null,
+        pendingProviderAppScopedUserId: null,
+        pendingOauthIntent: null,
+        pendingExpectedGeneration: null,
+        authorizationLossTransitionId: null,
+        authorizationLossOpenedAt: null,
+      },
+    });
+    if (result.count !== 1) throw staleAttempt();
+    await this.prisma.brandInstagramOAuthState.updateMany({
+      where: { brandProfileId: current.brandProfileId, consumedAt: null },
+      data: { consumedAt: new Date() },
+    });
+  }
+
+  private async openAuthorizationLoss(
+    integrationId: string,
+    expectedGeneration: number,
+  ) {
+    const transitionId = randomUUID();
+    const row = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.brandIntegration.findUniqueOrThrow({
+        where: { id: integrationId },
+      });
+      if (
+        current.authorizationGeneration !== expectedGeneration ||
+        !current.isActive
+      )
+        return null;
+      if (current.authorizationLossTransitionId) return current;
+      return tx.brandIntegration.update({
+        where: { id: current.id },
+        data: {
+          authorizationHealth: InstagramAuthorizationHealth.NEEDS_REVALIDATION,
+          humanActionRequired: true,
+          authorizationLossTransitionId: transitionId,
+          authorizationLossOpenedAt: new Date(),
+        },
+      });
+    });
+    if (!row?.authorizationLossTransitionId || !this.notifications) return;
+    await this.notifications.dispatch({
+      eventType: "integration.instagram_token_expired",
+      workspaceId: row.brandProfileId,
+      source: {
+        sourceType: "BRAND_INSTAGRAM_AUTHORIZATION",
+        sourceId: row.id,
+        transitionId: row.authorizationLossTransitionId,
+      },
+      payload: {
+        integration_id: row.id,
+        authorization_health: row.authorizationHealth,
+      },
+    });
+  }
+
+  private assertIntentRole(role: BrandRole, intent: InstagramOAuthIntent) {
+    const action =
+      intent === InstagramOAuthIntent.INITIAL_CONNECT
+        ? "INITIAL_CONNECT"
+        : intent === InstagramOAuthIntent.RECONNECT
+          ? "SAME_ID_RECONNECT"
+          : intent === InstagramOAuthIntent.ACCOUNT_CHANGE
+            ? "CONTROLLED_ACCOUNT_CHANGE"
+            : "LEGACY_IDENTITY_RECONCILIATION";
+    this.access.assertInstagramAction(role, action);
+  }
+
+  private assertIntentState(
+    integration: Prisma.BrandIntegrationGetPayload<object> | null,
+    intent: InstagramOAuthIntent,
+  ): void {
+    const invalid = () =>
+      new BadRequestException({
+        code: "INVALID_INSTAGRAM_OAUTH_INTENT",
         message:
-          "Cannot disconnect or purge social data while campaigns are actively running. Conclude active campaigns before modifying API integrations.",
+          "The requested Instagram operation does not match current state.",
+      });
+    if (intent === InstagramOAuthIntent.INITIAL_CONNECT && integration) {
+      throw invalid();
+    }
+    if (intent === InstagramOAuthIntent.RECONNECT && !integration) {
+      throw invalid();
+    }
+    if (
+      intent === InstagramOAuthIntent.ACCOUNT_CHANGE &&
+      !integration?.providerAccountId
+    ) {
+      throw invalid();
+    }
+    if (
+      intent === InstagramOAuthIntent.LEGACY_IDENTITY_RECONCILIATION &&
+      (!integration || integration.providerAccountId)
+    ) {
+      throw invalid();
+    }
+  }
+
+  private findInstagram(brandProfileId: string) {
+    return this.prisma.brandIntegration.findUnique({
+      where: {
+        brandProfileId_provider: {
+          brandProfileId,
+          provider: BrandIntegrationProvider.INSTAGRAM,
+        },
+      },
+    });
+  }
+
+  private async assertNoActiveDeletion(brandProfileId: string): Promise<void> {
+    const active = await this.prisma.brandInstagramDeletionRequest.count({
+      where: {
+        brandProfileId,
+        state: { notIn: ["COMPLETED", "FAILED_TERMINAL"] },
+      },
+    });
+    if (active) {
+      throw new BadRequestException({
+        code: "INSTAGRAM_DELETION_IN_PROGRESS",
+        message: "Instagram data deletion is in progress.",
       });
     }
   }
+
+  private allowedActions(
+    role: BrandRole,
+    row: { providerAccountId: string | null; isActive: boolean },
+  ) {
+    return {
+      read: true,
+      initialConnect: false,
+      sameIdReconnect:
+        role === BrandRole.BRAND_OWNER || role === BrandRole.CAMPAIGN_MANAGER,
+      controlledAccountChange: role === BrandRole.BRAND_OWNER,
+      disconnect: role === BrandRole.BRAND_OWNER,
+      deleteMyData: role === BrandRole.BRAND_OWNER,
+      legacyIdentityReconciliation:
+        role === BrandRole.BRAND_OWNER && !row.providerAccountId,
+    };
+  }
+}
+
+function staleAttempt(): BadRequestException {
+  return new BadRequestException({
+    code: "STALE_INSTAGRAM_AUTHORIZATION_GENERATION",
+    message: "Instagram connection state changed. Start a fresh authorization.",
+  });
+}
+
+function healthFromCapabilities(row: {
+  firstPartyProfileCapability: InstagramCapabilityState;
+  firstPartyInsightsCapability: InstagramCapabilityState;
+}): InstagramAuthorizationHealth {
+  if (
+    row.firstPartyProfileCapability === InstagramCapabilityState.YES &&
+    row.firstPartyInsightsCapability === InstagramCapabilityState.YES
+  ) {
+    return InstagramAuthorizationHealth.CONNECTED_FULL;
+  }
+  if (
+    row.firstPartyProfileCapability === InstagramCapabilityState.YES &&
+    row.firstPartyInsightsCapability === InstagramCapabilityState.NO
+  ) {
+    return InstagramAuthorizationHealth.PARTIALLY_CONNECTED;
+  }
+  return InstagramAuthorizationHealth.NEEDS_REVALIDATION;
+}
+
+function providerFailureClassification(
+  error: unknown,
+): InstagramProviderErrorClass {
+  if (
+    error instanceof InstagramTokenRefreshError ||
+    error instanceof InstagramProviderRequestError
+  ) {
+    return error.classification;
+  }
+  return "UNKNOWN";
+}
+
+function isHumanReauthorizationFailure(error: unknown): boolean {
+  const classification = providerFailureClassification(error);
+  return (
+    classification === "AUTHORIZATION_REVALIDATION_REQUIRED" ||
+    classification === "PERMISSION_LOSS"
+  );
 }

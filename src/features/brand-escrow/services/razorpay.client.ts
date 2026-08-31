@@ -20,6 +20,9 @@ interface RazorpayVirtualAccountResponse {
 
 interface RazorpayOrderResponse {
   id: string;
+  amount?: number;
+  currency?: string;
+  receipt?: string;
 }
 
 @Injectable()
@@ -43,7 +46,10 @@ export class RazorpayClient {
     return `Basic ${Buffer.from(`${this.apiKeyId}:${this.apiKeySecret}`).toString("base64")}`;
   }
 
-  private async postJson<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  private async postJson<T>(
+    path: string,
+    body: Record<string, unknown>,
+  ): Promise<T> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
 
@@ -74,9 +80,33 @@ export class RazorpayClient {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new ServiceUnavailableException(
-        "Payment gateway handshake failed",
-      );
+      throw new ServiceUnavailableException("Payment gateway handshake failed");
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private async getJson<T>(path: string): Promise<T> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const response = await fetch(`https://api.razorpay.com/v1/${path}`, {
+        headers: { Authorization: this.authHeader },
+        signal: controller.signal,
+      });
+      const payload = (await response.json()) as T & {
+        error?: { description?: string };
+      };
+      if (!response.ok) {
+        throw new BadRequestException(
+          payload.error?.description ??
+            `Razorpay request failed with status ${response.status}`,
+        );
+      }
+      return payload;
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      throw new ServiceUnavailableException("Payment gateway handshake failed");
     } finally {
       clearTimeout(timeout);
     }
@@ -110,6 +140,22 @@ export class RazorpayClient {
     });
   }
 
+  async findOrderByReceipt(
+    receipt: string,
+  ): Promise<RazorpayOrderResponse | null> {
+    const response = await this.getJson<{ items?: RazorpayOrderResponse[] }>(
+      `orders?receipt=${encodeURIComponent(receipt)}`,
+    );
+    const exact =
+      response.items?.filter((order) => order.receipt === receipt) ?? [];
+    if (exact.length > 1) {
+      throw new BadRequestException(
+        "Multiple provider orders exist for the funding receipt",
+      );
+    }
+    return exact[0] ?? null;
+  }
+
   async capturePayment(paymentId: string, amountPaise: number): Promise<void> {
     await this.postJson(`payments/${paymentId}/capture`, {
       amount: amountPaise,
@@ -119,14 +165,11 @@ export class RazorpayClient {
 
 export function extractBankReceiver(
   receivers: RazorpayReceiver[] | undefined,
-): RazorpayReceiver {
-  const bankAccount = receivers?.find((receiver) => receiver.entity === "bank_account");
-  if (!bankAccount?.account_number || !bankAccount.ifsc) {
-    throw new BadRequestException(
-      "Partner gateway did not return virtual account bank routing details",
-    );
-  }
-  return bankAccount;
+): RazorpayReceiver | null {
+  const bankAccount = receivers?.find(
+    (receiver) => receiver.entity === "bank_account",
+  );
+  return bankAccount ?? null;
 }
 
 export function extractVpaReceiver(

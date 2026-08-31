@@ -12,7 +12,7 @@ export function eventTypeToPostmarkEnvKey(eventType: string): string {
 export const NOTIFICATION_EMAIL_EVENT_TYPES = Object.values(
   NOTIFICATION_EVENT_REGISTRY,
 )
-  .filter((definition) => definition.email)
+  .filter((definition) => definition.emailPolicy !== "NONE")
   .map((definition) => definition.eventType);
 
 /** Env var names for per-event Postmark template IDs (deploy + local). */
@@ -24,17 +24,17 @@ export type NotificationPostmarkTemplateEnvKey =
 
 /**
  * Resolves Postmark template ID for a notification event.
- * Per-event env → default notification template → OTP template.
+ * Per-event env → default notification template.
  */
-export function resolveNotificationTemplateIdFromEnv(eventType: string): number {
+export function resolveNotificationTemplateIdFromEnv(
+  eventType: string,
+): number {
   const envKey = eventTypeToPostmarkEnvKey(eventType);
   const specific = process.env[envKey]?.trim();
   const fallback =
-    process.env.POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID?.trim() ??
-    process.env.POSTMARK_OTP_TEMPLATE_ID?.trim();
+    process.env.POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID?.trim();
 
-  const raw =
-    specific && specific.length > 0 ? specific : fallback;
+  const raw = specific && specific.length > 0 ? specific : fallback;
 
   if (!raw) {
     throw new Error(
