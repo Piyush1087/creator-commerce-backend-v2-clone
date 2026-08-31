@@ -887,7 +887,7 @@ describe.skipIf(!enabled)(
     it("authenticated Brand Centre route progressively projects current and preserves it on failed refresh", async () => {
       const f = await fixture();
       const org = await prisma.organization.create({
-        data: { name: "Differentiation test org" },
+        data: { name: "Differentiation test org", kind: "BRAND" },
       });
       await prisma.brandProfile.update({
         where: { id: f.brandId },

@@ -52,7 +52,7 @@ describe.skipIf(process.env.BS03_DATABASE_TEST !== "true")(
         throw new Error("BS-03 requires a disposable loopback bs03_* database");
 
       const organization = await prisma.organization.create({
-        data: { name: "Operational Workspace Only" },
+        data: { name: "Operational Workspace Only", kind: "BRAND" },
       });
       organizationId = organization.id;
       const brand = await prisma.brandProfile.create({

@@ -25,6 +25,11 @@ enum UserAuthState {
   DISABLED
 }
 
+enum OrganizationKind {
+  BRAND
+  CREATOR
+}
+
 enum AuthMethodType {
   PASSWORD
   GOOGLE
@@ -740,6 +745,33 @@ enum InstagramOAuthIntent {
   LEGACY_IDENTITY_RECONCILIATION
 }
 
+enum ProviderOAuthProvider {
+  INSTAGRAM
+}
+
+enum ProviderOAuthSubjectType {
+  BRAND
+  CREATOR
+}
+
+enum ProviderCapabilityState {
+  AVAILABLE
+  UNAVAILABLE
+  UNKNOWN
+}
+
+enum ProviderAuthorizationHealth {
+  USABLE
+  REAUTHORIZATION_REQUIRED
+  PROVIDER_ACCESS_BLOCKED
+  UNKNOWN
+  DISCONNECTED
+}
+
+enum CreatorEntryContinuationIntent {
+  CAMPAIGN_APPLY
+}
+
 enum InstagramIgHandleProvenance {
   META_DIRECT
   USER_ENTERED
@@ -1281,59 +1313,62 @@ enum DataExtractionSemanticObservationRelationType {
 // ============================================================================
 
 model Organization {
-  id        String   @id @default(uuid())
+  id        String           @id @default(uuid())
   name      String
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  kind      OrganizationKind
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
 
   users                      User[]
   brandProfile               BrandProfile?
+  creatorWorkspace           CreatorWorkspace?
   gatekeeperRecoveryRequests GatekeeperRecoveryRequest[]
 
   @@map("organizations")
 }
 
 model User {
-  id                            String                            @id @default(uuid())
-  email                         String                            @unique
+  id                                 String                            @id @default(uuid())
+  email                              String                            @unique
   /// Database trigger derives this canonical authority from email on every write.
-  normalizedEmail               String?                           @unique @map("normalized_email")
+  normalizedEmail                    String                            @unique @default(dbgenerated()) @map("normalized_email")
   /// Display name; brand onboarding sets local-part of work email.
-  name                          String?
+  name                               String?
   /// Scrypt hash for creator email/password signup.
-  hashedPassword                String?                           @map("hashed_password")
+  hashedPassword                     String?                           @map("hashed_password")
   /// Google OAuth subject (`sub` claim) for creator Google signup/sign-in.
-  googleSubjectId               String?                           @unique @map("google_subject_id")
-  emailVerifiedAt               DateTime?                         @map("email_verified_at")
-  authState                     UserAuthState                     @default(PROVISIONAL) @map("auth_state")
-  role                          UserRole
-  organizationId                String?                           @map("organization_id")
-  organization                  Organization?                     @relation(fields: [organizationId], references: [id])
-  createdAt                     DateTime                          @default(now()) @map("created_at")
-  updatedAt                     DateTime                          @updatedAt @map("updated_at")
-  discoveryLeads                DiscoveryLead[]
-  creatorProfile                CreatorProfile?
-  creatorOnboardingTrack        CreatorOnboardingTrack?
-  userProfile                   UserProfile?
-  historicChatThreads           HistoricChatThread[]
-  metricPostPulses              MetricPostPulse[]
-  collaborationsAsCreator       Collaboration[]                   @relation("CollaborationCreator")
-  coPilotThreads                CoPilotThread[]
-  coPilotMessageFeedback        CoPilotMessageFeedback[]
-  creatorCoPilotThreadsAuthored CreatorCoPilotThread[]            @relation("CreatorCoPilotThreadAuthor")
-  creatorCoPilotMessageFeedback CreatorCoPilotMessageFeedback[]
-  brandTeamMemberships          BrandTeamMember[]
-  brandInstagramOAuthStates     BrandInstagramOAuthState[]
-  triggeredNotifications        Notification[]                    @relation("NotificationTriggerUser")
-  notificationRecipients        NotificationRecipient[]
-  notificationPreferences       UserBrandNotificationPreference[]
-  notificationEmailDeliveries   NotificationEmailDelivery[]
-  notificationJobRecipients     NotificationJobRecipient[]
-  gatekeeperRecoveryRequests    GatekeeperRecoveryRequest[]
-  authMethods                   UserAuthMethod[]
-  authSessions                  AuthSession[]
-  passwordResetChallenges       PasswordResetChallenge[]
-  securityEvents                SecurityEvent[]                   @relation("SecurityEventSubject")
+  googleSubjectId                    String?                           @unique @map("google_subject_id")
+  emailVerifiedAt                    DateTime?                         @map("email_verified_at")
+  authState                          UserAuthState                     @default(PROVISIONAL) @map("auth_state")
+  role                               UserRole
+  organizationId                     String?                           @map("organization_id")
+  organization                       Organization?                     @relation(fields: [organizationId], references: [id])
+  createdAt                          DateTime                          @default(now()) @map("created_at")
+  updatedAt                          DateTime                          @updatedAt @map("updated_at")
+  discoveryLeads                     DiscoveryLead[]
+  creatorProfile                     CreatorProfile?
+  creatorOnboardingTrack             CreatorOnboardingTrack?
+  userProfile                        UserProfile?
+  historicChatThreads                HistoricChatThread[]
+  metricPostPulses                   MetricPostPulse[]
+  collaborationsAsCreator            Collaboration[]                   @relation("CollaborationCreator")
+  coPilotThreads                     CoPilotThread[]
+  coPilotMessageFeedback             CoPilotMessageFeedback[]
+  creatorCoPilotThreadsAuthored      CreatorCoPilotThread[]            @relation("CreatorCoPilotThreadAuthor")
+  creatorCoPilotMessageFeedback      CreatorCoPilotMessageFeedback[]
+  brandTeamMemberships               BrandTeamMember[]
+  initiatedProviderOAuthTransactions ProviderOAuthTransaction[]
+  creatorEntryContinuations          CreatorEntryContinuation[]
+  triggeredNotifications             Notification[]                    @relation("NotificationTriggerUser")
+  notificationRecipients             NotificationRecipient[]
+  notificationPreferences            UserBrandNotificationPreference[]
+  notificationEmailDeliveries        NotificationEmailDelivery[]
+  notificationJobRecipients          NotificationJobRecipient[]
+  gatekeeperRecoveryRequests         GatekeeperRecoveryRequest[]
+  authMethods                        UserAuthMethod[]
+  authSessions                       AuthSession[]
+  passwordResetChallenges            PasswordResetChallenge[]
+  securityEvents                     SecurityEvent[]                   @relation("SecurityEventSubject")
 
   @@index([organizationId])
   @@index([role])
@@ -1810,34 +1845,39 @@ model BrandProfile {
   notifications             Notification[]
   notificationPreferences   UserBrandNotificationPreference[]
   integrations              BrandIntegration[]
-  instagramOAuthStates      BrandInstagramOAuthState[]
+  providerOAuthTransactions ProviderOAuthTransaction[]
   instagramSyncInvitations  InstagramSyncInvitation[]
   instagramDeletionRequests BrandInstagramDeletionRequest[]
 
   @@map("brand_profiles")
 }
 
-/// One-time, hashed state for authenticated Instagram Settings OAuth only.
-model BrandInstagramOAuthState {
-  id                        String               @id @default(uuid())
-  brandProfileId            String               @map("brand_profile_id")
-  brandProfile              BrandProfile         @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  initiatedByUserId         String               @map("initiated_by_user_id")
-  initiatedByUser           User                 @relation(fields: [initiatedByUserId], references: [id], onDelete: Cascade)
-  stateHash                 String               @unique @map("state_hash") @db.VarChar(64)
-  redirectUri               String               @map("redirect_uri")
-  intent                    InstagramOAuthIntent @default(INITIAL_CONNECT)
-  initiatedByRole           BrandRole            @default(BRAND_OWNER) @map("initiated_by_role")
-  expectedGeneration        Int                  @default(0) @map("expected_generation")
-  expectedProviderAccountId String?              @map("expected_provider_account_id") @db.VarChar(100)
-  expiresAt                 DateTime             @map("expires_at")
-  consumedAt                DateTime?            @map("consumed_at")
-  createdAt                 DateTime             @default(now()) @map("created_at")
+/// Shared, one-time provider OAuth transaction. Raw state is never persisted.
+model ProviderOAuthTransaction {
+  id                        String                   @id @default(uuid())
+  provider                  ProviderOAuthProvider
+  subjectType               ProviderOAuthSubjectType @map("subject_type")
+  brandProfileId            String?                  @map("brand_profile_id")
+  brandProfile              BrandProfile?            @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  creatorProfileId          String?                  @map("creator_profile_id")
+  creatorProfile            CreatorProfile?          @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  initiatedByUserId         String                   @map("initiated_by_user_id")
+  initiatedByUser           User                     @relation(fields: [initiatedByUserId], references: [id], onDelete: Cascade)
+  stateHash                 String                   @unique @map("state_hash") @db.VarChar(64)
+  redirectUri               String                   @map("redirect_uri")
+  intent                    InstagramOAuthIntent     @default(INITIAL_CONNECT)
+  initiatedByRole           BrandRole?               @map("initiated_by_role")
+  expectedGeneration        Int                      @default(0) @map("expected_generation")
+  expectedProviderAccountId String?                  @map("expected_provider_account_id") @db.VarChar(100)
+  expiresAt                 DateTime                 @map("expires_at")
+  consumedAt                DateTime?                @map("consumed_at")
+  createdAt                 DateTime                 @default(now()) @map("created_at")
 
   @@index([expiresAt, consumedAt])
   @@index([brandProfileId])
+  @@index([creatorProfileId])
   @@index([initiatedByUserId])
-  @@map("brand_instagram_oauth_states")
+  @@map("provider_oauth_transactions")
 }
 
 /// Brand OAuth connections (Instagram Login + optional Meta Business Suite in Settings).
@@ -2569,25 +2609,45 @@ model UceCampaign {
   createdAt      DateTime          @default(now()) @map("created_at")
   updatedAt      DateTime          @updatedAt @map("updated_at")
 
-  performanceAggregate   UceCampaignPerformanceAggregate?
-  strategy               UceCampaignStrategy?
-  targeting              UceCampaignTargeting?
-  commercials            UceCampaignCommercials?
-  products               UceCampaignProduct[]
-  assets                 UceCampaignAsset[]
-  briefs                 UceCampaignBrief[]
-  collaborations         UceCampaignCollaboration[]
-  campaignCreators       UceCampaignCreator[]
-  applications           UceApplication[]
-  shares                 UceCampaignShare[]
-  workflowCollaborations Collaboration[]
-  reportingSnapshots     UceCampaignReportingSnapshot[]
-  reportingTimeseries    UceCampaignReportingTimeseriesHourly[]
-  reportingAssets        UceCampaignReportingAssetGallery[]
-  bridgeSignals          IntegrationBridgeSignalLedger[]
+  performanceAggregate      UceCampaignPerformanceAggregate?
+  strategy                  UceCampaignStrategy?
+  targeting                 UceCampaignTargeting?
+  commercials               UceCampaignCommercials?
+  products                  UceCampaignProduct[]
+  assets                    UceCampaignAsset[]
+  briefs                    UceCampaignBrief[]
+  collaborations            UceCampaignCollaboration[]
+  campaignCreators          UceCampaignCreator[]
+  applications              UceApplication[]
+  shares                    UceCampaignShare[]
+  workflowCollaborations    Collaboration[]
+  reportingSnapshots        UceCampaignReportingSnapshot[]
+  reportingTimeseries       UceCampaignReportingTimeseriesHourly[]
+  reportingAssets           UceCampaignReportingAssetGallery[]
+  bridgeSignals             IntegrationBridgeSignalLedger[]
+  creatorEntryContinuations CreatorEntryContinuation[]
 
   @@index([brandProfileId, status])
   @@map("uce_campaigns")
+}
+
+/// Persistence-only handoff to an already resolved canonical Campaign.
+model CreatorEntryContinuation {
+  id          String                         @id @default(uuid())
+  tokenDigest String                         @unique @map("token_digest") @db.Char(64)
+  intent      CreatorEntryContinuationIntent @default(CAMPAIGN_APPLY)
+  campaignId  String                         @map("campaign_id")
+  campaign    UceCampaign                    @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  boundUserId String?                        @map("bound_user_id")
+  boundUser   User?                          @relation(fields: [boundUserId], references: [id], onDelete: SetNull)
+  createdAt   DateTime                       @default(now()) @map("created_at")
+  expiresAt   DateTime                       @map("expires_at")
+  consumedAt  DateTime?                      @map("consumed_at")
+
+  @@index([campaignId])
+  @@index([boundUserId])
+  @@index([expiresAt, consumedAt])
+  @@map("creator_entry_continuations")
 }
 
 /// Canonical read-only Campaign reference to a Brand Centre-owned entity.
@@ -3130,19 +3190,20 @@ model CreatorProfile {
   createdAt                  DateTime @default(now()) @map("created_at")
   updatedAt                  DateTime @updatedAt @map("updated_at")
 
-  bankDetails            CreatorBankDetails[]
-  shippingAddresses      CreatorShippingAddress[]
-  settlementProfile      CreatorSettlementProfile?
-  payoutProfile          CreatorPayoutProfile?
-  payoutObligations      CreatorPayoutObligation[]
-  ownedWorkspaces        CreatorWorkspace[]              @relation("CreatorWorkspaceOwner")
-  workspaceSeats         CreatorWorkspaceMember[]        @relation("CreatorWorkspaceMemberProfile")
-  socialIntegrations     CreatorSocialIntegration[]
-  coPilotThreads         CreatorCoPilotThread[]
-  coPilotMessageFeedback CreatorCoPilotMessageFeedback[]
-  coPilotInteractionLogs CreatorCoPilotInteractionLog[]
-  uceCollaborations      UceCampaignCollaboration[]
-  campaignCreators       UceCampaignCreator[]
+  bankDetails               CreatorBankDetails[]
+  shippingAddresses         CreatorShippingAddress[]
+  settlementProfile         CreatorSettlementProfile?
+  payoutProfile             CreatorPayoutProfile?
+  payoutObligations         CreatorPayoutObligation[]
+  ownedWorkspaces           CreatorWorkspace[]              @relation("CreatorWorkspaceOwner")
+  workspaceSeats            CreatorWorkspaceMember[]        @relation("CreatorWorkspaceMemberProfile")
+  socialIntegrations        CreatorSocialIntegration[]
+  providerOAuthTransactions ProviderOAuthTransaction[]
+  coPilotThreads            CreatorCoPilotThread[]
+  coPilotMessageFeedback    CreatorCoPilotMessageFeedback[]
+  coPilotInteractionLogs    CreatorCoPilotInteractionLog[]
+  uceCollaborations         UceCampaignCollaboration[]
+  campaignCreators          UceCampaignCreator[]
 
   @@map("creator_profiles")
 }
@@ -3299,6 +3360,8 @@ model CreatorWorkspace {
   id                      String         @id @default(uuid())
   ownerProfileId          String         @map("owner_profile_id")
   ownerProfile            CreatorProfile @relation("CreatorWorkspaceOwner", fields: [ownerProfileId], references: [id], onDelete: Cascade)
+  organizationId          String         @unique @map("organization_id")
+  organization            Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   organizationDisplayName String         @default("My Creative Workspace") @map("organization_display_name") @db.VarChar(150)
   createdAt               DateTime       @default(now()) @map("created_at")
   updatedAt               DateTime       @updatedAt @map("updated_at")
@@ -3342,28 +3405,39 @@ model CreatorWorkspaceInvitation {
 }
 
 model CreatorSocialIntegration {
-  id                         String                            @id @default(uuid())
-  creatorProfileId           String                            @map("creator_profile_id")
-  creatorProfile             CreatorProfile                    @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
-  platformNetwork            SocialNetworkProvider             @map("platform_network")
-  nativePlatformUserId       String                            @map("native_platform_user_id") @db.VarChar(100)
-  channelHandleString        String                            @map("channel_handle_string") @db.VarChar(100)
-  channelDisplayTitle        String?                           @map("channel_display_title") @db.VarChar(255)
-  verifiedAvatarUrl          String?                           @map("verified_avatar_url") @db.Text
-  oauthAccessTokenEncrypted  String                            @map("oauth_access_token_encrypted") @db.Text
-  oauthRefreshTokenEncrypted String?                           @map("oauth_refresh_token_encrypted") @db.Text
-  tokenScopePermissions      String[]                          @default([]) @map("token_scope_permissions")
-  tokenStateCondition        OAuthTokenStatus                  @default(ACTIVE) @map("token_state_condition")
-  tokenExpiresAt             DateTime?                         @map("token_expires_at")
-  lastMetadataSyncAt         DateTime?                         @map("last_metadata_sync_at")
-  professionalAccountType    InstagramProfessionalAccountType? @map("professional_account_type")
-  mediaCountCache            Int?                              @map("media_count_cache")
-  createdAt                  DateTime                          @default(now()) @map("created_at")
-  updatedAt                  DateTime                          @updatedAt @map("updated_at")
+  id                            String                            @id @default(uuid())
+  creatorProfileId              String                            @map("creator_profile_id")
+  creatorProfile                CreatorProfile                    @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  platformNetwork               SocialNetworkProvider             @map("platform_network")
+  nativePlatformUserId          String                            @map("native_platform_user_id") @db.VarChar(100)
+  channelHandleString           String                            @map("channel_handle_string") @db.VarChar(100)
+  channelDisplayTitle           String?                           @map("channel_display_title") @db.VarChar(255)
+  verifiedAvatarUrl             String?                           @map("verified_avatar_url") @db.Text
+  oauthAccessTokenEncrypted     String                            @map("oauth_access_token_encrypted") @db.Text
+  oauthRefreshTokenEncrypted    String?                           @map("oauth_refresh_token_encrypted") @db.Text
+  tokenScopePermissions         String[]                          @default([]) @map("token_scope_permissions")
+  tokenStateCondition           OAuthTokenStatus                  @default(ACTIVE) @map("token_state_condition")
+  tokenExpiresAt                DateTime?                         @map("token_expires_at")
+  tokenIssuedAt                 DateTime?                         @map("token_issued_at")
+  tokenRefreshedAt              DateTime?                         @map("token_refreshed_at")
+  authorizationGeneration       Int                               @default(0) @map("authorization_generation")
+  credentialVersion             Int                               @default(1) @map("credential_version")
+  authorizationHealth           ProviderAuthorizationHealth       @default(UNKNOWN) @map("authorization_health")
+  authorizationHealthReasonCode String?                           @map("authorization_health_reason_code") @db.VarChar(100)
+  basicAuthorizationCapability  ProviderCapabilityState           @default(UNKNOWN) @map("basic_authorization_capability")
+  insightsCapability            ProviderCapabilityState           @default(UNKNOWN) @map("insights_capability")
+  lastAuthorizationValidatedAt  DateTime?                         @map("last_authorization_validated_at")
+  disconnectedAt                DateTime?                         @map("disconnected_at")
+  lastMetadataSyncAt            DateTime?                         @map("last_metadata_sync_at")
+  professionalAccountType       InstagramProfessionalAccountType? @map("professional_account_type")
+  mediaCountCache               Int?                              @map("media_count_cache")
+  createdAt                     DateTime                          @default(now()) @map("created_at")
+  updatedAt                     DateTime                          @updatedAt @map("updated_at")
 
   @@unique([creatorProfileId, platformNetwork], map: "creator_social_integrations_profile_platform_key")
   @@unique([platformNetwork, nativePlatformUserId], map: "creator_social_integrations_platform_native_user_key")
   @@index([creatorProfileId, platformNetwork, tokenStateCondition], map: "creator_social_integrations_profile_platform_state_idx")
+  @@index([platformNetwork, authorizationHealth], map: "creator_social_integrations_authorization_health_idx")
   @@map("creator_social_integrations")
 }
 

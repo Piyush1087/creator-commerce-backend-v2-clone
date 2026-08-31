@@ -930,7 +930,7 @@ describe.skipIf(!enabled)(
     it("Brand consumer endpoint progressively exposes active Audience without exposing inactive history", async () => {
       const f = await fixture();
       const org = await prisma.organization.create({
-        data: { name: "Audience test org" },
+        data: { name: "Audience test org", kind: "BRAND" },
       });
       await prisma.brandProfile.update({
         where: { id: f.brandId },

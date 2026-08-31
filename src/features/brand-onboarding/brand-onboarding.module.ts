@@ -10,6 +10,7 @@ import { MailModule } from "../../mail/mail.module";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { S3Module } from "../../shared/s3/s3.module";
 import { DataExtractionModule } from "../data-extraction/data-extraction.module";
+import { ProviderOAuthModule } from "../provider-oauth/provider-oauth.module";
 import { BrandSocialSyncController } from "./social-sync/brand-social-sync.controller";
 import { BrandSocialSyncService } from "./social-sync/brand-social-sync.service";
 import { BrandSettingsAccessService } from "../brand-settings/services/brand-settings-access.service";
@@ -95,6 +96,7 @@ import { CanonicalBrandStateService } from "./canonical-brand-state/canonical-br
     BrandCanonicalStateModule,
     InstagramModule,
     DataExtractionModule,
+    ProviderOAuthModule,
   ],
   controllers: [
     BrandOnboardingController,

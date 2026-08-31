@@ -18,6 +18,7 @@ import { MetaInstagramDeletionController } from "./meta-instagram-deletion.contr
 import { BrandInstagramDeletionScheduler } from "./schedulers/brand-instagram-deletion.scheduler";
 import { BrandInstagramDeletionService } from "./services/brand-instagram-deletion.service";
 import { MetaInstagramDeletionCallbackService } from "./services/meta-instagram-deletion-callback.service";
+import { ProviderOAuthModule } from "../provider-oauth/provider-oauth.module";
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { MetaInstagramDeletionCallbackService } from "./services/meta-instagram-
     InstagramModule,
     AuthModule,
     MailModule,
+    ProviderOAuthModule,
     forwardRef(() => NotificationsModule),
   ],
   controllers: [

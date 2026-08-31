@@ -13,6 +13,7 @@ import { BrandWorkspaceAuthorizationService } from "../../brand-centre/brand-wor
 import { BrandCentreSessionEvictionService } from "../../brand-centre/services/brand-centre-session-eviction.service";
 import { InstagramGraphClient } from "../../instagram/instagram-graph.client";
 import { InstagramOAuthClient } from "../../instagram/instagram-oauth.client";
+import { ProviderOAuthTransactionService } from "../../provider-oauth/provider-oauth-transaction.service";
 import { BrandInstagramOAuthStateService } from "../services/brand-instagram-oauth-state.service";
 import { BrandSettingsAccessService } from "../services/brand-settings-access.service";
 import { BrandSettingsIntegrationsService } from "../services/brand-settings-integrations.service";
@@ -38,7 +39,9 @@ describe.skipIf(process.env.BS06_MIGRATION_DATABASE_TEST !== "true")(
     );
     const oauth = new InstagramOAuthClient();
     const graph = new InstagramGraphClient();
-    const states = new BrandInstagramOAuthStateService(db);
+    const states = new BrandInstagramOAuthStateService(
+      new ProviderOAuthTransactionService(db),
+    );
     const service = new BrandSettingsIntegrationsService(
       db,
       access,
@@ -127,7 +130,7 @@ describe.skipIf(process.env.BS06_MIGRATION_DATABASE_TEST !== "true")(
         pendingProviderAccountId: null,
       });
       expect(
-        await prisma.brandInstagramOAuthState.findUniqueOrThrow({
+        await prisma.providerOAuthTransaction.findUniqueOrThrow({
           where: { id: LEGACY_STATE_ID },
         }),
       ).toMatchObject({ consumedAt: expect.any(Date) });

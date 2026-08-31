@@ -780,7 +780,7 @@ export class BrandSettingsIntegrationsService {
       },
     });
     if (result.count !== 1) throw staleAttempt();
-    await this.prisma.brandInstagramOAuthState.updateMany({
+    await this.prisma.providerOAuthTransaction.updateMany({
       where: { brandProfileId: current.brandProfileId, consumedAt: null },
       data: { consumedAt: new Date() },
     });

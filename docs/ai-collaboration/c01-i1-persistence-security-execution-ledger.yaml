@@ -1,0 +1,113 @@
+run_id: C01-I1-BACKEND
+
+authority:
+  repository: Piyush1087/dummy_tcs
+  authority_sha: 544646140c6b2c69b8fce1bede6ea808517aca70
+  parent_gate: C01-GATE-A4_CLOSED_ACCEPTED
+  prior_phase: C01-I0_CLOSED_ACCEPTED
+  phase: I1_PERSISTENCE_SECURITY_FOUNDATION
+  charters:
+    - docs/organization/charters/systems_architect_ai_worker_charter.md
+    - docs/organization/charters/browser_ai_worker_codex_runner_operating_standard.md
+
+execution_mode: HYBRID_RUN
+repository: Piyush1087/creator-commerce-backend-v2-clone
+starting_sha: bc580ced573361e0cc467f772fdc13dfb7650c9c
+program_branch: c01/i1-persistence-security-foundation
+
+checkpoint:
+  status: PENDING_SYSTEMS_ACCEPTANCE
+  sha: null
+  candidate_head_self_recorded: false
+  sha_source: C01_I1_PERSISTENCE_SECURITY_FOUNDATION_REPORT_V1_AND_REMOTE_BRANCH_TIP
+
+migration_names:
+  - 20260908120000_c01_i1_organization_workspace_foundation
+  - 20260908121000_c01_i1_provider_oauth_transaction
+  - 20260908122000_c01_i1_creator_provider_health
+  - 20260908123000_c01_i1_campaign_continuation
+
+historical_scan_status: ROW_COUNT_NOT_VERIFIABLE_FROM_AUTHORIZED_DATABASE
+historical_persistent_migration_blocker: ACTIVE
+
+schema_changes:
+  organization_kind: BRAND_OR_CREATOR_REQUIRED
+  creator_workspace_organization: UNIQUE_REQUIRED_FOREIGN_KEY
+  owner_user_organization_consistency: DATABASE_TRIGGER_GUARDED
+  user_organization_role_consistency: ACTIVE_CUSTOMER_USERS_DATABASE_GUARDED
+  normalized_email: PRISMA_REQUIRED_DATABASE_GENERATED_DATABASE_NOT_NULL_RETAINED
+
+oauth_generalization:
+  model: ProviderOAuthTransaction
+  history_strategy: IN_PLACE_TABLE_RENAME_AND_TYPED_ADDITIVE_EXTENSION
+  provider: TYPED_INSTAGRAM
+  subjects: BRAND_AND_CREATOR_WITH_EXCLUSIVE_FOREIGN_KEYS
+  shared_security_service: ProviderOAuthTransactionService
+  brand_adapter: BrandInstagramOAuthStateService_COMPATIBLE
+  creator_adapter: PERSISTENCE_SECURITY_ONLY_INITIAL_CONNECT_OR_RECONNECT
+
+provider_health:
+  identity_field_retained: CreatorSocialIntegration.nativePlatformUserId
+  basic_capability: AVAILABLE_UNAVAILABLE_UNKNOWN
+  insights_capability: AVAILABLE_UNAVAILABLE_UNKNOWN
+  authorization_health: USABLE_REAUTHORIZATION_REQUIRED_PROVIDER_ACCESS_BLOCKED_UNKNOWN_DISCONNECTED
+  authorization_generation: REQUIRED_POSITIVE_INTEGER
+  credential_version: REQUIRED_POSITIVE_INTEGER
+
+continuation_persistence:
+  model: CreatorEntryContinuation
+  intent: CAMPAIGN_APPLY
+  external_identity: RANDOM_32_BYTE_TOKEN_SHA256_DIGEST_ONLY
+  campaign_authority: UceCampaign_INTERNAL_FOREIGN_KEY
+  workflow_implemented: false
+
+test_results:
+  canonical_default_suite: PASS_AFTER_BOUNDED_MIGRATION_COUNT_GUARD_CORRECTION_157_EXECUTED_FILES_1049_PASSED_39_DATABASE_GATED_FILES_503_SKIPPED
+  c01_i1_postgresql_security: PASS_22_OF_22
+  settings_auth_postgresql: PASS_10_OF_10
+  settings_general_postgresql: PASS_41_OF_41
+  settings_team_postgresql: PASS_97_OF_97
+  settings_billing_postgresql: PASS_4_OF_4
+  brand_workspace_authorization_postgresql: PASS_10_OF_10
+  brand_instagram_postgresql: PASS_49_OF_49
+  notification_postgresql: PASS_14_OF_14
+  subscription_lifecycle_postgresql: PASS_2_OF_2
+  brand_centre_postgresql: PASS_26_WITH_1_EXISTING_INTENTIONAL_SKIP
+  product_intelligence_and_consumer_postgresql: PASS_11_OF_11
+  brand_intelligence_postgresql: PASS_134_OF_134
+  data_extraction_postgresql: PASS_FUNCTIONALLY_WITH_EXISTING_5_SECOND_TIMING_THRESHOLD_RERUN_AT_15_SECONDS
+  production_build: PASS
+  scoped_i1_eslint: PASS
+  repository_lint: PRE_EXISTING_1022_FORMATTING_ERRORS_I1_SCOPED_ERRORS_ZERO
+  repository_typecheck: PRE_EXISTING_TEST_FIXTURE_AND_SST_DIAGNOSTICS_I1_NEW_FILES_AND_PRODUCTION_BUILD_DIAGNOSTICS_ZERO
+
+migration_validation:
+  base_count: 66
+  i1_count: 4
+  final_count: 70
+  zero_to_head: PASS_ALL_70_ON_FRESH_DISPOSABLE_POSTGRESQL
+  schema_validation: PASS
+  historical_shaped_upgrades:
+    brand: PASS
+    active_creator: PASS
+    provisional_creator: PASS_NOT_PROMOTED
+    brand_creator_conflict: PASS_FAILS_CLOSED
+    multiple_creator_workspaces: PASS_FAILS_CLOSED
+    brand_oauth_history: PASS_EXACT_SECURITY_EVIDENCE_PRESERVED
+
+corrections:
+  - generalized_brand_oauth_storage_in_place_without_semantic_behavior_change
+  - reconciled_active_verified_legacy_creator_context_deterministically
+  - retained_provisional_creator_isolation
+  - added_cross_table_database_invariant_guards
+  - reconciled_current_migration_count_guards_from_66_to_70
+  - corrected_legacy_database_test_fixtures_to_respect_typed_organization_invariants
+  - corrected_verified_brand_scan_to_use_brand_team_members_primary_key_column
+
+deviations:
+  - no_authorized_historical_database_was_available_so_row_counts_were_not_invented
+  - specialized_bs06_pre_i1_migration_fixture_suite_was_superseded_by_the_dedicated_seeded_66_to_70_oauth_history_upgrade_proof
+  - one_data_extraction_vertical_slice_exceeds_its_existing_5_second_threshold_on_this_host_and_passes_12_of_12_with_a_15_second_test_timeout
+
+checkpoint_sha_source: C01_I1_PERSISTENCE_SECURITY_FOUNDATION_REPORT_V1_AND_REMOTE_BRANCH_TIP
+stop_reason: STOP_FOR_SYSTEMS_AND_PARENT_I1_REVIEW

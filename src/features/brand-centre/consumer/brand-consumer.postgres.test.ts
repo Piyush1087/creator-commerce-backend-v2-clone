@@ -92,7 +92,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
 
     async function brand() {
       const org = await prisma.organization.create({
-        data: { name: "Consumer test" },
+        data: { name: "Consumer test", kind: "BRAND" },
       });
       const b = await prisma.brandProfile.create({
         data: {

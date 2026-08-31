@@ -127,7 +127,7 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
     });
     async function workspace(role: BrandRole = "BRAND_OWNER") {
       const org = await prisma.organization.create({
-        data: { name: "BS-02 fixture" },
+        data: { name: "BS-02 fixture", kind: "BRAND" },
       });
       orgIds.push(org.id);
       const brand = await prisma.brandProfile.create({
@@ -403,12 +403,21 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
     ])("existing recipient %s", async (kind) => {
       const w = await workspace();
       const other = kind === "other-org" ? await workspace() : null;
+      const creatorOrganization =
+        kind === "non-brand"
+          ? await prisma.organization.create({
+              data: { name: "BS-02 Creator fixture", kind: "CREATOR" },
+            })
+          : null;
+      if (creatorOrganization) orgIds.push(creatorOrganization.id);
       const user = await prisma.user.create({
         data: {
           email: freshEmail(),
           role: kind === "non-brand" ? "CREATOR" : "BRAND",
           organizationId:
-            kind === "unassigned" ? null : (other?.org.id ?? w.org.id),
+            kind === "unassigned"
+              ? null
+              : (creatorOrganization?.id ?? other?.org.id ?? w.org.id),
           authState: UserAuthState.ACTIVE,
         },
       });
@@ -692,7 +701,7 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
       for (const claimed of [false, true]) {
         const { profile, email } = await activationProfile(false);
         const org = await prisma.organization.create({
-          data: { name: "Existing activation organization" },
+          data: { name: "Existing activation organization", kind: "BRAND" },
         });
         orgIds.push(org.id);
         const user = await prisma.user.create({

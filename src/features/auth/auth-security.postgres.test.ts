@@ -471,7 +471,7 @@ describe.skipIf(process.env.BS12_DATABASE_TEST !== "true")(
 
     it("denies the same unexpired session immediately after Brand membership removal", async () => {
       const organization = await prisma.organization.create({
-        data: { name: "BS12 revocation test" },
+        data: { name: "BS12 revocation test", kind: "BRAND" },
       });
       organizationIds.push(organization.id);
       const brand = await prisma.brandProfile.create({

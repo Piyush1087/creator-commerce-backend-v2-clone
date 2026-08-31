@@ -8,6 +8,8 @@ import {
   CreatorBankVerificationStatus,
   CreatorTeamRole,
   OAuthTokenStatus,
+  ProviderAuthorizationHealth,
+  ProviderCapabilityState,
   SocialNetworkProvider,
   WorkspaceInvitationStatus,
 } from "@prisma/client";
@@ -521,7 +523,14 @@ export class CreatorSettingsService {
 
     await this.prisma.creatorSocialIntegration.update({
       where: { id: existing.id },
-      data: { tokenStateCondition: OAuthTokenStatus.REVOKED },
+      data: {
+        tokenStateCondition: OAuthTokenStatus.REVOKED,
+        authorizationHealth: ProviderAuthorizationHealth.DISCONNECTED,
+        authorizationHealthReasonCode: "USER_DISCONNECTED",
+        basicAuthorizationCapability: ProviderCapabilityState.UNAVAILABLE,
+        insightsCapability: ProviderCapabilityState.UNAVAILABLE,
+        disconnectedAt: new Date(),
+      },
     });
 
     return { disconnected: true, platform };

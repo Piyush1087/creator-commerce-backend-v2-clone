@@ -67,7 +67,7 @@ describe.skipIf(process.env.BRAND_WORKSPACE_DATABASE_TEST !== "true")(
 
     async function workspace(role: UserRole = UserRole.BRAND) {
       const organization = await prisma.organization.create({
-        data: { name: "BS-07 disposable authorization test" },
+        data: { name: "BS-07 disposable authorization test", kind: "BRAND" },
       });
       organizationIds.push(organization.id);
       const brand = await prisma.brandProfile.create({
@@ -79,9 +79,22 @@ describe.skipIf(process.env.BRAND_WORKSPACE_DATABASE_TEST !== "true")(
         },
       });
       brandIds.push(brand.id);
+      const actorOrganization =
+        role === UserRole.CREATOR
+          ? await prisma.organization.create({
+              data: {
+                name: "BS-07 Creator authorization test",
+                kind: "CREATOR",
+              },
+            })
+          : null;
+      if (actorOrganization) organizationIds.push(actorOrganization.id);
       const user = await prisma.user.create({
         data: {
-          organizationId: organization.id,
+          organizationId:
+            role === UserRole.BRAND
+              ? organization.id
+              : (actorOrganization?.id ?? null),
           email: `${randomUUID()}@example.test`,
           role,
           authState: UserAuthState.ACTIVE,

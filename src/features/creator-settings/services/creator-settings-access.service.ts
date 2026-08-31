@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { CreatorTeamRole, UserRole } from "@prisma/client";
+import { CreatorTeamRole, OrganizationKind, UserRole } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
@@ -50,20 +50,41 @@ export class CreatorSettingsAccessService {
     });
 
     if (!workspace) {
-      workspace = await this.prisma.creatorWorkspace.create({
-        data: {
-          ownerProfileId: creatorProfileId,
-          organizationDisplayName: "My Creative Workspace",
-          members: {
-            create: {
-              assignedProfileId: creatorProfileId,
-              associatedEmail: userEmail.toLowerCase(),
-              securityRole: CreatorTeamRole.OWNER,
-              isActive: true,
-              joinedAt: new Date(),
+      workspace = await this.prisma.$transaction(async (tx) => {
+        const owner = await tx.creatorProfile.findUniqueOrThrow({
+          where: { id: creatorProfileId },
+          include: { user: true },
+        });
+        let organizationId = owner.user.organizationId;
+        if (!organizationId) {
+          const organization = await tx.organization.create({
+            data: {
+              name: owner.displayName ?? "My Creative Workspace",
+              kind: OrganizationKind.CREATOR,
+            },
+          });
+          organizationId = organization.id;
+          await tx.user.update({
+            where: { id: owner.userId },
+            data: { organizationId },
+          });
+        }
+        return tx.creatorWorkspace.create({
+          data: {
+            ownerProfileId: creatorProfileId,
+            organizationId,
+            organizationDisplayName: "My Creative Workspace",
+            members: {
+              create: {
+                assignedProfileId: creatorProfileId,
+                associatedEmail: userEmail.toLowerCase(),
+                securityRole: CreatorTeamRole.OWNER,
+                isActive: true,
+                joinedAt: new Date(),
+              },
             },
           },
-        },
+        });
       });
     }
 

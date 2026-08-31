@@ -13,6 +13,7 @@ import {
   CreatorTeamRole,
   OAuthTokenStatus,
   OnboardingStatus,
+  OrganizationKind,
   SocialNetworkProvider,
   UserAuthState,
   UserRole,
@@ -319,6 +320,20 @@ export class CreatorOnboardingService {
       if (!current || current.authState !== UserAuthState.PROVISIONAL) {
         throw new ConflictException("Creator account is already activated.");
       }
+      const organization = await tx.organization.create({
+        data: {
+          name: `${user.name ?? "Creator"}'s Studio`,
+          kind: OrganizationKind.CREATOR,
+        },
+      });
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          organizationId: organization.id,
+          authState: UserAuthState.ACTIVE,
+          emailVerifiedAt: new Date(),
+        },
+      });
       const creatorProfile = await tx.creatorProfile.create({
         data: {
           userId: user.id,
@@ -333,6 +348,7 @@ export class CreatorOnboardingService {
       const workspace = await tx.creatorWorkspace.create({
         data: {
           ownerProfileId: creatorProfile.id,
+          organizationId: organization.id,
           organizationDisplayName: `${user.name ?? "Creator"}'s Studio`,
         },
       });
@@ -344,13 +360,6 @@ export class CreatorOnboardingService {
           securityRole: CreatorTeamRole.OWNER,
           isActive: true,
           joinedAt: new Date(),
-        },
-      });
-      await tx.user.update({
-        where: { id: user.id },
-        data: {
-          authState: UserAuthState.ACTIVE,
-          emailVerifiedAt: new Date(),
         },
       });
       await tx.creatorOnboardingTrack.update({

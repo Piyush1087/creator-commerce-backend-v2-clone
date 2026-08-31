@@ -131,7 +131,7 @@ database("Product consumer exact-Offering PostgreSQL surface", () => {
 
   async function brand(label: string) {
     const organization = await prisma.organization.create({
-      data: { name: `Product consumer ${label}` },
+      data: { name: `Product consumer ${label}`, kind: "BRAND" },
     });
     const profile = await prisma.brandProfile.create({
       data: {

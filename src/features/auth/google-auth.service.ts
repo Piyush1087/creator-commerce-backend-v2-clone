@@ -8,6 +8,7 @@ import {
   AuthMethodType,
   CreatorTeamRole,
   OnboardingStatus,
+  OrganizationKind,
   Prisma,
   SecurityEventType,
   UserAuthState,
@@ -184,12 +185,19 @@ export class GoogleAuthService {
       track.instagramHandle,
     );
     return this.prisma.$transaction(async (tx) => {
+      const organization = await tx.organization.create({
+        data: {
+          name: `${args.name}'s Studio`,
+          kind: OrganizationKind.CREATOR,
+        },
+      });
       const createdUser = await tx.user.create({
         data: {
           email: args.email,
           normalizedEmail: args.email,
           name: args.name,
           role: UserRole.CREATOR,
+          organizationId: organization.id,
           googleSubjectId: args.googleSubjectId,
           emailVerifiedAt: new Date(),
           authState: UserAuthState.ACTIVE,
@@ -216,6 +224,7 @@ export class GoogleAuthService {
       const workspace = await tx.creatorWorkspace.create({
         data: {
           ownerProfileId: creatorProfile.id,
+          organizationId: organization.id,
           organizationDisplayName: `${args.name}'s Studio`,
         },
       });

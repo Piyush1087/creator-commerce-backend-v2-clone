@@ -292,7 +292,7 @@ export class BrandInstagramDeletionService {
         });
       }
       const now = new Date();
-      await tx.brandInstagramOAuthState.updateMany({
+      await tx.providerOAuthTransaction.updateMany({
         where: {
           brandProfileId: request.brandProfileId,
           consumedAt: null,

@@ -25,6 +25,7 @@ import { BrandCentreSessionEvictionService } from "../../brand-centre/services/b
 import { BrandWorkspaceAuthorizationService } from "../../brand-centre/brand-workspace-authorization.service";
 import { InstagramOAuthClient } from "../../instagram/instagram-oauth.client";
 import { InstagramGraphClient } from "../../instagram/instagram-graph.client";
+import { ProviderOAuthTransactionService } from "../../provider-oauth/provider-oauth-transaction.service";
 import { BrandSettingsAccessService } from "../services/brand-settings-access.service";
 import { BrandInstagramDeletionService } from "../services/brand-instagram-deletion.service";
 import { BrandSettingsIntegrationsService } from "../services/brand-settings-integrations.service";
@@ -68,7 +69,9 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
     );
     const oauth = new InstagramOAuthClient();
     const graph = new InstagramGraphClient();
-    const states = new BrandInstagramOAuthStateService(db);
+    const states = new BrandInstagramOAuthStateService(
+      new ProviderOAuthTransactionService(db),
+    );
     const deletion = new BrandInstagramDeletionService(db, access);
     const service = new BrandSettingsIntegrationsService(
       db,
@@ -141,7 +144,7 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
     });
     async function workspace() {
       const org = await prisma.organization.create({
-        data: { name: "BS06 fixture" },
+        data: { name: "BS06 fixture", kind: "BRAND" },
       });
       orgIds.push(org.id);
       const brand = await prisma.brandProfile.create({
@@ -199,7 +202,7 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
       const second = await start(w);
       expect(raw).toMatch(/^[A-Za-z0-9_-]{43}$/);
       expect(second === raw).toBe(false);
-      const row = await prisma.brandInstagramOAuthState.findUniqueOrThrow({
+      const row = await prisma.providerOAuthTransaction.findUniqueOrThrow({
         where: { stateHash: hashInstagramSettingsState(raw) },
       });
       expect(row.brandProfileId).toBe(w.brand.id);
@@ -235,12 +238,12 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
       if (failure === "altered")
         state = (state[0] === "A" ? "B" : "A") + state.slice(1);
       if (failure === "expired")
-        await prisma.brandInstagramOAuthState.update({
+        await prisma.providerOAuthTransaction.update({
           where,
           data: { expiresAt: new Date(Date.now() - 1000) },
         });
       if (failure === "consumed")
-        await prisma.brandInstagramOAuthState.update({
+        await prisma.providerOAuthTransaction.update({
           where,
           data: { consumedAt: new Date() },
         });
@@ -272,7 +275,7 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
       expect(me).not.toHaveBeenCalled();
       if (["wrong-user", "wrong-brand", "redirect"].includes(failure)) {
         expect(
-          (await prisma.brandInstagramOAuthState.findUniqueOrThrow({ where }))
+          (await prisma.providerOAuthTransaction.findUniqueOrThrow({ where }))
             .consumedAt,
         ).toBeNull();
         await expect(connect(w, state)).resolves.toMatchObject({

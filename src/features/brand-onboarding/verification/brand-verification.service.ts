@@ -8,6 +8,7 @@ import {
 import {
   AuthMethodType,
   EmailOtpPurpose,
+  OrganizationKind,
   UserAuthState,
   UserRole,
 } from "@prisma/client";
@@ -164,7 +165,7 @@ export class BrandVerificationService {
         }
       } else {
         const organization = await tx.organization.create({
-          data: { name: profile.name },
+          data: { name: profile.name, kind: OrganizationKind.BRAND },
         });
         organizationId = organization.id;
       }
