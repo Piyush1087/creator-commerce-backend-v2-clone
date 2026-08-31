@@ -13,7 +13,7 @@ from AI tools is a proposal, not repo-ready code.
 - No large catch-all modules.
 - No generated API logic pasted directly into `app.module.ts`.
 - No `any` unless there is a documented boundary and a narrowing plan.
-- No automatic production migrations.
+- No automatic production migrations **except** `RUN_MIGRATIONS_ON_START=true` on prod ECS (same as dev — review migrations before deploy).
 - No secrets in source, docs, examples, screenshots, or prompts.
 - No schema changes without a migration review.
 - No business logic inside controllers.
@@ -58,9 +58,8 @@ Rules:
 - Use clear model names and relation names.
 - Do not carry old deprecated schema forward unless explicitly approved.
 - Use `npm run db:migrate:dev` locally.
-- Use `npm run db:migrate:deploy` manually after review.
-- Do not enable container startup migrations without updating this file and
-  `docs/database`.
+- Use `npm run db:migrate:deploy` manually after review (or rely on ECS auto-migrate on dev/prod deploy).
+- Container startup migrations: enabled for **dev and prod** ECS via `RUN_MIGRATIONS_ON_START` in `sst.config.ts`. Documented in `docs/deployment` and `docs/database`.
 
 ## Git remotes
 

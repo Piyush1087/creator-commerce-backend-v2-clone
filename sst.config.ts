@@ -35,29 +35,31 @@ export default $config({
       bastion: $app.stage === "prod",
     });
 
-    const aurora = new sst.aws.Aurora("core", {
-      engine: "postgres",
-      vpc,
-      scaling: {
-        min: "0 ACU",
-        max: "2 ACU",
-        pauseAfter: "15 minutes",
-      },
-      dev: {
-        username: "postgres",
-        password: "password",
-        database: "thecreatorshop",
-        host: "localhost",
-        port: 5432,
-      },
-    });
+    // Aurora is prod-only. Dev uses manual RDS via DEV_DATABASE_URL in `.env`.
+    const aurora =
+      $app.stage === "prod"
+        ? new sst.aws.Aurora("core", {
+            engine: "postgres",
+            vpc,
+            scaling: {
+              min: "0 ACU",
+              max: "2 ACU",
+              pauseAfter: "15 minutes",
+            },
+          })
+        : undefined;
 
     const devDatabaseUrlOverride =
       $app.stage === "dev" ? process.env.DEV_DATABASE_URL : undefined;
+    const localDatabaseUrl =
+      process.env.DATABASE_URL?.trim() ||
+      "postgresql://postgres:password@localhost:5432/thecreatorshop?schema=public";
     const DATABASE_URL =
       devDatabaseUrlOverride && devDatabaseUrlOverride.trim().length > 0
         ? devDatabaseUrlOverride
-        : $interpolate`postgresql://${aurora.username}:${aurora.password}@${aurora.host}:${aurora.port}/${aurora.database}`;
+        : aurora
+          ? $interpolate`postgresql://${aurora.username}:${aurora.password}@${aurora.host}:${aurora.port}/${aurora.database}`
+          : localDatabaseUrl;
 
     const JWT_SECRET_DEV =
       process.env.JWT_SECRET_DEV ?? "ccs-jwt-dev-placeholder-change-me";
@@ -105,7 +107,8 @@ export default $config({
       STAGE: $app.stage,
       PORT: "80",
       DATABASE_URL,
-      RUN_MIGRATIONS_ON_START: $app.stage === "dev" ? "true" : "false",
+      RUN_MIGRATIONS_ON_START:
+        $app.stage === "dev" || $app.stage === "prod" ? "true" : "false",
       APP_BACKEND_URL:
         $app.stage === "prod"
           ? "https://api.thecreatorshop.in"
@@ -213,7 +216,7 @@ export default $config({
     };
 
     cluster.addService("api", {
-      link: [aurora, filesBucket],
+      link: aurora ? [aurora, filesBucket] : [filesBucket],
       architecture: "arm64",
       memory: "1 GB",
       cpu: "0.5 vCPU",

@@ -23,6 +23,7 @@
     "db:seed:dev-collaboration": "ts-node -r dotenv/config scripts/seed-dev-collaboration.ts",
     "intelligence:contracts:generate": "ts-node src/features/brand-intelligence/contracts/bundle/contract-bundle.generator.ts",
     "intelligence:contracts:verify": "ts-node src/features/brand-intelligence/contracts/bundle/contract-bundle.generator.ts --verify",
+    "test:provider-keys": "node scripts/test-provider-keys.mjs",
     "db:tunnel:dev": "powershell -ExecutionPolicy Bypass -File scripts/start-dev-tunnel.ps1",
     "db:tunnel:prod": "powershell -ExecutionPolicy Bypass -File scripts/start-prod-tunnel.ps1"
   },
