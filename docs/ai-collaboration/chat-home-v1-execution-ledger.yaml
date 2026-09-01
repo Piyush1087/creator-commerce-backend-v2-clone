@@ -28,7 +28,7 @@ backend:
 
 phase:
   id: P1
-  status: IN_PROGRESS
+  status: CANDIDATE_READY_FOR_IE_REVIEW
 
 deferred_dependencies:
   canonical_offering_discovery:
@@ -224,8 +224,11 @@ p1_validation:
     accepted_pi_migration_hashes_unchanged: true
 
 p1_checkpoint:
-  implementation_sha: PENDING
-  final_checkpoint_sha: PENDING
+  implementation_sha: e0ce85086bf5696e967f3c82c34936caa6339414
+  final_checkpoint_sha: SELF_COMMIT_CONTAINING_THIS_LEDGER
+  ie_review: PENDING
+  systems_review: PENDING
+  target_gate: P1_INTELLIGENCE_CONSUMER_CONTRACT_ACCEPTED
 
 p1_semantic_differential:
   base_sha: 87e6e82a1d0442fb1943f06e63a9bcb8b1a095e6
@@ -267,4 +270,4 @@ p1_semantic_differential:
     chat_runtime_absent: true
 
 breaker: NONE
-next_phase: P1
+next_phase: P1_REVIEW
