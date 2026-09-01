@@ -12,6 +12,7 @@ import { BrandCentreController } from "./brand-centre.controller";
 import { BrandWorkspaceAuthorizationService } from "./brand-workspace-authorization.service";
 import { BrandConsumerController } from "./consumer/brand-consumer.controller";
 import { BrandConsumerService } from "./consumer/brand-consumer.service";
+import { CanonicalOfferingDiscoveryService } from "./consumer/canonical-offering-discovery.service";
 import { ProcessorRuntimeProjectionService } from "./consumer/processor-runtime-projection.service";
 import { ProductConsumerController } from "./consumer/product-consumer.controller";
 import { ProductConsumerService } from "./consumer/product-consumer.service";
@@ -44,6 +45,7 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
   ],
   providers: [
     BrandConsumerService,
+    CanonicalOfferingDiscoveryService,
     ProductConsumerService,
     ProcessorRuntimeProjectionService,
     BrandCentreAuthService,
@@ -66,6 +68,7 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
   ],
   exports: [
     BrandConsumerService,
+    CanonicalOfferingDiscoveryService,
     ProductConsumerService,
     BrandCentreAuthService,
     BrandWorkspaceAuthorizationService,
