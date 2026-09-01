@@ -1,0 +1,232 @@
+run_id: C01-I7-JOINT-RUNTIME-ACCEPTANCE
+execution_mode: HYBRID_RUN
+executed_at: 2026-09-01
+
+lineage:
+  backend:
+    branch: c01/i7-joint-runtime-acceptance
+    starting_sha: 5ab702647c0f606d514161ca694c9c55032de69a
+    remote_start_verified: true
+    final_sha: SELF_COMMIT_CONTAINING_THIS_LEDGER
+  frontend:
+    branch: c01/i7-joint-runtime-acceptance
+    starting_sha: dcb79ef351bca13cea9c408084e881050e0259f2
+    remote_start_verified: true
+    final_sha: SELF_COMMIT_CONTAINING_FRONTEND_I7_LEDGER
+  initial_worktrees_clean: true
+
+environment_classification:
+  runner: WINDOWS_LOCAL_ACCEPTANCE
+  database: DISPOSABLE_LOCAL_POSTGRESQL_CONTAINER
+  browser: CODEX_IN_APP_CHROMIUM_TRUE_VIEWPORTS
+  application_runtime: LOCAL_FRONTEND_PLUS_DETERMINISTIC_HTTP_FAKE
+  backend_contract_runtime: REAL_SERVICES_PLUS_DISPOSABLE_POSTGRESQL
+  provider_evidence_type: MOCKED
+  historical_database: NOT_AUTHORIZED
+  live_meta_oauth: NOT_AUTHORIZED
+  production_or_shared_infrastructure: NOT_TOUCHED
+
+gates:
+  A_lineage_and_configuration_preflight:
+    status: PASS
+    frontend_api_origin: FAIL_CLOSED_IN_PRODUCTION
+    backend_cors_credentials: PASS
+    refresh_cookie_topology: PASS
+    continuation_cookie_topology: PASS
+    canonical_callback: /creator-marketplace/callback
+    legacy_integrate_instagram: COMPATIBILITY_ONLY
+  B_migration_acceptance:
+    status: PASS
+    migration_count: 70
+    fresh_replay: PASS_0_TO_70
+    historical_shaped_disposable_fixtures: PASS
+    new_migrations: NONE
+  C_historical_persistent_data:
+    status: BLOCKED_BY_AUTHORIZATION
+    HISTORICAL_PERSISTENT_DATA_SCAN: NOT_EXECUTED_NO_AUTHORIZED_DATABASE
+    historical_persistent_migration_blocker: ACTIVE
+    PRODUCTION_PERSISTENT_MIGRATION_AUTHORIZATION: CLOSED
+  D_direct_password_creator:
+    status: PASS_COMPOSED_BROWSER_SERVICE_AND_POSTGRESQL_EVIDENCE
+    pre_verification: PROVISIONAL_USER_ONLY_NO_ORG_PROFILE_WORKSPACE_PROVIDER_OR_SESSION
+    post_verification: ACTIVE_VERIFIED_CREATOR_CANONICAL_ORG_PROFILE_WORKSPACE_OWNER_AND_SESSION
+  E_google_creator:
+    status: PASS_DETERMINISTIC_GOOGLE_VERIFIER
+    cases:
+      - NEW_GOOGLE_CREATOR
+      - EXISTING_CREATOR_SAME_SUBJECT
+      - SAFE_GOOGLE_LINK
+      - STERILE_PROVISIONAL_PLUS_GOOGLE
+      - ACTIVE_BRAND_CONFLICT
+      - DIFFERENT_SUBJECT_CONFLICT
+  F_brand_conflict_and_one_email_one_org:
+    status: PASS
+    active_brand_creator_entry: ACCOUNT_CONTEXT_CONFLICT
+    forbidden_side_effects: NONE
+    sterile_provisional_brand_reclaim: PASS
+  G_shared_session_lifecycle:
+    status: PASS_AUTOMATED_WITH_BROWSER_RELOAD_EVIDENCE
+    covered:
+      - PASSWORD_LOGIN
+      - EMAIL_CODE_LOGIN
+      - GOOGLE_EXISTING_ACCOUNT_LOGIN
+      - REFRESH_COOKIE_ROTATION
+      - PAGE_RELOAD_SESSION_RESTORE
+      - LOGOUT
+      - LOGOUT_ALL
+      - FORGOT_RESET_PASSWORD
+      - PASSWORD_CHANGE
+      - INCOMPLETE_INSTAGRAM_LOGOUT_LOGIN_STATE_RECOVERY
+  H_initial_instagram_connection:
+    status: PASS_MOCKED_PROVIDER_MATRIX
+    live_provider_claim: NONE
+    basic_available_required_for_entry: true
+    insights_available_required_for_entry: false
+  I_instagram_continuity:
+    status: PASS_MOCKED_PROVIDER_MATRIX
+    token_refresh_scheduler_isolation: PASS
+    generation_and_credential_fencing: PASS
+  J_disconnect_and_permission_matrix:
+    status: PASS
+    disconnect_contract: PASS
+    frontend_incomplete_creator_route_matrix: PASS
+    backend_normal_product_guards: PASS
+    recovery_and_settings_scope: PASS
+  K_campaign_continuation_and_runtime_quality:
+    status: PASS_WITH_RECORDED_NONFUNCTIONAL_GAPS
+    browser_abandonment_and_cookie_recovery: PASS
+    zero_auto_apply: PASS
+    invite_token_compatibility: PASS
+    responsive_1440_768_390: PASS
+    accessibility_rendered_dom: PASS_WITH_TAB_TRAVERSAL_TOOLING_GAP
+    frontend_dependency_security: RELEASE_BLOCKED
+
+migration_acceptance:
+  migration_count: 70
+  fresh_database_replay: PASS
+  persistence_foundation_postgresql: PASS_22_OF_22
+  account_auth_provisioning_postgresql: PASS_29_OF_29
+  instagram_connection_postgresql: PASS_21_OF_21
+  instagram_continuity_postgresql: PASS_27_OF_27
+  campaign_continuation_cookie_transport_architecture: PASS_41_OF_41
+  shared_authentication: PASS_22_OF_22
+  platform_guard_legacy_campaign_regression: PASS_27_OF_27
+  brand_historical_and_reconciliation_postgresql: PASS_50_OF_50
+  destructive_migration: NONE
+
+runtime_journeys:
+  direct_password_creator: PASS
+  google_creator: PASS_DETERMINISTIC_VERIFIER
+  active_brand_conflict: PASS
+  shared_session_lifecycle: PASS
+  initial_provider_matrix: PASS_MOCKED
+  continuing_provider_matrix: PASS_MOCKED
+  disconnect_and_recovery: PASS
+  campaign_apply_continuation: PASS
+  campaign_status_change_preserves_relation: PASS
+  invitation_compatibility: PASS
+
+campaign_zero_mutation_proof:
+  campaign_application_auto_creation: NONE
+  wizard_immediately_after_return: CLOSED
+  unchanged:
+    - UceApplication
+    - UceCampaignCreator
+    - UceCampaignCollaboration
+    - Campaign_applicant_aggregate
+    - CREATOR_APPLIED_audit_events
+
+route_permission_matrix:
+  incomplete_creator_normal_product_routes: DENIED_TO_CREATOR_ONBOARDING
+  backend_guard_authoritative_when_frontend_bypassed: PASS
+  creator_entry_and_callback_recovery: ALLOWED
+  creator_settings_blanket_platform_guard: NOT_APPLIED
+
+secret_and_log_evidence:
+  instagram_access_token_in_logs: NONE_FOUND
+  oauth_code_in_logs: NONE_FOUND
+  raw_oauth_state_in_logs: NONE_FOUND
+  raw_continuation_token_in_json_js_storage_url_or_logs: NONE_FOUND
+  continuation_database_storage: SHA256_DIGEST_ONLY
+  refresh_cookie: HTTPONLY
+  continuation_cookie: HTTPONLY
+  one_time_ownership_and_consumption: PASS
+  normalized_email_concurrency: PASS
+
+responsive_results:
+  desktop_1440: PASS_TRUE_BROWSER_VIEWPORT_NO_HORIZONTAL_OVERFLOW
+  tablet_768: PASS_TRUE_BROWSER_VIEWPORT_NO_HORIZONTAL_OVERFLOW
+  mobile_390: PASS_TRUE_BROWSER_VIEWPORT_NO_HORIZONTAL_OVERFLOW
+  long_email_and_provider_error_wrapping: PASS
+  primary_buttons_usable: PASS
+  campaign_return: PASS
+
+accessibility_results:
+  rendered_landmarks_labels_controls_alerts: PASS
+  otp_form_and_autocomplete: PASS
+  aria_busy_role_status_aria_live: PASS
+  visible_focus: PASS
+  error_status_not_color_only: PASS
+  keyboard_component_regressions: PASS
+  end_to_end_tab_traversal: NOT_EXECUTED_TOOLING_LIMITATION
+  release_impact: NONBLOCKING_GAP_WITH_AUTOMATED_KEYBOARD_COVERAGE
+
+dependency_security:
+  frontend_full_audit: 18_PACKAGES_1_CRITICAL_13_HIGH_2_MODERATE_2_LOW
+  frontend_runtime_audit: 9_PACKAGES_0_CRITICAL_8_HIGH_1_MODERATE
+  npm_dependency_tree: CLEAN_EXIT_0
+  classification: RELEASE_BLOCKED
+  reason: DIRECT_HIGH_RUNTIME_ROUTER_AND_AXIOS_CHAINS_WITH_AVAILABLE_NON_MAJOR_REMEDIATION
+  package_changes_in_i7: NONE
+
+production_configuration_validation:
+  backend_build: PASS
+  frontend_typecheck: PASS
+  frontend_build: PASS_WITH_INHERITED_CHUNK_SIZE_WARNING
+  frontend_api_url: PASS_FAIL_CLOSED
+  google_client_config: INVENTORIED_NO_LIVE_CREDENTIAL_USE
+  public_app_origin: PASS
+  callback_route: PASS
+  backend_required_env_inventory: PASS
+  cookie_secure_behavior: PASS
+  cors_credentials: PASS
+  encryption_key_requirement: PASS
+  postgres_configuration: PASS
+  instagram_redirect_fail_closed: PASS
+  scheduler_configuration: PASS
+  live_deployment_resources_created: NONE
+
+validations:
+  backend_full_suite: PASS_166_FILES_1103_PASSED_43_SKIPPED_605_SKIPPED_ASSERTIONS
+  backend_build: PASS
+  prisma_format: PASS_NO_SCHEMA_DIFF
+  prisma_validate: PASS
+  prisma_generate: PASS
+  prisma_migrate_status: PASS_70_CURRENT
+  backend_scoped_eslint: PASS
+  backend_git_diff_check: PASS
+  frontend_full_suite: PASS_86_FILES_676_ASSERTIONS
+  frontend_typecheck: PASS
+  frontend_build: PASS
+  frontend_acceptance_scoped_eslint: PASS
+  frontend_broad_lint_slice: INHERITED_2_ERRORS_8_WARNINGS_OUTSIDE_I7_ACCEPTANCE_SCOPE
+  frontend_git_diff_check: PASS
+
+bounded_corrections: NONE
+code_corrections: NONE
+new_migrations: NONE
+meta_changes: NONE
+production_or_shared_db_mutations: NONE
+campaign_application_auto_creation: NONE
+development_merge: NONE
+
+remaining_blockers:
+  - FRONTEND_DEPENDENCY_SECURITY_RELEASE_BLOCKED
+  - HISTORICAL_PERSISTENT_DATA_SCAN_NOT_AUTHORIZED
+  - PRODUCTION_PERSISTENT_MIGRATION_AUTHORIZATION_CLOSED
+  - LIVE_META_OAUTH_E2E_NOT_AUTHORIZED
+  - SEPARATE_META_APP_A_READ_ONLY_REVALIDATION_PENDING_SYSTEMS_INTEGRATION
+
+checkpoint:
+  status: BLOCKED_PENDING_DEPENDENCY_REMEDIATION_AND_EXTERNAL_GATES
+  candidate_head_self_recorded: false
