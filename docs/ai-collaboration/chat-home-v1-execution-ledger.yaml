@@ -34,7 +34,7 @@ backend:
 
 phase:
   id: P2
-  status: IN_PROGRESS
+  status: CANDIDATE_READY_FOR_SYSTEMS_REVIEW
 
 deferred_dependencies:
   canonical_offering_discovery:
@@ -399,5 +399,11 @@ p2_semantic_differential:
     accepted_pi_migrations: true
     deferred_offering_discovery: true
 
+p2_checkpoint:
+  implementation_sha: baf2102e6f6f96ddbd6458590c1af7438be846be
+  final_checkpoint_sha: SELF_COMMIT_CONTAINING_THIS_LEDGER
+  systems_review: PENDING
+  target_gate: P2_CHAT_FOUNDATION_ACCEPTED
+
 breaker: NONE
-next_phase: P2_IMPLEMENTATION_CHECKPOINT
+next_phase: P2_SYSTEMS_REVIEW
