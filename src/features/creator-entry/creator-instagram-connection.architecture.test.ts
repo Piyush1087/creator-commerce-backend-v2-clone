@@ -13,6 +13,9 @@ describe("C01-I3 Creator Instagram architecture", () => {
     const service = source(
       "src/features/creator-entry/creator-instagram-connection.service.ts",
     );
+    const authority = source(
+      "src/features/creator-entry/creator-instagram-authority.ts",
+    );
     expect(controller).toContain('@Post("instagram/authorize")');
     expect(controller).toContain('@Post("instagram/complete")');
     expect(controller).toMatch(
@@ -21,7 +24,8 @@ describe("C01-I3 Creator Instagram architecture", () => {
     expect(controller).toMatch(
       /@UseGuards\(JwtAuthGuard\)[\s\S]*@Post\("instagram\/complete"\)/,
     );
-    expect(service).toContain("CREATOR_INSTAGRAM_REDIRECT_URI");
+    expect(service).toContain("resolveCreatorInstagramRedirectUri");
+    expect(authority).toContain("CREATOR_INSTAGRAM_REDIRECT_URI");
     expect(service).toContain("CreatorInstagramOAuthTransactionService");
     expect(service).toContain("InstagramOAuthIntent.INITIAL_CONNECT");
     expect(service).not.toMatch(/redirectUri:\s*input|input\.redirectUri/);
@@ -45,8 +49,11 @@ describe("C01-I3 Creator Instagram architecture", () => {
     const state = source(
       "src/features/creator-entry/creator-entry-state.service.ts",
     );
-    expect(connection).toContain("instagram_business_basic");
-    expect(connection).toContain("instagram_business_manage_insights");
+    const authority = source(
+      "src/features/creator-entry/creator-instagram-authority.ts",
+    );
+    expect(authority).toContain("instagram_business_basic");
+    expect(authority).toContain("instagram_business_manage_insights");
     expect(connection).toContain("ProviderCapabilityState.UNKNOWN");
     expect(state).not.toMatch(
       /canEnterCreatorPlatform[\s\S]{0,300}insightsCapability\s*===/,
@@ -73,7 +80,7 @@ describe("C01-I3 Creator Instagram architecture", () => {
     ).not.toContain("CreatorPlatformAccessGuard");
   });
 
-  it("adds no I4, I5, intelligence, media ingestion, or schema authority", () => {
+  it("keeps initial connection free of I4, I5, intelligence, and media authority", () => {
     const service = source(
       "src/features/creator-entry/creator-instagram-connection.service.ts",
     );

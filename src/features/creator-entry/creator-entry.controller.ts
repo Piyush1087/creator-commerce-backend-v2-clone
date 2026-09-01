@@ -19,6 +19,7 @@ import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { CreatorEntryRegistrationService } from "./creator-entry-registration.service";
 import { CreatorEntryStateService } from "./creator-entry-state.service";
 import { CreatorInstagramConnectionService } from "./creator-instagram-connection.service";
+import { CreatorInstagramContinuityService } from "./creator-instagram-continuity.service";
 import {
   CreatorGoogleRegistrationDto,
   CreatorInstagramCompleteDto,
@@ -34,6 +35,7 @@ export class CreatorEntryController {
     private readonly registration: CreatorEntryRegistrationService,
     private readonly state: CreatorEntryStateService,
     private readonly instagram: CreatorInstagramConnectionService,
+    private readonly continuity: CreatorInstagramContinuityService,
   ) {}
 
   @Public()
@@ -97,6 +99,30 @@ export class CreatorEntryController {
     @Body() dto: CreatorInstagramCompleteDto,
   ) {
     return this.instagram.complete(request.user, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("instagram/revalidate")
+  @HttpCode(200)
+  revalidateInstagram(@Req() request: RequestWithAuthUser) {
+    return this.continuity.revalidate(request.user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("instagram/reconnect/authorize")
+  @HttpCode(200)
+  authorizeInstagramReconnect(@Req() request: RequestWithAuthUser) {
+    return this.continuity.authorizeReconnect(request.user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("instagram/reconnect/complete")
+  @HttpCode(200)
+  completeInstagramReconnect(
+    @Req() request: RequestWithAuthUser,
+    @Body() dto: CreatorInstagramCompleteDto,
+  ) {
+    return this.continuity.completeReconnect(request.user, dto);
   }
 
   private withRefreshCookie(response: Response, result: SessionIssueResult) {

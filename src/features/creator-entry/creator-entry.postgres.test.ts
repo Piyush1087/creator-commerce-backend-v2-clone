@@ -954,6 +954,7 @@ database("C01-I2 account, auth and provisioning", () => {
         health: ProviderAuthorizationHealth.UNKNOWN,
         disconnectedAt: new Date(),
         expectedIdentity: "DISCONNECTED",
+        expectedAction: "RECONNECT_INSTAGRAM",
       },
       {
         label: "DISCONNECTED authorization health",
@@ -962,6 +963,7 @@ database("C01-I2 account, auth and provisioning", () => {
         health: ProviderAuthorizationHealth.DISCONNECTED,
         disconnectedAt: new Date(),
         expectedIdentity: "DISCONNECTED",
+        expectedAction: "RECONNECT_INSTAGRAM",
       },
       {
         label: "an expired token requiring reauthorization",
@@ -970,6 +972,7 @@ database("C01-I2 account, auth and provisioning", () => {
         health: ProviderAuthorizationHealth.REAUTHORIZATION_REQUIRED,
         disconnectedAt: null,
         expectedIdentity: "CONNECTED",
+        expectedAction: "RECONNECT_INSTAGRAM",
       },
       {
         label: "unavailable basic authorization requiring reauthorization",
@@ -978,6 +981,7 @@ database("C01-I2 account, auth and provisioning", () => {
         health: ProviderAuthorizationHealth.REAUTHORIZATION_REQUIRED,
         disconnectedAt: null,
         expectedIdentity: "CONNECTED",
+        expectedAction: "RECONNECT_INSTAGRAM",
       },
       {
         label: "provider-blocked authorization",
@@ -986,6 +990,16 @@ database("C01-I2 account, auth and provisioning", () => {
         health: ProviderAuthorizationHealth.PROVIDER_ACCESS_BLOCKED,
         disconnectedAt: null,
         expectedIdentity: "CONNECTED",
+        expectedAction: "REVALIDATE_INSTAGRAM",
+      },
+      {
+        label: "unknown authorization health",
+        tokenState: OAuthTokenStatus.ACTIVE,
+        basic: ProviderCapabilityState.AVAILABLE,
+        health: ProviderAuthorizationHealth.UNKNOWN,
+        disconnectedAt: null,
+        expectedIdentity: "CONNECTED",
+        expectedAction: "REVALIDATE_INSTAGRAM",
       },
     ])(
       "keeps $label outside entry without erasing stable identity",
@@ -995,6 +1009,7 @@ database("C01-I2 account, auth and provisioning", () => {
         health,
         disconnectedAt,
         expectedIdentity,
+        expectedAction,
       }) => {
         const creator = await canonicalCreator();
         await prisma.creatorSocialIntegration.create({
@@ -1015,7 +1030,7 @@ database("C01-I2 account, auth and provisioning", () => {
           accountContext: "CREATOR_READY",
           onboardingStatus: "INCOMPLETE",
           canEnterCreatorPlatform: false,
-          nextAction: "CONNECT_INSTAGRAM",
+          nextAction: expectedAction,
           instagram: {
             identityConnection: expectedIdentity,
             basicAuthorization: basic,

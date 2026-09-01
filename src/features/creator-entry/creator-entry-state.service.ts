@@ -97,14 +97,18 @@ export class CreatorEntryStateService {
       identityConnection === "CONNECTED" &&
       basicAuthorization === ProviderCapabilityState.AVAILABLE &&
       authorizationHealth === ProviderAuthorizationHealth.USABLE;
+    const nextAction = this.nextInstagramAction({
+      canEnterCreatorPlatform,
+      identityConnection,
+      basicAuthorization,
+      authorizationHealth,
+    });
 
     return {
       accountContext: "CREATOR_READY" as CreatorEntryAccountContext,
       onboardingStatus: canEnterCreatorPlatform ? "COMPLETE" : "INCOMPLETE",
       canEnterCreatorPlatform,
-      nextAction: (canEnterCreatorPlatform
-        ? "CREATOR_WORKSPACE_ENTRY"
-        : "CONNECT_INSTAGRAM") as CreatorEntryNextAction,
+      nextAction,
       instagram: {
         identityConnection,
         basicAuthorization,
@@ -112,6 +116,36 @@ export class CreatorEntryStateService {
         authorizationHealth,
       },
     };
+  }
+
+  private nextInstagramAction(input: {
+    canEnterCreatorPlatform: boolean;
+    identityConnection: "NOT_CONNECTED" | "DISCONNECTED" | "CONNECTED";
+    basicAuthorization: ProviderCapabilityState;
+    authorizationHealth: ProviderAuthorizationHealth;
+  }): CreatorEntryNextAction {
+    if (input.canEnterCreatorPlatform) return "CREATOR_WORKSPACE_ENTRY";
+    if (input.identityConnection === "NOT_CONNECTED") {
+      return "CONNECT_INSTAGRAM";
+    }
+    if (input.identityConnection === "DISCONNECTED") {
+      return "RECONNECT_INSTAGRAM";
+    }
+    if (
+      input.authorizationHealth === ProviderAuthorizationHealth.UNKNOWN ||
+      input.authorizationHealth ===
+        ProviderAuthorizationHealth.PROVIDER_ACCESS_BLOCKED
+    ) {
+      return "REVALIDATE_INSTAGRAM";
+    }
+    if (
+      input.authorizationHealth ===
+        ProviderAuthorizationHealth.REAUTHORIZATION_REQUIRED ||
+      input.basicAuthorization === ProviderCapabilityState.UNAVAILABLE
+    ) {
+      return "RECONNECT_INSTAGRAM";
+    }
+    return "REVALIDATE_INSTAGRAM";
   }
 
   private nonReady(

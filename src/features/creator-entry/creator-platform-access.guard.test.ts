@@ -45,6 +45,14 @@ describe("C01-I3 CreatorPlatformAccessGuard", () => {
       label: "reauthorization-required health",
       health: ProviderAuthorizationHealth.REAUTHORIZATION_REQUIRED,
     },
+    {
+      label: "disconnected health",
+      health: ProviderAuthorizationHealth.DISCONNECTED,
+    },
+    {
+      label: "provider-blocked health",
+      health: ProviderAuthorizationHealth.PROVIDER_ACCESS_BLOCKED,
+    },
   ])("denies $label without mutating context", async ({ health }) => {
     const state = {
       read: vi.fn().mockResolvedValue({

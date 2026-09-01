@@ -1,0 +1,247 @@
+run_id: C01-I4-BACKEND
+
+execution_mode: HYBRID_RUN
+starting_sha: 39822ea59e3d57427070bb0915b6ed56a43c30b3
+branch: c01/i4-instagram-continuity-recovery
+
+canonical_authority:
+  creator_context: CreatorCanonicalContextService
+  state_projection: CreatorEntryStateService
+  platform_guard: CreatorPlatformAccessGuard
+  stable_instagram_identity: CreatorSocialIntegration.nativePlatformUserId
+  redirect_source: CREATOR_INSTAGRAM_REDIRECT_URI_EXACT_ALLOWLIST
+  oauth_persistence: CreatorInstagramOAuthTransactionService_OVER_ProviderOAuthTransactionService
+
+revalidation_contract:
+  route: POST_/api/v1/creator-entry/instagram/revalidate
+  authentication: JWT_AUTHENTICATED_CANONICAL_CREATOR
+  existing_stable_identity_required: true
+  explicitly_disconnected_credential_used: false
+  provider_sequence:
+    - INSTAGRAM_ME
+    - SAME_STABLE_USER_ID
+    - PROFESSIONAL_ACCOUNT
+    - INSTAGRAM_ME_PERMISSIONS
+  username: MUTABLE_METADATA_NOT_IDENTITY
+  generation_increment: false
+  credential_version_increment: false
+  media_or_intelligence_reads: NONE
+
+refresh_contract:
+  provider_operation: InstagramOAuthClient.refreshLongLivedToken
+  credential: ENCRYPTED_LONG_LIVED_ACCESS_TOKEN
+  minimum_token_age: 24_HOURS
+  expiry_window: 7_DAYS
+  timing_authority: SHARED_INSTAGRAM_TOKEN_LIFECYCLE_CONSTANTS
+  expired_token_refresh_attempt: FORBIDDEN
+  stable_identity_change: FORBIDDEN
+  successful_credential_version_increment: 1
+  successful_authorization_generation_increment: 0
+  fences:
+    - integration_id
+    - stable_provider_identity
+    - authorization_generation
+    - credential_version
+    - active_token_state
+    - not_disconnected
+
+scheduler_contract:
+  mechanism: NEST_SCHEDULE_CRON
+  cadence: DAILY_AT_03_00_SERVER_TIME
+  cron: "0 0 3 * * *"
+  bounded_batch_size: 50
+  overlapping_callback: WAIT_FOR_COMPLETION
+  one_candidate_failure_aborts_batch: false
+  logs_plaintext_token_code_or_state: false
+
+reconnect_authorize:
+  route: POST_/api/v1/creator-entry/instagram/reconnect/authorize
+  authentication: JWT_AUTHENTICATED_CANONICAL_CREATOR
+  request_security_context: NONE
+  intent: RECONNECT
+  bindings:
+    - initiating_user
+    - creator_profile
+    - server_redirect_uri
+    - expected_authorization_generation
+    - expected_stable_provider_account_id
+  existing_stable_identity_required: true
+
+reconnect_complete:
+  route: POST_/api/v1/creator-entry/instagram/reconnect/complete
+  authentication: JWT_AUTHENTICATED_CANONICAL_CREATOR
+  accepted_request:
+    - STATE_AND_CODE
+    - STATE_ERROR_AND_OPTIONAL_DESCRIPTION
+  state_consumed_before_provider_io: true
+  provider_sequence:
+    - SHORT_TO_LONG_TOKEN_EXCHANGE
+    - INSTAGRAM_ME
+    - PROFESSIONAL_ACCOUNT
+    - SAME_STABLE_USER_ID
+    - PERMISSIONS
+    - ATOMIC_PROMOTION
+  authorization_generation_increment: 1
+  credential_version_increment: 1
+
+same_identity_fencing:
+  provider_me_user_id_must_equal_expected: true
+  different_identity: INSTAGRAM_IDENTITY_CONFLICT
+  native_platform_user_id_overwrite: FORBIDDEN
+  provider_identity_transfer: FORBIDDEN
+
+disconnect_reconciliation:
+  canonical_route: DELETE_/api/v1/creator/settings/social/INSTAGRAM
+  stable_identity_retained: true
+  metadata_retained_as_history: true
+  token_state: REVOKED
+  authorization_health: DISCONNECTED
+  basic_capability: UNAVAILABLE
+  insights_capability: UNAVAILABLE
+  disconnected_at: SET
+  reason_code: USER_DISCONNECTED
+  ciphertext: RETAINED_BECAUSE_SCHEMA_FIELD_IS_REQUIRED
+  revoked_ciphertext_runtime_reuse: FORBIDDEN
+
+generation_fencing:
+  disconnect_authorization_generation_increment: 1
+  disconnect_credential_version_increment: 1
+  reconnect_requires_expected_generation_and_provider_id: true
+  stale_pre_disconnect_state: INSTAGRAM_AUTHORIZATION_STALE
+  concurrent_reconnect: EXACTLY_ONE_WINNER
+
+state_recovery_actions:
+  no_identity: CONNECT_INSTAGRAM
+  connected_reauthorization_required: RECONNECT_INSTAGRAM
+  disconnected: RECONNECT_INSTAGRAM
+  connected_unknown: REVALIDATE_INSTAGRAM
+  provider_access_blocked: REVALIDATE_INSTAGRAM
+  usable_basic: CREATOR_WORKSPACE_ENTRY
+
+platform_guard_behavior:
+  provider_calls: NONE
+  lazy_repair: NONE
+  allow_formula: CONNECTED_AND_BASIC_AVAILABLE_AND_HEALTH_USABLE
+  insights_gate: false
+  expired_denied: true
+  disconnected_denied: true
+  provider_blocked_denied: true
+  recovery_routes_guarded_by_platform_guard: false
+
+provider_failure_transitions:
+  TRANSIENT_OR_UNKNOWN:
+    state_mutation: NONE
+    outcome: INSTAGRAM_PROVIDER_RETRY_REQUIRED
+  AUTHORIZATION_REVALIDATION_REQUIRED_OR_PERMISSION_LOSS:
+    stable_identity: RETAINED
+    basic: UNAVAILABLE
+    insights: UNKNOWN
+    health: REAUTHORIZATION_REQUIRED
+  PROVIDER_ACCESS_BLOCKED:
+    stable_identity: RETAINED
+    basic: RETAIN_STRONGEST_KNOWN_EVIDENCE
+    health: PROVIDER_ACCESS_BLOCKED
+  EXPIRED:
+    stable_identity: RETAINED
+    token_state: EXPIRED
+    basic: UNAVAILABLE
+    insights: UNKNOWN
+    health: REAUTHORIZATION_REQUIRED
+    reason_code: TOKEN_EXPIRED
+
+deauthorization_callback_status: NOT_CONFIGURED_EXTERNAL_META_CALLBACK_I7_GAP
+data_deletion_callback_status: COMPLIANCE_GAP_I7
+provider_continuity_detection_is_callback_substitute: false
+
+tests:
+  c01_i4_postgresql: PASS_27_OF_27
+  c01_i4_architecture: PASS_5_OF_5
+  creator_platform_guard: PASS_6_OF_6
+  combined_i4_acceptance: PASS_38_OF_38
+  revalidation:
+    - SAME_ID_PROFESSIONAL_BASIC_USABLE
+    - USERNAME_METADATA_ONLY
+    - DIFFERENT_ID_CONFLICT_NO_MUTATION
+    - PERSONAL_REAUTHORIZATION_REQUIRED_IDENTITY_RETAINED
+    - BASIC_ABSENT_REAUTHORIZATION_REQUIRED
+    - INSIGHTS_ABSENT_USABLE
+    - TRANSIENT_PERMISSION_EVIDENCE_NON_DESTRUCTIVE
+    - PROVIDER_BLOCKED
+  refresh:
+    - DUE_VALID_REFRESH
+    - CREDENTIAL_VERSION_INCREMENT
+    - GENERATION_UNCHANGED
+    - YOUNGER_THAN_24_HOURS_SKIPPED
+    - OUTSIDE_WINDOW_SKIPPED
+    - EXPIRED_NOT_REFRESHED_AND_RECONCILED
+    - TRANSIENT_STATE_PRESERVED
+    - AUTHORIZATION_LOSS_TRANSITION
+    - PROVIDER_BLOCK_TRANSITION
+    - ONE_FAILURE_DOES_NOT_ABORT_BATCH
+  reconnect:
+    - EXISTING_IDENTITY_REQUIRED
+    - EXPECTED_GENERATION_AND_ACCOUNT_ID_BOUND
+    - DENIAL_CONSUMES_STATE
+    - SAME_ID_SUCCESS
+    - DIFFERENT_ID_CONFLICT
+    - CREDENTIAL_AND_GENERATION_INCREMENT
+    - OLD_STATE_STALE
+    - PRE_DISCONNECT_STATE_STALE
+    - CONCURRENT_ONE_WINNER
+  disconnect:
+    - IDENTITY_RETAINED
+    - DISCONNECTED_HEALTH_AND_BASIC_UNAVAILABLE
+    - PLATFORM_DENIED
+    - GENERATION_AND_CREDENTIAL_VERSION_INCREMENT
+    - ACCOUNT_REMAINS_ACTIVE
+
+brand_regression:
+  status: PASS_77_OF_77_ON_ISOLATED_DISPOSABLE_FIXTURES
+  shared_instagram_unit: PASS_27_OF_27
+  legacy_postgresql: PASS_27_OF_27
+  reconciliation_postgresql: PASS_22_OF_22
+  historical_migration: PASS_1_OF_1
+  behavior_change_from_shared_timing_constants: NONE
+
+i1_i3_regression:
+  i1_persistence_security: PASS_30_OF_30
+  i2_account_auth_provisioning_state: PASS_35_OF_35
+  i3_initial_instagram_and_guard: PASS_32_OF_32
+  legacy_creator_onboarding_retirement: PASS_10_OF_10
+  shared_authentication: PASS_22_OF_22
+
+global_validation:
+  full_repository_suite: PASS_163_FILES_1083_PASSED_42_DATABASE_GATED_FILES_584_SKIPPED
+  production_build: PASS
+  prisma_format: PASS_NO_SCHEMA_DIFF
+  prisma_validate: PASS
+  prisma_generate: PASS
+  fresh_migration_deploy: PASS_ALL_70
+  scoped_eslint: PASS
+  git_diff_check: PASS
+
+migrations:
+  added: NONE
+  base_count: 70
+  final_count: 70
+
+meta_changes: NONE
+persistent_db_changes: NONE
+production_or_shared_db_mutations: NONE
+historical_persistent_migration_blocker: ACTIVE
+
+deviations: NONE
+
+technical_debt:
+  - META_APP_A_DEAUTHORIZATION_CALLBACK_REMAINS_UNCONFIGURED_FOR_I7
+  - META_DATA_DELETION_CALLBACK_REMAINS_A_COMPLIANCE_GAP_FOR_I7
+  - LEGACY_CREATOR_INSTAGRAM_COMPATIBILITY_CONTROLLER_REMAINS_UNTIL_PARENT_AUTHORITY_RETIRES_IT
+  - REVOKED_CREATOR_CIPHERTEXT_IS_RETAINED_UNDER_THE_EXISTING_NON_NULL_SCHEMA_AND_MUST_NEVER_BE_REUSED
+
+checkpoint:
+  status: PENDING_SYSTEMS_REVIEW
+  sha: null
+  candidate_head_self_recorded: false
+
+next_authorized_boundary: SYSTEMS_REVIEW_THEN_AUTONOMOUS_I5
+stop_reason: STOP_FOR_SYSTEMS_REVIEW_DO_NOT_START_I5

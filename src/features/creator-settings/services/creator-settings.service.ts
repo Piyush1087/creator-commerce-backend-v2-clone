@@ -521,17 +521,29 @@ export class CreatorSettingsService {
       throw new NotFoundException("Social integration not found");
     }
 
-    await this.prisma.creatorSocialIntegration.update({
-      where: { id: existing.id },
+    const disconnectedAt = new Date();
+    const update = await this.prisma.creatorSocialIntegration.updateMany({
+      where: {
+        id: existing.id,
+        authorizationGeneration: existing.authorizationGeneration,
+        credentialVersion: existing.credentialVersion,
+      },
       data: {
         tokenStateCondition: OAuthTokenStatus.REVOKED,
         authorizationHealth: ProviderAuthorizationHealth.DISCONNECTED,
         authorizationHealthReasonCode: "USER_DISCONNECTED",
         basicAuthorizationCapability: ProviderCapabilityState.UNAVAILABLE,
         insightsCapability: ProviderCapabilityState.UNAVAILABLE,
-        disconnectedAt: new Date(),
+        disconnectedAt,
+        authorizationGeneration: { increment: 1 },
+        credentialVersion: { increment: 1 },
       },
     });
+    if (update.count !== 1) {
+      throw new BadRequestException(
+        "Instagram connection changed. Refresh Settings and try again.",
+      );
+    }
 
     return { disconnected: true, platform };
   }

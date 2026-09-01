@@ -5,19 +5,15 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import {
-  CreatorTeamRole,
   InstagramOAuthIntent,
   InstagramProfessionalAccountType,
   OAuthTokenStatus,
-  OrganizationKind,
   Prisma,
   ProviderAuthorizationHealth,
   ProviderCapabilityState,
   ProviderOAuthProvider,
   ProviderOAuthSubjectType,
   SocialNetworkProvider,
-  UserAuthState,
-  UserRole,
 } from "@prisma/client";
 
 import { PrismaService } from "../../prisma/prisma.service";
@@ -35,22 +31,19 @@ import {
   type InstagramTokenExchangeResult,
 } from "../instagram/instagram-oauth.client";
 import { CreatorInstagramOAuthTransactionService } from "../provider-oauth/creator-instagram-oauth-transaction.service";
+import {
+  type CanonicalCreatorContext,
+  CreatorCanonicalContextService,
+} from "./creator-canonical-context.service";
 import { CreatorEntryStateService } from "./creator-entry-state.service";
 import { CREATOR_ENTRY_ERROR } from "./creator-entry.types";
+import {
+  CREATOR_INSTAGRAM_BASIC_PERMISSION,
+  CREATOR_INSTAGRAM_INSIGHTS_PERMISSION,
+  normalizeCreatorInstagramPermissions,
+  resolveCreatorInstagramRedirectUri,
+} from "./creator-instagram-authority";
 import type { CreatorInstagramCompleteDto } from "./dto/creator-entry.dto";
-
-const CREATOR_INSTAGRAM_REDIRECT_URIS = new Set([
-  "https://dashboard.dev.thecreatorshop.in/creator-marketplace/callback",
-  "https://dashboard.thecreatorshop.in/creator-marketplace/callback",
-]);
-
-const BASIC_PERMISSION = "instagram_business_basic";
-const INSIGHTS_PERMISSION = "instagram_business_manage_insights";
-
-type CanonicalCreatorContext = {
-  userId: string;
-  creatorProfileId: string;
-};
 
 type CapabilityEvidence = {
   tokenScopePermissions: string[];
@@ -68,10 +61,11 @@ export class CreatorInstagramConnectionService {
     private readonly oauth: InstagramOAuthClient,
     private readonly graph: InstagramGraphClient,
     private readonly state: CreatorEntryStateService,
+    private readonly contexts: CreatorCanonicalContextService,
   ) {}
 
   async authorize(user: AuthUser) {
-    const creator = await this.resolveCanonicalCreator(user.id);
+    const creator = await this.contexts.resolve(user.id);
     const existing = await this.prisma.creatorSocialIntegration.findUnique({
       where: {
         creatorProfileId_platformNetwork: {
@@ -84,12 +78,11 @@ export class CreatorInstagramConnectionService {
     if (existing) {
       throw new ConflictException({
         code: CREATOR_ENTRY_ERROR.INSTAGRAM_RECOVERY_FLOW_REQUIRED,
-        message:
-          "An Instagram identity already exists. Use the recovery flow when it becomes available.",
+        message: "An Instagram identity already exists. Use the recovery flow.",
       });
     }
 
-    const redirectUri = this.resolveRedirectUri();
+    const redirectUri = resolveCreatorInstagramRedirectUri();
     const state = await this.transactions.issue({
       creatorProfileId: creator.creatorProfileId,
       initiatedByUserId: creator.userId,
@@ -105,8 +98,8 @@ export class CreatorInstagramConnectionService {
   }
 
   async complete(user: AuthUser, input: CreatorInstagramCompleteDto) {
-    const creator = await this.resolveCanonicalCreator(user.id);
-    const redirectUri = this.resolveRedirectUri();
+    const creator = await this.contexts.resolve(user.id);
+    const redirectUri = resolveCreatorInstagramRedirectUri();
     const attempt = await this.transactions.consume(
       {
         creatorProfileId: creator.creatorProfileId,
@@ -150,84 +143,6 @@ export class CreatorInstagramConnectionService {
       connected: true as const,
       state: await this.state.read(user),
     };
-  }
-
-  private async resolveCanonicalCreator(
-    userId: string,
-  ): Promise<CanonicalCreatorContext> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        organization: true,
-        creatorProfile: {
-          include: {
-            ownedWorkspaces: {
-              include: {
-                members: {
-                  where: {
-                    isActive: true,
-                    securityRole: CreatorTeamRole.OWNER,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-    if (!user || user.role !== UserRole.CREATOR) {
-      throw new ConflictException({
-        code: CREATOR_ENTRY_ERROR.ACCOUNT_CONTEXT_CONFLICT,
-        message: "Creator account context is required.",
-      });
-    }
-    if (!this.isCanonicalCreator(user)) {
-      throw new ConflictException({
-        code: "CONTEXT_RECOVERY_REQUIRED",
-        message: "Creator account context requires recovery.",
-      });
-    }
-    return { userId: user.id, creatorProfileId: user.creatorProfile!.id };
-  }
-
-  private isCanonicalCreator(user: {
-    authState: UserAuthState;
-    organizationId: string | null;
-    organization: { kind: OrganizationKind } | null;
-    creatorProfile: {
-      id: string;
-      ownedWorkspaces: Array<{
-        ownerProfileId: string;
-        organizationId: string;
-        members: Array<{ assignedProfileId: string | null }>;
-      }>;
-    } | null;
-  }): boolean {
-    const profile = user.creatorProfile;
-    const workspaces = profile?.ownedWorkspaces ?? [];
-    const workspace = workspaces[0];
-    return Boolean(
-      user.authState === UserAuthState.ACTIVE &&
-      user.organizationId &&
-      user.organization?.kind === OrganizationKind.CREATOR &&
-      profile &&
-      workspaces.length === 1 &&
-      workspace.ownerProfileId === profile.id &&
-      workspace.organizationId === user.organizationId &&
-      workspace.members.length === 1 &&
-      workspace.members[0].assignedProfileId === profile.id,
-    );
-  }
-
-  private resolveRedirectUri(): string {
-    const value = process.env.CREATOR_INSTAGRAM_REDIRECT_URI?.trim();
-    if (!value || !CREATOR_INSTAGRAM_REDIRECT_URIS.has(value)) {
-      throw new BadRequestException({
-        code: "CREATOR_INSTAGRAM_REDIRECT_URI_INVALID",
-        message: "Creator Instagram authorization is not configured.",
-      });
-    }
-    return value;
   }
 
   private assertInitialConnectAttempt(
@@ -319,16 +234,20 @@ export class CreatorInstagramConnectionService {
     token: InstagramTokenExchangeResult,
   ): Promise<CapabilityEvidence> {
     try {
-      const providerPermissions = normalizePermissions(
+      const providerPermissions = normalizeCreatorInstagramPermissions(
         await this.graph.fetchGrantedPermissions(token.accessToken),
       );
-      const hasBasic = providerPermissions.includes(BASIC_PERMISSION);
+      const hasBasic = providerPermissions.includes(
+        CREATOR_INSTAGRAM_BASIC_PERMISSION,
+      );
       return {
         tokenScopePermissions: providerPermissions,
         basic: hasBasic
           ? ProviderCapabilityState.AVAILABLE
           : ProviderCapabilityState.UNAVAILABLE,
-        insights: providerPermissions.includes(INSIGHTS_PERMISSION)
+        insights: providerPermissions.includes(
+          CREATOR_INSTAGRAM_INSIGHTS_PERMISSION,
+        )
           ? ProviderCapabilityState.AVAILABLE
           : ProviderCapabilityState.UNAVAILABLE,
         health: hasBasic
@@ -340,7 +259,9 @@ export class CreatorInstagramConnectionService {
       };
     } catch (error) {
       if (!(error instanceof InstagramPermissionEvidenceError)) throw error;
-      const permissions = normalizePermissions(token.permissions);
+      const permissions = normalizeCreatorInstagramPermissions(
+        token.permissions,
+      );
       if (error.classification === "PROVIDER_ACCESS_BLOCKED") {
         return {
           tokenScopePermissions: permissions,
@@ -386,7 +307,7 @@ export class CreatorInstagramConnectionService {
     );
     try {
       await this.prisma.$transaction(async (tx) => {
-        await this.assertCanonicalCreatorInTransaction(tx, args.creator);
+        await this.contexts.assertInTransaction(tx, args.creator);
         const existing = await tx.creatorSocialIntegration.findUnique({
           where: {
             creatorProfileId_platformNetwork: {
@@ -457,40 +378,6 @@ export class CreatorInstagramConnectionService {
     }
   }
 
-  private async assertCanonicalCreatorInTransaction(
-    tx: Prisma.TransactionClient,
-    expected: CanonicalCreatorContext,
-  ): Promise<void> {
-    const user = await tx.user.findUnique({
-      where: { id: expected.userId },
-      include: {
-        organization: true,
-        creatorProfile: {
-          include: {
-            ownedWorkspaces: {
-              include: {
-                members: {
-                  where: {
-                    isActive: true,
-                    securityRole: CreatorTeamRole.OWNER,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-    if (
-      !user ||
-      user.role !== UserRole.CREATOR ||
-      user.creatorProfile?.id !== expected.creatorProfileId ||
-      !this.isCanonicalCreator(user)
-    ) {
-      throw this.staleAttempt();
-    }
-  }
-
   private providerFailure(error: unknown): Error {
     const classification =
       error instanceof InstagramProviderRequestError
@@ -532,10 +419,4 @@ export class CreatorInstagramConnectionService {
       message: "This Instagram identity is already connected.",
     });
   }
-}
-
-function normalizePermissions(values: string[]): string[] {
-  return [...new Set(values.map((value) => value.trim().toLowerCase()))]
-    .filter(Boolean)
-    .sort();
 }
