@@ -1,0 +1,120 @@
+module: C05_CREATOR_SETTINGS
+run_id: C05_AUTONOMOUS_RUN_20260901
+status: ACCEPTED_PENDING_TERMINAL_RETURN
+authority:
+  product: C05_PRODUCT_LOGIC_AND_ARCHITECTURE_FREEZE_V1
+  plan: C05_FINITE_EXECUTION_PLAN_V1
+  mode: AUTONOMOUS_RUN_WITH_GATES
+  systems_architect_charter_sha: 0c74c3c2c655c9a49a693c024e88815eb6886930
+  codex_runner_standard_sha: 6109c5c6491f54a09d27efafc127781773841426
+repositories:
+  backend:
+    name: Piyush1087/creator-commerce-backend-v2-clone
+    starting_development_sha: 8f2a3b3acf6b48dc1d5cb4a212a26b9f0755fbbd
+    final_runtime_development_sha: 156d5834266077be7e2b6a2d459bae5489edbbd6
+  frontend:
+    name: Piyush1087/creator-commerce-frontend-v2-clone
+    starting_development_sha: b50c36fd4b99b6e0ec0718291d794d7a58353f4c
+    final_runtime_development_sha: 323658d4b147b95b5629ff8d91fa90b8fe9077e4
+checkpoints:
+  p0:
+    status: ACCEPTED_PUBLISHED
+    backend_sha: 8793beb97584b05cdd4a87f8af5893134e51a59c
+    backend_tree: 2bb6c7d3d1bb0b7c610d5c9663c41ae1b5f0719f
+    frontend_sha: 1c1a3e1693344c669ff3aed75d2fca5653a0d7d3
+    frontend_tree: a9c47bfb27b2dbfafd2693ca7f5df90611d87c3e
+    branch: c05/p0-foundation
+  p1a:
+    status: ACCEPTED_PUBLISHED
+    backend_sha: ce9cb71715464fb58fb17f05bbf36fea3ac945a2
+    backend_tree: 1a2ff7315e4bc96cc89f40a677453121f263b4d3
+    frontend_sha: 1f7c2d545f8195c524f8ec16c6d7ab5301be8d78
+    frontend_tree: 8be14e4da03b0b56ed3beaa723660b142eda603f
+    branch: c05/p1a-shell-settings
+  p1b:
+    status: ACCEPTED_PUBLISHED
+    backend_sha: 4450a30c8881a113c814c286d9c62ae9cbb72c0b
+    backend_tree: acb33250794df2548df4df9dce61256a9f69d519
+    frontend_sha: 8d0d8ab57284eb238a6bb27c4c6ba048142a8ca0
+    frontend_tree: 46feeaca2ecb6a278278a28559a0b3d46a5a8f09
+    branch: c05/p1b-team-actor
+  p1c:
+    status: ACCEPTED_PUBLISHED
+    backend_sha: 70cc6e1358b89d9e06ccd57d1b261ab8b7755a41
+    backend_tree: f7d9ae74b3f318e2d9964b024e7f76bf787418e9
+    frontend_sha: facdd5d0fac9cc3b2a3f1328f910f7ab509b14d0
+    frontend_tree: 84e260c9f8a1180f9443b23a21e37ccd3004210c
+    branch: c05/p1c-instagram-settings
+  p1d:
+    status: ACCEPTED_PUBLISHED
+    backend_sha: 78ad2856c6738681385abcafb892c622760797a8
+    backend_tree: 7e273768f7c84a202db8752f72679b4176516d70
+    frontend_sha: d50a2fae7de60950c4eb6587a3bd4c1c73004f5e
+    frontend_tree: a3b070f9f4b1f058bbb9e02dffe7a015202e138e
+    branch: c05/p1d-payout-legal
+  p2:
+    status: ACCEPTED_PUBLISHED
+    backend_sha: a54f88e32d14bd6fefbb57d6e33605b1f9298187
+    backend_tree: 2c6ce7d1217def878a01cce937ce90a3b0288a0f
+    frontend_sha: e275640bdc71159a277cbe1b13afb336b18457da
+    frontend_tree: 41c6b303d5c3b766d33bfcb20140720e32077820
+    branch: c05/p2-convergence
+  p3:
+    status: ACCEPTED_PUBLISHED
+    backend_sha: 156d5834266077be7e2b6a2d459bae5489edbbd6
+    backend_tree: 2c6ce7d1217def878a01cce937ce90a3b0288a0f
+    frontend_sha: 323658d4b147b95b5629ff8d91fa90b8fe9077e4
+    frontend_tree: 4ff40849c64a98429a89cc8e4f1ff6949815070c
+    branch: c05/p3-joint-acceptance
+  p4:
+    status: ACCEPTED_RUNTIME_INTEGRATED
+    backend_runtime_sha: 156d5834266077be7e2b6a2d459bae5489edbbd6
+    frontend_runtime_sha: 323658d4b147b95b5629ff8d91fa90b8fe9077e4
+    documentation_branch: c05/p4-closeout
+    documentation_sha: RECORDED_IN_TERMINAL_RETURN
+migrations:
+  count: 4
+  repository_total: 74
+  identifiers:
+    - 20260909120000_c05_p0_team_user_identity
+    - 20260909121000_c05_p0_contact_phone
+    - 20260909122000_c05_p0_legal_profile
+    - 20260909123000_c05_p0_payout_destination
+  policy: ADDITIVE_FIRST_NO_BACKFILL
+acceptance:
+  backend:
+    passed_files: 184
+    skipped_files: 44
+    passed_tests: 1229
+    skipped_tests: 610
+    focused_c05_files: 17
+    focused_c05_tests: 124
+    build: PASS
+    prisma_validate_generate: PASS
+  frontend:
+    passed_files: 112
+    passed_tests: 853
+    typecheck: PASS
+    build: PASS
+    transformed_modules: 2104
+  migrations:
+    replay: PASS
+    replayed: 74
+    public_relations: 165
+    runtime: PostgreSQL_18_3_COMPATIBLE_PGLITE_0_5_8
+  browser:
+    status: PASS
+    chromium: 149.0.7827.0
+    viewports: [1440, 768, 390]
+    external_traffic: NONE
+known_gates:
+  - REAL_POSTGRESQL_C05_TEAM_CONTENTION_REQUIRED_BEFORE_RELEASE_CERTIFICATION
+  - PRODUCTION_PERSISTENT_DATA_REQUIRES_SEPARATE_AUTHORITY
+  - LIVE_PROVIDER_VALIDATION_NOT_EXECUTED
+excluded:
+  - PRODUCTION_DEPLOYMENT
+  - PRODUCTION_DATABASE_ACCESS_OR_MIGRATION
+  - PROVIDER_CONFIGURATION_OR_ONBOARDING
+  - KYC_OR_VERIFICATION
+  - PAYOUT_TRANSFER_SETTLEMENT_LEDGER
+  - C03_C04_C06_BUSINESS_BEHAVIOR
