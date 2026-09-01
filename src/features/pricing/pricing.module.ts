@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 
 import { PrismaModule } from "../../prisma/prisma.module";
 import { AuthModule } from "../auth/auth.module";
@@ -24,7 +24,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
     PrismaModule,
     AuthModule,
     BrandCentreModule,
-    BrandSettingsModule,
+    forwardRef(() => BrandSettingsModule),
     SubscriptionCapabilityModule,
     NotificationsModule,
   ],

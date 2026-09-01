@@ -22,7 +22,7 @@ import { MetaInstagramDeletionCallbackService } from "./services/meta-instagram-
 @Module({
   imports: [
     BrandCentreModule,
-    InstagramModule,
+    forwardRef(() => InstagramModule),
     AuthModule,
     MailModule,
     forwardRef(() => NotificationsModule),
