@@ -946,41 +946,127 @@ database("C01-I2 account, auth and provisioning", () => {
       );
     });
 
-    it("allows entry with basic authorization and usable health without Insights", async () => {
-      const creator = await canonicalCreator();
-      const integration = await prisma.creatorSocialIntegration.create({
-        data: {
-          creatorProfileId: creator.user.creatorProfile!.id,
-          platformNetwork: SocialNetworkProvider.INSTAGRAM,
-          nativePlatformUserId: `ig-${randomUUID()}`,
-          channelHandleString: `creator_${randomUUID()}`,
-          oauthAccessTokenEncrypted: "test-only-encrypted-token",
-          tokenStateCondition: OAuthTokenStatus.ACTIVE,
-          basicAuthorizationCapability: ProviderCapabilityState.AVAILABLE,
-          insightsCapability: ProviderCapabilityState.UNAVAILABLE,
-          authorizationHealth: ProviderAuthorizationHealth.USABLE,
-        },
-      });
-      const result = await state.read(authUser(creator.user));
-      expect(result).toMatchObject({
-        accountContext: "CREATOR_READY",
-        onboardingStatus: "READY",
-        canEnterCreatorPlatform: true,
-        nextAction: "CREATOR_WORKSPACE_ENTRY",
-        instagram: {
-          identityConnection: "CONNECTED",
-          basicAuthorization: ProviderCapabilityState.AVAILABLE,
-          insightsCapability: ProviderCapabilityState.UNAVAILABLE,
-          authorizationHealth: ProviderAuthorizationHealth.USABLE,
-        },
-      });
-      expect(
-        (
-          await prisma.creatorSocialIntegration.findUniqueOrThrow({
-            where: { id: integration.id },
-          })
-        ).updatedAt,
-      ).toEqual(integration.updatedAt);
-    });
+    it.each([
+      {
+        label: "a persisted disconnect timestamp",
+        tokenState: OAuthTokenStatus.ACTIVE,
+        basic: ProviderCapabilityState.AVAILABLE,
+        health: ProviderAuthorizationHealth.UNKNOWN,
+        disconnectedAt: new Date(),
+        expectedIdentity: "DISCONNECTED",
+      },
+      {
+        label: "DISCONNECTED authorization health",
+        tokenState: OAuthTokenStatus.ACTIVE,
+        basic: ProviderCapabilityState.AVAILABLE,
+        health: ProviderAuthorizationHealth.DISCONNECTED,
+        disconnectedAt: new Date(),
+        expectedIdentity: "DISCONNECTED",
+      },
+      {
+        label: "an expired token requiring reauthorization",
+        tokenState: OAuthTokenStatus.EXPIRED,
+        basic: ProviderCapabilityState.AVAILABLE,
+        health: ProviderAuthorizationHealth.REAUTHORIZATION_REQUIRED,
+        disconnectedAt: null,
+        expectedIdentity: "CONNECTED",
+      },
+      {
+        label: "unavailable basic authorization requiring reauthorization",
+        tokenState: OAuthTokenStatus.ACTIVE,
+        basic: ProviderCapabilityState.UNAVAILABLE,
+        health: ProviderAuthorizationHealth.REAUTHORIZATION_REQUIRED,
+        disconnectedAt: null,
+        expectedIdentity: "CONNECTED",
+      },
+      {
+        label: "provider-blocked authorization",
+        tokenState: OAuthTokenStatus.ACTIVE,
+        basic: ProviderCapabilityState.AVAILABLE,
+        health: ProviderAuthorizationHealth.PROVIDER_ACCESS_BLOCKED,
+        disconnectedAt: null,
+        expectedIdentity: "CONNECTED",
+      },
+    ])(
+      "keeps $label outside entry without erasing stable identity",
+      async ({
+        tokenState,
+        basic,
+        health,
+        disconnectedAt,
+        expectedIdentity,
+      }) => {
+        const creator = await canonicalCreator();
+        await prisma.creatorSocialIntegration.create({
+          data: {
+            creatorProfileId: creator.user.creatorProfile!.id,
+            platformNetwork: SocialNetworkProvider.INSTAGRAM,
+            nativePlatformUserId: `ig-${randomUUID()}`,
+            channelHandleString: `creator_${randomUUID()}`,
+            oauthAccessTokenEncrypted: "test-only-encrypted-token",
+            tokenStateCondition: tokenState,
+            basicAuthorizationCapability: basic,
+            insightsCapability: ProviderCapabilityState.UNKNOWN,
+            authorizationHealth: health,
+            disconnectedAt,
+          },
+        });
+        expect(await state.read(authUser(creator.user))).toMatchObject({
+          accountContext: "CREATOR_READY",
+          onboardingStatus: "INCOMPLETE",
+          canEnterCreatorPlatform: false,
+          nextAction: "CONNECT_INSTAGRAM",
+          instagram: {
+            identityConnection: expectedIdentity,
+            basicAuthorization: basic,
+            insightsCapability: ProviderCapabilityState.UNKNOWN,
+            authorizationHealth: health,
+          },
+        });
+      },
+    );
+
+    it.each([
+      ProviderCapabilityState.UNAVAILABLE,
+      ProviderCapabilityState.UNKNOWN,
+    ])(
+      "allows entry with usable basic authorization when Insights are %s",
+      async (insightsCapability) => {
+        const creator = await canonicalCreator();
+        const integration = await prisma.creatorSocialIntegration.create({
+          data: {
+            creatorProfileId: creator.user.creatorProfile!.id,
+            platformNetwork: SocialNetworkProvider.INSTAGRAM,
+            nativePlatformUserId: `ig-${randomUUID()}`,
+            channelHandleString: `creator_${randomUUID()}`,
+            oauthAccessTokenEncrypted: "test-only-encrypted-token",
+            tokenStateCondition: OAuthTokenStatus.ACTIVE,
+            basicAuthorizationCapability: ProviderCapabilityState.AVAILABLE,
+            insightsCapability,
+            authorizationHealth: ProviderAuthorizationHealth.USABLE,
+          },
+        });
+        const result = await state.read(authUser(creator.user));
+        expect(result).toMatchObject({
+          accountContext: "CREATOR_READY",
+          onboardingStatus: "COMPLETE",
+          canEnterCreatorPlatform: true,
+          nextAction: "CREATOR_WORKSPACE_ENTRY",
+          instagram: {
+            identityConnection: "CONNECTED",
+            basicAuthorization: ProviderCapabilityState.AVAILABLE,
+            insightsCapability,
+            authorizationHealth: ProviderAuthorizationHealth.USABLE,
+          },
+        });
+        expect(
+          (
+            await prisma.creatorSocialIntegration.findUniqueOrThrow({
+              where: { id: integration.id },
+            })
+          ).updatedAt,
+        ).toEqual(integration.updatedAt);
+      },
+    );
   });
 });

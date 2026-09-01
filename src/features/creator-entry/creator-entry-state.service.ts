@@ -2,7 +2,6 @@ import { Injectable } from "@nestjs/common";
 import {
   CreatorTeamRole,
   OrganizationKind,
-  OAuthTokenStatus,
   ProviderAuthorizationHealth,
   ProviderCapabilityState,
   SocialNetworkProvider,
@@ -74,12 +73,6 @@ export class CreatorEntryStateService {
     }
 
     const integration = profile.socialIntegrations[0];
-    const identityConnected = Boolean(
-      integration &&
-      integration.nativePlatformUserId.trim() &&
-      integration.tokenStateCondition === OAuthTokenStatus.ACTIVE &&
-      !integration.disconnectedAt,
-    );
     const basicAuthorization =
       integration?.basicAuthorizationCapability ??
       ProviderCapabilityState.UNKNOWN;
@@ -87,22 +80,33 @@ export class CreatorEntryStateService {
       integration?.insightsCapability ?? ProviderCapabilityState.UNKNOWN;
     const authorizationHealth =
       integration?.authorizationHealth ?? ProviderAuthorizationHealth.UNKNOWN;
+    const hasStableProviderIdentity = Boolean(
+      integration?.nativePlatformUserId.trim(),
+    );
+    const explicitlyDisconnected = Boolean(
+      integration &&
+      (integration.disconnectedAt ||
+        authorizationHealth === ProviderAuthorizationHealth.DISCONNECTED),
+    );
+    const identityConnection = !hasStableProviderIdentity
+      ? ("NOT_CONNECTED" as const)
+      : explicitlyDisconnected
+        ? ("DISCONNECTED" as const)
+        : ("CONNECTED" as const);
     const canEnterCreatorPlatform =
-      identityConnected &&
+      identityConnection === "CONNECTED" &&
       basicAuthorization === ProviderCapabilityState.AVAILABLE &&
       authorizationHealth === ProviderAuthorizationHealth.USABLE;
 
     return {
       accountContext: "CREATOR_READY" as CreatorEntryAccountContext,
-      onboardingStatus: canEnterCreatorPlatform ? "READY" : "INCOMPLETE",
+      onboardingStatus: canEnterCreatorPlatform ? "COMPLETE" : "INCOMPLETE",
       canEnterCreatorPlatform,
       nextAction: (canEnterCreatorPlatform
         ? "CREATOR_WORKSPACE_ENTRY"
         : "CONNECT_INSTAGRAM") as CreatorEntryNextAction,
       instagram: {
-        identityConnection: identityConnected
-          ? ("CONNECTED" as const)
-          : ("NOT_CONNECTED" as const),
+        identityConnection,
         basicAuthorization,
         insightsCapability,
         authorizationHealth,

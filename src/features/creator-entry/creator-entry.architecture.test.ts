@@ -72,6 +72,14 @@ describe("C01-I2 Creator Entry architecture", () => {
       /\.(create|update|upsert|delete|connectForUser)\s*\(/,
     );
     expect(state).not.toMatch(/fetch\s*\(|axios|OAuth2Client|graph\.facebook/i);
+    expect(state).toContain(
+      'onboardingStatus: canEnterCreatorPlatform ? "COMPLETE"',
+    );
+    expect(state).toContain('identityConnection === "CONNECTED"');
+    expect(state).toContain("ProviderAuthorizationHealth.DISCONNECTED");
+    expect(state).not.toMatch(
+      /identityConnected[\s\S]*OAuthTokenStatus\.ACTIVE/,
+    );
   });
 
   it("centralizes the fail-closed sterile provisional policy", () => {
