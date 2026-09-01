@@ -115,8 +115,9 @@ export class InstagramOAuthClient {
     if (!res.ok) {
       const metadata = await safeInstagramErrorMetadata(res);
       this.logger.warn(renderSafeInstagramError("short_token", metadata));
-      throw new BadRequestException(
+      throw new InstagramOAuthExchangeError(
         "Failed to exchange Instagram authorization code.",
+        metadata.classification,
       );
     }
     const data = (await res.json()) as {
@@ -145,8 +146,9 @@ export class InstagramOAuthClient {
     if (!res.ok) {
       const metadata = await safeInstagramErrorMetadata(res);
       this.logger.warn(renderSafeInstagramError("long_token", metadata));
-      throw new BadRequestException(
+      throw new InstagramOAuthExchangeError(
         "Failed to obtain long-lived Instagram token.",
+        metadata.classification,
       );
     }
     const data = (await res.json()) as {
@@ -159,6 +161,21 @@ export class InstagramOAuthClient {
       );
     }
     return { access_token: data.access_token, expires_in: data.expires_in };
+  }
+}
+
+export class InstagramOAuthExchangeError extends BadRequestException {
+  constructor(
+    message: string,
+    readonly classification:
+      | "TRANSIENT"
+      | "AUTHORIZATION_REVALIDATION_REQUIRED"
+      | "PERMISSION_LOSS"
+      | "PROVIDER_ACCESS_BLOCKED"
+      | "CONTENT_OR_METRIC_UNAVAILABLE"
+      | "UNKNOWN",
+  ) {
+    super(message);
   }
 }
 

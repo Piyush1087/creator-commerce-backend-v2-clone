@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 const source = (relativePath: string): string =>
   readFileSync(join(process.cwd(), relativePath), "utf8");
 
-describe("C01-I2 Creator Entry architecture", () => {
-  it("exposes only the bounded I2 Creator Entry surface", () => {
+describe("C01 Creator Entry architecture", () => {
+  it("preserves I2 registration/state and exposes only the bounded I3 Instagram surface", () => {
     const controller = source(
       "src/features/creator-entry/creator-entry.controller.ts",
     );
@@ -16,9 +16,9 @@ describe("C01-I2 Creator Entry architecture", () => {
     expect(controller).toContain('@Post("register/email/otp/verify")');
     expect(controller).toContain('@Post("register/google")');
     expect(controller).toContain('@Get("state")');
-    expect(controller).not.toMatch(
-      /instagram\/(authorize|complete|revalidate)/,
-    );
+    expect(controller).toContain('@Post("instagram/authorize")');
+    expect(controller).toContain('@Post("instagram/complete")');
+    expect(controller).not.toMatch(/instagram\/revalidate/);
     expect(controller).not.toMatch(/campaign|continuation/i);
   });
 

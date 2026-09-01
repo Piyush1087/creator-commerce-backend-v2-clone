@@ -207,6 +207,11 @@ export default $config({
         process.env.OFFERING_PRICE_REFRESH_BATCH_SIZE ?? "20",
       INSTAGRAM_API_ID: process.env.INSTAGRAM_API_ID as string,
       INSTAGRAM_APP_SECRET: process.env.INSTAGRAM_APP_SECRET as string,
+      CREATOR_INSTAGRAM_REDIRECT_URI:
+        process.env.CREATOR_INSTAGRAM_REDIRECT_URI ??
+        ($app.stage === "prod"
+          ? "https://dashboard.thecreatorshop.in/creator-marketplace/callback"
+          : "https://dashboard.dev.thecreatorshop.in/creator-marketplace/callback"),
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? "",
       // QA apply/eligibility bypass — default test@creator.com on non-prod; empty on prod unless set.
       CREATOR_APPLY_BYPASS_EMAILS:

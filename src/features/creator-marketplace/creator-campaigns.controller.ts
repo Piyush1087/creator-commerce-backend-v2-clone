@@ -11,6 +11,7 @@ import { ThrottlerGuard } from "@nestjs/throttler";
 
 import type { RequestWithAuthUser } from "../auth/auth.controller";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { CreatorPlatformAccessGuard } from "../creator-entry/creator-platform-access.guard";
 import { ZodValidationPipe } from "../creator-onboarding/pipes/zod-validation.pipe";
 import { CreatorCampaignsCommandService } from "./services/creator-campaigns-command.service";
 import { CreatorCampaignsWorkspaceService } from "./services/creator-campaigns-workspace.service";
@@ -26,7 +27,7 @@ import {
  * Command center + history for creator campaign collaborations.
  */
 @Controller("api/v1/creator/campaigns")
-@UseGuards(ThrottlerGuard, JwtAuthGuard)
+@UseGuards(ThrottlerGuard, JwtAuthGuard, CreatorPlatformAccessGuard)
 export class CreatorCampaignsController {
   constructor(
     private readonly workspace: CreatorCampaignsWorkspaceService,

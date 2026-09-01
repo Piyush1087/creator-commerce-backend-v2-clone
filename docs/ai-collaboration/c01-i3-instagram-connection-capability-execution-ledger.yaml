@@ -1,0 +1,235 @@
+run_id: C01-I3-BACKEND
+
+execution_mode: HYBRID_RUN
+starting_sha: ffd7990760930ce057bca14de32f126727a669ca
+branch: c01/i3-instagram-connection-capability
+
+authorize_contract:
+  route: POST /api/v1/creator-entry/instagram/authorize
+  authentication: JWT_AUTHENTICATED_CANONICAL_CREATOR
+  request: EMPTY_SERVER_AUTHORITATIVE
+  intent: INITIAL_CONNECT
+  expected_generation: 0
+  expected_provider_account_id: null
+  existing_identity_outcome: INSTAGRAM_RECOVERY_FLOW_REQUIRED
+
+callback_contract:
+  route: POST /api/v1/creator-entry/instagram/complete
+  authentication: JWT_AUTHENTICATED_CANONICAL_CREATOR
+  success_request: STATE_AND_CODE_ONLY
+  denial_request: STATE_ERROR_AND_OPTIONAL_DESCRIPTION
+  state_consumed_before_provider_io: true
+  denial_outcome: INSTAGRAM_AUTHORIZATION_DENIED
+  returned_projection: CANONICAL_CREATOR_ENTRY_STATE
+
+redirect_authority:
+  source: CREATOR_INSTAGRAM_REDIRECT_URI
+  browser_override: NONE
+  exact_allowlist:
+    - https://dashboard.dev.thecreatorshop.in/creator-marketplace/callback
+    - https://dashboard.thecreatorshop.in/creator-marketplace/callback
+
+shared_oauth_transaction:
+  adapter: CreatorInstagramOAuthTransactionService
+  persistence: ProviderOAuthTransactionService
+  provider: INSTAGRAM
+  subject_type: CREATOR
+  raw_state_persisted: false
+  digest: SHA256
+  one_time_consumption: true
+  bindings:
+    - initiating_user
+    - creator_profile
+    - server_redirect_uri
+    - initial_connect_intent
+    - expected_generation
+
+provider_identity:
+  stable_authority: INSTAGRAM_ME_USER_ID
+  app_scoped_me_id_persisted: false
+  username_authority: MUTABLE_METADATA_ONLY
+  global_uniqueness: PLATFORM_PLUS_NATIVE_PLATFORM_USER_ID
+  transfer_from_disconnected_or_revoked_owner: FORBIDDEN
+
+professional_account_validation:
+  accepted:
+    - BUSINESS
+    - CREATOR
+    - MEDIA_CREATOR_MAPPED_TO_CREATOR
+  personal: INSTAGRAM_PROFESSIONAL_ACCOUNT_REQUIRED
+  unknown: INSTAGRAM_PROFESSIONAL_ACCOUNT_REVALIDATION_REQUIRED
+
+token_security:
+  credential: LONG_LIVED_ACCESS_TOKEN
+  encryption: SHARED_FIELD_ENCRYPTION_AES_256_GCM
+  plaintext_database: FORBIDDEN
+  plaintext_response: FORBIDDEN
+  plaintext_logs: FORBIDDEN
+  token_state: ACTIVE
+  credential_version: 1
+  authorization_generation: 1
+  refresh_token: null
+  provider_permission_names_persisted: true
+
+basic_capability:
+  permission: instagram_business_basic
+  professional_me_without_contradiction: AVAILABLE
+  deterministic_absence: UNAVAILABLE
+  permission_read_unavailable_after_professional_me: AVAILABLE
+
+insights_capability:
+  permission: instagram_business_manage_insights
+  granted: AVAILABLE
+  deterministically_absent: UNAVAILABLE
+  permission_evidence_unavailable: UNKNOWN
+  platform_entry_gate: false
+
+authorization_health:
+  basic_available: USABLE
+  basic_unavailable: REAUTHORIZATION_REQUIRED
+  deterministic_provider_block: PROVIDER_ACCESS_BLOCKED
+  identity_disconnect_on_capability_loss: false
+
+atomic_promotion:
+  transaction: ONE_DATABASE_TRANSACTION
+  rechecks:
+    - canonical_user_profile_workspace_organization
+    - no_profile_platform_integration
+    - expected_generation_zero
+    - global_provider_identity_unowned
+  created_records:
+    - CreatorSocialIntegration
+  forbidden_records:
+    - CreatorIntelligence
+    - media_analytics
+    - CreatorMarketplace
+    - CampaignCreator
+    - Application
+
+platform_guard:
+  guard: CreatorPlatformAccessGuard
+  authority: CreatorEntryStateService
+  provider_calls: NONE
+  lazy_repair: NONE
+  denial: CREATOR_PLATFORM_ACCESS_REQUIRED
+  formula: CAN_ENTER_CREATOR_PLATFORM
+
+guarded_routes:
+  - /api/v1/creator-centre/**
+  - /api/v1/creator/co-pilot/**
+  - /api/v1/creator/payouts/**
+  - /api/v1/creator/marketplace/**
+  - /api/v1/creator/campaigns/**
+  - /api/v1/creator-uce/**
+
+guard_exemptions:
+  - /api/v1/auth/**
+  - GET /api/v1/creator-entry/state
+  - POST /api/v1/creator-entry/instagram/authorize
+  - POST /api/v1/creator-entry/instagram/complete
+  - /api/v1/creator/settings/**
+  - existing_creator_instagram_settings_and_disconnect_compatibility
+  - future_i4_recovery_revalidate_reconnect
+
+ambiguous_route_debt:
+  - legacy_creator_onboarding_meta_connect_and_activate_sync_remain_unguarded_compatibility_recovery_surfaces_pending_i7_retirement
+  - creator_settings_section_level_access_remains_future_creator_settings_product_authority
+
+admission_policy:
+  global_follower_threshold: NONE
+  global_creator_admission_filter: NONE
+  insights_gate: NONE
+  creator_intelligence_gate: NONE
+
+tests:
+  c01_i3_postgresql: PASS_21_OF_21
+  c01_i3_architecture: PASS_5_OF_5
+  creator_platform_guard: PASS_4_OF_4
+  creator_entry_architecture: PASS_6_OF_6
+  callback_security:
+    - canonical_creator_authorize
+    - Brand_context_conflict
+    - malformed_creator_recovery
+    - audited_server_redirect_only
+    - server_generated_state_only
+    - creator_typed_digest_state
+    - initiating_user_and_profile_binding
+    - wrong_user_and_subject_rejected
+    - replay_rejected
+    - expired_state_rejected
+    - denial_consumes_state
+    - provider_failure_keeps_state_consumed
+  provider_identity:
+    - Business_accepted
+    - Creator_accepted
+    - Personal_rejected
+    - UNKNOWN_rejected
+    - stable_user_id_persisted
+    - username_not_unique_authority
+    - disconnected_revoked_owner_identity_not_transferable
+  capability:
+    - Insights_AVAILABLE_complete
+    - Insights_UNAVAILABLE_complete
+    - Insights_UNKNOWN_complete
+    - Basic_UNAVAILABLE_connected_but_incomplete
+  credential:
+    - encrypted_at_rest_and_decryptable
+    - plaintext_absent_from_response
+    - plaintext_absent_from_logs
+  race:
+    - one_state_one_consumer
+    - one_provider_identity_one_owner
+    - post_authorize_integration_is_stale
+    - duplicate_completion_no_overwrite
+  guard:
+    - no_identity_denied
+    - reauthorization_required_denied
+    - Insights_UNAVAILABLE_allowed
+    - Insights_UNKNOWN_allowed
+    - state_and_recovery_routes_exempt
+
+brand_regression:
+  status: PASS_77_OF_77
+  shared_instagram_unit: PASS_27_OF_27
+  legacy_postgresql: PASS_27_OF_27
+  reconciliation_postgresql: PASS_22_OF_22
+  historical_migration: PASS_1_OF_1
+
+i1_i2_regression:
+  i1_persistence_provider_security_and_architecture: PASS_30_OF_30
+  i2_account_auth_provisioning_and_state: PASS_34_OF_34
+  shared_authentication: PASS_22_OF_22
+
+global_validation:
+  full_repository_suite: PASS_160_FILES_1066_PASSED_41_DATABASE_GATED_FILES_556_SKIPPED
+  production_build: PASS
+  prisma_format: PASS_NO_SCHEMA_DIFF
+  prisma_validate: PASS
+  prisma_generate: PASS
+  fresh_migration_deploy: PASS_ALL_70
+  scoped_eslint: PASS
+  git_diff_check: PASS
+
+migrations:
+  added: NONE
+  base_count: 70
+  final_count: 70
+
+meta_changes: NONE
+persistent_db_changes: NONE
+production_or_shared_db_mutations: NONE
+historical_persistent_migration_blocker: ACTIVE
+
+deviations: NONE
+
+technical_debt:
+  - legacy_creator_instagram_compatibility_controller_remains_until_parent_authority_retires_it
+  - creator_onboarding_meta_connect_and_activate_sync_remain_bounded_recovery_compatibility_surfaces
+
+checkpoint:
+  status: PENDING_SYSTEMS_REVIEW
+  sha: null
+  candidate_head_self_recorded: false
+
+next_authorized_boundary: SYSTEMS_REVIEW_THEN_AUTONOMOUS_I4
+stop_reason: STOP_FOR_SYSTEMS_REVIEW_DO_NOT_START_I4

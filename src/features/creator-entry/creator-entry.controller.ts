@@ -18,8 +18,10 @@ import { Public } from "../auth/decorators/public.decorator";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { CreatorEntryRegistrationService } from "./creator-entry-registration.service";
 import { CreatorEntryStateService } from "./creator-entry-state.service";
+import { CreatorInstagramConnectionService } from "./creator-instagram-connection.service";
 import {
   CreatorGoogleRegistrationDto,
+  CreatorInstagramCompleteDto,
   CreatorPasswordRegistrationDto,
   CreatorRegistrationEmailDto,
   CreatorRegistrationOtpDto,
@@ -31,6 +33,7 @@ export class CreatorEntryController {
   constructor(
     private readonly registration: CreatorEntryRegistrationService,
     private readonly state: CreatorEntryStateService,
+    private readonly instagram: CreatorInstagramConnectionService,
   ) {}
 
   @Public()
@@ -77,6 +80,23 @@ export class CreatorEntryController {
   @Get("state")
   stateFor(@Req() request: RequestWithAuthUser) {
     return this.state.read(request.user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("instagram/authorize")
+  @HttpCode(200)
+  authorizeInstagram(@Req() request: RequestWithAuthUser) {
+    return this.instagram.authorize(request.user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("instagram/complete")
+  @HttpCode(200)
+  completeInstagram(
+    @Req() request: RequestWithAuthUser,
+    @Body() dto: CreatorInstagramCompleteDto,
+  ) {
+    return this.instagram.complete(request.user, dto);
   }
 
   private withRefreshCookie(response: Response, result: SessionIssueResult) {
