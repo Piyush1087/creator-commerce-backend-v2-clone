@@ -13,6 +13,7 @@ import { CreatorMarketplaceService } from "./services/creator-marketplace.servic
 import { CreatorCampaignsWorkspaceService } from "./services/creator-campaigns-workspace.service";
 import { CreatorCampaignsPanicService } from "./services/creator-campaigns-panic.service";
 import { CreatorCampaignsCommandService } from "./services/creator-campaigns-command.service";
+import { CampaignApplyContinuationIssuanceService } from "./services/campaign-apply-continuation-issuance.service";
 
 @Module({
   imports: [PrismaModule, AuthModule, CreatorEntryModule],
@@ -29,6 +30,7 @@ import { CreatorCampaignsCommandService } from "./services/creator-campaigns-com
     CreatorCampaignsWorkspaceService,
     CreatorCampaignsPanicService,
     CreatorCampaignsCommandService,
+    CampaignApplyContinuationIssuanceService,
   ],
   exports: [CreatorEligibilityService, CreatorAffinityService],
 })

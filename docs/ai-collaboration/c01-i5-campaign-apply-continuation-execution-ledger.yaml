@@ -1,0 +1,135 @@
+run_id: C01-I5-BACKEND
+
+execution_mode: HYBRID_RUN
+starting_sha: e530223ce7acd6de268ce776524d6910df4e5333
+branch: c01/i5-campaign-apply-continuation
+
+campaign_resolution_authority:
+  owner: CreatorMarketplaceService.getPublicMarketplaceCampaignDetail
+  route_identifier: EXISTING_CAMPAIGN_PUBLIC_ROUTE_CAMPAIGN_ID
+  generic_public_requirements:
+    - CAMPAIGN_EXISTS
+    - CAMPAIGN_STATUS_LIVE
+    - CAMPAIGN_VISIBILITY_EVERYONE
+  identity_specific_invitation_provenance: NOT_ACCEPTED
+
+public_issuance_contract:
+  route: POST_/api/v1/public/marketplace/campaigns/:campaignId/apply-continuation
+  authentication: NONE
+  creator_platform_guard: NONE
+  request_body: NONE
+  throttle: 20_PER_60_SECONDS
+  response:
+    - intent_CAMPAIGN_APPLY
+    - opaque_continuationToken
+    - server_derived_expiresAt
+
+continuation_ttl: 24_HOURS
+continuation_security:
+  entropy: 32_RANDOM_BYTES
+  encoding: BASE64URL_43_CHARACTERS
+  persistence: SHA256_DIGEST_ONLY
+  malformed_token_database_lookup: NONE
+  raw_token_logging: NONE
+  arbitrary_return_destination: NONE
+
+binding_contract:
+  trigger: FIRST_AUTHENTICATED_CANONICAL_CREATOR_RESOLVE
+  initial_bound_user: null
+  monotonic_transition: NULL_TO_ONE_USER
+  implementation: CONDITIONAL_POSTGRESQL_UPDATE_WITH_DATABASE_TRIGGER_FINAL_GUARD
+  brand_account: ACCOUNT_CONTEXT_CONFLICT_AND_UNBOUND
+  malformed_creator_context: CONTEXT_RECOVERY_REQUIRED_AND_UNBOUND
+  expired: CREATOR_ENTRY_CONTINUATION_EXPIRED_AND_UNBOUND
+  unknown: CREATOR_ENTRY_CONTINUATION_NOT_FOUND
+  different_user: CREATOR_ENTRY_CONTINUATION_IDENTITY_CONFLICT
+  concurrent_different_users: EXACTLY_ONE_BINDING_WINNER
+
+pending_state_contract:
+  authority: CreatorEntryStateService
+  result: PENDING_CREATOR_ENTRY
+  binding_retained: true
+  consumed_at: null
+  next_actions:
+    - CONNECT_INSTAGRAM
+    - RECONNECT_INSTAGRAM
+    - REVALIDATE_INSTAGRAM
+    - RECOVER_CREATOR_CONTEXT
+
+completion_contract:
+  formula: CAN_ENTER_CREATOR_PLATFORM_TRUE_AND_VALID_BOUND_UNEXPIRED_CAMPAIGN_APPLY_CONTINUATION
+  result: READY_TO_RETURN
+  consume_transition: NULL_TO_TIMESTAMP_EXACTLY_ONCE
+  campaign_relation: PERSISTED_UCE_CAMPAIGN_ID
+  campaign_status_revalidation_after_issuance: NONE
+
+idempotency_contract:
+  same_user_consumed_retry: RETURN_PERSISTED_SEMANTIC_HANDOFF_WITHOUT_MUTATION
+  different_user_consumed_retry: CREATOR_ENTRY_CONTINUATION_IDENTITY_CONFLICT
+
+return_target: RETURN_TO_ORIGINATING_CAMPAIGN
+
+campaign_application_auto_creation:
+  policy: FORBIDDEN
+  observed: NONE
+campaign_mutations: NONE
+campaign_entities_unchanged:
+  - UceApplication
+  - UceCampaignCreator
+  - UceCampaignCollaboration
+  - UceCampaign
+  - UceCampaignPerformanceAggregate
+  - UceCollaborationAuditLog_CREATOR_APPLIED
+
+direct_entry_behavior: CREATOR_WORKSPACE_ENTRY
+
+tests:
+  c01_i5_postgresql: PASS_18_OF_18
+  c01_i5_architecture: PASS_7_OF_7
+  combined_i5_acceptance: PASS_25_OF_25
+  full_repository_suite: PASS_164_FILES_1090_PASSED_43_DATABASE_GATED_FILES_602_SKIPPED
+  production_build: PASS
+  prisma_format: PASS_NO_SCHEMA_DIFF
+  prisma_validate: PASS
+  prisma_generate: PASS
+  fresh_migration_replay: PASS_ALL_70
+  scoped_eslint: PASS
+  git_diff_check: PASS
+
+campaign_regression:
+  relevant_campaign_suite: PASS_30_OF_30
+  public_detail_list_and_visibility: PASS_IN_C01_I5_POSTGRESQL
+  invitation_visibility_not_broadened: PASS_IN_C01_I5_POSTGRESQL
+  explicit_apply_separation_and_guards: PASS_IN_ARCHITECTURE_AND_CAMPAIGN_SUITES
+  invitation_service_changes: NONE
+
+i1_i4_regression:
+  i1_persistence_security: PASS_30_OF_30
+  i2_account_auth_provisioning_state: PASS_35_OF_35
+  i3_initial_instagram_and_guard: PASS_32_OF_32
+  i4_instagram_continuity_and_guard: PASS_38_OF_38
+  shared_authentication: PASS_22_OF_22
+  legacy_creator_onboarding_retirement: PASS_10_OF_10
+
+migrations: NONE
+migration_count:
+  starting: 70
+  final: 70
+meta_changes: NONE
+persistent_db_changes: NONE
+production_or_shared_db_mutations: NONE
+historical_persistent_migration_blocker: ACTIVE
+
+deviations: NONE
+
+technical_debt:
+  - IDENTITY_SPECIFIC_INVITATION_TO_C01_CONTINUATION_REMAINS_CAMPAIGN_SIDE_COMPATIBILITY_DEBT
+  - NO_PREEXISTING_DEDICATED_CREATOR_MARKETPLACE_INVITATION_OR_AUTHENTICATED_DETAIL_REGRESSION_FILE
+
+checkpoint:
+  status: PENDING_SYSTEMS_REVIEW
+  sha: null
+  candidate_head_self_recorded: false
+
+next_authorized_boundary: SYSTEMS_REVIEW_THEN_AUTONOMOUS_I6
+stop_reason: STOP_FOR_SYSTEMS_REVIEW_DO_NOT_START_I6

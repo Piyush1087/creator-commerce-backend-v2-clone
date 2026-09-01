@@ -5,6 +5,8 @@ import { AuthModule } from "../auth/auth.module";
 import { InstagramModule } from "../instagram/instagram.module";
 import { ProviderOAuthModule } from "../provider-oauth/provider-oauth.module";
 import { CreatorEntryController } from "./creator-entry.controller";
+import { CreatorCampaignApplyContinuationService } from "./creator-campaign-apply-continuation.service";
+import { CreatorEntryContinuationStore } from "./creator-entry-continuation.store";
 import { CreatorInstagramConnectionService } from "./creator-instagram-connection.service";
 import { CreatorCanonicalContextService } from "./creator-canonical-context.service";
 import { CreatorInstagramContinuityService } from "./creator-instagram-continuity.service";
@@ -22,6 +24,8 @@ import { CreatorPlatformAccessGuard } from "./creator-platform-access.guard";
     CreatorEntryProvisioningService,
     CreatorEntryRegistrationService,
     CreatorEntryStateService,
+    CreatorEntryContinuationStore,
+    CreatorCampaignApplyContinuationService,
     CreatorCanonicalContextService,
     CreatorInstagramConnectionService,
     CreatorInstagramContinuityService,
@@ -31,6 +35,7 @@ import { CreatorPlatformAccessGuard } from "./creator-platform-access.guard";
   ],
   exports: [
     CreatorEntryStateService,
+    CreatorCampaignApplyContinuationService,
     CreatorPlatformAccessGuard,
     CreatorInstagramTokenRefreshService,
   ],

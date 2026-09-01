@@ -60,3 +60,10 @@ export class CreatorInstagramCompleteDto {
   @MaxLength(1000)
   errorDescription?: string;
 }
+
+export class CreatorCampaignApplyContinuationResolveDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(256)
+  continuationToken!: string;
+}

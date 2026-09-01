@@ -6,7 +6,7 @@ const source = (relativePath: string): string =>
   readFileSync(join(process.cwd(), relativePath), "utf8");
 
 describe("C01 Creator Entry architecture", () => {
-  it("preserves I2 registration/state and exposes the bounded I3/I4 Instagram surfaces", () => {
+  it("preserves I2 registration/state and exposes the bounded I3/I4/I5 surfaces", () => {
     const controller = source(
       "src/features/creator-entry/creator-entry.controller.ts",
     );
@@ -21,7 +21,11 @@ describe("C01 Creator Entry architecture", () => {
     expect(controller).toContain('@Post("instagram/revalidate")');
     expect(controller).toContain('@Post("instagram/reconnect/authorize")');
     expect(controller).toContain('@Post("instagram/reconnect/complete")');
-    expect(controller).not.toMatch(/campaign|continuation/i);
+    expect(controller).toContain(
+      '@Post("campaign-apply/continuation/resolve")',
+    );
+    expect(controller).not.toContain("applyToCampaign");
+    expect(controller).not.toContain("CreatorUceCampaignsService");
   });
 
   it("keeps password registration outside the session/cookie boundary", () => {

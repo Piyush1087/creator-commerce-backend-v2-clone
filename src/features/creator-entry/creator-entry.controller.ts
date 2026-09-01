@@ -16,12 +16,14 @@ import { setRefreshCookie } from "../auth/auth-cookie.util";
 import type { SessionIssueResult } from "../auth/auth-session.service";
 import { Public } from "../auth/decorators/public.decorator";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { CreatorCampaignApplyContinuationService } from "./creator-campaign-apply-continuation.service";
 import { CreatorEntryRegistrationService } from "./creator-entry-registration.service";
 import { CreatorEntryStateService } from "./creator-entry-state.service";
 import { CreatorInstagramConnectionService } from "./creator-instagram-connection.service";
 import { CreatorInstagramContinuityService } from "./creator-instagram-continuity.service";
 import {
   CreatorGoogleRegistrationDto,
+  CreatorCampaignApplyContinuationResolveDto,
   CreatorInstagramCompleteDto,
   CreatorPasswordRegistrationDto,
   CreatorRegistrationEmailDto,
@@ -36,6 +38,7 @@ export class CreatorEntryController {
     private readonly state: CreatorEntryStateService,
     private readonly instagram: CreatorInstagramConnectionService,
     private readonly continuity: CreatorInstagramContinuityService,
+    private readonly campaignContinuations: CreatorCampaignApplyContinuationService,
   ) {}
 
   @Public()
@@ -123,6 +126,19 @@ export class CreatorEntryController {
     @Body() dto: CreatorInstagramCompleteDto,
   ) {
     return this.continuity.completeReconnect(request.user, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("campaign-apply/continuation/resolve")
+  @HttpCode(200)
+  resolveCampaignApplyContinuation(
+    @Req() request: RequestWithAuthUser,
+    @Body() dto: CreatorCampaignApplyContinuationResolveDto,
+  ) {
+    return this.campaignContinuations.resolve(
+      request.user,
+      dto.continuationToken,
+    );
   }
 
   private withRefreshCookie(response: Response, result: SessionIssueResult) {
