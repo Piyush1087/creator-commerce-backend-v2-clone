@@ -77,7 +77,9 @@ const enabled = process.env.BRAND_CHARACTER_DATABASE_TEST === "true";
 describe.skipIf(!enabled)(
   "brand_character real PostgreSQL vertical slice",
   () => {
-    const prisma = new PrismaClient();
+    const prisma = new PrismaClient({
+      transactionOptions: { maxWait: 10_000 },
+    });
     const service = prisma as unknown as PrismaService;
     afterAll(async () => {
       await prisma.$disconnect();
@@ -386,7 +388,8 @@ describe.skipIf(!enabled)(
         retryAtNow: async (id: string) => {
           await prisma.intelligenceProcessorExecution.update({
             where: { id },
-            data: { eligibleAt: new Date() },
+            // Fixture-only: force eligibility without mixing host and database clocks.
+            data: { eligibleAt: new Date(0) },
           });
         },
       };

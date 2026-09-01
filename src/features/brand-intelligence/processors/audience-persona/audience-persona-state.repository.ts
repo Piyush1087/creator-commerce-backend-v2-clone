@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../../prisma/prisma.service";
 import { AUDIENCE_OBJECT } from "./audience-persona.types";
+import { resolveIntelligenceSubject } from "../../subject/intelligence-subject";
 
 const include = Prisma.validator<Prisma.IntelligenceCurrentComponentInclude>()({
   currentComponentGeneration: true,
@@ -13,12 +14,18 @@ export type AudienceCurrentState =
 @Injectable()
 export class AudiencePersonaStateRepository {
   constructor(private readonly prisma: PrismaService) {}
-  read(
+  async read(
     brandId: string,
     tx?: Prisma.TransactionClient,
   ): Promise<AudienceCurrentState[]> {
-    return (tx ?? this.prisma).intelligenceCurrentComponent.findMany({
-      where: { brandId, objectSemanticId: AUDIENCE_OBJECT },
+    const client = tx ?? this.prisma;
+    const subject = await resolveIntelligenceSubject(client, brandId);
+    return client.intelligenceCurrentComponent.findMany({
+      where: {
+        brandId,
+        subjectId: subject.id,
+        objectSemanticId: AUDIENCE_OBJECT,
+      },
       include,
       orderBy: { componentSemanticPath: "asc" },
     });

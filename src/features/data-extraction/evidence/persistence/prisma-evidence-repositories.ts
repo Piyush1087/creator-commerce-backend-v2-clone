@@ -48,6 +48,7 @@ import type {
   CapabilityEvidenceRepository,
   CapabilityExecutionRepository,
   CapabilityResourceRepository,
+  CanonicalOfferingScopeRepository,
   CaptureRepository,
   CompleteCapabilityExecutionInput,
   CompleteCaptureInput,
@@ -1053,6 +1054,25 @@ export class PrismaCapabilityExecutionRepository implements CapabilityExecutionR
     });
   }
 
+  async findCompleted(
+    brandId: BrandId,
+    capabilityId: EvidenceCapabilityId,
+  ): Promise<readonly DataExtractionCapabilityExecutionRecord[]> {
+    return withPersistenceErrorMapping(async () =>
+      (
+        await this.db.dataExtractionCapabilityExecution.findMany({
+          where: { brandId, capabilityId, completedAt: { not: null } },
+          orderBy: [
+            { completedAt: "desc" },
+            { createdAt: "desc" },
+            { capabilityExecutionRef: "asc" },
+          ],
+          include: { resourceScope: true, evidenceMemberships: true },
+        })
+      ).map(toCapabilityExecution),
+    );
+  }
+
   async complete(
     brandId: BrandId,
     ref: CapabilityExecutionRef,
@@ -1121,6 +1141,26 @@ export class PrismaCapabilityExecutionRepository implements CapabilityExecutionR
         completedAt: record.completedAt,
       });
     }
+  }
+}
+
+export class PrismaCanonicalOfferingScopeRepository implements CanonicalOfferingScopeRepository {
+  constructor(private readonly db: DataExtractionDb) {}
+
+  async assertOwnedByBrand(
+    brandId: BrandId,
+    canonicalOfferingRef: string,
+  ): Promise<void> {
+    await withPersistenceErrorMapping(async () => {
+      if (!canonicalOfferingRef.trim()) {
+        throw persistenceError("PERSISTENCE_INVARIANT");
+      }
+      const offering = await this.db.offering.findFirst({
+        where: { id: canonicalOfferingRef, brandProfileId: brandId },
+        select: { id: true },
+      });
+      if (!offering) throw persistenceError("PERSISTENCE_INVARIANT");
+    });
   }
 }
 
@@ -1814,6 +1854,7 @@ export interface DataExtractionRepositorySet {
   readonly semanticObservations: PrismaSemanticObservationRepository;
   readonly freshnessAssessments: PrismaFreshnessAssessmentRepository;
   readonly providerExecutionLinks: PrismaProviderExecutionLinkRepository;
+  readonly canonicalOfferings: PrismaCanonicalOfferingScopeRepository;
 }
 
 export function createDataExtractionRepositorySet(
@@ -1830,6 +1871,7 @@ export function createDataExtractionRepositorySet(
     semanticObservations: new PrismaSemanticObservationRepository(db),
     freshnessAssessments: new PrismaFreshnessAssessmentRepository(db),
     providerExecutionLinks: new PrismaProviderExecutionLinkRepository(db),
+    canonicalOfferings: new PrismaCanonicalOfferingScopeRepository(db),
   };
 }
 

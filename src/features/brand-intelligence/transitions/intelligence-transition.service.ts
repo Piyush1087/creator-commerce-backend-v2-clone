@@ -71,14 +71,10 @@ export class IntelligenceTransitionService {
     command: IntelligenceTransitionCommand,
   ): Promise<IntelligenceTransitionResult> {
     this.assertCommand(command);
-    const decisions = [...command.decisions].sort(compareSemanticAddresses);
-    const currents = await this.currentRepository.lockInCanonicalOrder(
-      tx,
-      decisions,
-    );
     const actionLookup = await this.actionRepository.createOrReplay(tx, {
       id: command.action.id,
       brandId: command.action.brandId,
+      subjectId: command.action.subjectId,
       actionType: command.action.actionType,
       actorType: command.action.actorType,
       actorRef: command.action.actorRef,
@@ -90,13 +86,35 @@ export class IntelligenceTransitionService {
       outcome: "RECORDED",
       processorExecutionId: command.action.processorExecutionId ?? null,
     });
+    const scopedAction = {
+      ...command.action,
+      subjectId: actionLookup.action.subjectId,
+    };
+    const decisions = command.decisions
+      .map((decision) => {
+        if (
+          decision.subjectId &&
+          decision.subjectId !== actionLookup.action.subjectId
+        ) {
+          throw new IntelligencePersistenceError(
+            "TENANCY_VIOLATION",
+            "Transition decision belongs to another Intelligence subject",
+          );
+        }
+        return { ...decision, subjectId: actionLookup.action.subjectId };
+      })
+      .sort(compareSemanticAddresses);
+    const currents = await this.currentRepository.lockInCanonicalOrder(
+      tx,
+      decisions,
+    );
 
     if (actionLookup.replayed) {
       const recorded = await this.actionRepository.getTransitions(
         tx,
         actionLookup.action.id,
       );
-      this.assertReplay(command.decisions, recorded);
+      this.assertReplay(decisions, recorded);
       return {
         actionId: actionLookup.action.id,
         replayed: true,
@@ -109,7 +127,7 @@ export class IntelligenceTransitionService {
       const current =
         currents.get(this.currentRepository.key(decision)) ?? null;
       outcomes.push(
-        await this.applyDecision(tx, command.action, decision, current),
+        await this.applyDecision(tx, scopedAction, decision, current),
       );
     }
     return {
@@ -231,6 +249,7 @@ export class IntelligenceTransitionService {
       }
       const candidate = await this.candidateRepository.createOrGetPending(tx, {
         brandId: decision.brandId,
+        subjectId: decision.subjectId ?? action.subjectId!,
         currentComponentId: current.id,
         objectSemanticId: decision.objectSemanticId,
         pathSchemeVersion: decision.pathSchemeVersion,
@@ -645,6 +664,7 @@ export class IntelligenceTransitionService {
     const expected = decision.expectedCurrent;
     return this.actionRepository.createTransition(tx, {
       brandId: decision.brandId,
+      subjectId: decision.subjectId ?? action.subjectId!,
       actionId: action.id,
       currentComponentId: current?.id ?? null,
       objectSemanticId: decision.objectSemanticId,
@@ -710,6 +730,7 @@ export class IntelligenceTransitionService {
   ): boolean {
     return (
       generation.brandId === address.brandId &&
+      generation.subjectId === address.subjectId &&
       generation.objectSemanticId === address.objectSemanticId &&
       generation.pathSchemeVersion === address.pathSchemeVersion &&
       generation.componentSemanticPath === address.componentSemanticPath
@@ -777,6 +798,7 @@ export class IntelligenceTransitionService {
         "candidateId" in decision ? decision.candidateId : null;
       if (
         transition.brandId !== decision.brandId ||
+        transition.subjectId !== decision.subjectId ||
         transition.objectSemanticId !== decision.objectSemanticId ||
         transition.pathSchemeVersion !== decision.pathSchemeVersion ||
         transition.componentSemanticPath !== decision.componentSemanticPath ||

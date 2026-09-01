@@ -1,0 +1,110 @@
+version: "1.0"
+status: FROZEN
+owner_engine: brand_intelligence
+id: visual_style_synthesis
+owning_branch: visual_identity
+processor_type: HYBRID
+purpose: >-
+  Produce visual_style_profile as a grounded reusable interpretation of Brand visual patterns from canonical visual
+  business-state references and owned visual Evidence without owning canonical assets/settings or promoting observed
+  patterns into protected Brand constraints.
+outputs:
+  - visual_style_profile
+canonical_inputs:
+  - canonical primary logo reference when available
+  - canonical secondary mark references when available
+  - approved palette reference when available
+  - approved typography reference when available
+  - approved reference image references when available
+  - explicit Brand visual guidance when available
+evidence_sufficiency:
+  minimum:
+    rule: >-
+      Execute when sufficient representative visual Evidence exists for at least one defensible visual_style_profile
+      component. No individual visual Evidence subtype or Brand user input is universally required for every execution.
+  supporting_capabilities:
+    - owned_website.visual_evidence
+    - owned_website.imagery_evidence
+    - owned_website.graphic_treatment_evidence
+    - brand_user_input_and_confirmations
+  optional_enrichment:
+    - instagram.owned_brand_visual_context
+  non_blocking_absence:
+    - owned_website.imagery_evidence when other component Evidence is sufficient
+    - owned_website.graphic_treatment_evidence when other component Evidence is sufficient
+    - brand_user_input_and_confirmations
+    - canonical approved visual assets when descriptive Evidence is sufficient
+    - instagram.owned_brand_visual_context
+hybrid_responsibility:
+  AI_REASONING:
+    - summary
+    - style_traits
+    - imagery_style
+    - graphic_treatment
+  DETERMINISTIC:
+    - normalize and reference canonical visual asset IDs
+    - stable item semantic identity normalization
+    - enforce protected visual constraint scope
+visual_state_boundary:
+  canonical_visual_assets_and_settings: CANONICAL_APPLICATION_STATE
+  observed_visual_patterns: OBSERVED_EVIDENCE
+  visual_style_profile: CREATOR_SHOP_DERIVED_INTELLIGENCE
+  frequent_colour_is_approved_palette: false
+  observed_typeface_is_approved_font: false
+  observed_logo_is_canonical_logo: false
+  repeated_pattern_is_hard_constraint: false
+constraint_boundary:
+  processor_generated_hard_constraint: forbidden
+  observed_pattern_default_authority: CREATOR_SHOP_DERIVED
+  visual_constraints_required_authority: BRAND_CONFIRMED
+  protected_current_constraints:
+    ordinary_derivation_dependency: false
+    silent_overwrite: forbidden
+    generated_replacement: forbidden
+preview_boundary:
+  preview_logo_role:
+    - APPLICATION_CANDIDATE
+    - RECONCILIATION_CONTEXT
+  automatic_canonical_logo: forbidden
+  automatic_visual_style_profile: forbidden
+partial_output_behavior:
+  profile_nullable: true
+  component_level_partial: true
+  visual_constraints_may_be_absent: true
+  filler: forbidden
+readiness:
+  consumer_scoped: true
+  execution_rules:
+    - representative imagery Evidence alone may enable imagery_style synthesis
+    - representative graphic-treatment Evidence alone may enable graphic_treatment synthesis
+    - representative overall visual Evidence may enable summary or style_traits synthesis
+    - missing Brand user input does not block derived Visual Identity
+    - missing canonical approved assets does not block descriptive partial synthesis when Evidence is sufficient
+    - insufficient representative Evidence overall implies WAITING_FOR_EVIDENCE
+    - a requested operation that specifically requires unavailable canonical state implies WAITING_FOR_CANONICAL_INPUT
+  no_brand_preview_gate: true
+  no_verification_gate: true
+  no_home_gate: true
+  no_brand_centre_entry_gate: true
+refresh_triggers:
+  - canonical logo or asset replacement
+  - approved palette or typography change
+  - approved reference image change
+  - material owned website redesign
+  - new representative visual Evidence
+  - explicit Brand visual constraint or guidance edit
+invalidation:
+  directed_only: true
+  affected_visual_components_only: true
+  whole_brand_intelligence_recompute: forbidden
+model_profile_requirement_class: grounded_multimodal_visual_semantic_synthesis
+provider_or_model_selection: deferred
+persistence_boundary: Semantic processor contract only; persistence implementation is deferred.
+non_owned_scope:
+  - canonical visual asset CRUD
+  - approved palette storage
+  - approved font storage
+  - reference image storage
+  - Campaign creative direction
+  - shot list
+  - visual asset extraction mechanics

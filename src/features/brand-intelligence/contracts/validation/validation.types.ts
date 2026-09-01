@@ -31,6 +31,9 @@ export interface EvidenceManifestEntry {
   readonly generalizationScope?: string;
   readonly normalizedPayload?: unknown;
   readonly polarity?: string;
+  readonly conflictGroupRef?: string;
+  readonly freshness?: string;
+  readonly sourceClass?: string;
 }
 
 export interface BusinessStateManifestEntry {

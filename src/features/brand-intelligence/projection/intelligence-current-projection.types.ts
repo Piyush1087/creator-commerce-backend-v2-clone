@@ -67,6 +67,7 @@ export interface IntelligenceBusinessStateReferenceSummary {
 export interface CurrentIntelligenceComponentProjection {
   readonly projectionState: "CURRENT";
   readonly brandId: string;
+  readonly subjectId?: string;
   readonly objectSemanticId: string;
   readonly componentSemanticPath: string;
   readonly pathSchemeVersion: 1;
@@ -90,6 +91,7 @@ export interface CurrentIntelligenceComponentProjection {
 export interface AbsentIntelligenceComponentProjection {
   readonly projectionState: "NO_CURRENT" | "NOT_OWNED";
   readonly brandId: string;
+  readonly subjectId?: string;
   readonly objectSemanticId: string;
   readonly componentSemanticPath: string;
   readonly pathSchemeVersion: 1;
@@ -107,6 +109,7 @@ export interface IntelligenceContractProjection {
 
 export interface CurrentIntelligenceObjectProjection {
   readonly brandId: string;
+  readonly subjectId?: string;
   readonly objectSemanticId: string;
   readonly objectContract: IntelligenceContractProjection | null;
   readonly objectContractVersions: readonly IntelligenceContractProjection[];
@@ -126,6 +129,8 @@ export interface CurrentIntelligenceObjectProjection {
 
 export interface ReadCurrentIntelligenceObjectRequest {
   readonly brandId: string;
+  /** Omission preserves the Brand-only consumer boundary. */
+  readonly subject?: IntelligenceSubjectSelector;
   readonly objectSemanticId: string;
 }
 
@@ -141,3 +146,4 @@ export interface IntelligenceCurrentProjectionReader {
     request: ReadCurrentIntelligenceComponentRequest,
   ): Promise<IntelligenceComponentProjection>;
 }
+import type { IntelligenceSubjectSelector } from "../subject/intelligence-subject.resolver";

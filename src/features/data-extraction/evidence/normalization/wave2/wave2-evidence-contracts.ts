@@ -36,8 +36,8 @@ export const proofEvidenceSchema = z
       "OTHER_BOUNDED_PROOF_CONTEXT",
     ]),
     scope,
-    factual_referent_ref: z.null(),
-    offering_refs: z.array(z.string()).max(0),
+    factual_referent_ref: z.string().min(1).nullable(),
+    offering_refs: z.array(z.string().min(1)).max(1),
     claim_sensitivity: z.array(
       z.enum([
         "BRAND_AUTHORED_CLAIM",
@@ -115,7 +115,7 @@ export const serviceabilityEvidenceSchema = z
       "TRANSACTIONAL",
     ]),
     geography_assertions: z.array(geographyAssertionSchema).max(8),
-    offering_ref: z.null(),
+    offering_ref: z.string().min(1).nullable(),
     offering_candidate_ref: z.string().nullable(),
     statement_or_normalized_fact: text,
     evidence_strength: z.enum([
@@ -139,7 +139,7 @@ export const locationEvidenceSchema = z
     canonical_location_ref: z.string().min(1).nullable(),
     geography_assertion: geographyAssertionSchema.nullable(),
     booking_or_access_ref: z.null(),
-    offering_ref: z.null(),
+    offering_ref: z.string().min(1).nullable(),
     statement_or_normalized_fact: text,
     observed_name: nullableText,
     street_address: nullableText,
@@ -154,3 +154,85 @@ export const locationEvidenceSchema = z
     source_location_identifier: nullableText,
   })
   .strict();
+
+const amount = z.number().finite().nonnegative();
+export const commercialEvidenceSchema = z
+  .object({
+    ...common,
+    evidence_semantic: z.literal("exact_offering_commercial_observation"),
+    canonical_offering_ref: z.string().min(1),
+    observed_price_mode: z.enum([
+      "EXACT",
+      "STARTING_AT",
+      "RANGE",
+      "NOT_PUBLICLY_LISTED",
+    ]),
+    current_min_amount: amount.nullable(),
+    current_max_amount: amount.nullable(),
+    regular_reference_min_amount: amount.nullable(),
+    regular_reference_max_amount: amount.nullable(),
+    currency: z
+      .string()
+      .regex(/^[A-Z]{3}$/)
+      .nullable(),
+    sale_or_reference_relationship: z.enum([
+      "CURRENT_ONLY",
+      "CURRENT_IS_SALE_WITH_REGULAR_REFERENCE",
+      "NOT_APPLICABLE",
+    ]),
+    explicit_not_publicly_listed: z.boolean(),
+    observed_at: z.string().datetime(),
+    commercial_context: text,
+    observation_source: z.enum(["HTML", "JSON_LD"]),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const issue = (message: string) =>
+      context.addIssue({ code: z.ZodIssueCode.custom, message });
+    if (
+      value.observed_price_mode === "EXACT" &&
+      (value.current_min_amount === null ||
+        value.current_max_amount !== value.current_min_amount)
+    )
+      issue("EXACT_REQUIRES_ONE_CURRENT_AMOUNT");
+    if (
+      value.observed_price_mode === "STARTING_AT" &&
+      (value.current_min_amount === null || value.current_max_amount !== null)
+    )
+      issue("STARTING_AT_REQUIRES_MINIMUM_ONLY");
+    if (
+      value.observed_price_mode === "RANGE" &&
+      (value.current_min_amount === null ||
+        value.current_max_amount === null ||
+        value.current_min_amount >= value.current_max_amount)
+    )
+      issue("RANGE_REQUIRES_ASCENDING_MINIMUM_AND_MAXIMUM");
+    if (
+      value.observed_price_mode === "NOT_PUBLICLY_LISTED" &&
+      (!value.explicit_not_publicly_listed ||
+        value.current_min_amount !== null ||
+        value.current_max_amount !== null ||
+        value.regular_reference_min_amount !== null ||
+        value.regular_reference_max_amount !== null ||
+        value.sale_or_reference_relationship !== "NOT_APPLICABLE")
+    )
+      issue("NOT_PUBLICLY_LISTED_REQUIRES_EXPLICIT_AMOUNT_ABSENCE");
+    if (
+      value.observed_price_mode !== "NOT_PUBLICLY_LISTED" &&
+      value.explicit_not_publicly_listed
+    )
+      issue("PRICE_AMOUNT_CANNOT_BE_EXPLICITLY_NOT_LISTED");
+    if (
+      value.sale_or_reference_relationship ===
+        "CURRENT_IS_SALE_WITH_REGULAR_REFERENCE" &&
+      (value.regular_reference_min_amount === null ||
+        value.regular_reference_max_amount === null)
+    )
+      issue("SALE_RELATIONSHIP_REQUIRES_REFERENCE_AMOUNT");
+    if (
+      value.sale_or_reference_relationship === "CURRENT_ONLY" &&
+      (value.regular_reference_min_amount !== null ||
+        value.regular_reference_max_amount !== null)
+    )
+      issue("CURRENT_ONLY_CANNOT_CARRY_REFERENCE_AMOUNT");
+  });

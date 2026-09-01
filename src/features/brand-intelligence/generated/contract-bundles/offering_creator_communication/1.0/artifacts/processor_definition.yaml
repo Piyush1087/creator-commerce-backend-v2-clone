@@ -1,0 +1,119 @@
+processor_id: offering_creator_communication
+version: "1.0"
+status: FROZEN
+engine: product_intelligence
+processor_type: AI_REASONING
+owned_object: offering_creator_communication_profile
+object_authority: intelligence/engines/product_intelligence/objects.yaml#offering_creator_communication_profile
+
+responsibility: >-
+  Produce reusable, grounded creator talking-point ingredients and communication constraints for one exact
+  canonical Offering without producing final Campaign Brief copy or upgrading claims beyond their support.
+
+scope_semantics:
+  brand_ref: required
+  offering_ref: required
+  one_exact_canonical_offering_per_execution: true
+  evidence_subject_match: exact offering_ref required unless an explicit Brand-level constraint applies to all Offerings
+  brand_level_constraint_application_must_be_explicit: true
+  sibling_offering_evidence: forbidden
+  execution_identity_invariant: independently identifiable by Brand + Offering subject + processor
+  exact_technical_representation: deferred_to_P1
+
+canonical_inputs:
+  - exact Offering.id and Brand ownership
+  - Brand-confirmed Offering do-not-say guidance
+  - protected same-Offering communication values
+
+minimum_evidence_profile:
+  required_inputs:
+    - current offering_factual_profile when available and safe for reuse
+    - same-Offering claims or proof Evidence for each claim-sensitive talking point
+  admission_rule: >-
+    At least one requested output must be supportable from current factual understanding, protected guidance,
+    an explicitly applicable Brand constraint, or same-Offering Evidence; otherwise return NOT_READY.
+
+optional_evidence_and_enrichment:
+  - relevant Brand communication constraints explicitly applicable to the Offering
+  - derived_communication_constraint_evidence with OFFERING_SPECIFIC scope matching the exact Offering
+  - Brand-level derived communication constraints explicitly applicable across Offerings
+  - Meta/Instagram context when representative, subject-mapped, and not used to establish a hard rule
+
+readiness_and_admission_rules:
+  execution_ready_when:
+    - exact canonical Brand and Offering refs resolve
+    - requested active paths are owned by offering_creator_communication_profile
+    - inputs can support at least one reusable safe ingredient or explicit-null evaluation
+  claims_require_same_offering_support: true
+  protected_guidance_is_comparison_or_constraint_context_not_replacement_target: true
+  active_lifecycle_required_for_new_campaign_use: true
+  no_filler_to_force_ready: true
+  processor_execution_failure:
+    object_readiness_state_created: false
+    failed_refresh_replaces_prior_current: false
+    readiness_when_no_current_result: NOT_READY
+    failure_exposed_by_runtime_independently: true
+
+partial_output_behavior:
+  supported: true
+  independently_nullable_paths: [creator_talking_points, communication_constraints]
+  unsupported_talking_point: omit
+  insufficient_claim_support: fail_closed_and_omit
+  unresolved_constraint_conflict: preserve_stricter_safe_boundary_or_return_partial_null
+  final_campaign_copy: forbidden
+
+invalidation_triggers:
+  - affected offering_factual_profile path changes or becomes stale
+  - same-Offering claim or proof Evidence changes
+  - Brand-confirmed Offering do-not-say guidance changes
+  - relevant Brand communication constraint changes
+  - Offering identity reconciliation correction affecting subject scope
+invalidation_scope: affected semantic items for this Offering only
+
+authority_behavior:
+  default_interpretation: CREATOR_SHOP_DERIVED
+  explicit_same_offering_owned_source_constraint_when_supported: OBSERVED
+  processor_must_not_emit: [BRAND_CONFIRMED, SUPPORT_CONTROLLED]
+  brand_confirmation_transition_owner: authorized_application_or_business_state_action
+
+forbidden_writes:
+  - any canonical Offering field
+  - Offering identity or lifecycle
+  - canonical price or currency
+  - canonical media or Location relations
+  - Campaign Asset
+  - Campaign Brief
+  - Offer
+  - Audience
+
+forbidden_derivations:
+  - final Campaign Brief copy
+  - Campaign-specific CTA, objective, audience, deliverable, timing, or platform instruction
+  - unsupported efficacy, safety, success, performance, or superiority claim
+  - hard rule inferred from absence or incidental pattern
+  - sibling-Offering claim support
+  - testimonial treated as proof
+  - credential occurrence treated as verification
+
+failure_isolation_semantics:
+  processor_isolated_from_sibling_processors: true
+  failed_execution_replaces_current_object: false
+  invalid_untrusted_output_persisted_as_current: false
+  contract_valid_partial_output_may_persist: true
+  protected_current_conflict: retain candidate/discrepancy without silent overwrite
+
+claim_and_proof_safety:
+  observed_statement_is_external_verification: false
+  brand_confirmation_is_external_verification: false
+  testimonial_is_proof: false
+  credential_occurrence_is_verification: false
+  same_offering_support_required: true
+  regulated_or_high_risk_claims_without_sufficient_approved_support: FAIL_CLOSED
+  compliance_engine_created: false
+
+validation_invariants:
+  - Owns only offering_creator_communication_profile.
+  - Produces reusable ingredients, never final Campaign Brief copy.
+  - Every claim-sensitive item has sufficient same-Offering support.
+  - Brand confirmation is not external verification.
+  - Mutates no canonical application state.

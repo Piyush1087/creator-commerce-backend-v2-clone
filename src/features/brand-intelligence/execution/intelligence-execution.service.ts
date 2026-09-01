@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import {
   IntelligenceProcessorExecutionStatus,
   Prisma,
+  type IntelligenceSubject,
   type IntelligenceProcessorExecution,
 } from "@prisma/client";
 
@@ -17,10 +18,11 @@ import type {
 } from "./domain/intelligence-execution.types";
 import {
   canonicalActiveScope,
-  processorLogicalKey,
+  processorLogicalKeyV2,
   sha256CanonicalExecution,
 } from "./domain/execution-hash";
 import { ExecutionContractGate } from "./registry/execution-contract.gate";
+import { resolveIntelligenceSubject } from "../subject/intelligence-subject.resolver";
 
 interface PreparedProcessor {
   readonly request: ProcessorExecutionRequest;
@@ -60,8 +62,13 @@ export class IntelligenceExecutionService {
   async createOrReturn(
     command: CreateIntelligenceExecutionCommand,
   ): Promise<CreatedIntelligenceExecution> {
-    const prepared = this.prepare(command);
-    const existing = await this.findExisting(command);
+    const subject = await resolveIntelligenceSubject(
+      this.prisma,
+      command.brandId,
+      command.subject,
+    );
+    const prepared = this.prepare(command, subject);
+    const existing = await this.findExisting(command, subject.id);
     if (existing) return this.assertReplay(existing, command, prepared);
 
     try {
@@ -69,8 +76,9 @@ export class IntelligenceExecutionService {
         async (tx) => {
           const raced = await tx.intelligenceExecution.findUnique({
             where: {
-              brandId_triggerIdempotencyKey: {
+              brandId_subjectId_triggerIdempotencyKey: {
                 brandId: command.brandId,
+                subjectId: subject.id,
                 triggerIdempotencyKey: command.triggerIdempotencyKey,
               },
             },
@@ -80,6 +88,7 @@ export class IntelligenceExecutionService {
           return tx.intelligenceExecution.create({
             data: {
               brandId: command.brandId,
+              subjectId: subject.id,
               triggerType: command.triggerType,
               triggerRef: command.triggerRef,
               triggerIdempotencyKey: command.triggerIdempotencyKey,
@@ -88,6 +97,14 @@ export class IntelligenceExecutionService {
               processorExecutions: {
                 create: prepared.map((item) => ({
                   brand: { connect: { id: command.brandId } },
+                  subject: {
+                    connect: {
+                      id_brandId: {
+                        id: subject.id,
+                        brandId: command.brandId,
+                      },
+                    },
+                  },
                   processorId: item.processorId,
                   processorVersion: item.processorVersion,
                   bundleId: item.bundleId,
@@ -103,6 +120,7 @@ export class IntelligenceExecutionService {
                   evidenceManifestHash: item.evidenceManifestHash,
                   triggerIntentKey: item.triggerIntentKey,
                   processorExecutionKey: item.processorExecutionKey,
+                  processorKeyVersion: 2,
                   maxAttempts: item.request.maxAttempts,
                   status: item.request.dependencyEligible
                     ? IntelligenceProcessorExecutionStatus.QUEUED
@@ -124,7 +142,7 @@ export class IntelligenceExecutionService {
       // A concurrent creator may surface as a uniqueness or serialization
       // error depending on the Prisma/driver version. Re-read the durable
       // trigger identity before mapping any persistence error.
-      const raced = await this.findExisting(command);
+      const raced = await this.findExisting(command, subject.id);
       if (raced) return this.assertReplay(raced, command, prepared);
       throw new IntelligenceExecutionError(
         "INVALID_EXECUTION_STATE",
@@ -135,6 +153,7 @@ export class IntelligenceExecutionService {
 
   private prepare(
     command: CreateIntelligenceExecutionCommand,
+    subject: IntelligenceSubject,
   ): readonly PreparedProcessor[] {
     if (command.processors.length === 0) {
       throw new IntelligenceExecutionError(
@@ -154,6 +173,12 @@ export class IntelligenceExecutionService {
           throw new IntelligenceExecutionError(
             "INVALID_EXECUTION_STATE",
             "Active scope cannot cross Brand boundaries",
+          );
+        }
+        if (address.subjectId && address.subjectId !== subject.id) {
+          throw new IntelligenceExecutionError(
+            "INVALID_EXECUTION_STATE",
+            "Active scope cannot cross Intelligence subject boundaries",
           );
         }
         this.pathCodec.assertCanonical(
@@ -210,8 +235,13 @@ export class IntelligenceExecutionService {
         dependencyManifestHash,
         evidenceManifestHash,
         triggerIntentKey,
-        processorExecutionKey: processorLogicalKey({
+        processorExecutionKey: processorLogicalKeyV2({
           brandId: command.brandId,
+          subject: {
+            id: subject.id,
+            type: subject.subjectType,
+            ref: subject.subjectRef,
+          },
           manifest,
           activeScope: request.activeScope,
           dependencyManifestHash,
@@ -234,11 +264,13 @@ export class IntelligenceExecutionService {
 
   private findExisting(
     command: CreateIntelligenceExecutionCommand,
+    subjectId: string,
   ): Promise<ExecutionWithProcessors | null> {
     return this.prisma.intelligenceExecution.findUnique({
       where: {
-        brandId_triggerIdempotencyKey: {
+        brandId_subjectId_triggerIdempotencyKey: {
           brandId: command.brandId,
+          subjectId,
           triggerIdempotencyKey: command.triggerIdempotencyKey,
         },
       },

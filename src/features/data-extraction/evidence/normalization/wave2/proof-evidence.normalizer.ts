@@ -2,6 +2,7 @@ import type {
   DataExtractionEvidenceNormalizer,
   DataExtractionNormalizationInput,
 } from "../owned-website-wave1-normalizers";
+import { canonicalOfferingRefForSource } from "../owned-website-wave1-normalizers";
 import { proofEvidenceSchema } from "./wave2-evidence-contracts";
 import {
   commonPayload,
@@ -106,6 +107,10 @@ export class ProofEvidenceNormalizer implements DataExtractionEvidenceNormalizer
           if (proofStrength === "FIRST_PARTY_CLAIM" || assertion)
             sensitivity.push("BRAND_AUTHORED_CLAIM");
           const common = commonPayload(source, unit);
+          const canonicalOfferingRef = canonicalOfferingRefForSource(
+            input,
+            source,
+          );
           const payload = proofEvidenceSchema.parse({
             ...common,
             authorship: testimonial ? "TESTIMONIAL" : common.authorship,
@@ -114,8 +119,8 @@ export class ProofEvidenceNormalizer implements DataExtractionEvidenceNormalizer
             proof_strength: proofStrength,
             proof_class: proofClass,
             scope: common.subject_scope,
-            factual_referent_ref: null,
-            offering_refs: [],
+            factual_referent_ref: canonicalOfferingRef,
+            offering_refs: canonicalOfferingRef ? [canonicalOfferingRef] : [],
             claim_sensitivity: [...new Set(sensitivity)],
             verification_status: "NOT_EXTERNALLY_VERIFIED",
           });

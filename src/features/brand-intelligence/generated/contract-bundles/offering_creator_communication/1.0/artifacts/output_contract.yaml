@@ -1,0 +1,100 @@
+id: offering_creator_communication_output_contract
+version: "1.0"
+status: FROZEN
+processor: offering_creator_communication
+object: offering_creator_communication_profile
+strict: true
+additional_properties: false
+processor_definition: intelligence/engines/product_intelligence/processors/offering_creator_communication.yaml
+reasoning_authority: intelligence/engines/product_intelligence/artifacts/offering_creator_communication/reasoning.yaml
+object_authority: intelligence/engines/product_intelligence/objects.yaml#offering_creator_communication_profile
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define reusable creator communication ingredients for one exact canonical Offering while enforcing claim safety,
+  partial output, stable item identity, protected guidance, and the boundary against final Campaign Brief copy.
+
+subject:
+  required: [brand_ref, offering_ref]
+  exact_canonical_offering_match_required: true
+
+response:
+  type: object
+  required: [offering_creator_communication_profile, output_metadata]
+  additional_properties: false
+  properties:
+    offering_creator_communication_profile:
+      type: [object, "null"]
+      nullable: true
+      additional_properties: false
+      fields:
+        creator_talking_points:
+          type: [array, "null"]
+          nullable: true
+          item: {additional_properties: false, required: [semantic_id, talking_point], fields: {semantic_id: {type: string, min_length: 1}, talking_point: {type: string, min_length: 1}}}
+        communication_constraints:
+          type: [array, "null"]
+          nullable: true
+          item: {additional_properties: false, required: [semantic_id, constraint], fields: {semantic_id: {type: string, min_length: 1}, constraint: {type: string, min_length: 1}}}
+    output_metadata:
+      type: object
+      additional_properties: false
+      required: [creator_talking_points, communication_constraints]
+      fields:
+        creator_talking_points: {type: [array, "null"], nullable: true, keyed_by: semantic_id, item: shared_item_metadata}
+        communication_constraints: {type: [array, "null"], nullable: true, keyed_by: semantic_id, item: shared_item_metadata}
+
+shared_item_metadata:
+  additional_properties: false
+  required: [semantic_id, authority, source_class, freshness, evidence_refs, business_state_refs]
+  fields:
+    semantic_id: {type: string, min_length: 1}
+    authority: {type: enum, values: [OBSERVED, CREATOR_SHOP_DERIVED], forbidden: [BRAND_CONFIRMED, SUPPORT_CONTROLLED]}
+    source_class: {type: enum, values: [OWNED_WEBSITE, BRAND_USER_INPUT, CANONICAL_BUSINESS_STATE, MULTI_SOURCE, SYSTEM_DERIVATION_INPUT]}
+    freshness: {type: enum, values: [CURRENT, STALE, UNKNOWN]}
+    evidence_refs: {type: array, unique_items: true, item_type: string}
+    business_state_refs: {type: array, unique_items: true, item_type: string}
+
+partial_shape_rules:
+  profile_may_be_null: true
+  component_level_nullability: true
+  both_families_non_null_required: false
+  no_list_cardinality_frozen: true
+  unsupported_claim_or_constraint: omit_or_null
+  no_filler_to_force_ready: true
+  metadata_alignment:
+    - null semantic collection requires null metadata
+    - every emitted semantic item has exactly one metadata item with the same semantic_id
+
+semantic_validation:
+  creator_talking_points:
+    - reusable ingredient not final Campaign Brief copy
+    - same-Offering factual support required
+    - claim-sensitive item requires sufficient approved same-Offering support
+    - Campaign-specific objective, audience, CTA, deliverable, timing, or platform instruction is invalid
+  communication_constraints:
+    - exact Offering constraint or explicitly applicable Brand-level rule only
+    - hard rule inferred from absence or incidental pattern is invalid
+    - repeated descriptive pattern does not become mandatory constraint
+    - Brand confirmation is not external verification
+  claim_safety:
+    - observed statement is not externally verified fact
+    - testimonial is not proof
+    - credential occurrence is not credential verification
+    - regulated or high-risk claims without sufficient approved support fail closed
+
+scope_validation:
+  every_claim_support_ref_must_match_subject_offering: true
+  offering_specific_constraint_must_match_subject_offering: true
+  sibling_offering_evidence: invalid
+  Brand_level_constraint_requires_explicit_applicability: true
+
+authority_and_protection_validation:
+  processor_emitted_brand_confirmed: invalid
+  processor_emitted_support_controlled: invalid
+  protected_guidance_silent_replacement: invalid
+
+readiness:
+  bounded_partial_output_supported: true
+  final_campaign_copy_generated: false
+  invalid_or_failed_output_replaces_current: false

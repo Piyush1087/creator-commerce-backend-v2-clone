@@ -1,0 +1,127 @@
+processor_id: offering_actionability_synthesis
+version: "1.0"
+status: FROZEN
+engine: product_intelligence
+processor_type: HYBRID
+owned_object: offering_actionability_profile
+object_authority: intelligence/engines/product_intelligence/objects.yaml#offering_actionability_profile
+
+responsibility: >-
+  Produce grounded customer-action and commercial-context interpretation for one exact canonical Offering while
+  preserving the distinction between deterministic canonical inputs and derived interpretation.
+
+scope_semantics:
+  brand_ref: required
+  offering_ref: required
+  one_exact_canonical_offering_per_execution: true
+  evidence_subject_match: exact offering_ref required
+  sibling_offering_evidence: forbidden
+  execution_identity_invariant: independently identifiable by Brand + Offering subject + processor
+  exact_technical_representation: deferred_to_P1
+
+canonical_inputs:
+  deterministic:
+    - Offering lifecycle
+    - customer destination
+    - canonical price and currency commercial tuple
+    - canonical Offer refs when available
+    - OFFERING_AVAILABLE_AT_LOCATION refs
+  boundary_rules:
+    - canonical values are referenced and not copied into Intelligence ownership
+    - price plus currency remain one tuple
+    - absent formerly public price must not be interpreted as zero or silently null
+    - OFFERING_AVAILABLE_AT_LOCATION means obtain, receive, or use at that exact canonical Location only
+
+minimum_evidence_profile:
+  requirement: canonical inputs and lineage sufficient for every emitted derived interpretation
+  commercial_price_status: P2_DE_CAPABILITY_PREFLIGHT_REQUIRED
+  p0_new_price_capability: forbidden
+
+optional_evidence_and_enrichment:
+  - owned_website.serviceability_evidence scoped to the exact Offering
+  - owned_website.location_evidence scoped to the exact Offering
+  - same-Offering owned website actionability observations
+  - Meta/Instagram context when explicitly subject-mapped and materially relevant
+
+hybrid_responsibility:
+  DETERMINISTIC:
+    - validate exact canonical Offering and Brand scope
+    - normalize references to lifecycle, destination, commercial tuple, Offer refs, and Location relations
+    - preserve stale or unknown commercial state without converting it to zero
+    - enforce exact Location-relation meaning
+  AI_REASONING:
+    - derive concise customer_action interpretation
+    - derive concise commercial_context interpretation
+    - interpret broader observed availability or actionability only when same-Offering Evidence supports it
+  separate_price_or_location_processor: forbidden
+
+readiness_and_admission_rules:
+  execution_ready_when:
+    - exact canonical Brand and Offering refs resolve
+    - requested active paths are owned by offering_actionability_profile
+    - canonical inputs or qualified Evidence can support at least one requested interpretation or explicit-null evaluation
+  active_lifecycle_required_for_new_campaign_use: true
+  inactive_offering_may_retain_historical_intelligence: true
+  no_filler_to_force_ready: true
+  processor_execution_failure:
+    object_readiness_state_created: false
+    failed_refresh_replaces_prior_current: false
+    readiness_when_no_current_result: NOT_READY
+    failure_exposed_by_runtime_independently: true
+
+partial_output_behavior:
+  supported: true
+  independently_nullable_paths: [customer_action, commercial_context]
+  destination_without_commercial_context: allowed_when_grounded
+  commercial_context_without_safe_customer_action: allowed_when_grounded
+  missing_or_stale_price: unknown_or_stale_not_zero
+  unsupported_broader_geography: omit_or_null
+
+invalidation_triggers:
+  - Offering lifecycle change
+  - customer destination change
+  - canonical price or currency tuple change
+  - canonical Offer reference change
+  - OFFERING_AVAILABLE_AT_LOCATION relation change
+  - material same-Offering serviceability, location, or actionability Evidence change
+  - Offering identity reconciliation correction affecting subject scope
+invalidation_scope: affected paths for this Offering only
+
+authority_behavior:
+  default_interpretation: CREATOR_SHOP_DERIVED
+  deterministic_reference_normalization: SYSTEM_DERIVED
+  direct_observed_actionability_when_supported: OBSERVED
+  processor_must_not_emit: [BRAND_CONFIRMED, SUPPORT_CONTROLLED]
+
+forbidden_writes:
+  - Offering identity, kind, subtype, or lifecycle
+  - canonical customer destination
+  - canonical price or currency
+  - canonical Offer
+  - canonical Location
+  - OFFERING_AVAILABLE_AT_LOCATION relation
+  - broad canonical geography
+  - Campaign Asset
+  - Audience
+
+forbidden_derivations:
+  - canonical price from unapproved Evidence capability
+  - mutation under the first-party price refresh exception
+  - delivery origin, warehouse origin, service radius, marketing geography, or Brand-wide serviceability from a Location relation
+  - broad canonical geography from observed availability
+  - universal availability from one Location or sibling Offering
+  - final Campaign CTA or Brief copy
+
+failure_isolation_semantics:
+  processor_isolated_from_sibling_processors: true
+  failed_execution_replaces_current_object: false
+  invalid_untrusted_output_persisted_as_current: false
+  contract_valid_partial_output_may_persist: true
+  canonical_conflict: preserve canonical input and record derived discrepancy without mutation
+
+validation_invariants:
+  - Owns only offering_actionability_profile.
+  - Deterministic canonical inputs remain distinct from derived interpretation.
+  - Canonical price and broad geography are never mutated or created.
+  - Product commercial or price Evidence capability remains a P2 preflight decision.
+  - Consumes no sibling-Offering Evidence.

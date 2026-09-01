@@ -123,6 +123,8 @@ export interface DataExtractionEvidenceItemRecord {
   readonly relationshipRefs: readonly SemanticObservationKey[];
   /** Read projection only; derived from durable semantic conflict relations. */
   readonly conflictGroupRef?: string;
+  /** Read projection only; exact Offering reads can span completed executions. */
+  readonly capabilityExecutionRefs?: readonly CapabilityExecutionRef[];
 }
 
 export type SemanticObservationRelationType =

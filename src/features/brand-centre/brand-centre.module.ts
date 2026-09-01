@@ -12,6 +12,9 @@ import { BrandCentreController } from "./brand-centre.controller";
 import { BrandWorkspaceAuthorizationService } from "./brand-workspace-authorization.service";
 import { BrandConsumerController } from "./consumer/brand-consumer.controller";
 import { BrandConsumerService } from "./consumer/brand-consumer.service";
+import { ProcessorRuntimeProjectionService } from "./consumer/processor-runtime-projection.service";
+import { ProductConsumerController } from "./consumer/product-consumer.controller";
+import { ProductConsumerService } from "./consumer/product-consumer.service";
 import { BrandCentreBudgetService } from "./services/brand-centre-budget.service";
 import { BrandCentreColdStartService } from "./services/brand-centre-cold-start.service";
 import { BrandCentreDnaService } from "./services/brand-centre-dna.service";
@@ -21,6 +24,7 @@ import { BrandCentrePlannerService } from "./services/brand-centre-planner.servi
 import { BrandCentreRoutingService } from "./services/brand-centre-routing.service";
 import { BrandCentreScanService } from "./services/brand-centre-scan.service";
 import { BrandCentreSessionEvictionService } from "./services/brand-centre-session-eviction.service";
+import { CanonicalOfferingStateService } from "./services/canonical-offering-state.service";
 import { DeepScanWorker } from "./workers/deep-scan.worker";
 import { IntelligenceRefreshWorker } from "./workers/intelligence-refresh.worker";
 import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
@@ -33,9 +37,15 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
     BrandIntelligenceModule,
     SubscriptionCapabilityModule,
   ],
-  controllers: [BrandCentreController, BrandConsumerController],
+  controllers: [
+    BrandCentreController,
+    BrandConsumerController,
+    ProductConsumerController,
+  ],
   providers: [
     BrandConsumerService,
+    ProductConsumerService,
+    ProcessorRuntimeProjectionService,
     BrandCentreAuthService,
     BrandWorkspaceAuthorizationService,
     BrandCentreRoutingService,
@@ -46,6 +56,7 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
     BrandCentreIntelligenceService,
     BrandCentrePlannerService,
     BrandCentreSessionEvictionService,
+    CanonicalOfferingStateService,
     BrandCentreJobDispatcherService,
     GeminiJsonClient,
     ParallelExtractClient,
@@ -61,6 +72,7 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
     BrandCentreDnaService,
     BrandCentreIntelligenceService,
     BrandCentrePlannerService,
+    CanonicalOfferingStateService,
   ],
 })
 export class BrandCentreModule {}

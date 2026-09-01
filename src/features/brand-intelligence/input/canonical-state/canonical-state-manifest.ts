@@ -22,6 +22,18 @@ export interface CanonicalDependencyManifest {
   readonly brandId: string;
   readonly canonicalSnapshotRef: string;
   readonly entries: readonly CanonicalDependencyManifestEntry[];
+  readonly offeringReferences?: readonly Omit<
+    BusinessStateReference,
+    "observedAt"
+  >[];
+  readonly visualReferences?: readonly Omit<
+    BusinessStateReference,
+    "observedAt"
+  >[];
+  readonly serviceabilityReferences?: readonly Omit<
+    BusinessStateReference,
+    "observedAt"
+  >[];
 }
 
 @Injectable()
@@ -55,6 +67,51 @@ export class CanonicalStateManifestBuilder {
       brandId: snapshot.brandId,
       canonicalSnapshotRef: snapshot.canonicalSnapshotRef,
       entries,
+      ...(snapshot.visualState
+        ? {
+            visualReferences: [
+              ...(snapshot.visualState.stateReference
+                ? [snapshot.visualState.stateReference]
+                : []),
+              ...snapshot.visualState.items.map(
+                (item) => item.businessStateReference,
+              ),
+            ]
+              .map(({ observedAt: _observedAt, ...ref }) => ref)
+              .sort((a, b) => a.entityId.localeCompare(b.entityId)),
+          }
+        : {}),
+      ...(snapshot.offeringFacts
+        ? {
+            offeringReferences: snapshot.offeringFacts
+              .map((fact) => {
+                const { observedAt: _observedAt, ...reference } =
+                  fact.businessStateReference;
+                return reference;
+              })
+              .sort((a, b) => a.entityId.localeCompare(b.entityId)),
+          }
+        : {}),
+      ...(snapshot.serviceabilityState
+        ? {
+            serviceabilityReferences: [
+              ...snapshot.serviceabilityState.locations.map(
+                (item) => item.businessStateReference,
+              ),
+              ...snapshot.serviceabilityState.offeringIdentities.map(
+                (item) => item.businessStateReference,
+              ),
+              ...snapshot.serviceabilityState.offeringAvailabilityReferences,
+              ...snapshot.serviceabilityState.offeringLocationReferences,
+            ]
+              .map(({ observedAt: _observedAt, ...ref }) => ref)
+              .sort((a, b) =>
+                `${a.entityType}:${a.entityId}:${a.semanticFieldPath}`.localeCompare(
+                  `${b.entityType}:${b.entityId}:${b.semanticFieldPath}`,
+                ),
+              ),
+          }
+        : {}),
     };
     return { manifest, hash: sha256CanonicalExecution(manifest) };
   }

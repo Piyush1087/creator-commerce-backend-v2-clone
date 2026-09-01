@@ -37,7 +37,15 @@ export type CanonicalBrandStateResolution =
   | "UNKNOWN_PROVENANCE";
 
 export interface BusinessStateReference {
-  readonly entityType: "BrandProfile";
+  readonly entityType:
+    | "BrandProfile"
+    | "Offering"
+    | "IntelligenceCurrentObject"
+    | "Location"
+    | "BrandVisualState"
+    | "BrandVisualAsset"
+    | "BrandVisualColor"
+    | "BrandVisualTypography";
   readonly entityId: string;
   readonly semanticFieldPath: string;
   readonly revisionKind: "UPDATED_AT" | "SNAPSHOT_FINGERPRINT";
@@ -67,11 +75,140 @@ export interface CanonicalBrandStateSnapshot {
   readonly observedAt: string;
   readonly canonicalSnapshotRef: string;
   readonly entries: readonly CanonicalBrandStateEntry[];
+  /** Optional application-owned Offering facts, never observed DE candidates. */
+  readonly offeringFacts?: readonly CanonicalOfferingFact[];
+  readonly visualState?: CanonicalVisualSnapshot;
+  /** Optional application-owned refs; no Offering availability is inferred. */
+  readonly serviceabilityState?: CanonicalServiceabilitySnapshot;
+}
+
+/** Approved application records only; never a legacy logo or observed candidate. */
+export interface CanonicalVisualFact {
+  readonly brandId: string;
+  readonly itemId: string;
+  readonly role:
+    | "PRIMARY_LOGO"
+    | "ALTERNATE_MARK"
+    | "REFERENCE_IMAGE"
+    | "PALETTE"
+    | "TYPOGRAPHY";
+  readonly authority: string;
+  readonly origin: string;
+  /** Transient context; excluded from persisted manifests and Intelligence values. */
+  readonly value: string;
+  readonly usage: string | null;
+  readonly businessStateReference: BusinessStateReference;
+}
+export interface CanonicalVisualSnapshot {
+  readonly brandId: string;
+  readonly stateReference: BusinessStateReference | null;
+  readonly items: readonly CanonicalVisualFact[];
+}
+
+export interface CanonicalOfferingFact {
+  readonly offeringId: string;
+  readonly brandId: string;
+  readonly name: string;
+  readonly type: string;
+  readonly url: string;
+  readonly categoryTag: string | null;
+  readonly isActive: boolean;
+  readonly canonicalKind?: string | null;
+  readonly canonicalSubtype?: string | null;
+  readonly canonicalLifecycle?: string | null;
+  readonly description?: string | null;
+  readonly customerDestination?: string;
+  readonly mediaRefs?: readonly Readonly<{
+    id: string;
+    url: string;
+    authority: string;
+    origin: string;
+    revision: number;
+  }>[];
+  readonly bundleRelationships?: readonly Readonly<{
+    relationId: string;
+    bundleOfferingId: string;
+    productOfferingId: string;
+    revision: number;
+  }>[];
+  readonly brandConfirmedValues?: readonly Readonly<{
+    semanticFieldPath: string;
+    value: unknown;
+    revision: number;
+  }>[];
+  readonly canonicalPrice?: Readonly<{
+    revisionId: string;
+    mode: string;
+    currentMinAmount: string | null;
+    currentMaxAmount: string | null;
+    regularMinAmount: string | null;
+    regularMaxAmount: string | null;
+    currency: string;
+    freshness: string;
+    authority: string;
+    observedAt: string | null;
+  }> | null;
+  readonly canonicalOffers?: readonly Readonly<{
+    applicabilityId: string;
+    offerId: string;
+    name: string;
+    promoCode: string;
+    applicabilityScope: string;
+    validityStart: string;
+    validityEnd: string;
+    description: string | null;
+    entityLink: string | null;
+    termsText: string | null;
+    revision: number;
+  }>[];
+  readonly availableAtLocations?: readonly Readonly<{
+    relationId: string;
+    locationId: string;
+    name: string | null;
+    address: string;
+    city: string | null;
+    revision: number;
+  }>[];
+  readonly businessStateReference: BusinessStateReference;
+}
+
+export interface CanonicalLocationReference {
+  readonly brandId: string;
+  readonly locationId: string;
+  readonly name: string | null;
+  readonly city: string | null;
+  readonly authority: string;
+  readonly businessStateReference: BusinessStateReference;
+}
+
+export interface CanonicalOfferingIdentityReference {
+  readonly brandId: string;
+  readonly offeringId: string;
+  readonly name: string;
+  readonly type: string;
+  readonly businessStateReference: BusinessStateReference;
+}
+
+export interface CanonicalServiceabilitySnapshot {
+  readonly brandId: string;
+  readonly locations: readonly CanonicalLocationReference[];
+  readonly offeringIdentities: readonly CanonicalOfferingIdentityReference[];
+  /** Deliberately empty until application-owned availability exists. */
+  readonly offeringAvailabilityReferences: readonly BusinessStateReference[];
+  /** locationIds is not promoted into authoritative relationship state. */
+  readonly offeringLocationReferences: readonly BusinessStateReference[];
 }
 
 export interface CanonicalBrandStateReadRequest {
   readonly brandId: string;
   readonly requiredSemantics: readonly CanonicalBrandStateSemantic[];
+  readonly includeOfferingFacts?: boolean;
+  readonly includeVisualState?: boolean;
+  readonly includeServiceabilityState?: boolean;
+  /** Exact Product input scope; never inferred from URL or Evidence. */
+  readonly exactOfferingScope?: Readonly<{
+    readonly canonicalOfferingRef: string;
+  }>;
 }
 
 export interface CanonicalBrandStateReader {

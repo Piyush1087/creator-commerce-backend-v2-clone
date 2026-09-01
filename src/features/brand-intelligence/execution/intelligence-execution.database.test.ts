@@ -14,6 +14,7 @@ import type { PrismaService } from "../../../prisma/prisma.service";
 import { BundlePathOwnershipRegistry } from "../contracts/registry/bundle-path-ownership.registry";
 import type { ContractRuntimeRegistry } from "../contracts/registry/contract-runtime.registry";
 import { ComponentPathCodec } from "../semantic-path/component-path.codec";
+import { resolveIntelligenceSubject } from "../subject/intelligence-subject.resolver";
 import {
   SYNTHETIC_OUTPUT_CONTRACT_ID,
   SYNTHETIC_OUTPUT_CONTRACT_VERSION,
@@ -39,7 +40,9 @@ const hash = (seed: string) =>
   createHash("sha256").update(seed, "utf8").digest("hex");
 
 describe.skipIf(!databaseEnabled)("W1.0D PostgreSQL execution runtime", () => {
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient({
+    transactionOptions: { maxWait: 10_000 },
+  });
   const prismaService = prisma as unknown as PrismaService;
   const aggregation = new ExecutionAggregationService();
   const retryBackoff = new RetryBackoffPolicy();
@@ -75,6 +78,7 @@ describe.skipIf(!databaseEnabled)("W1.0D PostgreSQL execution runtime", () => {
     persistenceHook,
   );
   const brandId = randomUUID();
+  let brandSubjectId: string;
 
   function command(
     scenario: SyntheticProcessorScenario,
@@ -148,6 +152,7 @@ describe.skipIf(!databaseEnabled)("W1.0D PostgreSQL execution runtime", () => {
         targetAudience: {},
       },
     });
+    brandSubjectId = (await resolveIntelligenceSubject(prisma, brandId)).id;
   });
 
   afterAll(async () => {
@@ -158,6 +163,7 @@ describe.skipIf(!databaseEnabled)("W1.0D PostgreSQL execution runtime", () => {
       where: { brandId },
     });
     await prisma.intelligenceExecution.deleteMany({ where: { brandId } });
+    await prisma.intelligenceSubject.deleteMany({ where: { brandId } });
     await prisma.brandProfile.delete({ where: { id: brandId } });
     await prisma.$disconnect();
   });
@@ -400,6 +406,7 @@ describe.skipIf(!databaseEnabled)("W1.0D PostgreSQL execution runtime", () => {
     const execution = await prisma.intelligenceExecution.create({
       data: {
         brandId,
+        subjectId: brandSubjectId,
         triggerType: "WAITING_AGGREGATION_TEST",
         triggerRef: randomUUID(),
         triggerIdempotencyKey: randomUUID(),
@@ -415,6 +422,7 @@ describe.skipIf(!databaseEnabled)("W1.0D PostgreSQL execution runtime", () => {
       data: {
         executionId: execution.id,
         brandId,
+        subjectId: brandSubjectId,
         processorId: "completed-sibling",
         processorVersion: "1",
         bundleId: "aggregate-test",
@@ -506,6 +514,7 @@ describe.skipIf(!databaseEnabled)("W1.0D PostgreSQL execution runtime", () => {
     const execution = await prisma.intelligenceExecution.create({
       data: {
         brandId,
+        subjectId: brandSubjectId,
         triggerType: "AGGREGATION_TEST",
         triggerRef: randomUUID(),
         triggerIdempotencyKey: randomUUID(),
@@ -521,6 +530,7 @@ describe.skipIf(!databaseEnabled)("W1.0D PostgreSQL execution runtime", () => {
         data: {
           executionId: execution.id,
           brandId,
+          subjectId: brandSubjectId,
           processorId: `aggregate-${index}`,
           processorVersion: "1",
           bundleId: "aggregate-test",

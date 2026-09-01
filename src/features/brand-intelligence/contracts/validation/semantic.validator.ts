@@ -1,6 +1,14 @@
 import { Injectable } from "@nestjs/common";
+import { VisualStyleSemanticValidator } from "./visual-style.semantic-validator";
+import { ServiceabilitySemanticValidator } from "./serviceability.semantic-validator";
 import { BrandCharacterSemanticValidator } from "./brand-character.semantic-validator";
 import { AudiencePersonaSemanticValidator } from "./audience-persona.semantic-validator";
+import { BrandDifferentiationSemanticValidator } from "./brand-differentiation.semantic-validator";
+import { OfferingFactualSemanticValidator } from "./offering-factual.semantic-validator";
+import {
+  OfferingActionabilitySemanticValidator,
+  OfferingCreatorCommunicationSemanticValidator,
+} from "./offering-derived.semantic-validator";
 
 import type { VerifiedContractBundle } from "../bundle/contract-bundle.types";
 import { accepted, rejected } from "./validation-result";
@@ -73,6 +81,7 @@ function capabilityIds(bundle: VerifiedContractBundle): Set<string> {
   const evidence = bundle.artifacts.evidenceContract;
   const sections = [
     record(evidence.capabilities),
+    record(evidence.classifications),
     record(evidence.optional_enrichment),
   ];
   return new Set(sections.flatMap((section) => Object.keys(section ?? {})));
@@ -327,6 +336,12 @@ export class SemanticValidator {
         new BrandMeaningSemanticValidator(),
         new BrandCharacterSemanticValidator(),
         new AudiencePersonaSemanticValidator(),
+        new BrandDifferentiationSemanticValidator(),
+        new VisualStyleSemanticValidator(),
+        new ServiceabilitySemanticValidator(),
+        new OfferingFactualSemanticValidator(),
+        new OfferingCreatorCommunicationSemanticValidator(),
+        new OfferingActionabilitySemanticValidator(),
       ].map((validator) => [validator.validatorId, validator]),
     );
 

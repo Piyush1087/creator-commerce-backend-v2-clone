@@ -43,6 +43,33 @@ const location = z
     sourceIdentifier: boundedText.nullable(),
   })
   .strict();
+const commercial = z
+  .object({
+    locator: z.string().max(160),
+    sourceKind: z.enum(["HTML", "JSON_LD"]),
+    observedPriceMode: z.enum([
+      "EXACT",
+      "STARTING_AT",
+      "RANGE",
+      "NOT_PUBLICLY_LISTED",
+    ]),
+    currentMinAmount: z.number().finite().nonnegative().nullable(),
+    currentMaxAmount: z.number().finite().nonnegative().nullable(),
+    regularReferenceMinAmount: z.number().finite().nonnegative().nullable(),
+    regularReferenceMaxAmount: z.number().finite().nonnegative().nullable(),
+    currency: z
+      .string()
+      .regex(/^[A-Z]{3}$/)
+      .nullable(),
+    relationship: z.enum([
+      "CURRENT_ONLY",
+      "CURRENT_IS_SALE_WITH_REGULAR_REFERENCE",
+      "NOT_APPLICABLE",
+    ]),
+    explicitNotPubliclyListed: z.boolean(),
+    context: boundedText,
+  })
+  .strict();
 
 /** Provider-neutral bounded source descriptors, never computed styles or canonical state. */
 export const ownedSiteObservationFragmentSchema = z
@@ -51,6 +78,7 @@ export const ownedSiteObservationFragmentSchema = z
     statements: z.array(statement).max(80),
     visuals: z.array(visual).max(32),
     locations: z.array(location).max(24),
+    commercials: z.array(commercial).max(24).default([]),
     limitations: z.array(z.string().max(80)).max(12),
   })
   .strict();
@@ -59,6 +87,7 @@ export type OwnedSiteObservationFragment = z.infer<
 >;
 export type ObservedStatement = z.infer<typeof statement>;
 export type ObservedLocation = z.infer<typeof location>;
+export type ObservedCommercial = z.infer<typeof commercial>;
 
 const clean = (value: string) => value.replace(/\s+/g, " ").trim();
 const textValue = (value: unknown): string | null =>
@@ -78,6 +107,161 @@ const coordinate = (value: unknown, limit: number): number | null => {
     ? numeric
     : null;
 };
+
+const intlCurrencySupport = Intl as typeof Intl & {
+  supportedValuesOf(key: "currency"): string[];
+};
+const ISO_CURRENCIES = new Set(
+  intlCurrencySupport.supportedValuesOf("currency"),
+);
+type Money = { amount: number; currency: string | null; raw: string };
+const moneyPattern =
+  /(?:\b(AED|AUD|CAD|CHF|CNY|EUR|GBP|INR|JPY|NZD|SGD|USD)\s*|([$₹€£])\s*)(\d{1,12}(?:[,.]\d{1,3})*(?:\.\d{1,2})?)|\b(\d{1,12}(?:[,.]\d{1,3})*(?:\.\d{1,2})?)\s*(AED|AUD|CAD|CHF|CNY|EUR|GBP|INR|JPY|NZD|SGD|USD)\b/gi;
+
+function numericAmount(value: unknown): number | null {
+  if (typeof value === "number")
+    return Number.isFinite(value) && value >= 0 ? value : null;
+  if (typeof value !== "string") return null;
+  const normalized = value.replace(/,/g, "").trim();
+  if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) return null;
+  const amount = Number(normalized);
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+}
+
+function safeCurrency(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toUpperCase();
+  return ISO_CURRENCIES.has(normalized) ? normalized : null;
+}
+
+function symbolCurrency(symbol: string | undefined): string | null {
+  if (symbol === "₹") return "INR";
+  if (symbol === "€") return "EUR";
+  if (symbol === "£") return "GBP";
+  // A bare dollar symbol is not defensible as USD, CAD, AUD, NZD or SGD.
+  return null;
+}
+
+function monies(text: string): Money[] {
+  return [...text.matchAll(moneyPattern)].flatMap((match) => {
+    const amount = numericAmount(match[3] ?? match[4]);
+    if (amount === null) return [];
+    return [
+      {
+        amount,
+        currency:
+          safeCurrency(match[1] ?? match[5]) ?? symbolCurrency(match[2]),
+        raw: match[0],
+      },
+    ];
+  });
+}
+
+function commonCurrency(values: readonly Money[]): string | null {
+  const observed = [...new Set(values.map((value) => value.currency))];
+  return observed.length === 1 ? observed[0] : null;
+}
+
+function commercialFromText(
+  text: string,
+  locator: string,
+): z.infer<typeof commercial> | null {
+  const context = clean(text).slice(0, 600);
+  if (
+    /\b(?:price|pricing|cost)\s+(?:is\s+)?(?:not\s+public(?:ly\s+(?:available|listed))?|available\s+(?:only\s+)?on\s+request)|\bcontact\s+(?:us\s+)?for\s+pric(?:e|ing)|\brequest\s+(?:a\s+)?quote\b/i.test(
+      context,
+    )
+  ) {
+    return {
+      locator,
+      sourceKind: "HTML",
+      observedPriceMode: "NOT_PUBLICLY_LISTED",
+      currentMinAmount: null,
+      currentMaxAmount: null,
+      regularReferenceMinAmount: null,
+      regularReferenceMaxAmount: null,
+      currency: null,
+      relationship: "NOT_APPLICABLE",
+      explicitNotPubliclyListed: true,
+      context,
+    };
+  }
+  const values = monies(context);
+  if (!values.length) return null;
+  const regularCurrent =
+    /\b(?:was|regular(?:ly)?|regular price|mrp|list price)\b[\s\S]{0,80}\b(?:now|sale(?: price)?|promotional(?: price)?)\b/i.test(
+      context,
+    );
+  if (regularCurrent && values.length === 2) {
+    return {
+      locator,
+      sourceKind: "HTML",
+      observedPriceMode: "EXACT",
+      currentMinAmount: values[1].amount,
+      currentMaxAmount: values[1].amount,
+      regularReferenceMinAmount: values[0].amount,
+      regularReferenceMaxAmount: values[0].amount,
+      currency: commonCurrency(values),
+      relationship: "CURRENT_IS_SALE_WITH_REGULAR_REFERENCE",
+      explicitNotPubliclyListed: false,
+      context,
+    };
+  }
+  if (
+    values.length === 2 &&
+    /(?:\bbetween\b[\s\S]{0,80}\band\b|\b(?:price|pricing|cost)?\s*range\b|\bfrom\b[\s\S]{0,80}\bto\b|\s[-–—]\s)/i.test(
+      context,
+    )
+  ) {
+    return {
+      locator,
+      sourceKind: "HTML",
+      observedPriceMode: "RANGE",
+      currentMinAmount: Math.min(values[0].amount, values[1].amount),
+      currentMaxAmount: Math.max(values[0].amount, values[1].amount),
+      regularReferenceMinAmount: null,
+      regularReferenceMaxAmount: null,
+      currency: commonCurrency(values),
+      relationship: "CURRENT_ONLY",
+      explicitNotPubliclyListed: false,
+      context,
+    };
+  }
+  if (
+    values.length === 1 &&
+    /\b(?:from|starting\s+(?:at|from)|starts?\s+at|as\s+low\s+as)\b/i.test(
+      context,
+    )
+  ) {
+    return {
+      locator,
+      sourceKind: "HTML",
+      observedPriceMode: "STARTING_AT",
+      currentMinAmount: values[0].amount,
+      currentMaxAmount: null,
+      regularReferenceMinAmount: null,
+      regularReferenceMaxAmount: null,
+      currency: values[0].currency,
+      relationship: "CURRENT_ONLY",
+      explicitNotPubliclyListed: false,
+      context,
+    };
+  }
+  if (values.length !== 1) return null;
+  return {
+    locator,
+    sourceKind: "HTML",
+    observedPriceMode: "EXACT",
+    currentMinAmount: values[0].amount,
+    currentMaxAmount: values[0].amount,
+    regularReferenceMinAmount: null,
+    regularReferenceMaxAmount: null,
+    currency: values[0].currency,
+    relationship: "CURRENT_ONLY",
+    explicitNotPubliclyListed: false,
+    context,
+  };
+}
 
 function topLevelStyleRules(
   css: string,
@@ -118,6 +302,7 @@ export function retainOwnedSiteObservations(
     statements: [],
     visuals: [],
     locations: [],
+    commercials: [],
     limitations: ["DOM_DECLARATIONS_NOT_COMPUTED_OR_RENDERED"],
   };
   if (html.length > 250_000)
@@ -158,6 +343,16 @@ export function retainOwnedSiteObservations(
         authorship: testimonial ? "TESTIMONIAL" : "BRAND_AUTHORED",
         offeringContext,
       });
+      if (
+        !testimonial &&
+        result.commercials.length < 24 &&
+        !node.closest(
+          '[class*="related"],[class*="recommend"],[class*="upsell"],[class*="cross-sell"],[data-related-products]',
+        ).length
+      ) {
+        const observed = commercialFromText(text, `text:${index}:${unitIndex}`);
+        if (observed) result.commercials.push(observed);
+      }
     }
   });
   function addStyle(
@@ -313,9 +508,111 @@ export function retainOwnedSiteObservations(
     for (const key of ["@graph", "location", "department", "subOrganization"])
       if (node[key]) visit(node[key], `${locator}:${key}`, depth + 1);
   }
+
+  function typed(value: Record<string, unknown>, expected: string): boolean {
+    const types = Array.isArray(value["@type"])
+      ? value["@type"]
+      : [value["@type"]];
+    return types.includes(expected);
+  }
+
+  function structuredCommercial(
+    offer: Record<string, unknown>,
+    locator: string,
+  ): z.infer<typeof commercial> | null {
+    const currency = safeCurrency(offer.priceCurrency);
+    const low = numericAmount(offer.lowPrice);
+    const high = numericAmount(offer.highPrice);
+    const price = numericAmount(offer.price);
+    if (low !== null && high !== null) {
+      return {
+        locator,
+        sourceKind: "JSON_LD",
+        observedPriceMode: low === high ? "EXACT" : "RANGE",
+        currentMinAmount: Math.min(low, high),
+        currentMaxAmount: Math.max(low, high),
+        regularReferenceMinAmount: null,
+        regularReferenceMaxAmount: null,
+        currency,
+        relationship: "CURRENT_ONLY",
+        explicitNotPubliclyListed: false,
+        context: `Structured Offer ${low}-${high}${currency ? ` ${currency}` : ""}`,
+      };
+    }
+    if (price === null) return null;
+    return {
+      locator,
+      sourceKind: "JSON_LD",
+      observedPriceMode: "EXACT",
+      currentMinAmount: price,
+      currentMaxAmount: price,
+      regularReferenceMinAmount: null,
+      regularReferenceMaxAmount: null,
+      currency,
+      relationship: "CURRENT_ONLY",
+      explicitNotPubliclyListed: false,
+      context: `Structured Offer ${price}${currency ? ` ${currency}` : ""}`,
+    };
+  }
+
+  function collectTyped(
+    value: unknown,
+    expected: string,
+    output: Record<string, unknown>[],
+    depth = 0,
+  ): void {
+    if (depth > 4 || output.length > 24) return;
+    if (Array.isArray(value)) {
+      value
+        .slice(0, 24)
+        .forEach((entry) => collectTyped(entry, expected, output, depth + 1));
+      return;
+    }
+    const node = object(value);
+    if (!node) return;
+    if (typed(node, expected)) output.push(node);
+    for (const key of ["@graph", "mainEntity"])
+      if (node[key]) collectTyped(node[key], expected, output, depth + 1);
+  }
+
+  function addStructuredCommercial(value: unknown, locator: string): void {
+    if (result.commercials.length >= 24) return;
+    const products: Record<string, unknown>[] = [];
+    collectTyped(value, "Product", products);
+    if (products.length > 1) {
+      if (
+        !result.limitations.includes(
+          "AMBIGUOUS_MULTI_OFFERING_STRUCTURED_COMMERCIAL",
+        )
+      )
+        result.limitations.push(
+          "AMBIGUOUS_MULTI_OFFERING_STRUCTURED_COMMERCIAL",
+        );
+      return;
+    }
+    let rawOffers: unknown;
+    if (products.length === 1) rawOffers = products[0].offers;
+    else {
+      const directOffers: Record<string, unknown>[] = [];
+      collectTyped(value, "Offer", directOffers);
+      collectTyped(value, "AggregateOffer", directOffers);
+      if (directOffers.length !== 1) return;
+      rawOffers = directOffers[0];
+    }
+    const offers = Array.isArray(rawOffers) ? rawOffers : [rawOffers];
+    // Multiple Offer nodes can describe sibling variants or products; never turn them into a range.
+    if (offers.length !== 1) return;
+    const offer = object(offers[0]);
+    if (!offer || (!typed(offer, "Offer") && !typed(offer, "AggregateOffer")))
+      return;
+    const observed = structuredCommercial(offer, `${locator}:offers:0`);
+    if (observed) result.commercials.push(observed);
+  }
   $('script[type="application/ld+json"]').each((index, element) => {
     try {
-      visit(JSON.parse($(element).text()) as unknown, `jsonld:${index}`, 0);
+      const structured = JSON.parse($(element).text()) as unknown;
+      visit(structured, `jsonld:${index}`, 0);
+      addStructuredCommercial(structured, `jsonld:${index}`);
     } catch {
       if (!result.limitations.includes("MALFORMED_STRUCTURED_SOURCE"))
         result.limitations.push("MALFORMED_STRUCTURED_SOURCE");

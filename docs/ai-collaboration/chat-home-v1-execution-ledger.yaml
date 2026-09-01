@@ -1,0 +1,93 @@
+run_id: chat-home-v1
+execution_mode: HYBRID_RUN
+
+authority:
+  repository: Piyush1087/dummy_tcs
+  branch: main
+  sha: d69ba6b8cb331bfa36b450307d9defcd26d09c6e
+
+backend:
+  repository: Piyush1087/creator-commerce-backend-v2-clone
+  active_source:
+    branch: program/brand-settings-mvp
+    sha: 517531682f6286d5ee45bd48ec4e145e96d583a7
+  product_intelligence_source:
+    branch: phase-g/product-intelligence-v1
+    sha: f3a2d7b19f5692ad10e5d13751ee880e1604f93a
+
+phase:
+  id: P0
+  status: IN_PROGRESS
+
+integration:
+  branch: program/chat-home-v1
+  merge_base: a67afb5e4877605fb7a1b6401434e13f84b96cba
+  checkpoint_sha: null
+  merge_strategy: THREE_WAY_NO_FF_NO_COMMIT
+
+preflight:
+  worktree_initially_clean: true
+  authority_verified: true
+  remote_sources_verified: true
+  target_branch_absent_locally_and_remotely: true
+  active_unique_commits: 31
+  product_intelligence_unique_commits: 21
+  patch_equivalent_commits: []
+
+conflicts:
+  - path: src/features/brand-centre/services/brand-centre-dna.service.ts
+    resolution: Preserve active subscription capability and Instagram provenance behavior together with accepted canonical Offering behavior.
+  - path: src/features/brand-intelligence/brand-intelligence.module.ts
+    resolution: Import Data Extraction, canonical Brand state, and Notifications modules together.
+  - path: src/features/data-extraction/evidence/intelligence/data-extraction-intelligence-evidence.architecture.test.ts
+    resolution: Assert all three converged module dependencies without weakening the DE adapter boundary checks.
+
+migration_policy:
+  new_chat_home_migrations: 0
+  conversation_migration_required: false
+  accepted_product_intelligence_migrations:
+    - 20260827223000_product_intelligence_v1_canonical_offering_foundation
+    - 20260827234500_product_intelligence_v1_generic_intelligence_subject_scope
+    - 20260828120000_data_extraction_offering_commercial_evidence
+  accepted_migration_blobs:
+    20260827223000_product_intelligence_v1_canonical_offering_foundation: 9718a592525b3b4551519acd8a520cd50d110eee
+    20260827234500_product_intelligence_v1_generic_intelligence_subject_scope: e00ea913ccd91e8cad5b09ba888c7e9abdecc935
+    20260828120000_data_extraction_offering_commercial_evidence: e9b4252f579ebe8550cbefae9834acf8be253a4f
+
+diagnostics:
+  - id: P0_BREAKER_CLASSIFICATION_01
+    original_breaker: PRODUCTION_RUNTIME_FAILURE
+    area: notifications
+    finding: KNOWN_ACTIVE_BASELINE_NONDETERMINISM
+    convergence_causation: NOT_PROVEN
+    active_baseline_reproduced: true
+    candidate_reproduced_during_diagnostic: false
+    notification_code_changed_by_p0: false
+    notification_schema_changed_by_p0: false
+    pi_migrations_touch_notification_schema: false
+    fix_authorized: false
+    disposition: P0_RESUME_AUTHORIZED
+  - id: P0_BREAKER_CLASSIFICATION_02
+    area: subscription_lifecycle
+    classification: PRE_EXISTING_TIME_DEPENDENT_TEST_FIXTURE_DEFECT
+    convergence_causation: NOT_PROVEN
+    runtime_fix_authorized: false
+    product_semantic_change: false
+    test_harness_correction_authorized: true
+    correction:
+      file: src/features/pricing/services/subscription-lifecycle.p2.test.ts
+      type: FUTURE_EFFECTIVE_DATE_FIXTURE
+
+legacy_harness_observations:
+  classification: NON_GATING_LEGACY_HARNESS_OBSERVATIONS
+  items:
+    - area: BS01
+      finding: The legacy final-tree fixture is incompatible with final BS12 JWT and session fixture assumptions.
+    - area: BS06_P1C1
+      finding: The historical migration harness requires a pre-migration seeded fixture that is absent from a full migrated clone.
+    - area: BS06_LEGACY_PROVIDER
+      finding: The legacy provider harness uses provisional or superseded provider semantics; the current reconciliation suite passed 22 of 22 tests.
+
+tests: []
+breaker: null
+next_phase: P1

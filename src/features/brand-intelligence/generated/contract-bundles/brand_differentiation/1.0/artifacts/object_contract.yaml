@@ -1,0 +1,583 @@
+version: "1.0"
+status: FROZEN
+engine: brand_intelligence
+branch: brand_expression
+contract: objects
+shared_metadata_contract: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+compatibility_boundary:
+  existing_identity_branch:
+    status: [FROZEN_REFERENCE, COMPATIBILITY_ONLY]
+    rule: Do not modify or remap existing Identity objects/processors/artifacts/persistence in this contract.
+  brand_preview:
+    rule: Brand Preview bounded synthesis is not durable Brand Expression Intelligence and must not be silently promoted into these Objects.
+
+branch_purpose: >-
+  Maintain the smallest reusable durable Brand-level expression Intelligence required to explain what the Brand is,
+  what it stands for, how it creates customer value, what makes it credible or differentiated, and how it should
+  communicate across Brand Centre, Chat, Creator Strategy and Campaign Brief generation.
+
+non_owned_scope:
+  - canonical Brand account or confirmed identity anchors
+  - Brand Preview presentation synthesis
+  - Visual Identity
+  - Audience
+  - Geography
+  - Product / Offering Intelligence
+  - Campaign-specific strategy or Brief instructions
+  - provider or Data Extraction mechanics
+  - persistence implementation
+
+canonical_business_state_inputs:
+  required_or_applicable:
+    - brand_id
+    - brand_name
+    - website_url
+    - confirmed_industry
+    - confirmed_sub_industry_or_category
+  optional_context:
+    - primary_country_or_geography
+    - canonical_social_handles
+    - Brand-authored Brand Expression fields
+    - Brand-confirmed Brand Expression fields
+  authority_rule: Canonical business state is consumed as current authoritative context and is not duplicated as Brand Expression-owned Intelligence.
+
+shared_object_rules:
+  nullable_and_partial_maturity: true
+  no_onboarding_gate: true
+  protected_current_state_vs_derivation:
+    derivation_dependencies:
+      meaning: Evidence, canonical business-state context, or other semantic inputs permitted to produce or refresh a CREATOR_SHOP_DERIVED or OBSERVED value.
+      may_trigger_recompute: true
+    protected_current_authoritative_state:
+      meaning: Current BRAND_CONFIRMED value or protected subfield/item that remains authoritative even when new Evidence is evaluated.
+      ordinary_derivation_input_for_replacement: false
+      may_be_compared_against_new_evidence: true
+      conflict_behavior: preserve current authority; record or surface discrepancy according to later domain/application policy.
+  structured_identity_rule: >-
+    Structured/list Objects must define stable semantic identity for independently confirmable or refreshable items/subfields.
+    Authority may apply at Object, item, or subfield granularity without requiring any particular persistence model.
+  default_authority_lifecycle:
+    initial_observed: OBSERVED
+    initial_derived: CREATOR_SHOP_DERIVED
+    Brand_confirmation_transition:
+      from: [OBSERVED, CREATOR_SHOP_DERIVED]
+      to: BRAND_CONFIRMED
+    protected_refresh_rule: BRAND_CONFIRMED values or protected items/subfields cannot be silently overwritten by later observed or derived refresh.
+  default_freshness:
+    states: [CURRENT, STALE, UNKNOWN]
+    no_platform_ttl: true
+  default_readiness:
+    states: [READY, PARTIAL, NOT_READY, FAILED]
+    consumer_scoped: true
+    partial_is_usable: true
+  generation_lineage_required_for_derived_outputs:
+    - producer
+    - processor_version
+    - execution_id
+    - generated_at
+    - evidence_refs
+  supersession:
+    historical_lineage_preserved: true
+    stale_does_not_equal_superseded: true
+  confidence:
+    optional: true
+    allowed_when_material: true
+    allowed_values: [HIGH, MEDIUM, LOW]
+    numeric_percentage_required: false
+
+objects:
+  - id: brand_description
+    semantic_identity:
+      domain: brand_intelligence
+      branch: brand_expression
+      semantic_key: brand_description
+    definition: >-
+      A concise reusable description of what the Brand is, what it principally provides, and the business/customer
+      context necessary to understand it.
+    why_it_exists: Gives Brand Centre, Chat and downstream strategy stable Brand context without reconstructing basic Brand meaning from raw Evidence.
+    type: string
+    nullable: true
+    structure: scalar
+    semantic_boundaries:
+      not_equivalent_to:
+        - Brand Preview brand_descriptor
+        - Brand Preview brand_understanding_narrative
+        - tagline
+        - positioning
+        - marketing slogan
+    derivation_dependencies:
+      canonical_business_state_refs:
+        - brand_name
+        - website_url
+        - confirmed_industry
+        - confirmed_sub_industry_or_category
+      evidence_classes:
+        - owned_website_homepage
+        - owned_website_company_context
+        - owned_website_offering_context
+      protected_current_authoritative_state:
+        allowed: true
+        role: comparison_only_when_BRAND_CONFIRMED
+    authority:
+      supported: [OBSERVED, CREATOR_SHOP_DERIVED, BRAND_CONFIRMED]
+      default_ai_result: CREATOR_SHOP_DERIVED
+      Brand_editable: true
+      Brand_confirmation_protects_from_refresh: true
+    freshness:
+      policy: material Brand proposition/business-context change may mark derived value STALE.
+    invalidation:
+      on_material_change:
+        - canonical Brand category/context materially changes
+        - supporting Brand proposition Evidence materially changes
+        - explicit Brand edit
+      directed_only: true
+    readiness_by_consumer:
+      Brand_Centre: PARTIAL_ALLOWED
+      Chat: PARTIAL_ALLOWED
+      Creator_Strategy: OPTIONAL_CONTEXT
+      Campaign_Brief: OPTIONAL_CONTEXT
+    supersession:
+      versioned_when_recomputed: true
+    confidence:
+      materially_justified: false
+    maturity:
+      earliest_useful_stage: D
+      may_continue_maturing_at: E
+    downstream_consumers: [Brand_Centre, Chat, Creator_Strategy, Campaign_Brief]
+    persistence_target_classification: PERSISTENCE_RECONCILIATION_REQUIRED
+
+  - id: positioning
+    semantic_identity:
+      domain: brand_intelligence
+      branch: brand_expression
+      semantic_key: positioning
+    definition: >-
+      The reusable understanding of the strategic meaning or place the Brand seeks to occupy for its relevant customers,
+      grounded in Brand-owned truth and communication.
+    why_it_exists: Carries the Brand's intended strategic meaning into Brand Centre, Chat, Creator Strategy and downstream communication without becoming competitive-market ranking.
+    type: string
+    nullable: true
+    structure: scalar
+    semantic_boundaries:
+      excludes:
+        - competitor ranking
+        - market share
+        - unsupported leadership claims
+        - campaign-specific positioning
+    derivation_dependencies:
+      canonical_business_state_refs:
+        - brand_name
+        - confirmed_industry
+        - confirmed_sub_industry_or_category
+      evidence_classes:
+        - owned_website_homepage
+        - owned_website_company_context
+        - owned_website_brand_messaging
+        - Brand_user_input
+      protected_current_authoritative_state:
+        allowed: true
+        role: compare_new_evidence_without_automatic_replacement
+    authority:
+      supported: [OBSERVED, CREATOR_SHOP_DERIVED, BRAND_CONFIRMED]
+      default_ai_result: CREATOR_SHOP_DERIVED
+      Brand_editable: true
+      Brand_confirmation_protects_from_refresh: true
+    freshness:
+      policy: material Brand proposition, messaging, or explicit Brand edit may mark derived positioning STALE.
+    invalidation:
+      dependency_refs:
+        - brand_description
+        - confirmed_industry
+        - confirmed_sub_industry_or_category
+      directed_only: true
+    readiness_by_consumer:
+      Brand_Centre: PARTIAL_ALLOWED
+      Chat: PARTIAL_ALLOWED
+      Creator_Strategy: IMPORTANT_CONTEXT
+      Campaign_Brief: SUPPORTING_CONTEXT
+    supersession:
+      versioned_when_recomputed: true
+    confidence:
+      materially_justified: true
+      semantic_only: true
+    maturity:
+      earliest_useful_stage: D
+      may_continue_maturing_at: E
+    downstream_consumers: [Brand_Centre, Chat, Creator_Strategy, Campaign_Brief]
+    persistence_target_classification: PERSISTENCE_RECONCILIATION_REQUIRED
+
+  - id: value_proposition
+    semantic_identity:
+      domain: brand_intelligence
+      branch: brand_expression
+      semantic_key: value_proposition
+    definition: >-
+      The reusable customer-value proposition describing the principal value, outcome, convenience, capability, or experience
+      the Brand offers to relevant customers.
+    why_it_exists: Separates customer value from broader Brand positioning so downstream strategy and creator communication can explain why the Brand matters without inventing outcomes.
+    type: string
+    nullable: true
+    structure: scalar
+    semantic_boundaries:
+      prohibits:
+        - unsupported performance claim
+        - unsupported efficacy claim
+        - guaranteed customer outcome
+    derivation_dependencies:
+      canonical_business_state_refs:
+        - brand_name
+        - confirmed_industry
+        - confirmed_sub_industry_or_category
+      evidence_classes:
+        - owned_website_homepage
+        - owned_website_company_context
+        - owned_website_offering_context
+        - owned_website_brand_messaging
+      protected_current_authoritative_state:
+        allowed: true
+        role: compare_new_evidence_without_automatic_replacement
+    authority:
+      supported: [OBSERVED, CREATOR_SHOP_DERIVED, BRAND_CONFIRMED]
+      default_ai_result: CREATOR_SHOP_DERIVED
+      Brand_editable: true
+      Brand_confirmation_protects_from_refresh: true
+    freshness:
+      policy: material Offering/business proposition or Brand messaging change may mark derived value STALE.
+    invalidation:
+      dependency_refs:
+        - brand_description
+        - positioning
+      directed_only: true
+    readiness_by_consumer:
+      Brand_Centre: PARTIAL_ALLOWED
+      Chat: PARTIAL_ALLOWED
+      Creator_Strategy: IMPORTANT_CONTEXT
+      Campaign_Brief: IMPORTANT_CONTEXT
+    supersession:
+      versioned_when_recomputed: true
+    confidence:
+      materially_justified: true
+      semantic_only: true
+    maturity:
+      earliest_useful_stage: D
+      may_continue_maturing_at: E
+    downstream_consumers: [Brand_Centre, Chat, Creator_Strategy, Campaign_Brief]
+    persistence_target_classification: PERSISTENCE_RECONCILIATION_REQUIRED
+
+  - id: brand_values
+    semantic_identity:
+      domain: brand_intelligence
+      branch: brand_expression
+      semantic_key: brand_values
+    definition: A bounded set of principles, commitments, or beliefs that materially influence how the Brand presents itself and makes communication choices.
+    why_it_exists: Preserves reusable Brand-level principles without conflating them with personality traits or Campaign instructions.
+    type: array
+    nullable: true
+    structure:
+      item:
+        semantic_id:
+          required: true
+          meaning: Stable identity within the Brand Values collection across refresh/reconciliation.
+        value:
+          type: string
+          required: true
+        metadata_granularity:
+          authority: item
+          source: item
+          freshness: item_optional
+          supersession: item_optional
+    derivation_dependencies:
+      canonical_business_state_refs:
+        - brand_name
+        - confirmed_industry
+      evidence_classes:
+        - owned_website_company_context
+        - owned_website_brand_messaging
+        - Brand_user_input
+      protected_current_authoritative_state:
+        allowed: true
+        granularity: item
+        rule: confirmed items remain protected while unconfirmed items may refresh independently.
+    authority:
+      supported: [OBSERVED, CREATOR_SHOP_DERIVED, BRAND_CONFIRMED]
+      default_ai_result: CREATOR_SHOP_DERIVED
+      Brand_editable: true
+      Brand_confirmation_granularity: item
+    freshness:
+      policy: values normally have low natural decay; only material Brand change or explicit edit should invalidate confirmed/derived items.
+    invalidation:
+      directed_only: true
+      item_level_supported: true
+    readiness_by_consumer:
+      Brand_Centre: PARTIAL_ALLOWED
+      Chat: OPTIONAL_CONTEXT
+      Creator_Strategy: OPTIONAL_CONTEXT
+      Campaign_Brief: OPTIONAL_CONTEXT
+    supersession:
+      item_level_supported: true
+    confidence:
+      materially_justified: false
+    maturity:
+      earliest_useful_stage: E
+    downstream_consumers: [Brand_Centre, Chat, Creator_Strategy, Campaign_Brief]
+    persistence_target_classification: PERSISTENCE_RECONCILIATION_REQUIRED
+
+  - id: brand_personality
+    semantic_identity:
+      domain: brand_intelligence
+      branch: brand_expression
+      semantic_key: brand_personality
+    definition: A bounded set of human-readable character traits describing the Brand's characteristic persona or behavioral expression.
+    why_it_exists: Gives downstream communication and strategy a stable sense of Brand character without duplicating values or tone.
+    type: array
+    nullable: true
+    structure:
+      item:
+        semantic_id:
+          required: true
+          meaning: Stable identity within the Brand Personality collection across refresh/reconciliation.
+        trait:
+          type: string
+          required: true
+        metadata_granularity:
+          authority: item
+          source: item
+          freshness: item_optional
+          supersession: item_optional
+    derivation_dependencies:
+      evidence_classes:
+        - owned_website_brand_messaging
+        - owned_website_company_context
+        - Brand_user_input
+      protected_current_authoritative_state:
+        allowed: true
+        granularity: item
+        rule: confirmed traits remain protected while unconfirmed traits may refresh independently.
+    authority:
+      supported: [OBSERVED, CREATOR_SHOP_DERIVED, BRAND_CONFIRMED]
+      default_ai_result: CREATOR_SHOP_DERIVED
+      Brand_editable: true
+      Brand_confirmation_granularity: item
+    freshness:
+      policy: low-to-medium natural decay; invalidate only on material Brand expression change or explicit Brand edit.
+    invalidation:
+      directed_only: true
+      item_level_supported: true
+    readiness_by_consumer:
+      Brand_Centre: PARTIAL_ALLOWED
+      Chat: OPTIONAL_CONTEXT
+      Creator_Strategy: OPTIONAL_CONTEXT
+      Campaign_Brief: OPTIONAL_CONTEXT
+    supersession:
+      item_level_supported: true
+    confidence:
+      materially_justified: false
+    maturity:
+      earliest_useful_stage: E
+    downstream_consumers: [Brand_Centre, Chat, Creator_Strategy, Campaign_Brief]
+    persistence_target_classification: PERSISTENCE_RECONCILIATION_REQUIRED
+
+  - id: differentiation_and_proof
+    semantic_identity:
+      domain: brand_intelligence
+      branch: brand_expression
+      semantic_key: differentiation_and_proof
+    definition: >-
+      A structured set of Brand-level differentiators and the factual proof points or reasons that make each differentiator
+      credible for reusable creator communication and strategy.
+    why_it_exists: Prevents unsupported USP lists by keeping strategic differentiation semantically connected to factual support while preserving their distinct authority.
+    type: array
+    nullable: true
+    structure:
+      item:
+        semantic_id:
+          required: true
+          meaning: Stable identity for one differentiator record across refresh/reconciliation.
+        differentiator:
+          type: string
+          required: true
+          semantic_role: CREATOR_SHOP_STRATEGIC_INTERPRETATION_OR_BRAND_CONFIRMED_CLAIM
+          metadata_granularity:
+            authority: subfield
+            source: subfield
+            confidence: subfield_optional
+        proof_points:
+          type: array
+          nullable: true
+          item:
+            semantic_id:
+              required: true
+              meaning: Stable identity for one factual support point.
+            statement:
+              type: string
+              required: true
+            semantic_role: FACTUAL_SUPPORT
+            metadata_granularity:
+              authority: item
+              source: item
+              freshness: item
+              confidence: item_optional
+    derivation_dependencies:
+      canonical_business_state_refs:
+        - brand_name
+        - confirmed_industry
+        - confirmed_sub_industry_or_category
+      evidence_classes:
+        - owned_website_homepage
+        - owned_website_company_context
+        - owned_website_brand_messaging
+        - canonical_Brand_business_state
+      protected_current_authoritative_state:
+        allowed: true
+        granularity: differentiator_subfield_and_proof_item
+        rule: Brand-confirmed differentiators or proof statements are compared against new Evidence but not silently replaced.
+    authority:
+      supported: [OBSERVED, CREATOR_SHOP_DERIVED, BRAND_CONFIRMED]
+      differentiator_default: CREATOR_SHOP_DERIVED
+      proof_point_default: OBSERVED
+      Brand_editable: true
+      mixed_authority_within_object: true
+      critical_invariant: A CREATOR_SHOP_DERIVED differentiator does not elevate its supporting OBSERVED proof point to derived authority, and an OBSERVED proof point does not make a differentiator factual truth.
+    freshness:
+      policy: proof points may stale independently when supporting facts change; differentiator may remain current, become stale, or require reevaluation according to surviving proof.
+    invalidation:
+      directed_only: true
+      item_and_subfield_level_supported: true
+      proof_change_may_invalidate_parent_differentiator: true
+    readiness_by_consumer:
+      Brand_Centre: PARTIAL_ALLOWED
+      Chat: PARTIAL_ALLOWED
+      Creator_Strategy: IMPORTANT_CONTEXT
+      Campaign_Brief: IMPORTANT_CONTEXT
+    supersession:
+      item_level_supported: true
+      proof_item_level_supported: true
+    confidence:
+      materially_justified: true
+      primarily_for: differentiator_interpretation
+      proof_strength_may_be_domain_semantic: true
+    maturity:
+      earliest_useful_stage: E
+    downstream_consumers: [Brand_Centre, Chat, Creator_Strategy, Campaign_Brief]
+    persistence_target_classification: DERIVED_INTELLIGENCE_STORAGE_REQUIRED
+
+  - id: communication_profile
+    semantic_identity:
+      domain: brand_intelligence
+      branch: brand_expression
+      semantic_key: communication_profile
+    definition: >-
+      Reusable Brand-level guidance describing how the Brand communicates, including tonal character, explicit communication
+      constraints, optional free-text guidance, and primary communication language where useful.
+    why_it_exists: Provides one coherent communication authority for Brand Centre, Chat, Creator Strategy and Brief generation without splitting tone, constraints and language into artificial top-level Objects.
+    type: object
+    nullable: true
+    structure:
+      fields:
+        tone_traits:
+          type: array
+          nullable: true
+          item:
+            semantic_id:
+              required: true
+            trait:
+              type: string
+              required: true
+            metadata_granularity:
+              authority: item
+              source: item
+              freshness: item_optional
+        free_text_guidance:
+          type: string
+          nullable: true
+          metadata_granularity:
+            authority: subfield
+            source: subfield
+        communication_constraints:
+          type: array
+          nullable: true
+          item:
+            semantic_id:
+              required: true
+            constraint:
+              type: string
+              required: true
+            metadata_granularity:
+              authority: item
+              source: item
+              freshness: item_optional
+        primary_language:
+          type: string
+          nullable: true
+          normalization: ISO_639_1_lowercase_when_resolved
+          metadata_granularity:
+            authority: subfield
+            source: subfield
+            freshness: subfield_optional
+    semantic_boundaries:
+      excludes:
+        - Campaign CTA
+        - Campaign-specific mandatory talking points
+        - deliverable instructions
+        - platform-specific Campaign instructions
+        - Campaign objective
+    derivation_dependencies:
+      canonical_business_state_refs:
+        - brand_name
+        - confirmed_industry
+      evidence_classes:
+        - owned_website_brand_messaging
+        - owned_website_company_context
+        - Brand_user_input
+      protected_current_authoritative_state:
+        allowed: true
+        granularity: item_or_subfield
+        rule: confirmed tone traits, constraints, guidance or language remain protected independently from refreshable derived parts.
+    authority:
+      supported: [OBSERVED, CREATOR_SHOP_DERIVED, BRAND_CONFIRMED]
+      default_ai_result: CREATOR_SHOP_DERIVED
+      Brand_editable: true
+      mixed_authority_within_object: true
+    freshness:
+      policy: communication elements may stale independently after material Brand expression change; Brand-confirmed elements remain authoritative while stale until Brand changes them.
+    invalidation:
+      directed_only: true
+      item_and_subfield_level_supported: true
+    readiness_by_consumer:
+      Brand_Centre: PARTIAL_ALLOWED
+      Chat: IMPORTANT_CONTEXT
+      Creator_Strategy: IMPORTANT_CONTEXT
+      Campaign_Brief: IMPORTANT_CONTEXT
+    supersession:
+      item_and_subfield_history_supported: true
+    confidence:
+      materially_justified: false
+    maturity:
+      earliest_useful_stage: D
+      may_continue_maturing_at: E
+    downstream_consumers: [Brand_Centre, Chat, Creator_Strategy, Campaign_Brief]
+    persistence_target_classification: PERSISTENCE_RECONCILIATION_REQUIRED
+
+deferred_semantics:
+  website_currency:
+    disposition: DEFER_TO_PRODUCT_INTELLIGENCE_RECONCILIATION
+    permanent_Brand_Intelligence_object: false
+
+persistence_classification_vocabulary:
+  - MAP_TO_CANONICAL_BRAND_STATE
+  - DERIVED_INTELLIGENCE_STORAGE_REQUIRED
+  - PERSISTENCE_RECONCILIATION_REQUIRED
+
+validation_invariants:
+  - Exactly seven Objects are defined.
+  - Every Object is nullable or supports partial maturity.
+  - No Object is an onboarding gate or Brand Preview readiness prerequisite.
+  - Derivation dependencies and protected current authoritative state are independently represented.
+  - BRAND_CONFIRMED current state is not an ordinary derivation input that authorizes automated replacement.
+  - Structured/list Objects expose stable semantic identity for independently confirmable or refreshable items/subfields.
+  - differentiation_and_proof allows different authority for differentiator and proof points.
+  - Observed factual proof does not become equivalent to Creator Shop-derived strategic interpretation.
+  - Brand Preview bounded synthesis is not durable Brand Expression Intelligence.
+  - Existing Identity remains FROZEN_REFERENCE and COMPATIBILITY_ONLY.
+  - Provider names are absent from canonical source/evidence semantics.
+  - Persistence implementation is not defined here.

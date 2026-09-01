@@ -80,13 +80,13 @@ function artifactSemanticId(
   role: ContractArtifactRole,
   value: Readonly<Record<string, unknown>>,
 ): string {
-  return textField(
-    value,
+  const key =
     role === "OBJECT_CONTRACT" || role === "SHARED_METADATA_CONTRACT"
       ? "contract"
-      : "id",
-    role,
-  );
+      : role === "PROCESSOR_DEFINITION" && value.processor_id
+        ? "processor_id"
+        : "id";
+  return textField(value, key, role);
 }
 
 function git(sourceRoot: string, args: readonly string[]): Buffer {
@@ -159,6 +159,11 @@ function assertBundleSemantics(
   const evidence = parsed.EVIDENCE_CONTRACT;
   const objects = parsed.OBJECT_CONTRACT;
   const shared = parsed.SHARED_METADATA_CONTRACT;
+
+  if (spec.sourceDialect === "PRODUCT_ENGINE_V1") {
+    assertProductBundleSemantics(spec, parsed);
+    return;
+  }
 
   for (const [role, artifact] of Object.entries(parsed)) {
     if (artifact.status !== "FROZEN") {
@@ -285,6 +290,97 @@ function assertBundleSemantics(
     "output_contract_authority",
     spec.artifactPaths.OUTPUT_CONTRACT,
     "EVIDENCE_CONTRACT",
+  );
+}
+
+function assertProductBundleSemantics(
+  spec: ContractSourceSpec,
+  parsed: Readonly<Record<ContractArtifactRole, Record<string, unknown>>>,
+): void {
+  const processor = parsed.PROCESSOR_DEFINITION;
+  const reasoning = parsed.REASONING_CONTRACT;
+  const output = parsed.OUTPUT_CONTRACT;
+  const evidence = parsed.EVIDENCE_CONTRACT;
+  const objects = parsed.OBJECT_CONTRACT;
+  const shared = parsed.SHARED_METADATA_CONTRACT;
+  for (const [role, artifact] of Object.entries(parsed)) {
+    if (artifact.status !== "FROZEN")
+      throw new Error(`${role} status must be FROZEN`);
+  }
+  if (
+    textField(processor, "processor_id", "PROCESSOR_DEFINITION") !==
+      spec.processorId ||
+    textField(processor, "version", "PROCESSOR_DEFINITION") !==
+      spec.processorVersion ||
+    processor.engine !== spec.ownerEngine ||
+    reasoning.processor !== spec.processorId ||
+    reasoning.engine !== spec.ownerEngine ||
+    output.processor !== spec.processorId ||
+    evidence.engine !== spec.ownerEngine ||
+    objects.engine !== spec.ownerEngine
+  )
+    throw new Error("Product processor/engine identity mismatch");
+  if (
+    artifactSemanticId("OUTPUT_CONTRACT", output) !== spec.outputContractId ||
+    textField(output, "version", "OUTPUT_CONTRACT") !==
+      spec.outputContractVersion ||
+    artifactSemanticId("EVIDENCE_CONTRACT", evidence) !==
+      spec.evidenceContractId ||
+    textField(evidence, "version", "EVIDENCE_CONTRACT") !==
+      spec.evidenceContractVersion ||
+    shared.contract !== "shared_intelligence_metadata"
+  )
+    throw new Error("Product contract identity mismatch");
+  const objectRows = objects.objects;
+  if (!Array.isArray(objectRows))
+    throw new Error("Object contract objects must be an array");
+  const availableObjectIds = new Set(
+    objectRows.map((item) =>
+      textField(record(item, "Object"), "object_id", "Object"),
+    ),
+  );
+  const outputObjects = [output.object];
+  if (
+    outputObjects.length !== spec.ownedObjectSemanticIds.length ||
+    outputObjects.some(
+      (objectId) =>
+        typeof objectId !== "string" ||
+        !spec.ownedObjectSemanticIds.includes(objectId) ||
+        !availableObjectIds.has(objectId),
+    )
+  )
+    throw new Error("Product output Object ownership mismatch");
+  for (const artifact of [reasoning, output]) {
+    assertPathReference(
+      artifact,
+      "processor_definition",
+      spec.artifactPaths.PROCESSOR_DEFINITION,
+      "artifact",
+    );
+    assertPathReference(
+      artifact,
+      "object_authority",
+      spec.artifactPaths.OBJECT_CONTRACT,
+      "artifact",
+    );
+    assertPathReference(
+      artifact,
+      "shared_metadata_authority",
+      spec.artifactPaths.SHARED_METADATA_CONTRACT,
+      "artifact",
+    );
+  }
+  assertPathReference(
+    output,
+    "reasoning_authority",
+    spec.artifactPaths.REASONING_CONTRACT,
+    "OUTPUT_CONTRACT",
+  );
+  assertPathReference(
+    reasoning,
+    "evidence_authority",
+    spec.artifactPaths.EVIDENCE_CONTRACT,
+    "REASONING_CONTRACT",
   );
 }
 

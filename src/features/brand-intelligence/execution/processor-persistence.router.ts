@@ -1,4 +1,7 @@
 import { Injectable, Optional } from "@nestjs/common";
+import { VisualStylePersistenceHook } from "../processors/visual-style/visual-style-persistence.hook";
+import { ServiceabilityPersistenceHook } from "../processors/serviceability/serviceability-persistence.hook";
+import { BrandDifferentiationPersistenceHook } from "../processors/brand-differentiation/brand-differentiation-persistence.hook";
 import { BrandCharacterPersistenceHook } from "../processors/brand-character/brand-character-persistence.hook";
 import { AudiencePersonaPersistenceHook } from "../processors/audience-persona/audience-persona-persistence.hook";
 import type { Prisma } from "@prisma/client";
@@ -11,6 +14,7 @@ import type {
 import { SYNTHETIC_PROCESSOR_ID } from "./domain/intelligence-execution.types";
 import { ProcessorExecutorFailure } from "./executor/processor-executor";
 import type { ProcessorSuccessPersistenceHook } from "./processor-persistence.hook";
+import { OfferingFactualPersistenceHook } from "../processors/offering-factual/offering-factual-persistence.hook";
 
 /** Bounded dispatch only; finalization still owns the transaction and live lease. */
 @Injectable()
@@ -20,6 +24,13 @@ export class ProcessorPersistenceRouter implements ProcessorSuccessPersistenceHo
     private readonly meaning: BrandMeaningPersistenceHook,
     @Optional() private readonly character?: BrandCharacterPersistenceHook,
     @Optional() private readonly audience?: AudiencePersonaPersistenceHook,
+    @Optional()
+    private readonly differentiation?: BrandDifferentiationPersistenceHook,
+    @Optional() private readonly visualStyle?: VisualStylePersistenceHook,
+    @Optional()
+    private readonly serviceability?: ServiceabilityPersistenceHook,
+    @Optional()
+    private readonly offeringFactual?: OfferingFactualPersistenceHook,
   ) {}
   async persistBeforeCompletion(
     tx: Prisma.TransactionClient,
@@ -27,6 +38,36 @@ export class ProcessorPersistenceRouter implements ProcessorSuccessPersistenceHo
     result: ProcessorExecutionResult,
   ): Promise<void> {
     switch (claim.processorExecution.processorId) {
+      case "offering_factual_synthesis":
+      case "offering_creator_communication":
+      case "offering_actionability_synthesis":
+        if (!this.offeringFactual)
+          throw new ProcessorExecutorFailure({
+            category: "CONFIGURATION_DRIFT",
+            code: "PERSISTENCE_HOOK_REGISTRATION_MISSING",
+          });
+        return this.offeringFactual.persistBeforeCompletion(tx, claim, result);
+      case "serviceability_synthesis":
+        if (!this.serviceability)
+          throw new ProcessorExecutorFailure({
+            category: "CONFIGURATION_DRIFT",
+            code: "PERSISTENCE_HOOK_REGISTRATION_MISSING",
+          });
+        return this.serviceability.persistBeforeCompletion(tx, claim, result);
+      case "visual_style_synthesis":
+        if (!this.visualStyle)
+          throw new ProcessorExecutorFailure({
+            category: "CONFIGURATION_DRIFT",
+            code: "PERSISTENCE_HOOK_REGISTRATION_MISSING",
+          });
+        return this.visualStyle.persistBeforeCompletion(tx, claim, result);
+      case "brand_differentiation":
+        if (!this.differentiation)
+          throw new ProcessorExecutorFailure({
+            category: "CONFIGURATION_DRIFT",
+            code: "PERSISTENCE_HOOK_REGISTRATION_MISSING",
+          });
+        return this.differentiation.persistBeforeCompletion(tx, claim, result);
       case "audience_persona_synthesis":
         if (!this.audience)
           throw new ProcessorExecutorFailure({

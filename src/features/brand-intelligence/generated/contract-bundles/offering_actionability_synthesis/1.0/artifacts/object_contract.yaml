@@ -1,0 +1,267 @@
+version: "1.0"
+status: FROZEN
+engine: product_intelligence
+contract: objects
+scope: ONE_EXACT_CANONICAL_OFFERING_WITHIN_ONE_BRAND
+shared_metadata_contract: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+product_authority: intelligence/product_authority/product_intelligence_product_authority_register_v1.md
+
+engine_purpose: >-
+  Maintain derived, reusable Offering understanding for Brand Centre, Chat, creator strategy,
+  Campaign planning and Brief generation without owning or mutating canonical Offering state.
+
+canonical_application_state_boundary:
+  owner: application_backend
+  referenced_not_owned:
+    - Offering.id and Brand ownership
+    - Offering kind and industry-aware subtype
+    - Offering lifecycle
+    - customer destination
+    - canonical price and currency commercial tuple
+    - canonical Offer references
+    - canonical media and media approval
+    - OFFERING_AVAILABLE_AT_LOCATION relationships
+    - Collection/BUNDLE relationships
+    - Brand-confirmed Offering values
+  intelligence_owns: derived_understanding_only
+  canonical_field_invention: forbidden
+
+scope_rules:
+  subject_identity: exact durable canonical Offering.id
+  within: one exact Brand
+  cross_offering_evidence_consumption: forbidden
+  sibling_offering_context_as_substitute_for_subject_evidence: forbidden
+  execution_identity_invariant: >-
+    One processor execution for an Offering must be independently identifiable from an execution
+    for another Offering under the same Brand; the exact technical subject-scope representation is deferred to P1.
+
+shared_object_rules:
+  authority:
+    processor_may_emit: [OBSERVED, CREATOR_SHOP_DERIVED, SYSTEM_DERIVED]
+    processor_must_not_emit: [BRAND_CONFIRMED, SUPPORT_CONTROLLED]
+    brand_confirmation_transition_owner: authorized_application_or_business_state_action
+  readiness:
+    states: [READY, PARTIAL, NOT_READY]
+    consumer_scoped: true
+    partial_must_be_usable_bounded_degradation: true
+    filler: forbidden
+    processor_execution_failure:
+      object_readiness_state_created: false
+      failed_refresh_replaces_prior_current: false
+      readiness_when_no_current_result: NOT_READY
+      failure_exposed_by_runtime_independently: true
+  freshness:
+    states: [CURRENT, STALE, UNKNOWN]
+    no_universal_ttl: true
+    authority_independent: true
+  lineage:
+    required_for_derived_outputs: [producer, processor_version, execution_id, generated_at]
+    evidence_and_business_state_refs_required_when_material: true
+  protection:
+    brand_confirmed_non_price_truth_silent_overwrite: forbidden
+    ordinary_processor_replacement_of_protected_state: forbidden
+    conflict_behavior: preserve current and retain candidate/discrepancy according to shared runtime policy
+    price_exception_owner: canonical_Offering_application_state
+  partial_output:
+    contract_valid_subsets_allowed: true
+    explicit_null_distinct_from_not_evaluated: true
+    unsupported_content: null_or_omit_not_invent
+  semantic_item_identity:
+    required_for_independently_refreshable_items: true
+    array_position_as_identity: forbidden
+  claim_safety:
+    observed_statement_equals_externally_verified_fact: false
+    brand_confirmation_equals_external_verification: false
+    testimonial_equals_proof: false
+    credential_occurrence_equals_credential_verification: false
+    same_canonical_offering_support_required: true
+    regulated_or_high_risk_claims_without_sufficient_approved_support: FAIL_CLOSED
+
+objects:
+  - object_id: offering_factual_profile
+    owner_engine: product_intelligence
+    authority:
+      default_interpretive: CREATOR_SHOP_DERIVED
+      direct_fact_when_supported: OBSERVED
+      brand_confirmation_supported_by_application: true
+      processor_emits_brand_confirmed: false
+    definition: >-
+      Grounded reusable factual and customer-use understanding of one exact canonical Offering.
+    scope:
+      brand_ref: required
+      offering_ref: required
+      exact_subject_match_required: true
+    semantic_paths_owned:
+      - factual_summary
+      - key_facts
+      - key_benefits
+      - proof_points
+      - usage_context
+      - customer_context
+    structure:
+      factual_summary: {type: string, nullable: true}
+      key_facts: {type: semantic_item_array, nullable: true, item_value: fact}
+      key_benefits: {type: semantic_item_array, nullable: true, item_value: benefit}
+      proof_points: {type: semantic_item_array, nullable: true, item_value: statement}
+      usage_context: {type: semantic_item_array, nullable: true, item_value: context}
+      customer_context: {type: semantic_item_array, nullable: true, item_value: context}
+    readiness_semantics:
+      READY: all emitted semantics are grounded and sufficient for the declared consumer
+      PARTIAL: a useful grounded subset exists while unsupported families remain null or absent
+      NOT_READY: no safe useful factual understanding can be produced for the declared consumer
+      processor_execution_failure: does not create Object readiness; prior current remains, or readiness is NOT_READY when no current result exists
+    freshness_semantics:
+      policy: canonical Offering or materially supporting same-Offering Evidence change may stale only affected paths
+      proof_points_refresh_independently: true
+    canonical_application_state_inputs:
+      - exact Offering identity and Brand ownership
+      - kind and industry-aware subtype
+      - lifecycle
+      - canonical customer destination when relevant
+      - canonical media refs when relevant as context only
+      - canonical Collection/BUNDLE relationships when relevant
+      - Brand-confirmed Offering values
+    evidence_dependencies:
+      minimum:
+        - owned_website.offering_context scoped to the exact Offering
+      conditional:
+        - explicit factual proof or claim Evidence scoped to the exact Offering
+      optional:
+        - relevant canonical Brand context explicitly permitted by the processor contract
+    downstream_consumer_classes: [Brand_Centre, Chat, Creator_Strategy, Campaign_Planning, Campaign_Brief]
+    partial_output_behavior:
+      independent_family_nullability: true
+      unsupported_claim_or_benefit: omit_or_null
+      no_arbitrary_list_cardinality: true
+    protection_and_candidate_behavior:
+      granularity: field_or_semantic_item
+      protected_non_price_truth: preserved
+      conflict: candidate_or_discrepancy_not_silent_replacement
+    identity_and_scope_rules:
+      semantic_key: offering_factual_profile
+      subject_key: canonical Offering.id
+      item_identity: normalized_same_Offering_semantic_meaning
+      no_cross_offering_generalization: true
+
+  - object_id: offering_creator_communication_profile
+    owner_engine: product_intelligence
+    authority:
+      default_interpretive: CREATOR_SHOP_DERIVED
+      explicit_same_offering_constraint_when_supported: OBSERVED
+      brand_confirmation_supported_by_application: true
+      processor_emits_brand_confirmed: false
+    definition: >-
+      Reusable creator communication ingredients and constraints for one exact canonical Offering,
+      not final Campaign Brief copy.
+    scope:
+      brand_ref: required
+      offering_ref: required
+      exact_subject_match_required: true
+    semantic_paths_owned: [creator_talking_points, communication_constraints]
+    structure:
+      creator_talking_points: {type: semantic_item_array, nullable: true, item_value: talking_point}
+      communication_constraints: {type: semantic_item_array, nullable: true, item_value: constraint}
+    readiness_semantics:
+      READY: emitted ingredients are grounded and safe for the declared reusable consumer
+      PARTIAL: a safe useful subset exists and unsupported claims/constraints are absent
+      NOT_READY: no safely reusable creator communication ingredient is defensible
+      processor_execution_failure: does not create Object readiness; prior current remains, or readiness is NOT_READY when no current result exists
+    freshness_semantics:
+      policy: factual-profile, protected Offering guidance, Brand constraint, or proof change stales affected items only
+    canonical_application_state_inputs:
+      - exact Offering identity and Brand ownership
+      - Brand-confirmed Offering do-not-say guidance
+      - relevant protected Offering communication values
+    evidence_dependencies:
+      minimum:
+        - current offering_factual_profile when available and consumer-safe
+        - same-Offering claim/proof Evidence for any claim-sensitive item
+      optional:
+        - relevant Brand communication constraints
+        - derived_communication_constraint_evidence filtered to the exact Offering or explicitly applicable Brand scope
+    downstream_consumer_classes: [Brand_Centre, Chat, Creator_Strategy, Campaign_Planning, Campaign_Brief]
+    partial_output_behavior:
+      independent_family_nullability: true
+      unsupported_claim: fail_closed_and_omit
+      final_campaign_copy: forbidden
+      no_arbitrary_list_cardinality: true
+    protection_and_candidate_behavior:
+      granularity: semantic_item
+      protected_constraints_and_talking_points: preserved
+      conflict: candidate_or_discrepancy_not_silent_replacement
+    identity_and_scope_rules:
+      semantic_key: offering_creator_communication_profile
+      subject_key: canonical Offering.id
+      item_identity: normalized_same_Offering_communication_meaning
+      no_cross_offering_claim_support: true
+
+  - object_id: offering_actionability_profile
+    owner_engine: product_intelligence
+    authority:
+      default_interpretive: CREATOR_SHOP_DERIVED
+      deterministic_reference_normalization: SYSTEM_DERIVED
+      brand_confirmation_supported_by_application: true
+      processor_emits_brand_confirmed: false
+    definition: >-
+      Derived understanding of how a customer can act on interest in one exact canonical Offering and
+      the commercial context relevant to that action, without owning canonical commercial or geography state.
+    scope:
+      brand_ref: required
+      offering_ref: required
+      exact_subject_match_required: true
+    semantic_paths_owned: [customer_action, commercial_context]
+    structure:
+      customer_action: {type: semantic_item_array, nullable: true, item_value: action}
+      commercial_context: {type: semantic_item_array, nullable: true, item_value: context}
+    readiness_semantics:
+      READY: actionable interpretation is grounded in current canonical inputs and sufficient Evidence for the declared consumer
+      PARTIAL: a bounded action or commercial interpretation is safe while other context is unresolved
+      NOT_READY: no safe customer action or commercial interpretation can be asserted
+      processor_execution_failure: does not create Object readiness; prior current remains, or readiness is NOT_READY when no current result exists
+    freshness_semantics:
+      policy: lifecycle, destination, commercial tuple, Offer ref, Location relation, or supporting same-Offering Evidence change stales affected paths
+      commercial_context_high_refresh_sensitivity: true
+    canonical_application_state_inputs:
+      - exact Offering identity and Brand ownership
+      - lifecycle
+      - customer destination
+      - canonical price and currency commercial tuple
+      - canonical Offer refs when available
+      - OFFERING_AVAILABLE_AT_LOCATION refs
+    evidence_dependencies:
+      minimum:
+        - canonical inputs sufficient for the emitted interpretation
+      optional:
+        - owned_website.serviceability_evidence scoped to the exact Offering
+        - owned_website.location_evidence scoped to the exact Offering
+        - same-Offering first-party actionability context
+      deferred:
+        - Product commercial/price Evidence sufficiency requires P2 DE capability preflight
+    downstream_consumer_classes: [Brand_Centre, Chat, Creator_Strategy, Campaign_Planning, Campaign_Brief]
+    partial_output_behavior:
+      independent_family_nullability: true
+      missing_or_stale_commercial_truth: preserve_unknown_or_stale_semantics_not_zero
+      no_arbitrary_list_cardinality: true
+    protection_and_candidate_behavior:
+      granularity: semantic_item
+      canonical_price_mutation: forbidden
+      conflict: derived_discrepancy_not_canonical_mutation
+    identity_and_scope_rules:
+      semantic_key: offering_actionability_profile
+      subject_key: canonical Offering.id
+      item_identity: normalized_same_Offering_action_or_commercial_meaning
+      no_broad_canonical_geography_creation: true
+
+validation_invariants:
+  - Exactly three Product Intelligence Objects are defined.
+  - Object IDs are offering_factual_profile, offering_creator_communication_profile, and offering_actionability_profile.
+  - All ten PD-07 semantic families are owned exactly once.
+  - Every Object is scoped to one exact canonical Offering within one Brand.
+  - Canonical Offering fields and lifecycle remain application-owned.
+  - Product Intelligence produces derived understanding only.
+  - Brand-confirmed non-price truth is protected from silent overwrite.
+  - Price mutation remains outside Product Intelligence.
+  - Claim and proof support must match the same canonical Offering.
+  - Final Campaign Brief copy is not produced.
+  - No list cardinality is frozen.
+  - No persistence representation or migration is defined.

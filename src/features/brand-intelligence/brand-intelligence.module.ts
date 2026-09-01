@@ -1,4 +1,26 @@
 import { Module } from "@nestjs/common";
+import { ServiceabilityProcessorExecutor } from "./processors/serviceability/serviceability-processor.executor";
+import { ServiceabilityPersistenceHook } from "./processors/serviceability/serviceability-persistence.hook";
+import { ServiceabilityStateRepository } from "./processors/serviceability/serviceability-state.repository";
+import {
+  SERVICEABILITY_MODEL_PROVIDER,
+  StructuredServiceabilityModelProvider,
+} from "./processors/serviceability/serviceability-model.provider";
+import { BrandCanonicalStateModule } from "../brand-canonical-state/brand-canonical-state.module";
+import { VisualStyleProcessorExecutor } from "./processors/visual-style/visual-style-processor.executor";
+import { VisualStylePersistenceHook } from "./processors/visual-style/visual-style-persistence.hook";
+import { VisualStyleStateRepository } from "./processors/visual-style/visual-style-state.repository";
+import {
+  VISUAL_STYLE_MODEL_PROVIDER,
+  StructuredVisualStyleModelProvider,
+} from "./processors/visual-style/visual-style-model.provider";
+import { BrandDifferentiationProcessorExecutor } from "./processors/brand-differentiation/brand-differentiation-processor.executor";
+import { BrandDifferentiationPersistenceHook } from "./processors/brand-differentiation/brand-differentiation-persistence.hook";
+import { BrandDifferentiationStateRepository } from "./processors/brand-differentiation/brand-differentiation-state.repository";
+import {
+  BRAND_DIFFERENTIATION_MODEL_PROVIDER,
+  StructuredBrandDifferentiationModelProvider,
+} from "./processors/brand-differentiation/brand-differentiation-model.provider";
 import { AudiencePersonaProcessorExecutor } from "./processors/audience-persona/audience-persona-processor.executor";
 import { AudiencePersonaPersistenceHook } from "./processors/audience-persona/audience-persona-persistence.hook";
 import { AudiencePersonaStateRepository } from "./processors/audience-persona/audience-persona-state.repository";
@@ -65,8 +87,45 @@ import {
   BRAND_CHARACTER_MODEL_PROVIDER,
   StructuredBrandCharacterModelProvider,
 } from "./processors/brand-character/brand-character-model.provider";
+import { OfferingFactualProcessorExecutor } from "./processors/offering-factual/offering-factual-processor.executor";
+import { OfferingFactualPersistenceHook } from "./processors/offering-factual/offering-factual-persistence.hook";
+import {
+  OFFERING_FACTUAL_MODEL_PROVIDER,
+  StructuredOfferingFactualModelProvider,
+} from "./processors/offering-factual/offering-factual-model.provider";
+import {
+  OfferingActionabilityProcessorExecutor,
+  OfferingCreatorCommunicationProcessorExecutor,
+} from "./processors/offering-derived/offering-derived-processor.executor";
+import {
+  OFFERING_ACTIONABILITY_MODEL_PROVIDER,
+  OFFERING_CREATOR_MODEL_PROVIDER,
+  StructuredOfferingActionabilityModelProvider,
+  StructuredOfferingCreatorModelProvider,
+} from "./processors/offering-derived/offering-derived-model.provider";
 
 const internalProviders = [
+  ServiceabilityProcessorExecutor,
+  ServiceabilityPersistenceHook,
+  ServiceabilityStateRepository,
+  {
+    provide: SERVICEABILITY_MODEL_PROVIDER,
+    useClass: StructuredServiceabilityModelProvider,
+  },
+  VisualStyleProcessorExecutor,
+  VisualStylePersistenceHook,
+  VisualStyleStateRepository,
+  {
+    provide: VISUAL_STYLE_MODEL_PROVIDER,
+    useClass: StructuredVisualStyleModelProvider,
+  },
+  BrandDifferentiationProcessorExecutor,
+  BrandDifferentiationPersistenceHook,
+  BrandDifferentiationStateRepository,
+  {
+    provide: BRAND_DIFFERENTIATION_MODEL_PROVIDER,
+    useClass: StructuredBrandDifferentiationModelProvider,
+  },
   AudiencePersonaProcessorExecutor,
   AudiencePersonaPersistenceHook,
   AudiencePersonaStateRepository,
@@ -89,6 +148,22 @@ const internalProviders = [
   BrandCharacterProcessorExecutor,
   BrandCharacterPersistenceHook,
   BrandCharacterStateRepository,
+  OfferingFactualProcessorExecutor,
+  OfferingFactualPersistenceHook,
+  OfferingCreatorCommunicationProcessorExecutor,
+  OfferingActionabilityProcessorExecutor,
+  {
+    provide: OFFERING_FACTUAL_MODEL_PROVIDER,
+    useClass: StructuredOfferingFactualModelProvider,
+  },
+  {
+    provide: OFFERING_CREATOR_MODEL_PROVIDER,
+    useClass: StructuredOfferingCreatorModelProvider,
+  },
+  {
+    provide: OFFERING_ACTIONABILITY_MODEL_PROVIDER,
+    useClass: StructuredOfferingActionabilityModelProvider,
+  },
   BrandCommunicationPersistenceHook,
   BrandMeaningPersistenceHook,
   ProcessorExecutorRegistry,
@@ -139,7 +214,11 @@ const internalProviders = [
 ];
 
 @Module({
-  imports: [DataExtractionModule, NotificationsModule],
+  imports: [
+    DataExtractionModule,
+    BrandCanonicalStateModule,
+    NotificationsModule,
+  ],
   providers: internalProviders,
   exports: internalProviders,
 })

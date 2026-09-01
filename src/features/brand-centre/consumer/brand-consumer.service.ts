@@ -1,5 +1,4 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
 import { BrandVisualStateService } from "../../brand-canonical-state/brand-visual-state.service";
 import { BrandLocationService } from "../../brand-canonical-state/brand-location.service";
@@ -17,49 +16,42 @@ import {
   BRAND_CONSUMER_OBJECTS,
   intelligenceField,
 } from "./brand-consumer.mapper";
-import type { ConsumerRuntimeActivity } from "./brand-consumer.types";
+import {
+  aggregateProcessorRuntime,
+  ProcessorRuntimeProjectionService,
+} from "./processor-runtime-projection.service";
 
 @Injectable()
 export class BrandConsumerService {
   constructor(
     private readonly auth: BrandCentreAuthService,
-    private readonly prisma: PrismaService,
     @Inject(CANONICAL_BRAND_STATE_READER)
     private readonly canonical: CanonicalBrandStateReader,
     private readonly visuals: BrandVisualStateService,
     private readonly locations: BrandLocationService,
     private readonly intelligence: IntelligenceCurrentProjectionService,
+    private readonly processorRuntime: ProcessorRuntimeProjectionService,
   ) {}
 
   async read(user: AuthUser) {
     // Brand selection is exclusively derived from the authenticated organization.
     const brandId = await this.auth.resolveBrandProfileId(user);
-    const [anchors, visual, locations, objects, execution, scan] =
-      await Promise.all([
-        this.canonical.read({
-          brandId,
-          requiredSemantics: CANONICAL_BRAND_STATE_SEMANTICS.filter(
-            (key) => key !== "brand_logo",
-          ),
-        }),
-        this.visuals.read(brandId),
-        this.locations.read(brandId),
-        Promise.all(
-          BRAND_CONSUMER_OBJECTS.map((objectSemanticId) =>
-            this.intelligence.readObject({ brandId, objectSemanticId }),
-          ),
+    const [anchors, visual, locations, objects] = await Promise.all([
+      this.canonical.read({
+        brandId,
+        requiredSemantics: CANONICAL_BRAND_STATE_SEMANTICS.filter(
+          (key) => key !== "brand_logo",
         ),
-        this.prisma.intelligenceExecution.findFirst({
-          where: { brandId },
-          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-          select: { status: true },
-        }),
-        this.prisma.brandCentreJob.findFirst({
-          where: { brandProfileId: brandId, type: "DEEP_SCAN" },
-          orderBy: [{ queuedAt: "desc" }, { id: "desc" }],
-          select: { status: true },
-        }),
-      ]);
+      }),
+      this.visuals.read(brandId),
+      this.locations.read(brandId),
+      Promise.all(
+        BRAND_CONSUMER_OBJECTS.map((objectSemanticId) =>
+          this.intelligence.readObject({ brandId, objectSemanticId }),
+        ),
+      ),
+    ]);
+    const processorRuntime = await this.processorRuntime.read(brandId, objects);
     const fields = Object.fromEntries(
       anchors.entries.map((entry) => [entry.semantic, anchorField(entry)]),
     );
@@ -72,18 +64,7 @@ export class BrandConsumerService {
     const hasCurrent = objects.some(
       (object) => object.objectState !== "NO_CURRENT",
     );
-    const active =
-      execution?.status === "PENDING" ||
-      execution?.status === "RUNNING" ||
-      scan?.status === "QUEUED" ||
-      scan?.status === "RUNNING";
-    const runtimeActivity: ConsumerRuntimeActivity = active
-      ? hasCurrent
-        ? "REFRESHING"
-        : "LEARNING"
-      : execution?.status === "FAILED" || scan?.status === "FAILED"
-        ? "TEMPORARILY_UNAVAILABLE"
-        : "NONE";
+    const runtimeActivity = aggregateProcessorRuntime(processorRuntime);
     const itemMeta = (item: {
       id: string;
       authority: string;
@@ -146,6 +127,7 @@ export class BrandConsumerService {
             ? ("PARTIAL" as const)
             : ("NOT_READY" as const),
       runtimeActivity,
+      processorRuntime,
       identity: {
         brandName: fields.brand_name,
         website: {

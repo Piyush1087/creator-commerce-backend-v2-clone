@@ -1,0 +1,109 @@
+id: offering_creator_communication_reasoning
+version: "1.0"
+status: FROZEN
+processor: offering_creator_communication
+engine: product_intelligence
+processor_definition: intelligence/engines/product_intelligence/processors/offering_creator_communication.yaml
+object_authority: intelligence/engines/product_intelligence/objects.yaml#offering_creator_communication_profile
+evidence_authority: intelligence/engines/product_intelligence/evidence/product_intelligence_evidence_requirements.yaml
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+purpose: >-
+  Define safe reasoning for reusable creator talking-point ingredients and communication constraints for one exact
+  canonical Offering without producing final Campaign Brief copy or overstating claim support.
+
+model_capability_requirement: structured_grounded_reasoning_with_claim_safety
+provider_or_model_selection: deferred_to_model_registry
+
+inputs:
+  subject: [brand_ref, exact canonical offering_ref]
+  intelligence:
+    - current offering_factual_profile when available and consumer-safe
+  canonical:
+    - Brand-confirmed Offering do-not-say guidance
+    - protected same-Offering communication values
+  evidence:
+    required_for_claim_sensitive_items:
+      - sufficient approved same-Offering claim or proof Evidence
+    optional:
+      - exact-Offering communication constraint Evidence
+      - explicitly applicable Brand communication constraints
+
+scope_policy:
+  exact_offering_match_required: true
+  sibling_offering_evidence: reject
+  Brand_level_constraint_use:
+    allowed_when: explicit rule applicability includes the subject Offering
+    must_not_be_assumed_from_brand_membership_alone: true
+
+protected_current_state:
+  protected_offering_guidance: normative_context_and_comparison_only
+  ordinary_refresh_replacement: forbidden
+  conflict_behavior: preserve protected current and retain candidate/discrepancy lineage
+
+reasoning_sequence:
+  - validate Brand and exact canonical Offering scope
+  - identify requested unprotected semantic paths and protected do-not-say guidance
+  - load current factual understanding without treating stale or unsupported content as current truth
+  - separate direct factual ingredients from interpretive creator communication suggestions
+  - generate only reusable creator_talking_points grounded in the exact Offering
+  - apply each explicit Offering or applicable Brand communication constraint
+  - reject Campaign-specific objective, audience, CTA, deliverable, timing, and platform instructions
+  - fail closed on claim-sensitive talking points without sufficient approved same-Offering support
+  - preserve stable semantic identity across wording-only changes
+  - return a bounded partial profile when only some ingredients are defensible
+
+creator_talking_points:
+  semantic_role: reusable_grounded_creator_ingredient
+  rules:
+    - explain or demonstrate only defensible exact-Offering facts, benefits, proof, usage, or customer context
+    - do not turn a reusable ingredient into final Brief wording
+    - do not add campaign objective, CTA, audience, deliverable, platform, timing, or creative-direction content
+    - claim-sensitive language must not exceed approved support
+  default_authority: CREATOR_SHOP_DERIVED
+
+communication_constraints:
+  semantic_role: reusable_offering_communication_boundary
+  rules:
+    - preserve Brand-confirmed Offering do-not-say guidance
+    - explicit same-Offering owned-source rules may be OBSERVED
+    - a repeated pattern remains descriptive unless explicit authority makes it a rule
+    - absence of a prohibition never proves permission or creates a negative rule
+    - conflicts resolve to narrower safe output or partial/null, never invented certainty
+
+claim_and_proof_safety:
+  observed_statement_is_externally_verified_fact: false
+  brand_confirmation_is_external_verification: false
+  testimonial_is_proof: false
+  credential_occurrence_is_verification: false
+  same_offering_support_required: true
+  regulated_or_high_risk_categories: [efficacy, safety, success, superiority]
+  insufficient_approved_support: fail_closed_and_omit
+  compliance_engine_created: false
+
+partial_output:
+  supported: true
+  valid_examples:
+    - creator_talking_points only
+    - communication_constraints only
+    - both families
+  arbitrary_list_cardinality: not_frozen
+  unsupported_item: omit
+  filler: forbidden
+
+refresh_and_invalidation:
+  directed_only: true
+  exact_offering_only: true
+  triggers:
+    - relevant factual-profile path change or staleness
+    - same-Offering claim or proof Evidence change
+    - Brand-confirmed Offering do-not-say change
+    - explicitly applicable Brand communication constraint change
+
+non_goals:
+  - final Campaign Brief copy
+  - Campaign-specific strategy
+  - canonical state mutation
+  - compliance engine
+  - provider or model selection
+  - runtime or persistence design

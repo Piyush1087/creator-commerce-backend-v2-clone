@@ -8,6 +8,7 @@ import type {
 
 import type { ComponentSemanticAddress } from "../../semantic-path/component-path.types";
 import type { ContractRegistryKey } from "../../contracts/bundle/contract-bundle.types";
+import type { IntelligenceSubjectSelector } from "../../subject/intelligence-subject.resolver";
 
 export const SYNTHETIC_PROCESSOR_ID = "synthetic_test_processor";
 export const SYNTHETIC_PROCESSOR_VERSION = "1.0";
@@ -50,6 +51,8 @@ export interface ProcessorExecutionRequest {
 
 export interface CreateIntelligenceExecutionCommand {
   readonly brandId: string;
+  /** Omission is the explicit legacy Brand compatibility boundary. */
+  readonly subject?: IntelligenceSubjectSelector;
   readonly triggerType: string;
   readonly triggerRef: string;
   readonly triggerIdempotencyKey: string;

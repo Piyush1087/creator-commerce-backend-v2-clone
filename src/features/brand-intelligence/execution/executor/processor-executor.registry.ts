@@ -1,4 +1,7 @@
 import { Injectable, Optional } from "@nestjs/common";
+import { VisualStyleProcessorExecutor } from "../../processors/visual-style/visual-style-processor.executor";
+import { ServiceabilityProcessorExecutor } from "../../processors/serviceability/serviceability-processor.executor";
+import { BrandDifferentiationProcessorExecutor } from "../../processors/brand-differentiation/brand-differentiation-processor.executor";
 
 import { IntelligenceExecutionError } from "../domain/intelligence-execution.error";
 import { SYNTHETIC_PROCESSOR_ID } from "../domain/intelligence-execution.types";
@@ -8,6 +11,11 @@ import { BrandCommunicationProcessorExecutor } from "../../processors/brand-comm
 import { BrandMeaningProcessorExecutor } from "../../processors/brand-meaning/brand-meaning-processor.executor";
 import { BrandCharacterProcessorExecutor } from "../../processors/brand-character/brand-character-processor.executor";
 import { AudiencePersonaProcessorExecutor } from "../../processors/audience-persona/audience-persona-processor.executor";
+import { OfferingFactualProcessorExecutor } from "../../processors/offering-factual/offering-factual-processor.executor";
+import {
+  OfferingActionabilityProcessorExecutor,
+  OfferingCreatorCommunicationProcessorExecutor,
+} from "../../processors/offering-derived/offering-derived-processor.executor";
 
 @Injectable()
 export class ProcessorExecutorRegistry {
@@ -23,6 +31,18 @@ export class ProcessorExecutorRegistry {
     brandCharacterExecutor?: BrandCharacterProcessorExecutor,
     @Optional()
     audiencePersonaExecutor?: AudiencePersonaProcessorExecutor,
+    @Optional()
+    brandDifferentiationExecutor?: BrandDifferentiationProcessorExecutor,
+    @Optional()
+    visualStyleExecutor?: VisualStyleProcessorExecutor,
+    @Optional()
+    serviceabilityExecutor?: ServiceabilityProcessorExecutor,
+    @Optional()
+    offeringFactualExecutor?: OfferingFactualProcessorExecutor,
+    @Optional()
+    offeringCreatorExecutor?: OfferingCreatorCommunicationProcessorExecutor,
+    @Optional()
+    offeringActionabilityExecutor?: OfferingActionabilityProcessorExecutor,
   ) {
     const executors: [string, ProcessorExecutor][] = [
       [SYNTHETIC_PROCESSOR_ID, syntheticExecutor],
@@ -44,6 +64,33 @@ export class ProcessorExecutorRegistry {
       executors.push([
         audiencePersonaExecutor.processorId,
         audiencePersonaExecutor,
+      ]);
+    if (brandDifferentiationExecutor)
+      executors.push([
+        brandDifferentiationExecutor.processorId,
+        brandDifferentiationExecutor,
+      ]);
+    if (visualStyleExecutor)
+      executors.push([visualStyleExecutor.processorId, visualStyleExecutor]);
+    if (serviceabilityExecutor)
+      executors.push([
+        serviceabilityExecutor.processorId,
+        serviceabilityExecutor,
+      ]);
+    if (offeringFactualExecutor)
+      executors.push([
+        offeringFactualExecutor.processorId,
+        offeringFactualExecutor,
+      ]);
+    if (offeringCreatorExecutor)
+      executors.push([
+        offeringCreatorExecutor.processorId,
+        offeringCreatorExecutor,
+      ]);
+    if (offeringActionabilityExecutor)
+      executors.push([
+        offeringActionabilityExecutor.processorId,
+        offeringActionabilityExecutor,
       ]);
     this.executors = new Map(executors);
   }

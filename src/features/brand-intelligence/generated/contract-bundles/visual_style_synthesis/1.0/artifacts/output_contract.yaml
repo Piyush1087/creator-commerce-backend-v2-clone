@@ -1,0 +1,160 @@
+id: visual_style_synthesis_output_contract
+version: "1.0"
+status: FROZEN
+processor: visual_style_synthesis
+object: visual_style_profile
+strict: true
+additional_properties: false
+processor_definition: intelligence/engines/brand_intelligence/branches/visual_identity/processors/visual_style_synthesis.yaml
+reasoning_authority: intelligence/engines/brand_intelligence/branches/visual_identity/artifacts/visual_style_synthesis/reasoning.yaml
+object_authority: intelligence/engines/brand_intelligence/branches/visual_identity/objects.yaml
+shared_metadata_authority: intelligence/architecture/shared_intelligence_metadata_contract.yaml
+
+response:
+  type: object
+  required:
+    - visual_style_profile
+    - output_metadata
+  additional_properties: false
+  properties:
+    visual_style_profile:
+      type: [object, "null"]
+      nullable: true
+      additional_properties: false
+      fields:
+        summary: {type: [string, "null"], nullable: true}
+        style_traits:
+          type: [array, "null"]
+          nullable: true
+          item: semantic_trait_item
+        imagery_style:
+          type: [object, "null"]
+          nullable: true
+          additional_properties: false
+          fields:
+            photographic_tendencies: {type: [array, "null"], nullable: true, item: semantic_value_item}
+            subject_tendencies: {type: [array, "null"], nullable: true, item: semantic_value_item}
+            mood_or_treatment: {type: [array, "null"], nullable: true, item: semantic_value_item}
+        graphic_treatment:
+          type: [object, "null"]
+          nullable: true
+          additional_properties: false
+          fields:
+            traits: {type: [array, "null"], nullable: true, item: semantic_value_item}
+        visual_constraints:
+          type: [array, "null"]
+          nullable: true
+          generated_by_processor: false
+          semantic_role: PROTECTED_CURRENT_STATE_ONLY
+          item:
+            additional_properties: false
+            required: [semantic_id, rule]
+            fields:
+              semantic_id: {type: string, min_length: 1}
+              rule: {type: string, min_length: 1}
+    output_metadata:
+      type: object
+      additional_properties: false
+      required:
+        - summary
+        - style_traits
+        - imagery_style
+        - graphic_treatment
+        - visual_constraints
+      fields:
+        summary: {type: [object, "null"], nullable: true}
+        style_traits: {type: [array, "null"], nullable: true}
+        imagery_style: {type: [object, "null"], nullable: true}
+        graphic_treatment: {type: [object, "null"], nullable: true}
+        visual_constraints:
+          type: [array, "null"]
+          nullable: true
+          metadata_role: PROTECTED_INPUT_METADATA_ONLY
+
+semantic_trait_item:
+  additional_properties: false
+  required: [semantic_id, trait]
+  fields:
+    semantic_id: {type: string, min_length: 1, stable_identity_rule: normalized_trait_meaning}
+    trait: {type: string, min_length: 1}
+
+semantic_value_item:
+  additional_properties: false
+  required: [semantic_id, value]
+  fields:
+    semantic_id: {type: string, min_length: 1, stable_identity_rule: normalized_visual_pattern_meaning}
+    value: {type: string, min_length: 1}
+
+generated_metadata:
+  required: [authority, source_class, freshness, evidence_refs]
+  fields:
+    authority:
+      type: enum
+      values: [OBSERVED, CREATOR_SHOP_DERIVED, SYSTEM_DERIVED]
+      forbidden: [BRAND_CONFIRMED, SUPPORT_CONTROLLED]
+    source_class:
+      type: enum
+      values: [OWNED_WEBSITE, BRAND_USER_INPUT, INSTAGRAM_OWNED, CANONICAL_BUSINESS_STATE, MULTI_SOURCE, SYSTEM_DERIVATION_INPUT]
+    freshness:
+      type: enum
+      values: [CURRENT, STALE, UNKNOWN]
+    evidence_refs:
+      type: array
+      unique_items: true
+      item_type: string
+    business_state_refs:
+      type: array
+      required: false
+      unique_items: true
+      item_type: string
+    confidence:
+      type: [string, "null"]
+      nullable: true
+      values_when_non_null: [HIGH, MEDIUM, LOW]
+
+partial_shape_rules:
+  profile_may_be_null: true
+  component_level_partial: true
+  visual_constraints_may_be_null: true
+  all_descriptive_components_required: false
+  filler: forbidden
+
+structural_validation:
+  reject_additional_properties: true
+  reject_duplicate_style_trait_ids: true
+  reject_duplicate_nested_item_ids: true
+  reject_blank_non_null_strings: true
+
+semantic_validation:
+  canonical_asset_boundary:
+    - exact canonical logo_palette_font_or_reference_asset payload duplication invalid
+    - canonical visual assets referenced by business_state_ref
+  description_pattern_constraint:
+    - descriptive pattern may be OBSERVED or CREATOR_SHOP_DERIVED
+    - observed_or_derived_pattern cannot become hard constraint
+  visual_constraints:
+    - processor_generated_constraint invalid
+    - constraint authority other than protected BRAND_CONFIRMED invalid
+    - protected constraints may only be retained unchanged outside generated scope
+  preview:
+    - preview_logo_direct_canonical_promotion invalid
+    - preview_logo_direct_visual_style_profile_promotion invalid
+  campaign:
+    - campaign_art_direction_shot_list_deliverable_or_CTA invalid
+
+protected_current_state_validation:
+  generated_output_must_not_replace_brand_confirmed_component: true
+  visual_constraints_are_protected_input_not_generated_semantic: true
+  processor_emitted_brand_confirmed: invalid
+
+lineage_validation:
+  non_null_generated_descriptive_component_requires_evidence_or_business_state_lineage: true
+  provider_names_as_source_classes: invalid
+  generation_lineage_required_at_runtime_boundary: true
+
+readiness:
+  consumer_scoped: true
+  no_brand_preview_gate: true
+  no_verification_gate: true
+  no_home_gate: true
+  no_brand_centre_entry_gate: true

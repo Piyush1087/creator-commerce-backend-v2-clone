@@ -64,8 +64,8 @@ function validated<T extends z.ZodTypeAny>(
 export class BrandVisualStateService {
   constructor(private readonly prisma: PrismaService) {}
 
-  read(brandProfileId: string) {
-    return this.prisma.brandVisualState.findUnique({
+  read(brandProfileId: string, tx?: Prisma.TransactionClient) {
+    return (tx ?? this.prisma).brandVisualState.findUnique({
       where: { brandProfileId },
       include: {
         primaryLogo: true,

@@ -101,9 +101,9 @@ describe("DE-W1.0F production reader architecture", () => {
   });
 
   it("binds production Intelligence reads to the exported DE adapter without a circular module import", () => {
-    expect(intelligenceModule).toContain(
-      "imports: [DataExtractionModule, NotificationsModule]",
-    );
+    expect(intelligenceModule).toContain("DataExtractionModule");
+    expect(intelligenceModule).toContain("BrandCanonicalStateModule");
+    expect(intelligenceModule).toContain("NotificationsModule");
     expect(intelligenceModule).toContain(
       "useExisting: DataExtractionIntelligenceEvidenceAdapter",
     );

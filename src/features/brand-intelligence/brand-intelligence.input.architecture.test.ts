@@ -34,7 +34,7 @@ describe("W1.0E input-port architecture", () => {
     }
   });
 
-  it("keeps input ports bounded with exactly four real executable processors", () => {
+  it("keeps input ports bounded with seven Brand and three Product executables", () => {
     expect(
       registry.registrations.map((registration) => ({
         processorId: registration.processorId,
@@ -63,6 +63,42 @@ describe("W1.0E input-port architecture", () => {
       },
       {
         processorId: "audience_persona_synthesis",
+        bundled: true,
+        registered: true,
+        executionEnabled: true,
+      },
+      {
+        processorId: "brand_differentiation",
+        bundled: true,
+        registered: true,
+        executionEnabled: true,
+      },
+      {
+        processorId: "visual_style_synthesis",
+        bundled: true,
+        registered: true,
+        executionEnabled: true,
+      },
+      {
+        processorId: "serviceability_synthesis",
+        bundled: true,
+        registered: true,
+        executionEnabled: true,
+      },
+      {
+        processorId: "offering_factual_synthesis",
+        bundled: true,
+        registered: true,
+        executionEnabled: true,
+      },
+      {
+        processorId: "offering_creator_communication",
+        bundled: true,
+        registered: true,
+        executionEnabled: true,
+      },
+      {
+        processorId: "offering_actionability_synthesis",
         bundled: true,
         registered: true,
         executionEnabled: true,
