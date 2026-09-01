@@ -15,6 +15,7 @@ import {
   type User,
 } from "@prisma/client";
 import { randomUUID } from "node:crypto";
+import type { Request, Response } from "express";
 import {
   afterAll,
   beforeAll,
@@ -26,17 +27,25 @@ import {
 } from "vitest";
 
 import type { PrismaService } from "../../prisma/prisma.service";
+import type { RequestWithAuthUser } from "../auth/auth.controller";
 import type { AuthUser } from "../auth/types/auth-user";
+import { PublicMarketplaceController } from "../creator-marketplace/public-marketplace.controller";
 import { CreatorAffinityService } from "../creator-marketplace/services/creator-affinity.service";
 import { CampaignApplyContinuationIssuanceService } from "../creator-marketplace/services/campaign-apply-continuation-issuance.service";
 import { CreatorEligibilityService } from "../creator-marketplace/services/creator-eligibility.service";
 import { CreatorInvitationService } from "../creator-marketplace/services/creator-invitation.service";
 import { CreatorMarketplaceService } from "../creator-marketplace/services/creator-marketplace.service";
 import {
+  CREATOR_CAMPAIGN_CONTINUATION_IDEMPOTENCY_GRACE_MS,
   CREATOR_CAMPAIGN_CONTINUATION_TTL_MS,
   CreatorCampaignApplyContinuationService,
 } from "./creator-campaign-apply-continuation.service";
+import {
+  CREATOR_CAMPAIGN_CONTINUATION_COOKIE_NAME,
+  CREATOR_CAMPAIGN_CONTINUATION_COOKIE_PATH,
+} from "./creator-campaign-apply-continuation-cookie.util";
 import { CreatorCanonicalContextService } from "./creator-canonical-context.service";
+import { CreatorEntryController } from "./creator-entry.controller";
 import {
   CreatorEntryContinuationStore,
   hashCreatorEntryContinuationToken,
@@ -71,6 +80,18 @@ database("C01-I5 Campaign Apply continuation", () => {
   );
   const issuance = new CampaignApplyContinuationIssuanceService(
     marketplace,
+    continuations,
+  );
+  const publicController = new PublicMarketplaceController(
+    marketplace,
+    invitations,
+    issuance,
+  );
+  const entryController = new CreatorEntryController(
+    null as never,
+    entryState,
+    null as never,
+    null as never,
     continuations,
   );
 
@@ -121,6 +142,25 @@ database("C01-I5 Campaign Apply continuation", () => {
       role: user.role,
       organizationId: user.organizationId,
     };
+  }
+
+  function responseDouble() {
+    return {
+      cookie: vi.fn(),
+      clearCookie: vi.fn(),
+    } as unknown as Response;
+  }
+
+  function cookieRequest(
+    opaqueToken: string,
+    authenticatedUser?: User,
+  ): Request | RequestWithAuthUser {
+    return {
+      headers: {
+        cookie: `${CREATOR_CAMPAIGN_CONTINUATION_COOKIE_NAME}=${opaqueToken}`,
+      },
+      ...(authenticatedUser ? { user: authUser(authenticatedUser) } : {}),
+    } as unknown as Request | RequestWithAuthUser;
   }
 
   async function brandAccount(label: string) {
@@ -679,7 +719,7 @@ database("C01-I5 Campaign Apply continuation", () => {
 
       await expect(
         continuations.resolve(authUser(creator.user), issued.continuationToken),
-      ).resolves.toEqual({
+      ).resolves.toMatchObject({
         status: "READY_TO_RETURN",
         intent: "CAMPAIGN_APPLY",
         nextAction: "RETURN_TO_ORIGINATING_CAMPAIGN",
@@ -753,7 +793,7 @@ database("C01-I5 Campaign Apply continuation", () => {
         continuations.resolve(authUser(creator.user), issued.continuationToken),
         continuations.resolve(authUser(creator.user), issued.continuationToken),
       ]);
-      expect(finalResults).toEqual([
+      expect(finalResults).toMatchObject([
         {
           status: "READY_TO_RETURN",
           intent: "CAMPAIGN_APPLY",
@@ -797,9 +837,193 @@ database("C01-I5 Campaign Apply continuation", () => {
           code: "CREATOR_ENTRY_CONTINUATION_IDENTITY_CONFLICT",
         },
       });
+      const graceEnd = new Date(
+        consumed.consumedAt!.getTime() +
+          CREATOR_CAMPAIGN_CONTINUATION_IDEMPOTENCY_GRACE_MS,
+      );
+      await expect(
+        continuations.isPresent(
+          issued.continuationToken,
+          new Date(graceEnd.getTime() - 1),
+        ),
+      ).resolves.toBe(true);
+      await expect(
+        continuations.isPresent(issued.continuationToken, graceEnd),
+      ).resolves.toBe(false);
+      await expect(
+        continuations.resolve(
+          authUser(creator.user),
+          issued.continuationToken,
+          graceEnd,
+        ),
+      ).rejects.toMatchObject({
+        response: { code: "CREATOR_ENTRY_CONTINUATION_NOT_FOUND" },
+      });
       expect(await campaignMutationSnapshot(origin.campaign.id)).toEqual(
         before,
       );
+    });
+  });
+
+  describe("HttpOnly abandonment durability", () => {
+    it("recovers the same continuation in a fresh client context after browser close", async () => {
+      const origin = await campaign("browser-close");
+      const creator = await canonicalCreator("browser-close");
+      const before = await campaignMutationSnapshot(origin.campaign.id);
+      const firstClientResponse = responseDouble();
+
+      const issuanceBody = await publicController.issueApplyContinuation(
+        origin.campaign.id,
+        firstClientResponse,
+      );
+      expect(issuanceBody).toMatchObject({
+        intent: "CAMPAIGN_APPLY",
+        continuationPresent: true,
+      });
+      expect(issuanceBody).not.toHaveProperty("continuationToken");
+      const setCookieCall = vi.mocked(firstClientResponse.cookie).mock.calls[0];
+      expect(setCookieCall[0]).toBe(CREATOR_CAMPAIGN_CONTINUATION_COOKIE_NAME);
+      const opaqueToken = setCookieCall[1];
+      expect(opaqueToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
+      expect(setCookieCall[2]).toMatchObject({
+        httpOnly: true,
+        sameSite: "lax",
+        path: CREATOR_CAMPAIGN_CONTINUATION_COOKIE_PATH,
+      });
+
+      const persisted = await prisma.creatorEntryContinuation.findUniqueOrThrow(
+        {
+          where: {
+            tokenDigest: hashCreatorEntryContinuationToken(opaqueToken),
+          },
+        },
+      );
+      expect(persisted.tokenDigest).not.toBe(opaqueToken);
+      expect(JSON.stringify(persisted)).not.toContain(opaqueToken);
+
+      const reopenedClientRequest = cookieRequest(opaqueToken);
+      await expect(
+        entryController.campaignApplyContinuationStatus(
+          reopenedClientRequest as Request,
+          responseDouble(),
+        ),
+      ).resolves.toEqual({ present: true });
+      await expect(
+        entryController.resolveCampaignApplyContinuation(
+          cookieRequest(opaqueToken, creator.user) as RequestWithAuthUser,
+          responseDouble(),
+        ),
+      ).resolves.toMatchObject({
+        status: "PENDING_CREATOR_ENTRY",
+        nextAction: "CONNECT_INSTAGRAM",
+      });
+      await connectInstagram(creator.profile.id, {
+        health: ProviderAuthorizationHealth.USABLE,
+        basic: ProviderCapabilityState.AVAILABLE,
+        insights: ProviderCapabilityState.UNKNOWN,
+      });
+      const readyResponse = responseDouble();
+      await expect(
+        entryController.resolveCampaignApplyContinuation(
+          cookieRequest(opaqueToken, creator.user) as RequestWithAuthUser,
+          readyResponse,
+        ),
+      ).resolves.toEqual({
+        status: "READY_TO_RETURN",
+        intent: "CAMPAIGN_APPLY",
+        nextAction: "RETURN_TO_ORIGINATING_CAMPAIGN",
+        campaign: { campaignId: origin.campaign.id },
+      });
+      expect(vi.mocked(readyResponse.cookie).mock.calls[0][2]).toMatchObject({
+        httpOnly: true,
+        path: CREATOR_CAMPAIGN_CONTINUATION_COOKIE_PATH,
+        maxAge: expect.any(Number),
+      });
+      expect(await campaignMutationSnapshot(origin.campaign.id)).toEqual(
+        before,
+      );
+    });
+
+    it("clears discard and invalid status transport without touching persistence", async () => {
+      const origin = await campaign("discard-transport");
+      const before = await campaignMutationSnapshot(origin.campaign.id);
+      const issued = await issuance.issue(origin.campaign.id);
+      const persistedBefore =
+        await prisma.creatorEntryContinuation.findUniqueOrThrow({
+          where: {
+            tokenDigest: hashCreatorEntryContinuationToken(
+              issued.continuationToken,
+            ),
+          },
+        });
+      const discardResponse = responseDouble();
+      expect(
+        entryController.discardCampaignApplyContinuation(discardResponse),
+      ).toEqual({ present: false });
+      expect(discardResponse.clearCookie).toHaveBeenCalledWith(
+        CREATOR_CAMPAIGN_CONTINUATION_COOKIE_NAME,
+        expect.objectContaining({
+          path: CREATOR_CAMPAIGN_CONTINUATION_COOKIE_PATH,
+        }),
+      );
+      expect(
+        await prisma.creatorEntryContinuation.findUniqueOrThrow({
+          where: { id: persistedBefore.id },
+        }),
+      ).toEqual(persistedBefore);
+
+      for (const invalidToken of ["malformed", "U".repeat(43)]) {
+        const statusResponse = responseDouble();
+        await expect(
+          entryController.campaignApplyContinuationStatus(
+            cookieRequest(invalidToken) as Request,
+            statusResponse,
+          ),
+        ).resolves.toEqual({ present: false });
+        expect(statusResponse.clearCookie).toHaveBeenCalledTimes(1);
+      }
+      expect(await prisma.creatorEntryContinuation.count()).toBe(1);
+      expect(await campaignMutationSnapshot(origin.campaign.id)).toEqual(
+        before,
+      );
+    });
+
+    it("clears expired status and resolve transport without recovering the row", async () => {
+      const origin = await campaign("expired-cookie");
+      const creator = await canonicalCreator("expired-cookie");
+      const expiredToken = "X".repeat(43);
+      const expired = await prisma.creatorEntryContinuation.create({
+        data: {
+          tokenDigest: hashCreatorEntryContinuationToken(expiredToken),
+          campaignId: origin.campaign.id,
+          createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000),
+          expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        },
+      });
+      const statusResponse = responseDouble();
+      await expect(
+        entryController.campaignApplyContinuationStatus(
+          cookieRequest(expiredToken) as Request,
+          statusResponse,
+        ),
+      ).resolves.toEqual({ present: false });
+      expect(statusResponse.clearCookie).toHaveBeenCalledTimes(1);
+
+      const resolveResponse = responseDouble();
+      await expect(
+        entryController.resolveCampaignApplyContinuation(
+          cookieRequest(expiredToken, creator.user) as RequestWithAuthUser,
+          resolveResponse,
+        ),
+      ).rejects.toMatchObject({
+        response: { code: "CREATOR_ENTRY_CONTINUATION_EXPIRED" },
+      });
+      expect(resolveResponse.clearCookie).toHaveBeenCalledTimes(1);
+      expect(
+        await prisma.creatorEntryContinuation.findUniqueOrThrow({
+          where: { id: expired.id },
+        }),
+      ).toMatchObject({ boundUserId: null, consumedAt: null });
     });
   });
 });

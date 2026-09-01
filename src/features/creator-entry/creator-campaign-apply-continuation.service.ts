@@ -17,6 +17,8 @@ import { CreatorEntryStateService } from "./creator-entry-state.service";
 import { CREATOR_ENTRY_ERROR } from "./creator-entry.types";
 
 export const CREATOR_CAMPAIGN_CONTINUATION_TTL_MS = 24 * 60 * 60 * 1000;
+export const CREATOR_CAMPAIGN_CONTINUATION_IDEMPOTENCY_GRACE_MS =
+  10 * 60 * 1000;
 
 @Injectable()
 export class CreatorCampaignApplyContinuationService {
@@ -60,7 +62,11 @@ export class CreatorCampaignApplyContinuationService {
       now,
     });
     if (binding.outcome === "CONSUMED") {
-      return this.readyHandoff(binding.campaignId);
+      this.assertConsumedRetryAvailable(binding, now);
+      return {
+        ...this.readyHandoff(binding.campaignId),
+        continuationExpiresAt: binding.expiresAt,
+      };
     }
     this.assertAvailable(binding);
 
@@ -70,6 +76,7 @@ export class CreatorCampaignApplyContinuationService {
         status: "PENDING_CREATOR_ENTRY" as const,
         intent: CreatorEntryContinuationIntent.CAMPAIGN_APPLY,
         nextAction: entryState.nextAction,
+        continuationExpiresAt: binding.expiresAt,
       };
     }
 
@@ -79,7 +86,27 @@ export class CreatorCampaignApplyContinuationService {
       now: new Date(),
     });
     this.assertAvailable(consumed, true);
-    return this.readyHandoff(consumed.campaignId);
+    return {
+      ...this.readyHandoff(consumed.campaignId),
+      continuationExpiresAt: consumed.expiresAt,
+    };
+  }
+
+  async isPresent(continuationToken: string, now = new Date()) {
+    if (!isCreatorEntryContinuationToken(continuationToken)) return false;
+    const continuation = await this.store.lookupByOpaqueToken(
+      continuationToken,
+      now,
+    );
+    if (!continuation || continuation.status === "EXPIRED") return false;
+    if (continuation.status === "AVAILABLE") return true;
+    return Boolean(
+      continuation.consumedAt &&
+      continuation.expiresAt.getTime() > now.getTime() &&
+      continuation.consumedAt.getTime() +
+        CREATOR_CAMPAIGN_CONTINUATION_IDEMPOTENCY_GRACE_MS >
+        now.getTime(),
+    );
   }
 
   private assertAvailable(
@@ -108,6 +135,32 @@ export class CreatorCampaignApplyContinuationService {
       });
     }
     if (result.outcome === "CONSUMED" && !acceptConsumed) return;
+  }
+
+  private assertConsumedRetryAvailable(
+    result: Extract<
+      CreatorEntryContinuationClaimResult,
+      { outcome: "BOUND" | "CONSUMED" }
+    >,
+    now: Date,
+  ): void {
+    if (result.expiresAt.getTime() <= now.getTime()) {
+      throw new GoneException({
+        code: CREATOR_ENTRY_ERROR.CREATOR_ENTRY_CONTINUATION_EXPIRED,
+        message: "Campaign continuation has expired.",
+      });
+    }
+    if (
+      !result.consumedAt ||
+      result.consumedAt.getTime() +
+        CREATOR_CAMPAIGN_CONTINUATION_IDEMPOTENCY_GRACE_MS <=
+        now.getTime()
+    ) {
+      throw new NotFoundException({
+        code: CREATOR_ENTRY_ERROR.CREATOR_ENTRY_CONTINUATION_NOT_FOUND,
+        message: "Campaign continuation was not found or is invalid.",
+      });
+    }
   }
 
   private readyHandoff(campaignId: string) {

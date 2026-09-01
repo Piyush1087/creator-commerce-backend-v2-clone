@@ -2,20 +2,27 @@ import {
   Body,
   Controller,
   Get,
+  GoneException,
   HttpCode,
+  NotFoundException,
   Post,
   Req,
   Res,
   UseGuards,
 } from "@nestjs/common";
-import { ThrottlerGuard } from "@nestjs/throttler";
-import type { Response } from "express";
+import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
+import type { Request, Response } from "express";
 
 import type { RequestWithAuthUser } from "../auth/auth.controller";
 import { setRefreshCookie } from "../auth/auth-cookie.util";
 import type { SessionIssueResult } from "../auth/auth-session.service";
 import { Public } from "../auth/decorators/public.decorator";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import {
+  clearCreatorCampaignApplyContinuationCookie,
+  readCreatorCampaignApplyContinuationCookie,
+  shortenCreatorCampaignApplyContinuationCookie,
+} from "./creator-campaign-apply-continuation-cookie.util";
 import { CreatorCampaignApplyContinuationService } from "./creator-campaign-apply-continuation.service";
 import { CreatorEntryRegistrationService } from "./creator-entry-registration.service";
 import { CreatorEntryStateService } from "./creator-entry-state.service";
@@ -23,7 +30,6 @@ import { CreatorInstagramConnectionService } from "./creator-instagram-connectio
 import { CreatorInstagramContinuityService } from "./creator-instagram-continuity.service";
 import {
   CreatorGoogleRegistrationDto,
-  CreatorCampaignApplyContinuationResolveDto,
   CreatorInstagramCompleteDto,
   CreatorPasswordRegistrationDto,
   CreatorRegistrationEmailDto,
@@ -131,14 +137,62 @@ export class CreatorEntryController {
   @UseGuards(JwtAuthGuard)
   @Post("campaign-apply/continuation/resolve")
   @HttpCode(200)
-  resolveCampaignApplyContinuation(
+  async resolveCampaignApplyContinuation(
     @Req() request: RequestWithAuthUser,
-    @Body() dto: CreatorCampaignApplyContinuationResolveDto,
+    @Res({ passthrough: true }) response: Response,
   ) {
-    return this.campaignContinuations.resolve(
-      request.user,
-      dto.continuationToken,
-    );
+    const continuationToken =
+      readCreatorCampaignApplyContinuationCookie(request);
+    try {
+      const result = await this.campaignContinuations.resolve(
+        request.user,
+        continuationToken ?? "",
+      );
+      const { continuationExpiresAt, ...publicResult } = result;
+      if (publicResult.status === "READY_TO_RETURN" && continuationToken) {
+        shortenCreatorCampaignApplyContinuationCookie(
+          response,
+          continuationToken,
+          continuationExpiresAt,
+        );
+      }
+      return publicResult;
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof GoneException
+      ) {
+        clearCreatorCampaignApplyContinuationCookie(response);
+      }
+      throw error;
+    }
+  }
+
+  @Public()
+  @Get("campaign-apply/continuation/status")
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  async campaignApplyContinuationStatus(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const continuationToken =
+      readCreatorCampaignApplyContinuationCookie(request);
+    if (continuationToken === undefined) return { present: false };
+    const present =
+      await this.campaignContinuations.isPresent(continuationToken);
+    if (!present) clearCreatorCampaignApplyContinuationCookie(response);
+    return { present };
+  }
+
+  @Public()
+  @Post("campaign-apply/continuation/discard")
+  @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  discardCampaignApplyContinuation(
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    clearCreatorCampaignApplyContinuationCookie(response);
+    return { present: false };
   }
 
   private withRefreshCookie(response: Response, result: SessionIssueResult) {

@@ -22,6 +22,7 @@ export type CreatorEntryContinuationClaimResult =
   | {
       outcome: "BOUND" | "CONSUMED";
       campaignId: string;
+      expiresAt: Date;
       consumedAt: Date | null;
     };
 
@@ -54,7 +55,7 @@ export class CreatorEntryContinuationStore {
     return { continuationId: continuation.id, opaqueToken };
   }
 
-  async lookupByOpaqueToken(token: string) {
+  async lookupByOpaqueToken(token: string, now = new Date()) {
     if (!isCreatorEntryContinuationToken(token)) return null;
     const continuation = await this.prisma.creatorEntryContinuation.findUnique({
       where: { tokenDigest: hashCreatorEntryContinuationToken(token) },
@@ -62,7 +63,7 @@ export class CreatorEntryContinuationStore {
     if (!continuation) return null;
     const status: CreatorEntryContinuationStatus = continuation.consumedAt
       ? "CONSUMED"
-      : continuation.expiresAt.getTime() <= Date.now()
+      : continuation.expiresAt.getTime() <= now.getTime()
         ? "EXPIRED"
         : "AVAILABLE";
     return { ...continuation, status };
@@ -142,6 +143,7 @@ export class CreatorEntryContinuationStore {
       return {
         outcome: "CONSUMED",
         campaignId: continuation.campaignId,
+        expiresAt: continuation.expiresAt,
         consumedAt: continuation.consumedAt,
       };
     }
@@ -154,6 +156,7 @@ export class CreatorEntryContinuationStore {
     return {
       outcome: "BOUND",
       campaignId: continuation.campaignId,
+      expiresAt: continuation.expiresAt,
       consumedAt: null,
     };
   }

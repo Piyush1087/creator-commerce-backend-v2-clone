@@ -6,10 +6,13 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  Res,
   UseGuards,
 } from "@nestjs/common";
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
+import type { Response } from "express";
 
+import { setCreatorCampaignApplyContinuationCookie } from "../creator-entry/creator-campaign-apply-continuation-cookie.util";
 import { MarketplaceQueryDto } from "./dto/marketplace-query.dto";
 import { CreatorInvitationService } from "./services/creator-invitation.service";
 import { CreatorMarketplaceService } from "./services/creator-marketplace.service";
@@ -47,10 +50,21 @@ export class PublicMarketplaceController {
   @Post("campaigns/:campaignId/apply-continuation")
   @HttpCode(201)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  issueApplyContinuation(
+  async issueApplyContinuation(
     @Param("campaignId", ParseUUIDPipe) campaignId: string,
+    @Res({ passthrough: true }) response: Response,
   ) {
-    return this.continuations.issue(campaignId);
+    const issued = await this.continuations.issue(campaignId);
+    setCreatorCampaignApplyContinuationCookie(
+      response,
+      issued.continuationToken,
+      issued.expiresAt,
+    );
+    return {
+      intent: issued.intent,
+      expiresAt: issued.expiresAt,
+      continuationPresent: true as const,
+    };
   }
 
   @Get("invitations/:token")

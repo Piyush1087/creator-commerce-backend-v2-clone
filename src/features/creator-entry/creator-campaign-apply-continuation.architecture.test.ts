@@ -61,21 +61,39 @@ describe("C01-I5 Campaign Apply continuation architecture", () => {
     }
   });
 
-  it("accepts no arbitrary return destination or Campaign input during resolve", () => {
+  it("accepts no request body or arbitrary return destination during resolve", () => {
     const service = source(
       "src/features/creator-entry/creator-campaign-apply-continuation.service.ts",
     );
-    const dto = source("src/features/creator-entry/dto/creator-entry.dto.ts");
+    const controller = source(
+      "src/features/creator-entry/creator-entry.controller.ts",
+    );
     expect(service).not.toMatch(
       /returnUrl|redirectUri|frontendPath|continueTo|inviteToken|briefId|productId/,
     );
-    const resolveDto = dto.slice(
-      dto.indexOf("export class CreatorCampaignApplyContinuationResolveDto"),
+    const resolveMethod = controller.slice(
+      controller.indexOf("resolveCampaignApplyContinuation("),
+      controller.indexOf("campaignApplyContinuationStatus("),
     );
-    expect(resolveDto).toContain("continuationToken");
-    expect(resolveDto).not.toMatch(
-      /campaignId|returnUrl|inviteToken|creatorProfileId|userId|nextAction/,
+    expect(resolveMethod).toContain(
+      "readCreatorCampaignApplyContinuationCookie(request)",
     );
+    expect(resolveMethod).not.toContain("@Body");
+    expect(
+      source("src/features/creator-entry/dto/creator-entry.dto.ts"),
+    ).not.toContain("CreatorCampaignApplyContinuationResolveDto");
+  });
+
+  it("exposes only public boolean status and transport-only discard surfaces", () => {
+    const controller = source(
+      "src/features/creator-entry/creator-entry.controller.ts",
+    );
+    expect(controller).toContain('@Get("campaign-apply/continuation/status")');
+    expect(controller).toContain(
+      '@Post("campaign-apply/continuation/discard")',
+    );
+    expect(controller).toContain("return { present }");
+    expect(controller).not.toMatch(/return \{ present,.*campaign/s);
   });
 
   it("preserves the separately guarded explicit Apply command and direct entry action", () => {
