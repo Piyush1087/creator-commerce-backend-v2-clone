@@ -4,6 +4,31 @@ execution_mode: HYBRID_RUN
 starting_sha: ffd7990760930ce057bca14de32f126727a669ca
 branch: c01/i3-instagram-connection-capability
 
+systems_review:
+  initial_checkpoint: 50b0f25ac106653676705fcda644a677c3a1d10d
+  result: BOUNDED_LEGACY_AUTHORITY_RETIREMENT_REQUIRED
+
+canonical_creator_instagram_connection_authority: ONLY_CREATOR_ENTRY_SHARED_OAUTH
+legacy_creator_onboarding_runtime_authority: RETIRED
+
+legacy_authority_retirement:
+  http_status: 410_GONE
+  routes:
+    handle_check: CREATOR_HANDLE_ADMISSION_RETIRED
+    feature_staging: CREATOR_FEATURE_STAGING_RETIRED
+    signup: CREATOR_ONBOARDING_ACCOUNT_CREATION_RETIRED
+    verify_otp: CREATOR_ONBOARDING_ACCOUNT_CREATION_RETIRED
+    meta_connect: CREATOR_ONBOARDING_INSTAGRAM_CONNECTION_RETIRED
+    activate_sync: CREATOR_ONBOARDING_ACTIVATION_RETIRED
+    track_runtime: CREATOR_ONBOARDING_TRACK_RUNTIME_RETIRED
+    waitlist: CREATOR_WAITLIST_RETIRED
+  controller_runtime_dependencies: NONE
+  provider_calls: NONE
+  state_mutations: NONE
+  historical_persistence: RETAINED_AS_COMPATIBILITY_AND_AUDIT_DATA
+  retirement_tests: PASS_8_OF_8
+  retirement_architecture: PASS_2_OF_2
+
 authorize_contract:
   route: POST /api/v1/creator-entry/instagram/authorize
   authentication: JWT_AUTHENTICATED_CANONICAL_CREATOR
@@ -132,7 +157,6 @@ guard_exemptions:
   - future_i4_recovery_revalidate_reconnect
 
 ambiguous_route_debt:
-  - legacy_creator_onboarding_meta_connect_and_activate_sync_remain_unguarded_compatibility_recovery_surfaces_pending_i7_retirement
   - creator_settings_section_level_access_remains_future_creator_settings_product_authority
 
 admission_policy:
@@ -201,7 +225,7 @@ i1_i2_regression:
   shared_authentication: PASS_22_OF_22
 
 global_validation:
-  full_repository_suite: PASS_160_FILES_1066_PASSED_41_DATABASE_GATED_FILES_556_SKIPPED
+  full_repository_suite: PASS_162_FILES_1076_PASSED_41_DATABASE_GATED_FILES_556_SKIPPED
   production_build: PASS
   prisma_format: PASS_NO_SCHEMA_DIFF
   prisma_validate: PASS
@@ -224,10 +248,11 @@ deviations: NONE
 
 technical_debt:
   - legacy_creator_instagram_compatibility_controller_remains_until_parent_authority_retires_it
-  - creator_onboarding_meta_connect_and_activate_sync_remain_bounded_recovery_compatibility_surfaces
+  - creator_onboarding_services_and_persistence_remain_as_legacy_compatibility_and_audit_implementation_without_active_http_authority
 
 checkpoint:
-  status: PENDING_SYSTEMS_REVIEW
+  status: CORRECTION_PENDING_SYSTEMS_REVIEW
+  previous_sha: 50b0f25ac106653676705fcda644a677c3a1d10d
   sha: null
   candidate_head_self_recorded: false
 
