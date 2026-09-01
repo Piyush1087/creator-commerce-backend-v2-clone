@@ -15,6 +15,8 @@ import { PricingRazorpayClient } from "./services/pricing-razorpay.client";
 import { PricingWebhookService } from "./services/pricing-webhook.service";
 import { RazorpayPlanProvisioningService } from "./services/razorpay-plan-provisioning.service";
 import { SubscriptionLifecycleService } from "./services/subscription-lifecycle.service";
+import { PlanCommercialPolicyService } from "./services/plan-commercial-policy.service";
+import { BusinessGeographyFinancialPolicyService } from "./services/business-geography-financial-policy.service";
 import { SubscriptionAccessService } from "./services/subscription-access.service";
 import { SubscriptionCapabilityModule } from "./subscription-capability.module";
 import { NotificationsModule } from "../notifications/notifications.module";
@@ -40,6 +42,8 @@ import { NotificationsModule } from "../notifications/notifications.module";
     PricingInvoiceService,
     PricingWebhookService,
     SubscriptionLifecycleReconciliationScheduler,
+    PlanCommercialPolicyService,
+    BusinessGeographyFinancialPolicyService,
   ],
   exports: [
     SubscriptionCapabilityModule,
@@ -48,6 +52,8 @@ import { NotificationsModule } from "../notifications/notifications.module";
     SubscriptionLifecycleService,
     SubscriptionAccessService,
     GeoRoutingService,
+    PlanCommercialPolicyService,
+    BusinessGeographyFinancialPolicyService,
   ],
 })
 export class PricingModule {}
