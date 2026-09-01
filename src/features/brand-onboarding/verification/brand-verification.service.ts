@@ -6,13 +6,16 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { UserRole } from "@prisma/client";
+import { AuthMethodType, UserAuthState, UserRole } from "@prisma/client";
 import { addMinutes } from "date-fns";
 
 import { MailService } from "../../../mail/mail.service";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { hashPasswordAsync } from "../../../shared/crypto/password.util";
 import { AuthService } from "../../auth/auth.service";
 import { GoogleAuthService } from "../../auth/google-auth.service";
+import { establishInitialBrandOwner } from "../../brand-settings/team/initial-brand-owner";
+import { lockBrandTeam } from "../../brand-settings/team/brand-team-policy";
 import { BrandCentreScanService } from "../../brand-centre/services/brand-centre-scan.service";
 import {
   emailDomainFromAddress,
@@ -175,7 +178,7 @@ export class BrandVerificationService {
       );
     }
 
-    const hashedPassword = this.auth.hashPassword(password);
+    const hashedPassword = await hashPasswordAsync(password);
     const displayName = emailLocalPart(email);
 
     const existingUser = await this.prisma.user.findUnique({
@@ -188,6 +191,8 @@ export class BrandVerificationService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      await lockBrandTeam(tx, brandProfileId);
+
       let organizationId = profile.organizationId;
       let userId = existingUser?.id;
 
@@ -206,6 +211,7 @@ export class BrandVerificationService {
             emailVerifiedAt: new Date(),
             name: existingUser?.name ?? displayName,
             organizationId,
+            authState: UserAuthState.ACTIVE,
           },
         });
       } else {
@@ -217,10 +223,28 @@ export class BrandVerificationService {
             organizationId,
             hashedPassword,
             emailVerifiedAt: new Date(),
+            authState: UserAuthState.ACTIVE,
           },
         });
         userId = user.id;
       }
+
+      await tx.userAuthMethod.upsert({
+        where: {
+          userId_type: { userId: userId!, type: AuthMethodType.PASSWORD },
+        },
+        create: {
+          userId: userId!,
+          type: AuthMethodType.PASSWORD,
+          credentialHash: hashedPassword,
+          verifiedAt: new Date(),
+        },
+        update: {
+          credentialHash: hashedPassword,
+          verifiedAt: new Date(),
+          disabledAt: null,
+        },
+      });
 
       await tx.brandProfile.update({
         where: { id: profile.id },
@@ -231,6 +255,17 @@ export class BrandVerificationService {
           verificationEmail: email,
         },
       });
+
+      const ownerResult = await establishInitialBrandOwner(
+        tx,
+        profile.id,
+        userId!,
+      );
+      if (ownerResult !== "CREATED" && ownerResult !== "EXISTING_TEAM") {
+        throw new ConflictException(
+          "Brand workspace owner could not be established.",
+        );
+      }
 
       return { userId: userId!, organizationId };
     });

@@ -71,6 +71,10 @@ export default $config({
     const authSuffix = $app.stage === "prod" ? "PROD" : "DEV";
     const JWT_SECRET = requiredEnv(`JWT_SECRET_${authSuffix}`);
     const AUTH_OTP_PEPPER = requiredEnv(`AUTH_OTP_PEPPER_${authSuffix}`);
+    const GATEKEEPER_TERMS_VERSION = requiredEnv("GATEKEEPER_TERMS_VERSION");
+    const GATEKEEPER_PRIVACY_POLICY_VERSION = requiredEnv(
+      "GATEKEEPER_PRIVACY_POLICY_VERSION",
+    );
 
     const defaultFrontendUrl =
       $app.stage === "prod"
@@ -191,6 +195,15 @@ export default $config({
         "gemini-2.5-flash",
       GEMINI_REQUEST_TIMEOUT_MS:
         process.env.GEMINI_REQUEST_TIMEOUT_MS ?? "120000",
+      GATEKEEPER_TERMS_VERSION,
+      GATEKEEPER_PRIVACY_POLICY_VERSION,
+      GATEKEEPER_SUPPORT_URL: process.env.GATEKEEPER_SUPPORT_URL?.trim() ?? "",
+      GATEKEEPER_OPENAI_MODEL_ID:
+        process.env.GATEKEEPER_OPENAI_MODEL_ID?.trim() ?? "",
+      BRAND_VERIFICATION_USE_REAL_OTP:
+        process.env.BRAND_VERIFICATION_USE_REAL_OTP ?? "false",
+      CREATOR_VERIFICATION_USE_REAL_OTP:
+        process.env.CREATOR_VERIFICATION_USE_REAL_OTP ?? "false",
       // Data Extraction OpenAI runtime: model id is supplied by Intelligence at call time.
       OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? "",
       OPENAI_REQUEST_TIMEOUT_MS:
