@@ -5,7 +5,7 @@ export class GoogleSignInDto {
   @IsNotEmpty()
   idToken!: string;
 
-  /** Required for new creator signup during onboarding funnel. */
+  /** Compatibility-only. It has no account-creation authority. */
   @IsOptional()
   @IsUUID()
   onboardingTrackId?: string;

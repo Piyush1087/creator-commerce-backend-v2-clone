@@ -2,28 +2,24 @@ import {
   Body,
   Controller,
   Get,
+  GoneException,
   Headers,
   HttpCode,
   Ip,
   Param,
   Post,
   Req,
-  Res,
   UseGuards,
 } from "@nestjs/common";
-import type { Response } from "express";
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 
 import type { RequestWithAuthUser } from "../auth/auth.controller";
-import { setRefreshCookie } from "../auth/auth-cookie.util";
 import { Public } from "../auth/decorators/public.decorator";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { CreatorOnboardingService } from "./creator-onboarding.service";
 import { ZodValidationPipe } from "./pipes/zod-validation.pipe";
 import {
-  AccountSignupSchema,
   AiActivationTriggerSchema,
-  EmailOtpVerificationSchema,
   FeatureStagingSchema,
   HandleCheckSchema,
   JoinCreatorWaitlistSchema,
@@ -72,33 +68,14 @@ export class CreatorOnboardingController {
 
   @Public()
   @Post("signup")
-  @HttpCode(201)
-  signup(
-    @Body(new ZodValidationPipe(AccountSignupSchema))
-    body: {
-      onboardingTrackId: string;
-      email: string;
-      password: string;
-    },
-  ) {
-    return this.onboarding.signup(body);
+  signup(): never {
+    throw this.accountCreationRetired();
   }
 
   @Public()
   @Post("verify-otp")
-  @HttpCode(200)
-  async verifyOtp(
-    @Body(new ZodValidationPipe(EmailOtpVerificationSchema))
-    body: {
-      email: string;
-      otpCode: string;
-    },
-    @Res({ passthrough: true }) response: Response,
-  ) {
-    const result = await this.onboarding.verifyOtp(body.email, body.otpCode);
-    setRefreshCookie(response, result.refreshToken);
-    const { refreshToken: _refreshToken, ...publicResult } = result;
-    return publicResult;
+  verifyOtp(): never {
+    throw this.accountCreationRetired();
   }
 
   @UseGuards(JwtAuthGuard)
@@ -148,5 +125,13 @@ export class CreatorOnboardingController {
     },
   ) {
     return this.onboarding.joinWaitlist(body);
+  }
+
+  private accountCreationRetired(): GoneException {
+    return new GoneException({
+      code: "CREATOR_ONBOARDING_ACCOUNT_CREATION_RETIRED",
+      message:
+        "Use the Creator Entry registration routes under /api/v1/creator-entry/register.",
+    });
   }
 }

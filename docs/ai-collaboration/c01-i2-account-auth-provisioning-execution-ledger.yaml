@@ -1,0 +1,172 @@
+run_id: C01-I2-BACKEND
+
+authority:
+  repository: Piyush1087/creator-commerce-backend-v2-clone
+  prior_phase: C01-I1_CLOSED_ACCEPTED
+  phase: I2_ACCOUNT_AUTH_PROVISIONING_VERTICAL_SLICE
+  requested_charters:
+    - docs/organization/charters/systems_architect_ai_worker_charter.md
+    - docs/organization/charters/browser_ai_worker_codex_runner_operating_standard.md
+  charter_status: NOT_PRESENT_IN_REPOSITORY_OR_LOCAL_USER_PROFILE
+
+execution_mode: HYBRID_RUN
+starting_sha: 3ce09d8496d9a4275a9b3b1cf9acf1dea4d16ea0
+branch: c01/i2-account-auth-provisioning
+
+registration_contract:
+  module: CreatorEntryModule
+  routes:
+    - POST /api/v1/creator-entry/register/password
+    - POST /api/v1/creator-entry/register/email/otp/request
+    - POST /api/v1/creator-entry/register/email/otp/verify
+    - POST /api/v1/creator-entry/register/google
+    - GET /api/v1/creator-entry/state
+  campaign_continuation_routes_added: false
+  instagram_routes_added: false
+
+provisional_policy:
+  helper: src/shared/identity/sterile-provisional-creator.policy.ts
+  required_state: PROVISIONAL_CREATOR_WITHOUT_CANONICAL_CONTEXT
+  forbidden_evidence:
+    - organization
+    - verified_email
+    - google_subject
+    - creator_profile
+    - legacy_creator_onboarding_track
+    - compatibility_user_profile
+    - active_brand_membership
+    - live_auth_session
+    - live_provider_oauth_transaction
+    - enabled_non_password_auth_method
+  ambiguous_outcome: CREATOR_CONTEXT_RECOVERY_REQUIRED
+  identity_lock: SHARED_NORMALIZED_EMAIL_ADVISORY_LOCK_WITH_BRAND_ADMISSION
+
+password_flow:
+  new_email: STERILE_PROVISIONAL_USER_AND_PASSWORD_METHOD_ONLY
+  repeated_sterile_email: SAME_USER_PASSWORD_REPLACED_AND_OTP_SUPERSEDED
+  active_email: ACCOUNT_EXISTS_SIGN_IN_REQUIRED_WITH_ROLE_NEUTRAL_RESPONSE
+  otp_purpose: CREATOR_EMAIL_VERIFICATION
+  unauthenticated_acceptance_status: 202
+  provisional_session_created: false
+  canonical_provisioning: ONE_TRANSACTION_AFTER_SHARED_OTP_CONSUMPTION
+  session_boundary: AFTER_PROVISIONING_COMMIT
+  rollback_behavior: NO_SESSION_NO_PARTIAL_CONTEXT_AND_NEW_OTP_RETRY_SUPPORTED
+
+google_flow:
+  token_verification: EXISTING_GOOGLE_ID_TOKEN_AUDIENCE_SIGNATURE_AND_EMAIL_VERIFICATION
+  new_creator: ATOMIC_CANONICAL_CREATOR_PROVISIONING
+  existing_creator_same_subject: SIGN_IN
+  existing_creator_without_google: SAFE_LINK_THEN_SIGN_IN
+  existing_creator_different_subject: GOOGLE_IDENTITY_CONFLICT
+  active_brand: ACCOUNT_CONTEXT_CONFLICT
+  sterile_password_creator: SAME_USER_REUSED_AND_CREATOR_OTP_SUPERSEDED
+  conflict_evidence: GOOGLE_LINK_CONFLICT_SECURITY_EVENT_AFTER_ROLLBACK
+  session_boundary: AFTER_PROVISIONING_COMMIT
+
+brand_provisional_reclaim:
+  allowed: VERIFIED_BRAND_IDENTITY_PLUS_SAME_EMAIL_PLUS_STERILE_PROVISIONAL_CREATOR
+  user_row_preserved: true
+  password_and_security_evidence_preserved: true
+  outstanding_creator_otp_superseded: true
+  concurrent_creator_otp_postcheck: ENABLED
+  active_or_ambiguous_creator_reclaimed: false
+
+legacy_bypass_retirement:
+  creator_onboarding_signup: 410_CREATOR_ONBOARDING_ACCOUNT_CREATION_RETIRED
+  creator_onboarding_verify_otp: 410_CREATOR_ONBOARDING_ACCOUNT_CREATION_RETIRED
+  legacy_service_account_creation_removed: true
+  auth_google_signin_mode: EXISTING_ACCOUNT_SIGN_IN_OR_LINK_ONLY
+  onboarding_track_account_authority: NONE
+  unknown_google_identity: GOOGLE_REGISTRATION_REQUIRED
+
+state_projection:
+  read_only: true
+  provider_calls: NONE
+  account_contexts:
+    - CREATOR_READY
+    - ACCOUNT_CONTEXT_CONFLICT
+    - CONTEXT_RECOVERY_REQUIRED
+  instagram_dimensions:
+    - identity_connection
+    - basic_authorization
+    - insights_capability
+    - authorization_health
+  can_enter_formula: ACTIVE_CANONICAL_CREATOR_AND_CONNECTED_IDENTITY_AND_BASIC_AVAILABLE_AND_HEALTH_USABLE
+  insights_excluded_from_entry_formula: true
+
+tests:
+  c01_i2_postgresql: PASS_22_OF_22
+  c01_i2_architecture: PASS_6_OF_6
+  password_proofs:
+    - sterile_new_registration
+    - repeated_and_concurrent_duplicate_registration
+    - role_neutral_active_conflict
+    - enumeration_resistant_resend
+    - invalid_expired_replayed_otp
+    - concurrent_single_winner_verification
+    - atomic_provisioning_rollback_and_retry
+  google_proofs:
+    - new_creator
+    - same_subject_sign_in
+    - active_creator_safe_link
+    - active_brand_context_conflict
+    - subject_and_email_conflicts_with_security_evidence
+    - sterile_placeholder_reuse
+    - concurrent_single_context
+    - legacy_onboarding_track_bypass_retirement
+    - existing_active_brand_shared_signin_and_link
+  state_proofs:
+    - brand_context_conflict
+    - malformed_creator_recovery
+    - no_instagram_incomplete
+    - basic_available_health_usable_entry
+    - insights_unavailable_does_not_block
+    - no_database_mutation
+
+regressions:
+  c01_i1_postgresql_security: PASS_22_OF_22
+  c01_i1_historical_conflict_architecture: PASS_6_OF_6
+  c01_i1_persistence_architecture: PASS_2_OF_2
+  shared_auth_unit_static_postgresql: PASS_22_OF_22
+  brand_team_verification_owner_shared_auth: PASS_97_OF_97
+  brand_general_settings: PASS_41_OF_41
+  brand_workspace_authorization: PASS_10_OF_10
+  default_repository_suite: PASS_158_FILES_1057_PASSED_40_DATABASE_GATED_FILES_529_SKIPPED
+  bounded_inherited_test_correction:
+    file: src/features/pricing/services/subscription-lifecycle.p2.test.ts
+    correction: REPLACE_EXPIRED_FIXED_PERIOD_END_WITH_CLOCK_RELATIVE_FUTURE_PERIOD
+    i2_related: false
+  production_build: PASS
+  scoped_eslint: PASS
+  standalone_repository_typecheck: PRE_EXISTING_TEST_FIXTURE_AND_SST_DIAGNOSTICS_I2_PRODUCTION_BUILD_DIAGNOSTICS_ZERO
+  prisma_format: PASS_NO_SCHEMA_DIFF
+  prisma_validate: PASS
+  prisma_generate: PASS
+  fresh_migration_deploy: PASS_ALL_70
+  git_diff_check: PASS
+
+migrations:
+  added: NONE
+  base_count: 70
+  final_count: 70
+  historical_persistent_migration_blocker: ACTIVE
+
+deviations:
+  - requested_authority_charter_files_were_absent_from_the_repository_and_local_user_profile
+  - one_unrelated_calendar_stale_pricing_test_fixture_received_a_bounded_test_only_correction
+
+technical_debt:
+  - compatibility_only_google_onboardingTrackId_DTO_field_remains_without_account_creation_authority
+  - retired_legacy_creator_signup_schemas_and_uninjected_otp_service_remain_for_bounded_cleanup_after_systems_review
+
+production_or_shared_db_mutations: NONE
+meta_changes: NONE
+
+checkpoint:
+  status: PENDING_SYSTEMS_REVIEW
+  sha: null
+  candidate_head_self_recorded: false
+  sha_source: C01_I2_ACCOUNT_AUTH_PROVISIONING_REPORT_V1_AND_REMOTE_BRANCH_TIP
+
+next_authorized_boundary: SYSTEMS_REVIEW_THEN_AUTONOMOUS_I3
+stop_reason: STOP_FOR_SYSTEMS_REVIEW_DO_NOT_START_I3

@@ -16,6 +16,7 @@ import {
 import { PrismaService } from "../../../prisma/prisma.service";
 import { hashPasswordAsync } from "../../../shared/crypto/password.util";
 import { normalizeEmail } from "../../../shared/identity/normalize-email";
+import { inspectSterileProvisionalCreator } from "../../../shared/identity/sterile-provisional-creator.policy";
 import { AuthService } from "../../auth/auth.service";
 import { EmailOtpService } from "../../auth/email-otp.service";
 import { GoogleAuthService } from "../../auth/google-auth.service";
@@ -147,10 +148,27 @@ export class BrandVerificationService {
       const existing = await tx.user.findUnique({
         where: { normalizedEmail: email },
       });
+      let reclaimsSterileCreator = false;
       if (existing && existing.role !== UserRole.BRAND) {
-        throw new ConflictException(
-          "This email belongs to another account type.",
+        const inspection = await inspectSterileProvisionalCreator(
+          tx,
+          existing.id,
         );
+        if (!inspection.sterile) {
+          throw new ConflictException(
+            "This email belongs to another account type.",
+          );
+        }
+        reclaimsSterileCreator = true;
+        await tx.emailOtpChallenge.updateMany({
+          where: {
+            normalizedEmail: email,
+            purpose: EmailOtpPurpose.CREATOR_EMAIL_VERIFICATION,
+            consumedAt: null,
+            supersededAt: null,
+          },
+          data: { supersededAt: new Date() },
+        });
       }
       let organizationId = existing?.organizationId ?? null;
       if (organizationId) {
@@ -176,10 +194,12 @@ export class BrandVerificationService {
               email,
               normalizedEmail: email,
               name: existing.name ?? emailLocalPart(email),
+              role: UserRole.BRAND,
               organizationId,
               hashedPassword,
               emailVerifiedAt: new Date(),
               authState: UserAuthState.ACTIVE,
+              ...(reclaimsSterileCreator ? { googleSubjectId: null } : {}),
             },
           })
         : await tx.user.create({

@@ -143,7 +143,7 @@ describe("SubscriptionLifecycleService P2", () => {
   );
 
   it("schedules provider cancellation at cycle end before confirming Product cancellation", async () => {
-    const currentPeriodEnd = new Date("2026-09-01T00:00:00.000Z");
+    const currentPeriodEnd = new Date(Date.now() + 30 * 86_400_000);
     const h = harness({
       subscription: baseSubscription({
         status: SubscriptionStatus.ACTIVE,

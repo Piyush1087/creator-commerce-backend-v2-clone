@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { BrandRole, Prisma, UserRole } from "@prisma/client";
 import type { AuthUser } from "../../auth/types/auth-user";
+import { lockCanonicalIdentityEmail } from "../../../shared/identity/sterile-provisional-creator.policy";
 import {
   emailDomainMatchesBrandDomain,
   isSafeBrandDomainAuthority,
@@ -50,8 +51,8 @@ export async function lockAdmissionEmail(
   tx: Prisma.TransactionClient,
   email: string,
 ) {
-  // Also serialize the same recipient accepting invitations to different Brands.
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${email.toLowerCase()}, 2))::text`;
+  // Also serialize Brand and Creator admission for the same identity.
+  await lockCanonicalIdentityEmail(tx, email.toLowerCase());
 }
 
 export async function requireActiveTeamMember(
