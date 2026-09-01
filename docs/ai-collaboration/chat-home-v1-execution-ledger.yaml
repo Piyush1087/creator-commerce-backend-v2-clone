@@ -39,14 +39,15 @@ backend:
 
 phase:
   id: P3
-  status: IN_PROGRESS
+  status: CANDIDATE_READY_FOR_SYSTEMS_REVIEW
 
 deferred_dependencies:
   canonical_offering_discovery:
     source_sha: 17214722dc20abf23c8dce935a58050a017f6639
     source_branch: development
     capability: offering.list
-    integration_status: DEFERRED_TO_FIRST_SLICE_PREPARATION
+    integration_status: INTEGRATED
+    integration_sha: 1fa5f34f72782b142244e3e8ff0395ae03ff574b
     reuse_required: true
     auto_import_parent_price_refresh: false
 
@@ -406,9 +407,273 @@ p2_semantic_differential:
 
 p2_checkpoint:
   implementation_sha: baf2102e6f6f96ddbd6458590c1af7438be846be
-  final_checkpoint_sha: SELF_COMMIT_CONTAINING_THIS_LEDGER
-  systems_review: PENDING
+  final_checkpoint_sha: 0eec694d44cbb8d72b12a8381c977e5d296fb629
+  systems_review: PASS
   target_gate: P2_CHAT_FOUNDATION_ACCEPTED
 
+p3_contract:
+  first_slice_capabilities: 9
+  implemented_capabilities: 9
+  execute_capabilities: 0
+  capability_availability: AVAILABLE
+  handler_count: 9
+  planning:
+    max_passes: 2
+    max_distinct_executions: 10
+    duplicate_key: CAPABILITY_ID_PLUS_VALIDATED_INPUT
+    reads_before_navigation: true
+    autonomous_loop: false
+  canonical_brand_source: CANONICAL_BRAND_STATE_READER
+  canonical_brand_adapter: BrandCurrentReadService
+  offering_list_source:
+    service: CanonicalOfferingDiscoveryService
+    commit: 17214722dc20abf23c8dce935a58050a017f6639
+    integration_sha: 1fa5f34f72782b142244e3e8ff0395ae03ff574b
+    parent_sha: 30cfab84604b8865d8270557f98267928cdfc502
+    parent_imported: false
+  offering_read_source: CanonicalOfferingStateService
+  intelligence_source: IntelligenceConsumerService
+  campaign_source: BrandUceCampaignService
+  navigation:
+    destinations:
+      - HOME
+      - BRAND_CENTRE
+      - OFFERINGS
+      - CAMPAIGNS
+    business_mutation: false
+    model_is_authority: false
+    arbitrary_urls: false
+  conversation_history:
+    persistent_existing_storage: true
+    max_messages: 12
+    max_message_characters: 2000
+    max_total_characters: 12000
+    is_business_truth: false
+  model:
+    gateway: ChatModelGateway
+    underlying_client: GeminiJsonClient
+    native_tool_calling: false
+    chain_of_thought_persisted: false
+  http_routes:
+    - POST /api/v1/chat/conversations
+    - GET /api/v1/chat/conversations
+    - GET /api/v1/chat/conversations/:conversationId
+    - PATCH /api/v1/chat/conversations/:conversationId
+    - POST /api/v1/chat/conversations/:conversationId/turns
+  provider_actions: false
+  business_mutations: false
+  new_migrations: 0
+
+p3_capability_map:
+  workspace.context.read:
+    class: READ
+    source: ChatContext
+    handler: WorkspaceContextReadHandler
+    availability: AVAILABLE
+  brand.current.read:
+    class: READ
+    source: BrandCurrentReadService/CANONICAL_BRAND_STATE_READER
+    handler: BrandCurrentReadHandler
+    availability: AVAILABLE
+  offering.list:
+    class: READ
+    source: CanonicalOfferingDiscoveryService
+    handler: OfferingListHandler
+    availability: AVAILABLE
+  offering.read:
+    class: READ
+    source: CanonicalOfferingStateService
+    handler: OfferingReadHandler
+    availability: AVAILABLE
+  brand_intelligence.current.read:
+    class: READ
+    source: IntelligenceConsumerService/brand_intelligence/BRAND
+    handler: BrandIntelligenceCurrentReadHandler
+    availability: AVAILABLE
+  product_intelligence.current.read:
+    class: READ
+    source: IntelligenceConsumerService/product_intelligence/OFFERING
+    handler: ProductIntelligenceCurrentReadHandler
+    availability: AVAILABLE
+  campaign.list:
+    class: READ
+    source: BrandUceCampaignService.listCampaigns
+    handler: CampaignListHandler
+    availability: AVAILABLE
+  campaign.read:
+    class: READ
+    source: BrandUceCampaignService.getCampaignShell
+    handler: CampaignReadHandler
+    availability: AVAILABLE
+  app.navigate:
+    class: NAVIGATE
+    source: ChatNavigationRegistry
+    handler: AppNavigateHandler
+    availability: AVAILABLE
+
+p3_validation:
+  targeted_chat:
+    status: PASS
+    passed: 62
+    failed: 0
+    skipped: 7
+  offering_discovery:
+    status: PASS
+    passed: 4
+    failed: 0
+    skipped: 0
+  orchestration_first_verticals:
+    status: PASS
+    passed: 9
+    failed: 0
+    skipped: 0
+  chat_postgresql:
+    status: PASS
+    conversation_passed: 3
+    http_passed: 4
+    failed: 0
+    skipped: 0
+    disposable_migrations_applied: 66
+  p1_intelligence_regression:
+    status: PASS
+    passed: 23
+    failed: 0
+    skipped: 0
+    semantics_unchanged: true
+  brand_consumer_postgresql:
+    status: PASS
+    passed: 8
+    failed: 0
+    skipped: 0
+  product_consumer_regression:
+    status: PASS
+    non_database_passed: 4
+    postgresql_passed: 4
+    failed: 0
+    skipped: 0
+  campaign_regression:
+    status: PASS
+    passed: 4
+    failed: 0
+    skipped: 0
+  legacy_copilot_regression:
+    status: PASS
+    passed: 7
+    failed: 0
+    skipped: 0
+  combined_postgresql_final:
+    status: PASS
+    passed: 19
+    failed: 0
+    skipped: 0
+    database: DISPOSABLE_LOCAL_CHAT_HOME_P3
+    applied_migrations: 66
+  standard_full_suite:
+    status: PASS
+    attempts: 1
+    passed: 1085
+    failed: 0
+    skipped: 488
+    notification_variance_observed: false
+  final_validation:
+    prisma_generate: PASS
+    prisma_validate: PASS
+    intelligence_contracts_verify: PASS
+    intelligence_architecture_commit: bbb0be3345c36e9cc7c4f06ca68fb491b742b83f
+    backend_build: PASS
+    git_diff_check: PASS
+    changed_scope_prettier: PASS
+    changed_scope_lint: PASS
+    full_repository_lint: PRE_EXISTING_BASELINE_FAILURE_770_UNMODIFIED_FORMATTING_ERRORS
+  migrations:
+    count_before: 66
+    count_after: 66
+    new_migrations: 0
+    accepted_pi_migration_hashes_unchanged: true
+  diagnostic_attempts:
+    - area: OFFERING_DISCOVERY_CLI
+      result: HARNESS_COMMAND_CORRECTED
+      detail: Vitest rejected the Jest-only --runInBand flag; the corrected command passed 4 of 4.
+      production_failure: false
+    - area: CHAT_HTTP_POSTGRES_TEST_MODULE
+      result: HARNESS_METADATA_CORRECTED
+      detail: The first HTTP harness attempt lacked Vitest constructor metadata; explicit Nest injections produced a 7 of 7 pass.
+      production_failure: false
+    - area: REPEATED_PRODUCT_POSTGRES_FIXTURE
+      result: DISPOSABLE_FIXTURE_CONTAMINATION
+      detail: A repeat run against a previously used disposable database collided on fixed test emails; a newly migrated empty database passed the combined 19 of 19 gate.
+      production_failure: false
+    - area: PRISMA_VALIDATE_ENVIRONMENT
+      result: COMMAND_ENVIRONMENT_CORRECTED
+      detail: The first validate command omitted DATABASE_URL; validation passed with the isolated disposable URL.
+      production_failure: false
+
+p3_security_review:
+  same_brand_cross_user_isolation: PASS
+  cross_brand_isolation: PASS
+  foreign_offering_isolation: PASS
+  foreign_campaign_isolation: PASS
+  server_authoritative_actor: PASS
+  server_authoritative_brand: PASS
+  request_authority_injection: PASS
+  route_hint_authority_escalation: BLOCKED
+  model_authority_injection: PASS
+  history_not_business_truth: PASS
+  stale_disclosure: PASS
+  grounding_integrity: PASS
+  navigation_integrity: PASS
+  direct_prisma_in_chat_capabilities_or_orchestration: false
+  legacy_copilot_business_tools_used: false
+  processor_execution_from_chat: false
+  data_extraction_execution_from_chat: false
+  provider_actions: false
+  credential_or_token_logging: false
+
+p3_semantic_differential:
+  base_sha: 0eec694d44cbb8d72b12a8381c977e5d296fb629
+  classifications:
+    OFFERING_DISCOVERY_INTEGRATION:
+      - src/features/brand-centre/consumer/canonical-offering-discovery.schema.ts
+      - src/features/brand-centre/consumer/canonical-offering-discovery.service.ts
+    CAPABILITY_IMPLEMENTATION:
+      - src/features/chat/capabilities
+    DOMAIN_READ_ACCESSIBILITY:
+      - src/features/brand-centre/consumer/brand-current-read.service.ts
+      - src/features/brand-centre/brand-centre.module.ts
+    CHAT_ORCHESTRATION:
+      - src/features/chat/orchestration
+    CHAT_HTTP_API:
+      - src/features/chat/chat.controller.ts
+      - src/features/chat/chat-http.schema.ts
+      - src/features/chat/chat-zod-validation.pipe.ts
+    MODEL_PLANNING_EXTENSION:
+      - src/features/chat/model
+    GROUNDING_RESPONSE_CLASSIFICATION_NAVIGATION:
+      - src/features/chat/response
+      - src/features/chat/capabilities/chat-navigation.registry.ts
+    MODULE_WIRING:
+      - src/features/chat/chat.module.ts
+    TEST:
+      - src/features/chat
+      - src/features/brand-centre/consumer/brand-current-read.service.test.ts
+      - src/features/brand-centre/consumer/canonical-offering-discovery.service.test.ts
+    EXECUTION_LEDGER:
+      - docs/ai-collaboration/chat-home-v1-execution-ledger.yaml
+  unchanged_semantics:
+    intelligence_consumer_contract: true
+    intelligence_current_candidate_separation: true
+    intelligence_readiness_freshness_authority: true
+    product_semantics: true
+    campaign_semantics: true
+    prisma_schema: true
+    accepted_pi_migrations: true
+
+p3_checkpoint:
+  offering_discovery_integration_sha: 1fa5f34f72782b142244e3e8ff0395ae03ff574b
+  implementation_sha: 3c5f5eb8a95ee15901838676e57f1a66118e7c36
+  final_checkpoint_sha: SELF_COMMIT_CONTAINING_THIS_LEDGER
+  systems_review: PENDING
+  target_gate: P3_BACKEND_FIRST_CHAT_SLICE_ACCEPTED
+
 breaker: NONE
-next_phase: P2_SYSTEMS_REVIEW
+next_phase: P3_SYSTEMS_REVIEW
