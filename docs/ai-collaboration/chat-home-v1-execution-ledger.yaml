@@ -17,12 +17,13 @@ backend:
 
 phase:
   id: P0
-  status: IN_PROGRESS
+  status: CANDIDATE_READY_FOR_IE_REVIEW
 
 integration:
   branch: program/chat-home-v1
   merge_base: a67afb5e4877605fb7a1b6401434e13f84b96cba
-  checkpoint_sha: null
+  checkpoint_sha: 0efdcae0b114378762ae9c4fa7edbb064e5b0a79
+  p0_merge_sha: 0efdcae0b114378762ae9c4fa7edbb064e5b0a79
   merge_strategy: THREE_WAY_NO_FF_NO_COMMIT
 
 preflight:
@@ -53,12 +54,23 @@ migration_policy:
     20260827223000_product_intelligence_v1_canonical_offering_foundation: 9718a592525b3b4551519acd8a520cd50d110eee
     20260827234500_product_intelligence_v1_generic_intelligence_subject_scope: e00ea913ccd91e8cad5b09ba888c7e9abdecc935
     20260828120000_data_extraction_offering_commercial_evidence: e9b4252f579ebe8550cbefae9834acf8be253a4f
+  gates:
+    fresh_combined:
+      status: PASS
+      applied_migrations: 66
+      failed_migrations: 0
+    active_to_converged_upgrade:
+      status: PASS
+      active_migrations: 63
+      accepted_pi_migrations_applied: 3
+      final_migrations: 66
 
 diagnostics:
   - id: P0_BREAKER_CLASSIFICATION_01
     original_breaker: PRODUCTION_RUNTIME_FAILURE
     area: notifications
     finding: KNOWN_ACTIVE_BASELINE_NONDETERMINISM
+    classification: ENVIRONMENT_OR_NONDETERMINISTIC_FAILURE
     convergence_causation: NOT_PROVEN
     active_baseline_reproduced: true
     candidate_reproduced_during_diagnostic: false
@@ -77,6 +89,7 @@ diagnostics:
     correction:
       file: src/features/pricing/services/subscription-lifecycle.p2.test.ts
       type: FUTURE_EFFECTIVE_DATE_FIXTURE
+      semantic_scope: TEST_ONLY
 
 legacy_harness_observations:
   classification: NON_GATING_LEGACY_HARNESS_OBSERVATIONS
@@ -88,6 +101,37 @@ legacy_harness_observations:
     - area: BS06_LEGACY_PROVIDER
       finding: The legacy provider harness uses provisional or superseded provider semantics; the current reconciliation suite passed 22 of 22 tests.
 
-tests: []
-breaker: null
+tests:
+  targeted_subscription_lifecycle_unit:
+    status: PASS
+    passed: 11
+    failed: 0
+    skipped: 0
+  targeted_subscription_access_unit:
+    status: PASS
+    passed: 4
+    failed: 0
+    skipped: 0
+  targeted_subscription_lifecycle_postgres:
+    status: PASS
+    passed: 2
+    failed: 0
+    skipped: 0
+    disposable_migrations_applied: 66
+  standard_full_suite:
+    status: PASS
+    attempts: 1
+    passed: 1000
+    failed: 0
+    skipped: 481
+    notification_variance_observed: false
+  final_validation:
+    intelligence_contracts_verify: PASS
+    architecture_commit: bbb0be3345c36e9cc7c4f06ca68fb491b742b83f
+    backend_build: PASS
+    prisma_validate: PASS
+    git_diff_check: PASS
+    unresolved_merge_entries: 0
+
+breaker: NONE
 next_phase: P1
