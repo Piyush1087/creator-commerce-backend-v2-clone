@@ -11,7 +11,7 @@ import { ChatCapabilityRegistry } from "./chat-capability.registry";
 describe("ChatCapabilityRegistry", () => {
   const registry = new ChatCapabilityRegistry(CHAT_CAPABILITY_CATALOG);
 
-  it("freezes exactly nine discoverable but non-executable first-slice capabilities", () => {
+  it("freezes exactly nine available implemented first-slice capabilities", () => {
     expect(registry.list().map((descriptor) => descriptor.id)).toEqual(
       CHAT_FIRST_SLICE_CAPABILITY_IDS,
     );
@@ -21,10 +21,11 @@ describe("ChatCapabilityRegistry", () => {
         .list()
         .every(
           (descriptor) =>
-            descriptor.implementationState === "NOT_IMPLEMENTED" &&
-            descriptor.availability === "NOT_IMPLEMENTED" &&
+            descriptor.implementationState === "IMPLEMENTED" &&
+            descriptor.availability === "AVAILABLE" &&
             descriptor.risk === "NON_CONSEQUENTIAL" &&
-            descriptor.confirmation === "NOT_REQUIRED",
+            descriptor.confirmation === "NOT_REQUIRED" &&
+            typeof descriptor.outputSchema?.parse === "function",
         ),
     ).toBe(true);
     expect(

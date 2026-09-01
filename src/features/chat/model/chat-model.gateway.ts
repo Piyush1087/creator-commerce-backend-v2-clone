@@ -4,7 +4,9 @@ import { GeminiJsonClient } from "../../brand-onboarding/integrations/gemini/gem
 import { ChatCapabilityRegistry } from "../capabilities/chat-capability.registry";
 import {
   ChatCapabilityPlanSchema,
+  ChatConversationExcerptSchema,
   ChatModelContextHintsSchema,
+  ChatPlanningServerContextSchema,
   ChatSynthesisDraftSchema,
   type ChatCapabilityPlan,
   type ChatSynthesisDraft,
@@ -20,19 +22,31 @@ export class ChatModelGateway {
   async planCapabilities(args: {
     userRequest: string;
     allowedCapabilityIds: readonly string[];
-    contextHints: Readonly<Record<string, unknown>>;
+    clientContextHints: Readonly<Record<string, unknown>>;
+    conversationExcerpt: readonly Readonly<Record<string, unknown>>[];
+    serverContext: Readonly<Record<string, unknown>>;
   }): Promise<ChatCapabilityPlan> {
     const allowed = new Set(
       args.allowedCapabilityIds.map((id) => this.capabilities.get(id).id),
     );
-    const contextHints = ChatModelContextHintsSchema.parse(args.contextHints);
+    const clientContextHints = ChatModelContextHintsSchema.parse(
+      args.clientContextHints,
+    );
+    const conversationExcerpt = ChatConversationExcerptSchema.parse(
+      args.conversationExcerpt,
+    );
+    const serverContext = ChatPlanningServerContextSchema.parse(
+      args.serverContext,
+    );
     const modelResult = await this.model.generateJson({
       systemInstruction:
-        "Return only strict JSON requests. Select only from allowedCapabilityIds. Do not add rationale, reasoning, actor, workspace, credentials, or authorization fields.",
+        "Return only strict JSON requests with no rationale or reasoning. Select only supplied capability IDs and satisfy their strict input schemas. Server-authorized entity candidates are the only entity IDs you may select. Client route and entity hints are non-authoritative. Never request a business mutation, credentials, actor, workspace, or authorization fields.",
       userText: JSON.stringify({
         userRequest: args.userRequest,
         allowedCapabilityIds: [...allowed],
-        contextHints,
+        clientContextHints,
+        conversationExcerpt,
+        serverContext,
       }),
       temperature: 0,
     });

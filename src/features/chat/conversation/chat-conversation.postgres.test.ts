@@ -44,10 +44,10 @@ describe.skipIf(process.env.CHAT_HOME_DATABASE_TEST !== "true")(
       if (
         !["postgres:", "postgresql:"].includes(url.protocol) ||
         !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) ||
-        !url.pathname.startsWith("/chat_home_p2_")
+        !/^\/chat_home_p[23]_/u.test(url.pathname)
       ) {
         throw new Error(
-          "Chat P2 PostgreSQL tests require a disposable local chat_home_p2_* database",
+          "Chat PostgreSQL tests require a disposable local chat_home_p2_* or chat_home_p3_* database",
         );
       }
       const migrations = await prisma.$queryRaw<[{ count: number }]>`

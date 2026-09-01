@@ -3,8 +3,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { CHAT_CAPABILITY_CATALOG } from "./capabilities/chat-capability.catalog";
+import { CHAT_FIRST_SLICE_CAPABILITY_IDS } from "./capabilities/chat-capability.catalog";
 
-describe("permanent Chat P2 architecture", () => {
+describe("permanent Chat P3 architecture", () => {
   const root = join(process.cwd(), "src/features/chat");
   const productionFiles = (directory: string): string[] =>
     readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -18,26 +19,30 @@ describe("permanent Chat P2 architecture", () => {
     .map((path) => readFileSync(path, "utf8"))
     .join("\n");
 
-  it("contains no controller, handler, direct persistence, legacy memory, or slot-session dependency", () => {
-    expect(existsSync(join(root, "chat.controller.ts"))).toBe(false);
+  it("contains the permanent controller and exact handlers without forbidden dependencies", () => {
+    expect(existsSync(join(root, "chat.controller.ts"))).toBe(true);
     expect(
       productionFiles(root).filter((path) => path.endsWith(".handler.ts")),
-    ).toEqual([]);
+    ).toHaveLength(9);
     expect(source).not.toContain("PrismaService");
+    expect(source).not.toContain("PrismaClient");
     expect(source).not.toContain("CoPilotConversationMemoryService");
     expect(source).not.toContain("CoPilotSlotSessionService");
-    expect(source).not.toContain("IntelligenceCurrent");
+    expect(source).not.toContain("CoPilotOrchestratorService");
+    expect(source).not.toContain("CoPilotHitlService");
+    expect(source).not.toContain("IntelligenceCurrentProjectionService");
+    expect(source).not.toContain("IntelligenceCurrentStateRepository");
     expect(source).not.toContain("DataExtraction");
     expect(source).not.toContain("ProviderRegistry");
     expect(source).not.toContain("ToolCallingFramework");
   });
 
-  it("registers no business or EXECUTE implementation in production", () => {
+  it("registers exactly the nine frozen implementations and no EXECUTE capability", () => {
     expect(
       CHAT_CAPABILITY_CATALOG.filter(
         (capability) => capability.implementationState === "IMPLEMENTED",
-      ),
-    ).toEqual([]);
+      ).map((capability) => capability.id),
+    ).toEqual(CHAT_FIRST_SLICE_CAPABILITY_IDS);
     expect(
       CHAT_CAPABILITY_CATALOG.filter(
         (capability) => capability.class === "EXECUTE",

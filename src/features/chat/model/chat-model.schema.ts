@@ -29,6 +29,44 @@ export const ChatModelContextHintsSchema = z
   })
   .strict();
 
+export const ChatAuthorizedEntityCandidateSchema = z
+  .object({
+    type: z.enum(["BRAND", "OFFERING", "CAMPAIGN"]),
+    id: z.string().trim().min(1).max(128),
+    label: z.string().trim().min(1).max(500).optional(),
+  })
+  .strict();
+
+export const ChatConversationExcerptSchema = z
+  .array(
+    z
+      .object({
+        role: z.enum(["USER", "ASSISTANT"]),
+        text: z.string().max(2_000),
+      })
+      .strict(),
+  )
+  .max(12);
+
+export const ChatPlanningServerContextSchema = z
+  .object({
+    planningPass: z.union([z.literal(1), z.literal(2)]),
+    authorizedEntityCandidates: z
+      .array(ChatAuthorizedEntityCandidateSchema)
+      .max(500),
+    alreadyInvokedCapabilities: z
+      .array(
+        z
+          .object({
+            capabilityId: z.string().trim().min(1).max(128),
+            input: z.record(z.unknown()),
+          })
+          .strict(),
+      )
+      .max(10),
+  })
+  .strict();
+
 export const ChatSynthesisDraftSchema = z
   .object({
     answer: z.string().max(20_000),

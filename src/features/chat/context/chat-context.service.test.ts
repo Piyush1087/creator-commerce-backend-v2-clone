@@ -60,7 +60,7 @@ describe("ChatContextService", () => {
     expect(context.capabilities).toHaveLength(9);
     expect(
       context.capabilities.every(
-        (capability) => capability.availability === "NOT_IMPLEMENTED",
+        (capability) => capability.availability === "AVAILABLE",
       ),
     ).toBe(true);
     expect(Date.parse(context.turnStartedAt)).toBeGreaterThanOrEqual(before);

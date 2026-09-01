@@ -56,9 +56,19 @@ export class ChatConversationService {
     threadId: string,
     archived: boolean,
   ) {
-    return this.threads.patchThread(await this.resolveScope(user), threadId, {
-      archived,
-    });
+    return this.patchConversation(user, threadId, { archived });
+  }
+
+  async patchConversation(
+    user: AuthUser,
+    threadId: string,
+    data: { title?: string; archived?: boolean },
+  ) {
+    return this.threads.patchThread(
+      await this.resolveScope(user),
+      threadId,
+      data,
+    );
   }
 
   async listMessages(user: AuthUser, threadId: string) {

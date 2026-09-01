@@ -7,6 +7,16 @@ import { ChatCapabilityRegistry } from "../capabilities/chat-capability.registry
 import { ChatModelGateway } from "./chat-model.gateway";
 
 describe("ChatModelGateway", () => {
+  const planningContext = {
+    clientContextHints: {},
+    conversationExcerpt: [],
+    serverContext: {
+      planningPass: 1 as const,
+      authorizedEntityCandidates: [],
+      alreadyInvokedCapabilities: [],
+    },
+  };
+
   function fixture(result: unknown) {
     const generateJson = vi.fn().mockResolvedValue(result);
     const gateway = new ChatModelGateway(
@@ -26,7 +36,8 @@ describe("ChatModelGateway", () => {
       gateway.planCapabilities({
         userRequest: "Show this offering",
         allowedCapabilityIds: ["offering.read"],
-        contextHints: { routePath: "/offerings/o-1" },
+        ...planningContext,
+        clientContextHints: { routePath: "/offerings/o-1" },
       }),
     ).resolves.toEqual({
       requests: [
@@ -51,7 +62,7 @@ describe("ChatModelGateway", () => {
       disallowed.planCapabilities({
         userRequest: "read",
         allowedCapabilityIds: ["brand.current.read"],
-        contextHints: {},
+        ...planningContext,
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
 
@@ -67,7 +78,7 @@ describe("ChatModelGateway", () => {
       injected.planCapabilities({
         userRequest: "read",
         allowedCapabilityIds: ["offering.read"],
-        contextHints: {},
+        ...planningContext,
       }),
     ).rejects.toThrow();
 
@@ -76,7 +87,7 @@ describe("ChatModelGateway", () => {
       reasoning.planCapabilities({
         userRequest: "read",
         allowedCapabilityIds: [],
-        contextHints: {},
+        ...planningContext,
       }),
     ).rejects.toThrow();
 
@@ -85,7 +96,11 @@ describe("ChatModelGateway", () => {
       authorityHint.planCapabilities({
         userRequest: "read",
         allowedCapabilityIds: [],
-        contextHints: { userId: "attacker", brandProfileId: "foreign" },
+        ...planningContext,
+        clientContextHints: {
+          userId: "attacker",
+          brandProfileId: "foreign",
+        },
       }),
     ).rejects.toThrow();
   });

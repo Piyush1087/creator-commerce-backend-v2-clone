@@ -5,6 +5,16 @@ import {
   NavigateChatCapabilityInputSchema,
   OfferingChatCapabilityInputSchema,
 } from "./chat-capability.schema";
+import {
+  BrandCurrentCapabilityOutputSchema,
+  CampaignListCapabilityOutputSchema,
+  CampaignReadCapabilityOutputSchema,
+  IntelligenceCapabilityOutputSchema,
+  NavigateCapabilityOutputSchema,
+  OfferingListCapabilityOutputSchema,
+  OfferingReadCapabilityOutputSchema,
+  WorkspaceContextCapabilityOutputSchema,
+} from "./chat-capability-output.schema";
 
 export const CHAT_FIRST_SLICE_CAPABILITY_IDS = [
   "workspace.context.read",
@@ -18,11 +28,12 @@ export const CHAT_FIRST_SLICE_CAPABILITY_IDS = [
   "app.navigate",
 ] as const;
 
-const planned = (
+const implemented = (
   id: (typeof CHAT_FIRST_SLICE_CAPABILITY_IDS)[number],
   capabilityClass: "READ" | "NAVIGATE",
   domain: string,
   inputSchema: ChatCapabilityDescriptor["inputSchema"],
+  outputSchema: NonNullable<ChatCapabilityDescriptor["outputSchema"]>,
 ): ChatCapabilityDescriptor => ({
   id,
   class: capabilityClass,
@@ -31,53 +42,73 @@ const planned = (
   risk: "NON_CONSEQUENTIAL",
   confirmation: "NOT_REQUIRED",
   inputSchema,
-  implementationState: "NOT_IMPLEMENTED",
-  availability: "NOT_IMPLEMENTED",
+  outputSchema,
+  implementationState: "IMPLEMENTED",
+  availability: "AVAILABLE",
 });
 
 export const CHAT_CAPABILITY_CATALOG: readonly ChatCapabilityDescriptor[] = [
-  planned(
+  implemented(
     "workspace.context.read",
     "READ",
     "workspace",
     EmptyChatCapabilityInputSchema,
+    WorkspaceContextCapabilityOutputSchema,
   ),
-  planned(
+  implemented(
     "brand.current.read",
     "READ",
     "brand",
     EmptyChatCapabilityInputSchema,
+    BrandCurrentCapabilityOutputSchema,
   ),
-  planned("offering.list", "READ", "offering", EmptyChatCapabilityInputSchema),
-  planned(
+  implemented(
+    "offering.list",
+    "READ",
+    "offering",
+    EmptyChatCapabilityInputSchema,
+    OfferingListCapabilityOutputSchema,
+  ),
+  implemented(
     "offering.read",
     "READ",
     "offering",
     OfferingChatCapabilityInputSchema,
+    OfferingReadCapabilityOutputSchema,
   ),
-  planned(
+  implemented(
     "brand_intelligence.current.read",
     "READ",
     "brand-intelligence",
     EmptyChatCapabilityInputSchema,
+    IntelligenceCapabilityOutputSchema,
   ),
-  planned(
+  implemented(
     "product_intelligence.current.read",
     "READ",
     "product-intelligence",
     OfferingChatCapabilityInputSchema,
+    IntelligenceCapabilityOutputSchema,
   ),
-  planned("campaign.list", "READ", "campaign", EmptyChatCapabilityInputSchema),
-  planned(
+  implemented(
+    "campaign.list",
+    "READ",
+    "campaign",
+    EmptyChatCapabilityInputSchema,
+    CampaignListCapabilityOutputSchema,
+  ),
+  implemented(
     "campaign.read",
     "READ",
     "campaign",
     CampaignChatCapabilityInputSchema,
+    CampaignReadCapabilityOutputSchema,
   ),
-  planned(
+  implemented(
     "app.navigate",
     "NAVIGATE",
     "navigation",
     NavigateChatCapabilityInputSchema,
+    NavigateCapabilityOutputSchema,
   ),
 ];

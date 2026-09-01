@@ -67,6 +67,7 @@ export class ChatCapabilityRegistry {
         descriptor.implementationState,
       ) ||
       typeof descriptor.inputSchema?.parse !== "function" ||
+      typeof descriptor.outputSchema?.parse !== "function" ||
       (descriptor.implementationState === "NOT_IMPLEMENTED" &&
         descriptor.availability !== "NOT_IMPLEMENTED")
     ) {

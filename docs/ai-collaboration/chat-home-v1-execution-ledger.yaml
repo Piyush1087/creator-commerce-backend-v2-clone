@@ -22,6 +22,11 @@ accepted_checkpoints:
     checkpoint_sha: 17ebca265faa088a03b1433e06bef3acc3baeb99
     ie_review: PASS
     systems_review: PASS
+  p2:
+    gate: P2_CHAT_FOUNDATION_ACCEPTED
+    implementation_sha: baf2102e6f6f96ddbd6458590c1af7438be846be
+    checkpoint_sha: 0eec694d44cbb8d72b12a8381c977e5d296fb629
+    systems_review: PASS
 
 backend:
   repository: Piyush1087/creator-commerce-backend-v2-clone
@@ -33,8 +38,8 @@ backend:
     sha: f3a2d7b19f5692ad10e5d13751ee880e1604f93a
 
 phase:
-  id: P2
-  status: CANDIDATE_READY_FOR_SYSTEMS_REVIEW
+  id: P3
+  status: IN_PROGRESS
 
 deferred_dependencies:
   canonical_offering_discovery:
