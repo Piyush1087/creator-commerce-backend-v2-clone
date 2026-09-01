@@ -5,6 +5,17 @@ authority:
   repository: Piyush1087/dummy_tcs
   branch: main
   sha: d69ba6b8cb331bfa36b450307d9defcd26d09c6e
+  intelligence_architecture:
+    branch: agent/product-intelligence-v1-contracts
+    sha: bbb0be3345c36e9cc7c4f06ca68fb491b742b83f
+
+accepted_checkpoints:
+  p0:
+    gate: P0_PRODUCT_INTELLIGENCE_CONVERGENCE_ACCEPTED
+    merge_sha: 0efdcae0b114378762ae9c4fa7edbb064e5b0a79
+    checkpoint_sha: 87e6e82a1d0442fb1943f06e63a9bcb8b1a095e6
+    ie_review: PASS
+    systems_review: PASS
 
 backend:
   repository: Piyush1087/creator-commerce-backend-v2-clone
@@ -16,8 +27,35 @@ backend:
     sha: f3a2d7b19f5692ad10e5d13751ee880e1604f93a
 
 phase:
-  id: P0
-  status: CANDIDATE_READY_FOR_IE_REVIEW
+  id: P1
+  status: IN_PROGRESS
+
+deferred_dependencies:
+  canonical_offering_discovery:
+    source_sha: 17214722dc20abf23c8dce935a58050a017f6639
+    source_branch: development
+    capability: offering.list
+    integration_status: DEFERRED_TO_FIRST_SLICE_PREPARATION
+    reuse_required: true
+    auto_import_parent_price_refresh: false
+
+p1_contract:
+  common_consumer_version: "1.0"
+  engine_registration_version: "1.0"
+  domain_payload_version: "1.0"
+  registry_storage: CODE_ONLY
+  registered_engines:
+    - engine_id: brand_intelligence
+      supported_subject_types:
+        - BRAND
+      object_count: 10
+    - engine_id: product_intelligence
+      supported_subject_types:
+        - OFFERING
+      object_count: 3
+  direct_persistence_access: false
+  domain_payload_flattened: false
+  chat_runtime_implemented: false
 
 integration:
   branch: program/chat-home-v1
@@ -132,6 +170,101 @@ tests:
     prisma_validate: PASS
     git_diff_check: PASS
     unresolved_merge_entries: 0
+
+p1_validation:
+  targeted_common_consumer:
+    status: PASS
+    files: 5
+    passed: 23
+    failed: 0
+    skipped: 0
+  existing_consumer_non_database:
+    status: PASS
+    files_passed: 4
+    files_skipped: 2
+    passed: 12
+    failed: 0
+    skipped: 12
+  brand_consumer_postgres:
+    status: PASS
+    passed: 8
+    failed: 0
+    skipped: 0
+    disposable_migrations_applied: 66
+    fixture_alignment:
+      classification: PRE_EXISTING_ACCEPTED_AUTH_HARNESS_DRIFT
+      scope: TEST_ONLY
+      server_authoritative_sessions_used: true
+      persisted_brand_membership_used: true
+      production_auth_semantics_changed: false
+  product_consumer_postgres:
+    status: PASS
+    passed: 4
+    failed: 0
+    skipped: 0
+    disposable_migrations_applied: 66
+  standard_full_suite:
+    status: PASS
+    attempts: 1
+    passed: 1023
+    failed: 0
+    skipped: 481
+    notification_variance_observed: false
+  final_validation:
+    prisma_generate: PASS
+    prisma_validate: PASS
+    intelligence_contracts_verify: PASS
+    intelligence_architecture_commit: bbb0be3345c36e9cc7c4f06ca68fb491b742b83f
+    backend_build: PASS
+    git_diff_check: PASS
+  migrations:
+    count_before: 66
+    count_after: 66
+    new_migrations: 0
+    accepted_pi_migration_hashes_unchanged: true
+
+p1_checkpoint:
+  implementation_sha: PENDING
+  final_checkpoint_sha: PENDING
+
+p1_semantic_differential:
+  base_sha: 87e6e82a1d0442fb1943f06e63a9bcb8b1a095e6
+  changed_files:
+    COMMON_CONSUMER_CONTRACT:
+      - src/features/intelligence-consumer/intelligence-consumer.contract.ts
+      - src/features/intelligence-consumer/intelligence-consumer.mapper.ts
+      - src/features/intelligence-consumer/intelligence-consumer.schema.ts
+    ENGINE_REGISTRATION:
+      - src/app.module.ts
+      - src/features/brand-centre/brand-centre.module.ts
+      - src/features/intelligence-consumer/intelligence-consumer.module.ts
+      - src/features/intelligence-consumer/intelligence-consumer.registry.ts
+      - src/features/intelligence-consumer/intelligence-consumer.service.ts
+      - src/features/intelligence-consumer/intelligence-consumer.tokens.ts
+    BRAND_ADAPTER:
+      - src/features/intelligence-consumer/adapters/brand-intelligence-consumer.adapter.ts
+    PRODUCT_ADAPTER:
+      - src/features/intelligence-consumer/adapters/product-intelligence-consumer.adapter.ts
+    TEST:
+      - src/features/brand-centre/consumer/brand-consumer.postgres.test.ts
+      - src/features/intelligence-consumer/adapters/brand-intelligence-consumer.adapter.test.ts
+      - src/features/intelligence-consumer/adapters/product-intelligence-consumer.adapter.test.ts
+      - src/features/intelligence-consumer/intelligence-consumer.architecture.test.ts
+      - src/features/intelligence-consumer/intelligence-consumer.registry.test.ts
+      - src/features/intelligence-consumer/intelligence-consumer.schema.test.ts
+    EXECUTION_LEDGER:
+      - docs/ai-collaboration/chat-home-v1-execution-ledger.yaml
+  unchanged_semantics:
+    brand_consumer_contract: true
+    product_consumer_contract: true
+    product_processor_ownership: true
+    product_object_ownership: true
+    canonical_offering_runtime: true
+    intelligence_persistence: true
+    data_extraction_persistence: true
+    prisma_schema: true
+    accepted_pi_migrations: true
+    chat_runtime_absent: true
 
 breaker: NONE
 next_phase: P1

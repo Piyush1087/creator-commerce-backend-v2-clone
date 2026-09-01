@@ -24,6 +24,7 @@ import { CreatorSettingsModule } from "./features/creator-settings/creator-setti
 import { CreatorUceModule } from "./features/creator-uce/creator-uce.module";
 import { DataExtractionModule } from "./features/data-extraction/data-extraction.module";
 import { InstagramModule } from "./features/instagram/instagram.module";
+import { IntelligenceConsumerModule } from "./features/intelligence-consumer/intelligence-consumer.module";
 import { NotificationsModule } from "./features/notifications/notifications.module";
 import { PublicBrandModule } from "./features/public-brand/public-brand.module";
 import { PublicCreatorModule } from "./features/public-creator/public-creator.module";
@@ -51,6 +52,7 @@ import { S3Module } from "./shared/s3/s3.module";
     BrandOnboardingModule,
     BrandIntelligenceModule,
     BrandCentreModule,
+    IntelligenceConsumerModule,
     BrandCentreUceBridgeModule,
     BrandUceModule,
     BrandEscrowModule,

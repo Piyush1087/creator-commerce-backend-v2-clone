@@ -65,6 +65,8 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
     PlannerAggregateWorker,
   ],
   exports: [
+    BrandConsumerService,
+    ProductConsumerService,
     BrandCentreAuthService,
     BrandWorkspaceAuthorizationService,
     BrandCentreColdStartService,
