@@ -21,8 +21,17 @@ export class CreatorEntryStateService {
   constructor(private readonly prisma: PrismaService) {}
 
   async read(authUser: AuthUser) {
+    return this.readCanonicalOwner(authUser.id);
+  }
+
+  /**
+   * C-05 subject/actor compatibility seam. A Team actor may complete an
+   * Owner-subject provider operation, while Creator Entry state remains the
+   * canonical Owner subject's state.
+   */
+  async readCanonicalOwner(subjectOwnerUserId: string) {
     const user = await this.prisma.user.findUnique({
-      where: { id: authUser.id },
+      where: { id: subjectOwnerUserId },
       include: {
         organization: true,
         creatorProfile: {

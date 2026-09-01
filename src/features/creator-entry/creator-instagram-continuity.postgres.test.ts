@@ -252,11 +252,7 @@ database("C01-I4 Instagram continuity and recovery", () => {
       resolveWorkspaceRole: vi.fn().mockResolvedValue(CreatorTeamRole.OWNER),
       isAssistantReadOnly: vi.fn().mockReturnValue(false),
     };
-    const settings = new CreatorSettingsService(
-      db,
-      access as never,
-      {} as never,
-    );
+    const settings = new CreatorSettingsService(db, access as never);
     return settings.disconnectSocialIntegration(
       authUser(creator.user),
       SocialNetworkProvider.INSTAGRAM,

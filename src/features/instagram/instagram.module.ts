@@ -5,21 +5,17 @@ import { CreatorSettingsModule } from "../creator-settings/creator-settings.modu
 import { PrismaModule } from "../../prisma/prisma.module";
 import { InstagramConnectController } from "./instagram-connect.controller";
 import { InstagramConnectService } from "./instagram-connect.service";
-import { InstagramGraphClient } from "./instagram-graph.client";
-import { InstagramOAuthClient } from "./instagram-oauth.client";
+import { InstagramProviderClientModule } from "./instagram-provider-client.module";
 
 @Module({
-  imports: [PrismaModule, AuthModule, CreatorSettingsModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    CreatorSettingsModule,
+    InstagramProviderClientModule,
+  ],
   controllers: [InstagramConnectController],
-  providers: [
-    InstagramConnectService,
-    InstagramOAuthClient,
-    InstagramGraphClient,
-  ],
-  exports: [
-    InstagramConnectService,
-    InstagramOAuthClient,
-    InstagramGraphClient,
-  ],
+  providers: [InstagramConnectService],
+  exports: [InstagramConnectService, InstagramProviderClientModule],
 })
 export class InstagramModule {}

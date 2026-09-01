@@ -49,7 +49,7 @@ import {
   ProviderOAuthTransactionService,
 } from "../provider-oauth/provider-oauth-transaction.service";
 import { CreatorEntryStateService } from "./creator-entry-state.service";
-import { CreatorCanonicalContextService } from "./creator-canonical-context.service";
+import { CreatorWorkspaceActorService } from "../creator-settings/team/creator-workspace-actor.service";
 import { CreatorInstagramConnectionService } from "./creator-instagram-connection.service";
 
 const databaseUrl = process.env.C01_I3_DATABASE_URL;
@@ -73,14 +73,14 @@ database("C01-I3 Creator Instagram connection", () => {
   const oauth = new InstagramOAuthClient();
   const graph = new InstagramGraphClient();
   const state = new CreatorEntryStateService(db);
-  const contexts = new CreatorCanonicalContextService(db);
+  const actors = new CreatorWorkspaceActorService(db);
   const connection = new CreatorInstagramConnectionService(
     db,
     creatorTransactions,
     oauth,
     graph,
     state,
-    contexts,
+    actors,
   );
   const exchange = vi.spyOn(oauth, "exchangeAuthorizationCode");
   const fetchMe = vi.spyOn(graph, "fetchMe");

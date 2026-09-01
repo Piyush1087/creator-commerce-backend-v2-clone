@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { PrismaModule } from "../../prisma/prisma.module";
 import { AuthModule } from "../auth/auth.module";
+import { CreatorSettingsModule } from "../creator-settings/creator-settings.module";
 import { InstagramModule } from "../instagram/instagram.module";
 import { ProviderOAuthModule } from "../provider-oauth/provider-oauth.module";
 import { CreatorEntryController } from "./creator-entry.controller";
@@ -18,7 +19,13 @@ import { CreatorEntryStateService } from "./creator-entry-state.service";
 import { CreatorPlatformAccessGuard } from "./creator-platform-access.guard";
 
 @Module({
-  imports: [PrismaModule, AuthModule, InstagramModule, ProviderOAuthModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    CreatorSettingsModule,
+    InstagramModule,
+    ProviderOAuthModule,
+  ],
   controllers: [CreatorEntryController],
   providers: [
     CreatorEntryProvisioningService,

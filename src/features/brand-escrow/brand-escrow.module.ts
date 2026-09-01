@@ -26,7 +26,6 @@ import { IdempotencyManager } from "./services/idempotency.manager";
 import { RazorpayClient } from "./services/razorpay.client";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { CreatorPayoutObligationService } from "./services/creator-payout-obligation.service";
-import { CreatorPayoutProfileService } from "./services/creator-payout-profile.service";
 import { RazorpayRouteAdapter } from "./services/razorpay-route.adapter";
 import { RouteReconciliationService } from "./services/route-reconciliation.service";
 import { RouteTransferService } from "./services/route-transfer.service";
@@ -43,6 +42,7 @@ import { BrandReturnWebhookEventParser } from "./services/brand-return-webhook-e
 import { BrandReturnWebhookService } from "./services/brand-return-webhook.service";
 import { EscrowFundingAttributionService } from "./services/escrow-funding-attribution.service";
 import { EscrowFundingSourceReconciliationService } from "./services/escrow-funding-source-reconciliation.service";
+import { CreatorPayoutProfileModule } from "./creator-payout-profile.module";
 
 @Module({
   imports: [
@@ -52,6 +52,7 @@ import { EscrowFundingSourceReconciliationService } from "./services/escrow-fund
     PricingModule,
     SubscriptionCapabilityModule,
     NotificationsModule,
+    CreatorPayoutProfileModule,
   ],
   controllers: [
     BrandEscrowController,
@@ -73,7 +74,6 @@ import { EscrowFundingSourceReconciliationService } from "./services/escrow-fund
     EscrowSubscriptionContextService,
     IdempotencyManager,
     RazorpayClient,
-    CreatorPayoutProfileService,
     EscrowFinancialAllocationService,
     CreatorPayoutObligationService,
     CollaborationRefundInstructionService,
@@ -98,7 +98,7 @@ import { EscrowFundingSourceReconciliationService } from "./services/escrow-fund
     BrandEscrowComputationService,
     BrandEscrowInterlockService,
     BrandEscrowHardenedService,
-    CreatorPayoutProfileService,
+    CreatorPayoutProfileModule,
     CreatorPayoutObligationService,
     CollaborationRefundInstructionService,
     RouteTransferService,

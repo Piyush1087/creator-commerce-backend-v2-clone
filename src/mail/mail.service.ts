@@ -92,6 +92,37 @@ export class MailService {
     expiresAt: Date;
     rawToken: string;
   }): Promise<void> {
+    return this.sendWorkspaceTeamInvitation({
+      email: args.email,
+      workspaceName: args.brandName,
+      role: args.role,
+      expiresAt: args.expiresAt,
+      rawToken: args.rawToken,
+      acceptancePath: "/brand/team-invitations/accept",
+    });
+  }
+
+  async sendCreatorTeamInvitation(args: {
+    email: string;
+    workspaceName: string;
+    role: string;
+    expiresAt: Date;
+    rawToken: string;
+  }): Promise<void> {
+    return this.sendWorkspaceTeamInvitation({
+      ...args,
+      acceptancePath: "/creator/team-invitations/accept",
+    });
+  }
+
+  private async sendWorkspaceTeamInvitation(args: {
+    email: string;
+    workspaceName: string;
+    role: string;
+    expiresAt: Date;
+    rawToken: string;
+    acceptancePath: string;
+  }): Promise<void> {
     const configuredId = process.env.POSTMARK_TEAM_INVITE_TEMPLATE_ID;
     const templateId = Number(configuredId);
     const frontend = process.env.APP_FRONTEND_URL;
@@ -113,7 +144,7 @@ export class MailService {
     ) {
       throw new Error("APP_FRONTEND_URL must be an HTTP(S) origin");
     }
-    const link = new URL("/brand/team-invitations/accept", origin);
+    const link = new URL(args.acceptancePath, origin);
     // A fragment keeps the bearer token out of frontend HTTP/access logs.
     link.hash = new URLSearchParams({ token: args.rawToken }).toString();
     try {
@@ -122,7 +153,7 @@ export class MailService {
         To: args.email,
         TemplateId: templateId,
         TemplateModel: {
-          brand_name: args.brandName,
+          brand_name: args.workspaceName,
           invited_role: args.role,
           expires_at: args.expiresAt.toISOString(),
           acceptance_url: link.toString(),

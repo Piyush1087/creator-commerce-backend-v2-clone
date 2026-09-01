@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   ServiceUnavailableException,
 } from "@nestjs/common";
@@ -18,7 +19,9 @@ import {
 
 import { PrismaService } from "../../prisma/prisma.service";
 import { encryptField } from "../../shared/crypto/field-encryption.util";
+import type { CreatorWorkspaceActorContext } from "../../shared/creator/creator-workspace-actor.contract";
 import type { AuthUser } from "../auth/types/auth-user";
+import { CreatorWorkspaceActorService } from "../creator-settings/team/creator-workspace-actor.service";
 import {
   InstagramGraphClient,
   InstagramPermissionEvidenceError,
@@ -31,10 +34,6 @@ import {
   type InstagramTokenExchangeResult,
 } from "../instagram/instagram-oauth.client";
 import { CreatorInstagramOAuthTransactionService } from "../provider-oauth/creator-instagram-oauth-transaction.service";
-import {
-  type CanonicalCreatorContext,
-  CreatorCanonicalContextService,
-} from "./creator-canonical-context.service";
 import { CreatorEntryStateService } from "./creator-entry-state.service";
 import { CREATOR_ENTRY_ERROR } from "./creator-entry.types";
 import {
@@ -53,6 +52,16 @@ type CapabilityEvidence = {
   reasonCode: string | null;
 };
 
+type InitialConnectContext = {
+  authUser: AuthUser;
+  actorUserId: string;
+  actorMembershipId: string;
+  workspaceId: string;
+  organizationId: string;
+  subjectCreatorProfileId: string;
+  subjectOwnerUserId: string;
+};
+
 @Injectable()
 export class CreatorInstagramConnectionService {
   constructor(
@@ -61,15 +70,15 @@ export class CreatorInstagramConnectionService {
     private readonly oauth: InstagramOAuthClient,
     private readonly graph: InstagramGraphClient,
     private readonly state: CreatorEntryStateService,
-    private readonly contexts: CreatorCanonicalContextService,
+    private readonly workspaceActors: CreatorWorkspaceActorService,
   ) {}
 
   async authorize(user: AuthUser) {
-    const creator = await this.contexts.resolve(user.id);
+    const creator = await this.resolveInitialConnectContext(user);
     const existing = await this.prisma.creatorSocialIntegration.findUnique({
       where: {
         creatorProfileId_platformNetwork: {
-          creatorProfileId: creator.creatorProfileId,
+          creatorProfileId: creator.subjectCreatorProfileId,
           platformNetwork: SocialNetworkProvider.INSTAGRAM,
         },
       },
@@ -84,8 +93,8 @@ export class CreatorInstagramConnectionService {
 
     const redirectUri = resolveCreatorInstagramRedirectUri();
     const state = await this.transactions.issue({
-      creatorProfileId: creator.creatorProfileId,
-      initiatedByUserId: creator.userId,
+      creatorProfileId: creator.subjectCreatorProfileId,
+      initiatedByUserId: creator.actorUserId,
       redirectUri,
       intent: InstagramOAuthIntent.INITIAL_CONNECT,
       expectedGeneration: 0,
@@ -98,12 +107,12 @@ export class CreatorInstagramConnectionService {
   }
 
   async complete(user: AuthUser, input: CreatorInstagramCompleteDto) {
-    const creator = await this.contexts.resolve(user.id);
+    const creator = await this.resolveInitialConnectContext(user);
     const redirectUri = resolveCreatorInstagramRedirectUri();
     const attempt = await this.transactions.consume(
       {
-        creatorProfileId: creator.creatorProfileId,
-        initiatedByUserId: creator.userId,
+        creatorProfileId: creator.subjectCreatorProfileId,
+        initiatedByUserId: creator.actorUserId,
         redirectUri,
         intent: InstagramOAuthIntent.INITIAL_CONNECT,
         expectedGeneration: 0,
@@ -141,7 +150,7 @@ export class CreatorInstagramConnectionService {
 
     return {
       connected: true as const,
-      state: await this.state.read(user),
+      state: await this.state.readCanonicalOwner(creator.subjectOwnerUserId),
     };
   }
 
@@ -156,14 +165,14 @@ export class CreatorInstagramConnectionService {
       expectedGeneration: number;
       expectedProviderAccountId: string | null;
     },
-    creator: CanonicalCreatorContext,
+    creator: InitialConnectContext,
     redirectUri: string,
   ): void {
     if (
       attempt.provider !== ProviderOAuthProvider.INSTAGRAM ||
       attempt.subjectType !== ProviderOAuthSubjectType.CREATOR ||
-      attempt.creatorProfileId !== creator.creatorProfileId ||
-      attempt.initiatedByUserId !== creator.userId ||
+      attempt.creatorProfileId !== creator.subjectCreatorProfileId ||
+      attempt.initiatedByUserId !== creator.actorUserId ||
       attempt.redirectUri !== redirectUri ||
       attempt.intent !== InstagramOAuthIntent.INITIAL_CONNECT ||
       attempt.expectedGeneration !== 0 ||
@@ -185,13 +194,13 @@ export class CreatorInstagramConnectionService {
   }
 
   private async assertInitialGeneration(
-    creator: CanonicalCreatorContext,
+    creator: InitialConnectContext,
     expectedGeneration: number,
   ): Promise<void> {
     const existing = await this.prisma.creatorSocialIntegration.findUnique({
       where: {
         creatorProfileId_platformNetwork: {
-          creatorProfileId: creator.creatorProfileId,
+          creatorProfileId: creator.subjectCreatorProfileId,
           platformNetwork: SocialNetworkProvider.INSTAGRAM,
         },
       },
@@ -294,7 +303,7 @@ export class CreatorInstagramConnectionService {
   }
 
   private async promoteInitialConnection(args: {
-    creator: CanonicalCreatorContext;
+    creator: InitialConnectContext;
     attemptGeneration: number;
     token: InstagramTokenExchangeResult;
     me: InstagramMeProfile;
@@ -307,11 +316,11 @@ export class CreatorInstagramConnectionService {
     );
     try {
       await this.prisma.$transaction(async (tx) => {
-        await this.contexts.assertInTransaction(tx, args.creator);
+        await this.assertInitialConnectContextInTransaction(tx, args.creator);
         const existing = await tx.creatorSocialIntegration.findUnique({
           where: {
             creatorProfileId_platformNetwork: {
-              creatorProfileId: args.creator.creatorProfileId,
+              creatorProfileId: args.creator.subjectCreatorProfileId,
               platformNetwork: SocialNetworkProvider.INSTAGRAM,
             },
           },
@@ -332,7 +341,7 @@ export class CreatorInstagramConnectionService {
 
         await tx.creatorSocialIntegration.create({
           data: {
-            creatorProfileId: args.creator.creatorProfileId,
+            creatorProfileId: args.creator.subjectCreatorProfileId,
             platformNetwork: SocialNetworkProvider.INSTAGRAM,
             nativePlatformUserId: args.me.userId,
             channelHandleString: args.me.username,
@@ -371,10 +380,72 @@ export class CreatorInstagramConnectionService {
         },
         select: { creatorProfileId: true },
       });
-      if (owner && owner.creatorProfileId !== args.creator.creatorProfileId) {
+      if (
+        owner &&
+        owner.creatorProfileId !== args.creator.subjectCreatorProfileId
+      ) {
         throw this.identityAlreadyInUse();
       }
       throw this.staleAttempt();
+    }
+  }
+
+  /**
+   * COMPATIBILITY_RECONCILIATION_ONLY.
+   *
+   * C-01's initial connection originally coupled actor User and Owner subject.
+   * C-05 resolves the direct Team User actor while retaining the canonical
+   * Owner CreatorProfile as provider subject. The same resolver preserves the
+   * previous Owner path through its canonical Owner reconciliation.
+   */
+  private async resolveInitialConnectContext(
+    user: AuthUser,
+  ): Promise<InitialConnectContext> {
+    const actor = await this.workspaceActors.resolve(user);
+    this.assertInitialConnectActor(actor, user.id);
+    return {
+      authUser: user,
+      actorUserId: actor.actorUserId,
+      actorMembershipId: actor.actorMembershipId,
+      workspaceId: actor.workspaceId,
+      organizationId: actor.organizationId,
+      subjectCreatorProfileId: actor.subjectCreatorProfileId,
+      subjectOwnerUserId: actor.subjectOwnerUserId,
+    };
+  }
+
+  private async assertInitialConnectContextInTransaction(
+    tx: Prisma.TransactionClient,
+    expected: InitialConnectContext,
+  ): Promise<void> {
+    const current = await this.workspaceActors.resolveInTransaction(
+      tx,
+      expected.authUser,
+      expected.workspaceId,
+    );
+    this.assertInitialConnectActor(current, expected.actorUserId);
+    if (
+      current.actorMembershipId !== expected.actorMembershipId ||
+      current.organizationId !== expected.organizationId ||
+      current.subjectCreatorProfileId !== expected.subjectCreatorProfileId ||
+      current.subjectOwnerUserId !== expected.subjectOwnerUserId
+    ) {
+      throw this.staleAttempt();
+    }
+  }
+
+  private assertInitialConnectActor(
+    actor: CreatorWorkspaceActorContext,
+    authenticatedUserId: string,
+  ): void {
+    if (
+      actor.actorUserId !== authenticatedUserId ||
+      (actor.actorRole !== "OWNER" && actor.actorRole !== "MANAGER") ||
+      !actor.allowedActions.includes("INSTAGRAM_SETTINGS_MANAGE")
+    ) {
+      throw new ForbiddenException(
+        "Your Creator Team role cannot connect Instagram.",
+      );
     }
   }
 
