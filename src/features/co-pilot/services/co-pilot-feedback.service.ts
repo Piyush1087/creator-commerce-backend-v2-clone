@@ -24,19 +24,26 @@ export class CoPilotFeedbackService {
         id: args.messageId,
         threadId: args.threadId,
         role: "ASSISTANT",
-        thread: { brandProfileId: args.brandProfileId },
+        thread: {
+          brandProfileId: args.brandProfileId,
+          createdByUserId: args.userId,
+        },
       },
     });
 
     if (!message) {
-      throw new NotFoundException("Assistant message not found in this thread.");
+      throw new NotFoundException(
+        "Assistant message not found in this thread.",
+      );
     }
 
     const existing = await this.prisma.coPilotMessageFeedback.findUnique({
       where: { messageId: args.messageId },
     });
     if (existing) {
-      throw new ConflictException("Feedback already submitted for this message.");
+      throw new ConflictException(
+        "Feedback already submitted for this message.",
+      );
     }
 
     return this.prisma.coPilotMessageFeedback.create({

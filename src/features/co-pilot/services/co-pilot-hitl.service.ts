@@ -3,7 +3,13 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { BrandCentreJobStatus, IndustryVertical, PlannerWorkflowStatus, UserRole, type UceMilestoneStage } from "@prisma/client";
+import {
+  BrandCentreJobStatus,
+  IndustryVertical,
+  PlannerWorkflowStatus,
+  UserRole,
+  type UceMilestoneStage,
+} from "@prisma/client";
 
 import { BrandCentreDnaService } from "../../brand-centre/services/brand-centre-dna.service";
 import { BrandCentreIntelligenceService } from "../../brand-centre/services/brand-centre-intelligence.service";
@@ -37,9 +43,7 @@ import {
   validationChecklistToPayloadFields as collabValidationChecklistToPayloadFields,
   type CollaborationValidationAction,
 } from "../modules/collaboration/collaboration-validation";
-import {
-  isBrandWriteAllowedAtStage,
-} from "../modules/collaboration/collaboration.stages";
+import { isBrandWriteAllowedAtStage } from "../modules/collaboration/collaboration.stages";
 import {
   mapBrandSettingsValidationError,
   validationChecklistToPayloadFields as settingsValidationChecklistToPayloadFields,
@@ -51,7 +55,10 @@ import {
   UpdateBrandGeneralProfileSchema,
 } from "../../brand-settings/schemas/brand-settings.schema";
 import { CoPilotSlotSessionService } from "./co-pilot-slot-session.service";
-import { CoPilotThreadService } from "./co-pilot-thread.service";
+import {
+  CoPilotThreadService,
+  type ConversationOwnerScope,
+} from "./co-pilot-thread.service";
 import { CoPilotConversationMemoryService } from "./co-pilot-conversation-memory.service";
 
 export type HitlConfirmResult = {
@@ -78,6 +85,8 @@ export type HitlConfirmResult = {
   followUpChecklist?: ValidationChecklistData;
 };
 
+type HitlThreadScope = ConversationOwnerScope & { threadId: string };
+
 @Injectable()
 export class CoPilotHitlService {
   constructor(
@@ -100,7 +109,15 @@ export class CoPilotHitlService {
     threadId: string;
     idempotencyKey: string;
   }): Promise<HitlConfirmResult> {
+    const ownerScope = this.ownerScope(args);
+    const thread = await this.threads.getThread(ownerScope, args.threadId, {
+      includeArchived: true,
+    });
+    if (!thread) {
+      throw new NotFoundException("No staged session for this thread.");
+    }
     const prior = await this.threads.findHitlResolution(
+      ownerScope,
       args.threadId,
       args.idempotencyKey,
     );
@@ -120,7 +137,9 @@ export class CoPilotHitlService {
       session.stagedPayload as Record<string, unknown>,
     );
     if (staged.idempotencyKey !== args.idempotencyKey) {
-      throw new BadRequestException("Idempotency key does not match staged widget.");
+      throw new BadRequestException(
+        "Idempotency key does not match staged widget.",
+      );
     }
 
     const intent = session.intentWorkspaceContext as WriteIntentKind;
@@ -177,7 +196,14 @@ export class CoPilotHitlService {
     }
   }
 
-  async discardStaged(args: { threadId: string; idempotencyKey: string }) {
+  async discardStaged(args: HitlThreadScope & { idempotencyKey: string }) {
+    const ownerScope = this.ownerScope(args);
+    const thread = await this.threads.getThread(ownerScope, args.threadId, {
+      includeArchived: true,
+    });
+    if (!thread) {
+      throw new NotFoundException("No staged session for this thread.");
+    }
     const session = await this.slotSessions.getActiveSession(args.threadId);
     if (!session) {
       return { ok: true };
@@ -185,16 +211,23 @@ export class CoPilotHitlService {
 
     const staged = session.stagedPayload as Record<string, unknown>;
     if (staged.idempotencyKey !== args.idempotencyKey) {
-      throw new BadRequestException("Idempotency key does not match staged widget.");
+      throw new BadRequestException(
+        "Idempotency key does not match staged widget.",
+      );
     }
 
     await this.slotSessions.clearSession(args.threadId);
     const resolvedAt = new Date().toISOString();
-    await this.threads.persistHitlResolution(args.threadId, args.idempotencyKey, {
-      status: "DISCARDED",
-      resolvedAt,
-      summary: "Staged action discarded.",
-    });
+    await this.threads.persistHitlResolution(
+      ownerScope,
+      args.threadId,
+      args.idempotencyKey,
+      {
+        status: "DISCARDED",
+        resolvedAt,
+        summary: "Staged action discarded.",
+      },
+    );
 
     return {
       ok: true,
@@ -224,7 +257,9 @@ export class CoPilotHitlService {
       );
     }
 
-    const dashboard = await this.planner.getPlannerDashboard(args.brandProfileId);
+    const dashboard = await this.planner.getPlannerDashboard(
+      args.brandProfileId,
+    );
     const payload = job.payload as { leakId?: string } | null;
     let card = dashboard.cards[0];
 
@@ -243,7 +278,8 @@ export class CoPilotHitlService {
     }
 
     if (card) {
-      const label = card.aiContextHook ?? card.strategy.objective ?? "Planner card";
+      const label =
+        card.aiContextHook ?? card.strategy.objective ?? "Planner card";
       return buildPlannerReadyFollowUp(label);
     }
 
@@ -269,7 +305,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmCampaignLaunch(
-    args: { brandProfileId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     const profile = await this.prisma.brandProfile.findUnique({
@@ -291,56 +327,66 @@ export class CoPilotHitlService {
       objective !== "TRAFFIC_CLICKS" &&
       objective !== "SALES_CONVERSIONS"
     ) {
-      throw new BadRequestException("Invalid marketing objective in staged payload.");
+      throw new BadRequestException(
+        "Invalid marketing objective in staged payload.",
+      );
     }
 
     if (!Number.isFinite(budget) || budget <= 0) {
       throw new BadRequestException("Invalid budget in staged payload.");
     }
 
-    const campaign = await this.uceCampaigns.createFromWizard(args.brandProfileId, {
-      strategy: {
-        campaign_name: `${productName} — Co-Pilot Draft`,
-        timeline_type: "DYNAMIC_MILESTONES" as const,
-        dynamic_days_limit: 30,
-        core_objective: objective,
-        platform_deliverables: [
-          { platform: "INSTAGRAM" as const, formats: ["REEL", "STORY"] },
-        ],
+    const campaign = await this.uceCampaigns.createFromWizard(
+      args.brandProfileId,
+      {
+        strategy: {
+          campaign_name: `${productName} — Co-Pilot Draft`,
+          timeline_type: "DYNAMIC_MILESTONES" as const,
+          dynamic_days_limit: 30,
+          core_objective: objective,
+          platform_deliverables: [
+            { platform: "INSTAGRAM" as const, formats: ["REEL", "STORY"] },
+          ],
+        },
+        targeting: {
+          industry_vertical: profile.industry,
+          creator_archetypes: ["Lifestyle", "Beauty"],
+          follower_tiers: ["MICRO", "MID_TIER"],
+          audience_age_min: 22,
+          audience_age_max: 40,
+          audience_gender: "ALL",
+          target_locations: [profile.countryCode ?? "IN"],
+          disqualifying_keywords: [],
+          visibility_scopes: ["EVERYONE"],
+          application_scope: "EVERYONE",
+        },
+        commercials: {
+          compensation_type: "NEGOTIABLE" as const,
+          fixed_fee_amount: 0,
+          negotiable_min_fee: Math.round(budget * 0.05),
+          negotiable_max_fee: Math.round(budget * 0.15),
+          total_campaign_budget_pool: budget,
+          advance_payment_percentage: 50,
+          final_balance_terms: "NET_15" as const,
+        },
       },
-      targeting: {
-        industry_vertical: profile.industry,
-        creator_archetypes: ["Lifestyle", "Beauty"],
-        follower_tiers: ["MICRO", "MID_TIER"],
-        audience_age_min: 22,
-        audience_age_max: 40,
-        audience_gender: "ALL",
-        target_locations: [profile.countryCode ?? "IN"],
-        disqualifying_keywords: [],
-        visibility_scopes: ["EVERYONE"],
-        application_scope: "EVERYONE",
-      },
-      commercials: {
-        compensation_type: "NEGOTIABLE" as const,
-        fixed_fee_amount: 0,
-        negotiable_min_fee: Math.round(budget * 0.05),
-        negotiable_max_fee: Math.round(budget * 0.15),
-        total_campaign_budget_pool: budget,
-        advance_payment_percentage: 50,
-        final_balance_terms: "NET_15" as const,
-      },
-    });
+    );
 
     await this.slotSessions.clearSession(args.threadId);
     const resolvedAt = new Date().toISOString();
     const summary = `Draft campaign "${campaign.campaign_name}" created. Open Campaigns to continue setup.`;
-    await this.threads.persistHitlResolution(args.threadId, String(staged.idempotencyKey), {
-      status: "CONFIRMED",
-      resolvedAt,
-      summary,
-      campaignId: campaign.campaign_id,
-      campaignName: campaign.campaign_name,
-    });
+    await this.threads.persistHitlResolution(
+      this.ownerScope(args),
+      args.threadId,
+      String(staged.idempotencyKey),
+      {
+        status: "CONFIRMED",
+        resolvedAt,
+        summary,
+        campaignId: campaign.campaign_id,
+        campaignName: campaign.campaign_name,
+      },
+    );
 
     return {
       intent: "CAMPAIGN_LAUNCH",
@@ -357,7 +403,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmCampaignEditDraft(
-    args: { brandProfileId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     const campaignId = this.parseSelectId(staged.campaign_id);
@@ -438,6 +484,7 @@ export class CoPilotHitlService {
       const resolvedAt = new Date().toISOString();
       const summary = `Draft campaign "${campaign.campaign_name}" updated.`;
       await this.threads.persistHitlResolution(
+        this.ownerScope(args),
         args.threadId,
         String(staged.idempotencyKey),
         {
@@ -488,7 +535,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmIntelligenceMoveToPlanner(
-    args: { brandProfileId: string; userId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     const leakId = String(staged.leak_id ?? "").trim();
@@ -506,12 +553,17 @@ export class CoPilotHitlService {
     const resolvedAt = new Date().toISOString();
     const summary =
       "Leak sent to Campaign Planner. Building your planner card in the background…";
-    await this.threads.persistHitlResolution(args.threadId, String(staged.idempotencyKey), {
-      status: "CONFIRMED",
-      resolvedAt,
-      summary,
-      brandCentreJobId: jobId,
-    });
+    await this.threads.persistHitlResolution(
+      this.ownerScope(args),
+      args.threadId,
+      String(staged.idempotencyKey),
+      {
+        status: "CONFIRMED",
+        resolvedAt,
+        summary,
+        brandCentreJobId: jobId,
+      },
+    );
 
     return {
       intent: "INTELLIGENCE_MOVE_TO_PLANNER",
@@ -527,7 +579,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmPlannerLaunchDraft(
-    args: { brandProfileId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     const cardId = String(staged.planner_card_id ?? "").trim();
@@ -542,8 +594,14 @@ export class CoPilotHitlService {
       throw new NotFoundException("Brand profile not found.");
     }
 
-    const existingCard = await this.planner.getCard(args.brandProfileId, cardId);
-    if (existingCard.workflowStatus === PlannerWorkflowStatus.PROCEEDED_TO_PIPELINE) {
+    const existingCard = await this.planner.getCard(
+      args.brandProfileId,
+      cardId,
+    );
+    if (
+      existingCard.workflowStatus ===
+      PlannerWorkflowStatus.PROCEEDED_TO_PIPELINE
+    ) {
       throw new BadRequestException(
         "This planner card was already launched. Open Campaigns to review the existing DRAFT.",
       );
@@ -596,14 +654,19 @@ export class CoPilotHitlService {
     await this.slotSessions.clearSession(args.threadId);
     const resolvedAt = new Date().toISOString();
     const summary = `Draft campaign "${shell.campaign_name}" created from Campaign Planner. Open Campaigns to review products and briefs.`;
-    await this.threads.persistHitlResolution(args.threadId, String(staged.idempotencyKey), {
-      status: "CONFIRMED",
-      resolvedAt,
-      summary,
-      campaignId,
-      campaignName: shell.campaign_name,
-      plannerCardId: cardId,
-    });
+    await this.threads.persistHitlResolution(
+      this.ownerScope(args),
+      args.threadId,
+      String(staged.idempotencyKey),
+      {
+        status: "CONFIRMED",
+        resolvedAt,
+        summary,
+        campaignId,
+        campaignName: shell.campaign_name,
+        plannerCardId: cardId,
+      },
+    );
 
     return {
       intent: "PLANNER_LAUNCH_DRAFT",
@@ -623,7 +686,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmDnaIdentity(
-    args: { brandProfileId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     const axes = (staged.update_axes ?? []) as DnaIdentityUpdateAxis[];
@@ -637,7 +700,9 @@ export class CoPilotHitlService {
         aesthetics: current.aesthetics,
       },
       axes: axes.length > 0 ? axes : ["fonts", "aesthetics"],
-      primaryFont: staged.primary_font ? String(staged.primary_font).trim() : undefined,
+      primaryFont: staged.primary_font
+        ? String(staged.primary_font).trim()
+        : undefined,
       aestheticStyle: staged.aesthetic_style
         ? String(staged.aesthetic_style).trim()
         : undefined,
@@ -663,11 +728,16 @@ export class CoPilotHitlService {
     if (patch.fonts?.length) changed.push("fonts");
     if (patch.aesthetics?.length) changed.push("aesthetic styles");
     const summary = `Brand DNA ${changed.join(" and ")} updated.`;
-    await this.threads.persistHitlResolution(args.threadId, String(staged.idempotencyKey), {
-      status: "CONFIRMED",
-      resolvedAt,
-      summary,
-    });
+    await this.threads.persistHitlResolution(
+      this.ownerScope(args),
+      args.threadId,
+      String(staged.idempotencyKey),
+      {
+        status: "CONFIRMED",
+        resolvedAt,
+        summary,
+      },
+    );
 
     return {
       intent: "DNA_IDENTITY_UPDATE",
@@ -677,16 +747,21 @@ export class CoPilotHitlService {
   }
 
   private async confirmDnaOffering(
-    args: { brandProfileId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     const offeringName = String(staged.offering_name ?? "").trim();
     const description = String(staged.description ?? "").trim();
     if (!offeringName || !description) {
-      throw new BadRequestException("Offering name and description are required.");
+      throw new BadRequestException(
+        "Offering name and description are required.",
+      );
     }
 
-    const offerings = await this.dna.listOfferings(args.brandProfileId, "primary");
+    const offerings = await this.dna.listOfferings(
+      args.brandProfileId,
+      "primary",
+    );
     const match = offerings.find(
       (o) => o.name.toLowerCase() === offeringName.toLowerCase(),
     );
@@ -696,16 +771,23 @@ export class CoPilotHitlService {
       );
     }
 
-    await this.dna.updateOffering(args.brandProfileId, match.id, { description });
+    await this.dna.updateOffering(args.brandProfileId, match.id, {
+      description,
+    });
     await this.slotSessions.clearSession(args.threadId);
 
     const resolvedAt = new Date().toISOString();
     const summary = `Updated description for "${match.name}".`;
-    await this.threads.persistHitlResolution(args.threadId, String(staged.idempotencyKey), {
-      status: "CONFIRMED",
-      resolvedAt,
-      summary,
-    });
+    await this.threads.persistHitlResolution(
+      this.ownerScope(args),
+      args.threadId,
+      String(staged.idempotencyKey),
+      {
+        status: "CONFIRMED",
+        resolvedAt,
+        summary,
+      },
+    );
 
     return {
       intent: "DNA_OFFERING_UPDATE",
@@ -715,7 +797,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmDnaPersonaCreate(
-    args: { brandProfileId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     const personaName = String(staged.persona_name ?? "").trim();
@@ -740,11 +822,16 @@ export class CoPilotHitlService {
     await this.slotSessions.clearSession(args.threadId);
     const resolvedAt = new Date().toISOString();
     const summary = `Persona "${persona.personaName}" created.`;
-    await this.threads.persistHitlResolution(args.threadId, String(staged.idempotencyKey), {
-      status: "CONFIRMED",
-      resolvedAt,
-      summary,
-    });
+    await this.threads.persistHitlResolution(
+      this.ownerScope(args),
+      args.threadId,
+      String(staged.idempotencyKey),
+      {
+        status: "CONFIRMED",
+        resolvedAt,
+        summary,
+      },
+    );
 
     return {
       intent: "DNA_PERSONA_CREATE",
@@ -777,6 +864,7 @@ export class CoPilotHitlService {
 
   private async confirmLifecycleWithValidation(args: {
     brandProfileId: string;
+    userId: string;
     threadId: string;
     intent: Extract<
       WriteIntentKind,
@@ -811,6 +899,7 @@ export class CoPilotHitlService {
       const resolvedAt = new Date().toISOString();
       const summary = args.successSummary(result);
       await this.threads.persistHitlResolution(
+        this.ownerScope(args),
         args.threadId,
         String(args.staged.idempotencyKey),
         {
@@ -860,7 +949,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmPauseCampaign(
-    args: { brandProfileId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     const campaignId = this.parseSelectId(staged.campaign_id);
@@ -900,19 +989,18 @@ export class CoPilotHitlService {
     }
 
     return this.confirmLifecycleWithValidation({
-      brandProfileId: args.brandProfileId,
-      threadId: args.threadId,
+      ...args,
       intent: "PAUSE_CAMPAIGN",
       action: "PAUSE",
       staged,
-      run: () => this.uceCampaigns.pauseCampaign(args.brandProfileId, campaignId),
-      successSummary: (result) =>
-        `Campaign paused (${result.current_status}).`,
+      run: () =>
+        this.uceCampaigns.pauseCampaign(args.brandProfileId, campaignId),
+      successSummary: (result) => `Campaign paused (${result.current_status}).`,
     });
   }
 
   private async confirmResumeCampaign(
-    args: { brandProfileId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     const campaignId = this.parseSelectId(staged.campaign_id);
@@ -965,7 +1053,8 @@ export class CoPilotHitlService {
       const mapped = mapCampaignListValidationError({
         err: {
           response: {
-            message: "Campaign cannot be activated until checklist criteria are met",
+            message:
+              "Campaign cannot be activated until checklist criteria are met",
             checklist,
           },
           status: 400,
@@ -992,19 +1081,19 @@ export class CoPilotHitlService {
     }
 
     return this.confirmLifecycleWithValidation({
-      brandProfileId: args.brandProfileId,
-      threadId: args.threadId,
+      ...args,
       intent: "RESUME_CAMPAIGN",
       action: "RESUME",
       staged,
-      run: () => this.uceCampaigns.resumeCampaign(args.brandProfileId, campaignId),
+      run: () =>
+        this.uceCampaigns.resumeCampaign(args.brandProfileId, campaignId),
       successSummary: (result) =>
         `Campaign resumed (${result.current_status}).`,
     });
   }
 
   private async confirmGoLiveCampaign(
-    args: { brandProfileId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     const campaignId = this.parseSelectId(staged.campaign_id);
@@ -1057,7 +1146,8 @@ export class CoPilotHitlService {
       const mapped = mapCampaignListValidationError({
         err: {
           response: {
-            message: "Campaign cannot be activated until checklist criteria are met",
+            message:
+              "Campaign cannot be activated until checklist criteria are met",
             checklist,
           },
           status: 400,
@@ -1084,19 +1174,19 @@ export class CoPilotHitlService {
     }
 
     return this.confirmLifecycleWithValidation({
-      brandProfileId: args.brandProfileId,
-      threadId: args.threadId,
+      ...args,
       intent: "GO_LIVE_CAMPAIGN",
       action: "GO_LIVE",
       staged,
-      run: () => this.uceCampaigns.goLiveCampaign(args.brandProfileId, campaignId),
+      run: () =>
+        this.uceCampaigns.goLiveCampaign(args.brandProfileId, campaignId),
       successSummary: (result) =>
         `Campaign is live (${result.current_status}).`,
     });
   }
 
   private async confirmArchiveCampaign(
-    args: { brandProfileId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     const campaignId = this.parseSelectId(staged.campaign_id);
@@ -1141,8 +1231,7 @@ export class CoPilotHitlService {
     }
 
     return this.confirmLifecycleWithValidation({
-      brandProfileId: args.brandProfileId,
-      threadId: args.threadId,
+      ...args,
       intent: "ARCHIVE_CAMPAIGN",
       action: "ARCHIVE",
       staged,
@@ -1154,7 +1243,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmDuplicateCampaign(
-    args: { brandProfileId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     const campaignId = this.parseSelectId(staged.campaign_id);
@@ -1166,8 +1255,7 @@ export class CoPilotHitlService {
       throw new BadRequestException("New campaign name is required.");
     }
     return this.confirmLifecycleWithValidation({
-      brandProfileId: args.brandProfileId,
-      threadId: args.threadId,
+      ...args,
       intent: "DUPLICATE_CAMPAIGN",
       action: "DUPLICATE",
       staged,
@@ -1189,7 +1277,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmBulkCampaignAction(
-    args: { brandProfileId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     const action = String(staged.bulk_action ?? "")
@@ -1249,7 +1337,10 @@ export class CoPilotHitlService {
       );
 
       const nameMap: Record<string, string> = {};
-      if (typeof staged.campaign_name === "string" && campaignIds.length === 1) {
+      if (
+        typeof staged.campaign_name === "string" &&
+        campaignIds.length === 1
+      ) {
         nameMap[campaignIds[0]] = staged.campaign_name;
       }
 
@@ -1282,6 +1373,7 @@ export class CoPilotHitlService {
         summary = `${summary} Some campaigns need attention — see the checklist.`;
       }
       await this.threads.persistHitlResolution(
+        this.ownerScope(args),
         args.threadId,
         String(staged.idempotencyKey),
         {
@@ -1345,6 +1437,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmCollabAction(args: {
+    brandProfileId: string;
     userId: string;
     threadId: string;
     intent: Extract<
@@ -1359,7 +1452,10 @@ export class CoPilotHitlService {
     >;
     action: CollaborationValidationAction;
     staged: Record<string, unknown>;
-    run: (authUser: AuthUser, collaborationId: string) => Promise<{
+    run: (
+      authUser: AuthUser,
+      collaborationId: string,
+    ) => Promise<{
       stage?: string;
       campaignName?: string;
       creatorLabel?: string;
@@ -1418,6 +1514,7 @@ export class CoPilotHitlService {
         campaignName: meta.campaignName ?? campaignName,
       });
       await this.threads.persistHitlResolution(
+        this.ownerScope(args),
         args.threadId,
         String(args.staged.idempotencyKey),
         {
@@ -1465,14 +1562,14 @@ export class CoPilotHitlService {
     }
   }
 
-  private stageFromDetail(detail: Awaited<
-    ReturnType<CollaborationService["getThread"]>
-  >): string {
+  private stageFromDetail(
+    detail: Awaited<ReturnType<CollaborationService["getThread"]>>,
+  ): string {
     return detail.thread.currentStage;
   }
 
   private async confirmCollabCounterOffer(
-    args: { userId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     const amount = Number(staged.counter_offer);
@@ -1505,7 +1602,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmCollabAcceptTerms(
-    args: { userId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     return this.confirmCollabAction({
@@ -1534,7 +1631,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmCollabFundEscrow(
-    args: { userId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     return this.confirmCollabAction({
@@ -1563,7 +1660,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmCollabDispatch(
-    args: { userId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     const trackingId =
@@ -1601,7 +1698,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmCollabApproveContent(
-    args: { userId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     return this.confirmCollabAction({
@@ -1630,7 +1727,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmCollabRequestRevision(
-    args: { userId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     const feedback =
@@ -1666,7 +1763,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmCollabVerifyCompliance(
-    args: { userId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     return this.confirmCollabAction({
@@ -1694,7 +1791,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmSettingsUpdateGeneral(
-    args: { userId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     return this.confirmSettingsAction({
@@ -1725,7 +1822,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmSettingsUpdateBilling(
-    args: { userId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     return this.confirmSettingsAction({
@@ -1748,7 +1845,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmSettingsLinkWithdrawal(
-    args: { userId: string; threadId: string },
+    args: HitlThreadScope,
     staged: Record<string, unknown>,
   ): Promise<HitlConfirmResult> {
     return this.confirmSettingsAction({
@@ -1771,6 +1868,7 @@ export class CoPilotHitlService {
   }
 
   private async confirmSettingsAction(args: {
+    brandProfileId: string;
     userId: string;
     threadId: string;
     intent: Extract<
@@ -1792,6 +1890,7 @@ export class CoPilotHitlService {
       await this.slotSessions.clearSession(args.threadId);
       const resolvedAt = new Date().toISOString();
       await this.threads.persistHitlResolution(
+        this.ownerScope(args),
         args.threadId,
         String(args.staged.idempotencyKey),
         {
@@ -1810,7 +1909,10 @@ export class CoPilotHitlService {
         },
       };
     } catch (err) {
-      if (err instanceof BadRequestException || err instanceof NotFoundException) {
+      if (
+        err instanceof BadRequestException ||
+        err instanceof NotFoundException
+      ) {
         throw err;
       }
       const mapped = mapBrandSettingsValidationError({
@@ -1839,5 +1941,12 @@ export class CoPilotHitlService {
     }
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  private ownerScope(args: ConversationOwnerScope): ConversationOwnerScope {
+    return {
+      brandProfileId: args.brandProfileId,
+      userId: args.userId,
+    };
   }
 }

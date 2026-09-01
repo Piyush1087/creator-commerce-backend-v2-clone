@@ -16,6 +16,12 @@ accepted_checkpoints:
     checkpoint_sha: 87e6e82a1d0442fb1943f06e63a9bcb8b1a095e6
     ie_review: PASS
     systems_review: PASS
+  p1:
+    gate: P1_INTELLIGENCE_CONSUMER_CONTRACT_ACCEPTED
+    implementation_sha: e0ce85086bf5696e967f3c82c34936caa6339414
+    checkpoint_sha: 17ebca265faa088a03b1433e06bef3acc3baeb99
+    ie_review: PASS
+    systems_review: PASS
 
 backend:
   repository: Piyush1087/creator-commerce-backend-v2-clone
@@ -27,8 +33,8 @@ backend:
     sha: f3a2d7b19f5692ad10e5d13751ee880e1604f93a
 
 phase:
-  id: P1
-  status: CANDIDATE_READY_FOR_IE_REVIEW
+  id: P2
+  status: IN_PROGRESS
 
 deferred_dependencies:
   canonical_offering_discovery:
@@ -225,9 +231,9 @@ p1_validation:
 
 p1_checkpoint:
   implementation_sha: e0ce85086bf5696e967f3c82c34936caa6339414
-  final_checkpoint_sha: SELF_COMMIT_CONTAINING_THIS_LEDGER
-  ie_review: PENDING
-  systems_review: PENDING
+  final_checkpoint_sha: 17ebca265faa088a03b1433e06bef3acc3baeb99
+  ie_review: PASS
+  systems_review: PASS
   target_gate: P1_INTELLIGENCE_CONSUMER_CONTRACT_ACCEPTED
 
 p1_semantic_differential:
@@ -269,5 +275,129 @@ p1_semantic_differential:
     accepted_pi_migrations: true
     chat_runtime_absent: true
 
+p2_contract:
+  capability_registry: CODE_ONLY
+  planned_first_slice_capabilities: 9
+  implemented_business_capabilities: 0
+  execute_capabilities: 0
+  conversation_storage: EXISTING_COPILOT_TABLES
+  conversation_scope: USER_X_BRAND_X_CONVERSATION
+  conversation_migration_required: false
+  chat_context_persisted_as_truth: false
+  legacy_memory_used: false
+  model_gateway: EXISTING_GEMINI_JSON_CLIENT
+  native_model_tool_calling_required: false
+  personal_memory: false
+  vector_memory: false
+  provider_actions: false
+  new_migrations: 0
+
+p2_validation:
+  targeted_chat:
+    status: PASS
+    files: 6
+    passed: 21
+    failed: 0
+    skipped: 0
+  conversation_postgres:
+    status: PASS
+    passed: 3
+    failed: 0
+    skipped: 0
+    disposable_migrations_applied: 66
+    same_brand_cross_user: PASS
+    cross_brand: PASS
+    inactive_membership: PASS
+    persistence_reload: PASS
+    legacy_shared_storage_service_path: PASS
+  legacy_copilot_regression:
+    status: PASS
+    existing_unit_passed: 7
+    existing_unit_failed: 0
+    ownership_reconciled_in_controller_and_hitl: true
+  p1_regression:
+    status: PASS
+    non_database_passed: 35
+    brand_consumer_postgres_passed: 8
+    product_consumer_postgres_passed: 4
+    failed: 0
+  standard_full_suite:
+    status: PASS
+    attempts: 1
+    passed: 1044
+    failed: 0
+    skipped: 484
+    notification_variance_observed: false
+  final_validation:
+    prisma_generate: PASS
+    prisma_validate: PASS
+    intelligence_contracts_verify: PASS
+    intelligence_architecture_commit: bbb0be3345c36e9cc7c4f06ca68fb491b742b83f
+    backend_build: PASS
+    git_diff_check: PASS
+    changed_scope_lint: PASS
+    full_repository_lint: PRE_EXISTING_BASELINE_FAILURE_816_UNMODIFIED_FORMATTING_ERRORS
+  migrations:
+    count_before: 66
+    count_after: 66
+    new_migrations: 0
+    accepted_pi_migration_hashes_unchanged: true
+
+p2_security_review:
+  same_brand_cross_user_isolation: PASS
+  cross_brand_isolation: PASS
+  server_authoritative_actor: PASS
+  server_authoritative_workspace: PASS
+  untrusted_route_hint_contained: PASS
+  untrusted_entity_hint_contained: PASS
+  legacy_thread_bypass: BLOCKED
+  unscoped_assistant_message_write: false
+  unscoped_hitl_lookup_or_write: false
+  model_output_used_as_authorization: false
+  credential_or_token_logging: false
+  conversation_history_used_as_business_truth: false
+
+p2_semantic_differential:
+  base_sha: 17ebca265faa088a03b1433e06bef3acc3baeb99
+  classifications:
+    CHAT_CAPABILITY_FOUNDATION:
+      - src/features/chat/capabilities
+    CHAT_CONTEXT:
+      - src/features/chat/context
+    CONVERSATION_PRIVACY_RECONCILIATION:
+      - src/features/co-pilot/services/co-pilot-thread.service.ts
+      - src/features/co-pilot/services/co-pilot-feedback.service.ts
+      - src/features/co-pilot/services/co-pilot-hitl.service.ts
+    CHAT_CONVERSATION_FACADE:
+      - src/features/chat/conversation
+      - src/features/co-pilot/co-pilot-persistence.module.ts
+    MODEL_GATEWAY:
+      - src/features/chat/model
+    RESPONSE_CONTRACT:
+      - src/features/chat/response
+    TELEMETRY:
+      - src/features/chat/telemetry
+    LEGACY_COPILOT_CALLSITE_RECONCILIATION:
+      - src/features/co-pilot/co-pilot.controller.ts
+      - src/features/co-pilot/co-pilot.module.ts
+    TEST:
+      - src/features/chat
+    APP_MODULE_WIRING:
+      - src/app.module.ts
+    EXECUTION_LEDGER:
+      - docs/ai-collaboration/chat-home-v1-execution-ledger.yaml
+  unchanged_semantics:
+    business_capability_handlers: true
+    chat_http_controller_absent: true
+    provider_readiness_absent: true
+    provider_actions_absent: true
+    recommendation_engine_absent: true
+    workflow_engine_absent: true
+    intelligence_consumer_contract: true
+    product_semantics: true
+    prisma_schema: true
+    accepted_pi_migrations: true
+    deferred_offering_discovery: true
+
 breaker: NONE
-next_phase: P1_REVIEW
+next_phase: P2_IMPLEMENTATION_CHECKPOINT

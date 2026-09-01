@@ -60,25 +60,31 @@ export type SerializedCoPilotMessage = {
   createdAt: string;
 };
 
+export type ConversationOwnerScope = {
+  brandProfileId: string;
+  userId: string;
+};
+
 @Injectable()
 export class CoPilotThreadService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createThread(args: {
-    brandProfileId: string;
-    userId: string;
-    title?: string;
-    scopeContext?: CoPilotScopeContext;
-    welcomePayload?: Record<string, unknown>;
-  }) {
+  async createThread(
+    scope: ConversationOwnerScope,
+    args: {
+      title?: string;
+      scopeContext?: CoPilotScopeContext;
+      welcomePayload?: Record<string, unknown>;
+    },
+  ) {
     const now = new Date();
     const title = args.title?.trim() || "New conversation";
 
     return this.prisma.$transaction(async (tx) => {
       const thread = await tx.coPilotThread.create({
         data: {
-          brandProfileId: args.brandProfileId,
-          createdByUserId: args.userId,
+          brandProfileId: scope.brandProfileId,
+          createdByUserId: scope.userId,
           title,
           scopeContext: args.scopeContext ?? CoPilotScopeContext.BRAND_CENTRE,
           lastMessageAt: now,
@@ -111,13 +117,14 @@ export class CoPilotThreadService {
   }
 
   async listThreads(
-    brandProfileId: string,
+    scope: ConversationOwnerScope,
     args: { limit?: number; includeArchived?: boolean },
   ) {
     const limit = args.limit ?? 30;
     return this.prisma.coPilotThread.findMany({
       where: {
-        brandProfileId,
+        brandProfileId: scope.brandProfileId,
+        createdByUserId: scope.userId,
         ...(args.includeArchived ? {} : { archivedAt: null }),
       },
       orderBy: { lastMessageAt: "desc" },
@@ -125,30 +132,33 @@ export class CoPilotThreadService {
     });
   }
 
-  async getThreadForBrand(
-    brandProfileId: string,
+  async getThread(
+    scope: ConversationOwnerScope,
     threadId: string,
     options?: { includeArchived?: boolean },
   ) {
     return this.prisma.coPilotThread.findFirst({
       where: {
         id: threadId,
-        brandProfileId,
+        brandProfileId: scope.brandProfileId,
+        createdByUserId: scope.userId,
         ...(options?.includeArchived ? {} : { archivedAt: null }),
       },
     });
   }
 
-  async archiveThread(brandProfileId: string, threadId: string) {
-    return this.patchThread(brandProfileId, threadId, { archived: true });
+  async archiveThread(scope: ConversationOwnerScope, threadId: string) {
+    return this.patchThread(scope, threadId, { archived: true });
   }
 
   async patchThread(
-    brandProfileId: string,
+    scope: ConversationOwnerScope,
     threadId: string,
     data: { title?: string; archived?: boolean },
   ) {
-    const existing = await this.getThreadForBrand(brandProfileId, threadId);
+    const existing = await this.getThread(scope, threadId, {
+      includeArchived: true,
+    });
     if (!existing) {
       return null;
     }
@@ -166,8 +176,10 @@ export class CoPilotThreadService {
     });
   }
 
-  async listMessages(brandProfileId: string, threadId: string) {
-    const thread = await this.getThreadForBrand(brandProfileId, threadId);
+  async listMessages(scope: ConversationOwnerScope, threadId: string) {
+    const thread = await this.getThread(scope, threadId, {
+      includeArchived: true,
+    });
     if (!thread) {
       return null;
     }
@@ -181,12 +193,14 @@ export class CoPilotThreadService {
   }
 
   async appendUserMessage(args: {
-    brandProfileId: string;
+    scope: ConversationOwnerScope;
     threadId: string;
     text: string;
     scopeContext?: CoPilotScopeContext;
   }) {
-    const thread = await this.getThreadForBrand(args.brandProfileId, args.threadId);
+    const thread = await this.getThread(args.scope, args.threadId, {
+      includeArchived: true,
+    });
     if (!thread) {
       return null;
     }
@@ -196,7 +210,8 @@ export class CoPilotThreadService {
 
     const now = new Date();
     const shouldRetitle =
-      thread.title === "New conversation" || thread.title.startsWith("Brand Centre");
+      thread.title === "New conversation" ||
+      thread.title.startsWith("Brand Centre");
 
     return this.prisma.$transaction(async (tx) => {
       const userMessage = await tx.coPilotMessage.create({
@@ -223,11 +238,22 @@ export class CoPilotThreadService {
   }
 
   async appendAssistantMessage(args: {
+    scope: ConversationOwnerScope;
     threadId: string;
     payload: Record<string, unknown>;
     formatType: string;
     narrativeText: string;
   }) {
+    const thread = await this.getThread(args.scope, args.threadId, {
+      includeArchived: true,
+    });
+    if (!thread) {
+      return null;
+    }
+    if (thread.archivedAt) {
+      throw new BadRequestException("This conversation has been archived.");
+    }
+
     const tryCreate = (formatType: string) =>
       this.prisma.coPilotMessage.create({
         data: {
@@ -273,6 +299,7 @@ export class CoPilotThreadService {
   }
 
   async findHitlResolution(
+    scope: ConversationOwnerScope,
     threadId: string,
     idempotencyKey: string,
   ): Promise<{
@@ -284,6 +311,12 @@ export class CoPilotThreadService {
     plannerCardId?: string;
     brandCentreJobId?: string;
   } | null> {
+    const thread = await this.getThread(scope, threadId, {
+      includeArchived: true,
+    });
+    if (!thread) {
+      return null;
+    }
     const messages = await this.prisma.coPilotMessage.findMany({
       where: {
         threadId,
@@ -321,6 +354,7 @@ export class CoPilotThreadService {
   }
 
   async persistHitlResolution(
+    scope: ConversationOwnerScope,
     threadId: string,
     idempotencyKey: string,
     resolution: {
@@ -333,6 +367,12 @@ export class CoPilotThreadService {
       brandCentreJobId?: string;
     },
   ): Promise<string | null> {
+    const thread = await this.getThread(scope, threadId, {
+      includeArchived: true,
+    });
+    if (!thread) {
+      return null;
+    }
     const messages = await this.prisma.coPilotMessage.findMany({
       where: {
         threadId,

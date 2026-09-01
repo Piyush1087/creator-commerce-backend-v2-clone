@@ -15,6 +15,7 @@ import { BrandSettingsModule } from "./features/brand-settings/brand-settings.mo
 import { BrandUceModule } from "./features/brand-uce/brand-uce.module";
 import { CollaborationModule } from "./features/collaboration/collaboration.module";
 import { CoPilotModule } from "./features/co-pilot/co-pilot.module";
+import { ChatModule } from "./features/chat/chat.module";
 import { CreatorCoPilotModule } from "./features/creator-co-pilot/creator-co-pilot.module";
 import { CreatorCentreModule } from "./features/creator-centre/creator-centre.module";
 import { CreatorMarketplaceModule } from "./features/creator-marketplace/creator-marketplace.module";
@@ -62,6 +63,7 @@ import { S3Module } from "./shared/s3/s3.module";
     PricingModule,
     CollaborationModule,
     CoPilotModule,
+    ChatModule,
     CreatorMarketplaceModule,
     CreatorOnboardingModule,
     CreatorCentreModule,
