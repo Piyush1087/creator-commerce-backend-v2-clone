@@ -9,20 +9,19 @@ const eventTypeKeys = Object.keys(NOTIFICATION_EVENT_REGISTRY) as [
 
 export const notificationPayloadSchema = z.record(z.unknown());
 
-export const dispatchNotificationSchema = z.object({
-  event_type: z.enum(eventTypeKeys),
-  payload: notificationPayloadSchema.default({}),
-  actor_name: z.string().max(200).optional().nullable(),
-  trigger_user_id: z.string().uuid().optional().nullable(),
-});
+export const dispatchNotificationSchema = z
+  .object({
+    event_type: z.enum(eventTypeKeys),
+    payload: notificationPayloadSchema.default({}),
+    source_type: z.string().trim().min(1).max(100),
+    source_id: z.string().trim().min(1).max(200),
+    transition_id: z.string().trim().min(1).max(200),
+  })
+  .strict();
 
-export const testEmitNotificationSchema = dispatchNotificationSchema.extend({
-  workspace_id: z.string().uuid().optional(),
-});
+export const testEmitNotificationSchema = dispatchNotificationSchema;
 
-export const markNotificationReadSchema = z.object({
-  is_read: z.boolean().default(true),
-});
+export const markNotificationReadSchema = z.object({}).strict();
 
 export type DispatchNotificationInput = z.infer<
   typeof dispatchNotificationSchema

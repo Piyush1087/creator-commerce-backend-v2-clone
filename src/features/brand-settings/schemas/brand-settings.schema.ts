@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isIso31661Alpha2CountryCode } from "../../../shared/geography/iso-country-code";
 
 export const BrandRoleEnum = z.enum([
   "BRAND_OWNER",
@@ -6,30 +7,20 @@ export const BrandRoleEnum = z.enum([
   "CAMPAIGN_MANAGER",
 ]);
 
-export const NotificationChannelEnum = z.enum([
-  "EMAIL",
-  "IN_APP",
-  "SLACK_WEBHOOK",
-]);
-
 export const NotificationCategoryEnum = z.enum([
-  "ESCROW_LOW_BALANCE",
-  "MILESTONE_RELEASE_REQUEST",
-  "TAX_COMPLIANCE_ALERT",
-  "CAMPAIGN_BUDGET_OVERRUN",
+  "BILLING_SUBSCRIPTION",
+  "ESCROW_PAYOUTS",
+  "CAMPAIGNS_APPLICATIONS",
+  "COLLABORATIONS",
+  "BRAND_INTELLIGENCE",
+  "TEAM_ACCOUNT_INTEGRATIONS",
 ]);
 
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
 const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 
 const optionalGstin = z
   .union([z.string().trim().toUpperCase().regex(GSTIN_REGEX), z.literal("")])
-  .optional()
-  .transform((val) => (!val ? null : val));
-
-const optionalPan = z
-  .union([z.string().trim().toUpperCase().regex(PAN_REGEX), z.literal("")])
   .optional()
   .transform((val) => (!val ? null : val));
 
@@ -43,18 +34,32 @@ export const InviteTeamMemberSchema = z.object({
   role: BrandRoleEnum.default("CAMPAIGN_MANAGER"),
 });
 
-export const BrandBillingProfileSchema = z.object({
-  registeredCompanyName: z.string().min(2).max(255),
-  corporateBillingAddress: z.string().min(10),
-  gstin: optionalGstin,
-  pan: optionalPan,
-  defaultTdsPercentage: z.number().min(0).max(10).default(2),
-  currencyPreference: z
-    .string()
-    .length(3)
-    .default("INR")
-    .transform((val) => val.toUpperCase()),
-});
+export const BrandBillingProfileSchema = z
+  .object({
+    legalEntityName: z.string().trim().min(2).max(255),
+    legalEntityType: z.string().trim().min(2).max(100),
+    billingCountryCode: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z]{2}$/, "Use an ISO-3166-1 alpha-2 country code")
+      .refine(
+        isIso31661Alpha2CountryCode,
+        "Use an assigned ISO-3166-1 alpha-2 country code",
+      ),
+    billingAddress: z.string().trim().min(10).max(2000),
+    gstin: optionalGstin,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.gstin && value.billingCountryCode !== "IN") {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["gstin"],
+        message: "GSTIN is supported only when billing country is IN",
+      });
+    }
+  });
 
 export const BrandWithdrawalAccountSchema = z
   .object({
@@ -72,44 +77,23 @@ export const BrandWithdrawalAccountSchema = z
 export const NotificationSettingLineSchema = z
   .object({
     category: NotificationCategoryEnum,
-    channel: NotificationChannelEnum,
-    isEnabled: z.boolean().default(true),
-    slackWebhookUrl: z
-      .union([z.string().url(), z.literal(""), z.null()])
-      .optional()
-      .transform((val) => val || null),
+    optionalEmailEnabled: z.boolean(),
   })
-  .refine(
-    (data) => {
-      if (
-        data.channel === "SLACK_WEBHOOK" &&
-        data.isEnabled &&
-        !data.slackWebhookUrl
-      ) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message:
-        "A target webhook URL is required when Slack webhooks are enabled.",
-      path: ["slackWebhookUrl"],
-    },
-  );
+  .strict();
 
-export const BulkNotificationSettingsSchema = z.object({
-  settings: z.array(NotificationSettingLineSchema),
-});
+export const BulkNotificationSettingsSchema = z
+  .object({
+    settings: z.array(NotificationSettingLineSchema),
+  })
+  .strict();
 
-export const UpdateBrandGeneralProfileSchema = z.object({
-  firstName: z.string().min(1).max(100).optional(),
-  lastName: z.string().min(1).max(100).optional(),
-  organizationLegalName: z.string().min(2).max(255).optional(),
-  organizationAddress: z.string().min(5).optional(),
-  countryCode: z.string().length(2).optional(),
-  currencyCode: z.string().length(3).optional(),
-  taxId: z.string().max(50).nullable().optional(),
-});
+export const UpdateBrandGeneralProfileSchema = z
+  .object({
+    firstName: z.string().min(1).max(100).optional(),
+    lastName: z.string().min(1).max(100).optional(),
+    organizationLegalName: z.string().min(2).max(255).optional(),
+  })
+  .strict();
 
 export type UpdateTeamRoleInput = z.infer<typeof UpdateTeamRoleSchema>;
 export type InviteTeamMemberInput = z.infer<typeof InviteTeamMemberSchema>;
@@ -157,7 +141,8 @@ export const IntegrationConnectionSchema = z.object({
   currentPlatformHandle: z
     .string()
     .min(1)
-    .startsWith("@", { message: 'Handle must start with "@".' }),
+    .startsWith("@", { message: 'Handle must start with "@".' })
+    .nullable(),
   inboundOauthHandle: z
     .string()
     .startsWith("@", { message: 'Inbound handle must start with "@".' })
@@ -182,7 +167,7 @@ export const ManageConnectionActionSchema = z
     },
     {
       message:
-        'Explicit confirmation required to execute "Delete Ingested Social Data".',
+        "Explicit confirmation required to disconnect and remove connection credentials.",
       path: ["confirmDeleteData"],
     },
   );
@@ -197,6 +182,7 @@ export const IdentityConflictResolutionSchema = z.object({
 export const ConnectInstagramSettingsSchema = z.object({
   code: z.string().min(1),
   redirectUri: z.string().url(),
+  state: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
 });
 
 export type IntegrationConnectionDto = z.infer<

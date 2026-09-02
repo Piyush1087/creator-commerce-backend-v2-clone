@@ -4,12 +4,18 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { BrandRole, SettingsNotificationCategory } from "@prisma/client";
+import { BrandTeamService } from "./brand-team.service";
+import { BrandTeamInvitationsService } from "./brand-team-invitations.service";
 import {
-  BrandRole,
-  SettingsNotificationCategory,
-  SettingsNotificationChannel,
-} from "@prisma/client";
-import { randomBytes } from "node:crypto";
+  canonicalInvitationRole,
+  lockBrandTeam,
+  requireActiveTeamMember,
+} from "../team/brand-team-policy";
+import {
+  reconcileExpiredTeamInvitations,
+  TEAM_INVITATION_STATUS,
+} from "../team/team-invitation-lifecycle";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import {
@@ -31,63 +37,83 @@ import {
   BRAND_SETTINGS_MAX_SEATS,
   BrandSettingsAccessService,
 } from "./brand-settings-access.service";
-import { decimalToNumber } from "../../brand-uce/utils/uce-decimal.util";
 
-const DEFAULT_NOTIFICATION_MATRIX: Array<{
-  category: SettingsNotificationCategory;
-  channel: SettingsNotificationChannel;
-  isEnabled: boolean;
-}> = [
-  { category: "ESCROW_LOW_BALANCE", channel: "IN_APP", isEnabled: true },
-  { category: "ESCROW_LOW_BALANCE", channel: "EMAIL", isEnabled: true },
-  { category: "MILESTONE_RELEASE_REQUEST", channel: "IN_APP", isEnabled: true },
-  {
-    category: "TAX_COMPLIANCE_ALERT",
-    channel: "IN_APP",
-    isEnabled: true,
-  },
-  { category: "TAX_COMPLIANCE_ALERT", channel: "EMAIL", isEnabled: true },
-  {
-    category: "CAMPAIGN_BUDGET_OVERRUN",
-    channel: "IN_APP",
-    isEnabled: true,
-  },
-];
+export const BILLING_REQUIRED_FIELDS = [
+  "legal_entity_name",
+  "legal_entity_type",
+  "billing_country_code",
+  "billing_address",
+] as const;
+
+type BillingReadinessSource = {
+  registeredCompanyName: string | null;
+  legalEntityType: string | null;
+  billingCountryCode: string | null;
+  corporateBillingAddress: string | null;
+} | null;
+
+const CANONICAL_NOTIFICATION_CATEGORIES = [
+  [SettingsNotificationCategory.BILLING_SUBSCRIPTION, "Billing & Subscription"],
+  [SettingsNotificationCategory.ESCROW_PAYOUTS, "Escrow & Payouts"],
+  [
+    SettingsNotificationCategory.CAMPAIGNS_APPLICATIONS,
+    "Campaigns & Applications",
+  ],
+  [SettingsNotificationCategory.COLLABORATIONS, "Collaborations"],
+  [SettingsNotificationCategory.BRAND_INTELLIGENCE, "Brand Intelligence"],
+  [
+    SettingsNotificationCategory.TEAM_ACCOUNT_INTEGRATIONS,
+    "Team, Account & Integrations",
+  ],
+] as const;
 
 @Injectable()
 export class BrandSettingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: BrandSettingsAccessService,
+    private readonly team: BrandTeamService,
+    private readonly invitations: BrandTeamInvitationsService,
   ) {}
 
   async getOverview(user: AuthUser) {
-    const { brandProfileId, membership } =
-      await this.access.resolveBrandContext(user);
+    const { brandProfileId } = await this.access.resolveBrandContext(user);
 
-    const [profile, teamCount, pendingInvites] = await Promise.all([
-      this.prisma.brandProfile.findUnique({
-        where: { id: brandProfileId },
-        select: {
-          id: true,
-          name: true,
-          domain: true,
-          countryCode: true,
-          currencyCode: true,
-          logoUrl: true,
-        },
-      }),
-      this.prisma.brandTeamMember.count({
-        where: { brandProfileId, isActive: true },
-      }),
-      this.prisma.teamInvitation.count({
-        where: { brandProfileId, status: "PENDING" },
-      }),
-    ]);
+    const capturedNow = new Date();
+    const [membership, profile, teamCount, pendingInvites] =
+      await this.prisma.$transaction(async (tx) => {
+        await lockBrandTeam(tx, brandProfileId);
+        await reconcileExpiredTeamInvitations(tx, brandProfileId, capturedNow);
+        return Promise.all([
+          requireActiveTeamMember(tx, brandProfileId, user),
+          tx.brandProfile.findUnique({
+            where: { id: brandProfileId },
+            select: {
+              id: true,
+              name: true,
+              domain: true,
+              countryCode: true,
+              currencyCode: true,
+              logoUrl: true,
+            },
+          }),
+          tx.brandTeamMember.count({
+            where: { brandProfileId, isActive: true },
+          }),
+          tx.teamInvitation.count({
+            where: {
+              brandProfileId,
+              status: TEAM_INVITATION_STATUS.PENDING,
+              expiresAt: { gt: capturedNow },
+            },
+          }),
+        ]);
+      });
 
     return {
       brand_profile_id: brandProfileId,
       current_user_role: membership.role,
+      can_manage_team: this.access.canManageTeam(membership.role),
       is_financial_read_only: this.access.isFinancialReadOnly(membership.role),
       brand_identity: profile,
       seat_usage: {
@@ -100,22 +126,35 @@ export class BrandSettingsService {
   }
 
   async getGeneral(user: AuthUser) {
-    const { brandProfileId, membership } =
-      await this.access.resolveBrandContext(user);
+    const { brandProfileId } = await this.access.resolveBrandContext(user);
 
-    const [userRow, profile, team, invitations] = await Promise.all([
-      this.prisma.user.findUnique({ where: { id: user.id } }),
-      this.prisma.brandProfile.findUnique({ where: { id: brandProfileId } }),
-      this.prisma.brandTeamMember.findMany({
-        where: { brandProfileId, isActive: true },
-        include: { user: true },
-        orderBy: { joinedAt: "asc" },
-      }),
-      this.prisma.teamInvitation.findMany({
-        where: { brandProfileId, status: "PENDING" },
-        orderBy: { createdAt: "desc" },
-      }),
-    ]);
+    const capturedNow = new Date();
+    const [membership, userRow, profile, team, invitations] =
+      await this.prisma.$transaction(async (tx) => {
+        await lockBrandTeam(tx, brandProfileId);
+        await reconcileExpiredTeamInvitations(tx, brandProfileId, capturedNow);
+        return Promise.all([
+          requireActiveTeamMember(tx, brandProfileId, user),
+          tx.user.findUnique({ where: { id: user.id } }),
+          tx.brandProfile.findUnique({
+            where: { id: brandProfileId },
+            include: { organization: { select: { name: true } } },
+          }),
+          tx.brandTeamMember.findMany({
+            where: { brandProfileId, isActive: true },
+            include: { user: true },
+            orderBy: { joinedAt: "asc" },
+          }),
+          tx.teamInvitation.findMany({
+            where: {
+              brandProfileId,
+              status: TEAM_INVITATION_STATUS.PENDING,
+              expiresAt: { gt: capturedNow },
+            },
+            orderBy: { createdAt: "desc" },
+          }),
+        ]);
+      });
 
     if (!profile) {
       throw new NotFoundException("Brand profile not found");
@@ -125,14 +164,15 @@ export class BrandSettingsService {
 
     return {
       current_user_role: membership.role,
+      can_manage_team: this.access.canManageTeam(membership.role),
       personal_profile: {
         first_name: firstName,
         last_name: lastName,
         email: user.email,
-        avatar_url: profile.logoUrl,
+        avatar_url: null,
       },
       organization: {
-        company_legal_name: profile.name,
+        company_legal_name: profile.organization?.name ?? null,
         corporate_address: null,
         country_code: profile.countryCode,
         currency_code: profile.currencyCode,
@@ -157,7 +197,7 @@ export class BrandSettingsService {
         pending_invitations: invitations.map((row) => ({
           invitation_id: row.id,
           email: row.email,
-          role: row.role,
+          role: canonicalInvitationRole(row.role),
           status: row.status,
           expires_at: row.expiresAt.toISOString(),
         })),
@@ -174,26 +214,24 @@ export class BrandSettingsService {
     const { brandProfileId, membership } =
       await this.access.resolveBrandContext(user);
 
-    if (membership.role === BrandRole.CAMPAIGN_MANAGER) {
+    if (
+      membership.role === BrandRole.CAMPAIGN_MANAGER &&
+      input.organizationLegalName
+    ) {
       throw new ForbiddenException(
         "Campaign Managers cannot modify organization settings.",
       );
     }
 
-    const updates: {
-      name?: string;
-      countryCode?: string;
-      currencyCode?: string;
-    } = {};
-
-    if (input.organizationLegalName) {
-      updates.name = input.organizationLegalName;
-    }
-    if (input.countryCode) {
-      updates.countryCode = input.countryCode.toUpperCase();
-    }
-    if (input.currencyCode) {
-      updates.currencyCode = input.currencyCode.toUpperCase();
+    // Resolve organization authority through the authorized Brand, never input.
+    const profile = input.organizationLegalName
+      ? await this.prisma.brandProfile.findUnique({
+          where: { id: brandProfileId },
+          select: { organizationId: true },
+        })
+      : null;
+    if (input.organizationLegalName && !profile?.organizationId) {
+      throw new NotFoundException("Organization not found for this Brand");
     }
 
     if (input.firstName || input.lastName) {
@@ -215,10 +253,10 @@ export class BrandSettingsService {
       });
     }
 
-    if (Object.keys(updates).length > 0) {
-      await this.prisma.brandProfile.update({
-        where: { id: brandProfileId },
-        data: updates,
+    if (input.organizationLegalName && profile?.organizationId) {
+      await this.prisma.organization.update({
+        where: { id: profile.organizationId },
+        data: { name: input.organizationLegalName },
       });
     }
 
@@ -234,24 +272,57 @@ export class BrandSettingsService {
       where: { brandProfileId },
     });
 
-    if (!profile) {
-      return { billing_profile: null, is_read_only: readOnly };
-    }
+    const readiness = billingReadiness(profile);
+
+    if (!profile)
+      return {
+        billing_profile: null,
+        profile_state: "NOT_CONFIGURED" as const,
+        is_read_only: readOnly,
+        ...readiness,
+      };
 
     return {
       is_read_only: readOnly,
+      profile_state: profile.profileState,
       billing_profile: {
-        registered_company_name: profile.registeredCompanyName,
-        corporate_billing_address: profile.corporateBillingAddress,
+        legal_entity_name: profile.registeredCompanyName,
+        legal_entity_type: profile.legalEntityType,
+        billing_country_code: profile.billingCountryCode,
+        billing_address: profile.corporateBillingAddress,
         gstin: readOnly
           ? maskSensitiveString(profile.gstin, 2, 4)
           : profile.gstin,
-        pan: readOnly ? maskSensitiveString(profile.pan, 1, 1) : profile.pan,
-        default_tds_percentage: decimalToNumber(profile.defaultTdsPercentage),
-        currency_preference: profile.currencyPreference,
+        profile_state: profile.profileState,
+        configured_at: profile.configuredAt?.toISOString() ?? null,
         updated_at: profile.updatedAt.toISOString(),
       },
+      ...readiness,
     };
+  }
+
+  async getBillingReadiness(brandProfileId: string) {
+    const profile = await this.prisma.brandBillingProfile.findUnique({
+      where: { brandProfileId },
+      select: {
+        registeredCompanyName: true,
+        legalEntityType: true,
+        billingCountryCode: true,
+        corporateBillingAddress: true,
+      },
+    });
+    return billingReadiness(profile);
+  }
+
+  async requireCompleteBillingProfile(brandProfileId: string) {
+    const readiness = await this.getBillingReadiness(brandProfileId);
+    if (!readiness.is_complete_for_paid_conversion) {
+      throw new BadRequestException({
+        message: "A complete Billing Profile is required for paid conversion.",
+        ...readiness,
+      });
+    }
+    return readiness;
   }
 
   async upsertBillingProfile(user: AuthUser, input: BrandBillingProfileInput) {
@@ -259,34 +330,71 @@ export class BrandSettingsService {
       await this.access.resolveBrandContext(user);
     this.access.assertFinancialMutation(membership.role);
 
-    const profile = await this.prisma.brandBillingProfile.upsert({
-      where: { brandProfileId },
-      create: {
-        brandProfileId,
-        registeredCompanyName: input.registeredCompanyName,
-        corporateBillingAddress: input.corporateBillingAddress,
-        gstin: input.gstin,
-        pan: input.pan,
-        defaultTdsPercentage: input.defaultTdsPercentage,
-        currencyPreference: input.currencyPreference,
-      },
-      update: {
-        registeredCompanyName: input.registeredCompanyName,
-        corporateBillingAddress: input.corporateBillingAddress,
-        gstin: input.gstin,
-        pan: input.pan,
-        defaultTdsPercentage: input.defaultTdsPercentage,
-        currencyPreference: input.currencyPreference,
-      },
+    const now = new Date();
+    const gstin = input.gstin ?? null;
+    const profile = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.brandBillingProfile.findUnique({
+        where: { brandProfileId },
+      });
+      const isMaterialUpdate =
+        !!existing &&
+        (existing.registeredCompanyName !== input.legalEntityName ||
+          existing.legalEntityType !== input.legalEntityType ||
+          existing.billingCountryCode !== input.billingCountryCode ||
+          existing.corporateBillingAddress !== input.billingAddress ||
+          existing.gstin !== gstin);
+      const saved = await tx.brandBillingProfile.upsert({
+        where: { brandProfileId },
+        create: {
+          brandProfileId,
+          registeredCompanyName: input.legalEntityName,
+          legalEntityType: input.legalEntityType,
+          billingCountryCode: input.billingCountryCode,
+          corporateBillingAddress: input.billingAddress,
+          gstin,
+          profileState: "CONFIGURED",
+          configuredAt: now,
+        },
+        update: {
+          registeredCompanyName: input.legalEntityName,
+          legalEntityType: input.legalEntityType,
+          billingCountryCode: input.billingCountryCode,
+          corporateBillingAddress: input.billingAddress,
+          gstin,
+          ...(isMaterialUpdate ? { profileState: "UPDATED" as const } : {}),
+        },
+      });
+      if (!existing || isMaterialUpdate) {
+        await tx.brandBillingProfileVersion.create({
+          data: {
+            brandProfileId,
+            legalEntityName: input.legalEntityName,
+            legalEntityType: input.legalEntityType,
+            billingCountryCode: input.billingCountryCode,
+            billingAddress: input.billingAddress,
+            gstin,
+            effectiveFrom: now,
+          },
+        });
+      }
+      return saved;
     });
 
     return {
+      is_read_only: false,
+      profile_state: profile.profileState,
       billing_profile: {
         profile_id: profile.id,
-        registered_company_name: profile.registeredCompanyName,
-        default_tds_percentage: decimalToNumber(profile.defaultTdsPercentage),
+        legal_entity_name: profile.registeredCompanyName,
+        legal_entity_type: profile.legalEntityType,
+        billing_country_code: profile.billingCountryCode,
+        billing_address: profile.corporateBillingAddress,
+        gstin: profile.gstin,
+        profile_state: profile.profileState,
+        configured_at: profile.configuredAt?.toISOString() ?? null,
         updated_at: profile.updatedAt.toISOString(),
       },
+      ...billingReadiness(profile),
     };
   }
 
@@ -361,33 +469,22 @@ export class BrandSettingsService {
 
   async getNotifications(user: AuthUser) {
     const { brandProfileId } = await this.access.resolveBrandContext(user);
-
-    let settings = await this.prisma.brandNotificationSetting.findMany({
-      where: { brandProfileId },
-      orderBy: [{ category: "asc" }, { channel: "asc" }],
-    });
-
-    if (settings.length === 0) {
-      await this.prisma.brandNotificationSetting.createMany({
-        data: DEFAULT_NOTIFICATION_MATRIX.map((row) => ({
-          brandProfileId,
-          ...row,
-        })),
-      });
-      settings = await this.prisma.brandNotificationSetting.findMany({
-        where: { brandProfileId },
-        orderBy: [{ category: "asc" }, { channel: "asc" }],
-      });
-    }
+    const settings = await this.prisma.userBrandNotificationPreference.findMany(
+      {
+        where: { brandProfileId, userId: user.id },
+      },
+    );
+    const persisted = new Map(
+      settings.map((row) => [row.category, row.optionalEmailEnabled]),
+    );
 
     return {
-      settings: settings.map((row) => ({
-        setting_id: row.id,
-        category: row.category,
-        channel: row.channel,
-        is_enabled: row.isEnabled,
-        slack_webhook_url: row.slackWebhookUrl,
+      settings: CANONICAL_NOTIFICATION_CATEGORIES.map(([category, label]) => ({
+        category,
+        label,
+        optional_email_enabled: persisted.get(category) ?? true,
       })),
+      mandatory_system_email_unaffected: true,
     };
   }
 
@@ -395,41 +492,26 @@ export class BrandSettingsService {
     user: AuthUser,
     input: BulkNotificationSettingsInput,
   ) {
-    const { brandProfileId, membership } =
-      await this.access.resolveBrandContext(user);
-
-    if (membership.role === BrandRole.CAMPAIGN_MANAGER) {
-      throw new ForbiddenException(
-        "Campaign Managers cannot modify notification settings.",
-      );
-    }
+    const { brandProfileId } = await this.access.resolveBrandContext(user);
 
     await this.prisma.$transaction(
       input.settings.map((line) =>
-        this.prisma.brandNotificationSetting.upsert({
+        this.prisma.userBrandNotificationPreference.upsert({
           where: {
-            brandProfileId_category_channel: {
+            brandProfileId_userId_category: {
               brandProfileId,
+              userId: user.id,
               category: line.category,
-              channel: line.channel,
             },
           },
           create: {
             brandProfileId,
+            userId: user.id,
             category: line.category,
-            channel: line.channel,
-            isEnabled: line.isEnabled,
-            slackWebhookUrl:
-              line.channel === "SLACK_WEBHOOK"
-                ? (line.slackWebhookUrl ?? null)
-                : null,
+            optionalEmailEnabled: line.optionalEmailEnabled,
           },
           update: {
-            isEnabled: line.isEnabled,
-            slackWebhookUrl:
-              line.channel === "SLACK_WEBHOOK"
-                ? (line.slackWebhookUrl ?? null)
-                : null,
+            optionalEmailEnabled: line.optionalEmailEnabled,
           },
         }),
       ),
@@ -438,147 +520,37 @@ export class BrandSettingsService {
     return this.getNotifications(user);
   }
 
-  async updateTeamRole(user: AuthUser, input: UpdateTeamRoleInput) {
-    const { brandProfileId, membership } =
-      await this.access.resolveBrandContext(user);
-    this.access.assertTeamAdmin(membership.role);
-
-    const target = await this.access.getMembershipOrThrow(
-      input.membershipId,
-      brandProfileId,
-    );
-
-    if (
-      target.role === BrandRole.BRAND_OWNER &&
-      input.role !== BrandRole.BRAND_OWNER
-    ) {
-      const ownerCount = await this.prisma.brandTeamMember.count({
-        where: {
-          brandProfileId,
-          isActive: true,
-          role: BrandRole.BRAND_OWNER,
-        },
-      });
-      if (ownerCount <= 1) {
-        throw new BadRequestException(
-          "At least one Brand Owner must remain on the workspace.",
-        );
-      }
-    }
-
-    const updated = await this.prisma.brandTeamMember.update({
-      where: { id: input.membershipId },
-      data: { role: input.role },
-      include: { user: true },
-    });
-
-    return {
-      membership_id: updated.id,
-      user_id: updated.userId,
-      email: updated.user.email,
-      role: updated.role,
-    };
+  updateTeamRole(user: AuthUser, input: UpdateTeamRoleInput) {
+    return this.team.updateRole(user, input);
   }
 
-  async inviteTeamMember(user: AuthUser, input: InviteTeamMemberInput) {
-    const { brandProfileId, membership } =
-      await this.access.resolveBrandContext(user);
-    this.access.assertTeamAdmin(membership.role);
-
-    const [activeMembers, pendingInvites] = await Promise.all([
-      this.prisma.brandTeamMember.count({
-        where: { brandProfileId, isActive: true },
-      }),
-      this.prisma.teamInvitation.count({
-        where: { brandProfileId, status: "PENDING" },
-      }),
-    ]);
-
-    if (activeMembers + pendingInvites >= BRAND_SETTINGS_MAX_SEATS) {
-      throw new BadRequestException(
-        "Workspace seat capacity fully exhausted (5/5). Revoke a member or cancel a pending invitation.",
-      );
-    }
-
-    const normalizedEmail = input.email.trim().toLowerCase();
-    const token = randomBytes(32).toString("hex");
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
-
-    const invitation = await this.prisma.teamInvitation.create({
-      data: {
-        brandProfileId,
-        email: normalizedEmail,
-        role: mapBrandRoleToLegacyInviteRole(input.role),
-        token,
-        expiresAt,
-      },
-    });
-
-    return {
-      invitation_id: invitation.id,
-      email: invitation.email,
-      role: input.role,
-      expires_at: invitation.expiresAt.toISOString(),
-    };
+  inviteTeamMember(user: AuthUser, input: InviteTeamMemberInput) {
+    return this.invitations.create(user, input);
   }
 
-  async revokeTeamMember(user: AuthUser, membershipId: string) {
-    const { brandProfileId, membership } =
-      await this.access.resolveBrandContext(user);
-    this.access.assertTeamAdmin(membership.role);
-
-    const target = await this.access.getMembershipOrThrow(
-      membershipId,
-      brandProfileId,
-    );
-
-    if (target.userId === user.id) {
-      throw new BadRequestException("You cannot revoke your own access.");
-    }
-
-    if (target.role === BrandRole.BRAND_OWNER) {
-      const ownerCount = await this.prisma.brandTeamMember.count({
-        where: {
-          brandProfileId,
-          isActive: true,
-          role: BrandRole.BRAND_OWNER,
-        },
-      });
-      if (ownerCount <= 1) {
-        throw new BadRequestException(
-          "Cannot revoke the last Brand Owner on this workspace.",
-        );
-      }
-    }
-
-    await this.prisma.brandTeamMember.update({
-      where: { id: membershipId },
-      data: { isActive: false },
-    });
-
-    return { revoked: true, membership_id: membershipId };
+  revokeTeamMember(user: AuthUser, membershipId: string) {
+    return this.team.revoke(user, membershipId);
   }
 
-  async cancelTeamInvitation(user: AuthUser, invitationId: string) {
-    const { brandProfileId, membership } =
-      await this.access.resolveBrandContext(user);
-    this.access.assertTeamAdmin(membership.role);
-
-    const invitation = await this.prisma.teamInvitation.findFirst({
-      where: { id: invitationId, brandProfileId, status: "PENDING" },
-    });
-    if (!invitation) {
-      throw new NotFoundException("Pending invitation not found");
-    }
-
-    await this.prisma.teamInvitation.update({
-      where: { id: invitationId },
-      data: { status: "EXPIRED" },
-    });
-
-    return { cancelled: true, invitation_id: invitationId };
+  cancelTeamInvitation(user: AuthUser, invitationId: string) {
+    return this.team.cancel(user, invitationId);
   }
+}
+
+export function billingReadiness(profile: BillingReadinessSource) {
+  const missingRequiredFields: (typeof BILLING_REQUIRED_FIELDS)[number][] = [];
+  if (!profile?.registeredCompanyName?.trim())
+    missingRequiredFields.push("legal_entity_name");
+  if (!profile?.legalEntityType?.trim())
+    missingRequiredFields.push("legal_entity_type");
+  if (!profile?.billingCountryCode?.trim())
+    missingRequiredFields.push("billing_country_code");
+  if (!profile?.corporateBillingAddress?.trim())
+    missingRequiredFields.push("billing_address");
+  return {
+    is_complete_for_paid_conversion: missingRequiredFields.length === 0,
+    missing_required_fields: missingRequiredFields,
+  };
 }
 
 function splitDisplayName(name: string | null | undefined): {
@@ -596,15 +568,4 @@ function splitDisplayName(name: string | null | undefined): {
     firstName: parts[0],
     lastName: parts.slice(1).join(" "),
   };
-}
-
-function mapBrandRoleToLegacyInviteRole(role: BrandRole): string {
-  switch (role) {
-    case BrandRole.BRAND_OWNER:
-      return "ADMIN";
-    case BrandRole.FINANCE_ADMIN:
-      return "FINANCE_ADMIN";
-    default:
-      return "CAMPAIGN_MANAGER";
-  }
 }

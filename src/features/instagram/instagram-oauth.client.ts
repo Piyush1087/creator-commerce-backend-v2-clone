@@ -1,4 +1,8 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import {
+  renderSafeInstagramError,
+  safeInstagramErrorMetadata,
+} from "./instagram-provider-error";
 
 export type InstagramTokenExchangeResult = {
   accessToken: string;
@@ -65,6 +69,31 @@ export class InstagramOAuthClient {
     };
   }
 
+  async refreshLongLivedToken(
+    accessToken: string,
+  ): Promise<{ accessToken: string; expiresInSeconds: number }> {
+    const url = new URL("https://graph.instagram.com/refresh_access_token");
+    url.searchParams.set("grant_type", "ig_refresh_token");
+    url.searchParams.set("access_token", accessToken);
+    const res = await fetch(url);
+    if (!res.ok) {
+      const metadata = await safeInstagramErrorMetadata(res);
+      this.logger.warn(renderSafeInstagramError("refresh_token", metadata));
+      throw new InstagramTokenRefreshError(metadata.classification);
+    }
+    const data = (await res.json()) as {
+      access_token?: string;
+      expires_in?: number;
+    };
+    if (!data.access_token || !data.expires_in) {
+      throw new InstagramTokenRefreshError("UNKNOWN");
+    }
+    return {
+      accessToken: data.access_token,
+      expiresInSeconds: data.expires_in,
+    };
+  }
+
   private async fetchShortLivedToken(
     code: string,
     redirectUri: string,
@@ -84,10 +113,8 @@ export class InstagramOAuthClient {
       body,
     });
     if (!res.ok) {
-      const errText = await res.text();
-      this.logger.warn(
-        `Instagram short token failed: ${errText.slice(0, 200)}`,
-      );
+      const metadata = await safeInstagramErrorMetadata(res);
+      this.logger.warn(renderSafeInstagramError("short_token", metadata));
       throw new BadRequestException(
         "Failed to exchange Instagram authorization code.",
       );
@@ -116,8 +143,8 @@ export class InstagramOAuthClient {
 
     const res = await fetch(url);
     if (!res.ok) {
-      const errText = await res.text();
-      this.logger.warn(`Instagram long token failed: ${errText.slice(0, 200)}`);
+      const metadata = await safeInstagramErrorMetadata(res);
+      this.logger.warn(renderSafeInstagramError("long_token", metadata));
       throw new BadRequestException(
         "Failed to obtain long-lived Instagram token.",
       );
@@ -135,14 +162,24 @@ export class InstagramOAuthClient {
   }
 }
 
-function normalizePermissionList(
-  raw: string | string[] | undefined,
-): string[] {
+export class InstagramTokenRefreshError extends Error {
+  constructor(
+    readonly classification:
+      | "TRANSIENT"
+      | "AUTHORIZATION_REVALIDATION_REQUIRED"
+      | "PERMISSION_LOSS"
+      | "PROVIDER_ACCESS_BLOCKED"
+      | "CONTENT_OR_METRIC_UNAVAILABLE"
+      | "UNKNOWN",
+  ) {
+    super("Instagram token refresh failed");
+  }
+}
+
+function normalizePermissionList(raw: string | string[] | undefined): string[] {
   if (!raw) {
     return [];
   }
   const parts = Array.isArray(raw) ? raw : raw.split(",");
-  return parts
-    .map((p) => p.trim().toLowerCase())
-    .filter((p) => p.length > 0);
+  return parts.map((p) => p.trim().toLowerCase()).filter((p) => p.length > 0);
 }

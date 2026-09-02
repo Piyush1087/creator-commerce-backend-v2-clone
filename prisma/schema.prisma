@@ -252,7 +252,9 @@ enum PlanType {
 
 enum SubscriptionStatus {
   TRIALING
+  TRIAL_EXPIRED
   ACTIVE
+  CANCEL_SCHEDULED
   PAST_DUE
   CANCELED
   HALTED
@@ -754,12 +756,20 @@ enum SettingsNotificationCategory {
   MILESTONE_RELEASE_REQUEST
   TAX_COMPLIANCE_ALERT
   CAMPAIGN_BUDGET_OVERRUN
+  BILLING_SUBSCRIPTION
+  ESCROW_PAYOUTS
+  CAMPAIGNS_APPLICATIONS
+  COLLABORATIONS
+  BRAND_INTELLIGENCE
+  TEAM_ACCOUNT_INTEGRATIONS
 }
 
 enum NotificationUrgencyLevel {
   CRITICAL
   MEDIUM
   LOW
+  ACTION_REQUIRED
+  INFORMATIONAL
 }
 
 enum NotificationJobStatus {
@@ -888,6 +898,16 @@ enum CreatorCoPilotLinkedEntityType {
 // ============================================================================
 
 enum EscrowTransactionType {
+  LOAD
+  LOAD_FEE
+  RESERVE
+  RELEASE
+  CREATOR_PAYOUT
+  PLATFORM_COMMISSION
+  GST
+  COLLAB_REFUND
+  BRAND_RETURN
+  REVERSAL_CORRECTION
   VBA_TOPUP_WIRE
   GATEWAY_TOPUP_CARD
   CONTRACT_LOCK_RESERVE
@@ -896,9 +916,13 @@ enum EscrowTransactionType {
   PLATFORM_FEE_CAPTURE
   TDS_BUFFER_REVERSAL
   FAILED_COLLAB_REFUND
+  CREATOR_PAYOUT_SETTLEMENT
+  CREATOR_PAYOUT_REVERSAL
 }
 
 enum EscrowTransactionStatus {
+  PENDING
+  CREDITED
   PROCESSING_GATEWAY
   CLEARED
   FAILED
@@ -1180,36 +1204,47 @@ model Organization {
 }
 
 model User {
-  id                            String                          @id @default(uuid())
-  email                         String                          @unique
+  id                            String                            @id @default(uuid())
+  email                         String                            @unique
+  /// Database trigger derives this canonical authority from email on every write.
+  normalizedEmail               String?                           @unique @map("normalized_email")
   /// Display name; brand onboarding sets local-part of work email.
   name                          String?
   /// Scrypt hash for creator email/password signup.
-  hashedPassword                String?                         @map("hashed_password")
+  hashedPassword                String?                           @map("hashed_password")
   /// Google OAuth subject (`sub` claim) for creator Google signup/sign-in.
-  googleSubjectId String?        @unique @map("google_subject_id")
-  emailVerifiedAt DateTime?      @map("email_verified_at")
-  role           UserRole
-  organizationId String?         @map("organization_id")
-  organization   Organization?   @relation(fields: [organizationId], references: [id])
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-  discoveryLeads DiscoveryLead[]
-  creatorProfile CreatorProfile?
-  creatorOnboardingTrack CreatorOnboardingTrack?
-  userProfile UserProfile?
-  historicChatThreads HistoricChatThread[]
-  metricPostPulses MetricPostPulse[]
-  collaborationsAsCreator Collaboration[] @relation("CollaborationCreator")
-  uceCampaignCreators UceCampaignCreator[] @relation("UceCampaignCreatorUser")
-  coPilotThreads CoPilotThread[]
-  coPilotMessageFeedback CoPilotMessageFeedback[]
-  creatorCoPilotThreadsAuthored CreatorCoPilotThread[] @relation("CreatorCoPilotThreadAuthor")
+  googleSubjectId               String?                           @unique @map("google_subject_id")
+  emailVerifiedAt               DateTime?                         @map("email_verified_at")
+  authState                     UserAuthState                     @default(PROVISIONAL) @map("auth_state")
+  role                          UserRole
+  organizationId                String?                           @map("organization_id")
+  organization                  Organization?                     @relation(fields: [organizationId], references: [id])
+  createdAt                     DateTime                          @default(now()) @map("created_at")
+  updatedAt                     DateTime                          @updatedAt @map("updated_at")
+  discoveryLeads                DiscoveryLead[]
+  creatorProfile                CreatorProfile?
+  creatorOnboardingTrack        CreatorOnboardingTrack?
+  userProfile                   UserProfile?
+  historicChatThreads           HistoricChatThread[]
+  metricPostPulses              MetricPostPulse[]
+  collaborationsAsCreator       Collaboration[]                   @relation("CollaborationCreator")
+  uceCampaignCreators           UceCampaignCreator[]              @relation("UceCampaignCreatorUser")
+  coPilotThreads                CoPilotThread[]
+  coPilotMessageFeedback        CoPilotMessageFeedback[]
+  creatorCoPilotThreadsAuthored CreatorCoPilotThread[]            @relation("CreatorCoPilotThreadAuthor")
   creatorCoPilotMessageFeedback CreatorCoPilotMessageFeedback[]
   brandTeamMemberships          BrandTeamMember[]
-  triggeredNotifications        Notification[]                  @relation("NotificationTriggerUser")
+  brandInstagramOAuthStates     BrandInstagramOAuthState[]
+  triggeredNotifications        Notification[]                    @relation("NotificationTriggerUser")
   notificationRecipients        NotificationRecipient[]
+  notificationPreferences       UserBrandNotificationPreference[]
+  notificationEmailDeliveries   NotificationEmailDelivery[]
+  notificationJobRecipients     NotificationJobRecipient[]
   gatekeeperRecoveryRequests    GatekeeperRecoveryRequest[]
+  authMethods                   UserAuthMethod[]
+  authSessions                  AuthSession[]
+  passwordResetChallenges       PasswordResetChallenge[]
+  securityEvents                SecurityEvent[]                   @relation("SecurityEventSubject")
 
   @@index([organizationId])
   @@index([role])
@@ -1231,7 +1266,7 @@ model DiscoveryLead {
   industryNiche              String?                     @map("industry_niche")
   securityScore              Int                         @default(0) @map("security_score")
   metaHandshake              Boolean                     @default(false) @map("meta_handshake")
-  /// Step 1 session cache payload (AI classification output — populated when Neika/Invuet pipeline ships).
+  /// Step 1 session cache payload (AI classification output â€” populated when Neika/Invuet pipeline ships).
   temporaryPayload           Json?                       @map("temporary_payload")
   /// TTL for unverified Step 1 cache rows (change doc: 7-day horizon).
   expiresAt                  DateTime?                   @map("expires_at")
@@ -1450,9 +1485,9 @@ model BrandProfile {
   socialLinks             String[]         @default([]) @map("social_links")
   /// Banner offers / coupon codes detected during surface scan (product Prompt 2).
   surfaceOffers           Json?            @map("surface_offers")
-  /// Parallel markdown bundles from surface scan — Prompt 1 input (REQ-AI-001).
+  /// Parallel markdown bundles from surface scan â€” Prompt 1 input (REQ-AI-001).
   surfaceScrapeBundles    String?          @map("surface_scrape_bundles") @db.Text
-  /// Last authenticated Brand Centre API activity — session eviction (REQ-EVT-004).
+  /// Last authenticated Brand Centre API activity â€” session eviction (REQ-EVT-004).
   brandCentreLastActiveAt DateTime?        @map("brand_centre_last_active_at")
   visualIdentity          Json?            @map("visual_identity")
   brandValues             String[]         @map("brand_values")
@@ -1483,7 +1518,7 @@ model BrandProfile {
   planStartedAt      DateTime?          @map("plan_started_at")
   trialEndsAt        DateTime?          @map("trial_ends_at")
 
-  /// Payouts hub permission scope — Campaign Manager is read-only on funding actions.
+  /// Payouts hub permission scope â€” Campaign Manager is read-only on funding actions.
   payoutsWorkspaceRole BrandPayoutsWorkspaceRole @default(FINANCE_ADMIN) @map("payouts_workspace_role")
 
   // Usage Tracking (Beta Buffer)
@@ -1491,39 +1526,44 @@ model BrandProfile {
   competitorCount Int @default(0) @map("competitor_count")
   outreachCount   Int @default(0) @map("outreach_count")
 
-  // Brand Centre — Tab 1 routing & DNA
-  brandRoutingType    BrandRoutingType @default(D2C_SKINCARE) @map("brand_routing_type")
-  lifecycleStage      String           @default("GROWTH_STAGE") @map("lifecycle_stage")
-  strategicDna        Json?            @map("strategic_dna")
-  igHandle            String?          @map("ig_handle")
-  ytHandle            String?          @map("yt_handle")
-  tiktokHandle        String?          @map("tiktok_handle")
-  deepScanCompletedAt DateTime?        @map("deep_scan_completed_at")
+  // Brand Centre â€” Tab 1 routing & DNA
+  brandRoutingType    BrandRoutingType            @default(D2C_SKINCARE) @map("brand_routing_type")
+  lifecycleStage      String                      @default("GROWTH_STAGE") @map("lifecycle_stage")
+  strategicDna        Json?                       @map("strategic_dna")
+  igHandle            String?                     @map("ig_handle")
+  igHandleProvenance  InstagramIgHandleProvenance @default(LEGACY_UNKNOWN) @map("ig_handle_provenance")
+  ytHandle            String?                     @map("yt_handle")
+  tiktokHandle        String?                     @map("tiktok_handle")
+  deepScanCompletedAt DateTime?                   @map("deep_scan_completed_at")
 
   isUserEdited Json?    @map("is_user_edited")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  offerings              Offering[]
-  competitors            Competitor[]
-  locations              Location[]
-  visualState            BrandVisualState?
-  locationObservations   BrandLocationObservation[]
-  subscriptions          Subscription[]
-  teamInvitations        TeamInvitation[]
-  brandCentreJobs        BrandCentreJob[]
-  budgetConfiguration    BrandBudgetConfiguration?
-  audiencePersonas       BrandAudiencePersona[]
-  brandOffers            BrandOffer[]
-  budgetModificationLogs BrandBudgetModificationLog[]
-  intelligenceBaseline   BrandIntelligenceBaseline?
-  performanceLeaks       BrandPerformanceLeak[]
-  plannerCards           BrandPlannerCard[]
-  brandIntelligenceScans BrandIntelligenceScan[]
-  brandPreviewRuns       BrandPreviewRun[]
+  offerings                       Offering[]
+  competitors                     Competitor[]
+  locations                       Location[]
+  visualState                     BrandVisualState?
+  locationObservations            BrandLocationObservation[]
+  subscriptions                   Subscription[]
+  teamInvitations                 TeamInvitation[]
+  brandCentreJobs                 BrandCentreJob[]
+  budgetConfiguration             BrandBudgetConfiguration?
+  audiencePersonas                BrandAudiencePersona[]
+  brandOffers                     BrandOffer[]
+  budgetModificationLogs          BrandBudgetModificationLog[]
+  intelligenceBaseline            BrandIntelligenceBaseline?
+  performanceLeaks                BrandPerformanceLeak[]
+  plannerCards                    BrandPlannerCard[]
+  brandIntelligenceScans          BrandIntelligenceScan[]
+  brandPreviewRuns                BrandPreviewRun[]
+  creatorPayoutObligations        CreatorPayoutObligation[]
+  collaborationRefundInstructions CollaborationRefundInstruction[]
+  escrowFundingLots               EscrowFundingLot[]
+  brandReturnRequests             BrandReturnRequest[]
 
-  intelligenceExecutions              IntelligenceExecution[]
   intelligenceSubjects                IntelligenceSubject[]
+  intelligenceExecutions              IntelligenceExecution[]
   intelligenceProcessorExecutions     IntelligenceProcessorExecution[]
   intelligenceProcessorAttempts       IntelligenceProcessorAttempt[]
   intelligenceObjectGenerations       IntelligenceObjectGeneration[]
@@ -1548,7 +1588,7 @@ model BrandProfile {
   uceCampaigns   UceCampaign[]
   campaignAssets UceCampaignAsset[] @relation("CampaignAssetBrandProfile")
 
-  // Bridge ledger (Brand Centre → UCE)
+  // Bridge ledger (Brand Centre â†’ UCE)
   integrationBridgeSignals IntegrationBridgeSignalLedger[]
 
   collaborations         Collaboration[]
@@ -1558,55 +1598,91 @@ model BrandProfile {
   coPilotInteractionLogs CoPilotInteractionLog[]
   coPilotMessageFeedback CoPilotMessageFeedback[]
 
-  teamMembers              BrandTeamMember[]
-  billingProfile           BrandBillingProfile?
-  withdrawalAccounts       BrandWithdrawalAccount[]
-  notificationSettings     BrandNotificationSetting[]
-  notifications            Notification[]
-  integrations             BrandIntegration[]
-  instagramSyncInvitations InstagramSyncInvitation[]
+  teamMembers               BrandTeamMember[]
+  billingProfile            BrandBillingProfile?
+  billingProfileVersions    BrandBillingProfileVersion[]
+  withdrawalAccounts        BrandWithdrawalAccount[]
+  notificationSettings      BrandNotificationSetting[]
+  notifications             Notification[]
+  notificationPreferences   UserBrandNotificationPreference[]
+  integrations              BrandIntegration[]
+  instagramOAuthStates      BrandInstagramOAuthState[]
+  instagramSyncInvitations  InstagramSyncInvitation[]
+  instagramDeletionRequests BrandInstagramDeletionRequest[]
 
   @@map("brand_profiles")
 }
 
 /// Brand OAuth connections (Instagram Login + optional Meta Business Suite in Settings).
 model BrandIntegration {
-  id                    String                   @id @default(uuid()) @map("integration_id")
-  brandProfileId        String                   @map("brand_id")
-  brandProfile          BrandProfile             @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  provider              BrandIntegrationProvider
-  status                BrandIntegrationStatus   @default(DISCONNECTED)
-  currentPlatformHandle String                   @map("current_platform_handle") @db.VarChar(255)
-  inboundOauthHandle    String?                  @map("inbound_oauth_handle") @db.VarChar(255)
-  accessTokenEncrypted  String?                  @map("access_token_encrypted") @db.Text
-  refreshTokenEncrypted String?                  @map("refresh_token_encrypted") @db.Text
-  grantedScopes         BrandIntegrationScope[]  @default([]) @map("granted_scopes")
-  tokenExpiresAt        DateTime?                @map("token_expires_at")
-  isActive              Boolean                  @default(true) @map("is_active")
-  createdAt             DateTime                 @default(now()) @map("created_at")
-  updatedAt             DateTime                 @updatedAt @map("updated_at")
+  id                             String                        @id @default(uuid()) @map("integration_id")
+  brandProfileId                 String                        @map("brand_id")
+  brandProfile                   BrandProfile                  @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  provider                       BrandIntegrationProvider
+  status                         BrandIntegrationStatus        @default(DISCONNECTED)
+  currentPlatformHandle          String?                       @map("current_platform_handle") @db.VarChar(255)
+  inboundOauthHandle             String?                       @map("inbound_oauth_handle") @db.VarChar(255)
+  accessTokenEncrypted           String?                       @map("access_token_encrypted") @db.Text
+  refreshTokenEncrypted          String?                       @map("refresh_token_encrypted") @db.Text
+  pendingAccessTokenEncrypted    String?                       @map("pending_access_token_encrypted") @db.Text
+  pendingGrantedScopes           BrandIntegrationScope[]       @default([]) @map("pending_granted_scopes")
+  pendingTokenExpiresAt          DateTime?                     @map("pending_token_expires_at")
+  grantedScopes                  BrandIntegrationScope[]       @default([]) @map("granted_scopes")
+  tokenExpiresAt                 DateTime?                     @map("token_expires_at")
+  isActive                       Boolean                       @default(true) @map("is_active")
+  providerAccountId              String?                       @map("provider_account_id") @db.VarChar(100)
+  providerAppScopedUserId        String?                       @map("provider_app_scoped_user_id") @db.VarChar(100)
+  identityVerification           InstagramIdentityVerification @default(UNVERIFIED) @map("identity_verification")
+  authorizationHealth            InstagramAuthorizationHealth  @default(NEEDS_REVALIDATION) @map("authorization_health")
+  firstPartyProfileCapability    InstagramCapabilityState      @default(UNKNOWN) @map("first_party_profile_capability")
+  firstPartyInsightsCapability   InstagramCapabilityState      @default(UNKNOWN) @map("first_party_insights_capability")
+  businessDiscoveryCapability    InstagramCapabilityState      @default(DEFERRED) @map("business_discovery_capability")
+  creatorMarketplaceCapability   InstagramCapabilityState      @default(DEFERRED) @map("creator_marketplace_capability")
+  humanActionRequired            Boolean                       @default(false) @map("human_action_required")
+  syncHealth                     InstagramSyncHealth           @default(NOT_CONFIGURED) @map("sync_health")
+  authorizationGeneration        Int                           @default(0) @map("authorization_generation")
+  credentialVersion              Int                           @default(0) @map("credential_version")
+  tokenIssuedAt                  DateTime?                     @map("token_issued_at")
+  tokenLastRefreshedAt           DateTime?                     @map("token_last_refreshed_at")
+  tokenRefreshAttemptedAt        DateTime?                     @map("token_refresh_attempted_at")
+  pendingProviderAccountId       String?                       @map("pending_provider_account_id") @db.VarChar(100)
+  pendingProviderAppScopedUserId String?                       @map("pending_provider_app_scoped_user_id") @db.VarChar(100)
+  pendingOauthIntent             InstagramOAuthIntent?         @map("pending_oauth_intent")
+  pendingExpectedGeneration      Int?                          @map("pending_expected_generation")
+  authorizationLossTransitionId  String?                       @map("authorization_loss_transition_id") @db.Uuid
+  authorizationLossOpenedAt      DateTime?                     @map("authorization_loss_opened_at")
+  createdAt                      DateTime                      @default(now()) @map("created_at")
+  updatedAt                      DateTime                      @updatedAt @map("updated_at")
 
   @@unique([brandProfileId, provider], map: "uq_brand_provider_pair")
   @@index([brandProfileId, provider, status], map: "idx_brand_integrations_lookup")
   @@index([status, tokenExpiresAt], map: "idx_integrations_token_expiration")
+  @@index([provider, providerAppScopedUserId], map: "idx_integrations_callback_subject")
+  @@index([provider, authorizationHealth, tokenExpiresAt], map: "idx_instagram_refresh_candidates")
   @@map("brand_integrations")
 }
 
 /// Temporary agent invites for onboarding Instagram sync (no permanent User).
 model InstagramSyncInvitation {
-  id             String                        @id @default(uuid())
-  email          String
-  status         InstagramSyncInvitationStatus @default(PENDING)
-  token          String                        @unique
-  otpCode        String?                       @map("otp_code")
-  otpExpiresAt   DateTime?                     @map("otp_expires_at")
-  brandProfileId String                        @map("brand_id")
-  brandProfile   BrandProfile                  @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  createdAt      DateTime                      @default(now()) @map("created_at")
-  expiresAt      DateTime                      @map("expires_at")
+  id                      String                        @id @default(uuid())
+  email                   String
+  status                  InstagramSyncInvitationStatus @default(PENDING)
+  token                   String                        @unique
+  otpCode                 String?                       @map("otp_code")
+  otpExpiresAt            DateTime?                     @map("otp_expires_at")
+  oauthStateHash          String?                       @map("oauth_state_hash") @db.VarChar(64)
+  oauthRedirectUri        String?                       @map("oauth_redirect_uri") @db.Text
+  oauthExpectedGeneration Int?                          @map("oauth_expected_generation")
+  oauthStateExpiresAt     DateTime?                     @map("oauth_state_expires_at")
+  oauthStateConsumedAt    DateTime?                     @map("oauth_state_consumed_at")
+  brandProfileId          String                        @map("brand_id")
+  brandProfile            BrandProfile                  @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  createdAt               DateTime                      @default(now()) @map("created_at")
+  expiresAt               DateTime                      @map("expires_at")
 
   @@index([token])
   @@index([brandProfileId])
+  @@index([oauthStateHash, oauthStateExpiresAt])
   @@map("instagram_sync_invitations")
 }
 
@@ -2049,7 +2125,7 @@ model TeamInvitation {
   id             String       @id @default(uuid())
   email          String
   role           String       @default("ADMIN")
-  status         String       @default("PENDING") // PENDING, ACCEPTED, EXPIRED
+  status         String       @default("PENDING") // PENDING, ACCEPTED, CANCELLED, EXPIRED
   brandProfileId String       @map("brand_profile_id")
   brandProfile   BrandProfile @relation(fields: [brandProfileId], references: [id])
   token          String       @unique
@@ -2833,6 +2909,8 @@ model CreatorProfile {
   bankDetails            CreatorBankDetails[]
   shippingAddresses      CreatorShippingAddress[]
   settlementProfile      CreatorSettlementProfile?
+  payoutProfile          CreatorPayoutProfile?
+  payoutObligations      CreatorPayoutObligation[]
   ownedWorkspaces        CreatorWorkspace[]              @relation("CreatorWorkspaceOwner")
   workspaceSeats         CreatorWorkspaceMember[]        @relation("CreatorWorkspaceMemberProfile")
   socialIntegrations     CreatorSocialIntegration[]
@@ -2906,16 +2984,20 @@ model BrandTeamMember {
 }
 
 model BrandBillingProfile {
-  id                      String       @id @default(uuid()) @map("profile_id")
-  brandProfileId          String       @unique @map("brand_id")
-  brandProfile            BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  registeredCompanyName   String       @map("registered_company_name") @db.VarChar(255)
-  corporateBillingAddress String       @map("corporate_billing_address") @db.Text
-  gstin                   String?      @db.VarChar(15)
-  pan                     String?      @db.VarChar(10)
-  defaultTdsPercentage    Decimal      @default(2.00) @map("default_tds_percentage") @db.Decimal(5, 2)
-  currencyPreference      String       @default("INR") @map("currency_preference") @db.VarChar(3)
-  updatedAt               DateTime     @updatedAt @map("updated_at")
+  id                      String              @id @default(uuid()) @map("profile_id")
+  brandProfileId          String              @unique @map("brand_id")
+  brandProfile            BrandProfile        @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  registeredCompanyName   String              @map("registered_company_name") @db.VarChar(255)
+  corporateBillingAddress String              @map("corporate_billing_address") @db.Text
+  legalEntityType         String?             @map("legal_entity_type") @db.VarChar(100)
+  billingCountryCode      String?             @map("billing_country_code") @db.Char(2)
+  gstin                   String?             @db.VarChar(15)
+  pan                     String?             @db.VarChar(10)
+  defaultTdsPercentage    Decimal             @default(2.00) @map("default_tds_percentage") @db.Decimal(5, 2)
+  currencyPreference      String              @default("INR") @map("currency_preference") @db.VarChar(3)
+  profileState            BillingProfileState @default(CONFIGURED) @map("profile_state")
+  configuredAt            DateTime?           @map("configured_at")
+  updatedAt               DateTime            @updatedAt @map("updated_at")
 
   @@map("brand_billing_profiles")
 }
@@ -3212,6 +3294,9 @@ model Collaboration {
   settlement     CollaborationSettlement?
   feedbackWindow CollaborationFeedbackWindow?
   feedback       CollaborationFeedback[]
+  creatorPayoutObligations        CreatorPayoutObligation[]
+  collaborationRefundInstructions CollaborationRefundInstruction[]
+  fundingLotAllocations           CollaborationFundingLotAllocation[]
 
   @@index([campaignId, creatorUserId])
   @@index([brandProfileId, currentStage])
@@ -3642,20 +3727,27 @@ model BrandEscrowVault {
   id                       String       @id @default(uuid()) @map("vault_id")
   brandProfileId           String       @unique @map("brand_id")
   brandProfile             BrandProfile @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
-  razorpayVirtualAccountId String       @unique @map("razorpay_virtual_account_id")
-  virtualAccountNumber     String       @unique @map("virtual_account_number")
-  ifscCode                 String       @map("ifsc_code")
+  razorpayVirtualAccountId String?      @unique @map("razorpay_virtual_account_id")
+  virtualAccountNumber     String?      @unique @map("virtual_account_number")
+  ifscCode                 String?      @map("ifsc_code")
   upiVpa                   String?      @map("upi_vpa")
-  bankName                 String       @default("RBL Bank (Razorpay Escrow Partner Node)") @map("bank_name")
+  bankName                 String?      @map("bank_name")
+  virtualAccountEnabled    Boolean      @default(false) @map("virtual_account_enabled")
   currency                 String       @default("INR") @db.VarChar(3)
   totalPooledBalance       Decimal      @default(0) @map("total_pooled_balance") @db.Decimal(15, 4)
   lockedCampaignFunds      Decimal      @default(0) @map("locked_campaign_funds") @db.Decimal(15, 4)
   availableBalance         Decimal      @default(0) @map("available_balance") @db.Decimal(15, 4)
+  activeReturnCommitment   Decimal      @default(0) @map("active_return_commitment") @db.Decimal(15, 4)
   tdsBufferBalance         Decimal      @default(0) @map("tds_buffer_balance") @db.Decimal(15, 4)
   createdAt                DateTime     @default(now()) @map("created_at")
   updatedAt                DateTime     @updatedAt @map("updated_at")
 
-  ledgerEntries EscrowTransactionLedger[]
+  ledgerEntries            EscrowTransactionLedger[]
+  fundingLoads             EscrowFundingLoad[]
+  creatorPayoutObligations CreatorPayoutObligation[]
+  refundInstructions       CollaborationRefundInstruction[]
+  fundingLots              EscrowFundingLot[]
+  brandReturnRequests      BrandReturnRequest[]
 
   @@index([brandProfileId])
   @@map("brand_escrow_vaults")
@@ -3685,22 +3777,23 @@ model CollaborationEscrowLock {
 }
 
 model EscrowTransactionLedger {
-  id                         String                  @id @default(uuid()) @map("transaction_id")
-  vaultId                    String                  @map("vault_id")
-  vault                      BrandEscrowVault        @relation(fields: [vaultId], references: [id], onDelete: Restrict)
-  brandProfileId             String                  @map("brand_id")
-  collaborationId            String?                 @map("collaboration_id")
-  transactionType            EscrowTransactionType   @map("transaction_type")
-  payoutTrancheTarget        EscrowPayoutTranche?    @map("payout_tranche_target")
-  amount                     Decimal                 @db.Decimal(15, 4)
-  currency                   String                  @db.VarChar(3)
-  gatewayProcessingSurcharge Decimal                 @default(0) @map("gateway_processing_surcharge") @db.Decimal(15, 4)
-  gatewaySurchargeGst        Decimal                 @default(0) @map("gateway_surcharge_gst") @db.Decimal(15, 4)
-  idempotencyKey             String                  @unique @map("idempotency_key")
-  gatewayReferenceId         String?                 @unique @map("gateway_reference_id")
-  transactionStatus          EscrowTransactionStatus @default(PROCESSING_GATEWAY) @map("transaction_status")
-  errorDiagnosticPayload     Json?                   @map("error_diagnostic_payload")
-  createdAt                  DateTime                @default(now()) @map("created_at")
+  id                         String                          @id @default(uuid()) @map("transaction_id")
+  vaultId                    String                          @map("vault_id")
+  vault                      BrandEscrowVault                @relation(fields: [vaultId], references: [id], onDelete: Restrict)
+  brandProfileId             String                          @map("brand_id")
+  collaborationId            String?                         @map("collaboration_id")
+  transactionType            EscrowTransactionType           @map("transaction_type")
+  payoutTrancheTarget        EscrowPayoutTranche?            @map("payout_tranche_target")
+  amount                     Decimal                         @db.Decimal(15, 4)
+  currency                   String                          @db.VarChar(3)
+  gatewayProcessingSurcharge Decimal                         @default(0) @map("gateway_processing_surcharge") @db.Decimal(15, 4)
+  gatewaySurchargeGst        Decimal                         @default(0) @map("gateway_surcharge_gst") @db.Decimal(15, 4)
+  idempotencyKey             String                          @unique @map("idempotency_key")
+  gatewayReferenceId         String?                         @unique @map("gateway_reference_id")
+  transactionStatus          EscrowTransactionStatus         @default(PROCESSING_GATEWAY) @map("transaction_status")
+  errorDiagnosticPayload     Json?                           @map("error_diagnostic_payload")
+  createdAt                  DateTime                        @default(now()) @map("created_at")
+  refundInstruction          CollaborationRefundInstruction?
 
   @@index([vaultId])
   @@index([brandProfileId, collaborationId, transactionType])
@@ -3742,20 +3835,30 @@ model IdempotencyRegistry {
 // ---------------------------------------------------------------------------
 
 model BrandSubscription {
-  id                     String               @id @default(uuid()) @map("subscription_id")
-  brandProfileId         String               @unique @map("brand_id")
-  brandProfile           BrandProfile         @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  tier                   SubscriptionTier     @default(FOUNDERS_BETA)
-  status                 SubscriptionStatus   @default(TRIALING)
-  currency               SubscriptionCurrency @default(USD)
-  razorpayCustomerId     String?              @map("razorpay_customer_id")
-  razorpaySubscriptionId String?              @unique @map("razorpay_subscription_id")
-  razorpayPlanId         String?              @map("razorpay_plan_id")
-  trialEndsAt            DateTime?            @map("trial_ends_at")
-  currentPeriodStart     DateTime             @default(now()) @map("current_period_start")
-  currentPeriodEnd       DateTime             @map("current_period_end")
-  createdAt              DateTime             @default(now()) @map("created_at")
-  updatedAt              DateTime             @updatedAt @map("updated_at")
+  id                                 String               @id @default(uuid()) @map("subscription_id")
+  brandProfileId                     String               @unique @map("brand_id")
+  brandProfile                       BrandProfile         @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  tier                               SubscriptionTier     @default(FOUNDERS_BETA)
+  status                             SubscriptionStatus   @default(TRIALING)
+  currency                           SubscriptionCurrency @default(USD)
+  razorpayCustomerId                 String?              @map("razorpay_customer_id")
+  razorpaySubscriptionId             String?              @unique @map("razorpay_subscription_id")
+  razorpayPlanId                     String?              @map("razorpay_plan_id")
+  trialEndsAt                        DateTime?            @map("trial_ends_at")
+  currentPeriodStart                 DateTime             @default(now()) @map("current_period_start")
+  currentPeriodEnd                   DateTime             @map("current_period_end")
+  cancelScheduledAt                  DateTime?            @map("cancel_scheduled_at")
+  cancelEffectiveAt                  DateTime?            @map("cancel_effective_at")
+  firstPaymentFailureAt              DateTime?            @map("first_payment_failure_at")
+  paymentGraceEndsAt                 DateTime?            @map("payment_grace_ends_at")
+  providerStatus                     String?              @map("provider_status")
+  providerCancellationState          String?              @map("provider_cancellation_state")
+  continuationRazorpaySubscriptionId String?              @unique @map("continuation_razorpay_subscription_id")
+  continuationRazorpayPlanId         String?              @map("continuation_razorpay_plan_id")
+  continuationProviderStatus         String?              @map("continuation_provider_status")
+  continuationStartsAt               DateTime?            @map("continuation_starts_at")
+  createdAt                          DateTime             @default(now()) @map("created_at")
+  updatedAt                          DateTime             @updatedAt @map("updated_at")
 
   featureUsages   FeatureUsage[]
   billingInvoices BrandBillingInvoice[]
@@ -3766,29 +3869,37 @@ model BrandSubscription {
 }
 
 model BrandBillingInvoice {
-  id                     String            @id @default(uuid()) @map("invoice_row_id")
-  brandProfileId         String            @map("brand_id")
-  brandSubscriptionId    String            @map("subscription_id")
-  brandSubscription      BrandSubscription @relation(fields: [brandSubscriptionId], references: [id], onDelete: Cascade)
-  razorpayInvoiceId      String            @unique @map("razorpay_invoice_id")
-  razorpaySubscriptionId String            @map("razorpay_subscription_id")
-  razorpayPaymentId      String?           @map("razorpay_payment_id")
-  shortUrl               String?           @map("short_url")
-  status                 String
-  amount                 Int
-  amountPaid             Int               @default(0) @map("amount_paid")
-  currency               String            @default("USD")
-  invoiceNumber          String?           @map("invoice_number")
-  paidAt                 DateTime?         @map("paid_at")
-  billingPeriodStart     DateTime?         @map("billing_period_start")
-  billingPeriodEnd       DateTime?         @map("billing_period_end")
-  issuedAt               DateTime?         @map("issued_at")
-  createdAt              DateTime          @default(now()) @map("created_at")
-  updatedAt              DateTime          @updatedAt @map("updated_at")
+  id                      String                      @id @default(uuid()) @map("invoice_row_id")
+  brandProfileId          String                      @map("brand_id")
+  brandSubscriptionId     String                      @map("subscription_id")
+  brandSubscription       BrandSubscription           @relation(fields: [brandSubscriptionId], references: [id], onDelete: Cascade)
+  razorpayInvoiceId       String                      @unique @map("razorpay_invoice_id")
+  razorpaySubscriptionId  String                      @map("razorpay_subscription_id")
+  razorpayPaymentId       String?                     @map("razorpay_payment_id")
+  shortUrl                String?                     @map("short_url")
+  status                  String
+  amount                  Int
+  amountPaid              Int                         @default(0) @map("amount_paid")
+  currency                String                      @default("USD")
+  invoiceNumber           String?                     @map("invoice_number")
+  paidAt                  DateTime?                   @map("paid_at")
+  billingPeriodStart      DateTime?                   @map("billing_period_start")
+  billingPeriodEnd        DateTime?                   @map("billing_period_end")
+  issuedAt                DateTime?                   @map("issued_at")
+  billingProfileVersionId String?                     @map("billing_profile_version_id")
+  billingProfileVersion   BrandBillingProfileVersion? @relation(fields: [billingProfileVersionId], references: [id], onDelete: SetNull)
+  billingLegalEntityName  String?                     @map("billing_legal_entity_name") @db.VarChar(255)
+  billingLegalEntityType  String?                     @map("billing_legal_entity_type") @db.VarChar(100)
+  billingCountryCode      String?                     @map("billing_country_code") @db.Char(2)
+  billingAddress          String?                     @map("billing_address") @db.Text
+  billingGstin            String?                     @map("billing_gstin") @db.VarChar(15)
+  createdAt               DateTime                    @default(now()) @map("created_at")
+  updatedAt               DateTime                    @updatedAt @map("updated_at")
 
   @@index([brandProfileId])
   @@index([brandSubscriptionId])
   @@index([paidAt])
+  @@index([billingProfileVersionId])
   @@map("brand_billing_invoices")
 }
 
@@ -4018,33 +4129,41 @@ model CreatorCoPilotInteractionLog {
 // ============================================================================
 
 model Notification {
-  id            String                   @id @default(uuid())
-  workspaceId   String                   @map("workspace_id")
-  brandProfile  BrandProfile             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  triggerUserId String?                  @map("trigger_user_id")
-  triggerUser   User?                    @relation("NotificationTriggerUser", fields: [triggerUserId], references: [id], onDelete: SetNull)
-  eventType     String                   @map("event_type") @db.VarChar(100)
-  urgencyLevel  NotificationUrgencyLevel @map("urgency_level")
-  payload       Json
-  createdAt     DateTime                 @default(now()) @map("created_at")
-  updatedAt     DateTime                 @updatedAt @map("updated_at")
+  id               String                        @id @default(uuid())
+  workspaceId      String                        @map("workspace_id")
+  brandProfile     BrandProfile                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  triggerUserId    String?                       @map("trigger_user_id")
+  triggerUser      User?                         @relation("NotificationTriggerUser", fields: [triggerUserId], references: [id], onDelete: SetNull)
+  eventType        String                        @map("event_type") @db.VarChar(100)
+  urgencyLevel     NotificationUrgencyLevel      @map("urgency_level")
+  semanticEventKey String?                       @map("semantic_event_key") @db.VarChar(200)
+  category         SettingsNotificationCategory?
+  actionable       Boolean?
+  emailPolicy      NotificationEmailPolicy?      @map("email_policy")
+  inAppPolicy      NotificationInAppPolicy?      @map("in_app_policy")
+  payload          Json
+  createdAt        DateTime                      @default(now()) @map("created_at")
+  updatedAt        DateTime                      @updatedAt @map("updated_at")
 
-  recipients NotificationRecipient[]
+  recipients      NotificationRecipient[]
+  emailDeliveries NotificationEmailDelivery[]
 
+  @@unique([workspaceId, eventType, semanticEventKey])
   @@index([workspaceId])
   @@index([workspaceId, eventType, createdAt])
   @@map("notifications")
 }
 
 model NotificationRecipient {
-  id             String       @id @default(uuid())
-  notificationId String       @map("notification_id")
-  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
-  userId         String       @map("user_id")
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  isRead         Boolean      @default(false) @map("is_read")
-  isEmailed      Boolean      @default(false) @map("is_emailed")
-  readAt         DateTime?    @map("read_at")
+  id             String                     @id @default(uuid())
+  notificationId String                     @map("notification_id")
+  notification   Notification               @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  userId         String                     @map("user_id")
+  user           User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isRead         Boolean                    @default(false) @map("is_read")
+  isEmailed      Boolean                    @default(false) @map("is_emailed")
+  readAt         DateTime?                  @map("read_at")
+  emailDelivery  NotificationEmailDelivery?
 
   @@unique([notificationId, userId])
   @@index([userId, isRead])
@@ -4052,23 +4171,30 @@ model NotificationRecipient {
 }
 
 model NotificationJob {
-  id            String                   @id @default(uuid())
-  workspaceId   String                   @map("workspace_id")
-  eventType     String                   @map("event_type") @db.VarChar(100)
-  urgencyLevel  NotificationUrgencyLevel @map("urgency_level")
-  triggerUserId String?                  @map("trigger_user_id")
-  payload       Json
-  actorName     String?                  @map("actor_name") @db.VarChar(200)
-  status        NotificationJobStatus    @default(PENDING)
-  attempts      Int                      @default(0)
-  maxAttempts   Int                      @default(5) @map("max_attempts")
-  scheduledAt   DateTime                 @default(now()) @map("scheduled_at")
-  lockedAt      DateTime?                @map("locked_at")
-  lockedBy      String?                  @map("locked_by") @db.VarChar(100)
-  lastError     String?                  @map("last_error") @db.Text
-  completedAt   DateTime?                @map("completed_at")
-  createdAt     DateTime                 @default(now()) @map("created_at")
+  id                  String                   @id @default(uuid())
+  workspaceId         String                   @map("workspace_id")
+  eventType           String                   @map("event_type") @db.VarChar(100)
+  urgencyLevel        NotificationUrgencyLevel @map("urgency_level")
+  semanticEventKey    String                   @map("semantic_event_key") @db.VarChar(200)
+  triggerUserId       String?                  @map("trigger_user_id")
+  payload             Json
+  actorName           String?                  @map("actor_name") @db.VarChar(200)
+  status              NotificationJobStatus    @default(PENDING)
+  attempts            Int                      @default(0)
+  maxAttempts         Int                      @default(5) @map("max_attempts")
+  scheduledAt         DateTime                 @default(now()) @map("scheduled_at")
+  lockedAt            DateTime?                @map("locked_at")
+  lockedBy            String?                  @map("locked_by") @db.VarChar(100)
+  claimToken          String?                  @map("claim_token") @db.VarChar(100)
+  lastError           String?                  @map("last_error") @db.Text
+  completedAt         DateTime?                @map("completed_at")
+  snapshotFinalizedAt DateTime?                @map("snapshot_finalized_at")
+  materializedAt      DateTime?                @map("materialized_at")
+  createdAt           DateTime                 @default(now()) @map("created_at")
 
+  recipientSnapshots NotificationJobRecipient[]
+
+  @@unique([workspaceId, eventType, semanticEventKey])
   @@index([status, scheduledAt])
   @@map("notification_jobs")
 }
@@ -4810,4 +4936,831 @@ model DataExtractionProviderExecutionLink {
   @@index([captureRef], map: "idx_de_provider_link_capture_ref")
   @@index([capabilityExecutionRef], map: "idx_de_provider_link_capexec_ref")
   @@map("data_extraction_provider_execution_links")
+}
+
+enum AuthDeliveryStatus {
+  PENDING
+  MESSAGE_ACCEPTED
+  REJECTED
+  DELIVERY_UNKNOWN
+}
+
+enum AuthMethodType {
+  PASSWORD
+  GOOGLE
+  EMAIL_OTP
+}
+
+enum BillingProfileState {
+  CONFIGURED
+  UPDATED
+}
+
+enum BrandReturnActionRequiredReason {
+  SOURCE_PROVENANCE_REQUIRED
+  PROVIDER_SETUP_REQUIRED
+  PROVIDER_OUTCOME_AMBIGUOUS
+  SOURCE_NO_LONGER_REFUNDABLE
+  PROVIDER_RECONCILIATION_REQUIRED
+  UNSUPPORTED_SOURCE
+  UNSUPPORTED_CURRENCY
+}
+
+enum BrandReturnAllocationState {
+  READY
+  PROCESSING
+  SUCCEEDED
+  FAILED_TERMINAL
+  ACTION_REQUIRED
+  RELEASED
+}
+
+enum BrandReturnStatus {
+  RETURN_REQUESTED
+  ALLOCATING_SOURCES
+  PROCESSING
+  COMPLETED
+  PARTIAL
+  ACTION_REQUIRED
+  FAILED
+}
+
+enum CreatorPayoutBankStatus {
+  BANK_NOT_CONFIGURED
+  BANK_VALIDATION_PENDING
+  BANK_VALIDATED
+  BANK_VALIDATION_FAILED
+  UNKNOWN
+}
+
+enum CreatorPayoutObligationStatus {
+  ELIGIBLE
+  EXECUTING
+  BLOCKED
+  SETTLED
+  PARTIALLY_REVERSED
+  REVERSED
+}
+
+enum CreatorPayoutObligationType {
+  ADVANCE
+  BALANCE
+  FULL
+  RESOLUTION
+}
+
+enum CreatorPayoutOnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  NEEDS_INFORMATION
+  UNDER_REVIEW
+  VERIFIED
+  RESTRICTED
+  UNKNOWN
+}
+
+enum CreatorPayoutOperationalEligibility {
+  NO_LINKED_ACCOUNT
+  ACCOUNT_CREATED
+  STAKEHOLDER_COMPLETE
+  ROUTE_CONFIGURATION_REQUESTED
+  NEEDS_CLARIFICATION
+  UNDER_REVIEW
+  BANK_CONFIGURATION_PENDING
+  BANK_VALIDATION_PENDING
+  ACTIVATED
+  COOLING_PERIOD
+  ELIGIBLE_FOR_TRANSFER
+  SUSPENDED_OR_RESTRICTED
+  UNKNOWN
+}
+
+enum EmailOtpPurpose {
+  LOGIN
+  BRAND_VERIFICATION
+  CREATOR_EMAIL_VERIFICATION
+  TEAM_INVITE
+  SOCIAL_SYNC_INVITE
+}
+
+enum EscrowFundingLotSourceType {
+  GATEWAY
+  VIRTUAL_ACCOUNT
+  BANK_TRANSFER
+  LEGACY_SOURCE_UNKNOWN
+}
+
+enum EscrowFundingProvenanceStatus {
+  LEGACY_SOURCE_UNKNOWN
+  SOURCE_UNRESOLVED
+  PROVEN_SOURCE
+}
+
+enum EscrowFundingSourceType {
+  GATEWAY
+  VIRTUAL_ACCOUNT
+  BANK_TRANSFER
+}
+
+enum EscrowFundingState {
+  LOAD_INITIATED
+  PENDING
+  CREDITED
+  FAILED
+}
+
+enum InstagramAuthorizationHealth {
+  DISCONNECTED
+  CONNECTED_FULL
+  PARTIALLY_CONNECTED
+  NEEDS_REVALIDATION
+  PROVIDER_ACCESS_BLOCKED
+  UNKNOWN
+}
+
+enum InstagramCapabilityState {
+  YES
+  NO
+  UNKNOWN
+  DEFERRED
+}
+
+enum InstagramDeletionSource {
+  USER
+  META_CALLBACK
+}
+
+enum InstagramDeletionState {
+  REQUESTED
+  FENCED
+  IN_PROGRESS
+  COMPLETED
+  FAILED_RETRYABLE
+  FAILED_TERMINAL
+}
+
+enum InstagramIdentityVerification {
+  UNVERIFIED
+  VERIFIED
+}
+
+enum InstagramIgHandleProvenance {
+  META_DIRECT
+  USER_ENTERED
+  WEBSITE_DERIVED
+  LEGACY_UNKNOWN
+}
+
+enum InstagramOAuthIntent {
+  INITIAL_CONNECT
+  RECONNECT
+  ACCOUNT_CHANGE
+  LEGACY_IDENTITY_RECONCILIATION
+}
+
+enum InstagramSyncHealth {
+  NOT_CONFIGURED
+}
+
+enum NotificationEmailPolicy {
+  MANDATORY
+  OPTIONAL
+  NONE
+}
+
+enum NotificationEmailDeliveryStatus {
+  NOT_REQUIRED
+  PENDING
+  PROCESSING
+  SENT
+  FAILED_RETRYABLE
+  FAILED_TERMINAL
+}
+
+enum NotificationInAppPolicy {
+  REQUIRED
+  YES
+  NONE
+}
+
+enum RouteReversalState {
+  CREATED
+  PENDING
+  PROCESSED
+  FAILED
+  UNKNOWN
+}
+
+enum RouteSettlementState {
+  PENDING
+  HELD
+  RELEASE_ELIGIBLE
+  RELEASE_PROCESSING
+  RELEASED
+  SETTLED
+  BLOCKED
+  UNKNOWN
+}
+
+enum RouteTransferState {
+  CREATED
+  PENDING
+  PROCESSED
+  FAILED
+  REVERSED
+  PARTIALLY_REVERSED
+  UNKNOWN
+}
+
+enum SecurityEventType {
+  SESSION_CREATED
+  SESSION_REVOKED
+  ALL_SESSIONS_REVOKED
+  PASSWORD_RESET_REQUESTED
+  PASSWORD_RESET_COMPLETED
+  PASSWORD_CHANGED
+  GOOGLE_LINKED
+  GOOGLE_LINK_CONFLICT
+  OTP_ISSUED
+  OTP_VERIFIED
+  AUTH_DISABLED
+}
+
+enum UserAuthState {
+  PROVISIONAL
+  ACTIVE
+  RECOVERY_REQUIRED
+  DISABLED
+}
+
+model AuthRefreshCredential {
+  id         String      @id @default(uuid())
+  sessionId  String      @map("session_id")
+  session    AuthSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  digest     String      @unique @db.Char(64)
+  version    Int
+  createdAt  DateTime    @default(now()) @map("created_at")
+  consumedAt DateTime?   @map("consumed_at")
+
+  @@unique([sessionId, version])
+  @@index([sessionId, consumedAt])
+  @@map("auth_refresh_credentials")
+}
+
+model AuthSession {
+  id                        String                  @id @default(uuid())
+  userId                    String                  @map("user_id")
+  user                      User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentRefreshTokenDigest String                  @unique @map("current_refresh_token_digest") @db.Char(64)
+  refreshVersion            Int                     @default(1) @map("refresh_version")
+  createdAt                 DateTime                @default(now()) @map("created_at")
+  lastUsedAt                DateTime                @default(now()) @map("last_used_at")
+  lastRefreshedAt           DateTime?               @map("last_refreshed_at")
+  absoluteExpiresAt         DateTime                @map("absolute_expires_at")
+  revokedAt                 DateTime?               @map("revoked_at")
+  revocationReason          String?                 @map("revocation_reason") @db.VarChar(100)
+  refreshCredentials        AuthRefreshCredential[]
+
+  @@index([userId, revokedAt, absoluteExpiresAt])
+  @@map("auth_sessions")
+}
+
+model AuthThrottle {
+  id               String    @id @default(uuid())
+  identifierDigest String    @map("identifier_digest") @db.Char(64)
+  kind             String    @db.VarChar(50)
+  failureCount     Int       @default(0) @map("failure_count")
+  windowStartedAt  DateTime  @default(now()) @map("window_started_at")
+  blockedUntil     DateTime? @map("blocked_until")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@unique([identifierDigest, kind])
+  @@map("auth_throttles")
+}
+
+model BrandBillingProfileVersion {
+  id                 String                @id @default(uuid()) @map("version_id")
+  brandProfileId     String                @map("brand_id")
+  brandProfile       BrandProfile          @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  legalEntityName    String                @map("legal_entity_name") @db.VarChar(255)
+  legalEntityType    String?               @map("legal_entity_type") @db.VarChar(100)
+  billingCountryCode String?               @map("billing_country_code") @db.Char(2)
+  billingAddress     String                @map("billing_address") @db.Text
+  gstin              String?               @db.VarChar(15)
+  effectiveFrom      DateTime              @map("effective_from")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  invoices           BrandBillingInvoice[]
+
+  @@index([brandProfileId, effectiveFrom])
+  @@map("brand_billing_profile_versions")
+}
+
+model BrandInstagramOAuthState {
+  id                        String               @id @default(uuid())
+  brandProfileId            String               @map("brand_profile_id")
+  brandProfile              BrandProfile         @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  initiatedByUserId         String               @map("initiated_by_user_id")
+  initiatedByUser           User                 @relation(fields: [initiatedByUserId], references: [id], onDelete: Cascade)
+  stateHash                 String               @unique @map("state_hash") @db.VarChar(64)
+  redirectUri               String               @map("redirect_uri")
+  intent                    InstagramOAuthIntent @default(INITIAL_CONNECT)
+  initiatedByRole           BrandRole            @default(BRAND_OWNER) @map("initiated_by_role")
+  expectedGeneration        Int                  @default(0) @map("expected_generation")
+  expectedProviderAccountId String?              @map("expected_provider_account_id") @db.VarChar(100)
+  expiresAt                 DateTime             @map("expires_at")
+  consumedAt                DateTime?            @map("consumed_at")
+  createdAt                 DateTime             @default(now()) @map("created_at")
+
+  @@index([expiresAt, consumedAt])
+  @@index([brandProfileId])
+  @@index([initiatedByUserId])
+  @@map("brand_instagram_oauth_states")
+}
+
+model BrandInstagramDeletionRequest {
+  id                      String                  @id @default(uuid()) @map("deletion_request_id")
+  brandProfileId          String                  @map("brand_profile_id")
+  brandProfile            BrandProfile            @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  providerAccountId       String?                 @map("provider_account_id") @db.VarChar(100)
+  providerAppScopedUserId String?                 @map("provider_app_scoped_user_id") @db.VarChar(100)
+  source                  InstagramDeletionSource
+  requesterUserId         String?                 @map("requester_user_id")
+  state                   InstagramDeletionState  @default(REQUESTED)
+  requestedGeneration     Int                     @map("requested_generation")
+  fenceGeneration         Int?                    @map("fence_generation")
+  callbackRequestHash     String?                 @map("callback_request_hash") @db.Char(64)
+  confirmationCode        String                  @map("confirmation_code") @db.VarChar(80)
+  policyVersion           String                  @default("BS06_P1_V1") @map("policy_version") @db.VarChar(40)
+  resultSummary           Json?                   @map("result_summary")
+  attemptCount            Int                     @default(0) @map("attempt_count")
+  lastErrorCode           String?                 @map("last_error_code") @db.VarChar(100)
+  requestedAt             DateTime                @default(now()) @map("requested_at")
+  fencedAt                DateTime?               @map("fenced_at")
+  startedAt               DateTime?               @map("started_at")
+  completedAt             DateTime?               @map("completed_at")
+  updatedAt               DateTime                @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, source, requestedGeneration], map: "uq_instagram_delete_effective_request")
+  @@unique([brandProfileId, callbackRequestHash], map: "uq_instagram_delete_callback_replay")
+  @@index([confirmationCode], map: "idx_instagram_delete_confirmation")
+  @@index([state, requestedAt], map: "idx_instagram_delete_worker")
+  @@map("brand_instagram_deletion_requests")
+}
+
+model BrandReturnAllocation {
+  id                   String                           @id @default(uuid()) @map("brand_return_allocation_id")
+  requestId            String                           @map("brand_return_request_id")
+  request              BrandReturnRequest               @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  fundingLotId         String                           @map("funding_lot_id")
+  fundingLot           EscrowFundingLot                 @relation(fields: [fundingLotId], references: [id], onDelete: Restrict)
+  semanticIdentity     String                           @unique @map("semantic_identity")
+  providerPaymentId    String                           @map("provider_payment_id")
+  amount               Decimal                          @db.Decimal(15, 4)
+  currency             String                           @db.VarChar(3)
+  state                BrandReturnAllocationState       @default(READY)
+  actionRequiredReason BrandReturnActionRequiredReason? @map("action_required_reason")
+  providerRefundId     String?                          @unique @map("provider_refund_id")
+  providerState        String?                          @map("provider_state") @db.VarChar(100)
+  attemptCount         Int                              @default(0) @map("attempt_count")
+  diagnosticPayload    Json?                            @map("diagnostic_payload")
+  lastAttemptAt        DateTime?                        @map("last_attempt_at")
+  succeededAt          DateTime?                        @map("succeeded_at")
+  releasedAt           DateTime?                        @map("released_at")
+  createdAt            DateTime                         @default(now()) @map("created_at")
+  updatedAt            DateTime                         @updatedAt @map("updated_at")
+
+  @@unique([requestId, fundingLotId])
+  @@index([requestId, state, createdAt])
+  @@index([fundingLotId, state, createdAt])
+  @@map("brand_return_allocations")
+}
+
+model BrandReturnRequest {
+  id                   String                           @id @default(uuid()) @map("brand_return_request_id")
+  requestIdentity      String                           @unique @map("request_identity")
+  vaultId              String                           @map("vault_id")
+  vault                BrandEscrowVault                 @relation(fields: [vaultId], references: [id], onDelete: Restrict)
+  brandProfileId       String                           @map("brand_id")
+  brandProfile         BrandProfile                     @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
+  requestedAmount      Decimal                          @map("requested_amount") @db.Decimal(15, 4)
+  committedAmount      Decimal                          @default(0) @map("committed_amount") @db.Decimal(15, 4)
+  successfulAmount     Decimal                          @default(0) @map("successful_amount") @db.Decimal(15, 4)
+  unresolvedAmount     Decimal                          @default(0) @map("unresolved_amount") @db.Decimal(15, 4)
+  releasedAmount       Decimal                          @default(0) @map("released_amount") @db.Decimal(15, 4)
+  currency             String                           @db.VarChar(3)
+  status               BrandReturnStatus                @default(RETURN_REQUESTED)
+  actionRequiredReason BrandReturnActionRequiredReason? @map("action_required_reason")
+  requestedByUserId    String                           @map("requested_by_user_id")
+  requestedAt          DateTime                         @default(now()) @map("requested_at")
+  processingAt         DateTime?                        @map("processing_at")
+  completedAt          DateTime?                        @map("completed_at")
+  createdAt            DateTime                         @default(now()) @map("created_at")
+  updatedAt            DateTime                         @updatedAt @map("updated_at")
+  allocations          BrandReturnAllocation[]
+
+  @@index([brandProfileId, createdAt])
+  @@index([vaultId, status, createdAt])
+  @@map("brand_return_requests")
+}
+
+model BrandReturnWebhookReceipt {
+  id               String   @id @default(uuid()) @map("brand_return_webhook_receipt_id")
+  eventIdentity    String   @unique @map("event_identity")
+  eventType        String   @map("event_type") @db.VarChar(120)
+  payloadHash      String   @map("payload_hash") @db.VarChar(64)
+  providerRefundId String?  @map("provider_refund_id")
+  processedAt      DateTime @default(now()) @map("processed_at")
+
+  @@index([providerRefundId, processedAt])
+  @@map("brand_return_webhook_receipts")
+}
+
+model CollaborationFundingLotAllocation {
+  id                String                           @id @default(uuid()) @map("collaboration_lot_allocation_id")
+  collaborationId   String                           @map("collaboration_id")
+  collaboration     Collaboration                    @relation(fields: [collaborationId], references: [id], onDelete: Restrict)
+  fundingLotId      String                           @map("funding_lot_id")
+  fundingLot        EscrowFundingLot                 @relation(fields: [fundingLotId], references: [id], onDelete: Restrict)
+  reservedAmount    Decimal                          @map("reserved_amount") @db.Decimal(15, 4)
+  lockedAmount      Decimal                          @map("locked_amount") @db.Decimal(15, 4)
+  consumedAmount    Decimal                          @default(0) @map("consumed_amount") @db.Decimal(15, 4)
+  releasedAmount    Decimal                          @default(0) @map("released_amount") @db.Decimal(15, 4)
+  createdAt         DateTime                         @default(now()) @map("created_at")
+  updatedAt         DateTime                         @updatedAt @map("updated_at")
+  payoutAllocations CreatorPayoutFundingAllocation[]
+
+  @@unique([collaborationId, fundingLotId])
+  @@index([fundingLotId, createdAt])
+  @@map("collaboration_funding_lot_allocations")
+}
+
+model CollaborationRefundInstruction {
+  id                           String                  @id @default(uuid()) @map("refund_instruction_record_id")
+  refundInstructionId          String                  @unique @map("refund_instruction_id")
+  collaborationId              String                  @map("collaboration_id")
+  collaboration                Collaboration           @relation(fields: [collaborationId], references: [id], onDelete: Restrict)
+  vaultId                      String                  @map("vault_id")
+  vault                        BrandEscrowVault        @relation(fields: [vaultId], references: [id], onDelete: Restrict)
+  brandProfileId               String                  @map("brand_id")
+  brandProfile                 BrandProfile            @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
+  amount                       Decimal                 @db.Decimal(15, 4)
+  currency                     String                  @db.VarChar(3)
+  financialResolutionReference String                  @map("financial_resolution_reference")
+  instructionIssuedAt          DateTime                @map("instruction_issued_at")
+  triggeringUserId             String?                 @map("triggering_user_id")
+  ledgerTransactionId          String                  @unique @map("ledger_transaction_id")
+  ledgerTransaction            EscrowTransactionLedger @relation(fields: [ledgerTransactionId], references: [id], onDelete: Restrict)
+  executedAt                   DateTime                @default(now()) @map("executed_at")
+  createdAt                    DateTime                @default(now()) @map("created_at")
+  updatedAt                    DateTime                @updatedAt @map("updated_at")
+
+  @@index([collaborationId, executedAt])
+  @@index([brandProfileId, executedAt])
+  @@map("collaboration_refund_instructions")
+}
+
+model CreatorPayoutFundingAllocation {
+  id                        String                            @id @default(uuid()) @map("creator_payout_funding_allocation_id")
+  obligationId              String                            @map("obligation_id")
+  obligation                CreatorPayoutObligation           @relation(fields: [obligationId], references: [id], onDelete: Restrict)
+  collaborationAllocationId String                            @map("collaboration_lot_allocation_id")
+  collaborationAllocation   CollaborationFundingLotAllocation @relation(fields: [collaborationAllocationId], references: [id], onDelete: Restrict)
+  fundingLotId              String                            @map("funding_lot_id")
+  fundingLot                EscrowFundingLot                  @relation(fields: [fundingLotId], references: [id], onDelete: Restrict)
+  allocatedAmount           Decimal                           @map("allocated_amount") @db.Decimal(15, 4)
+  consumedAmount            Decimal                           @default(0) @map("consumed_amount") @db.Decimal(15, 4)
+  reversedAmount            Decimal                           @default(0) @map("reversed_amount") @db.Decimal(15, 4)
+  createdAt                 DateTime                          @default(now()) @map("created_at")
+  updatedAt                 DateTime                          @updatedAt @map("updated_at")
+
+  @@unique([obligationId, fundingLotId])
+  @@index([collaborationAllocationId, createdAt])
+  @@map("creator_payout_funding_allocations")
+}
+
+model CreatorPayoutObligation {
+  id                      String                           @id @default(uuid()) @map("obligation_id")
+  settlementInstructionId String                           @unique @map("settlement_instruction_id")
+  collaborationId         String                           @map("collaboration_id")
+  collaboration           Collaboration                    @relation(fields: [collaborationId], references: [id], onDelete: Restrict)
+  vaultId                 String                           @map("vault_id")
+  vault                   BrandEscrowVault                 @relation(fields: [vaultId], references: [id], onDelete: Restrict)
+  brandProfileId          String                           @map("brand_id")
+  brandProfile            BrandProfile                     @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
+  creatorProfileId        String                           @map("creator_profile_id")
+  creatorProfile          CreatorProfile                   @relation(fields: [creatorProfileId], references: [id], onDelete: Restrict)
+  payoutProfileId         String                           @map("payout_profile_id")
+  payoutProfile           CreatorPayoutProfile             @relation(fields: [payoutProfileId], references: [id], onDelete: Restrict)
+  obligationType          CreatorPayoutObligationType      @map("obligation_type")
+  entitlementAmount       Decimal                          @map("entitlement_amount") @db.Decimal(15, 4)
+  currency                String                           @db.VarChar(3)
+  status                  CreatorPayoutObligationStatus    @default(ELIGIBLE)
+  instructionIssuedAt     DateTime                         @map("instruction_issued_at")
+  paymentDueAt            DateTime?                        @map("payment_due_at")
+  blockedReason           String?                          @map("blocked_reason") @db.VarChar(100)
+  settledAt               DateTime?                        @map("settled_at")
+  terminalAt              DateTime?                        @map("terminal_at")
+  createdAt               DateTime                         @default(now()) @map("created_at")
+  updatedAt               DateTime                         @updatedAt @map("updated_at")
+  transfers               RouteTransferAttempt[]
+  fundingAllocations      CreatorPayoutFundingAllocation[]
+
+  @@index([brandProfileId, status, createdAt])
+  @@index([collaborationId, status])
+  @@index([creatorProfileId, status])
+  @@map("creator_payout_obligations")
+}
+
+model CreatorPayoutProfile {
+  id                       String                              @id @default(uuid()) @map("payout_profile_id")
+  creatorProfileId         String                              @unique @map("creator_profile_id")
+  creatorProfile           CreatorProfile                      @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  provider                 String                              @default("RAZORPAY_ROUTE") @db.VarChar(40)
+  externalReferenceId      String                              @unique @map("external_reference_id")
+  linkedAccountId          String?                             @unique @map("linked_account_id")
+  stakeholderId            String?                             @unique @map("stakeholder_id")
+  productConfigurationId   String?                             @unique @map("product_configuration_id")
+  onboardingStatus         CreatorPayoutOnboardingStatus       @default(NOT_STARTED) @map("onboarding_status")
+  bankStatus               CreatorPayoutBankStatus             @default(BANK_NOT_CONFIGURED) @map("bank_status")
+  operationalEligibility   CreatorPayoutOperationalEligibility @default(NO_LINKED_ACCOUNT) @map("operational_eligibility")
+  providerAccountStatus    String?                             @map("provider_account_status") @db.VarChar(100)
+  providerProductStatus    String?                             @map("provider_product_status") @db.VarChar(100)
+  providerBankStatus       String?                             @map("provider_bank_status") @db.VarChar(100)
+  maskedBankDisplay        String?                             @map("masked_bank_display") @db.VarChar(64)
+  eligibilityInvalidatedAt DateTime?                           @map("eligibility_invalidated_at")
+  lastProviderReconciledAt DateTime?                           @map("last_provider_reconciled_at")
+  stateVersion             Int                                 @default(0) @map("state_version")
+  createdAt                DateTime                            @default(now()) @map("created_at")
+  updatedAt                DateTime                            @updatedAt @map("updated_at")
+  obligations              CreatorPayoutObligation[]
+
+  @@index([operationalEligibility, updatedAt])
+  @@map("creator_payout_profiles")
+}
+
+model EmailOtpChallenge {
+  id                String             @id @default(uuid())
+  normalizedEmail   String             @map("normalized_email") @db.VarChar(320)
+  purpose           EmailOtpPurpose
+  digest            String             @db.Char(64)
+  attemptCount      Int                @default(0) @map("attempt_count")
+  maxAttempts       Int                @default(5) @map("max_attempts")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  expiresAt         DateTime           @map("expires_at")
+  consumedAt        DateTime?          @map("consumed_at")
+  supersededAt      DateTime?          @map("superseded_at")
+  deliveryStatus    AuthDeliveryStatus @default(PENDING) @map("delivery_status")
+  providerMessageId String?            @map("provider_message_id") @db.VarChar(255)
+
+  @@index([normalizedEmail, purpose, createdAt])
+  @@index([normalizedEmail, purpose, consumedAt, supersededAt])
+  @@map("email_otp_challenges")
+}
+
+model EscrowFundingLot {
+  id                       String                              @id @default(uuid()) @map("funding_lot_id")
+  vaultId                  String                              @map("vault_id")
+  vault                    BrandEscrowVault                    @relation(fields: [vaultId], references: [id], onDelete: Restrict)
+  brandProfileId           String                              @map("brand_id")
+  brandProfile             BrandProfile                        @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
+  fundingLoadId            String?                             @unique @map("funding_load_id")
+  fundingLoad              EscrowFundingLoad?                  @relation(fields: [fundingLoadId], references: [id], onDelete: Restrict)
+  sourceType               EscrowFundingLotSourceType          @map("source_type")
+  provenanceStatus         EscrowFundingProvenanceStatus       @map("provenance_status")
+  currency                 String                              @db.VarChar(3)
+  requestedPrincipal       Decimal                             @map("requested_principal") @db.Decimal(15, 4)
+  creditedPrincipal        Decimal                             @map("credited_principal") @db.Decimal(15, 4)
+  capturedAmount           Decimal?                            @map("captured_amount") @db.Decimal(15, 4)
+  providerRefundableAmount Decimal                             @default(0) @map("provider_refundable_amount") @db.Decimal(15, 4)
+  providerOrderId          String?                             @map("provider_order_id")
+  providerPaymentId        String?                             @unique @map("provider_payment_id")
+  providerPaymentCaptured  Boolean?                            @map("provider_payment_captured")
+  availableAmount          Decimal                             @default(0) @map("available_amount") @db.Decimal(15, 4)
+  lockedAmount             Decimal                             @default(0) @map("locked_amount") @db.Decimal(15, 4)
+  returnCommittedAmount    Decimal                             @default(0) @map("return_committed_amount") @db.Decimal(15, 4)
+  consumedAmount           Decimal                             @default(0) @map("consumed_amount") @db.Decimal(15, 4)
+  externallyReturnedAmount Decimal                             @default(0) @map("externally_returned_amount") @db.Decimal(15, 4)
+  economicAt               DateTime                            @map("economic_at")
+  creditedAt               DateTime?                           @map("credited_at")
+  provenanceDiagnostic     Json?                               @map("provenance_diagnostic")
+  createdAt                DateTime                            @default(now()) @map("created_at")
+  updatedAt                DateTime                            @updatedAt @map("updated_at")
+  collaborationAllocations CollaborationFundingLotAllocation[]
+  creatorPayoutAllocations CreatorPayoutFundingAllocation[]
+  returnAllocations        BrandReturnAllocation[]
+
+  @@index([vaultId, economicAt, id])
+  @@index([brandProfileId, provenanceStatus, currency])
+  @@map("escrow_funding_lots")
+}
+
+model EscrowFundingLoad {
+  id                String                        @id @default(uuid()) @map("funding_load_id")
+  vaultId           String                        @map("vault_id")
+  vault             BrandEscrowVault              @relation(fields: [vaultId], references: [id], onDelete: Restrict)
+  brandProfileId    String                        @map("brand_id")
+  sourceType        EscrowFundingSourceType       @map("source_type")
+  currency          String                        @db.VarChar(3)
+  principalAmount   Decimal                       @map("principal_amount") @db.Decimal(15, 4)
+  processingFee     Decimal                       @default(0) @map("processing_fee") @db.Decimal(15, 4)
+  processingFeeTax  Decimal                       @default(0) @map("processing_fee_tax") @db.Decimal(15, 4)
+  creditedPrincipal Decimal?                      @map("credited_principal") @db.Decimal(15, 4)
+  capturedAmount    Decimal?                      @map("captured_amount") @db.Decimal(15, 4)
+  paymentCurrency   String?                       @map("payment_currency") @db.VarChar(3)
+  paymentCaptured   Boolean?                      @map("payment_captured")
+  provenanceStatus  EscrowFundingProvenanceStatus @default(SOURCE_UNRESOLVED) @map("provenance_status")
+  state             EscrowFundingState            @default(LOAD_INITIATED)
+  idempotencyKey    String?                       @unique @map("idempotency_key")
+  providerOrderId   String?                       @unique @map("provider_order_id")
+  providerPaymentId String?                       @unique @map("provider_payment_id")
+  providerCreditId  String?                       @unique @map("provider_credit_id")
+  sourceReference   String?                       @map("source_reference")
+  initiatedAt       DateTime?                     @map("initiated_at")
+  creditedAt        DateTime?                     @map("credited_at")
+  failedAt          DateTime?                     @map("failed_at")
+  createdAt         DateTime                      @default(now()) @map("created_at")
+  updatedAt         DateTime                      @updatedAt @map("updated_at")
+  fundingLot        EscrowFundingLot?
+
+  @@index([vaultId, state])
+  @@index([brandProfileId, createdAt])
+  @@map("escrow_funding_loads")
+}
+
+model NotificationEmailDelivery {
+  id                    String                          @id @default(uuid())
+  notificationId        String                          @map("notification_id")
+  notification          Notification                    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  userId                String                          @map("user_id")
+  user                  User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipientId           String?                         @unique @map("recipient_id")
+  recipient             NotificationRecipient?          @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  targetEmail           String                          @map("target_email")
+  status                NotificationEmailDeliveryStatus @default(PENDING)
+  attempts              Int                             @default(0)
+  maxAttempts           Int                             @default(5) @map("max_attempts")
+  scheduledAt           DateTime                        @default(now()) @map("scheduled_at")
+  lockedAt              DateTime?                       @map("locked_at")
+  lockedBy              String?                         @map("locked_by") @db.VarChar(100)
+  claimToken            String?                         @map("claim_token") @db.VarChar(100)
+  providerSendStartedAt DateTime?                       @map("provider_send_started_at")
+  lastError             String?                         @map("last_error") @db.Text
+  providerMessageId     String?                         @map("provider_message_id") @db.VarChar(200)
+  sentAt                DateTime?                       @map("sent_at")
+  createdAt             DateTime                        @default(now()) @map("created_at")
+  updatedAt             DateTime                        @updatedAt @map("updated_at")
+
+  @@unique([notificationId, userId])
+  @@index([status, scheduledAt])
+  @@map("notification_email_deliveries")
+}
+
+model NotificationJobRecipient {
+  id              String                          @id @default(uuid())
+  jobId           String                          @map("job_id")
+  job             NotificationJob                 @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  userId          String                          @map("user_id")
+  user            User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetEmail     String                          @map("target_email")
+  recipientName   String?                         @map("recipient_name")
+  inboxObligation Boolean                         @map("inbox_obligation")
+  emailStatus     NotificationEmailDeliveryStatus @map("email_status")
+  createdAt       DateTime                        @default(now()) @map("created_at")
+
+  @@unique([jobId, userId])
+  @@index([jobId])
+  @@map("notification_job_recipients")
+}
+
+model PasswordResetChallenge {
+  id                String             @id @default(uuid())
+  userId            String             @map("user_id")
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  normalizedEmail   String             @map("normalized_email") @db.VarChar(320)
+  tokenDigest       String             @unique @map("token_digest") @db.Char(64)
+  createdAt         DateTime           @default(now()) @map("created_at")
+  expiresAt         DateTime           @map("expires_at")
+  consumedAt        DateTime?          @map("consumed_at")
+  supersededAt      DateTime?          @map("superseded_at")
+  deliveryStatus    AuthDeliveryStatus @default(PENDING) @map("delivery_status")
+  providerMessageId String?            @map("provider_message_id") @db.VarChar(255)
+
+  @@index([userId, consumedAt, supersededAt])
+  @@map("password_reset_challenges")
+}
+
+model RouteTransferAttempt {
+  id                  String                  @id @default(uuid()) @map("transfer_attempt_id")
+  obligationId        String                  @map("obligation_id")
+  obligation          CreatorPayoutObligation @relation(fields: [obligationId], references: [id], onDelete: Restrict)
+  attemptSequence     Int                     @map("attempt_sequence")
+  profileStateVersion Int                     @map("profile_state_version")
+  provider            String                  @default("RAZORPAY_ROUTE") @db.VarChar(40)
+  idempotencyKey      String                  @unique @map("idempotency_key")
+  transferId          String?                 @unique @map("transfer_id")
+  amount              Decimal                 @db.Decimal(15, 4)
+  currency            String                  @db.VarChar(3)
+  state               RouteTransferState      @default(CREATED)
+  settlementState     RouteSettlementState    @default(PENDING) @map("settlement_state")
+  onHold              Boolean                 @default(false) @map("on_hold")
+  onHoldUntil         DateTime?               @map("on_hold_until")
+  providerState       String?                 @map("provider_state") @db.VarChar(100)
+  settlementId        String?                 @unique @map("settlement_id")
+  diagnosticPayload   Json?                   @map("diagnostic_payload")
+  initiatedAt         DateTime                @default(now()) @map("initiated_at")
+  providerAcceptedAt  DateTime?               @map("provider_accepted_at")
+  processedAt         DateTime?               @map("processed_at")
+  releasedAt          DateTime?               @map("released_at")
+  settledAt           DateTime?               @map("settled_at")
+  failedAt            DateTime?               @map("failed_at")
+  createdAt           DateTime                @default(now()) @map("created_at")
+  updatedAt           DateTime                @updatedAt @map("updated_at")
+  reversals           RouteTransferReversal[]
+
+  @@unique([obligationId, attemptSequence])
+  @@index([obligationId, state, createdAt])
+  @@map("route_transfer_attempts")
+}
+
+model RouteTransferReversal {
+  id                String               @id @default(uuid()) @map("route_reversal_record_id")
+  transferAttemptId String               @map("transfer_attempt_id")
+  transferAttempt   RouteTransferAttempt @relation(fields: [transferAttemptId], references: [id], onDelete: Restrict)
+  reversalId        String?              @unique @map("reversal_id")
+  idempotencyKey    String               @unique @map("idempotency_key")
+  amount            Decimal              @db.Decimal(15, 4)
+  currency          String               @db.VarChar(3)
+  state             RouteReversalState   @default(CREATED)
+  providerState     String?              @map("provider_state") @db.VarChar(100)
+  diagnosticPayload Json?                @map("diagnostic_payload")
+  initiatedAt       DateTime             @default(now()) @map("initiated_at")
+  processedAt       DateTime?            @map("processed_at")
+  failedAt          DateTime?            @map("failed_at")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+
+  @@index([transferAttemptId, state, createdAt])
+  @@map("route_transfer_reversals")
+}
+
+model RouteWebhookReceipt {
+  id               String   @id @default(uuid()) @map("webhook_receipt_id")
+  eventIdentity    String   @unique @map("event_identity")
+  eventType        String   @map("event_type") @db.VarChar(120)
+  payloadHash      String   @map("payload_hash") @db.VarChar(64)
+  providerObjectId String?  @map("provider_object_id")
+  processedAt      DateTime @default(now()) @map("processed_at")
+
+  @@index([providerObjectId, processedAt])
+  @@map("route_webhook_receipts")
+}
+
+model SecurityEvent {
+  id         String            @id @default(uuid())
+  userId     String?           @map("user_id")
+  user       User?             @relation("SecurityEventSubject", fields: [userId], references: [id], onDelete: SetNull)
+  sessionId  String?           @map("session_id")
+  type       SecurityEventType
+  outcome    String            @default("SUCCESS") @db.VarChar(50)
+  reasonCode String?           @map("reason_code") @db.VarChar(100)
+  context    Json?
+  createdAt  DateTime          @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+  @@map("security_events")
+}
+
+model UserAuthMethod {
+  id                      String         @id @default(uuid())
+  userId                  String         @map("user_id")
+  user                    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type                    AuthMethodType
+  credentialHash          String?        @map("credential_hash") @db.Text
+  providerSubjectId       String?        @unique @map("provider_subject_id") @db.VarChar(255)
+  providerEmailNormalized String?        @map("provider_email_normalized") @db.VarChar(320)
+  verifiedAt              DateTime       @default(now()) @map("verified_at")
+  disabledAt              DateTime?      @map("disabled_at")
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
+
+  @@unique([userId, type])
+  @@index([type, providerEmailNormalized])
+  @@map("user_auth_methods")
+}
+
+model UserBrandNotificationPreference {
+  id                   String                       @id @default(uuid())
+  brandProfileId       String                       @map("brand_profile_id")
+  brandProfile         BrandProfile                 @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  userId               String                       @map("user_id")
+  user                 User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category             SettingsNotificationCategory
+  optionalEmailEnabled Boolean                      @default(true) @map("optional_email_enabled")
+  createdAt            DateTime                     @default(now()) @map("created_at")
+  updatedAt            DateTime                     @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, userId, category])
+  @@index([userId, brandProfileId])
+  @@map("user_brand_notification_preferences")
 }

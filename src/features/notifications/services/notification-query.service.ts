@@ -36,7 +36,9 @@ export class NotificationQueryService {
       notifications: rows.map((row) => ({
         id: row.notification.id,
         event_type: row.notification.eventType,
+        category: row.notification.category,
         urgency_level: row.notification.urgencyLevel,
+        actionable: row.notification.actionable,
         payload: row.notification.payload,
         created_at: row.notification.createdAt.toISOString(),
         is_read: row.isRead,
@@ -61,7 +63,7 @@ export class NotificationQueryService {
     return { unread_count: count };
   }
 
-  async markRead(user: AuthUser, notificationId: string, isRead: boolean) {
+  async markRead(user: AuthUser, notificationId: string) {
     const { brandProfileId, userId } =
       await this.access.resolveBrandWorkspace(user);
 
@@ -77,13 +79,12 @@ export class NotificationQueryService {
       throw new NotFoundException("Notification not found");
     }
 
-    const updated = await this.prisma.notificationRecipient.update({
-      where: { id: recipient.id },
-      data: {
-        isRead,
-        readAt: isRead ? new Date() : null,
-      },
-    });
+    const updated = recipient.isRead
+      ? recipient
+      : await this.prisma.notificationRecipient.update({
+          where: { id: recipient.id },
+          data: { isRead: true, readAt: new Date() },
+        });
 
     return {
       notification_id: notificationId,

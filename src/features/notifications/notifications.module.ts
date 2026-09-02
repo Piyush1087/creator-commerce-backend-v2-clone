@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 import { ScheduleModule } from "@nestjs/schedule";
 
 import { MailModule } from "../../mail/mail.module";
@@ -11,13 +11,15 @@ import { NotificationDispatchService } from "./services/notification-dispatch.se
 import { NotificationProcessorService } from "./services/notification-processor.service";
 import { NotificationQueryService } from "./services/notification-query.service";
 import { NotificationWorkerService } from "./services/notification-worker.service";
+import { NotificationEmailWorkerService } from "./services/notification-email-worker.service";
+import { NotificationRecipientPolicyService } from "./services/notification-recipient-policy.service";
 
 @Module({
   imports: [
     ScheduleModule,
     MailModule,
     BrandCentreModule,
-    BrandSettingsModule,
+    forwardRef(() => BrandSettingsModule),
   ],
   controllers: [NotificationsController],
   providers: [
@@ -26,6 +28,8 @@ import { NotificationWorkerService } from "./services/notification-worker.servic
     NotificationProcessorService,
     NotificationChannelService,
     NotificationWorkerService,
+    NotificationEmailWorkerService,
+    NotificationRecipientPolicyService,
     NotificationQueryService,
   ],
   exports: [NotificationDispatchService, NotificationProcessorService],

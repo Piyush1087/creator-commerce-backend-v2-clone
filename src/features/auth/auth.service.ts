@@ -1,231 +1,168 @@
 import {
-  BadRequestException,
-  ConflictException,
+  GoneException,
   Injectable,
   NotFoundException,
+  HttpException,
+  HttpStatus,
   UnauthorizedException,
 } from "@nestjs/common";
-import { JwtService } from "@nestjs/jwt";
-import { PlanType, SubscriptionStatus, UserRole } from "@prisma/client";
+import { AuthMethodType, EmailOtpPurpose, UserAuthState } from "@prisma/client";
+import { createHash } from "node:crypto";
 
 import { PrismaService } from "../../prisma/prisma.service";
 import {
   hashPassword,
+  hashPasswordAsync,
   verifyPassword,
+  verifyPasswordAsync,
 } from "../../shared/crypto/password.util";
-import { emailLocalPart } from "../brand-onboarding/verification/brand-verification-email.util";
-import { JWT_EXPIRES_IN } from "./auth-jwt.config";
-import { CompleteBrandRegistrationDto } from "./dto/complete-brand-registration.dto";
-import { BRAND_LOGIN_STUB_OTP, LoginDto } from "./dto/login.dto";
-import type { AuthUser, JwtPayload } from "./types/auth-user";
+import { normalizeEmail } from "../../shared/identity/normalize-email";
+import {
+  AuthSessionService,
+  type SessionIssueResult,
+} from "./auth-session.service";
+import { LoginDto } from "./dto/login.dto";
+import { EmailOtpService } from "./email-otp.service";
+import type { AuthUser } from "./types/auth-user";
 
-export type AuthTokenResponse = {
-  accessToken: string;
-  user: AuthUser;
-};
-
-export type CompleteBrandRegistrationResponse = AuthTokenResponse & {
-  brandProfileId: string;
-  organizationId: string;
-};
+export type AuthTokenResponse = SessionIssueResult;
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly jwtService: JwtService,
+    private readonly sessions: AuthSessionService,
+    private readonly emailOtp: EmailOtpService,
   ) {}
 
-  private assignPlanAtRegistration(planStartedAt: Date | null): {
-    planType: PlanType;
-    subscriptionStatus: SubscriptionStatus;
-    planStartedAt?: Date;
-  } {
-    const data = {
-      planType: PlanType.FREE_TRIAL,
-      subscriptionStatus: SubscriptionStatus.TRIALING,
-    };
-    if (!planStartedAt) {
-      return { ...data, planStartedAt: new Date() };
-    }
-    return data;
-  }
-
   async login(dto: LoginDto): Promise<AuthTokenResponse> {
-    const email = dto.email.trim().toLowerCase();
+    const normalizedEmail = normalizeEmail(dto.email);
+    await this.assertNotThrottled(normalizedEmail, "PASSWORD_LOGIN");
     const user = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException("No account found for this email.");
-    }
-
-    if (user.role !== UserRole.BRAND && user.role !== UserRole.CREATOR) {
-      throw new BadRequestException(
-        "This account type cannot sign in through the app yet.",
-      );
-    }
-
-    if (dto.role && dto.role !== user.role) {
-      throw new UnauthorizedException(
-        `This email is registered as ${user.role.toLowerCase()}, not ${dto.role.toLowerCase()}.`,
-      );
-    }
-
-    if (dto.password) {
-      if (user.role !== UserRole.CREATOR && user.role !== UserRole.BRAND) {
-        throw new BadRequestException(
-          "Password sign-in is not available for this account type.",
-        );
-      }
-      if (!user.hashedPassword) {
-        throw new UnauthorizedException(
-          "This account uses Google or OTP sign-in. Try those instead.",
-        );
-      }
-      if (!this.verifyPassword(dto.password, user.hashedPassword)) {
-        throw new UnauthorizedException("Invalid email or password.");
-      }
-      return {
-        accessToken: await this.signToken(user),
-        user: this.toAuthUser(user),
-      };
-    }
-
-    if (!dto.otp) {
-      throw new BadRequestException("Provide an OTP or password.");
-    }
-
-    if (dto.otp !== BRAND_LOGIN_STUB_OTP) {
-      throw new UnauthorizedException("Invalid verification code.");
-    }
-
-    return {
-      accessToken: await this.signToken(user),
-      user: this.toAuthUser(user),
-    };
-  }
-
-  async completeBrandRegistration(
-    dto: CompleteBrandRegistrationDto,
-  ): Promise<CompleteBrandRegistrationResponse> {
-    const profile = await this.prisma.brandProfile.findUnique({
-      where: { id: dto.brandProfileId },
-      select: {
-        id: true,
-        name: true,
-        domain: true,
-        isVerified: true,
-        verificationEmail: true,
-        organizationId: true,
-        planStartedAt: true,
+      where: { normalizedEmail },
+      include: {
+        authMethods: {
+          where: { type: AuthMethodType.PASSWORD, disabledAt: null },
+        },
       },
     });
-
-    if (!profile) {
-      throw new NotFoundException("Brand profile not found.");
+    const credentialHash = user?.authMethods[0]?.credentialHash;
+    const valid = credentialHash
+      ? await verifyPasswordAsync(dto.password, credentialHash)
+      : await this.performDummyPasswordWork(dto.password);
+    if (
+      !user ||
+      !credentialHash ||
+      !valid ||
+      user.authState !== UserAuthState.ACTIVE
+    ) {
+      await this.recordFailure(normalizedEmail, "PASSWORD_LOGIN");
+      throw new UnauthorizedException("Invalid email or password.");
     }
-
-    if (!profile.isVerified || !profile.verificationEmail) {
-      throw new BadRequestException(
-        "Verify your work email before starting your trial.",
-      );
-    }
-
-    const email = profile.verificationEmail.trim().toLowerCase();
-
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email },
-    });
-    if (existingUser) {
-      if (existingUser.role !== UserRole.BRAND) {
-        throw new ConflictException(
-          "This email cannot be used for a brand account.",
-        );
-      }
-      let organizationId =
-        profile.organizationId ?? existingUser.organizationId;
-      if (!profile.organizationId && existingUser.organizationId) {
-        await this.prisma.brandProfile.update({
-          where: { id: profile.id },
-          data: {
-            organizationId: existingUser.organizationId,
-            ...this.assignPlanAtRegistration(profile.planStartedAt),
-          },
-        });
-        organizationId = existingUser.organizationId;
-      } else {
-        await this.prisma.brandProfile.update({
-          where: { id: profile.id },
-          data: {
-            ...this.assignPlanAtRegistration(profile.planStartedAt),
-          },
-        });
-      }
-      await this.markDiscoverySignupCompleted(profile.domain);
-      return {
-        accessToken: await this.signToken(existingUser),
-        user: this.toAuthUser(existingUser),
-        brandProfileId: profile.id,
-        organizationId: organizationId ?? "",
-      };
-    }
-
-    if (profile.organizationId) {
-      throw new ConflictException(
-        "This brand is already registered. Please sign in.",
-      );
-    }
-
-    const adminEmail = await this.findClaimedOrganizationContact(
-      profile.domain,
-    );
-    if (adminEmail) {
-      throw new ConflictException(
-        "This brand domain is already set up. Ask your organization admin for an invitation to join the team.",
-      );
-    }
-
-    const displayName = emailLocalPart(email);
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      const organization = await tx.organization.create({
-        data: { name: profile.name },
-      });
-
-      const user = await tx.user.create({
-        data: {
-          email,
-          name: displayName,
-          role: UserRole.BRAND,
-          organizationId: organization.id,
-        },
-      });
-
-      await tx.brandProfile.update({
-        where: { id: profile.id },
-        data: {
-          organizationId: organization.id,
-          ...this.assignPlanAtRegistration(profile.planStartedAt),
-        },
-      });
-
-      return { organization, user };
-    });
-
-    await this.markDiscoverySignupCompleted(profile.domain);
-
-    return {
-      accessToken: await this.signToken(result.user),
-      user: this.toAuthUser(result.user),
-      brandProfileId: profile.id,
-      organizationId: result.organization.id,
-    };
+    await this.clearThrottle(normalizedEmail, "PASSWORD_LOGIN");
+    return this.sessions.create(user.id);
   }
 
-  getMe(user: AuthUser): AuthUser {
-    return user;
+  async requestLoginOtp(email: string): Promise<{ message: string }> {
+    const normalizedEmail = normalizeEmail(email);
+    const user = await this.prisma.user.findUnique({
+      where: { normalizedEmail },
+    });
+    try {
+      await this.emailOtp.issue({
+        email: normalizedEmail,
+        purpose: EmailOtpPurpose.LOGIN,
+        eligible: user?.authState === UserAuthState.ACTIVE,
+        displayName: user?.name ?? undefined,
+        userId: user?.id,
+      });
+    } catch {
+      // Public response is deliberately identical for unknown, suppressed,
+      // rejected and ambiguous-delivery recipients.
+    }
+    return { message: "If an eligible account exists, a code has been sent." };
+  }
+
+  async loginWithOtp(email: string, code: string): Promise<AuthTokenResponse> {
+    const normalizedEmail = normalizeEmail(email);
+    const user = await this.prisma.user.findUnique({
+      where: { normalizedEmail },
+    });
+    if (!user || user.authState !== UserAuthState.ACTIVE) {
+      throw new UnauthorizedException("Invalid or expired verification code.");
+    }
+    await this.emailOtp.consume({
+      email: normalizedEmail,
+      purpose: EmailOtpPurpose.LOGIN,
+      code,
+      userId: user.id,
+    });
+    await this.prisma.userAuthMethod.upsert({
+      where: {
+        userId_type: { userId: user.id, type: AuthMethodType.EMAIL_OTP },
+      },
+      create: { userId: user.id, type: AuthMethodType.EMAIL_OTP },
+      update: { verifiedAt: new Date(), disabledAt: null },
+    });
+    return this.sessions.create(user.id);
+  }
+
+  async completeBrandRegistration(): Promise<never> {
+    throw new GoneException(
+      "This registration endpoint has been retired. Complete verified onboarding instead.",
+    );
+  }
+
+  async getMe(authUser: AuthUser) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: authUser.id },
+      include: {
+        authMethods: {
+          where: { disabledAt: null },
+          select: { type: true, verifiedAt: true },
+        },
+        creatorProfile: {
+          select: {
+            id: true,
+            displayName: true,
+            ownedWorkspaces: {
+              select: { id: true, organizationDisplayName: true },
+            },
+          },
+        },
+        brandTeamMemberships: {
+          where: { isActive: true },
+          select: { brandProfileId: true, role: true, isActive: true },
+        },
+      },
+    });
+    if (!user || user.authState !== UserAuthState.ACTIVE) {
+      throw new UnauthorizedException("Session is not active.");
+    }
+    const session = authUser.sessionId
+      ? await this.prisma.authSession.findUnique({
+          where: { id: authUser.sessionId },
+          select: {
+            id: true,
+            createdAt: true,
+            lastUsedAt: true,
+            absoluteExpiresAt: true,
+            revokedAt: true,
+          },
+        })
+      : null;
+    return {
+      id: user.id,
+      sessionId: authUser.sessionId,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      authState: user.authState,
+      authMethods: user.authMethods,
+      creatorProfile: user.creatorProfile,
+      brandMemberships: user.brandTeamMemberships,
+      session,
+    };
   }
 
   hashPassword(plain: string): string {
@@ -238,83 +175,65 @@ export class AuthService {
 
   async issueTokenForUserId(userId: string): Promise<AuthTokenResponse> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      throw new NotFoundException("User not found.");
-    }
-    return {
-      accessToken: await this.signToken(user),
-      user: this.toAuthUser(user),
-    };
+    if (!user) throw new NotFoundException("User not found.");
+    return this.sessions.create(user.id);
   }
 
-  private async signToken(user: {
-    id: string;
-    email: string;
-    name: string | null;
-    role: UserRole;
-    organizationId: string | null;
-  }): Promise<string> {
-    const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      organizationId: user.organizationId,
-    };
-    return this.jwtService.signAsync(payload, {
-      expiresIn: JWT_EXPIRES_IN as `${number}${"s" | "m" | "h" | "d"}`,
-    });
+  async issueTokenForUser(user: { id: string }): Promise<AuthTokenResponse> {
+    return this.sessions.create(user.id);
   }
 
-  private toAuthUser(user: {
-    id: string;
-    email: string;
-    name: string | null;
-    role: UserRole;
-    organizationId: string | null;
-  }): AuthUser {
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      organizationId: user.organizationId,
-    };
+  private async performDummyPasswordWork(password: string): Promise<boolean> {
+    await hashPasswordAsync(password);
+    return false;
   }
 
-  /** Marks Step 1 discovery cache rows complete after brand signup. */
-  private async markDiscoverySignupCompleted(domain: string): Promise<void> {
-    const host = domain.trim().toLowerCase().replace(/^www\./, "");
-    if (!host) {
-      return;
-    }
-    const variants = [`https://${host}`, `https://www.${host}`];
-    await this.prisma.discoveryLead.updateMany({
-      where: { normalizedUrl: { in: variants } },
-      data: { signupCompleted: true },
-    });
+  private throttleDigest(email: string): string {
+    return createHash("sha256").update(email).digest("hex");
   }
 
-  private async findClaimedOrganizationContact(
-    domain: string,
-  ): Promise<string | null> {
-    const profile = await this.prisma.brandProfile.findFirst({
+  private async assertNotThrottled(email: string, kind: string): Promise<void> {
+    const throttle = await this.prisma.authThrottle.findUnique({
       where: {
-        OR: [{ domain }, { domain: domain.replace(/^www\./, "") }],
-      },
-      select: {
-        isVerified: true,
-        organizationId: true,
+        identifierDigest_kind: {
+          identifierDigest: this.throttleDigest(email),
+          kind,
+        },
       },
     });
-    if (!profile?.organizationId || !profile.isVerified) {
-      return null;
+    if (throttle?.blockedUntil && throttle.blockedUntil > new Date()) {
+      throw new HttpException("Try again later.", HttpStatus.TOO_MANY_REQUESTS);
     }
-    const user = await this.prisma.user.findFirst({
-      where: { organizationId: profile.organizationId },
-      orderBy: { createdAt: "asc" },
-      select: { email: true },
+  }
+
+  private async recordFailure(email: string, kind: string): Promise<void> {
+    const identifierDigest = this.throttleDigest(email);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`${kind}:${identifierDigest}`}, 0))::text`;
+      const existing = await tx.authThrottle.findUnique({
+        where: { identifierDigest_kind: { identifierDigest, kind } },
+      });
+      const now = new Date();
+      const inWindow =
+        existing &&
+        now.getTime() - existing.windowStartedAt.getTime() < 15 * 60_000;
+      const failures = inWindow ? existing.failureCount + 1 : 1;
+      await tx.authThrottle.upsert({
+        where: { identifierDigest_kind: { identifierDigest, kind } },
+        create: { identifierDigest, kind, failureCount: 1 },
+        update: {
+          failureCount: failures,
+          windowStartedAt: inWindow ? existing.windowStartedAt : now,
+          blockedUntil:
+            failures >= 5 ? new Date(now.getTime() + 15 * 60_000) : null,
+        },
+      });
     });
-    return user?.email ?? null;
+  }
+
+  private async clearThrottle(email: string, kind: string): Promise<void> {
+    await this.prisma.authThrottle.deleteMany({
+      where: { identifierDigest: this.throttleDigest(email), kind },
+    });
   }
 }

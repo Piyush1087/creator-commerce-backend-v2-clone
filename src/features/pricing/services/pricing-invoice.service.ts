@@ -3,20 +3,26 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import type { BrandBillingInvoice } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { RazorpayInvoiceEntity } from "../types/razorpay-invoice.types";
 import type { BillingInvoiceView } from "../types/pricing-invoice.types";
 import { PricingRazorpayClient } from "./pricing-razorpay.client";
+import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
+import { runNotificationTransaction } from "../../notifications/services/notification-transaction";
 
 @Injectable()
 export class PricingInvoiceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly razorpay: PricingRazorpayClient,
+    private readonly notifications: NotificationDispatchService,
   ) {}
 
-  async listInvoicesForBrand(brandProfileId: string): Promise<BillingInvoiceView[]> {
+  async listInvoicesForBrand(
+    brandProfileId: string,
+  ): Promise<BillingInvoiceView[]> {
     const subscription = await this.prisma.brandSubscription.findUnique({
       where: { brandProfileId },
     });
@@ -28,10 +34,23 @@ export class PricingInvoiceService {
     const invoices = await this.razorpay.listSubscriptionInvoices(
       subscription.razorpaySubscriptionId,
     );
+    const persisted = await this.prisma.brandBillingInvoice.findMany({
+      where: {
+        brandProfileId,
+        razorpayInvoiceId: { in: invoices.map((invoice) => invoice.id) },
+      },
+    });
+    const persistedByProviderId = new Map(
+      persisted.map((invoice) => [invoice.razorpayInvoiceId, invoice]),
+    );
 
     return invoices
       .map((invoice) =>
-        this.mapRazorpayInvoice(invoice, subscription.currency),
+        this.mapRazorpayInvoice(
+          invoice,
+          subscription.currency,
+          persistedByProviderId.get(invoice.id) ?? null,
+        ),
       )
       .sort((left, right) => {
         const leftTime = left.paidAt ?? left.issuedAt ?? "";
@@ -44,23 +63,32 @@ export class PricingInvoiceService {
     brandProfileId: string,
     razorpayInvoiceId: string,
   ): Promise<BillingInvoiceView> {
-    const subscription = await this.requireRazorpayBackedSubscription(brandProfileId);
+    const subscription =
+      await this.requireRazorpayBackedSubscription(brandProfileId);
     const invoice = await this.razorpay.fetchInvoice(razorpayInvoiceId);
 
     if (invoice.subscription_id !== subscription.razorpaySubscriptionId) {
       throw new NotFoundException("Invoice not found for this brand");
     }
 
-    return this.mapRazorpayInvoice(invoice, subscription.currency);
+    const persisted = await this.prisma.brandBillingInvoice.findUnique({
+      where: { razorpayInvoiceId },
+    });
+    return this.mapRazorpayInvoice(invoice, subscription.currency, persisted);
   }
 
   async resolveInvoiceViewUrl(
     brandProfileId: string,
     razorpayInvoiceId: string,
   ): Promise<string> {
-    const invoice = await this.getInvoiceForBrand(brandProfileId, razorpayInvoiceId);
+    const invoice = await this.getInvoiceForBrand(
+      brandProfileId,
+      razorpayInvoiceId,
+    );
     if (!invoice.shortUrl) {
-      throw new NotFoundException("Invoice view link is not available from Razorpay");
+      throw new NotFoundException(
+        "Invoice view link is not available from Razorpay",
+      );
     }
     return invoice.shortUrl;
   }
@@ -75,7 +103,10 @@ export class PricingInvoiceService {
   ) {
     const invoice = await this.razorpay.fetchInvoice(razorpayInvoiceId);
 
-    if (invoice.subscription_id && invoice.subscription_id !== razorpaySubscriptionId) {
+    if (
+      invoice.subscription_id &&
+      invoice.subscription_id !== razorpaySubscriptionId
+    ) {
       throw new BadRequestException(
         "Invoice subscription id does not match the active brand subscription",
       );
@@ -103,40 +134,82 @@ export class PricingInvoiceService {
     const currency =
       invoice.currency && invoice.currency.length > 0
         ? invoice.currency
-        : input.fallbackCurrency ?? "USD";
+        : (input.fallbackCurrency ?? "USD");
+    const issuedAt = this.epochToDate(invoice.issued_at);
+    return runNotificationTransaction(this.prisma, async (tx) => {
+      const existing = await tx.brandBillingInvoice.findUnique({
+        where: { razorpayInvoiceId: invoice.id },
+        select: { billingProfileVersionId: true },
+      });
+      const version =
+        !existing?.billingProfileVersionId && issuedAt
+          ? await tx.brandBillingProfileVersion.findFirst({
+              where: {
+                brandProfileId: input.brandProfileId,
+                effectiveFrom: { lte: issuedAt },
+              },
+              orderBy: { effectiveFrom: "desc" },
+            })
+          : null;
+      const snapshot = version
+        ? {
+            billingProfileVersionId: version.id,
+            billingLegalEntityName: version.legalEntityName,
+            billingLegalEntityType: version.legalEntityType,
+            billingCountryCode: version.billingCountryCode,
+            billingAddress: version.billingAddress,
+            billingGstin: version.gstin,
+          }
+        : {};
 
-    return this.prisma.brandBillingInvoice.upsert({
-      where: { razorpayInvoiceId: invoice.id },
-      create: {
-        brandProfileId: input.brandProfileId,
-        brandSubscriptionId: input.brandSubscriptionId,
-        razorpayInvoiceId: invoice.id,
-        razorpaySubscriptionId: input.razorpaySubscriptionId,
-        razorpayPaymentId: input.razorpayPaymentId ?? invoice.payment_id ?? null,
-        shortUrl: invoice.short_url ?? null,
-        status: invoice.status ?? "issued",
-        amount: invoice.amount ?? 0,
-        amountPaid: invoice.amount_paid ?? 0,
-        currency,
-        invoiceNumber: invoice.invoice_number ?? null,
-        paidAt: this.epochToDate(invoice.paid_at),
-        billingPeriodStart: this.epochToDate(invoice.billing_start),
-        billingPeriodEnd: this.epochToDate(invoice.billing_end),
-        issuedAt: this.epochToDate(invoice.issued_at),
-      },
-      update: {
-        razorpayPaymentId: input.razorpayPaymentId ?? invoice.payment_id ?? null,
-        shortUrl: invoice.short_url ?? null,
-        status: invoice.status ?? "issued",
-        amount: invoice.amount ?? 0,
-        amountPaid: invoice.amount_paid ?? 0,
-        currency,
-        invoiceNumber: invoice.invoice_number ?? null,
-        paidAt: this.epochToDate(invoice.paid_at),
-        billingPeriodStart: this.epochToDate(invoice.billing_start),
-        billingPeriodEnd: this.epochToDate(invoice.billing_end),
-        issuedAt: this.epochToDate(invoice.issued_at),
-      },
+      const persisted = await tx.brandBillingInvoice.upsert({
+        where: { razorpayInvoiceId: invoice.id },
+        create: {
+          brandProfileId: input.brandProfileId,
+          brandSubscriptionId: input.brandSubscriptionId,
+          razorpayInvoiceId: invoice.id,
+          razorpaySubscriptionId: input.razorpaySubscriptionId,
+          razorpayPaymentId:
+            input.razorpayPaymentId ?? invoice.payment_id ?? null,
+          shortUrl: invoice.short_url ?? null,
+          status: invoice.status ?? "issued",
+          amount: invoice.amount ?? 0,
+          amountPaid: invoice.amount_paid ?? 0,
+          currency,
+          invoiceNumber: invoice.invoice_number ?? null,
+          paidAt: this.epochToDate(invoice.paid_at),
+          billingPeriodStart: this.epochToDate(invoice.billing_start),
+          billingPeriodEnd: this.epochToDate(invoice.billing_end),
+          issuedAt,
+          ...snapshot,
+        },
+        update: {
+          razorpayPaymentId:
+            input.razorpayPaymentId ?? invoice.payment_id ?? null,
+          shortUrl: invoice.short_url ?? null,
+          status: invoice.status ?? "issued",
+          amount: invoice.amount ?? 0,
+          amountPaid: invoice.amount_paid ?? 0,
+          currency,
+          invoiceNumber: invoice.invoice_number ?? null,
+          paidAt: this.epochToDate(invoice.paid_at),
+          billingPeriodStart: this.epochToDate(invoice.billing_start),
+          billingPeriodEnd: this.epochToDate(invoice.billing_end),
+          issuedAt,
+          ...snapshot,
+        },
+      });
+      await this.notifications?.enqueueWithinTransaction(tx, {
+        workspaceId: input.brandProfileId,
+        eventType: "billing.invoice_ready",
+        source: {
+          sourceType: "billing_invoice",
+          sourceId: persisted.id,
+          transitionId: "ready",
+        },
+        payload: { invoice_id: persisted.id, provider_invoice_id: invoice.id },
+      });
+      return persisted;
     });
   }
 
@@ -157,6 +230,7 @@ export class PricingInvoiceService {
   private mapRazorpayInvoice(
     invoice: RazorpayInvoiceEntity,
     fallbackCurrency: string,
+    persisted: BrandBillingInvoice | null,
   ): BillingInvoiceView {
     const currency =
       invoice.currency && invoice.currency.length > 0
@@ -177,10 +251,28 @@ export class PricingInvoiceService {
       issuedAt: this.epochToIso(invoice.issued_at),
       billingPeriodStart: this.epochToIso(invoice.billing_start),
       billingPeriodEnd: this.epochToIso(invoice.billing_end),
+      billingIdentity:
+        persisted?.billingProfileVersionId &&
+        persisted.billingLegalEntityName &&
+        persisted.billingAddress
+          ? {
+              legalEntityName: persisted.billingLegalEntityName,
+              legalEntityType: persisted.billingLegalEntityType,
+              billingCountryCode: persisted.billingCountryCode,
+              billingAddress: persisted.billingAddress,
+              gstin: persisted.billingGstin,
+            }
+          : null,
+      historicalBillingIdentityAvailable: Boolean(
+        persisted?.billingProfileVersionId &&
+        persisted.billingLegalEntityName &&
+        persisted.billingAddress,
+      ),
       lineItems: (invoice.line_items ?? []).map((item) => ({
         name: item.name ?? "Subscription charge",
         amount: item.amount ?? 0,
-        currency: item.currency && item.currency.length > 0 ? item.currency : currency,
+        currency:
+          item.currency && item.currency.length > 0 ? item.currency : currency,
       })),
     };
   }

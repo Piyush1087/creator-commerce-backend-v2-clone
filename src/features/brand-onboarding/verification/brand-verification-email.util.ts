@@ -42,15 +42,34 @@ export function emailDomainFromAddress(email: string): string {
   return normalized.slice(at + 1).replace(/^www\./, "");
 }
 
+export function normalizeBrandDomain(domain: string): string {
+  return domain
+    .trim()
+    .toLowerCase()
+    .replace(/^www\./, "");
+}
+
+export function isSafeBrandDomainAuthority(domain: string): boolean {
+  const normalized = normalizeBrandDomain(domain);
+  if (!normalized || normalized.length > 253 || !normalized.includes(".")) {
+    return false;
+  }
+  return normalized
+    .split(".")
+    .every(
+      (label) =>
+        label.length > 0 &&
+        label.length <= 63 &&
+        /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label),
+    );
+}
+
 export function emailDomainMatchesBrandDomain(
   email: string,
   brandDomain: string,
 ): boolean {
   const emailHost = emailDomainFromAddress(email);
-  const site = brandDomain
-    .trim()
-    .toLowerCase()
-    .replace(/^www\./, "");
+  const site = normalizeBrandDomain(brandDomain);
   if (!emailHost || !site) {
     return false;
   }

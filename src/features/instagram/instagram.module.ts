@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 
 import { AuthModule } from "../auth/auth.module";
 import { CreatorSettingsModule } from "../creator-settings/creator-settings.module";
@@ -9,7 +9,7 @@ import { InstagramGraphClient } from "./instagram-graph.client";
 import { InstagramOAuthClient } from "./instagram-oauth.client";
 
 @Module({
-  imports: [PrismaModule, AuthModule, CreatorSettingsModule],
+  imports: [PrismaModule, AuthModule, forwardRef(() => CreatorSettingsModule)],
   controllers: [InstagramConnectController],
   providers: [
     InstagramConnectService,
