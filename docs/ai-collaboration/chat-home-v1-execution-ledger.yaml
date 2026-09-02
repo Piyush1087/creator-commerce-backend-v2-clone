@@ -675,5 +675,107 @@ p3_checkpoint:
   systems_review: PENDING
   target_gate: P3_BACKEND_FIRST_CHAT_SLICE_ACCEPTED
 
+runtime_corrections:
+  - id: P4_HUMAN_GATE_BACKEND_STARTUP_01
+    discovered_during: P4_HUMAN_E2E_GATE
+    classification: PRE_EXISTING_ACTIVE_BASELINE_MODULE_WIRING_RUNTIME_DEFECT
+    resolution_classification: BOUNDED_MODULE_BOUNDARY_RECONCILIATION
+    introduced_by_p3: false
+    starting_committed_sha: 93aa0c2da61b41415561d7f435c5c062c8b59a51
+    correction_sha: SELF_COMMIT_CONTAINING_THIS_LEDGER
+    diagnostic:
+      original_scc_size: 8
+      original_scc:
+        - BrandCentreModule
+        - BrandIntelligenceModule
+        - NotificationsModule
+        - BrandSettingsModule
+        - InstagramModule
+        - CreatorSettingsModule
+        - BrandEscrowModule
+        - PricingModule
+      residual_scc_size: 4
+      residual_scc:
+        - BrandCentreModule
+        - BrandIntelligenceModule
+        - NotificationsModule
+        - BrandSettingsModule
+    narrow_boundaries:
+      creator_payout_profile:
+        source_pattern: C05_ACCEPTED
+        module: CreatorPayoutProfileModule
+        single_provider_owner: true
+      instagram_provider_clients:
+        source_pattern: C05_ACCEPTED
+        module: InstagramProviderClientModule
+        oauth_client_single_provider_owner: true
+        graph_client_single_provider_owner: true
+    forward_refs:
+      required:
+        - NotificationsModule -> BrandCentreModule
+        - BrandSettingsModule -> BrandCentreModule
+      preserved_existing:
+        - NotificationsModule -> BrandSettingsModule
+        - BrandSettingsModule -> NotificationsModule
+      rejected_experimental:
+        - BrandEscrowModule -> BrandCentreModule
+        - PricingModule -> BrandCentreModule
+      unexpected_added: false
+    semantic_change:
+      product: false
+      intelligence: false
+      chat: false
+      settings: false
+      escrow: false
+      pricing: false
+      notifications: false
+      instagram_provider: false
+      creator_settings: false
+      campaign: false
+      collaboration: false
+      authorization_policy: false
+    schema_change: false
+    migration_required: false
+    migrations_applied: 66
+    startup:
+      database_classification: LOCAL_DISPOSABLE
+      run_1: PASS
+      run_2: PASS
+      health: PASS
+      health_http_status: 200
+      health_database_status: up
+      scratch_canonical_differential: NONE
+    validation:
+      wiring_test:
+        status: PASS
+        passed: 3
+        failed: 0
+        skipped: 0
+      standard_full_suite:
+        status: PASS
+        attempts: 1
+        passed: 1088
+        failed: 0
+        skipped: 488
+      known_notification_p2002_variance_observed: true
+      prisma_generate: PASS
+      prisma_validate: PASS
+      intelligence_contracts_verify: PASS
+      backend_build: PASS
+      git_diff_check: PASS
+
+future_architecture_debt:
+  - id: BRAND_WORKSPACE_ACCESS_BOUNDARY_COUPLED_TO_BRAND_CENTRE
+    status: NONBLOCKING_FOR_P4
+    description: Notifications, Brand Settings, Escrow, Pricing, Campaign, and Collaboration consume Brand workspace/auth through BrandCentreModule; extraction is not semantics-free because BrandCentreAuthService also performs Brand Centre session activity and eviction.
+  - id: NOTIFICATION_ACCESS_COUPLED_TO_BRAND_SETTINGS
+    status: NONBLOCKING_FOR_P4
+  - id: LEGACY_INSTAGRAM_CREATOR_SETTINGS_COUPLING
+    status: NONBLOCKING_FOR_P4
+  - id: CAMPAIGN_COLLABORATION_SHARED_ACCESS_BOUNDARY
+    status: NONBLOCKING_FOR_P4
+  - id: PRICING_BRAND_SETTINGS_BILLING_READINESS_COUPLING
+    status: LEGITIMATE_CURRENTLY_ACYCLIC
+
 breaker: NONE
 next_phase: P3_SYSTEMS_REVIEW
