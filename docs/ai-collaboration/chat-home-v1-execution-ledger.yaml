@@ -671,9 +671,9 @@ p3_semantic_differential:
 p3_checkpoint:
   offering_discovery_integration_sha: 1fa5f34f72782b142244e3e8ff0395ae03ff574b
   implementation_sha: 3c5f5eb8a95ee15901838676e57f1a66118e7c36
-  final_checkpoint_sha: SELF_COMMIT_CONTAINING_THIS_LEDGER
-  systems_review: PENDING
-  target_gate: P3_BACKEND_FIRST_CHAT_SLICE_ACCEPTED
+  final_checkpoint_sha: 93aa0c2da61b41415561d7f435c5c062c8b59a51
+  systems_review: ACCEPTED
+  accepted_gate: P3_BACKEND_FIRST_CHAT_SLICE_ACCEPTED
 
 runtime_corrections:
   - id: P4_HUMAN_GATE_BACKEND_STARTUP_01
@@ -682,7 +682,9 @@ runtime_corrections:
     resolution_classification: BOUNDED_MODULE_BOUNDARY_RECONCILIATION
     introduced_by_p3: false
     starting_committed_sha: 93aa0c2da61b41415561d7f435c5c062c8b59a51
-    correction_sha: SELF_COMMIT_CONTAINING_THIS_LEDGER
+    correction_sha: 6683c83d86172273d71923d1cf11da392da29368
+    systems_review: ACCEPTED
+    accepted_gate: P4_BACKEND_RUNTIME_RECONCILIATION_ACCEPTED
     diagnostic:
       original_scc_size: 8
       original_scc:
@@ -764,6 +766,14 @@ runtime_corrections:
       backend_build: PASS
       git_diff_check: PASS
 
+p4_backend_runtime_acceptance:
+  status: ACCEPTED
+  gate: P4_BACKEND_RUNTIME_RECONCILIATION_ACCEPTED
+  runtime_sha: 6683c83d86172273d71923d1cf11da392da29368
+  frontend_checkpoint_unchanged: 20b14055017409d1d6b9d972f3a0dfccd79014a7
+  human_gate_status: READY_TO_RESUME
+  p5_authorized: false
+
 future_architecture_debt:
   - id: BRAND_WORKSPACE_ACCESS_BOUNDARY_COUPLED_TO_BRAND_CENTRE
     status: NONBLOCKING_FOR_P4
@@ -778,4 +788,4 @@ future_architecture_debt:
     status: LEGITIMATE_CURRENTLY_ACYCLIC
 
 breaker: NONE
-next_phase: P3_SYSTEMS_REVIEW
+next_phase: P4_HUMAN_E2E_GATE_RESUME
