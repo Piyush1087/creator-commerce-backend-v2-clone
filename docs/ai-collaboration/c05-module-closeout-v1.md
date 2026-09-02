@@ -2,7 +2,7 @@
 
 ## Terminal status
 
-C-05 — Creator Settings has completed Product/architecture freeze, additive foundation, four bounded implementation streams, backend/frontend convergence, joint security/runtime/responsive acceptance, normal clone `development` integration, and durable developer handoff creation.
+The C-05 program has completed Product/architecture freeze, additive foundation, four bounded implementation streams, backend/frontend convergence, joint security/runtime/responsive acceptance, normal clone integration, and durable developer handoff creation. C-05 delivered Creator Settings and the persistent authenticated Creator shell foundation.
 
 This closeout does **not** claim production deployment, production migration, persistent-data reconciliation, provider configuration, KYC/verification, payout execution, or live provider certification.
 
@@ -42,19 +42,19 @@ Published checkpoint commit SHAs are authoritative; local specialist commits are
 | P3 joint acceptance                | `156d5834266077be7e2b6a2d459bae5489edbbd6` | `323658d4b147b95b5629ff8d91fa90b8fe9077e4` | Accepted/published            |
 | P4 runtime integration             | `156d5834266077be7e2b6a2d459bae5489edbbd6` | `323658d4b147b95b5629ff8d91fa90b8fe9077e4` | Normal non-force fast-forward |
 
-P3 backend is an explicit empty checkpoint commit over the accepted P2 runtime tree. P3 frontend contains the bounded 768px Team roster responsive correction. Published trees were fetched back and matched the reviewed local trees exactly.
+`C05_P3_BACKEND_SHA = 156d5834266077be7e2b6a2d459bae5489edbbd6` is an intentional empty acceptance-marker commit over the accepted P2 runtime tree. No correction is required. Future modules may use empty acceptance-marker commits when explicitly useful for immutable checkpoint traceability; they are not mandatory. P3 frontend contains the bounded 768px Team roster responsive correction. Published trees were fetched back and matched the reviewed local trees exactly.
 
-P4 handoff documentation is on backend branch `c05/p4-closeout`, parented by the final backend runtime SHA. Its exact documentation commit SHA is recorded in the terminal Parent return because a commit cannot truthfully embed its own SHA.
+The accepted P4 handoff source is backend branch `c05/p4-closeout` at `081df33b603b0a93bae35124cb044c9f12ecfa3d`, parented by the immutable backend runtime SHA. The three documentation artifacts are canonicalized onto backend `development`; the exact final docs-inclusive SHA is recorded in the terminal Parent return because a commit cannot truthfully embed its own SHA.
 
 ---
 
-## 3. Final canonical clone development SHAs
+## 3. Immutable runtime and final clone development SHAs
 
-Backend `development`:
+Immutable backend runtime acceptance:
 
 `156d5834266077be7e2b6a2d459bae5489edbbd6`
 
-Frontend `development`:
+Immutable frontend runtime acceptance:
 
 `323658d4b147b95b5629ff8d91fa90b8fe9077e4`
 
@@ -63,7 +63,13 @@ Pre-integration heads:
 - backend `8f2a3b3acf6b48dc1d5cb4a212a26b9f0755fbbd`;
 - frontend `b50c36fd4b99b6e0ec0718291d794d7a58353f4c`.
 
-For each repository, accepted C-05 was `3` commits ahead, `0` behind, and had the exact pre-integration head as merge base. Both updates were normal non-force fast-forwards. No newer canonical work was displaced.
+Final frontend `development` remains:
+
+`323658d4b147b95b5629ff8d91fa90b8fe9077e4`
+
+Final backend `development` is a documentation-only descendant of `156d5834266077be7e2b6a2d459bae5489edbbd6`; its exact SHA is recorded in `C05_FINAL_CANONICAL_CLOSEOUT_V1`.
+
+For each runtime repository, accepted C-05 was `3` commits ahead, `0` behind, and had the exact pre-integration head as merge base. Runtime integration used normal non-force fast-forwards. The backend documentation canonicalization is also a normal non-force fast-forward. No newer canonical work was displaced.
 
 ---
 
@@ -96,7 +102,7 @@ No production or real persistent database was accessed.
 
 ## 5. Accepted architecture outcome
 
-C-05 establishes:
+The C-05 program establishes:
 
 - one persistent Aurora Creator shell;
 - Brand/shared Settings shell and Account Security reuse;
@@ -106,6 +112,8 @@ C-05 establishes:
 - six-state Instagram Settings facade over C-01 provider continuity;
 - provider-neutral encrypted payout destination and minimal legal profile;
 - compatibility adapters that preserve Owner runtime while retiring conflicting legacy authority.
+
+The persistent Creator shell is application/platform-layer frontend authority. The Creator Settings module does **not** own it; Creator Settings is one consumer mounted within the shell.
 
 The final actor contract separates authenticated actor from canonical Owner subject and excludes `associatedEmail` from authorization. Owner/Manager/Assistant Settings policy, one-Owner protection, five-seat capacity, token hashing, replay/expiry, and no-User-fabrication gates are enforced.
 
@@ -204,7 +212,7 @@ No C-03 Campaign business behavior, C-04 Collaboration/negotiation behavior, or 
 - C-04 Collaboration Team command/negotiation policy and business UX;
 - C-06 beneficiary/provider onboarding, KYC, verification, transfer, settlement, ledger/reconciliation;
 - optional Creator notification preferences;
-- MVP.v2 legal/KYC/verification and provider mapping/provisioning.
+- MVP.v2 legal/KYC verification, destination verification, and provider mapping/provisioning.
 
 ### Release/data/security
 

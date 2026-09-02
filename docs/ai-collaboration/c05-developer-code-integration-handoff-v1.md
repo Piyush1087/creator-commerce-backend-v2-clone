@@ -4,7 +4,7 @@
 
 `COMPLETE`
 
-This is the developer code-integration handoff for C-05 — Creator Settings. It transfers the accepted clone implementation and its operational constraints to the developer responsible for a later production-repository/runtime integration.
+This is the developer code-integration handoff for the C-05 program. C-05 delivered Creator Settings and the persistent authenticated Creator shell foundation. It transfers the accepted clone implementation and its operational constraints to the developer responsible for a later production-repository/runtime integration.
 
 It does **not** authorize production deployment, production or shared-database access, migration execution against persistent data, provider configuration, provider onboarding, KYC, verification, payout execution, settlement, or ledger/reconciliation work.
 
@@ -12,7 +12,7 @@ It does **not** authorize production deployment, production or shared-database a
 
 ## 1. Frozen Product behavior
 
-C-05 owns the persistent authenticated Creator shell and the canonical Creator Settings platform. It does not own Creator Home/Centre content.
+The C-05 program delivered and froze the persistent authenticated Creator shell foundation and canonical Creator Settings. The Creator Settings module does **not** own the persistent shell: the shell is application/platform-layer frontend authority, structurally outside Creator Settings, and Creator Settings is one consumer mounted within it. C-05 does not own Creator Home/Centre content.
 
 Expanded Creator navigation is exactly:
 
@@ -52,13 +52,13 @@ Notifications are deferred. C-05 does not generalize Brand-bound notification pe
 
 ---
 
-## 2. Final clone development authority
+## 2. Immutable runtime and final development authority
 
 Backend repository:
 
 `Piyush1087/creator-commerce-backend-v2-clone`
 
-Final C-05 runtime `development` SHA:
+Immutable C-05 backend runtime acceptance SHA:
 
 `156d5834266077be7e2b6a2d459bae5489edbbd6`
 
@@ -66,19 +66,21 @@ Frontend repository:
 
 `Piyush1087/creator-commerce-frontend-v2-clone`
 
-Final C-05 runtime `development` SHA:
+Immutable C-05 frontend runtime acceptance SHA:
 
 `323658d4b147b95b5629ff8d91fa90b8fe9077e4`
 
-Both were normal non-force fast-forwards from the exact accepted C-01 heads. Each accepted result was `3` commits ahead, `0` commits behind, with the original `development` head as exact merge base.
+Both runtime checkpoints were normal non-force fast-forwards from the exact accepted C-01 heads. Each accepted result was `3` commits ahead, `0` commits behind, with the original `development` head as exact merge base.
 
-Durable C-05 handoff/closeout documents are published separately on backend branch `c05/p4-closeout`, whose parent is the final backend runtime SHA above. Keeping documentation on that branch allows this document to record both final runtime `development` SHAs without moving either runtime tree after acceptance.
+The backend final `development` SHA is a documentation-only descendant of the immutable backend runtime acceptance SHA. Its exact docs-inclusive value is recorded in `C05_FINAL_CANONICAL_CLOSEOUT_V1` because a commit cannot truthfully embed its own SHA. Frontend `development` remains exactly at the immutable frontend runtime acceptance SHA.
+
+The accepted documentation source was backend branch `c05/p4-closeout` at `081df33b603b0a93bae35124cb044c9f12ecfa3d`; these artifacts are now canonicalized onto backend `development` with only the authorized terminology corrections.
 
 ---
 
 ## 3. Shared shell and Settings architecture
 
-C-05 reuses the Aurora application shell and the Brand/shared Settings platform rather than retaining legacy Creator Settings as authority.
+The C-05 program reuses and extends the Aurora application shell and the Brand/shared Settings platform rather than retaining legacy Creator Settings as authority. The application shell remains platform-layer authority; the Creator Settings module is mounted within and consumes it.
 
 Frontend shell authority:
 
@@ -90,7 +92,7 @@ Frontend shell authority:
 - `src/features/settings/components/creator-settings-shell.tsx`
 - `src/features/settings/components/creator-settings-action-guard.tsx`
 
-The shell consumes one actor-context source with `LOADING`, `READY`, and `RECOVERY` states. Workspace destinations fail closed while authority is loading or unavailable; Account & Security remains recoverable. Frontend capability projection keeps navigation truthful, while backend guards remain authorization authority.
+The platform shell consumes one actor-context source with `LOADING`, `READY`, and `RECOVERY` states. Workspace destinations fail closed while authority is loading or unavailable; Account & Security remains recoverable. Frontend capability projection keeps navigation truthful, while backend guards remain authorization authority.
 
 Shared account-security UI is reused through `src/features/settings/components/account-security-settings.tsx`. Brand Settings behavior remains covered by regression tests.
 
@@ -409,7 +411,7 @@ Code rollback after canonical Team actors or payout destinations are in use requ
 - C-03: Campaign Team actions, Assistant Apply contract, eligibility/application behavior.
 - C-04: Collaboration Team commands, negotiation policy, business-state UX.
 - C-06: beneficiary onboarding, KYC, verification, transfer, settlement, ledger/reconciliation.
-- MVP.v2: KYC/legal verification policy and provider mappings/provisioning.
+- MVP.v2: KYC/legal verification policy, destination verification, and provider mappings/provisioning.
 - Product-deferred Creator notification preferences.
 - Real PostgreSQL Team contention gate in an authorized CI/runtime.
 - Persistent legacy-data reconciliation only if separately authorized and evidence proves it necessary.
