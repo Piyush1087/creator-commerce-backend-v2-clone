@@ -38,8 +38,8 @@ backend:
     sha: f3a2d7b19f5692ad10e5d13751ee880e1604f93a
 
 phase:
-  id: P3
-  status: CANDIDATE_READY_FOR_SYSTEMS_REVIEW
+  id: P7
+  status: ACCEPTED_CLOSED
 
 deferred_dependencies:
   canonical_offering_discovery:
@@ -1696,7 +1696,72 @@ p7_production_shaped_acceptance_resume_run_02:
     backend_production_changed_during_resume: false
     frontend_changed_during_resume: false
     ledger_only_checkpoint: true
-  p7_acceptance: PENDING_SYSTEMS
-  runtime_accepted: false
-  systems_review_ready: true
+  p7_acceptance: ACCEPTED_BY_SYSTEMS
+  runtime_accepted: true
+  systems_review_ready: false
   breaker: NONE
+
+p7_systems_final_acceptance:
+  authority: CHAT_HOME_P7_SYSTEMS_FINAL_ACCEPTANCE
+  status: ACCEPTED
+  product_authority_sha: d69ba6b8cb331bfa36b450307d9defcd26d09c6e
+
+  runtime_acceptance:
+    backend_sha: 00e1299ec2e97497bc6d81aeda808d6edd3b482a
+    frontend_sha: 1cf2e3bd93425f60fb3d40692320078aea567794
+
+  pre_acceptance_evidence_ledger_sha: b30b1bb3473ec445f591336eec08a2b0ff8316e7
+
+  p7_c1:
+    defect: P7-C1_BRAND_CENTRE_SESSION_ACTIVITY_BOUNDARY_LEAK
+    correction_sha: 00e1299ec2e97497bc6d81aeda808d6edd3b482a
+    disposition: CORRECTED_AND_ACCEPTED
+
+  runtime_evidence:
+    migration_count: 66
+    new_migrations: 0
+    capability_descriptors: 13
+    execute_descriptors: 0
+    home_gemini_calls: 0
+    chat_real_gemini: ACCEPTED
+    business_write_purity: ACCEPTED
+    user_workspace_isolation: ACCEPTED
+    cross_brand_isolation: ACCEPTED
+    intelligence_read_purity: ACCEPTED
+    desktop_runtime: ACCEPTED
+    mobile_runtime: ACCEPTED
+    accessibility_runtime: ACCEPTED
+    streaming: NOT_RETAINED
+
+  architecture:
+    generic_brand_authorization: SIDE_EFFECT_FREE
+    brand_centre_activity_path: PRESERVED
+    home_request_time_deterministic: true
+    new_application_state_layer: false
+    new_intelligence_runtime: false
+    recommendation_engine: false
+    personal_or_vector_memory: false
+    schema_changed: false
+
+  final_gates:
+    CHAT_HOME_BRAND_V1_RUNTIME_ACCEPTED: true
+    P7: CLOSED
+    P0_TO_P7_IMPLEMENTATION_PROGRAM: CLOSED
+
+module_closeout:
+  status: TECHNICALLY_ACCEPTED
+  implementation_complete: true
+  runtime_work_remaining: false
+  product_work_reopened: false
+
+  canonical_runtime:
+    backend: 00e1299ec2e97497bc6d81aeda808d6edd3b482a
+    frontend: 1cf2e3bd93425f60fb3d40692320078aea567794
+
+  documentation:
+    p7_pre_systems_evidence: b30b1bb3473ec445f591336eec08a2b0ff8316e7
+    final_closeout_commit: SELF
+
+  next_phase:
+    implementation_phase: NONE
+    p8: NOT_DEFINED
