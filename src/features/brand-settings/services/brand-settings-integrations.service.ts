@@ -40,13 +40,19 @@ import {
 } from "../../instagram/instagram-oauth.client";
 import { resolveInstagramScopesFromPermissions } from "../../instagram/instagram-scope.util";
 import type { InstagramProviderErrorClass } from "../../instagram/instagram-provider-error";
+import {
+  INSTAGRAM_LONG_LIVED_TOKEN_REFRESH_MIN_AGE_MS,
+  INSTAGRAM_LONG_LIVED_TOKEN_REFRESH_WINDOW_MS,
+} from "../../instagram/instagram-token-lifecycle.constants";
 import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
 import { BrandInstagramDeletionService } from "./brand-instagram-deletion.service";
 import { BrandSettingsAccessService } from "./brand-settings-access.service";
 import { BrandInstagramOAuthStateService } from "./brand-instagram-oauth-state.service";
 
-export const INSTAGRAM_REFRESH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-export const INSTAGRAM_MIN_REFRESH_AGE_MS = 24 * 60 * 60 * 1000;
+export const INSTAGRAM_REFRESH_WINDOW_MS =
+  INSTAGRAM_LONG_LIVED_TOKEN_REFRESH_WINDOW_MS;
+export const INSTAGRAM_MIN_REFRESH_AGE_MS =
+  INSTAGRAM_LONG_LIVED_TOKEN_REFRESH_MIN_AGE_MS;
 
 function normalizeHandle(raw: string): string {
   return raw.trim().replace(/^@/, "").toLowerCase();
@@ -780,7 +786,7 @@ export class BrandSettingsIntegrationsService {
       },
     });
     if (result.count !== 1) throw staleAttempt();
-    await this.prisma.brandInstagramOAuthState.updateMany({
+    await this.prisma.providerOAuthTransaction.updateMany({
       where: { brandProfileId: current.brandProfileId, consumedAt: null },
       data: { consumedAt: new Date() },
     });

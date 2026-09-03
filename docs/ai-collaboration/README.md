@@ -16,6 +16,10 @@ agents, or teammate proposals before it becomes source code.
 
 ## Recent intakes
 
+- `2026-09-03-c01-c05-clone-reconcile.md` — C-01 Entry + C-05 Settings/shell
+  path-checkout onto origin. Clone `c01-*` / `c05-*` files in this folder are
+  **reference copies**. Origin verification lives in
+  `docs/handoff-audit/creator/`.
 - `2026-08-13-collaboration-clone-reconcile.md` — Canonical Collaboration from
   frozen clone commit `13ce652` into developer backend-v2.
 - `2026-05-14-brand-onboarding-journey-intake.md` — Step 1 discovery API + schema

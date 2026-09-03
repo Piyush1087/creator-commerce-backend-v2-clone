@@ -19,13 +19,16 @@ import { MailService } from "./mail.service";
         ) {
           throw new Error("POSTMARK_SERVER_TOKEN is not configured");
         }
-        for (const name of [
-          "POSTMARK_AUTH_OTP_TEMPLATE_ID",
-          "POSTMARK_PASSWORD_RESET_TEMPLATE_ID",
+        for (const names of [
+          ["POSTMARK_OTP_TEMPLATE_ID", "POSTMARK_AUTH_OTP_TEMPLATE_ID"],
+          ["POSTMARK_PASSWORD_RESET_TEMPLATE_ID"],
         ]) {
-          const id = Number(configService.get<string>(name));
-          if (!Number.isSafeInteger(id) || id <= 0) {
-            throw new Error(`${name} is not configured`);
+          const configured = names.some((name) => {
+            const id = Number(configService.get<string>(name));
+            return Number.isSafeInteger(id) && id > 0;
+          });
+          if (!configured) {
+            throw new Error(`${names[0]} is not configured`);
           }
         }
         return new ServerClient(apiToken);

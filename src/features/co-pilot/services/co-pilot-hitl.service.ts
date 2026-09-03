@@ -48,7 +48,7 @@ import {
   type BrandSettingsValidationAction,
 } from "../modules/brand-settings/brand-settings-validation";
 import {
-  BrandBillingProfileSchema,
+  brandBillingProfileFromStaged,
   BrandWithdrawalAccountSchema,
   UpdateBrandGeneralProfileSchema,
 } from "../../brand-settings/schemas/brand-settings.schema";
@@ -1788,18 +1788,7 @@ export class CoPilotHitlService {
       action: "UPDATE_BILLING",
       staged,
       run: async (authUser) => {
-        const input = BrandBillingProfileSchema.parse({
-          registeredCompanyName: staged.registeredCompanyName,
-          corporateBillingAddress: staged.corporateBillingAddress,
-          gstin: this.optionalString(staged.gstin),
-          pan: this.optionalString(staged.pan),
-          defaultTdsPercentage:
-            typeof staged.defaultTdsPercentage === "number"
-              ? staged.defaultTdsPercentage
-              : Number(staged.defaultTdsPercentage ?? 2),
-          currencyPreference:
-            this.optionalString(staged.currencyPreference) ?? "INR",
-        });
+        const input = brandBillingProfileFromStaged(staged);
         await this.brandSettings.upsertBillingProfile(authUser, input);
         return "Billing profile saved.";
       },

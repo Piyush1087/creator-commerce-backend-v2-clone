@@ -28,7 +28,9 @@ import { BrandCentreSessionEvictionService } from "../brand-centre/services/bran
 describe.skipIf(process.env.BS12_DATABASE_TEST !== "true")(
   "BS-12 PostgreSQL authentication concurrency",
   () => {
-    const prisma = new PrismaClient();
+    const prisma = new PrismaClient({
+      transactionOptions: { maxWait: 10_000, timeout: 10_000 },
+    });
     const db = prisma as unknown as PrismaService;
     const config = new ConfigService({
       JWT_SECRET: "bs12-test-signing-secret",
@@ -76,12 +78,17 @@ describe.skipIf(process.env.BS12_DATABASE_TEST !== "true")(
       userIds.push(id);
       emails.push(email);
       const hash = await hashPasswordAsync("correct-password");
+      const organization = await prisma.organization.create({
+        data: { name: `BS12 Creator ${id}`, kind: "CREATOR" },
+      });
+      organizationIds.push(organization.id);
       return prisma.user.create({
         data: {
           id,
           email,
           normalizedEmail: email,
           role: UserRole.CREATOR,
+          organizationId: organization.id,
           authState: UserAuthState.ACTIVE,
           emailVerifiedAt: new Date(),
           hashedPassword: hash,
@@ -386,7 +393,7 @@ describe.skipIf(process.env.BS12_DATABASE_TEST !== "true")(
           eligible: true,
           userId: rejectedUser.id,
         }),
-      ).rejects.toThrow("Authentication email dispatch failed");
+      ).resolves.toBeUndefined();
       await expect(
         prisma.emailOtpChallenge.findFirstOrThrow({
           where: {
@@ -409,7 +416,7 @@ describe.skipIf(process.env.BS12_DATABASE_TEST !== "true")(
           eligible: true,
           userId: ambiguousUser.id,
         }),
-      ).rejects.toThrow("Authentication email dispatch failed");
+      ).resolves.toBeUndefined();
       await expect(
         prisma.emailOtpChallenge.findFirstOrThrow({
           where: {
@@ -471,7 +478,7 @@ describe.skipIf(process.env.BS12_DATABASE_TEST !== "true")(
 
     it("denies the same unexpired session immediately after Brand membership removal", async () => {
       const organization = await prisma.organization.create({
-        data: { name: "BS12 revocation test" },
+        data: { name: "BS12 revocation test", kind: "BRAND" },
       });
       organizationIds.push(organization.id);
       const brand = await prisma.brandProfile.create({

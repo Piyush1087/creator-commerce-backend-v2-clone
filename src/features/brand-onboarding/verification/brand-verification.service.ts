@@ -6,7 +6,12 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { AuthMethodType, UserAuthState, UserRole } from "@prisma/client";
+import {
+  AuthMethodType,
+  OrganizationKind,
+  UserAuthState,
+  UserRole,
+} from "@prisma/client";
 import { addMinutes } from "date-fns";
 
 import { MailService } from "../../../mail/mail.service";
@@ -27,25 +32,22 @@ import {
   verificationCodeIdentifier,
 } from "./brand-verification-email.util";
 
-/** Pre-prod stub code. PROD: set BRAND_VERIFICATION_USE_REAL_OTP=true in .env */
-const STUB_OTP_CODE = "123456";
-
 const OTP_TTL_MINUTES = 10;
 const MAX_VERIFY_ATTEMPTS = 3;
 const SEND_LIMIT_PER_WINDOW = 3;
 const SEND_WINDOW_MS = 60_000;
 
+/**
+ * TEMP local Brand Step 6 only. Not shared auth / Creator Entry.
+ * Before production: switch sendOtp/verifyOtp back to sendOtpReal/verifyOtpReal
+ * (Postmark + random code) and delete this constant.
+ */
+const BRAND_ONBOARDING_LOCAL_OTP = "123456";
+
 type PostmarkInactiveError = {
   statusCode?: number;
   message?: string;
 };
-
-/**
- * @see docs/brand-onboarding/VERIFICATION_OTP_TOGGLE.md
- */
-function isRealBrandVerificationOtpEnabled(): boolean {
-  return process.env.BRAND_VERIFICATION_USE_REAL_OTP === "true";
-}
 
 @Injectable()
 export class BrandVerificationService {
@@ -60,17 +62,13 @@ export class BrandVerificationService {
   ) {}
 
   async sendOtp(brandProfileId: string, rawEmail: string) {
-    if (!isRealBrandVerificationOtpEnabled()) {
-      return this.sendOtpStub(brandProfileId, rawEmail);
-    }
-    return this.sendOtpReal(brandProfileId, rawEmail);
+    return this.sendOtpLocal(brandProfileId, rawEmail);
+    // return this.sendOtpReal(brandProfileId, rawEmail);
   }
 
   async verifyOtp(brandProfileId: string, rawEmail: string, rawOtp: string) {
-    if (!isRealBrandVerificationOtpEnabled()) {
-      return this.verifyOtpStub(brandProfileId, rawEmail, rawOtp);
-    }
-    return this.verifyOtpReal(brandProfileId, rawEmail, rawOtp);
+    return this.verifyOtpLocal(brandProfileId, rawEmail, rawOtp);
+    // return this.verifyOtpReal(brandProfileId, rawEmail, rawOtp);
   }
 
   /**
@@ -198,7 +196,7 @@ export class BrandVerificationService {
 
       if (!organizationId) {
         const organization = await tx.organization.create({
-          data: { name: profile.name },
+          data: { name: profile.name, kind: OrganizationKind.BRAND },
         });
         organizationId = organization.id;
       }
@@ -299,84 +297,36 @@ export class BrandVerificationService {
     });
   }
 
-  /** PRE-PROD: no Postmark / no VerificationCode rows. Logged stub code 123456. */
-  private async sendOtpStub(brandProfileId: string, rawEmail: string) {
-    const email = normalizeVerificationEmail(rawEmail);
-    if (!isValidVerificationEmail(email)) {
-      throw new BadRequestException(
-        "Please enter a valid email address (e.g., name@brand.in)",
-      );
-    }
-
-    const profile = await this.prisma.brandProfile.findUnique({
-      where: { id: brandProfileId },
-      select: { id: true, domain: true },
-    });
-    if (!profile) {
-      throw new NotFoundException("Brand profile not found");
-    }
-
-    if (!emailDomainMatchesBrandDomain(email, profile.domain)) {
-      const emailDomain = emailDomainFromAddress(email);
-      throw new BadRequestException(
-        `The email domain (@${emailDomain}) doesn't match your website (${profile.domain}). Please use your work email, or go back and re-enter your website.`,
-      );
-    }
-
-    const expiresAt = addMinutes(new Date(), OTP_TTL_MINUTES);
-    this.logger.warn(
-      `[STUB OTP] brandProfileId=${brandProfileId} email=${email} code=${STUB_OTP_CODE} — set BRAND_VERIFICATION_USE_REAL_OTP=true for Postmark`,
+  private async sendOtpLocal(brandProfileId: string, rawEmail: string) {
+    const { profile } = await this.assertBrandVerificationEmail(
+      brandProfileId,
+      rawEmail,
     );
-
+    this.logger.warn(
+      `Brand onboarding OTP uses the local hardcoded bypass (no Postmark). brandProfileId=${profile.id}`,
+    );
     return {
       sent: true,
       expiresInMinutes: OTP_TTL_MINUTES,
-      expiresAt: expiresAt.toISOString(),
+      expiresAt: addMinutes(new Date(), OTP_TTL_MINUTES).toISOString(),
     };
   }
 
-  /** PRE-PROD: accepts only STUB_OTP_CODE; confirms identity only (password gate sets isVerified). */
-  private async verifyOtpStub(
+  private async verifyOtpLocal(
     brandProfileId: string,
     rawEmail: string,
     rawOtp: string,
   ) {
-    const email = normalizeVerificationEmail(rawEmail);
-    const otp = rawOtp.trim();
-
-    if (!isValidVerificationEmail(email)) {
-      throw new BadRequestException(
-        "Please enter a valid email address (e.g., name@brand.in)",
-      );
-    }
-
-    const profile = await this.prisma.brandProfile.findUnique({
-      where: { id: brandProfileId },
-      select: { id: true, domain: true },
-    });
-    if (!profile) {
-      throw new NotFoundException("Brand profile not found");
-    }
-
-    if (!emailDomainMatchesBrandDomain(email, profile.domain)) {
-      const emailDomain = emailDomainFromAddress(email);
-      throw new BadRequestException(
-        `The email domain (@${emailDomain}) doesn't match your website (${profile.domain}). Please use your work email, or go back and re-enter your website.`,
-      );
-    }
-
-    if (otp !== STUB_OTP_CODE) {
+    const { email, profile } = await this.assertBrandVerificationEmail(
+      brandProfileId,
+      rawEmail,
+    );
+    if (rawOtp.trim() !== BRAND_ONBOARDING_LOCAL_OTP) {
       throw new UnauthorizedException(
         "Incorrect code. Please check your email and try again.",
       );
     }
-
     await this.markIdentityConfirmed(brandProfileId, email);
-
-    this.logger.warn(
-      `[STUB OTP] identity confirmed brandProfileId=${brandProfileId} email=${email} — password still required`,
-    );
-
     return {
       identityConfirmed: true,
       brandProfileId: profile.id,
@@ -386,11 +336,36 @@ export class BrandVerificationService {
     };
   }
 
-  // ---------------------------------------------------------------------------
-  // PROD — real OTP (Postmark + VerificationCode). Active when
-  // BRAND_VERIFICATION_USE_REAL_OTP=true. Do not delete.
-  // ---------------------------------------------------------------------------
+  private async assertBrandVerificationEmail(
+    brandProfileId: string,
+    rawEmail: string,
+  ) {
+    const email = normalizeVerificationEmail(rawEmail);
+    if (!isValidVerificationEmail(email)) {
+      throw new BadRequestException(
+        "Please enter a valid email address (e.g., name@brand.in)",
+      );
+    }
 
+    const profile = await this.prisma.brandProfile.findUnique({
+      where: { id: brandProfileId },
+      select: { id: true, domain: true, name: true, isVerified: true },
+    });
+    if (!profile) {
+      throw new NotFoundException("Brand profile not found");
+    }
+
+    if (!emailDomainMatchesBrandDomain(email, profile.domain)) {
+      const emailDomain = emailDomainFromAddress(email);
+      throw new BadRequestException(
+        `The email domain (@${emailDomain}) doesn't match your website (${profile.domain}). Please use your work email, or go back and re-enter your website.`,
+      );
+    }
+
+    return { email, profile };
+  }
+
+  /** Production Postmark + random code. Unused while sendOtpLocal is wired. */
   private async sendOtpReal(brandProfileId: string, rawEmail: string) {
     const email = normalizeVerificationEmail(rawEmail);
     if (!isValidVerificationEmail(email)) {
@@ -435,9 +410,11 @@ export class BrandVerificationService {
       },
     });
 
-    this.logger.log(
-      `Brand verification OTP brandProfileId=${brandProfileId} email=${email} code=${otpCode} expiresAt=${expiresAt.toISOString()}`,
-    );
+    if ((process.env.STAGE ?? "").trim().toLowerCase() !== "prod") {
+      this.logger.warn(
+        `[OTP] purpose=BRAND_VERIFICATION email=${email} brandProfileId=${brandProfileId} code=${otpCode} expiresAt=${expiresAt.toISOString()}`,
+      );
+    }
 
     try {
       await this.mail.sendOtp(email, otpCode, emailLocalPart(email));

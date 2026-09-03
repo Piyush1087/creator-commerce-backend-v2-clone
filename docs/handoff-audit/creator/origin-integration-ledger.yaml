@@ -1,0 +1,83 @@
+module: ORIGIN_C01_C05_CREATOR_INTEGRATION
+run_id: ORIGIN_PORT_20260903
+status: CODE_PORTED_BUILD_VERIFIED_UI_PARTIAL
+authority:
+  product_reference:
+    - docs/ai-collaboration/c01-developer-code-integration-handoff-v1.md
+    - docs/ai-collaboration/c05-developer-code-integration-handoff-v1.md
+  clone_closeout_reference:
+    - docs/ai-collaboration/c01-module-closeout-v1.md
+    - docs/ai-collaboration/c05-module-closeout-v1.md
+    - docs/ai-collaboration/c05-execution-ledger-v1.yaml
+  aws_bootstrap_reference: docs/ai-collaboration/c01-aws-database-bootstrap-handoff-v1.md
+  origin_intake:
+    backend: docs/ai-collaboration/2026-09-03-c01-c05-clone-reconcile.md
+    frontend: creator-commerce-frontend-v2/docs/ai-collaboration/2026-09-03-c01-c05-clone-reconcile.md
+  method: PATH_CHECKOUT_PLUS_SURGICAL_RECONCILE
+  do_not_merge: piyush/development
+repositories:
+  backend:
+    origin: growth-verse/creator-commerce-backend-v2
+    branch: feature/c01-c05-creator-integration
+    origin_development_base: 2f03819a6ef974a26afd98064909de6f7b2a04a2
+    clone_file_checkout: 4c5f42858b950b7cd342f8972f99f548f3daa942
+    c01_clone_ancestor: 8f2a3b3acf6b48dc1d5cb4a212a26b9f0755fbbd
+    c05_runtime_acceptance: 156d5834266077be7e2b6a2d459bae5489edbbd6
+    unused_c01_handoff_checkpoint: 3ec01751d28cfa60840ecf97d95c706f94c3dec9
+  frontend:
+    origin: growth-verse/creator-commerce-frontend-v2
+    branch: feature/c01-c05-creator-integration
+    origin_development_base: f4e6c49b61c49ecf784961c5d770f9fb050c288b
+    clone_file_checkout: 323658d4b147b95b5629ff8d91fa90b8fe9077e4
+    c01_clone_ancestor: b50c36fd4b99b6e0ec0718291d794d7a58353f4c
+    c05_runtime_acceptance: 323658d4b147b95b5629ff8d91fa90b8fe9077e4
+clone_acceptance_counts_do_not_copy:
+  c01_backend_tests: 1103
+  c01_frontend_tests: 744
+  c05_backend_tests: 1229
+  c05_frontend_tests: 853
+  c01_clone_migrations: 70
+  c05_clone_migrations: 74
+origin:
+  previous_migrations: 74
+  added_c01_migrations: 4
+  added_c05_migrations: 4
+  expected_migrations_after_port: 82
+  prisma_validate: VERIFIED
+  tests: FAILED_CLASSIFIED
+  backend_build: VERIFIED
+  frontend_typecheck: VERIFIED
+  frontend_build: VERIFIED
+  frontend_lint: VERIFIED
+  backend_lint: VERIFIED_PRETTIER_ONLY
+  ui_smoke: PARTIAL
+  push: feature/c01-c05-creator-integration to origin and piyush
+  pr: NOT_OPENED
+  merge_to_development: NOT_AUTHORIZED
+migrations:
+  c01:
+    - 20260908120000_c01_i1_organization_workspace_foundation
+    - 20260908121000_c01_i1_provider_oauth_transaction
+    - 20260908122000_c01_i1_creator_provider_health
+    - 20260908123000_c01_i1_campaign_continuation
+  c05:
+    - 20260909120000_c05_p0_team_user_identity
+    - 20260909121000_c05_p0_contact_phone
+    - 20260909122000_c05_p0_legal_profile
+    - 20260909123000_c05_p0_payout_destination
+  do_not_copy_from_clone:
+    - 20260828120000_bs03
+    - 20260828120000_bs08
+excluded:
+  - PRODUCTION_DEPLOYMENT
+  - PRODUCTION_DATABASE_ACCESS_OR_MIGRATION
+  - AWS_BOOTSTRAP_EXECUTION
+  - LIVE_META_OAUTH
+  - KYC_OR_PAYOUT_EXECUTION
+  - FLIP_PROD_RUN_MIGRATIONS_ON_START
+known_origin_preserves:
+  - origin collaboration migrations
+  - Gatekeeper / brand-preview / Razorpay Route / Brand Return env
+  - Product Intelligence v1
+  - Brand Centre offering routes
+  - collaboration-escrow-reserve.service.ts

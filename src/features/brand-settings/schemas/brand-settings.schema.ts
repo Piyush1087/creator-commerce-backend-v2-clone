@@ -100,6 +100,28 @@ export type InviteTeamMemberInput = z.infer<typeof InviteTeamMemberSchema>;
 export type BrandBillingProfileInput = z.infer<
   typeof BrandBillingProfileSchema
 >;
+
+function stagedString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+/** Accepts canonical billing fields or retired Co-Pilot aliases. Drops PAN/TDS/currency. */
+export function brandBillingProfileFromStaged(
+  staged: Record<string, unknown>,
+): BrandBillingProfileInput {
+  return BrandBillingProfileSchema.parse({
+    legalEntityName:
+      stagedString(staged.legalEntityName) ??
+      stagedString(staged.registeredCompanyName),
+    legalEntityType: stagedString(staged.legalEntityType),
+    billingCountryCode: stagedString(staged.billingCountryCode),
+    billingAddress:
+      stagedString(staged.billingAddress) ??
+      stagedString(staged.corporateBillingAddress),
+    gstin: stagedString(staged.gstin),
+  });
+}
+
 export type BrandWithdrawalAccountInput = z.infer<
   typeof BrandWithdrawalAccountSchema
 >;

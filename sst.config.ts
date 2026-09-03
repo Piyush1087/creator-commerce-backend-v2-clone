@@ -200,10 +200,6 @@ export default $config({
       GATEKEEPER_SUPPORT_URL: process.env.GATEKEEPER_SUPPORT_URL?.trim() ?? "",
       GATEKEEPER_OPENAI_MODEL_ID:
         process.env.GATEKEEPER_OPENAI_MODEL_ID?.trim() ?? "",
-      BRAND_VERIFICATION_USE_REAL_OTP:
-        process.env.BRAND_VERIFICATION_USE_REAL_OTP ?? "false",
-      CREATOR_VERIFICATION_USE_REAL_OTP:
-        process.env.CREATOR_VERIFICATION_USE_REAL_OTP ?? "false",
       // Data Extraction OpenAI runtime: model id is supplied by Intelligence at call time.
       OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? "",
       OPENAI_REQUEST_TIMEOUT_MS:
@@ -212,6 +208,11 @@ export default $config({
         process.env.DATA_EXTRACTION_PROVIDER_MAX_ATTEMPTS ?? "3",
       INSTAGRAM_API_ID: process.env.INSTAGRAM_API_ID as string,
       INSTAGRAM_APP_SECRET: process.env.INSTAGRAM_APP_SECRET as string,
+      CREATOR_INSTAGRAM_REDIRECT_URI:
+        process.env.CREATOR_INSTAGRAM_REDIRECT_URI ??
+        ($app.stage === "prod"
+          ? "https://dashboard.thecreatorshop.in/creator-marketplace/callback"
+          : "https://dashboard.dev.thecreatorshop.in/creator-marketplace/callback"),
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? "",
       // QA apply/eligibility bypass — default test@creator.com on non-prod; empty on prod unless set.
       CREATOR_APPLY_BYPASS_EMAILS:

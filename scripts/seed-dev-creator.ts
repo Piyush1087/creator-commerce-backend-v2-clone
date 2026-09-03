@@ -8,7 +8,7 @@
  * Pair with CREATOR_APPLY_BYPASS_EMAILS=test@creator.com so this account can
  * see ELIGIBLE_ONLY campaigns and apply without real Instagram Graph data.
  *
- * Login: test@creator.com — OTP stub 123456 when CREATOR_VERIFICATION_USE_REAL_OTP=false
+ * Login: test@creator.com — password or email OTP (code is logged by the API in non-prod).
  */
 import { PrismaClient, UserRole } from "@prisma/client";
 
@@ -164,7 +164,7 @@ async function main() {
     console.log("");
     console.log("Creator seed complete (create-or-update).");
     console.log(`  Email:    ${CREATOR_EMAIL}`);
-    console.log(`  OTP:      123456 (when CREATOR_VERIFICATION_USE_REAL_OTP=false)`);
+    console.log(`  OTP:      check the API log in non-prod ([OTP] ...)`);
     console.log(`  Handle:   @${CREATOR_HANDLE}`);
     console.log(`  Followers:${PROFILE_FIELDS.followerCount} (MICRO tier stub)`);
     console.log(

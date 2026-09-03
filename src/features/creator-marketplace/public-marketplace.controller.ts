@@ -1,9 +1,22 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from "@nestjs/common";
-import { ThrottlerGuard } from "@nestjs/throttler";
+import {
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Res,
+  UseGuards,
+} from "@nestjs/common";
+import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
+import type { Response } from "express";
 
+import { setCreatorCampaignApplyContinuationCookie } from "../creator-entry/creator-campaign-apply-continuation-cookie.util";
 import { MarketplaceQueryDto } from "./dto/marketplace-query.dto";
 import { CreatorInvitationService } from "./services/creator-invitation.service";
 import { CreatorMarketplaceService } from "./services/creator-marketplace.service";
+import { CampaignApplyContinuationIssuanceService } from "./services/campaign-apply-continuation-issuance.service";
 
 /**
  * Public marketplace (State A — unauthenticated guest).
@@ -15,6 +28,7 @@ export class PublicMarketplaceController {
   constructor(
     private readonly marketplace: CreatorMarketplaceService,
     private readonly invitations: CreatorInvitationService,
+    private readonly continuations: CampaignApplyContinuationIssuanceService,
   ) {}
 
   @Get("campaigns")
@@ -27,7 +41,30 @@ export class PublicMarketplaceController {
     @Param("campaignId", ParseUUIDPipe) campaignId: string,
     @Query("invite_token") inviteToken?: string,
   ) {
-    return this.marketplace.getPublicMarketplaceCampaignDetail(campaignId, inviteToken);
+    return this.marketplace.getPublicMarketplaceCampaignDetail(
+      campaignId,
+      inviteToken,
+    );
+  }
+
+  @Post("campaigns/:campaignId/apply-continuation")
+  @HttpCode(201)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async issueApplyContinuation(
+    @Param("campaignId", ParseUUIDPipe) campaignId: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const issued = await this.continuations.issue(campaignId);
+    setCreatorCampaignApplyContinuationCookie(
+      response,
+      issued.continuationToken,
+      issued.expiresAt,
+    );
+    return {
+      intent: issued.intent,
+      expiresAt: issued.expiresAt,
+      continuationPresent: true as const,
+    };
   }
 
   @Get("invitations/:token")

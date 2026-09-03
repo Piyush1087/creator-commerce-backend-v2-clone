@@ -1,9 +1,10 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { CreatorTeamRole, UserRole } from "@prisma/client";
+import { CreatorTeamRole, OrganizationKind, UserRole } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
@@ -28,42 +29,43 @@ export class CreatorSettingsAccessService {
   async resolveCreatorProfile(user: AuthUser) {
     this.assertCreator(user);
 
-    let profile = await this.prisma.creatorProfile.findUnique({
+    const profile = await this.prisma.creatorProfile.findUnique({
       where: { userId: user.id },
     });
 
     if (!profile) {
-      profile = await this.prisma.creatorProfile.create({
-        data: {
-          userId: user.id,
-          displayName: user.name,
-        },
+      throw new ConflictException({
+        code: "CREATOR_CANONICAL_PROFILE_MISSING",
+        message: "Creator provisioning is incomplete.",
       });
     }
 
     return profile;
   }
 
-  async resolveWorkspace(creatorProfileId: string, userEmail: string) {
-    let workspace = await this.prisma.creatorWorkspace.findFirst({
+  async resolveWorkspace(creatorProfileId: string, _userEmail: string) {
+    const workspace = await this.prisma.creatorWorkspace.findFirst({
       where: { ownerProfileId: creatorProfileId },
+      include: {
+        organization: true,
+        ownerProfile: { include: { user: true } },
+      },
     });
 
     if (!workspace) {
-      workspace = await this.prisma.creatorWorkspace.create({
-        data: {
-          ownerProfileId: creatorProfileId,
-          organizationDisplayName: "My Creative Workspace",
-          members: {
-            create: {
-              assignedProfileId: creatorProfileId,
-              associatedEmail: userEmail.toLowerCase(),
-              securityRole: CreatorTeamRole.OWNER,
-              isActive: true,
-              joinedAt: new Date(),
-            },
-          },
-        },
+      throw new ConflictException({
+        code: "CREATOR_CANONICAL_WORKSPACE_MISSING",
+        message: "Creator workspace provisioning is incomplete.",
+      });
+    }
+
+    if (
+      workspace.organization.kind !== OrganizationKind.CREATOR ||
+      workspace.ownerProfile.user.organizationId !== workspace.organizationId
+    ) {
+      throw new ConflictException({
+        code: "CREATOR_CANONICAL_CONTEXT_INCONSISTENT",
+        message: "Creator workspace context is inconsistent.",
       });
     }
 
@@ -78,10 +80,8 @@ export class CreatorSettingsAccessService {
     const member = await this.prisma.creatorWorkspaceMember.findFirst({
       where: {
         workspaceId,
-        OR: [
-          { assignedProfileId: creatorProfileId },
-          { associatedEmail: user.email.toLowerCase() },
-        ],
+        assignedProfileId: creatorProfileId,
+        assignedProfile: { userId: user.id },
         isActive: true,
       },
     });
