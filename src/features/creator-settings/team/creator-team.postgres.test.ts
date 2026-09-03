@@ -337,9 +337,10 @@ describe.skipIf(process.env.C05_TEAM_DATABASE_TEST !== "true")(
         assistant.membership.id,
         "MANAGER",
       );
-      await expect(team.list(actor(assistant.user))).resolves.toEqual(
-        expect.any(Array),
-      );
+      await expect(team.list(actor(assistant.user))).resolves.toMatchObject({
+        actor: { role: CreatorTeamRole.MANAGER },
+        team: { members: expect.any(Array) },
+      });
     });
 
     it("makes cancellation and expiry terminal", async () => {
