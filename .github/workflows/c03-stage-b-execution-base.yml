@@ -50,21 +50,21 @@ jobs:
       AUTH_OTP_PEPPER: c03-stage-b-non-secret-runtime-proof
       AUTH_OTP_PEPPER_DEV: c03-stage-b-non-secret-runtime-proof
       AUTH_OTP_PEPPER_PROD: c03-stage-b-non-secret-runtime-proof
-      POSTMARK_SERVER_TOKEN: stage-b-placeholder
+      POSTMARK_SERVER_TOKEN: c03-stage-b-runtime-proof
       POSTMARK_OTP_TEMPLATE_ID: "1"
       POSTMARK_AUTH_OTP_TEMPLATE_ID: "1"
       POSTMARK_PASSWORD_RESET_TEMPLATE_ID: "1"
       POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID: "1"
       APP_FRONTEND_URL: http://127.0.0.1:4173
-      GEMINI_API_KEY: stage-b-placeholder
-      OPENAI_API_KEY: stage-b-placeholder
-      ZYTE_API_KEY: stage-b-placeholder
-      INSTAGRAM_API_ID: stage-b-placeholder
-      INSTAGRAM_APP_SECRET: stage-b-placeholder
+      GEMINI_API_KEY: c03-stage-b-runtime-proof
+      OPENAI_API_KEY: c03-stage-b-runtime-proof
+      ZYTE_API_KEY: c03-stage-b-runtime-proof
+      INSTAGRAM_API_ID: c03-stage-b-runtime-proof
+      INSTAGRAM_APP_SECRET: c03-stage-b-runtime-proof
       CREATOR_INSTAGRAM_REDIRECT_URI: https://dashboard.dev.thecreatorshop.in/creator-marketplace/callback
-      RAZORPAY_API_KEY_ID: stage-b-placeholder
-      RAZORPAY_API_KEY_SECRET: stage-b-placeholder
-      RAZORPAY_WEBHOOK_SECRET: stage-b-placeholder
+      RAZORPAY_API_KEY_ID: c03-stage-b-runtime-proof
+      RAZORPAY_API_KEY_SECRET: c03-stage-b-runtime-proof
+      RAZORPAY_WEBHOOK_SECRET: c03-stage-b-runtime-proof
       S3_BUCKET_NAME: creatorshop-stage-b-local
       AWS_REGION: ap-south-1
     steps:
