@@ -8,6 +8,7 @@ import { CHAT_RESPONSE_STATUSES } from "./chat-response.contract";
 describe("Chat response contract and evidence validation", () => {
   const validator = new ChatResponseValidationService();
   const brand = { type: "BRAND" as const, id: "brand-a" };
+  const canonicalFallbackRef = `canonical:brand.current.read:${"a".repeat(64)}`;
   const evidence = {
     invokedCapabilityIds: ["brand.current.read"],
     authorizedEntityRefs: [brand],
@@ -15,7 +16,7 @@ describe("Chat response contract and evidence validation", () => {
     executedGroundingResultRefs: [
       {
         capabilityId: "brand.current.read",
-        resultRefs: ["brand.current:brand-a"],
+        resultRefs: [canonicalFallbackRef],
       },
     ],
   };
@@ -79,20 +80,76 @@ describe("Chat response contract and evidence validation", () => {
     ).toThrow();
   });
 
-  it("accepts recommendation basis refs produced by executed authorized grounding", () => {
+  it("accepts a canonical fallback ref produced by executed authorized grounding", () => {
     expect(
       validator.validate(
         {
           ...response("ANSWERED"),
+          grounding: [
+            {
+              ...response("ANSWERED").grounding[0],
+              resultRefs: [canonicalFallbackRef],
+            },
+          ],
           recommendation: {
             text: "Review the current Brand state.",
-            basisRefs: ["brand.current:brand-a"],
+            basisRefs: [canonicalFallbackRef],
             nonMutating: true,
           },
         },
         evidence,
       ).recommendation,
-    ).toMatchObject({ basisRefs: ["brand.current:brand-a"] });
+    ).toMatchObject({ basisRefs: [canonicalFallbackRef] });
+  });
+
+  it("rejects a recommendation with an empty basis", () => {
+    expect(() =>
+      validator.validate(
+        {
+          ...response("ANSWERED"),
+          recommendation: {
+            text: "Review the current Brand state.",
+            basisRefs: [],
+            nonMutating: true,
+          },
+        },
+        evidence,
+      ),
+    ).toThrow();
+  });
+
+  it("accepts an existing Intelligence semantic result ref as recommendation basis", () => {
+    const intelligenceRef = "result:brand-a:differentiation_and_proof";
+    expect(
+      validator.validate(
+        {
+          ...response("ANSWERED"),
+          grounding: [
+            {
+              sourceType: "INTELLIGENCE",
+              capabilityId: "brand_intelligence.current.read",
+              entityRefs: [brand],
+              resultRefs: [intelligenceRef],
+            },
+          ],
+          recommendation: {
+            text: "Review the current Brand Intelligence.",
+            basisRefs: [intelligenceRef],
+            nonMutating: true,
+          },
+        },
+        {
+          ...evidence,
+          invokedCapabilityIds: ["brand_intelligence.current.read"],
+          executedGroundingResultRefs: [
+            {
+              capabilityId: "brand_intelligence.current.read",
+              resultRefs: [intelligenceRef],
+            },
+          ],
+        },
+      ).recommendation,
+    ).toMatchObject({ basisRefs: [intelligenceRef] });
   });
 
   it.each(["unknown:result", "foreign:result"])(

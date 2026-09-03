@@ -563,7 +563,7 @@ describe("ChatModelGateway", () => {
       nonMutating: { type: SchemaType.BOOLEAN },
     });
     expect(generateJson.mock.calls[0][0].systemInstruction).toContain(
-      "basisRefs must be exact resultRefs",
+      "basisRefs must contain at least one exact resultRef",
     );
     expect(generateJson.mock.calls[0][0].systemInstruction).toContain(
       "Never claim that you updated",
@@ -581,6 +581,34 @@ describe("ChatModelGateway", () => {
         authorizedCapabilityResults: [],
         sanitizedConversationContext: {},
         responseConstraints: {},
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("rejects a synthesized recommendation with an empty basis", async () => {
+    const { gateway } = fixture({
+      answer: "Review workspace readiness.",
+      freshnessNotes: [],
+      limitations: [],
+      recommendation: {
+        text: "Review workspace readiness.",
+        basisRefs: [],
+        nonMutating: true,
+      },
+    });
+
+    await expect(
+      gateway.synthesize({
+        userRequest: "What should I focus on?",
+        authorizedCapabilityResults: [
+          {
+            capabilityId: "workspace.readiness.read",
+            resultRefs: ["canonical:workspace.readiness.read:hash"],
+            data: {},
+          },
+        ],
+        sanitizedConversationContext: { recentMessages: [] },
+        responseConstraints: { useOnlyAuthorizedResults: true },
       }),
     ).rejects.toThrow();
   });

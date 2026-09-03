@@ -74,4 +74,188 @@ describe("ChatCapabilityExecutor", () => {
       test.executor.execute(context, "workspace.context.read", {}),
     ).rejects.toThrow();
   });
+
+  it.each([
+    {
+      capabilityId: "workspace.readiness.read",
+      data: {
+        contractVersion: "1.0",
+        brandId: "brand-1",
+        observedAt: new Date(0).toISOString(),
+        workspace: { state: "READY", reasonCodes: [] },
+        subscription: {
+          state: "FULL_ACCESS",
+          lifecycleStatus: "ACTIVE",
+          requiredAction: "NONE",
+        },
+        applicationCapabilities: [],
+        billing: {
+          state: "READY",
+          missingFieldCodes: [],
+          recoveryDestinationId: null,
+        },
+        setupItems: [],
+        limitations: [],
+      },
+    },
+    {
+      capabilityId: "provider.readiness.read",
+      data: {
+        contractVersion: "1.0",
+        brandId: "brand-1",
+        observedAt: new Date(0).toISOString(),
+        providers: [
+          {
+            provider: "INSTAGRAM",
+            state: "READY",
+            reasonCode: "INSTAGRAM_READY",
+            affectedProductCapabilities: [],
+            humanActionRequired: false,
+            recoveryDestinationId: null,
+            freshness: "CURRENT",
+          },
+        ],
+        limitations: [],
+      },
+    },
+    {
+      capabilityId: "campaign.list",
+      data: [
+        {
+          campaign_id: "campaign-1",
+          campaign_name: "Summer Launch",
+          current_status: "LIVE",
+          core_objective: null,
+          product_count: 1,
+          brief_count: 1,
+          prospects_count: 0,
+          applicants_count: 0,
+          active_collabs_count: 1,
+          total_spend_to_date: 0,
+          total_impressions: "0",
+          budget_pool: 100,
+          created_at: new Date(0).toISOString(),
+          updated_at: new Date(0).toISOString(),
+        },
+      ],
+    },
+    {
+      capabilityId: "collaboration.list",
+      data: {
+        collaborations: [
+          {
+            collaborationId: "collaboration-1",
+            campaign: { id: "campaign-1", name: "Summer Launch" },
+            brief: { id: "brief-1", title: "Launch brief" },
+            campaignProduct: null,
+            creator: { displayName: "Creator", instagramHandle: null },
+            lifecycle: {
+              stage: "STAGE_1_NEGOTIATION",
+              status: "ACTIVE_WORKFLOW",
+              phase: "INBOUND_INVITE",
+              paused: false,
+              terminated: false,
+            },
+            attention: {
+              health: "ON_TRACK",
+              actionRequiredBy: "NONE",
+              reasonCodes: [],
+              dueAt: new Date(0).toISOString(),
+            },
+            unreadCount: 0,
+            lastMessageSnippet: null,
+            lastMessageAt: null,
+            stageUpdatedAt: new Date(0).toISOString(),
+            updatedAt: new Date(0).toISOString(),
+          },
+        ],
+      },
+    },
+  ])(
+    "adds one stable opaque result ref to available $capabilityId data",
+    async ({ capabilityId, data }) => {
+      const test = executor(async () => ({
+        capabilityId,
+        availability: "AVAILABLE",
+        data,
+        grounding: [
+          {
+            sourceType: "CANONICAL",
+            capabilityId,
+            entityRefs: [{ type: "BRAND", id: "brand-1" }],
+          },
+        ],
+        authorizedEntityRefs: [{ type: "BRAND", id: "brand-1" }],
+      }));
+
+      const first = await test.executor.execute(context, capabilityId, {});
+      const second = await test.executor.execute(context, capabilityId, {});
+      const firstRef = first.grounding[0]?.resultRefs?.[0];
+      expect(firstRef).toMatch(
+        new RegExp(`^canonical:${capabilityId}:[a-f0-9]{64}$`, "u"),
+      );
+      expect(firstRef?.length).toBeLessThanOrEqual(128);
+      expect(second.grounding[0]?.resultRefs).toEqual([firstRef]);
+    },
+  );
+
+  it("preserves existing Intelligence semantic result refs exactly", async () => {
+    const semanticRef = "result:brand-1:differentiation_and_proof";
+    const test = executor(async () => ({
+      capabilityId: "brand_intelligence.current.read",
+      availability: "AVAILABLE",
+      data: {
+        contractVersion: "1.0",
+        engineId: "brand_intelligence",
+        subject: { type: "BRAND", id: "brand-1" },
+        objects: [
+          {
+            objectId: "object-1",
+            objectState: "CURRENT",
+            current: { kind: "VALUE", resultRef: semanticRef },
+            readiness: "READY",
+            resultReadiness: "READY",
+            freshness: "CURRENT",
+            changedAt: new Date(0).toISOString(),
+            authority: "creator_shop",
+          },
+        ],
+        capabilityAvailability: { status: "AVAILABLE" },
+        domainPayloadVersion: "1.0",
+        domainPayload: {},
+      },
+      grounding: [
+        {
+          sourceType: "INTELLIGENCE",
+          capabilityId: "brand_intelligence.current.read",
+          entityRefs: [{ type: "BRAND", id: "brand-1" }],
+          resultRefs: [semanticRef],
+        },
+      ],
+      authorizedEntityRefs: [{ type: "BRAND", id: "brand-1" }],
+    }));
+
+    const result = await test.executor.execute(
+      context,
+      "brand_intelligence.current.read",
+      {},
+    );
+    expect(result.grounding[0]?.resultRefs).toEqual([semanticRef]);
+  });
+
+  it("does not create fallback result refs for NAVIGATE capabilities", async () => {
+    const test = executor(async () => ({
+      capabilityId: "app.navigate",
+      availability: "AVAILABLE",
+      data: { destinationId: "SETTINGS" },
+      grounding: [],
+      authorizedEntityRefs: [],
+      navigation: { destinationId: "SETTINGS" },
+    }));
+
+    const result = await test.executor.execute(context, "app.navigate", {
+      destinationId: "SETTINGS",
+    });
+    expect(result.grounding).toEqual([]);
+  });
 });

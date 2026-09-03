@@ -75,7 +75,7 @@ export const ChatSynthesisDraftSchema = z
     recommendation: z
       .object({
         text: z.string().trim().min(1).max(4_000),
-        basisRefs: z.array(z.string().trim().min(1).max(128)),
+        basisRefs: z.array(z.string().trim().min(1).max(128)).min(1),
         nonMutating: z.literal(true),
       })
       .strict()
