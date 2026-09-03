@@ -42,10 +42,12 @@ jobs:
       C05_TEAM_DATABASE_TEST: "true"
       PLAYWRIGHT_ENABLED: "false"
       SETTINGS_FIELD_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      JWT_SECRET: c03-stage-b-non-secret-runtime-proof
       JWT_SECRET_DEV: c03-stage-b-non-secret-runtime-proof
       JWT_SECRET_PROD: c03-stage-b-non-secret-runtime-proof
       JWT_ISSUER: creatorshop-stage-b
       JWT_AUDIENCE: creatorshop-stage-b
+      AUTH_OTP_PEPPER: c03-stage-b-non-secret-runtime-proof
       AUTH_OTP_PEPPER_DEV: c03-stage-b-non-secret-runtime-proof
       AUTH_OTP_PEPPER_PROD: c03-stage-b-non-secret-runtime-proof
       POSTMARK_SERVER_TOKEN: stage-b-placeholder
