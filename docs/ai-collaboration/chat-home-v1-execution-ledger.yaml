@@ -1006,6 +1006,14 @@ p5_b_proactive_brand_home_aggregation:
   status: IMPLEMENTED_PENDING_SYSTEMS_ACCEPTANCE
   authorized_starting_sha: 8737f3327beeb41c74e3e7f76062d42f4e853153
   accepted_p5_a_runtime_authority: 0ec9888dd9212cd31e6f46de2ee39ec2ccf586fa
+  systems_review:
+    decision: BOUNDED_CORRECTION_REQUIRED
+    original_candidate_sha: 49566e014795174cb03a826cc05dc6c3a5b10d96
+  correction:
+    id: P5_B_SOURCE_STATE_CONTRACT_01
+    source_freshness_added: true
+    source_observed_at_added: true
+    partial_source_semantics_corrected: true
   scope:
     intelligence_consumer_reads: EXISTING_ONLY_NO_CREATE
     intelligence_write_resolution: CREATE_OR_READ_PRESERVED
@@ -1052,6 +1060,17 @@ p5_b_proactive_brand_home_aggregation:
     execution_claims_prohibited: true
   brand_home:
     contract_version: "1.0"
+    source_state_contract:
+      freshness_required: true
+      observed_at_required: true
+      observed_at_definition: HOME_REQUEST_EVALUATION_TIME
+      canonical_source_freshness: CURRENT_ON_SUCCESS_UNKNOWN_WHEN_UNAVAILABLE
+      provider_health_distinct_from_source_read_state: true
+      no_current_intelligence_state: READY
+      no_current_intelligence_freshness: UNKNOWN
+      stale_last_good_forces_partial: false
+      material_intelligence_partial_propagates: true
+      duplicate_limitations_suppressed: true
     stable_sections:
       - NEEDS_ATTENTION
       - CREATOR_SHOP_HAS_LEARNED
@@ -1083,6 +1102,9 @@ p5_b_proactive_brand_home_aggregation:
     primary:
       http_status: 200
       top_level_status: READY
+      all_source_observed_at: 2026-09-03T06:00:00.000Z
+      brand_intelligence_source_freshness: CURRENT
+      product_intelligence_source_freshness: CURRENT
       needs_attention: COLLABORATION_ACTION_OVERDUE
       learned: BRAND_DIFFERENTIATION_CURRENT
       learned_changed_at: 2026-09-03T04:00:00.000Z
@@ -1096,6 +1118,11 @@ p5_b_proactive_brand_home_aggregation:
       http_status: 200
       top_level_status: READY
       provider_blocker: INSTAGRAM_REVALIDATION_REQUIRED
+      provider_source_state: READY
+      provider_source_freshness: UNKNOWN
+      brand_intelligence_source_freshness: UNKNOWN
+      product_intelligence_source_freshness: UNKNOWN
+      all_source_observed_at: 2026-09-03T06:00:00.000Z
       cross_brand_data_present: false
       intelligence_subject_count_before: 0
       intelligence_subject_count_after: 0
@@ -1128,7 +1155,7 @@ p5_b_proactive_brand_home_aggregation:
       failed: 0
     home_contract:
       status: PASS
-      passed: 3
+      passed: 4
       failed: 0
     home_classifier:
       status: PASS
@@ -1154,10 +1181,21 @@ p5_b_proactive_brand_home_aggregation:
     standard_full_suite:
       status: PASS
       attempts: 1
-      passed: 1157
+      passed: 1164
       failed: 0
       skipped: 496
       notification_variance_observed: false
+    source_state_correction:
+      status: PASS
+      schema_passed: 4
+      aggregation_passed: 6
+      classifier_passed: 6
+      priority_dedup_passed: 4
+      postgresql_http_passed: 3
+      intelligence_pure_read_passed: 4
+      p5_a_regression_passed: 59
+      chat_passed: 88
+      chat_skipped: 12
   validation:
     prisma_generate: PASS
     prisma_validate: PASS
@@ -1167,6 +1205,7 @@ p5_b_proactive_brand_home_aggregation:
     git_diff_check: PASS
     changed_scope_lint: PASS
     changed_scope_lint_file_count: 46
+    correction_changed_scope_lint_file_count: 6
     repository_wide_lint_run: false
   module_graph:
     forward_ref_count_before: 7
@@ -1188,6 +1227,7 @@ p5_b_proactive_brand_home_aggregation:
     stable_repeated_probe: PASS
     primary_home_http_status: 200
     second_brand_home_http_status: 200
+    source_state_correction_reverified: true
   semantic_differential:
     product: UNCHANGED
     p5_a_capabilities: UNCHANGED

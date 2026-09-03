@@ -41,6 +41,8 @@ function response() {
       {
         sourceDomain: "CAMPAIGN",
         state: "READY",
+        freshness: "CURRENT",
+        observedAt: now,
         truncated: false,
         limitations: [],
       },
@@ -88,5 +90,46 @@ describe("Brand Home 1.0 response contract", () => {
       },
     } as never;
     expect(() => BrandHomeResponseSchema.parse(candidate)).toThrow();
+  });
+
+  it("requires strict source freshness and request-time observation", () => {
+    const missingFreshness = response();
+    delete (missingFreshness.sourceStates[0] as { freshness?: string })
+      .freshness;
+    expect(() => BrandHomeResponseSchema.parse(missingFreshness)).toThrow();
+
+    const missingObservedAt = response();
+    delete (missingObservedAt.sourceStates[0] as { observedAt?: string })
+      .observedAt;
+    expect(() => BrandHomeResponseSchema.parse(missingObservedAt)).toThrow();
+
+    expect(() =>
+      BrandHomeResponseSchema.parse({
+        ...response(),
+        sourceStates: [{ ...response().sourceStates[0], freshness: "FRESH" }],
+      }),
+    ).toThrow();
+    expect(() =>
+      BrandHomeResponseSchema.parse({
+        ...response(),
+        sourceStates: [{ ...response().sourceStates[0], state: "DEGRADED" }],
+      }),
+    ).toThrow();
+    expect(() =>
+      BrandHomeResponseSchema.parse({
+        ...response(),
+        sourceStates: [
+          { ...response().sourceStates[0], observedAt: "not-a-datetime" },
+        ],
+      }),
+    ).toThrow();
+    expect(() =>
+      BrandHomeResponseSchema.parse({
+        ...response(),
+        sourceStates: [
+          { ...response().sourceStates[0], internalState: "hidden" },
+        ],
+      }),
+    ).toThrow();
   });
 });

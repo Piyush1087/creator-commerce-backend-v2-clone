@@ -47,6 +47,12 @@ type ProductIntelligenceEntry = Readonly<{
   intelligence: IntelligenceConsumerResult;
 }>;
 
+type SourceSemantics = Readonly<{
+  state: BrandHomeSourceState["state"];
+  freshness: BrandHomeSourceState["freshness"];
+  limitations?: readonly string[];
+}>;
+
 @Injectable()
 export class BrandHomeAggregationService {
   constructor(
@@ -98,6 +104,10 @@ export class BrandHomeAggregationService {
       user,
       offeringIndex,
     );
+    const brandIntelligenceSemantics =
+      this.brandIntelligenceSemantics(brandIntelligence);
+    const productIntelligenceSemantics =
+      this.productIntelligenceSemantics(productIntelligence);
 
     const candidates: BrandHomeCandidate[] = [];
     for (const collaboration of collaborations.data?.collaborations ?? []) {
@@ -146,26 +156,34 @@ export class BrandHomeAggregationService {
     }
 
     const sourceStates: BrandHomeSourceState[] = [
-      this.sourceState("BRAND", brand),
-      this.sourceState("WORKSPACE_READINESS", workspaceReadiness),
-      this.sourceState("PROVIDER_READINESS", providerReadiness),
+      this.sourceState("BRAND", brand, generatedAt),
+      this.sourceState("WORKSPACE_READINESS", workspaceReadiness, generatedAt),
+      this.sourceState("PROVIDER_READINESS", providerReadiness, generatedAt, {
+        freshness:
+          (providerReadiness.data?.providers.some(
+            (provider) => provider.freshness === "UNKNOWN",
+          ) ?? true)
+            ? "UNKNOWN"
+            : "CURRENT",
+      }),
+      this.sourceState("COLLABORATION", collaborations, generatedAt, {
+        truncated: collaborations.data?.truncated ?? false,
+      }),
+      this.sourceState("BRAND_INTELLIGENCE", brandIntelligence, generatedAt, {
+        ...brandIntelligenceSemantics,
+      }),
+      this.sourceState("OFFERING", offeringIndex, generatedAt, {
+        truncated: offeringIndex.data?.truncated ?? false,
+      }),
       this.sourceState(
-        "COLLABORATION",
-        collaborations,
-        collaborations.data?.truncated ?? false,
+        "PRODUCT_INTELLIGENCE",
+        productIntelligence,
+        generatedAt,
+        { ...productIntelligenceSemantics },
       ),
-      this.sourceState("BRAND_INTELLIGENCE", brandIntelligence),
-      this.sourceState(
-        "OFFERING",
-        offeringIndex,
-        offeringIndex.data?.truncated ?? false,
-      ),
-      this.sourceState("PRODUCT_INTELLIGENCE", productIntelligence),
-      this.sourceState(
-        "CAMPAIGN",
-        campaigns,
-        campaigns.data?.truncated ?? false,
-      ),
+      this.sourceState("CAMPAIGN", campaigns, generatedAt, {
+        truncated: campaigns.data?.truncated ?? false,
+      }),
     ];
     const deduplicated = this.duplicateSuppressor.suppress(candidates);
     const sections = BRAND_HOME_SECTION_IDS.map((sectionId) => {
@@ -275,16 +293,91 @@ export class BrandHomeAggregationService {
   private sourceState<T>(
     sourceDomain: BrandHomeSourceDomain,
     collected: Collected<T>,
-    truncated = false,
+    observedAt: string,
+    options: Readonly<{
+      state?: BrandHomeSourceState["state"];
+      freshness?: BrandHomeSourceState["freshness"];
+      truncated?: boolean;
+      limitations?: readonly string[];
+    }> = {},
   ): BrandHomeSourceState {
+    const truncated = options.truncated ?? false;
     return {
       sourceDomain,
-      state: collected.state,
+      state: options.state ?? collected.state,
+      freshness:
+        collected.state === "UNAVAILABLE"
+          ? "UNKNOWN"
+          : (options.freshness ?? "CURRENT"),
+      observedAt,
       truncated,
-      limitations: [
+      limitations: this.unique([
         ...collected.limitations,
+        ...(options.limitations ?? []),
         ...(truncated ? [`${sourceDomain} source was truncated.`] : []),
-      ],
+      ]),
+    };
+  }
+
+  private brandIntelligenceSemantics(
+    collected: Collected<IntelligenceConsumerResult>,
+  ): SourceSemantics {
+    if (!collected.data) {
+      return { state: "UNAVAILABLE", freshness: "UNKNOWN" };
+    }
+    const relevant = collected.data.objects.find(
+      (object) => object.objectId === "differentiation_and_proof",
+    );
+    if (!relevant || relevant.current.kind !== "VALUE") {
+      return { state: "READY", freshness: "UNKNOWN" };
+    }
+    const partial =
+      relevant.objectState === "PARTIAL_CURRENT" ||
+      relevant.readiness === "PARTIAL" ||
+      relevant.resultReadiness === "PARTIAL";
+    return {
+      state: partial ? "PARTIAL" : "READY",
+      freshness: relevant.freshness,
+      limitations: partial
+        ? ["Brand Intelligence is materially partial for Home."]
+        : [],
+    };
+  }
+
+  private productIntelligenceSemantics(
+    collected: Collected<ProductIntelligenceEntry[]>,
+  ): SourceSemantics {
+    if (collected.state === "UNAVAILABLE" || !collected.data) {
+      return { state: "UNAVAILABLE", freshness: "UNKNOWN" };
+    }
+    const relevant = collected.data.map((entry) =>
+      entry.intelligence.objects.find(
+        (object) => object.objectId === "offering_actionability_profile",
+      ),
+    );
+    const partial = relevant.some(
+      (object) =>
+        object?.objectState === "PARTIAL_CURRENT" ||
+        object?.readiness === "PARTIAL" ||
+        object?.resultReadiness === "PARTIAL",
+    );
+    const freshness = relevant.some((object) => object?.freshness === "STALE")
+      ? ("STALE" as const)
+      : relevant.length === 0 ||
+          relevant.some(
+            (object) =>
+              !object ||
+              object.current.kind !== "VALUE" ||
+              object.freshness === "UNKNOWN",
+          )
+        ? ("UNKNOWN" as const)
+        : ("CURRENT" as const);
+    return {
+      state: collected.state === "PARTIAL" || partial ? "PARTIAL" : "READY",
+      freshness,
+      limitations: partial
+        ? ["Product Intelligence actionability is materially partial for Home."]
+        : [],
     };
   }
 

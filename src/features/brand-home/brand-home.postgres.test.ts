@@ -336,8 +336,24 @@ describe.skipIf(process.env.CHAT_HOME_P5_B_DATABASE_TEST !== "true")(
       expect(response.payload).toMatchObject({
         contractVersion: "1.0",
         generatedAt: FIXED_NOW,
+        status: "READY",
         brand: { id: PRIMARY_BRAND_ID },
       });
+      expect(
+        response.payload.sourceStates.every(
+          (source) => source.observedAt === FIXED_NOW,
+        ),
+      ).toBe(true);
+      expect(
+        response.payload.sourceStates.find(
+          (source) => source.sourceDomain === "BRAND_INTELLIGENCE",
+        ),
+      ).toMatchObject({ state: "READY", freshness: "CURRENT" });
+      expect(
+        response.payload.sourceStates.find(
+          (source) => source.sourceDomain === "PRODUCT_INTELLIGENCE",
+        ),
+      ).toMatchObject({ state: "READY", freshness: "CURRENT" });
       expect(response.payload.sections.map((section) => section.id)).toEqual(
         BRAND_HOME_SECTION_IDS,
       );
@@ -398,6 +414,26 @@ describe.skipIf(process.env.CHAT_HOME_P5_B_DATABASE_TEST !== "true")(
       const response = await home(second);
       expect(response.status).toBe(200);
       expect(response.payload.brand.id).toBe(SECOND_BRAND_ID);
+      expect(
+        response.payload.sourceStates.every(
+          (source) => source.observedAt === FIXED_NOW,
+        ),
+      ).toBe(true);
+      expect(
+        response.payload.sourceStates.find(
+          (source) => source.sourceDomain === "PROVIDER_READINESS",
+        ),
+      ).toMatchObject({ state: "READY", freshness: "UNKNOWN" });
+      expect(
+        response.payload.sourceStates.find(
+          (source) => source.sourceDomain === "BRAND_INTELLIGENCE",
+        ),
+      ).toMatchObject({ state: "READY", freshness: "UNKNOWN" });
+      expect(
+        response.payload.sourceStates.find(
+          (source) => source.sourceDomain === "PRODUCT_INTELLIGENCE",
+        ),
+      ).toMatchObject({ state: "READY", freshness: "UNKNOWN" });
       expect(JSON.stringify(response.payload)).not.toMatch(
         new RegExp(
           [

@@ -12,6 +12,8 @@ export type BrandHomeCandidate = BrandHomeItem & {
 export type BrandHomeSourceState = Readonly<{
   sourceDomain: BrandHomeItem["sourceDomains"][number];
   state: "READY" | "PARTIAL" | "UNAVAILABLE";
+  freshness: "CURRENT" | "STALE" | "UNKNOWN";
+  observedAt: string;
   truncated: boolean;
   limitations: string[];
 }>;

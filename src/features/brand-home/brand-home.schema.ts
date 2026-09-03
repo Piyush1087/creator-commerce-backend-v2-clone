@@ -78,6 +78,8 @@ export const BrandHomeResponseSchema = z
         .object({
           sourceDomain: z.enum(BRAND_HOME_SOURCE_DOMAINS),
           state: z.enum(["READY", "PARTIAL", "UNAVAILABLE"]),
+          freshness: z.enum(["CURRENT", "STALE", "UNKNOWN"]),
+          observedAt: z.string().datetime(),
           truncated: z.boolean(),
           limitations: z.array(z.string().trim().min(1).max(500)),
         })
