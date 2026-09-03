@@ -55,13 +55,16 @@ export interface IntelligenceConsumerCandidateMeta {
 
 export interface IntelligenceConsumerObjectMeta {
   readonly objectId: string;
+  readonly objectState: "NO_CURRENT" | "PARTIAL_CURRENT" | "CURRENT";
   readonly current:
     | { readonly kind: "VALUE"; readonly resultRef: string }
     | {
         readonly kind: Exclude<IntelligenceConsumerCurrentKind, "VALUE">;
       };
   readonly readiness: IntelligenceConsumerReadiness;
+  readonly resultReadiness: IntelligenceConsumerReadiness;
   readonly freshness: IntelligenceConsumerFreshness;
+  readonly changedAt: string | null;
   readonly authority: IntelligenceConsumerAuthority;
   readonly candidate?: IntelligenceConsumerCandidateMeta;
   readonly runtimeActivity?: IntelligenceConsumerRuntimeActivity;

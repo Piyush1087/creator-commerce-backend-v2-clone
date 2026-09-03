@@ -1000,3 +1000,210 @@ p5_a_remaining_canonical_reads_and_navigation:
     p5_c: false
     p6: false
   breaker: NONE
+
+p5_b_proactive_brand_home_aggregation:
+  authority: P5_B_PROACTIVE_BRAND_HOME_AGGREGATION
+  status: IMPLEMENTED_PENDING_SYSTEMS_ACCEPTANCE
+  authorized_starting_sha: 8737f3327beeb41c74e3e7f76062d42f4e853153
+  accepted_p5_a_runtime_authority: 0ec9888dd9212cd31e6f46de2ee39ec2ccf586fa
+  scope:
+    intelligence_consumer_reads: EXISTING_ONLY_NO_CREATE
+    intelligence_write_resolution: CREATE_OR_READ_PRESERVED
+    intelligence_changed_at: MAX_CURRENT_PROMOTED_COMPONENT_GENERATION_CREATED_AT
+    no_current_changed_at: null
+    recommendation_basis_authority: EXECUTED_AUTHORIZED_GROUNDING_RESULT_REFS_ONLY
+    proposals: NON_MUTATING
+    home_endpoint: GET /api/v1/brand/home
+    home_aggregation: REQUEST_TIME_DETERMINISTIC
+    home_persistence_added: false
+    gemini_home_authority: false
+    capability_descriptor_count: 13
+    execute_capability_count: 0
+  intelligence_pure_read_evidence:
+    existing_brand_subject_read_without_write: PASS
+    missing_brand_subject_result: NO_CURRENT
+    missing_brand_subject_created: false
+    existing_offering_subject_read_without_write: PASS
+    missing_offering_subject_result: NO_CURRENT
+    missing_offering_subject_created: false
+    exact_offering_ownership_required: true
+    second_brand_subject_count_before: 0
+    second_brand_subject_count_after: 0
+    object_generation_delta: 0
+    component_generation_delta: 0
+    current_component_delta: 0
+    no_current_contract:
+      object_state: NO_CURRENT
+      consumer_readiness: NOT_READY
+      result_readiness: NOT_READY
+      freshness: UNKNOWN
+      changed_at: null
+  intelligence_metadata:
+    changed_at_added: true
+    definition: MAX_CURRENT_PROMOTED_COMPONENT_GENERATION_CREATED_AT
+    fixture_brand_changed_at: 2026-09-03T04:00:00.000Z
+    fixture_product_changed_at: 2026-09-03T04:30:00.000Z
+  recommendation_validation:
+    unknown_basis_ref_rejected: true
+    non_invoked_basis_ref_rejected: true
+    foreign_unexecuted_basis_ref_rejected: true
+    executed_grounding_basis_accepted: true
+    non_mutating_enforced: true
+    execution_claims_prohibited: true
+  brand_home:
+    contract_version: "1.0"
+    stable_sections:
+      - NEEDS_ATTENTION
+      - CREATOR_SHOP_HAS_LEARNED
+      - OPPORTUNITIES_NEXT_ACTIONS
+      - CURRENT_MOMENTUM
+    section_order_correct: true
+    priority_tiers:
+      - BLOCKED_FAILED_ACTION_REQUIRED
+      - DEADLINE_SLA_TIME_SENSITIVE
+      - MATERIAL_SETUP_CAPABILITY_BLOCKER
+      - MATERIAL_OPPORTUNITY
+      - NEW_OR_CHANGED_INTELLIGENCE
+      - MEANINGFUL_MOMENTUM
+    priority_is_deterministic_server_logic: true
+    fixed_clock_supported: true
+    duplicate_suppression:
+      attention_suppresses_same_collaboration_momentum: true
+      opportunity_suppresses_duplicate_learned_action: true
+      unrelated_same_entity_items_survive: true
+    bounds:
+      collaborations: 50
+      offerings: 20
+      campaigns: 50
+      product_intelligence: BOUNDED_BY_OFFERINGS
+    partial_source_policy: PRESERVES_OTHER_VALID_SECTIONS
+  fixture_http_evidence:
+    database: chat_home_p3_module_boundary_01
+    reference_clock: 2026-09-03T06:00:00.000Z
+    primary:
+      http_status: 200
+      top_level_status: READY
+      needs_attention: COLLABORATION_ACTION_OVERDUE
+      learned: BRAND_DIFFERENTIATION_CURRENT
+      learned_changed_at: 2026-09-03T04:00:00.000Z
+      opportunity: OFFERING_ACTIONABILITY_CURRENT
+      opportunity_changed_at: 2026-09-03T04:30:00.000Z
+      momentum: CAMPAIGN_LIVE_MOMENTUM
+      momentum_changed_at: 2026-09-03T05:00:00.000Z
+      four_sections_present: true
+      navigation_metadata_valid: true
+    second_brand:
+      http_status: 200
+      top_level_status: READY
+      provider_blocker: INSTAGRAM_REVALIDATION_REQUIRED
+      cross_brand_data_present: false
+      intelligence_subject_count_before: 0
+      intelligence_subject_count_after: 0
+  business_read_purity:
+    collaboration_mutated: false
+    uce_collaboration_mutated: false
+    provider_mutated: false
+    subscription_mutated: false
+    billing_mutated: false
+    campaign_mutated: false
+    intelligence_state_mutated_by_read: false
+  external_actions:
+    gemini_home_calls: 0
+    meta_calls: 0
+    razorpay_calls: 0
+    email_calls: 0
+    notification_delivery_calls: 0
+  tests:
+    intelligence_pure_read:
+      status: PASS
+      passed: 7
+      failed: 0
+    intelligence_changed_at:
+      status: PASS
+      passed: 14
+      failed: 0
+    recommendation_validation:
+      status: PASS
+      passed: 13
+      failed: 0
+    home_contract:
+      status: PASS
+      passed: 3
+      failed: 0
+    home_classifier:
+      status: PASS
+      passed: 6
+      failed: 0
+    home_priority_dedup:
+      status: PASS
+      passed: 4
+      failed: 0
+    home_postgresql_http:
+      status: PASS
+      passed: 3
+      failed: 0
+    p5_a_regression:
+      status: PASS
+      passed: 59
+      failed: 0
+    full_chat_scope:
+      status: PASS
+      passed: 88
+      failed: 0
+      skipped: 12
+    standard_full_suite:
+      status: PASS
+      attempts: 1
+      passed: 1157
+      failed: 0
+      skipped: 496
+      notification_variance_observed: false
+  validation:
+    prisma_generate: PASS
+    prisma_validate: PASS
+    intelligence_contracts_verify: PASS
+    intelligence_architecture_commit: bbb0be3345c36e9cc7c4f06ca68fb491b742b83f
+    backend_build: PASS
+    git_diff_check: PASS
+    changed_scope_lint: PASS
+    changed_scope_lint_file_count: 46
+    repository_wide_lint_run: false
+  module_graph:
+    forward_ref_count_before: 7
+    forward_ref_count_after: 7
+    new_forward_refs: 0
+    scc_count_before: 1
+    scc_count_after: 1
+    new_scc_detected: false
+  migrations:
+    count_before: 66
+    count_after: 66
+    new_migrations: 0
+    prisma_schema_changed: false
+  runtime:
+    nest_initialized: true
+    port: 3000
+    health_http_status: 200
+    database_status: up
+    stable_repeated_probe: PASS
+    primary_home_http_status: 200
+    second_brand_home_http_status: 200
+  semantic_differential:
+    product: UNCHANGED
+    p5_a_capabilities: UNCHANGED
+    planner: UNCHANGED
+    authorization: UNCHANGED
+    conversation_persistence: UNCHANGED
+    campaign: UNCHANGED
+    collaboration: UNCHANGED
+    settings: UNCHANGED
+    provider: UNCHANGED
+    billing: UNCHANGED
+    intelligence_product_meaning: UNCHANGED
+    frontend: UNCHANGED
+    database_schema: UNCHANGED
+  next_phase_authorization:
+    p5_b_accepted: false
+    p5_c: false
+    p6: false
+  breaker: NONE

@@ -69,6 +69,23 @@ export class CollaborationConsumerService {
     return { collaborations: rows.map((row) => this.mapListRow(row)) };
   }
 
+  async listForHome(user: AuthUser, limit: number) {
+    const { brandProfileId } = await this.workspace.resolveBrandContext(user);
+    const boundedLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+    const rows = await this.prisma.collaboration.findMany({
+      where: { brandProfileId },
+      select: COLLABORATION_CONSUMER_SELECT,
+      orderBy: [{ lastMessageAt: "desc" }, { updatedAt: "desc" }],
+      take: boundedLimit + 1,
+    });
+    return {
+      collaborations: rows
+        .slice(0, boundedLimit)
+        .map((row) => this.mapListRow(row)),
+      truncated: rows.length > boundedLimit,
+    };
+  }
+
   async read(user: AuthUser, collaborationId: string) {
     const { brandProfileId } = await this.workspace.resolveBrandContext(user);
     const row = await this.prisma.collaboration.findFirst({

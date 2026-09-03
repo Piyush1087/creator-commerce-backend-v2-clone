@@ -556,7 +556,18 @@ describe("ChatModelGateway", () => {
       "answer",
       "freshnessNotes",
       "limitations",
+      "recommendation",
     ]);
+    expect(responseSchema.properties.recommendation.properties).toMatchObject({
+      basisRefs: { type: SchemaType.ARRAY },
+      nonMutating: { type: SchemaType.BOOLEAN },
+    });
+    expect(generateJson.mock.calls[0][0].systemInstruction).toContain(
+      "basisRefs must be exact resultRefs",
+    );
+    expect(generateJson.mock.calls[0][0].systemInstruction).toContain(
+      "Never claim that you updated",
+    );
 
     const invented = fixture({
       answer: "draft",

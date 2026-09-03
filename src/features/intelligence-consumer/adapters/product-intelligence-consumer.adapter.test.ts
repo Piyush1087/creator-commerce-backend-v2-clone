@@ -30,9 +30,12 @@ function productObject(
 ): ProductIntelligenceObject {
   return {
     semanticId,
+    objectState: "CURRENT",
     current: { kind: "VALUE", value: { semanticId, exact: true } },
     readiness: "READY",
+    resultReadiness: "READY",
     freshness: "CURRENT",
+    changedAt: "2026-09-03T04:30:00.000Z",
     authority: "creator_shop",
     candidate: {
       status: "NONE",
@@ -100,9 +103,12 @@ function productPayload(id = offeringId): ProductConsumerResponse {
       creatorCommunicationProfile: productObject(
         "offering_creator_communication_profile",
         {
+          objectState: "NO_CURRENT",
           current: { kind: "NO_CURRENT" },
           readiness: "PARTIAL",
+          resultReadiness: "PARTIAL",
           freshness: "STALE",
+          changedAt: null,
           candidate: {
             status: "CONFLICT",
             count: 3,
@@ -113,8 +119,10 @@ function productPayload(id = offeringId): ProductConsumerResponse {
         },
       ),
       actionabilityProfile: productObject("offering_actionability_profile", {
+        objectState: "CURRENT",
         current: { kind: "EXPLICIT_NULL" },
         readiness: "NOT_READY",
+        resultReadiness: "NOT_READY",
         freshness: "UNKNOWN",
       }),
     },

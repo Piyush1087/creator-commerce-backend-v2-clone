@@ -5,8 +5,11 @@ import { IntelligenceConsumerResultSchema } from "./intelligence-consumer.schema
 describe("Intelligence consumer envelope schema", () => {
   const baseObject = {
     objectId: "brand_description",
+    objectState: "CURRENT" as const,
     readiness: "READY" as const,
+    resultReadiness: "READY" as const,
     freshness: "CURRENT" as const,
+    changedAt: "2026-09-03T04:00:00.000Z",
     authority: "confirmed" as const,
   };
 
@@ -23,7 +26,21 @@ describe("Intelligence consumer envelope schema", () => {
         contractVersion: "1.0",
         engineId: "brand_intelligence",
         subject: { type: "BRAND", id: "brand-1" },
-        objects: [{ ...baseObject, current: { kind } }],
+        objects: [
+          {
+            ...baseObject,
+            ...(kind === "NO_CURRENT"
+              ? {
+                  objectState: "NO_CURRENT" as const,
+                  readiness: "NOT_READY" as const,
+                  resultReadiness: "NOT_READY" as const,
+                  freshness: "UNKNOWN" as const,
+                  changedAt: null,
+                }
+              : {}),
+            current: { kind },
+          },
+        ],
         capabilityAvailability: { status: "AVAILABLE" },
         domainPayloadVersion: "1.0",
         domainPayload: { brandSpecific: true },

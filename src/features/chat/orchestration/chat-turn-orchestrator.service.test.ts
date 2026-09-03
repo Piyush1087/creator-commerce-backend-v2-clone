@@ -505,6 +505,7 @@ describe("ChatTurnOrchestratorService", () => {
     ).toEqual([
       {
         capabilityId: "campaign.list",
+        resultRefs: [],
         data: [
           {
             campaign_id: "campaign-1",

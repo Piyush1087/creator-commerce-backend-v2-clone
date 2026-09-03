@@ -8,6 +8,7 @@ import { BrandCentreModule } from "./features/brand-centre/brand-centre.module";
 import { BrandCentreUceBridgeModule } from "./features/brand-centre-uce-bridge/brand-centre-uce-bridge.module";
 import { BrandOnboardingModule } from "./features/brand-onboarding/brand-onboarding.module";
 import { BrandEscrowModule } from "./features/brand-escrow/brand-escrow.module";
+import { BrandHomeModule } from "./features/brand-home/brand-home.module";
 import { BrandIntelligenceModule } from "./features/brand-intelligence/brand-intelligence.module";
 import { PricingModule } from "./features/pricing/pricing.module";
 import { BrandPayoutsModule } from "./features/brand-payouts/brand-payouts.module";
@@ -57,6 +58,7 @@ import { S3Module } from "./shared/s3/s3.module";
     BrandCentreUceBridgeModule,
     BrandUceModule,
     BrandEscrowModule,
+    BrandHomeModule,
     BrandPayoutsModule,
     BrandSettingsModule,
     NotificationsModule,

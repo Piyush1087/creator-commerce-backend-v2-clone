@@ -36,9 +36,12 @@ const currentSchema = z.discriminatedUnion("kind", [
 export const IntelligenceConsumerObjectMetaSchema = z
   .object({
     objectId: z.string().min(1),
+    objectState: z.enum(["NO_CURRENT", "PARTIAL_CURRENT", "CURRENT"]),
     current: currentSchema,
     readiness: z.enum(["READY", "PARTIAL", "NOT_READY"]),
+    resultReadiness: z.enum(["READY", "PARTIAL", "NOT_READY"]),
     freshness: z.enum(["CURRENT", "STALE", "UNKNOWN"]),
+    changedAt: z.string().datetime().nullable(),
     authority: z.enum([
       "observed",
       "creator_shop",

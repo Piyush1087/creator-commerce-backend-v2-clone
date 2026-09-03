@@ -128,7 +128,7 @@ export class ChatModelGateway {
   }): Promise<ChatSynthesisDraft> {
     const modelResult = await this.model.generateJson({
       systemInstruction:
-        "Synthesize only the supplied authorized results. Return exactly one JSON object containing answer, freshnessNotes, and limitations. Do not invent grounding, entities, navigation, actions, authorization, or unsupported facts.",
+        "Synthesize only the supplied authorized results. Return exactly one JSON object containing answer, freshnessNotes, limitations, and optionally a non-mutating recommendation. Recommendation basisRefs must be exact resultRefs supplied with executed authorized results. Never claim that you updated, approved, sent, connected, paid, changed, invited, completed, or otherwise executed an action. Do not invent grounding, entities, navigation, actions, authorization, or unsupported facts.",
       userText: JSON.stringify(args),
       responseSchema: zodToGeminiResponseSchema(ChatSynthesisDraftSchema),
       temperature: 0.2,

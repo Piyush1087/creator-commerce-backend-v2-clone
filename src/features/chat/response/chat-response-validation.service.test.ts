@@ -12,6 +12,12 @@ describe("Chat response contract and evidence validation", () => {
     invokedCapabilityIds: ["brand.current.read"],
     authorizedEntityRefs: [brand],
     allowedNavigationDestinationIds: ["BRAND_CENTRE"],
+    executedGroundingResultRefs: [
+      {
+        capabilityId: "brand.current.read",
+        resultRefs: ["brand.current:brand-a"],
+      },
+    ],
   };
 
   const response = (
@@ -71,6 +77,75 @@ describe("Chat response contract and evidence validation", () => {
         evidence,
       ),
     ).toThrow();
+  });
+
+  it("accepts recommendation basis refs produced by executed authorized grounding", () => {
+    expect(
+      validator.validate(
+        {
+          ...response("ANSWERED"),
+          recommendation: {
+            text: "Review the current Brand state.",
+            basisRefs: ["brand.current:brand-a"],
+            nonMutating: true,
+          },
+        },
+        evidence,
+      ).recommendation,
+    ).toMatchObject({ basisRefs: ["brand.current:brand-a"] });
+  });
+
+  it.each(["unknown:result", "foreign:result"])(
+    "rejects unexecuted recommendation basis ref %s",
+    (basisRef) => {
+      expect(() =>
+        validator.validate(
+          {
+            ...response("ANSWERED"),
+            recommendation: {
+              text: "Review this.",
+              basisRefs: [basisRef],
+              nonMutating: true,
+            },
+          },
+          evidence,
+        ),
+      ).toThrow(BadRequestException);
+    },
+  );
+
+  it("rejects a basis ref asserted through a non-invoked capability", () => {
+    expect(() =>
+      validator.validate(
+        {
+          ...response("ANSWERED"),
+          recommendation: {
+            text: "Review this.",
+            basisRefs: ["campaign.read:foreign"],
+            nonMutating: true,
+          },
+        },
+        {
+          ...evidence,
+          executedGroundingResultRefs: [
+            ...evidence.executedGroundingResultRefs,
+            {
+              capabilityId: "campaign.read",
+              resultRefs: ["campaign.read:foreign"],
+            },
+          ],
+        },
+      ),
+    ).toThrow(BadRequestException);
+  });
+
+  it("rejects execution claims from a non-mutating response", () => {
+    expect(() =>
+      validator.validate(
+        { ...response("ANSWERED"), answer: "I approved the campaign." },
+        evidence,
+      ),
+    ).toThrow(BadRequestException);
   });
 
   it("rejects grounding, entity refs, and navigation not proven by server evidence", () => {

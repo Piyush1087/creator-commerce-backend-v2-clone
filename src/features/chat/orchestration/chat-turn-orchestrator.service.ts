@@ -224,6 +224,9 @@ export class ChatTurnOrchestratorService {
                   .map((result) => ({
                     capabilityId: result.capabilityId,
                     data: result.data,
+                    resultRefs: result.grounding.flatMap(
+                      (grounding) => grounding.resultRefs ?? [],
+                    ),
                   })),
                 sanitizedConversationContext: { recentMessages: history },
                 responseConstraints: {
@@ -247,6 +250,9 @@ export class ChatTurnOrchestratorService {
           ...freshnessNotes,
         ]),
         limitations: this.unique([...draft.limitations, ...limitations]),
+        ...(draft.recommendation
+          ? { recommendation: draft.recommendation }
+          : {}),
         ...(navigation ? { navigation } : {}),
       };
       const validated = this.responses.validate(response, {
@@ -255,6 +261,12 @@ export class ChatTurnOrchestratorService {
         allowedNavigationDestinationIds: navigation
           ? [navigation.destinationId]
           : [],
+        executedGroundingResultRefs: usable.flatMap((result) =>
+          result.grounding.map((grounding) => ({
+            capabilityId: grounding.capabilityId,
+            resultRefs: grounding.resultRefs ?? [],
+          })),
+        ),
       });
       await this.conversations.appendAssistantResponse(
         actor,

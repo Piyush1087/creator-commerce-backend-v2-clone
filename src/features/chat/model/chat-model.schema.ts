@@ -72,6 +72,14 @@ export const ChatSynthesisDraftSchema = z
     answer: z.string().max(20_000),
     freshnessNotes: z.array(z.string().max(500)).default([]),
     limitations: z.array(z.string().max(500)).default([]),
+    recommendation: z
+      .object({
+        text: z.string().trim().min(1).max(4_000),
+        basisRefs: z.array(z.string().trim().min(1).max(128)),
+        nonMutating: z.literal(true),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

@@ -9,9 +9,12 @@ import type {
 } from "./intelligence-consumer.contract";
 
 interface DomainConsumerObjectMeta {
+  readonly objectState: "NO_CURRENT" | "PARTIAL_CURRENT" | "CURRENT";
   readonly current: { readonly kind: IntelligenceConsumerCurrentKind };
   readonly readiness: IntelligenceConsumerReadiness;
+  readonly resultReadiness: IntelligenceConsumerReadiness;
   readonly freshness: IntelligenceConsumerFreshness;
+  readonly changedAt: string | null;
   readonly authority: IntelligenceConsumerAuthority;
   readonly candidate?: IntelligenceConsumerCandidateMeta & {
     readonly rawCandidateVisible?: false;
@@ -45,12 +48,15 @@ export function toIntelligenceConsumerObjectMeta(
 ): IntelligenceConsumerObjectMeta {
   return {
     objectId,
+    objectState: source.objectState,
     current:
       source.current.kind === "VALUE"
         ? { kind: "VALUE", resultRef }
         : { kind: source.current.kind },
     readiness: source.readiness,
+    resultReadiness: source.resultReadiness,
     freshness: source.freshness,
+    changedAt: source.changedAt,
     authority: source.authority,
     ...(source.candidate
       ? {

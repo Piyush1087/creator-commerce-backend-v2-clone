@@ -60,4 +60,8 @@ export type ChatResponseExecutionEvidence = {
   invokedCapabilityIds: readonly string[];
   authorizedEntityRefs: readonly ChatEntityRef[];
   allowedNavigationDestinationIds: readonly string[];
+  executedGroundingResultRefs: readonly Readonly<{
+    capabilityId: string;
+    resultRefs: readonly string[];
+  }>[];
 };

@@ -25,10 +25,12 @@ function field(
 ): ConsumerIntelligenceField {
   return {
     semanticId,
+    objectState: "CURRENT",
     current: { kind: "VALUE", value: { semanticId, exact: true } },
     readiness: "READY",
     resultReadiness: "READY",
     freshness: "CURRENT",
+    changedAt: "2026-09-03T04:00:00.000Z",
     authority: "confirmed",
     editability: "POLICY_PENDING",
     candidate: {
@@ -75,9 +77,11 @@ function brandPayload(brandId = "brand-1"): BrandIntelligenceDomainPayload {
     brandIdentity: {
       description: field("brand_description"),
       positioning: field("positioning", {
+        objectState: "NO_CURRENT",
         current: { kind: "NO_CURRENT" },
         readiness: "NOT_READY",
         freshness: "UNKNOWN",
+        changedAt: null,
       }),
       valueProposition: field("value_proposition", {
         readiness: "PARTIAL",
