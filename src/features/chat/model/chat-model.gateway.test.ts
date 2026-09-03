@@ -1,10 +1,12 @@
 import { BadRequestException } from "@nestjs/common";
+import { SchemaType } from "@google/generative-ai";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GeminiJsonClient } from "../../brand-onboarding/integrations/gemini/gemini-json.client";
 import { CHAT_CAPABILITY_CATALOG } from "../capabilities/chat-capability.catalog";
 import { ChatCapabilityRegistry } from "../capabilities/chat-capability.registry";
 import { ChatModelGateway } from "./chat-model.gateway";
+import { ChatCapabilityPlanSchema } from "./chat-model.schema";
 
 describe("ChatModelGateway", () => {
   const planningContext = {
@@ -17,8 +19,11 @@ describe("ChatModelGateway", () => {
     },
   };
 
-  function fixture(result: unknown) {
-    const generateJson = vi.fn().mockResolvedValue(result);
+  function fixture(...results: unknown[]) {
+    const generateJson = vi.fn();
+    for (const result of results) {
+      generateJson.mockResolvedValueOnce(result);
+    }
     const gateway = new ChatModelGateway(
       { generateJson } as unknown as GeminiJsonClient,
       new ChatCapabilityRegistry(CHAT_CAPABILITY_CATALOG),
@@ -26,76 +31,347 @@ describe("ChatModelGateway", () => {
     return { gateway, generateJson };
   }
 
-  it("accepts only a server-allowed capability with registry-valid input", async () => {
-    const { gateway, generateJson } = fixture({
-      requests: [
-        { capabilityId: "offering.read", input: { offeringId: "o-1" } },
-      ],
-    });
+  it("filters Stage A to capabilities materializable from current server authority", async () => {
+    const { gateway, generateJson } = fixture({ capabilityIds: [] });
+    const allowedCapabilityIds = [
+      "workspace.context.read",
+      "offering.list",
+      "offering.read",
+      "product_intelligence.current.read",
+      "campaign.list",
+      "campaign.read",
+      "app.navigate",
+    ];
+
     await expect(
       gateway.planCapabilities({
-        userRequest: "Show this offering",
-        allowedCapabilityIds: ["offering.read"],
+        userRequest: "Inspect my workspace",
+        allowedCapabilityIds,
         ...planningContext,
-        clientContextHints: { routePath: "/offerings/o-1" },
+      }),
+    ).resolves.toEqual({ requests: [] });
+
+    expect(generateJson).toHaveBeenCalledTimes(1);
+    const call = generateJson.mock.calls[0][0];
+    expect(call.responseSchema).toEqual({
+      type: SchemaType.OBJECT,
+      properties: {
+        capabilityIds: {
+          type: SchemaType.ARRAY,
+          maxItems: 10,
+          items: {
+            type: SchemaType.STRING,
+            enum: [
+              "workspace.context.read",
+              "offering.list",
+              "campaign.list",
+              "app.navigate",
+            ],
+          },
+        },
+      },
+      required: ["capabilityIds"],
+    });
+    expect(JSON.parse(call.userText).selectableCapabilityIds).toEqual([
+      "workspace.context.read",
+      "offering.list",
+      "campaign.list",
+      "app.navigate",
+    ]);
+    expect(call).not.toHaveProperty("apiKey");
+    expect(call.systemInstruction).not.toContain("GEMINI_API_KEY");
+    expect(call.systemInstruction).toContain(
+      "app.navigate may omit an entity only for a generic destination request",
+    );
+  });
+
+  it("returns an empty plan without a provider call when nothing is selectable", async () => {
+    const { gateway, generateJson } = fixture();
+
+    await expect(
+      gateway.planCapabilities({
+        userRequest: "Read an unavailable entity",
+        allowedCapabilityIds: ["offering.read", "campaign.read"],
+        ...planningContext,
+      }),
+    ).resolves.toEqual({ requests: [] });
+    expect(generateJson).not.toHaveBeenCalled();
+  });
+
+  it("uses required offering input schemas and authorized offering enums on pass two", async () => {
+    const { gateway, generateJson } = fixture(
+      {
+        capabilityIds: ["offering.read", "product_intelligence.current.read"],
+      },
+      { offeringId: "o-1" },
+      { offeringId: "o-1" },
+    );
+    const serverContext = {
+      planningPass: 2 as const,
+      authorizedEntityCandidates: [
+        { type: "OFFERING" as const, id: "o-1", label: "Creator Shop" },
+      ],
+      alreadyInvokedCapabilities: [
+        { capabilityId: "offering.list", input: {} },
+      ],
+    };
+
+    await expect(
+      gateway.planCapabilities({
+        userRequest: "What do you know about my products?",
+        allowedCapabilityIds: [
+          "offering.read",
+          "product_intelligence.current.read",
+        ],
+        clientContextHints: {},
+        conversationExcerpt: [],
+        serverContext,
       }),
     ).resolves.toEqual({
       requests: [
         { capabilityId: "offering.read", input: { offeringId: "o-1" } },
+        {
+          capabilityId: "product_intelligence.current.read",
+          input: { offeringId: "o-1" },
+        },
       ],
     });
-    const call = generateJson.mock.calls[0][0];
-    expect(JSON.parse(call.userText).allowedCapabilityIds).toEqual([
-      "offering.read",
+
+    expect(generateJson).toHaveBeenCalledTimes(3);
+    for (const callIndex of [1, 2]) {
+      const responseSchema =
+        generateJson.mock.calls[callIndex][0].responseSchema;
+      expect(responseSchema.type).toBe(SchemaType.OBJECT);
+      expect(responseSchema.required).toEqual(["offeringId"]);
+      expect(responseSchema.properties.offeringId.enum).toEqual(["o-1"]);
+    }
+    expect(JSON.parse(generateJson.mock.calls[1][0].userText)).toEqual({
+      userRequest: "What do you know about my products?",
+      capabilityId: "offering.read",
+      clientContextHints: {},
+      conversationExcerpt: [],
+      serverContext,
+      alreadyMaterializedRequests: [],
+    });
+    expect(
+      JSON.parse(generateJson.mock.calls[2][0].userText)
+        .alreadyMaterializedRequests,
+    ).toEqual([
+      { capabilityId: "offering.read", input: { offeringId: "o-1" } },
     ]);
-    expect(call).not.toHaveProperty("apiKey");
-    expect(call.systemInstruction).not.toContain("GEMINI_API_KEY");
   });
 
-  it("rejects disallowed IDs, authority injection, and reasoning fields", async () => {
-    const disallowed = fixture({
+  it("makes campaign.read selectable and constrains its required campaignId", async () => {
+    const { gateway, generateJson } = fixture(
+      { capabilityIds: ["campaign.read"] },
+      { campaignId: "c-1" },
+    );
+
+    await expect(
+      gateway.planCapabilities({
+        userRequest: "Read the campaign",
+        allowedCapabilityIds: ["campaign.read"],
+        clientContextHints: {},
+        conversationExcerpt: [],
+        serverContext: {
+          planningPass: 2,
+          authorizedEntityCandidates: [
+            { type: "CAMPAIGN", id: "c-1", label: "Summer Launch" },
+          ],
+          alreadyInvokedCapabilities: [],
+        },
+      }),
+    ).resolves.toEqual({
       requests: [
         { capabilityId: "campaign.read", input: { campaignId: "c-1" } },
       ],
+    });
+
+    const selectionEnum =
+      generateJson.mock.calls[0][0].responseSchema.properties.capabilityIds
+        .items.enum;
+    expect(selectionEnum).toEqual(["campaign.read"]);
+    const responseSchema = generateJson.mock.calls[1][0].responseSchema;
+    expect(responseSchema.required).toEqual(["campaignId"]);
+    expect(responseSchema.properties.campaignId.enum).toEqual(["c-1"]);
+  });
+
+  it("skips materialization calls for valid empty capability inputs", async () => {
+    const capabilityIds = [
+      "workspace.context.read",
+      "brand.current.read",
+      "campaign.list",
+    ];
+    const { gateway, generateJson } = fixture({ capabilityIds });
+
+    const plan = await gateway.planCapabilities({
+      userRequest: "Summarize my workspace",
+      allowedCapabilityIds: capabilityIds,
+      ...planningContext,
+    });
+
+    expect(generateJson).toHaveBeenCalledTimes(1);
+    expect(plan).toEqual({
+      requests: capabilityIds.map((capabilityId) => ({
+        capabilityId,
+        input: {},
+      })),
+    });
+    expect(ChatCapabilityPlanSchema.parse(plan)).toEqual(plan);
+  });
+
+  it("preserves duplicate selections and supplies prior materializations", async () => {
+    const { gateway, generateJson } = fixture(
+      { capabilityIds: ["offering.read", "offering.read"] },
+      { offeringId: "o-1" },
+      { offeringId: "o-2" },
+    );
+
+    await expect(
+      gateway.planCapabilities({
+        userRequest: "Compare both products",
+        allowedCapabilityIds: ["offering.read"],
+        clientContextHints: {},
+        conversationExcerpt: [],
+        serverContext: {
+          planningPass: 2,
+          authorizedEntityCandidates: [
+            { type: "OFFERING", id: "o-1" },
+            { type: "OFFERING", id: "o-2" },
+          ],
+          alreadyInvokedCapabilities: [],
+        },
+      }),
+    ).resolves.toEqual({
+      requests: [
+        { capabilityId: "offering.read", input: { offeringId: "o-1" } },
+        { capabilityId: "offering.read", input: { offeringId: "o-2" } },
+      ],
+    });
+    expect(generateJson).toHaveBeenCalledTimes(3);
+    expect(
+      JSON.parse(generateJson.mock.calls[2][0].userText)
+        .alreadyMaterializedRequests,
+    ).toEqual([
+      { capabilityId: "offering.read", input: { offeringId: "o-1" } },
+    ]);
+  });
+
+  it("materializes navigation with required destination and optional constrained entity", async () => {
+    const { gateway, generateJson } = fixture(
+      { capabilityIds: ["app.navigate"] },
+      {
+        destinationId: "CAMPAIGNS",
+        entity: { type: "CAMPAIGN", id: "c-1" },
+      },
+    );
+
+    await expect(
+      gateway.planCapabilities({
+        userRequest: "Open the campaign",
+        allowedCapabilityIds: ["app.navigate"],
+        clientContextHints: {},
+        conversationExcerpt: [],
+        serverContext: {
+          planningPass: 2,
+          authorizedEntityCandidates: [
+            { type: "BRAND", id: "b-1" },
+            { type: "CAMPAIGN", id: "c-1" },
+          ],
+          alreadyInvokedCapabilities: [],
+        },
+      }),
+    ).resolves.toEqual({
+      requests: [
+        {
+          capabilityId: "app.navigate",
+          input: {
+            destinationId: "CAMPAIGNS",
+            entity: { type: "CAMPAIGN", id: "c-1" },
+          },
+        },
+      ],
+    });
+
+    const responseSchema = generateJson.mock.calls[1][0].responseSchema;
+    expect(responseSchema.required).toEqual(["destinationId"]);
+    expect(responseSchema.required).not.toContain("entity");
+    expect(responseSchema.properties.entity.required).toEqual(["type", "id"]);
+    expect(responseSchema.properties.entity.properties.id.enum).toEqual([
+      "b-1",
+      "c-1",
+    ]);
+    expect(generateJson.mock.calls[1][0].systemInstruction).toContain(
+      "include its optional entity when the user names a specific entity",
+    );
+  });
+
+  it("rejects malformed and authority-injected materialized inputs", async () => {
+    const context = {
+      userRequest: "Read the offering",
+      allowedCapabilityIds: ["offering.read"],
+      clientContextHints: {},
+      conversationExcerpt: [],
+      serverContext: {
+        planningPass: 2 as const,
+        authorizedEntityCandidates: [{ type: "OFFERING" as const, id: "o-1" }],
+        alreadyInvokedCapabilities: [],
+      },
+    };
+
+    const missing = fixture({ capabilityIds: ["offering.read"] }, {}).gateway;
+    await expect(missing.planCapabilities(context)).rejects.toThrow();
+
+    const injected = fixture(
+      { capabilityIds: ["offering.read"] },
+      { offeringId: "o-1", userId: "attacker" },
+    ).gateway;
+    await expect(injected.planCapabilities(context)).rejects.toThrow();
+  });
+
+  it("rejects invalid or non-strict Stage A selections", async () => {
+    const invalid = fixture({
+      capabilityIds: ["campaign.list"],
     }).gateway;
     await expect(
-      disallowed.planCapabilities({
-        userRequest: "read",
+      invalid.planCapabilities({
+        userRequest: "Read",
         allowedCapabilityIds: ["brand.current.read"],
         ...planningContext,
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
 
-    const injected = fixture({
-      requests: [
-        {
-          capabilityId: "offering.read",
-          input: { offeringId: "o-1", userId: "attacker", role: "ADMIN" },
-        },
-      ],
+    const rationale = fixture({
+      capabilityIds: [],
+      rationale: "hidden",
     }).gateway;
     await expect(
-      injected.planCapabilities({
-        userRequest: "read",
-        allowedCapabilityIds: ["offering.read"],
+      rationale.planCapabilities({
+        userRequest: "Read",
+        allowedCapabilityIds: ["brand.current.read"],
         ...planningContext,
       }),
     ).rejects.toThrow();
 
-    const reasoning = fixture({ requests: [], rationale: "hidden" }).gateway;
+    const tooMany = fixture({
+      capabilityIds: Array.from({ length: 11 }, () => "brand.current.read"),
+    }).gateway;
     await expect(
-      reasoning.planCapabilities({
-        userRequest: "read",
-        allowedCapabilityIds: [],
+      tooMany.planCapabilities({
+        userRequest: "Read",
+        allowedCapabilityIds: ["brand.current.read"],
         ...planningContext,
       }),
     ).rejects.toThrow();
+  });
 
-    const authorityHint = fixture({ requests: [] }).gateway;
+  it("rejects user-controlled authority hints before selection", async () => {
+    const { gateway, generateJson } = fixture({ capabilityIds: [] });
+
     await expect(
-      authorityHint.planCapabilities({
-        userRequest: "read",
-        allowedCapabilityIds: [],
+      gateway.planCapabilities({
+        userRequest: "Read",
+        allowedCapabilityIds: ["brand.current.read"],
         ...planningContext,
         clientContextHints: {
           userId: "attacker",
@@ -103,6 +379,7 @@ describe("ChatModelGateway", () => {
         },
       }),
     ).rejects.toThrow();
+    expect(generateJson).not.toHaveBeenCalled();
   });
 
   it("returns a bounded synthesis draft without accepting grounding authority", async () => {
@@ -129,6 +406,13 @@ describe("ChatModelGateway", () => {
       sanitizedConversationContext: { recentMessages: [] },
       responseConstraints: { maxLength: 2000 },
     });
+    const responseSchema = generateJson.mock.calls[0][0].responseSchema;
+    expect(responseSchema.type).toBe(SchemaType.OBJECT);
+    expect(Object.keys(responseSchema.properties).sort()).toEqual([
+      "answer",
+      "freshnessNotes",
+      "limitations",
+    ]);
 
     const invented = fixture({
       answer: "draft",

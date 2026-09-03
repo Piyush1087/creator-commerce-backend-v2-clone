@@ -787,5 +787,49 @@ future_architecture_debt:
   - id: PRICING_BRAND_SETTINGS_BILLING_READINESS_COUPLING
     status: LEGITIMATE_CURRENTLY_ACYCLIC
 
+production_shaped_runtime_corrections:
+  - id: P4_CHAT_MODEL_CONTRACT_01
+
+    discovered_during:
+      P4_HUMAN_E2E_H3
+
+    classification:
+      CHAT_MODEL_PROVIDER_OUTPUT_AND_INPUT_CONTRACT_RUNTIME_DEFECT
+
+    introduced_by_p3: true
+
+    failures:
+      - planner_root_array_instead_of_object
+      - capability_specific_required_input_not_materialized
+
+    correction:
+      capability_selection_structured_output: true
+      server_materializability_filter: true
+      capability_specific_input_materialization: true
+      authorized_entity_enum_constraints: true
+      synthesis_structured_output: true
+
+      final_plan_zod_validation_preserved: true
+      final_capability_input_validation_preserved: true
+      final_authorization_preserved: true
+      final_grounding_validation_preserved: true
+
+    semantic_change:
+      product: false
+      capability_catalog: false
+      authorization: false
+      grounding: false
+      persistence: false
+      response_contract: false
+      intelligence: false
+      campaign: false
+      navigation: false
+
+    schema_change: false
+    migration_required: false
+
+    human_gate:
+      status: PAUSED_PENDING_SYSTEMS_REVIEW
+
 breaker: NONE
 next_phase: P4_HUMAN_E2E_GATE_RESUME
