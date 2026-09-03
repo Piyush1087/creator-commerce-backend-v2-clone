@@ -1,0 +1,124 @@
+name: C03 Stage B Backend Execution Base
+
+on:
+  push:
+    branches:
+      - c03/stage-b-execution-base
+  pull_request:
+    branches:
+      - development
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c03-stage-b-backend-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  execution-base:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: c03_stage_b
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d c03_stage_b"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      STAGE: local
+      PORT: "3000"
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c05_c03_stage_b?schema=public
+      C01_I5_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c01_i5_c03_stage_b?schema=public
+      C05_TEAM_DATABASE_TEST: "true"
+      PLAYWRIGHT_ENABLED: "false"
+      SETTINGS_FIELD_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      JWT_SECRET: c03-stage-b-non-secret-runtime-proof
+      JWT_SECRET_DEV: c03-stage-b-non-secret-runtime-proof
+      JWT_SECRET_PROD: c03-stage-b-non-secret-runtime-proof
+      JWT_ISSUER: creatorshop-stage-b
+      JWT_AUDIENCE: creatorshop-stage-b
+      AUTH_OTP_PEPPER: c03-stage-b-non-secret-runtime-proof
+      AUTH_OTP_PEPPER_DEV: c03-stage-b-non-secret-runtime-proof
+      AUTH_OTP_PEPPER_PROD: c03-stage-b-non-secret-runtime-proof
+      POSTMARK_SERVER_TOKEN: c03-stage-b-runtime-proof
+      POSTMARK_OTP_TEMPLATE_ID: "1"
+      POSTMARK_AUTH_OTP_TEMPLATE_ID: "1"
+      POSTMARK_PASSWORD_RESET_TEMPLATE_ID: "1"
+      POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID: "1"
+      APP_FRONTEND_URL: http://127.0.0.1:4173
+      GEMINI_API_KEY: c03-stage-b-runtime-proof
+      OPENAI_API_KEY: c03-stage-b-runtime-proof
+      ZYTE_API_KEY: c03-stage-b-runtime-proof
+      INSTAGRAM_API_ID: c03-stage-b-runtime-proof
+      INSTAGRAM_APP_SECRET: c03-stage-b-runtime-proof
+      CREATOR_INSTAGRAM_REDIRECT_URI: https://dashboard.dev.thecreatorshop.in/creator-marketplace/callback
+      RAZORPAY_API_KEY_ID: c03-stage-b-runtime-proof
+      RAZORPAY_API_KEY_SECRET: c03-stage-b-runtime-proof
+      RAZORPAY_WEBHOOK_SECRET: c03-stage-b-runtime-proof
+      S3_BUCKET_NAME: creatorshop-stage-b-local
+      AWS_REGION: ap-south-1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Runtime identity
+        run: |
+          node --version
+          npm --version
+          test "$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" = "74"
+
+      - name: Locked install and Prisma generation
+        run: |
+          npm ci
+          npm run prisma:generate
+
+      - name: Fresh PostgreSQL migration replay
+        run: |
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_stage_b?schema=public npm run db:migrate:deploy
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_stage_b?schema=public npx prisma migrate status
+          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres -T c03_stage_b c01_i5_c03_stage_b
+          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres -T c03_stage_b c05_c03_stage_b
+
+      - name: Relevant real-PostgreSQL baseline
+        run: |
+          npx vitest run --config vitest.config.ts             src/features/creator-entry/creator-campaign-apply-continuation.postgres.test.ts             src/features/creator-settings/team/creator-team.postgres.test.ts
+
+      - name: Provider-neutral access fixtures
+        run: |
+          npx vitest run --config vitest.config.ts             src/features/creator-entry/creator-platform-access.guard.test.ts             src/features/creator-settings/team/creator-workspace-actor.service.test.ts
+
+      - name: Build
+        run: npm run build
+
+      - name: Backend startup smoke
+        run: |
+          npm run start:prod >/tmp/c03-stage-b-api.log 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/ >/tmp/c03-stage-b-root.json; then
+              break
+            fi
+            if ! kill -0 "$api_pid" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          if ! curl --fail --silent http://127.0.0.1:3000/; then
+            sed -n '1,240p' /tmp/c03-stage-b-api.log
+            exit 1
+          fi
