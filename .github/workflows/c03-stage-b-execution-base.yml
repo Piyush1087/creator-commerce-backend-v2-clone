@@ -107,10 +107,16 @@ jobs:
           npm run start:prod >/tmp/c03-stage-b-api.log 2>&1 &
           api_pid=$!
           trap 'kill "$api_pid" 2>/dev/null || true' EXIT
-          for attempt in $(seq 1 30); do
+          for attempt in $(seq 1 60); do
             if curl --fail --silent http://127.0.0.1:3000/ >/tmp/c03-stage-b-root.json; then
+              break
+            fi
+            if ! kill -0 "$api_pid" 2>/dev/null; then
               break
             fi
             sleep 1
           done
-          curl --fail --silent http://127.0.0.1:3000/
+          if ! curl --fail --silent http://127.0.0.1:3000/; then
+            sed -n '1,240p' /tmp/c03-stage-b-api.log
+            exit 1
+          fi
