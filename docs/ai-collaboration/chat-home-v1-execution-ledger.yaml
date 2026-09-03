@@ -831,14 +831,30 @@ production_shaped_runtime_corrections:
     human_gate:
       status: PAUSED_PENDING_SYSTEMS_REVIEW
 
+p4_current_state:
+  status: ACCEPTED
+  backend_runtime_sha: 1b9ed44b54df13e7357e91f16410b4df549a753c
+  frontend_runtime_sha: 20b14055017409d1d6b9d972f3a0dfccd79014a7
+  frontend_human_evidence_sha: 18e8363ac40b30a9248e6b529b857d3aa20e1fc0
+
 breaker: NONE
-next_phase: P4_HUMAN_E2E_GATE_RESUME
+next_phase: P5_B_PROACTIVE_BRAND_HOME_AGGREGATION
 
 p5_a_remaining_canonical_reads_and_navigation:
   authority: P5_A_REMAINING_CANONICAL_READS_AND_NAVIGATION
-  status: IMPLEMENTED_PENDING_SYSTEMS_ACCEPTANCE
-  parent_disposition: ACCEPT_WITH_BASELINE_LINT_DEBT
+  status: ACCEPTED
   authorized_starting_sha: 1b9ed44b54df13e7357e91f16410b4df549a753c
+  systems_review:
+    decision: ACCEPT
+    mode: RETROACTIVE
+    accepted_runtime_sha: 0ec9888dd9212cd31e6f46de2ee39ec2ccf586fa
+    reviewed_against_original_p5_a_gate: true
+  checkpoint_governance:
+    created_before_canonical_parent_review: true
+    original_creation_procedurally_premature: true
+    runtime_rejected: false
+    retroactively_adopted: true
+    history_rewrite_required: false
   scope:
     capabilities_added:
       - collaboration.list
@@ -916,7 +932,6 @@ p5_a_remaining_canonical_reads_and_navigation:
     prisma_validate: PASS
     changed_scope_lint: PASS
     changed_scope_lint_file_count: 32
-    repository_lint_gate: PASS_WITH_PREEXISTING_REPOSITORY_LINT_DEBT
     repository_lint_baseline:
       method: DETACHED_WORKTREE_AT_AUTHORIZED_STARTING_SHA
       sha: 1b9ed44b54df13e7357e91f16410b4df549a753c
@@ -933,9 +948,18 @@ p5_a_remaining_canonical_reads_and_navigation:
       affected_file_count: 117
       prettier_error_count: 754
       changed_p5_a_files_with_lint_findings: 0
-    repository_lint_debt_policy:
+    lint_disposition:
+      baseline_repository_formatting_debt_present: true
+      p5_a_changed_scope: PASS
+      p5_a_changed_scope_error_count: 0
+      absolute_repository_count_delta:
+        starting_errors: 719
+        current_errors: 754
+        delta: 35
+        classification: UNRESOLVED_NONCOMPARABLE_AGGREGATE
+        attributable_to_p5_a_changed_files: false
       unrelated_remediation_authorized: false
-      blocks_p5_a_checkpoint: false
+      blocks_p5_a_acceptance: false
     backend_build: PASS
     git_diff_check: PASS
   runtime:
@@ -971,7 +995,8 @@ p5_a_remaining_canonical_reads_and_navigation:
     frontend: UNCHANGED
     database_schema: UNCHANGED
   next_phase_authorization:
-    p5_b: false
+    p5_b: true
+    p5_b_started: false
     p5_c: false
     p6: false
   breaker: NONE
