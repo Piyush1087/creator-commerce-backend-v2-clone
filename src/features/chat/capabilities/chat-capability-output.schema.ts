@@ -1,11 +1,18 @@
 import { z } from "zod";
+import {
+  UceCollabStatus,
+  UceMilestoneStage,
+  UcePipelineHealthStatus,
+  UceProductionPhase,
+  UceWorkflowActionRole,
+} from "@prisma/client";
 
 import { IntelligenceConsumerResultSchema } from "../../intelligence-consumer/intelligence-consumer.schema";
 import { CHAT_CAPABILITY_AVAILABILITY } from "./chat-capability.contract";
 
 const EntityRefSchema = z
   .object({
-    type: z.enum(["BRAND", "OFFERING", "CAMPAIGN"]),
+    type: z.enum(["BRAND", "OFFERING", "CAMPAIGN", "COLLABORATION"]),
     id: z.string().trim().min(1).max(128),
   })
   .strict();
@@ -110,9 +117,216 @@ export const CampaignReadCapabilityOutputSchema = z
   })
   .strict();
 
+const CollaborationIdentitySchema = z
+  .object({
+    id: z.string().trim().min(1).max(128),
+    name: z.string().max(500),
+  })
+  .strict();
+
+const CollaborationCreatorSchema = z
+  .object({
+    displayName: z.string().trim().min(1).max(500),
+    instagramHandle: z.string().trim().min(1).max(255).nullable(),
+  })
+  .strict();
+
+const CollaborationBriefSchema = z
+  .object({
+    id: z.string().trim().min(1).max(128),
+    title: z.string().max(500),
+  })
+  .strict();
+
+const CampaignProductSchema = CollaborationIdentitySchema.nullable();
+const TimestampSchema = z.string().datetime();
+
+export const CollaborationListCapabilityOutputSchema = z
+  .object({
+    collaborations: z.array(
+      z
+        .object({
+          collaborationId: z.string().trim().min(1).max(128),
+          campaign: CollaborationIdentitySchema,
+          brief: CollaborationBriefSchema,
+          campaignProduct: CampaignProductSchema,
+          creator: CollaborationCreatorSchema,
+          lifecycle: z
+            .object({
+              stage: z.nativeEnum(UceMilestoneStage),
+              status: z.nativeEnum(UceCollabStatus),
+              phase: z.nativeEnum(UceProductionPhase),
+              paused: z.boolean(),
+              terminated: z.boolean(),
+            })
+            .strict(),
+          attention: z
+            .object({
+              health: z.nativeEnum(UcePipelineHealthStatus),
+              actionRequiredBy: z.nativeEnum(UceWorkflowActionRole),
+              reasonCodes: z.array(z.string().trim().min(1).max(128)),
+              dueAt: TimestampSchema,
+            })
+            .strict(),
+          unreadCount: z.number().int().nonnegative(),
+          lastMessageSnippet: z.string().max(200).nullable(),
+          lastMessageAt: TimestampSchema.nullable(),
+          stageUpdatedAt: TimestampSchema,
+          updatedAt: TimestampSchema,
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+export const CollaborationReadCapabilityOutputSchema = z
+  .object({
+    collaborationId: z.string().trim().min(1).max(128),
+    campaign: CollaborationIdentitySchema,
+    brief: CollaborationBriefSchema,
+    campaignProduct: CampaignProductSchema,
+    creator: CollaborationCreatorSchema,
+    lifecycle: z
+      .object({
+        stage: z.nativeEnum(UceMilestoneStage),
+        status: z.nativeEnum(UceCollabStatus),
+        phase: z.nativeEnum(UceProductionPhase),
+        milestone: z.nativeEnum(UceMilestoneStage),
+        paused: z.boolean(),
+        terminated: z.boolean(),
+        pipelineHealth: z.nativeEnum(UcePipelineHealthStatus),
+        actionRequiredBy: z.nativeEnum(UceWorkflowActionRole),
+      })
+      .strict(),
+    attention: z
+      .object({
+        reasonCodes: z.array(z.string().trim().min(1).max(128)),
+        currentMilestoneDueAt: TimestampSchema,
+        autoApprovalDueAt: TimestampSchema.nullable(),
+        productionDueAt: TimestampSchema.nullable(),
+      })
+      .strict(),
+    activity: z
+      .object({
+        negotiationRounds: z.number().int().nonnegative(),
+        fulfillmentIssues: z.number().int().nonnegative(),
+        revisionRounds: z.number().int().nonnegative(),
+        unreadCount: z.number().int().nonnegative(),
+        lastMessageSnippet: z.string().max(200).nullable(),
+        lastMessageAt: TimestampSchema.nullable(),
+        stageUpdatedAt: TimestampSchema,
+        updatedAt: TimestampSchema,
+      })
+      .strict(),
+  })
+  .strict();
+
+export const WorkspaceReadinessCapabilityOutputSchema = z
+  .object({
+    contractVersion: z.literal("1.0"),
+    brandId: z.string().trim().min(1).max(128),
+    observedAt: TimestampSchema,
+    workspace: z
+      .object({
+        state: z.enum(["READY", "PARTIAL", "ACTION_REQUIRED"]),
+        reasonCodes: z.array(z.string().trim().min(1).max(128)),
+      })
+      .strict(),
+    subscription: z
+      .object({
+        state: z.enum(["FULL_ACCESS", "RESTRICTED_WIND_DOWN"]),
+        lifecycleStatus: z.enum([
+          "TRIALING",
+          "ACTIVE",
+          "PAST_DUE",
+          "CANCEL_SCHEDULED",
+          "TRIAL_EXPIRED",
+          "CANCELLED",
+          "HALTED",
+        ]),
+        requiredAction: z.enum([
+          "NONE",
+          "PAYMENT_REQUIRED",
+          "UPDATE_PAYMENT_METHOD",
+        ]),
+      })
+      .strict(),
+    applicationCapabilities: z.array(
+      z
+        .object({
+          id: z.string().trim().min(1).max(128),
+          state: z.enum(["AVAILABLE", "BLOCKED"]),
+          reasonCode: z.string().trim().min(1).max(128),
+        })
+        .strict(),
+    ),
+    billing: z
+      .object({
+        state: z.enum(["READY", "ACTION_REQUIRED", "NOT_APPLICABLE"]),
+        missingFieldCodes: z.array(z.string().trim().min(1).max(128)),
+        recoveryDestinationId: z.literal("SETTINGS_BILLING").nullable(),
+      })
+      .strict(),
+    setupItems: z.array(
+      z
+        .object({
+          reasonCode: z.string().trim().min(1).max(128),
+          title: z.string().trim().min(1).max(500),
+          destinationId: z.enum(["BRAND_CENTRE", "SETTINGS_BILLING"]),
+        })
+        .strict(),
+    ),
+    limitations: z.array(z.string().max(500)),
+  })
+  .strict();
+
+export const ProviderReadinessCapabilityOutputSchema = z
+  .object({
+    contractVersion: z.literal("1.0"),
+    brandId: z.string().trim().min(1).max(128),
+    observedAt: TimestampSchema,
+    providers: z.array(
+      z
+        .object({
+          provider: z.literal("INSTAGRAM"),
+          state: z.enum([
+            "READY",
+            "LIMITED",
+            "ACTION_REQUIRED",
+            "UNAVAILABLE",
+            "NOT_CONNECTED",
+          ]),
+          reasonCode: z.string().trim().min(1).max(128),
+          affectedProductCapabilities: z.array(
+            z.enum([
+              "PROFILE",
+              "INSIGHTS",
+              "BUSINESS_DISCOVERY",
+              "CREATOR_DISCOVERY",
+            ]),
+          ),
+          humanActionRequired: z.boolean(),
+          recoveryDestinationId: z.literal("SETTINGS_INTEGRATIONS").nullable(),
+          freshness: z.enum(["CURRENT", "UNKNOWN"]),
+        })
+        .strict(),
+    ),
+    limitations: z.array(z.string().max(500)),
+  })
+  .strict();
+
 export const NavigateCapabilityOutputSchema = z
   .object({
-    destinationId: z.enum(["HOME", "BRAND_CENTRE", "OFFERINGS", "CAMPAIGNS"]),
+    destinationId: z.enum([
+      "HOME",
+      "BRAND_CENTRE",
+      "OFFERINGS",
+      "CAMPAIGNS",
+      "COLLABORATIONS",
+      "SETTINGS",
+      "SETTINGS_INTEGRATIONS",
+      "SETTINGS_BILLING",
+    ]),
     entityRef: EntityRefSchema.optional(),
   })
   .strict();

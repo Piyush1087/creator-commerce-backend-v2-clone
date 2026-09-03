@@ -7,6 +7,10 @@ export const CHAT_NAVIGATION_DESTINATIONS = [
   "BRAND_CENTRE",
   "OFFERINGS",
   "CAMPAIGNS",
+  "COLLABORATIONS",
+  "SETTINGS",
+  "SETTINGS_INTEGRATIONS",
+  "SETTINGS_BILLING",
 ] as const;
 
 type ChatNavigationDestination = (typeof CHAT_NAVIGATION_DESTINATIONS)[number];
@@ -18,6 +22,10 @@ const entityTypesByDestination: Readonly<
   BRAND_CENTRE: ["BRAND"],
   OFFERINGS: ["OFFERING"],
   CAMPAIGNS: ["CAMPAIGN"],
+  COLLABORATIONS: ["COLLABORATION"],
+  SETTINGS: [],
+  SETTINGS_INTEGRATIONS: [],
+  SETTINGS_BILLING: [],
 };
 
 @Injectable()

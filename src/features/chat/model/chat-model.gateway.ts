@@ -166,6 +166,14 @@ export class ChatModelGateway {
     ) {
       return false;
     }
+    if (
+      required.has("collaborationId") &&
+      !authorizedEntityCandidates.some(
+        (candidate) => candidate.type === "COLLABORATION",
+      )
+    ) {
+      return false;
+    }
     return true;
   }
 
@@ -196,7 +204,7 @@ export class ChatModelGateway {
     serverContext: {
       planningPass: 1 | 2;
       authorizedEntityCandidates: readonly {
-        type: "BRAND" | "OFFERING" | "CAMPAIGN";
+        type: "BRAND" | "OFFERING" | "CAMPAIGN" | "COLLABORATION";
         id: string;
         label?: string;
       }[];
@@ -251,7 +259,7 @@ export class ChatModelGateway {
     capabilityId: string,
     responseSchema: ResponseSchema,
     authorizedEntityCandidates: readonly {
-      type: "BRAND" | "OFFERING" | "CAMPAIGN";
+      type: "BRAND" | "OFFERING" | "CAMPAIGN" | "COLLABORATION";
       id: string;
     }[],
   ): void {
@@ -263,6 +271,10 @@ export class ChatModelGateway {
     const campaignIds = this.candidateIds(
       authorizedEntityCandidates,
       "CAMPAIGN",
+    );
+    const collaborationIds = this.candidateIds(
+      authorizedEntityCandidates,
+      "COLLABORATION",
     );
 
     if (required.has("offeringId")) {
@@ -283,6 +295,18 @@ export class ChatModelGateway {
       this.requireProperty(responseSchema, capabilityId, "campaignId").enum =
         campaignIds;
     }
+    if (required.has("collaborationId")) {
+      if (collaborationIds.length === 0) {
+        throw new Error(
+          `INTERNAL_PLANNER_INVARIANT_FAILURE: ${capabilityId} requires an authorized collaboration`,
+        );
+      }
+      this.requireProperty(
+        responseSchema,
+        capabilityId,
+        "collaborationId",
+      ).enum = collaborationIds;
+    }
 
     const entitySchema = responseSchema.properties?.entity;
     const entityIdSchema = entitySchema?.properties?.id;
@@ -294,10 +318,10 @@ export class ChatModelGateway {
 
   private candidateIds(
     candidates: readonly {
-      type: "BRAND" | "OFFERING" | "CAMPAIGN";
+      type: "BRAND" | "OFFERING" | "CAMPAIGN" | "COLLABORATION";
       id: string;
     }[],
-    type?: "BRAND" | "OFFERING" | "CAMPAIGN",
+    type?: "BRAND" | "OFFERING" | "CAMPAIGN" | "COLLABORATION",
   ): string[] {
     return [
       ...new Set(

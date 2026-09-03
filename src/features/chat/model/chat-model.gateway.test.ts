@@ -7,6 +7,7 @@ import { CHAT_CAPABILITY_CATALOG } from "../capabilities/chat-capability.catalog
 import { ChatCapabilityRegistry } from "../capabilities/chat-capability.registry";
 import { ChatModelGateway } from "./chat-model.gateway";
 import { ChatCapabilityPlanSchema } from "./chat-model.schema";
+import { ChatAuthorizedEntityCandidateSchema } from "./chat-model.schema";
 
 describe("ChatModelGateway", () => {
   const planningContext = {
@@ -30,6 +31,24 @@ describe("ChatModelGateway", () => {
     );
     return { gateway, generateJson };
   }
+
+  it("adds only Collaboration to materializable candidate vocabulary", () => {
+    expect(
+      ChatAuthorizedEntityCandidateSchema.parse({
+        type: "COLLABORATION",
+        id: "workflow-collaboration-1",
+      }),
+    ).toEqual({
+      type: "COLLABORATION",
+      id: "workflow-collaboration-1",
+    });
+    for (const type of ["SETTINGS", "PROVIDER"]) {
+      expect(
+        ChatAuthorizedEntityCandidateSchema.safeParse({ type, id: "x" })
+          .success,
+      ).toBe(false);
+    }
+  });
 
   it("filters Stage A to capabilities materializable from current server authority", async () => {
     const { gateway, generateJson } = fixture({ capabilityIds: [] });
@@ -194,6 +213,131 @@ describe("ChatModelGateway", () => {
     const responseSchema = generateJson.mock.calls[1][0].responseSchema;
     expect(responseSchema.required).toEqual(["campaignId"]);
     expect(responseSchema.properties.campaignId.enum).toEqual(["c-1"]);
+  });
+
+  it("keeps Collaboration exact reads off pass one while list and readiness reads remain selectable", async () => {
+    const { gateway, generateJson } = fixture({ capabilityIds: [] });
+    await gateway.planCapabilities({
+      userRequest: "Check collaborations and readiness",
+      allowedCapabilityIds: [
+        "collaboration.list",
+        "collaboration.read",
+        "workspace.readiness.read",
+        "provider.readiness.read",
+      ],
+      ...planningContext,
+    });
+    expect(
+      generateJson.mock.calls[0][0].responseSchema.properties.capabilityIds
+        .items.enum,
+    ).toEqual([
+      "collaboration.list",
+      "workspace.readiness.read",
+      "provider.readiness.read",
+    ]);
+  });
+
+  it("materializes collaboration.read only from authorized workflow IDs on pass two", async () => {
+    const { gateway, generateJson } = fixture(
+      { capabilityIds: ["collaboration.read"] },
+      { collaborationId: "workflow-collaboration-1" },
+    );
+    const serverContext = {
+      planningPass: 2 as const,
+      authorizedEntityCandidates: [
+        {
+          type: "COLLABORATION" as const,
+          id: "workflow-collaboration-1",
+          label: "Summer Launch — Creator — Launch brief",
+        },
+        { type: "CAMPAIGN" as const, id: "campaign-1" },
+      ],
+      alreadyInvokedCapabilities: [
+        { capabilityId: "collaboration.list", input: {} },
+      ],
+    };
+    await expect(
+      gateway.planCapabilities({
+        userRequest: "Read the Creator collaboration",
+        allowedCapabilityIds: ["collaboration.read"],
+        clientContextHints: {},
+        conversationExcerpt: [],
+        serverContext,
+      }),
+    ).resolves.toEqual({
+      requests: [
+        {
+          capabilityId: "collaboration.read",
+          input: { collaborationId: "workflow-collaboration-1" },
+        },
+      ],
+    });
+    const responseSchema = generateJson.mock.calls[1][0].responseSchema;
+    expect(responseSchema.required).toEqual(["collaborationId"]);
+    expect(responseSchema.properties.collaborationId.enum).toEqual([
+      "workflow-collaboration-1",
+    ]);
+  });
+
+  it("supports generic Settings and authorized named Collaboration navigation", async () => {
+    const generic = fixture(
+      { capabilityIds: ["app.navigate"] },
+      { destinationId: "SETTINGS" },
+    );
+    await expect(
+      generic.gateway.planCapabilities({
+        userRequest: "Open settings",
+        allowedCapabilityIds: ["app.navigate"],
+        ...planningContext,
+      }),
+    ).resolves.toEqual({
+      requests: [
+        { capabilityId: "app.navigate", input: { destinationId: "SETTINGS" } },
+      ],
+    });
+
+    const named = fixture(
+      { capabilityIds: ["app.navigate"] },
+      {
+        destinationId: "COLLABORATIONS",
+        entity: {
+          type: "COLLABORATION",
+          id: "workflow-collaboration-1",
+        },
+      },
+    );
+    await expect(
+      named.gateway.planCapabilities({
+        userRequest: "Open the Creator collaboration",
+        allowedCapabilityIds: ["app.navigate"],
+        clientContextHints: {},
+        conversationExcerpt: [],
+        serverContext: {
+          planningPass: 2,
+          authorizedEntityCandidates: [
+            { type: "COLLABORATION", id: "workflow-collaboration-1" },
+          ],
+          alreadyInvokedCapabilities: [],
+        },
+      }),
+    ).resolves.toMatchObject({
+      requests: [
+        {
+          capabilityId: "app.navigate",
+          input: {
+            destinationId: "COLLABORATIONS",
+            entity: {
+              type: "COLLABORATION",
+              id: "workflow-collaboration-1",
+            },
+          },
+        },
+      ],
+    });
+    expect(
+      named.generateJson.mock.calls[1][0].responseSchema.properties.entity
+        .properties.id.enum,
+    ).toEqual(["workflow-collaboration-1"]);
   });
 
   it("skips materialization calls for valid empty capability inputs", async () => {

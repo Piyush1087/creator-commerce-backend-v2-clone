@@ -31,7 +31,7 @@ export const ChatModelContextHintsSchema = z
 
 export const ChatAuthorizedEntityCandidateSchema = z
   .object({
-    type: z.enum(["BRAND", "OFFERING", "CAMPAIGN"]),
+    type: z.enum(["BRAND", "OFFERING", "CAMPAIGN", "COLLABORATION"]),
     id: z.string().trim().min(1).max(128),
     label: z.string().trim().min(1).max(500).optional(),
   })

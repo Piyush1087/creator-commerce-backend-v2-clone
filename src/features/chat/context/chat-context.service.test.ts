@@ -57,7 +57,7 @@ describe("ChatContextService", () => {
     });
     expect(context.intelligenceRefs).toEqual([]);
     expect(context.providerReadiness).toEqual([]);
-    expect(context.capabilities).toHaveLength(9);
+    expect(context.capabilities).toHaveLength(13);
     expect(
       context.capabilities.every(
         (capability) => capability.availability === "AVAILABLE",

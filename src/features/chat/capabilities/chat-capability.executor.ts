@@ -9,6 +9,7 @@ const ENTITY_SCOPED_CAPABILITIES = new Set([
   "offering.read",
   "product_intelligence.current.read",
   "campaign.read",
+  "collaboration.read",
 ]);
 
 @Injectable()

@@ -382,6 +382,93 @@ describe("ChatTurnOrchestratorService", () => {
     expect(test.synthesize).not.toHaveBeenCalled();
   });
 
+  it("projects safe Collaboration labels and workflow IDs into pass-two authority", async () => {
+    const listData = {
+      collaborations: [
+        {
+          collaborationId: "workflow-collaboration-1",
+          campaign: { id: "campaign-1", name: "Summer Launch" },
+          brief: { id: "brief-1", title: "Launch brief" },
+          campaignProduct: null,
+          creator: { displayName: "Creator Name", instagramHandle: "creator" },
+        },
+      ],
+    };
+    const test = fixture({
+      plans: [
+        { requests: [{ capabilityId: "collaboration.list", input: {} }] },
+        {
+          requests: [
+            {
+              capabilityId: "collaboration.read",
+              input: { collaborationId: "workflow-collaboration-1" },
+            },
+          ],
+        },
+      ],
+      override: (capabilityId, input, authorized) => {
+        if (capabilityId === "collaboration.list") {
+          return {
+            capabilityId,
+            availability: "AVAILABLE",
+            data: listData,
+            grounding: [
+              {
+                sourceType: "CANONICAL",
+                capabilityId,
+                entityRefs: [
+                  {
+                    type: "COLLABORATION",
+                    id: "workflow-collaboration-1",
+                  },
+                ],
+              },
+            ],
+            authorizedEntityRefs: [
+              { type: "COLLABORATION", id: "workflow-collaboration-1" },
+            ],
+          };
+        }
+        if (capabilityId === "collaboration.read") {
+          const id = String(input.collaborationId);
+          expect(authorized).toContainEqual({
+            type: "COLLABORATION",
+            id,
+          });
+          return {
+            capabilityId,
+            availability: "AVAILABLE",
+            data: { collaborationId: id },
+            grounding: [
+              {
+                sourceType: "CANONICAL",
+                capabilityId,
+                entityRefs: [{ type: "COLLABORATION", id }],
+              },
+            ],
+            authorizedEntityRefs: [{ type: "COLLABORATION", id }],
+          };
+        }
+        return undefined;
+      },
+    });
+    await test.orchestrator.runTurn(actor, context.conversation.id, {
+      message: "Read the Creator collaboration",
+    });
+    expect(
+      test.planCapabilities.mock.calls[1][0].serverContext
+        .authorizedEntityCandidates,
+    ).toContainEqual({
+      type: "COLLABORATION",
+      id: "workflow-collaboration-1",
+      label: "Summer Launch — Creator Name — Launch brief",
+    });
+    expect(test.execute.mock.calls.map((call) => call[1])).toEqual([
+      "collaboration.list",
+      "collaboration.read",
+    ]);
+  });
+
   it("uses a fresh Campaign list and its real status instead of old conversation text", async () => {
     const test = fixture({
       plans: [

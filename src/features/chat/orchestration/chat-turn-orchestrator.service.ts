@@ -338,6 +338,44 @@ export class ChatTurnOrchestratorService {
         }
       }
     }
+    if (
+      result.capabilityId === "collaboration.list" &&
+      this.isRecord(result.data) &&
+      Array.isArray(result.data.collaborations)
+    ) {
+      for (const row of result.data.collaborations) {
+        if (!this.isRecord(row) || typeof row.collaborationId !== "string") {
+          continue;
+        }
+        const campaign = this.isRecord(row.campaign) ? row.campaign : null;
+        const creator = this.isRecord(row.creator) ? row.creator : null;
+        const brief = this.isRecord(row.brief) ? row.brief : null;
+        const campaignName =
+          campaign && typeof campaign.name === "string"
+            ? campaign.name
+            : "Campaign";
+        const displayName =
+          creator && typeof creator.displayName === "string"
+            ? creator.displayName
+            : null;
+        const instagramHandle =
+          creator && typeof creator.instagramHandle === "string"
+            ? creator.instagramHandle.replace(/^@/u, "")
+            : null;
+        const creatorLabel =
+          displayName && displayName !== instagramHandle
+            ? displayName
+            : instagramHandle
+              ? `@${instagramHandle}`
+              : "Creator";
+        const briefTitle =
+          brief && typeof brief.title === "string" ? brief.title : "Brief";
+        labels.set(
+          row.collaborationId,
+          `${campaignName} — ${creatorLabel} — ${briefTitle}`,
+        );
+      }
+    }
     return result.authorizedEntityRefs.map((ref) => ({
       ...ref,
       ...(labels.has(ref.id) ? { label: labels.get(ref.id) } : {}),
@@ -390,6 +428,10 @@ export class ChatTurnOrchestratorService {
         BRAND_CENTRE: "Brand Centre",
         OFFERINGS: "Offerings",
         CAMPAIGNS: "Campaigns",
+        COLLABORATIONS: "Collaborations",
+        SETTINGS: "Settings",
+        SETTINGS_INTEGRATIONS: "Settings integrations",
+        SETTINGS_BILLING: "Settings billing",
       }[destinationId] ?? "the requested destination"
     );
   }

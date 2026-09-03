@@ -11,11 +11,11 @@ import { ChatCapabilityRegistry } from "./chat-capability.registry";
 describe("ChatCapabilityRegistry", () => {
   const registry = new ChatCapabilityRegistry(CHAT_CAPABILITY_CATALOG);
 
-  it("freezes exactly nine available implemented first-slice capabilities", () => {
+  it("registers exactly thirteen available implemented capabilities", () => {
     expect(registry.list().map((descriptor) => descriptor.id)).toEqual(
       CHAT_FIRST_SLICE_CAPABILITY_IDS,
     );
-    expect(registry.list()).toHaveLength(9);
+    expect(registry.list()).toHaveLength(13);
     expect(
       registry
         .list()
@@ -71,5 +71,19 @@ describe("ChatCapabilityRegistry", () => {
     ).toEqual({
       campaignId: "c-1",
     });
+    expect(
+      registry.validateInput("collaboration.read", {
+        collaborationId: "collaboration-1",
+      }),
+    ).toEqual({ collaborationId: "collaboration-1" });
+    expect(() =>
+      registry.validateInput("collaboration.read", {
+        collaborationId: "collaboration-1",
+        brandProfileId: "foreign",
+      }),
+    ).toThrow();
+    expect(() =>
+      registry.validateInput("provider.readiness.read", { refresh: true }),
+    ).toThrow();
   });
 });

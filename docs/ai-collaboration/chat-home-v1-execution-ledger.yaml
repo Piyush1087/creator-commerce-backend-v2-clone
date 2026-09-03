@@ -833,3 +833,145 @@ production_shaped_runtime_corrections:
 
 breaker: NONE
 next_phase: P4_HUMAN_E2E_GATE_RESUME
+
+p5_a_remaining_canonical_reads_and_navigation:
+  authority: P5_A_REMAINING_CANONICAL_READS_AND_NAVIGATION
+  status: IMPLEMENTED_PENDING_SYSTEMS_ACCEPTANCE
+  parent_disposition: ACCEPT_WITH_BASELINE_LINT_DEBT
+  authorized_starting_sha: 1b9ed44b54df13e7357e91f16410b4df549a753c
+  scope:
+    capabilities_added:
+      - collaboration.list
+      - collaboration.read
+      - workspace.readiness.read
+      - provider.readiness.read
+    navigation_destinations_added:
+      - COLLABORATIONS
+      - SETTINGS
+      - SETTINGS_INTEGRATIONS
+      - SETTINGS_BILLING
+    descriptor_count: 13
+    execute_capability_count: 0
+  narrow_module_boundaries:
+    collaboration_consumer_module: true
+    brand_settings_consumer_module: true
+    brand_workspace_readiness_module: true
+    chat_imports_full_collaboration_module: false
+    chat_imports_full_brand_settings_module: false
+    new_forward_refs: 0
+    new_scc_detected: false
+  canonical_read_evidence:
+    collaboration_list_read_only: PASS
+    collaboration_exact_read_read_only: PASS
+    workflow_collaboration_id_used: true
+    cross_brand_denial: PASS
+    sensitive_fields_exposed: false
+    collaboration_business_state_mutated: false
+    primary_workspace_state: READY
+    primary_subscription_state: FULL_ACCESS
+    primary_billing_state: READY
+    primary_instagram_state: READY
+    second_brand_instagram_state: ACTION_REQUIRED
+    external_provider_called: false
+    tokens_or_provider_ids_exposed: false
+  planner_and_navigation_evidence:
+    planner_core_algorithm_changed: false
+    collaboration_materializability_added: true
+    collaboration_id_enum_authorized_only: true
+    two_pass_named_collaboration_supported: true
+    unauthorized_collaboration_navigation_rejected: true
+    settings_entity_rejected: true
+  tests:
+    collaboration_consumer:
+      status: PASS
+      passed: 5
+      failed: 0
+    workspace_and_provider_readiness:
+      status: PASS
+      passed: 12
+      failed: 0
+    chat_capability_and_handler:
+      status: PASS
+      passed: 18
+      failed: 0
+    model_gateway:
+      status: PASS
+      passed: 15
+      failed: 0
+    navigation:
+      status: PASS
+      passed: 9
+      failed: 0
+    full_chat_scope:
+      status: PASS
+      passed: 83
+      failed: 0
+      skipped: 12
+    fixture_service_integration:
+      status: PASS
+      passed: 5
+      failed: 0
+  validation:
+    prisma_generate: PASS
+    prisma_validate: PASS
+    changed_scope_lint: PASS
+    changed_scope_lint_file_count: 32
+    repository_lint_gate: PASS_WITH_PREEXISTING_REPOSITORY_LINT_DEBT
+    repository_lint_baseline:
+      method: DETACHED_WORKTREE_AT_AUTHORIZED_STARTING_SHA
+      sha: 1b9ed44b54df13e7357e91f16410b4df549a753c
+      result: FAIL
+      error_count: 719
+      warning_count: 0
+      affected_file_count: 111
+      prettier_error_count: 719
+      source_writes_or_formatting: false
+    repository_lint_current_tree:
+      result: FAIL
+      error_count: 754
+      warning_count: 0
+      affected_file_count: 117
+      prettier_error_count: 754
+      changed_p5_a_files_with_lint_findings: 0
+    repository_lint_debt_policy:
+      unrelated_remediation_authorized: false
+      blocks_p5_a_checkpoint: false
+    backend_build: PASS
+    git_diff_check: PASS
+  runtime:
+    nest_initialized: true
+    port: 3000
+    health_http_status: 200
+    database_status: up
+    stable_repeated_probe: PASS
+  fixture_postcheck:
+    database: chat_home_p3_module_boundary_01
+    reference_time: 2026-09-03T06:00:00.000Z
+    fixture_manifest_present: true
+    migration_count_before: 66
+    migration_count_after: 66
+    new_migrations: 0
+    prisma_schema_changed: false
+    second_brand_intelligence_subject_count: 0
+    collaboration_state_preserved: true
+    provider_state_preserved: true
+    subscription_state_preserved: true
+    billing_state_preserved: true
+  semantic_differential:
+    product: UNCHANGED
+    existing_chat_capabilities: UNCHANGED
+    planner_algorithm: UNCHANGED
+    conversation_persistence: UNCHANGED
+    grounding: UNCHANGED
+    campaign: UNCHANGED
+    collaboration_mutations: UNCHANGED
+    settings_mutations: UNCHANGED
+    provider_mutations: UNCHANGED
+    billing: UNCHANGED
+    frontend: UNCHANGED
+    database_schema: UNCHANGED
+  next_phase_authorization:
+    p5_b: false
+    p5_c: false
+    p6: false
+  breaker: NONE

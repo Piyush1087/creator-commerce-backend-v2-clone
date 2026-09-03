@@ -3,6 +3,9 @@ import { Module } from "@nestjs/common";
 import { BrandCentreModule } from "../brand-centre/brand-centre.module";
 import { GeminiJsonClient } from "../brand-onboarding/integrations/gemini/gemini-json.client";
 import { BrandUceModule } from "../brand-uce/brand-uce.module";
+import { BrandSettingsConsumerModule } from "../brand-settings/brand-settings-consumer.module";
+import { BrandWorkspaceReadinessModule } from "../brand-workspace-readiness/brand-workspace-readiness.module";
+import { CollaborationConsumerModule } from "../collaboration/collaboration-consumer.module";
 import { CoPilotPersistenceModule } from "../co-pilot/co-pilot-persistence.module";
 import { IntelligenceConsumerModule } from "../intelligence-consumer/intelligence-consumer.module";
 import { CHAT_CAPABILITY_HANDLERS } from "./capabilities/chat-capability-handler.tokens";
@@ -18,9 +21,13 @@ import { BrandCurrentReadHandler } from "./capabilities/handlers/brand-current-r
 import { BrandIntelligenceCurrentReadHandler } from "./capabilities/handlers/brand-intelligence-current-read.handler";
 import { CampaignListHandler } from "./capabilities/handlers/campaign-list.handler";
 import { CampaignReadHandler } from "./capabilities/handlers/campaign-read.handler";
+import { CollaborationListHandler } from "./capabilities/handlers/collaboration-list.handler";
+import { CollaborationReadHandler } from "./capabilities/handlers/collaboration-read.handler";
 import { OfferingListHandler } from "./capabilities/handlers/offering-list.handler";
 import { OfferingReadHandler } from "./capabilities/handlers/offering-read.handler";
 import { ProductIntelligenceCurrentReadHandler } from "./capabilities/handlers/product-intelligence-current-read.handler";
+import { ProviderReadinessReadHandler } from "./capabilities/handlers/provider-readiness-read.handler";
+import { WorkspaceReadinessReadHandler } from "./capabilities/handlers/workspace-readiness-read.handler";
 import { WorkspaceContextReadHandler } from "./capabilities/handlers/workspace-context-read.handler";
 import { ChatController } from "./chat.controller";
 import { ChatContextService } from "./context/chat-context.service";
@@ -33,7 +40,10 @@ import { ChatTelemetryService } from "./telemetry/chat-telemetry.service";
 @Module({
   imports: [
     BrandCentreModule,
+    BrandSettingsConsumerModule,
     BrandUceModule,
+    BrandWorkspaceReadinessModule,
+    CollaborationConsumerModule,
     CoPilotPersistenceModule,
     IntelligenceConsumerModule,
   ],
@@ -53,6 +63,10 @@ import { ChatTelemetryService } from "./telemetry/chat-telemetry.service";
     ProductIntelligenceCurrentReadHandler,
     CampaignListHandler,
     CampaignReadHandler,
+    CollaborationListHandler,
+    CollaborationReadHandler,
+    WorkspaceReadinessReadHandler,
+    ProviderReadinessReadHandler,
     AppNavigateHandler,
     {
       provide: CHAT_CAPABILITY_HANDLERS,
@@ -65,6 +79,10 @@ import { ChatTelemetryService } from "./telemetry/chat-telemetry.service";
         ProductIntelligenceCurrentReadHandler,
         CampaignListHandler,
         CampaignReadHandler,
+        CollaborationListHandler,
+        CollaborationReadHandler,
+        WorkspaceReadinessReadHandler,
+        ProviderReadinessReadHandler,
         AppNavigateHandler,
       ],
       useFactory: (

@@ -1,6 +1,7 @@
 import type { ChatCapabilityDescriptor } from "./chat-capability.contract";
 import {
   CampaignChatCapabilityInputSchema,
+  CollaborationChatCapabilityInputSchema,
   EmptyChatCapabilityInputSchema,
   NavigateChatCapabilityInputSchema,
   OfferingChatCapabilityInputSchema,
@@ -9,10 +10,14 @@ import {
   BrandCurrentCapabilityOutputSchema,
   CampaignListCapabilityOutputSchema,
   CampaignReadCapabilityOutputSchema,
+  CollaborationListCapabilityOutputSchema,
+  CollaborationReadCapabilityOutputSchema,
   IntelligenceCapabilityOutputSchema,
   NavigateCapabilityOutputSchema,
   OfferingListCapabilityOutputSchema,
   OfferingReadCapabilityOutputSchema,
+  ProviderReadinessCapabilityOutputSchema,
+  WorkspaceReadinessCapabilityOutputSchema,
   WorkspaceContextCapabilityOutputSchema,
 } from "./chat-capability-output.schema";
 
@@ -25,6 +30,10 @@ export const CHAT_FIRST_SLICE_CAPABILITY_IDS = [
   "product_intelligence.current.read",
   "campaign.list",
   "campaign.read",
+  "collaboration.list",
+  "collaboration.read",
+  "workspace.readiness.read",
+  "provider.readiness.read",
   "app.navigate",
 ] as const;
 
@@ -103,6 +112,34 @@ export const CHAT_CAPABILITY_CATALOG: readonly ChatCapabilityDescriptor[] = [
     "campaign",
     CampaignChatCapabilityInputSchema,
     CampaignReadCapabilityOutputSchema,
+  ),
+  implemented(
+    "collaboration.list",
+    "READ",
+    "collaboration",
+    EmptyChatCapabilityInputSchema,
+    CollaborationListCapabilityOutputSchema,
+  ),
+  implemented(
+    "collaboration.read",
+    "READ",
+    "collaboration",
+    CollaborationChatCapabilityInputSchema,
+    CollaborationReadCapabilityOutputSchema,
+  ),
+  implemented(
+    "workspace.readiness.read",
+    "READ",
+    "workspace-readiness",
+    EmptyChatCapabilityInputSchema,
+    WorkspaceReadinessCapabilityOutputSchema,
+  ),
+  implemented(
+    "provider.readiness.read",
+    "READ",
+    "provider-readiness",
+    EmptyChatCapabilityInputSchema,
+    ProviderReadinessCapabilityOutputSchema,
   ),
   implemented(
     "app.navigate",
