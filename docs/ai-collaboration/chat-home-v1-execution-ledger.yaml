@@ -1003,11 +1003,13 @@ p5_a_remaining_canonical_reads_and_navigation:
 
 p5_b_proactive_brand_home_aggregation:
   authority: P5_B_PROACTIVE_BRAND_HOME_AGGREGATION
-  status: IMPLEMENTED_PENDING_SYSTEMS_ACCEPTANCE
+  status: ACCEPTED
+  accepted_runtime_sha: 75ad00464464d7a2fd5a5ac11a0d2107625a0b09
   authorized_starting_sha: 8737f3327beeb41c74e3e7f76062d42f4e853153
   accepted_p5_a_runtime_authority: 0ec9888dd9212cd31e6f46de2ee39ec2ccf586fa
   systems_review:
-    decision: BOUNDED_CORRECTION_REQUIRED
+    decision: ACCEPT
+    prior_decision: BOUNDED_CORRECTION_REQUIRED
     original_candidate_sha: 49566e014795174cb03a826cc05dc6c3a5b10d96
   correction:
     id: P5_B_SOURCE_STATE_CONTRACT_01
@@ -1243,7 +1245,210 @@ p5_b_proactive_brand_home_aggregation:
     frontend: UNCHANGED
     database_schema: UNCHANGED
   next_phase_authorization:
-    p5_b_accepted: false
-    p5_c: false
+    p5_b_accepted: true
+    p5_c: true
+    p6: false
+  breaker: NONE
+
+p5_c_production_shaped_backend_real_gemini_acceptance:
+  authority: P5_C_PRODUCTION_SHAPED_BACKEND_REAL_GEMINI_ACCEPTANCE
+  status: PRODUCTION_SHAPED_EVIDENCE_COMPLETE_PENDING_SYSTEMS_ACCEPTANCE
+  accepted_p5_b_runtime: 75ad00464464d7a2fd5a5ac11a0d2107625a0b09
+  final_runtime_candidate: 4beddc4615e97a4872e3e91b9fb3d352c155f5a7
+  credential_block:
+    status: RECOVERED
+    cause: API_KEY_INVALID_FROM_STALE_OR_WRONG_PROCESS_CREDENTIAL
+  credential_recovery:
+    source: ACTIVE_AWS_ECS_TASK_DEFINITION_ENVIRONMENT_ENTRY
+    service_task_context: creatorshop-be-dev-apiclusterCluster/api
+    aws_profile: creator-dev
+    region: ap-south-1
+    injection: PROCESS_ONLY
+    model: gemini-3.5-flash
+    provider_check: PASS
+  git_tracking_block:
+    status: RECOVERED
+    cause: STALE_LOCAL_REMOTE_TRACKING_REF
+    canonical_github_ref_remained_valid: true
+  retained_production_shaped_evidence:
+    r1_collaboration_attention:
+      status: PASS
+      invoked_capabilities:
+        - collaboration.list
+        - collaboration.read
+      permanent_chat_persistence: PASS
+    r2_named_collaboration_read:
+      status: PASS
+      invoked_capabilities:
+        - collaboration.list
+        - collaboration.read
+      collaboration_id: 5f100000-0000-4000-8000-000000000005
+    r3_collaboration_navigation:
+      status: PASS
+      navigation_target: COLLABORATIONS
+      collaboration_id: 5f100000-0000-4000-8000-000000000005
+    r4_workspace_readiness:
+      status: PASS
+      invoked_capability: workspace.readiness.read
+      workspace: READY
+      subscription: FULL_ACCESS
+      billing: READY
+    r5_instagram_readiness:
+      status: PASS
+      invoked_capability: provider.readiness.read
+      provider: INSTAGRAM
+      readiness: READY
+      reconnect_recommendation_present: false
+    r6_settings_navigation:
+      status: PASS
+      navigation_target: SETTINGS_INTEGRATIONS
+      entity_ref_present: false
+    r7_original:
+      status: FAIL
+      failure: RECOMMENDATION_BASIS_REFS_EMPTY
+    r7_architecture_correction:
+      correction_sha: 4beddc4615e97a4872e3e91b9fb3d352c155f5a7
+      canonical_read_fallback_result_refs: true
+      existing_intelligence_semantic_result_refs_unchanged: true
+      recommendation_basis_minimum: 1
+      recommendation_basis_subset_of_executed_authorized_grounding: true
+    r7_corrected:
+      status: PASS
+      recommendation_present: true
+      non_mutating: true
+      basis_ref_count: 2
+      basis_refs_authorized: true
+  r8_non_mutating_proposal:
+    status: PASS
+    conversation_id: 6423a180-04b2-4f5c-98be-f3c7a09565e3
+    conversation_status: ANSWERED
+    http_status: 201
+    planning_passes: 2
+    invoked_capabilities:
+      - collaboration.list
+      - collaboration.read
+    entity_refs:
+      - type: BRAND
+        id: 1af76731-f357-434f-96d3-2a37e5045e96
+      - type: COLLABORATION
+        id: 5f100000-0000-4000-8000-000000000005
+      - type: CAMPAIGN
+        id: 310e6b52-2001-4642-ba8d-d82190aa1ed1
+    grounding_result_refs:
+      - canonical:collaboration.list:f6a12bc1596cd0702b4878ebe52ea78ed36ffd2b839e3db5a0a146679dc4b5b8
+      - canonical:collaboration.read:bfd06766bd034b24a4e2c9fbd23438e2471e6bba4835cfa410725e137ecdfecc
+    recommendation:
+      present: true
+      non_mutating: true
+      basis_refs:
+        - canonical:collaboration.read:bfd06766bd034b24a4e2c9fbd23438e2471e6bba4835cfa410725e137ecdfecc
+    limitations: []
+    freshness_notes:
+      - CURRENT_AS_OF_LAST_UPDATE_2026_09_03T06_00_00Z
+    prepared_overdue_collaboration_represented_truthfully: true
+    execute_capability_used: false
+    provider_action_performed: false
+    execution_claim_present: false
+  campaign_regression:
+    status: PASS
+    conversation_id: f90d1509-2f60-4fc9-ba34-e391d974840a
+    conversation_status: ANSWERED
+    http_status: 201
+    planning_passes: 2
+    invoked_capabilities:
+      - campaign.list
+    grounding_result_refs:
+      - canonical:campaign.list:c68875c0a284d3f8c9e4963d24971382e56303026ed8ee2a4ab5f157a0bb53fe
+    campaign_entity_refs:
+      summer_launch_acceptance: 310e6b52-2001-4642-ba8d-d82190aa1ed1
+      p5_momentum_acceptance_campaign: 5f100000-0000-4000-8000-00000000000f
+    recommendation:
+      present: true
+      non_mutating: true
+      basis_refs:
+        - canonical:campaign.list:c68875c0a284d3f8c9e4963d24971382e56303026ed8ee2a4ab5f157a0bb53fe
+    summer_launch_present: true
+    momentum_campaign_present: true
+    fabricated_campaign: false
+  conversation_persistence:
+    status: PASS
+    conversation_id: 6423a180-04b2-4f5c-98be-f3c7a09565e3
+    reload_http_status: 200
+    user_message_persisted: true
+    assistant_message_persisted: true
+  business_purity:
+    collaboration_mutated: false
+    uce_collaboration_mutated: false
+    provider_mutated: false
+    subscription_mutated: false
+    billing_mutated: false
+    campaign_mutated: false
+    intelligence_mutated: false
+  second_brand_intelligence_pure_read:
+    brand_id: 5f100000-0000-4000-8000-00000000000b
+    intelligence_subject_before: 0
+    intelligence_subject_after: 0
+    object_generation_before: 0
+    object_generation_after: 0
+    object_generation_delta: 0
+    component_generation_before: 0
+    component_generation_after: 0
+    component_generation_delta: 0
+    current_component_before: 0
+    current_component_after: 0
+    current_component_delta: 0
+  external_actions:
+    real_gemini_chat_calls: EXPECTED
+    meta_calls: 0
+    instagram_provider_calls: 0
+    razorpay_calls: 0
+    email_sends: 0
+    notification_deliveries: 0
+    token_refreshes: 0
+  sensitive_log_review:
+    gemini_key_exposed: false
+    jwt_secret_exposed: false
+    acceptance_password_exposed: false
+    provider_token_exposed: false
+    bank_detail_exposed: false
+    digital_access_credential_exposed: false
+    private_collaboration_message_content_exposed: false
+  tests:
+    full_backend_suite:
+      status: PASS
+      attempts: 1
+      test_files_passed: 179
+      test_files_skipped: 42
+      passed: 1173
+      failed: 0
+      skipped: 496
+  validation:
+    prisma_generate: PASS
+    prisma_validate: PASS
+    intelligence_contracts_verify: PASS
+    intelligence_architecture_commit: bbb0be3345c36e9cc7c4f06ca68fb491b742b83f
+    backend_build: PASS
+    git_diff_check: PASS
+  migrations:
+    count_before: 66
+    count_after: 66
+    new_migrations: 0
+    prisma_schema_changed: false
+  capability_architecture_postcheck:
+    descriptor_count: 13
+    execute_capability_count: 0
+    planner_core_algorithm_changed: false
+    new_forward_refs: 0
+    new_scc_detected: false
+  source_freeze:
+    backend_runtime_source_changed: false
+    frontend_changed: false
+    frontend_head: 18e8363ac40b30a9248e6b529b857d3aa20e1fc0
+    ledger_only_change: true
+  systems_acceptance:
+    p5_c_accepted: false
+    p5_backend_full_brand_v1_accepted: false
+    systems_review_ready: true
+  next_phase_authorization:
     p6: false
   breaker: NONE
