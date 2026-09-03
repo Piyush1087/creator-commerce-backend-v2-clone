@@ -21,6 +21,7 @@ import type { Response } from "express";
 
 import type { RequestWithAuthUser } from "../auth/auth.controller";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { CreatorPlatformAccessGuard } from "../creator-entry/creator-platform-access.guard";
 import { CreatorSettingsAccessService } from "../creator-settings/services/creator-settings-access.service";
 import { ZodValidationPipe } from "../creator-onboarding/pipes/zod-validation.pipe";
 import { CREATOR_COPILOT_WELCOME_NARRATIVE } from "./integrations/creator-copilot-system-prompt";
@@ -41,7 +42,7 @@ import { CreatorCoPilotUsageService } from "./services/creator-co-pilot-usage.se
 import { CreatorCoPilotFeedbackService } from "./services/creator-co-pilot-feedback.service";
 
 @Controller("api/v1/creator/co-pilot")
-@UseGuards(ThrottlerGuard, JwtAuthGuard)
+@UseGuards(ThrottlerGuard, JwtAuthGuard, CreatorPlatformAccessGuard)
 export class CreatorCoPilotController {
   constructor(
     private readonly access: CreatorSettingsAccessService,

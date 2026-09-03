@@ -22,6 +22,7 @@ import { GoogleAuthService } from "../../auth/google-auth.service";
 import { establishInitialBrandOwner } from "../../brand-settings/team/initial-brand-owner";
 import { lockBrandTeam } from "../../brand-settings/team/brand-team-policy";
 import { BrandCentreScanService } from "../../brand-centre/services/brand-centre-scan.service";
+import { inspectSterileProvisionalCreator } from "../../../shared/identity/sterile-provisional-creator.policy";
 import {
   emailDomainFromAddress,
   emailDomainMatchesBrandDomain,
@@ -36,13 +37,6 @@ const OTP_TTL_MINUTES = 10;
 const MAX_VERIFY_ATTEMPTS = 3;
 const SEND_LIMIT_PER_WINDOW = 3;
 const SEND_WINDOW_MS = 60_000;
-
-/**
- * TEMP local Brand Step 6 only. Not shared auth / Creator Entry.
- * Before production: switch sendOtp/verifyOtp back to sendOtpReal/verifyOtpReal
- * (Postmark + random code) and delete this constant.
- */
-const BRAND_ONBOARDING_LOCAL_OTP = "123456";
 
 type PostmarkInactiveError = {
   statusCode?: number;
@@ -62,13 +56,11 @@ export class BrandVerificationService {
   ) {}
 
   async sendOtp(brandProfileId: string, rawEmail: string) {
-    return this.sendOtpLocal(brandProfileId, rawEmail);
-    // return this.sendOtpReal(brandProfileId, rawEmail);
+    return this.sendOtpReal(brandProfileId, rawEmail);
   }
 
   async verifyOtp(brandProfileId: string, rawEmail: string, rawOtp: string) {
-    return this.verifyOtpLocal(brandProfileId, rawEmail, rawOtp);
-    // return this.verifyOtpReal(brandProfileId, rawEmail, rawOtp);
+    return this.verifyOtpReal(brandProfileId, rawEmail, rawOtp);
   }
 
   /**
@@ -183,9 +175,17 @@ export class BrandVerificationService {
       where: { email },
     });
     if (existingUser && existingUser.role !== UserRole.BRAND) {
-      throw new ConflictException(
-        "This email is registered for a different account type.",
+      // Sterile provisional Creators may be reclaimed by Brand activation (Invariant 7).
+      // Any other non-BRAND account type is a hard conflict.
+      const sterileCheck = await inspectSterileProvisionalCreator(
+        this.prisma,
+        existingUser.id,
       );
+      if (!sterileCheck.sterile) {
+        throw new ConflictException(
+          "This email is registered for a different account type.",
+        );
+      }
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -193,6 +193,7 @@ export class BrandVerificationService {
 
       let organizationId = profile.organizationId;
       let userId = existingUser?.id;
+      let reclaimsSterileCreator = false;
 
       if (!organizationId) {
         const organization = await tx.organization.create({
@@ -202,6 +203,19 @@ export class BrandVerificationService {
       }
 
       if (userId) {
+        if (existingUser && existingUser.role !== UserRole.BRAND) {
+          // Re-verify sterile state inside transaction for race-safety.
+          const innerCheck = await inspectSterileProvisionalCreator(
+            tx,
+            userId,
+          );
+          if (!innerCheck.sterile) {
+            throw new ConflictException(
+              "This email is registered for a different account type.",
+            );
+          }
+          reclaimsSterileCreator = true;
+        }
         await tx.user.update({
           where: { id: userId },
           data: {
@@ -210,6 +224,9 @@ export class BrandVerificationService {
             name: existingUser?.name ?? displayName,
             organizationId,
             authState: UserAuthState.ACTIVE,
+            ...(reclaimsSterileCreator
+              ? { role: UserRole.BRAND, googleSubjectId: null }
+              : {}),
           },
         });
       } else {
@@ -297,75 +314,7 @@ export class BrandVerificationService {
     });
   }
 
-  private async sendOtpLocal(brandProfileId: string, rawEmail: string) {
-    const { profile } = await this.assertBrandVerificationEmail(
-      brandProfileId,
-      rawEmail,
-    );
-    this.logger.warn(
-      `Brand onboarding OTP uses the local hardcoded bypass (no Postmark). brandProfileId=${profile.id}`,
-    );
-    return {
-      sent: true,
-      expiresInMinutes: OTP_TTL_MINUTES,
-      expiresAt: addMinutes(new Date(), OTP_TTL_MINUTES).toISOString(),
-    };
-  }
-
-  private async verifyOtpLocal(
-    brandProfileId: string,
-    rawEmail: string,
-    rawOtp: string,
-  ) {
-    const { email, profile } = await this.assertBrandVerificationEmail(
-      brandProfileId,
-      rawEmail,
-    );
-    if (rawOtp.trim() !== BRAND_ONBOARDING_LOCAL_OTP) {
-      throw new UnauthorizedException(
-        "Incorrect code. Please check your email and try again.",
-      );
-    }
-    await this.markIdentityConfirmed(brandProfileId, email);
-    return {
-      identityConfirmed: true,
-      brandProfileId: profile.id,
-      domain: profile.domain,
-      email,
-      nextStep: "password" as const,
-    };
-  }
-
-  private async assertBrandVerificationEmail(
-    brandProfileId: string,
-    rawEmail: string,
-  ) {
-    const email = normalizeVerificationEmail(rawEmail);
-    if (!isValidVerificationEmail(email)) {
-      throw new BadRequestException(
-        "Please enter a valid email address (e.g., name@brand.in)",
-      );
-    }
-
-    const profile = await this.prisma.brandProfile.findUnique({
-      where: { id: brandProfileId },
-      select: { id: true, domain: true, name: true, isVerified: true },
-    });
-    if (!profile) {
-      throw new NotFoundException("Brand profile not found");
-    }
-
-    if (!emailDomainMatchesBrandDomain(email, profile.domain)) {
-      const emailDomain = emailDomainFromAddress(email);
-      throw new BadRequestException(
-        `The email domain (@${emailDomain}) doesn't match your website (${profile.domain}). Please use your work email, or go back and re-enter your website.`,
-      );
-    }
-
-    return { email, profile };
-  }
-
-  /** Production Postmark + random code. Unused while sendOtpLocal is wired. */
+  /** Production Postmark + random code. */
   private async sendOtpReal(brandProfileId: string, rawEmail: string) {
     const email = normalizeVerificationEmail(rawEmail);
     if (!isValidVerificationEmail(email)) {

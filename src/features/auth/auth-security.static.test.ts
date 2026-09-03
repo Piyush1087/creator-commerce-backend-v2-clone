@@ -22,12 +22,9 @@ describe("BS-12 runtime backdoor reconciliation", () => {
 
   it("contains no fixed six-digit legacy authentication bypass", () => {
     const legacyFixedCode = ["123", "456"].join("");
-    const offenders = sources.filter((file) => {
-      if (file.includes("brand-onboarding/verification/")) {
-        return false;
-      }
-      return readFileSync(file, "utf8").includes(legacyFixedCode);
-    });
+    const offenders = sources.filter((file) =>
+      readFileSync(file, "utf8").includes(legacyFixedCode),
+    );
     expect(offenders).toEqual([]);
     expect(`${deployment}\n${environmentExample}`).not.toContain(
       legacyFixedCode,

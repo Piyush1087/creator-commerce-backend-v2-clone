@@ -11,6 +11,7 @@ import { ThrottlerGuard } from "@nestjs/throttler";
 
 import type { RequestWithAuthUser } from "../auth/auth.controller";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { CreatorPlatformAccessGuard } from "../creator-entry/creator-platform-access.guard";
 import { ZodValidationPipe } from "../creator-onboarding/pipes/zod-validation.pipe";
 import { CreatorCentreService } from "./creator-centre.service";
 import {
@@ -19,7 +20,7 @@ import {
 } from "./schemas/creator-centre.schema";
 
 @Controller("api/v1/creator-centre")
-@UseGuards(ThrottlerGuard, JwtAuthGuard)
+@UseGuards(ThrottlerGuard, JwtAuthGuard, CreatorPlatformAccessGuard)
 export class CreatorCentreController {
   constructor(private readonly centre: CreatorCentreService) {}
 
