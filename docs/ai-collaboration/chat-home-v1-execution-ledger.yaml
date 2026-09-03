@@ -1452,3 +1452,251 @@ p5_c_production_shaped_backend_real_gemini_acceptance:
   next_phase_authorization:
     p6: false
   breaker: NONE
+
+p6_frontend_final_systems_acceptance:
+  status: ACCEPTED_BY_SYSTEMS
+  frontend_runtime_sha: 1cf2e3bd93425f60fb3d40692320078aea567794
+  parent_sha: eba4bfd57871b959ed558d9341e77b52b5f59c62
+  bounded_contract_correction:
+    finding: CHAT_RECOMMENDATION_BASISREF_CARDINALITY
+    recommendation_basis_refs_minimum: 1
+  regression:
+    source: P6_FINAL
+    test_files: 104
+    passed: 849
+    failed: 0
+    typecheck: PASS
+    build: PASS
+    git_diff_check: PASS
+    changed_scope_lint: PASS
+
+p7_production_shaped_acceptance_run_01:
+  authority: CHAT_HOME_P7_PRODUCTION_SHAPED_ACCEPTANCE_V1
+  status: STOP
+  backend_runtime_authority: 4beddc4615e97a4872e3e91b9fb3d352c155f5a7
+  backend_starting_evidence_head: b75d0f77291ef2ecd41622f8ad08845c0730a9fb
+  frontend_runtime_authority: 1cf2e3bd93425f60fb3d40692320078aea567794
+  conversation_id: 70a9aed4-3630-4a5d-81c6-0699e72824b5
+  passed_evidence_reused_by_resume: true
+  breaker: BUSINESS_STATE_MUTATION
+  defect_boundary: P7-C1_BRAND_CENTRE_SESSION_ACTIVITY_BOUNDARY_LEAK
+  home_unavailable_classification: NOT_EXECUTED_AFTER_BREAKER
+  browser_runtime_classification: NOT_EXECUTED_AFTER_BREAKER
+
+p7_c1_brand_centre_session_activity_boundary:
+  status: ACCEPTED_BY_SYSTEMS
+  defect: P7-C1_BRAND_CENTRE_SESSION_ACTIVITY_BOUNDARY_LEAK
+  starting_sha: b75d0f77291ef2ecd41622f8ad08845c0730a9fb
+  accepted_runtime_parent: 4beddc4615e97a4872e3e91b9fb3d352c155f5a7
+  correction_sha: 00e1299ec2e97497bc6d81aeda808d6edd3b482a
+  architecture:
+    generic_brand_authorization: SIDE_EFFECT_FREE
+    brand_centre_activity_path: PRESERVED
+    brand_centre_req_evt_004: PRESERVED
+  tests:
+    generic_brand_authorization: PASS
+    home_no_brandprofile_touch: PASS
+    home_no_leak_eviction: PASS
+    stale_activity_home_case: PASS
+    brand_centre_touch_preserved: PASS
+    brand_centre_eviction_preserved: PASS
+    chat_read_no_session_touch: PASS
+    cross_brand_authorization: PASS
+  regression:
+    backend_full_suite: PASS
+    passed: 1175
+    failed: 0
+    skipped: 500
+    prisma_generate: PASS
+    prisma_validate: PASS
+    intelligence_contracts: PASS
+    backend_build: PASS
+    git_diff_check: PASS
+    changed_scope_lint: PASS
+  migrations:
+    count: 66
+    schema_changed: false
+    migration_added: false
+
+p7_production_shaped_acceptance_resume_run_02:
+  authority: CHAT_HOME_P7_PRODUCTION_SHAPED_ACCEPTANCE_RESUME_V1
+  status: PASS_CANDIDATE_PENDING_SYSTEMS
+  evidence_policy: REUSE_ACCEPTED_EVIDENCE_AND_RESUME_FAILED_GATE
+  product_sha: d69ba6b8cb331bfa36b450307d9defcd26d09c6e
+  runtime_rc:
+    backend: 00e1299ec2e97497bc6d81aeda808d6edd3b482a
+    backend_parent: b75d0f77291ef2ecd41622f8ad08845c0730a9fb
+    frontend: 1cf2e3bd93425f60fb3d40692320078aea567794
+  preflight:
+    backend_local_true_remote_match: PASS
+    frontend_local_true_remote_match: PASS
+    worktrees_clean: PASS
+    migration_count: 66
+    fixture: PASS
+    authentication: PASS
+    gemini_credential_source: ACTIVE_AWS_ECS_TASK_DEFINITION_ENVIRONMENT_ENTRY
+    gemini_model: gemini-3.5-flash
+    gemini_readiness: PASS
+    minimal_readiness_calls: 1
+  environment:
+    database: chat_home_p3_module_boundary_01
+    backend: LOCAL_PRODUCTION_SHAPED
+    frontend: LOCAL_PRODUCTION_SHAPED
+    acceptance_fixture_manifest: C:/Users/piyus/AppData/Local/Temp/chat-home-p5-fixture-manifest.json
+    primary_brand_id: 1af76731-f357-434f-96d3-2a37e5045e96
+    second_brand_id: 5f100000-0000-4000-8000-00000000000b
+  breaker_revalidation:
+    home_http_success: PASS
+    home_status: READY
+    canonical_section_order: PASS
+    brand_profile_activity_unchanged: PASS
+    brand_profile_updated_at_unchanged: PASS
+    brand_performance_leak_unchanged: PASS
+    stale_brand_centre_activity_case: PASS
+    stale_case_leak_not_archived: PASS
+    fixture_restoration: PASS
+    home_gemini_calls: 0
+  home_unavailable:
+    establishment: PROCESS_ONLY_SOURCE_FAILURE_INJECTION
+    production_source_changed: false
+    runtime_http_success: PASS
+    home_status: UNAVAILABLE
+    source_states_unavailable: 8
+    canonical_sections_retained: 4
+    section_states_unavailable: 4
+    fabricated_items: 0
+    truthful_limitations: 8
+    frontend_rendering: PASS
+    ask_creator_shop_independently_available: PASS
+    business_mutation: false
+    gemini_calls: 0
+  representative_corrected_chat:
+    status: PASS
+    conversation_id: b374004e-c454-4edb-a4d1-7ed1c01d525f
+    natural_api_turns: 3
+    api_gemini_calls: 10
+    brand_intelligence: PASS
+    offering_and_product_intelligence: PASS
+    workspace_provider_campaign_multi_capability: PASS
+    authorized_capability_execution: PASS
+    recommendation_basis_refs_minimum: PASS
+    recommendation_basis_refs_subset_of_executed_results: PASS
+    execution_claim_present: false
+    cross_brand_data_present: false
+    generic_chat_brand_centre_session_touch: false
+    persistence_fetch: PASS
+    message_order: PASS
+    assistant_payload: PASS
+  isolation:
+    primary_home_primary_data_only: PASS
+    second_brand_cross_brand_spot_check: PASS
+    second_brand_primary_offering_present: false
+    second_brand_primary_intelligence_present: false
+    second_brand_primary_campaign_present: false
+    second_brand_primary_collaboration_present: false
+    second_brand_intelligence_before:
+      subjects: 0
+      objects: 0
+      components: 0
+      current: 0
+    second_brand_intelligence_after:
+      subjects: 0
+      objects: 0
+      components: 0
+      current: 0
+  business_purity:
+    generic_home_or_chat_brand_centre_session_mutation: false
+    campaign_mutation: false
+    collaboration_mutation: false
+    offering_mutation: false
+    brand_business_mutation: false
+    settings_mutation: false
+    provider_mutation: false
+    intelligence_mutation: false
+    financial_mutation: false
+    unexpected_leak_mutation: false
+    conversation_and_message_persistence: EXPECTED
+    explicit_activity_aware_navigation:
+      observed: true
+      classification: PERMITTED_EXPLICIT_BRAND_CENTRE_ACTIVITY_PATH
+      generic_read_defect: false
+  integrated_browser_runtime:
+    desktop_shape: PASS
+    desktop_viewport: 1280x720
+    mobile_shape: PASS
+    authenticated_real_home: PASS
+    canonical_four_section_hierarchy: PASS
+    real_server_data: PASS
+    entity_navigation: PASS
+    ask_creator_shop: PASS
+    browser_chat_interaction: PASS
+    browser_chat_gemini_calls: 2
+    degraded_disclosure: PASS
+    unavailable_disclosure: PASS
+    no_fabricated_unavailable_content: PASS
+    keyboard: PASS
+    dialog_semantics: PASS
+    visible_focus: PASS
+    non_color_only_states: PASS
+    loading_and_error_announcements_bounded: PASS
+  regression_evidence:
+    same_sha_reused: true
+    backend_source: P7_C1
+    backend_sha: 00e1299ec2e97497bc6d81aeda808d6edd3b482a
+    backend_full_suite: REUSED_FROM_P7_C1
+    backend_passed: 1175
+    backend_failed: 0
+    backend_skipped: 500
+    prisma_generate: PASS
+    prisma_validate: PASS
+    intelligence_contracts: PASS
+    backend_build: PASS
+    frontend_source: P6_FINAL
+    frontend_sha: 1cf2e3bd93425f60fb3d40692320078aea567794
+    frontend_full_suite: REUSED_FROM_P6_FINAL
+    frontend_test_files: 104
+    frontend_passed: 849
+    frontend_failed: 0
+    frontend_typecheck: PASS
+    frontend_build: PASS
+    git_diff_check: PASS
+  architecture:
+    capability_descriptors: 13
+    execute_descriptors: 0
+    home_request_time_deterministic: true
+    home_gemini_calls: 0
+    generic_brand_authorization: SIDE_EFFECT_FREE
+    brand_centre_session_behavior: EXPLICIT_ACTIVITY_PATH_ONLY
+    schema_changed: false
+    migration_count: 66
+    migration_added: false
+    new_application_state_layer: false
+    new_intelligence_runtime: false
+    recommendation_engine: false
+    personal_or_vector_memory: false
+    production_code_changed_during_resume: false
+  external_calls:
+    gemini_total: 13
+    gemini_readiness: 1
+    gemini_representative_api_chat: 10
+    gemini_browser_chat: 2
+    meta: 0
+    instagram_provider: 0
+    razorpay: 0
+    email: 0
+    notifications: 0
+  sensitive_log_review:
+    status: PASS
+    sensitive_logs: NONE
+    gemini_key_exposed: false
+    acceptance_password_exposed: false
+    credential_markers_exposed: false
+  streaming: NOT_RETAINED
+  source_freeze:
+    backend_production_changed_during_resume: false
+    frontend_changed_during_resume: false
+    ledger_only_checkpoint: true
+  p7_acceptance: PENDING_SYSTEMS
+  runtime_accepted: false
+  systems_review_ready: true
+  breaker: NONE
