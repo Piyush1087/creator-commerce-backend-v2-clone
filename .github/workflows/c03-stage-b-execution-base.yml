@@ -26,11 +26,11 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: c05_c03_stage_b
+          POSTGRES_DB: c03_stage_b
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d c05_c03_stage_b"
+          --health-cmd "pg_isready -U postgres -d c03_stage_b"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
@@ -38,7 +38,7 @@ jobs:
       STAGE: local
       PORT: "3000"
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c05_c03_stage_b?schema=public
-      C01_I5_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c05_c03_stage_b?schema=public
+      C01_I5_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c01_i5_c03_stage_b?schema=public
       C05_TEAM_DATABASE_TEST: "true"
       PLAYWRIGHT_ENABLED: "false"
       SETTINGS_FIELD_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
@@ -86,8 +86,10 @@ jobs:
 
       - name: Fresh PostgreSQL migration replay
         run: |
-          npm run db:migrate:deploy
-          npx prisma migrate status
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_stage_b?schema=public npm run db:migrate:deploy
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_stage_b?schema=public npx prisma migrate status
+          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres -T c03_stage_b c01_i5_c03_stage_b
+          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres -T c03_stage_b c05_c03_stage_b
 
       - name: Relevant real-PostgreSQL baseline
         run: |

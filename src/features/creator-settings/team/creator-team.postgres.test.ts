@@ -323,11 +323,6 @@ describe.skipIf(process.env.C05_TEAM_DATABASE_TEST !== "true")(
           "ASSISTANT",
         ),
       ).rejects.toThrow();
-      await team.updateRole(
-        actor(manager.user),
-        assistant.membership.id,
-        "MANAGER",
-      );
       await expect(team.list(actor(assistant.user))).rejects.toThrow(
         "Creator workspace action denied",
       );
@@ -337,6 +332,14 @@ describe.skipIf(process.env.C05_TEAM_DATABASE_TEST !== "true")(
           allocatedRole: "ASSISTANT",
         }),
       ).rejects.toThrow("Creator workspace action denied");
+      await team.updateRole(
+        actor(manager.user),
+        assistant.membership.id,
+        "MANAGER",
+      );
+      await expect(team.list(actor(assistant.user))).resolves.toEqual(
+        expect.any(Array),
+      );
     });
 
     it("makes cancellation and expiry terminal", async () => {
