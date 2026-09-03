@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-03  
 **Branch:** `feature/c01-c05-creator-integration`  
-**Run context:** Post-reconciliation-pass. Operator re-ran all recon-scoped backend suites with disposable Docker Postgres (0 skip on C-01 / C-05 / BS-12). Frontend not re-run (prior FE results remain).  
+**Run context:** Post-reconciliation-pass. Operator re-ran all recon-scoped backend suites with disposable Docker Postgres (0 skip on C-01 / C-05 / BS-12). Frontend automated results from same-day scoped run. Local UI smoke (R1, R3–R6) operator-verified 2026-09-03.  
 **Prior baseline:** `origin-run-log.md` + module `automated-test-results.md` files.  
 **Invariant report:** `reconciliation-report.md`
 
@@ -134,22 +134,37 @@ Prior FE evidence still stands (see earlier sections / F1–F6 from same-day run
 |---|---|---|---|
 | 1 | Campaign Apply continuation / no auto-Application | **PASS** | I5 postgres 21/21; continuity/apply suites green |
 | 2 | Invitation path separation | **GENUINE_AUTHORITY_CONFLICT** | FE architecture only (not re-run; prior fail stands) |
-| 3 | `CreatorPlatformAccessGuard` | **FIXED** | Architecture + guard controllers PASS |
-| 4 | Entry/Settings recovery | **PASS** | Prior FE; no new BE fail |
+| 3 | `CreatorPlatformAccessGuard` | **FIXED** | Architecture + guard controllers PASS; UI R1 |
+| 4 | Entry/Settings recovery | **PASS** | UI R1 + R3 |
 | 5 | Stable Instagram identity | **PASS** | Continuity postgres PASS |
 | 6 | One-email / account-context | **PASS** (known parked wording) | Deny works; code `Creator access required` vs clone `ACCOUNT_CONTEXT_CONFLICT` |
 | 7 | Sterile provisional Creator reclaim | **FIXED** (code) | Reclaim reaches update; harness token mock fails test |
 | 8 | FE structured error codes | **FIXED** | Prior FE scoped run |
-| 9 | Creator shell navigation | **PASS** | Prior FE |
-| 10 | Creator Team actor/subject + role | **PASS** (1 known test bug) | Team postgres 4/5 |
-| 11 | Aurora SideDrawer a11y | **FIXED** | Prior FE dialog tests PASS |
-| 12 | No deployable fixed OTP | **FIXED** | BE static 4/4 + BS-12 postgres 10/10 |
+| 9 | Creator shell navigation | **PASS** | UI R3 Settings shell |
+| 10 | Creator Team actor/subject + role | **PASS** (1 known test bug) | Team postgres 4/5; UI R3/R4 |
+| 11 | Aurora SideDrawer a11y | **FIXED** | FE dialog tests PASS + UI R4 |
+| 12 | No deployable fixed OTP | **FIXED** | BE static 4/4 + BS-12 postgres 10/10 + UI R5 |
+
+---
+
+## Local UI smoke (operator 2026-09-03)
+
+Reconciliation-scoped click-through on local BE/FE. Live Instagram / platform shell entry remains BLOCKED on localhost (same as prior `ui-verification.md`).
+
+| # | Check | Result |
+|---|---|---|
+| R1 | Incomplete Creator: product routes bounce to Entry; `/creator/settings/account` still opens | **PASS** |
+| R3 | Settings redirect + sections (Account / Profile / Team / Instagram / Payouts & Legal); `/social` → Instagram | **PASS** |
+| R4 | Team / Payouts (and related) drawers open; Esc closes; usable focus | **PASS** |
+| R5 | Brand Step 6 OTP uses real code (Postmark / log), not fixed `123456` | **PASS** |
+| R6 | 390px onboarding + Settings: stacks, full-width CTA, no page-level horizontal scroll | **PASS** |
 
 ---
 
 ## Bottom line
 
 - **All recon-scoped backend suites ran with DB env set; C-01 and C-05 Team had 0 skip.**
+- **Local UI smoke R1, R3–R6 PASS.**
 - **Failures match known baseline / harness / message / fixture debt** — not new regressions from this reconciliation pass.
 - **Do not fix gatekeeper `kind` fixture or C-05 matrix assertion order** on this branch (unrelated origin debt).
 - **One SA escalation remains:** Inv-2 (`inviteToken`).
