@@ -20,7 +20,7 @@ export class BrandWorkspaceReadinessConsumerService {
   async read(user: AuthUser) {
     const observedAt = new Date();
     const { brandProfileId } = await this.workspace.resolveBrandContext(user);
-    const brandState = await this.brandConsumer.read(user);
+    const brandState = await this.brandConsumer.readForWorkspace(user);
     if (brandState.brandId !== brandProfileId) {
       throw new Error("Brand workspace readiness scope mismatch");
     }

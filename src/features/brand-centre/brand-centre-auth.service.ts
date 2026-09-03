@@ -16,7 +16,7 @@ export class BrandCentreAuthService {
     private readonly sessionEviction: BrandCentreSessionEvictionService,
   ) {}
 
-  async resolveBrandProfileId(user: AuthUser): Promise<string> {
+  async resolveBrandProfileIdForWorkspace(user: AuthUser): Promise<string> {
     const current = await this.prisma.user.findUnique({
       where: { id: user.id },
       include: {
@@ -45,7 +45,11 @@ export class BrandCentreAuthService {
     if (candidates.length !== 1) {
       throw new ForbiddenException("Active Brand team membership required");
     }
-    const brandProfileId = candidates[0].brandProfileId;
+    return candidates[0].brandProfileId;
+  }
+
+  async resolveBrandProfileId(user: AuthUser): Promise<string> {
+    const brandProfileId = await this.resolveBrandProfileIdForWorkspace(user);
 
     await this.sessionEviction.evictIfInactive(brandProfileId);
     await this.sessionEviction.touchActivity(brandProfileId);

@@ -113,14 +113,14 @@ function subject() {
 describe("Brand Intelligence consumer adapter", () => {
   it("preserves the Brand payload and projects exactly ten Brand metadata objects", async () => {
     const payload = brandPayload();
-    const read = vi.fn().mockResolvedValue(payload);
+    const readForWorkspace = vi.fn().mockResolvedValue(payload);
     const adapter = new BrandIntelligenceConsumerAdapter({
-      read,
+      readForWorkspace,
     } as unknown as BrandConsumerService);
 
     const result = await adapter.read(actor, subject());
 
-    expect(read).toHaveBeenCalledWith(actor);
+    expect(readForWorkspace).toHaveBeenCalledWith(actor);
     expect(result).toMatchObject({
       contractVersion: "1.0",
       domainPayloadVersion: "1.0",
@@ -158,38 +158,40 @@ describe("Brand Intelligence consumer adapter", () => {
   });
 
   it("fails closed when authenticated Brand authority resolves a different Brand", async () => {
-    const read = vi.fn().mockResolvedValue(brandPayload("other-brand"));
+    const readForWorkspace = vi
+      .fn()
+      .mockResolvedValue(brandPayload("other-brand"));
     const adapter = new BrandIntelligenceConsumerAdapter({
-      read,
+      readForWorkspace,
     } as unknown as BrandConsumerService);
 
     await expect(adapter.read(actor, subject())).rejects.toBeInstanceOf(
       ForbiddenException,
     );
-    expect(read).toHaveBeenCalledWith(actor);
+    expect(readForWorkspace).toHaveBeenCalledWith(actor);
   });
 
   it("rejects an OFFERING subject without invoking the Brand consumer", async () => {
-    const read = vi.fn();
+    const readForWorkspace = vi.fn();
     const adapter = new BrandIntelligenceConsumerAdapter({
-      read,
+      readForWorkspace,
     } as unknown as BrandConsumerService);
 
     await expect(
       adapter.read(actor, { type: "OFFERING", id: "offering-1" }),
     ).rejects.toThrow("supports only BRAND");
-    expect(read).not.toHaveBeenCalled();
+    expect(readForWorkspace).not.toHaveBeenCalled();
   });
 
   it("resolves availability only after the authoritative Brand read succeeds", async () => {
-    const read = vi.fn().mockResolvedValue(brandPayload());
+    const readForWorkspace = vi.fn().mockResolvedValue(brandPayload());
     const adapter = new BrandIntelligenceConsumerAdapter({
-      read,
+      readForWorkspace,
     } as unknown as BrandConsumerService);
 
     await expect(
       adapter.resolveAvailability(actor, subject()),
     ).resolves.toEqual({ status: "AVAILABLE" });
-    expect(read).toHaveBeenCalledWith(actor);
+    expect(readForWorkspace).toHaveBeenCalledWith(actor);
   });
 });

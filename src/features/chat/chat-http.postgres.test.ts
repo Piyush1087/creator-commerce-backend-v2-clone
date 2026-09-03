@@ -8,7 +8,11 @@ import { Test } from "@nestjs/testing";
 import { ThrottlerGuard } from "@nestjs/throttler";
 import {
   BrandRole,
+  LeakBucket,
+  LeakPlannerStatus,
+  PerformanceColor,
   PrismaClient,
+  PriorityRank,
   UserAuthState,
   UserRole,
 } from "@prisma/client";
@@ -47,6 +51,9 @@ describe.skipIf(process.env.CHAT_HOME_P3_DATABASE_TEST !== "true")(
     let userA: AuthUser;
     let userB: AuthUser;
     let foreignUser: AuthUser;
+    let sharedBrandId: string;
+    let chatLeakId: string;
+    let sessionBefore: Awaited<ReturnType<typeof sessionSnapshot>>;
     let conversationId: string;
     let conversations: ChatConversationService;
 
@@ -122,6 +129,29 @@ describe.skipIf(process.env.CHAT_HOME_P3_DATABASE_TEST !== "true")(
       });
     }
 
+    function sessionSnapshot() {
+      return Promise.all([
+        prisma.brandProfile.findUniqueOrThrow({
+          where: { id: sharedBrandId },
+          select: {
+            id: true,
+            brandCentreLastActiveAt: true,
+            updatedAt: true,
+          },
+        }),
+        prisma.brandPerformanceLeak.findUniqueOrThrow({
+          where: { id: chatLeakId },
+          select: {
+            id: true,
+            plannerStatus: true,
+            isArchived: true,
+            archivedAt: true,
+            updatedAt: true,
+          },
+        }),
+      ]);
+    }
+
     beforeAll(async () => {
       const url = new URL(process.env.DATABASE_URL ?? "");
       if (
@@ -142,6 +172,7 @@ describe.skipIf(process.env.CHAT_HOME_P3_DATABASE_TEST !== "true")(
 
       const sharedOrg = await createOrganization("Chat P3 HTTP shared");
       const sharedBrand = await createBrand(sharedOrg.id, "Shared Brand");
+      sharedBrandId = sharedBrand.id;
       userA = await createUser(sharedOrg.id, "User A");
       userB = await createUser(sharedOrg.id, "User B");
       await addMembership(sharedBrand.id, userA.id, BrandRole.BRAND_OWNER);
@@ -238,6 +269,27 @@ describe.skipIf(process.env.CHAT_HOME_P3_DATABASE_TEST !== "true")(
         "Private HTTP conversation",
       );
       conversationId = conversation.id;
+      await prisma.brandProfile.update({
+        where: { id: sharedBrandId },
+        data: {
+          brandCentreLastActiveAt: new Date(Date.now() - 31 * 60 * 1000),
+        },
+      });
+      const leak = await prisma.brandPerformanceLeak.create({
+        data: {
+          brandProfileId: sharedBrandId,
+          insightTitle: "P7-C1 Chat session boundary",
+          shortDescription: "Chat reads must not evict this leak",
+          priorityRank: PriorityRank.HIGH,
+          leakBucket: LeakBucket.PDP,
+          performanceStatus: PerformanceColor.RED,
+          projectedLiftPercentage: 8.5,
+          drawerDeepDive: { evidence: ["P7-C1 Chat"] },
+          plannerStatus: LeakPlannerStatus.PUSHED_TO_PLANNER,
+        },
+      });
+      chatLeakId = leak.id;
+      sessionBefore = await sessionSnapshot();
     });
 
     afterAll(async () => {
@@ -395,6 +447,17 @@ describe.skipIf(process.env.CHAT_HOME_P3_DATABASE_TEST !== "true")(
         grounding: [
           { capabilityId: "workspace.context.read", sourceType: "CANONICAL" },
         ],
+      });
+    });
+
+    it("keeps Chat context and capability authorization free of Brand Centre session effects", async () => {
+      const after = await sessionSnapshot();
+      expect(after).toEqual(sessionBefore);
+      expect(after[1]).toMatchObject({
+        id: chatLeakId,
+        plannerStatus: LeakPlannerStatus.PUSHED_TO_PLANNER,
+        isArchived: false,
+        archivedAt: null,
       });
     });
   },

@@ -149,9 +149,9 @@ function productPayload(id = offeringId): ProductConsumerResponse {
 describe("Product Intelligence consumer adapter", () => {
   it("passes the exact Offering ID, preserves Product payload, and exposes three Product objects", async () => {
     const payload = productPayload();
-    const read = vi.fn().mockResolvedValue(payload);
+    const readForWorkspace = vi.fn().mockResolvedValue(payload);
     const adapter = new ProductIntelligenceConsumerAdapter({
-      read,
+      readForWorkspace,
     } as unknown as ProductConsumerService);
 
     const result = await adapter.read(actor, {
@@ -159,7 +159,7 @@ describe("Product Intelligence consumer adapter", () => {
       id: offeringId,
     });
 
-    expect(read).toHaveBeenCalledWith(actor, offeringId);
+    expect(readForWorkspace).toHaveBeenCalledWith(actor, offeringId);
     expect(result).toMatchObject({
       contractVersion: "1.0",
       domainPayloadVersion: "1.0",
@@ -196,38 +196,38 @@ describe("Product Intelligence consumer adapter", () => {
   });
 
   it("fails closed when the Product consumer returns a different Offering", async () => {
-    const read = vi
+    const readForWorkspace = vi
       .fn()
       .mockResolvedValue(
         productPayload("22222222-2222-4222-8222-222222222222"),
       );
     const adapter = new ProductIntelligenceConsumerAdapter({
-      read,
+      readForWorkspace,
     } as unknown as ProductConsumerService);
 
     await expect(
       adapter.read(actor, { type: "OFFERING", id: offeringId }),
     ).rejects.toBeInstanceOf(ConflictException);
-    expect(read).toHaveBeenCalledWith(actor, offeringId);
+    expect(readForWorkspace).toHaveBeenCalledWith(actor, offeringId);
   });
 
   it("rejects a BRAND subject without invoking the Product consumer", async () => {
-    const read = vi.fn();
+    const readForWorkspace = vi.fn();
     const adapter = new ProductIntelligenceConsumerAdapter({
-      read,
+      readForWorkspace,
     } as unknown as ProductConsumerService);
 
     await expect(
       adapter.read(actor, { type: "BRAND", id: "brand-1" }),
     ).rejects.toThrow("supports only OFFERING");
-    expect(read).not.toHaveBeenCalled();
+    expect(readForWorkspace).not.toHaveBeenCalled();
   });
 
   it("keeps Product authorization errors from the authoritative consumer intact", async () => {
     const authorizationError = new Error("authoritative Product denial");
-    const read = vi.fn().mockRejectedValue(authorizationError);
+    const readForWorkspace = vi.fn().mockRejectedValue(authorizationError);
     const adapter = new ProductIntelligenceConsumerAdapter({
-      read,
+      readForWorkspace,
     } as unknown as ProductConsumerService);
 
     await expect(

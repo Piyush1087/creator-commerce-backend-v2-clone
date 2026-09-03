@@ -101,7 +101,7 @@ describe("P3 Chat capability handler mappings", () => {
   });
 
   it("maps offering.list through canonical discovery", async () => {
-    const list = vi.fn().mockResolvedValue({
+    const listForWorkspace = vi.fn().mockResolvedValue({
       offerings: [
         {
           offeringId: "offering-1",
@@ -113,9 +113,9 @@ describe("P3 Chat capability handler mappings", () => {
       ],
     });
     const result = await new OfferingListHandler({
-      list,
+      listForWorkspace,
     } as unknown as CanonicalOfferingDiscoveryService).execute(baseContext, {});
-    expect(list).toHaveBeenCalledWith(actor);
+    expect(listForWorkspace).toHaveBeenCalledWith(actor);
     expect(result.authorizedEntityRefs).toEqual([
       { type: "OFFERING", id: "offering-1" },
     ]);

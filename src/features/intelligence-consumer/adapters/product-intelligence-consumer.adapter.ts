@@ -93,7 +93,10 @@ export class ProductIntelligenceConsumerAdapter implements EngineConsumerRegistr
         "product_intelligence supports only OFFERING subjects",
       );
     }
-    const payload = await this.productConsumer.read(actor, subject.id);
+    const payload = await this.productConsumer.readForWorkspace(
+      actor,
+      subject.id,
+    );
     if (payload.offering.id !== subject.id) {
       throw new ConflictException(
         "Product consumer returned an inconsistent Offering identity",

@@ -3,7 +3,17 @@ import "reflect-metadata";
 import { type INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { ThrottlerGuard } from "@nestjs/throttler";
-import { PrismaClient } from "@prisma/client";
+import {
+  BrandRole,
+  LeakBucket,
+  LeakPlannerStatus,
+  PerformanceColor,
+  PrismaClient,
+  PriorityRank,
+  UserAuthState,
+  UserRole,
+} from "@prisma/client";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -14,6 +24,7 @@ import { BrandLocationService } from "../brand-canonical-state/brand-location.se
 import { BrandVisualStateService } from "../brand-canonical-state/brand-visual-state.service";
 import { BrandCentreAuthService } from "../brand-centre/brand-centre-auth.service";
 import { BrandWorkspaceAuthorizationService } from "../brand-centre/brand-workspace-authorization.service";
+import { BrandConsumerController } from "../brand-centre/consumer/brand-consumer.controller";
 import { BrandConsumerService } from "../brand-centre/consumer/brand-consumer.service";
 import { BrandCurrentReadService } from "../brand-centre/consumer/brand-current-read.service";
 import { CanonicalOfferingDiscoveryService } from "../brand-centre/consumer/canonical-offering-discovery.service";
@@ -135,6 +146,13 @@ describe.skipIf(process.env.CHAT_HOME_P5_B_DATABASE_TEST !== "true")(
     let baseUrl: string;
     let primary: AuthUser;
     let second: AuthUser;
+    let isolated: {
+      actor: AuthUser;
+      organizationId: string;
+      brandId: string;
+      userId: string;
+      leakId: string;
+    };
     let businessBefore: unknown;
     let secondIntelligenceBefore: Awaited<
       ReturnType<typeof intelligenceCounts>
@@ -163,8 +181,44 @@ describe.skipIf(process.env.CHAT_HOME_P5_B_DATABASE_TEST !== "true")(
       ]);
     }
 
+    function brandCentreSessionSnapshot(brandId: string) {
+      return Promise.all([
+        prisma.brandProfile.findUniqueOrThrow({
+          where: { id: brandId },
+          select: {
+            id: true,
+            brandCentreLastActiveAt: true,
+            updatedAt: true,
+          },
+        }),
+        prisma.brandPerformanceLeak.findMany({
+          where: { brandProfileId: brandId },
+          orderBy: { id: "asc" },
+          select: {
+            id: true,
+            plannerStatus: true,
+            isArchived: true,
+            archivedAt: true,
+            updatedAt: true,
+          },
+        }),
+      ]);
+    }
+
     function businessSnapshot() {
       return Promise.all([
+        prisma.brandProfile.findMany({
+          where: { id: { in: [PRIMARY_BRAND_ID, SECOND_BRAND_ID] } },
+          orderBy: { id: "asc" },
+        }),
+        prisma.brandPerformanceLeak.findMany({
+          where: { brandProfileId: PRIMARY_BRAND_ID },
+          orderBy: { id: "asc" },
+        }),
+        prisma.offering.findMany({
+          where: { brandProfileId: PRIMARY_BRAND_ID },
+          orderBy: { id: "asc" },
+        }),
         prisma.collaboration.findUniqueOrThrow({
           where: { id: PRIMARY_COLLABORATION_ID },
           select: {
@@ -224,6 +278,30 @@ describe.skipIf(process.env.CHAT_HOME_P5_B_DATABASE_TEST !== "true")(
           orderBy: { id: "asc" },
           select: { id: true, status: true, updatedAt: true },
         }),
+        prisma.intelligenceSubject.findMany({
+          where: {
+            brandId: { in: [PRIMARY_BRAND_ID, SECOND_BRAND_ID] },
+          },
+          orderBy: { id: "asc" },
+        }),
+        prisma.intelligenceObjectGeneration.findMany({
+          where: {
+            brandId: { in: [PRIMARY_BRAND_ID, SECOND_BRAND_ID] },
+          },
+          orderBy: { id: "asc" },
+        }),
+        prisma.intelligenceComponentGeneration.findMany({
+          where: {
+            brandId: { in: [PRIMARY_BRAND_ID, SECOND_BRAND_ID] },
+          },
+          orderBy: { id: "asc" },
+        }),
+        prisma.intelligenceCurrentComponent.findMany({
+          where: {
+            brandId: { in: [PRIMARY_BRAND_ID, SECOND_BRAND_ID] },
+          },
+          orderBy: { id: "asc" },
+        }),
         intelligenceCounts(PRIMARY_BRAND_ID),
         intelligenceCounts(SECOND_BRAND_ID),
       ]);
@@ -276,6 +354,53 @@ describe.skipIf(process.env.CHAT_HOME_P5_B_DATABASE_TEST !== "true")(
       ]);
       primary = asActor(primaryUser);
       second = asActor(secondUser);
+      const organization = await prisma.organization.create({
+        data: { name: "P7-C1 isolated activity boundary" },
+      });
+      const brand = await prisma.brandProfile.create({
+        data: {
+          organizationId: organization.id,
+          domain: `${randomUUID()}.p7-c1.example.test`,
+          name: "P7-C1 isolated Brand",
+          industry: "D2C",
+          brandCentreLastActiveAt: new Date(Date.now() - 31 * 60 * 1000),
+        },
+      });
+      const user = await prisma.user.create({
+        data: {
+          organizationId: organization.id,
+          email: `${randomUUID()}@p7-c1.example.test`,
+          role: UserRole.BRAND,
+          authState: UserAuthState.ACTIVE,
+        },
+      });
+      await prisma.brandTeamMember.create({
+        data: {
+          brandProfileId: brand.id,
+          userId: user.id,
+          role: BrandRole.BRAND_OWNER,
+        },
+      });
+      const leak = await prisma.brandPerformanceLeak.create({
+        data: {
+          brandProfileId: brand.id,
+          insightTitle: "P7-C1 eligible session leak",
+          shortDescription: "Proves the Brand Centre session boundary",
+          priorityRank: PriorityRank.HIGH,
+          leakBucket: LeakBucket.PDP,
+          performanceStatus: PerformanceColor.RED,
+          projectedLiftPercentage: 12.5,
+          drawerDeepDive: { evidence: ["P7-C1"] },
+          plannerStatus: LeakPlannerStatus.PUSHED_TO_PLANNER,
+        },
+      });
+      isolated = {
+        actor: asActor(user),
+        organizationId: organization.id,
+        brandId: brand.id,
+        userId: user.id,
+        leakId: leak.id,
+      };
       secondIntelligenceBefore = await intelligenceCounts(SECOND_BRAND_ID);
       expect(secondIntelligenceBefore).toEqual([0, 0, 0, 0]);
       businessBefore = await businessSnapshot();
@@ -290,7 +415,9 @@ describe.skipIf(process.env.CHAT_HOME_P5_B_DATABASE_TEST !== "true")(
           request.user =
             request.headers["x-test-actor"] === SECOND_USER_ID
               ? second
-              : primary;
+              : request.headers["x-test-actor"] === isolated.userId
+                ? isolated.actor
+                : primary;
           return true;
         },
       };
@@ -299,10 +426,16 @@ describe.skipIf(process.env.CHAT_HOME_P5_B_DATABASE_TEST !== "true")(
         [BrandHomeAggregationService],
         BrandHomeController,
       );
+      Reflect.defineMetadata(
+        "design:paramtypes",
+        [BrandConsumerService],
+        BrandConsumerController,
+      );
       const moduleRef = await Test.createTestingModule({
-        controllers: [BrandHomeController],
+        controllers: [BrandHomeController, BrandConsumerController],
         providers: [
           { provide: BrandHomeAggregationService, useValue: homeService },
+          { provide: BrandConsumerService, useValue: brandConsumer },
         ],
       })
         .overrideGuard(JwtAuthGuard)
@@ -316,8 +449,20 @@ describe.skipIf(process.env.CHAT_HOME_P5_B_DATABASE_TEST !== "true")(
     }, 120_000);
 
     afterAll(async () => {
-      await app?.close();
-      await prisma.$disconnect();
+      try {
+        await app?.close();
+        if (isolated) {
+          await prisma.brandProfile.delete({
+            where: { id: isolated.brandId },
+          });
+          await prisma.user.delete({ where: { id: isolated.userId } });
+          await prisma.organization.delete({
+            where: { id: isolated.organizationId },
+          });
+        }
+      } finally {
+        await prisma.$disconnect();
+      }
     });
 
     async function home(actor: AuthUser) {
@@ -456,6 +601,28 @@ describe.skipIf(process.env.CHAT_HOME_P5_B_DATABASE_TEST !== "true")(
       );
     }, 120_000);
 
+    it("does not touch or evict a stale Brand Centre session during Home GET", async () => {
+      const before = await brandCentreSessionSnapshot(isolated.brandId);
+      expect(before[0].brandCentreLastActiveAt?.getTime()).toBeLessThan(
+        Date.now() - 30 * 60 * 1000,
+      );
+      expect(before[1]).toEqual([
+        expect.objectContaining({
+          id: isolated.leakId,
+          plannerStatus: LeakPlannerStatus.PUSHED_TO_PLANNER,
+          isArchived: false,
+          archivedAt: null,
+        }),
+      ]);
+
+      const response = await home(isolated.actor);
+
+      expect(response.status).toBe(200);
+      expect(await brandCentreSessionSnapshot(isolated.brandId)).toEqual(
+        before,
+      );
+    }, 120_000);
+
     it("leaves all snapshotted business and Intelligence state unchanged", async () => {
       expect(await businessSnapshot()).toEqual(businessBefore);
       expect(await intelligenceCounts(SECOND_BRAND_ID)).toEqual([0, 0, 0, 0]);
@@ -466,5 +633,29 @@ describe.skipIf(process.env.CHAT_HOME_P5_B_DATABASE_TEST !== "true")(
       `;
       expect(migrations[0]?.count).toBe(66);
     });
+
+    it("keeps Brand Centre activity touch and inactivity eviction on the Brand Centre API", async () => {
+      const before = await brandCentreSessionSnapshot(isolated.brandId);
+      const response = await fetch(`${baseUrl}/api/v1/brand-centre/brand`, {
+        headers: { "x-test-actor": isolated.actor.id },
+      });
+      expect(response.status).toBe(200);
+
+      const after = await brandCentreSessionSnapshot(isolated.brandId);
+      expect(after[0].brandCentreLastActiveAt?.getTime()).toBeGreaterThan(
+        before[0].brandCentreLastActiveAt?.getTime() ?? 0,
+      );
+      expect(after[0].updatedAt.getTime()).toBeGreaterThan(
+        before[0].updatedAt.getTime(),
+      );
+      expect(after[1]).toEqual([
+        expect.objectContaining({
+          id: isolated.leakId,
+          plannerStatus: LeakPlannerStatus.PUSHED_TO_PLANNER,
+          isArchived: true,
+          archivedAt: expect.any(Date),
+        }),
+      ]);
+    }, 120_000);
   },
 );

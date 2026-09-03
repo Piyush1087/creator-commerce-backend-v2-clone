@@ -19,7 +19,8 @@ export class BrandWorkspaceAuthorizationService {
 
   /** Resolve the existing Brand scope, then require explicit active membership. */
   async resolveBrandContext(user: AuthUser): Promise<BrandWorkspaceContext> {
-    const brandProfileId = await this.brandAuth.resolveBrandProfileId(user);
+    const brandProfileId =
+      await this.brandAuth.resolveBrandProfileIdForWorkspace(user);
     const membership = await this.prisma.brandTeamMember.findUnique({
       where: {
         brandProfileId_userId: { brandProfileId, userId: user.id },

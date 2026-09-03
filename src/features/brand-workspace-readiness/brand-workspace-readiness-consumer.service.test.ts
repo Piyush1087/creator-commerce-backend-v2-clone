@@ -63,7 +63,7 @@ function harness(options?: {
       }),
     } as unknown as BrandWorkspaceAuthorizationService,
     {
-      read: vi.fn().mockResolvedValue({
+      readForWorkspace: vi.fn().mockResolvedValue({
         brandId: "brand-1",
         workspaceReadiness: options?.workspaceReadiness ?? "READY",
       }),

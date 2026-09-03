@@ -14,6 +14,16 @@ export class CanonicalOfferingDiscoveryService {
 
   async list(user: AuthUser) {
     const brandProfileId = await this.auth.resolveBrandProfileId(user);
+    return this.listForBrand(brandProfileId);
+  }
+
+  async listForWorkspace(user: AuthUser) {
+    const brandProfileId =
+      await this.auth.resolveBrandProfileIdForWorkspace(user);
+    return this.listForBrand(brandProfileId);
+  }
+
+  private async listForBrand(brandProfileId: string) {
     const rows = await this.prisma.offering.findMany({
       where: {
         brandProfileId,
@@ -37,6 +47,16 @@ export class CanonicalOfferingDiscoveryService {
 
   async listBounded(user: AuthUser, limit: number) {
     const brandProfileId = await this.auth.resolveBrandProfileId(user);
+    return this.listBoundedForBrand(brandProfileId, limit);
+  }
+
+  async listBoundedForWorkspace(user: AuthUser, limit: number) {
+    const brandProfileId =
+      await this.auth.resolveBrandProfileIdForWorkspace(user);
+    return this.listBoundedForBrand(brandProfileId, limit);
+  }
+
+  private async listBoundedForBrand(brandProfileId: string, limit: number) {
     const boundedLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
     const rows = await this.prisma.offering.findMany({
       where: {

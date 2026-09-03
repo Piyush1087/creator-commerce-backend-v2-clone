@@ -205,7 +205,9 @@ describe.skipIf(process.env.CHAT_HOME_P5_A_DATABASE_TEST !== "true")(
       workspaceReadiness = new BrandWorkspaceReadinessConsumerService(
         db,
         authorization,
-        { read: brandConsumerRead } as unknown as BrandConsumerService,
+        +{
+          readForWorkspace: brandConsumerRead,
+        } as unknown as BrandConsumerService,
         new SubscriptionCapabilityService(db, new SubscriptionAccessService()),
       );
     }, 120_000);

@@ -94,7 +94,7 @@ export class BrandHomeAggregationService {
         }),
       ),
       this.collect("OFFERING", () =>
-        this.offerings.listBounded(user, HOME_OFFERING_LIMIT),
+        this.offerings.listBoundedForWorkspace(user, HOME_OFFERING_LIMIT),
       ),
       this.collect("CAMPAIGN", () =>
         this.campaigns.listForHome(brandProfileId, HOME_CAMPAIGN_LIMIT),

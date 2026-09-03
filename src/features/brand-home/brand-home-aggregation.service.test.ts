@@ -145,7 +145,10 @@ function service(options: ServiceOptions = {}) {
       }),
     } as never,
     {
-      listBounded: async () => ({ offerings, truncated: false }),
+      listBoundedForWorkspace: async () => ({
+        offerings,
+        truncated: false,
+      }),
     } as never,
     intelligence as never,
     {

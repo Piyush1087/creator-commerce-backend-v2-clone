@@ -16,7 +16,7 @@ export class OfferingListHandler implements ChatCapabilityHandler {
   async execute(
     context: ChatCapabilityExecutionContext,
   ): Promise<ChatCapabilityExecutionResult> {
-    const data = await this.offerings.list(context.actor);
+    const data = await this.offerings.listForWorkspace(context.actor);
     const refs = data.offerings.map((offering) => ({
       type: "OFFERING" as const,
       id: offering.offeringId,

@@ -132,7 +132,7 @@ export class BrandIntelligenceConsumerAdapter implements EngineConsumerRegistrat
         "brand_intelligence supports only BRAND subjects",
       );
     }
-    const payload = await this.brandConsumer.read(actor);
+    const payload = await this.brandConsumer.readForWorkspace(actor);
     if (payload.brandId !== subject.id) {
       throw new ForbiddenException(
         "Requested Brand subject is not available to authenticated actor",
