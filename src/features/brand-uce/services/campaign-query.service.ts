@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import {
+  UceApplicationAuthorityVersion,
   UceBriefStatus,
   UceCampaignAssetStatus,
   UceCampaignStatus,
@@ -569,6 +570,10 @@ export class CampaignQueryService {
       where: { id: campaignCreatorId, campaignId },
       include: {
         applications: {
+          where: {
+            authorityVersion:
+              UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
+          },
           orderBy: { appliedAt: "desc" },
           take: 10,
           select: {
@@ -576,8 +581,8 @@ export class CampaignQueryService {
             status: true,
             source: true,
             appliedAt: true,
-            briefId: true,
-            campaignAssetId: true,
+            legacyBriefId: true,
+            legacyCampaignProductId: true,
           },
         },
       },
@@ -596,8 +601,8 @@ export class CampaignQueryService {
         status: app.status,
         source: app.source,
         appliedAt: app.appliedAt.toISOString(),
-        briefId: app.briefId,
-        campaignAssetId: app.campaignAssetId,
+        briefId: app.legacyBriefId,
+        campaignAssetId: app.legacyCampaignProductId,
       })),
     };
   }

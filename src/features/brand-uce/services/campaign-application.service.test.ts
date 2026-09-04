@@ -1,5 +1,9 @@
 import { ConflictException, ForbiddenException } from "@nestjs/common";
-import { UceApplicationStatus, UceCampaignStatus } from "@prisma/client";
+import {
+  UceApplicationAuthorityVersion,
+  UceApplicationStatus,
+  UceCampaignStatus,
+} from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
 import { CampaignApplicationService } from "./campaign-application.service";
@@ -11,8 +15,8 @@ function approvalHarness(claimCount = 1, capabilityError?: Error) {
     id: applicationId,
     campaignId: "campaign-1",
     campaignCreatorId: "creator-1",
-    campaignAssetId: "legacy-product-1",
-    briefId: "legacy-brief-1",
+    legacyCampaignProductId: "legacy-product-1",
+    legacyBriefId: "legacy-brief-1",
     status: UceApplicationStatus.PENDING,
     campaignCreator: {
       socialHandle: "creator",
@@ -105,8 +109,8 @@ describe("CampaignApplicationService development authority", () => {
       {
         id: applicationId,
         campaignCreatorId: "creator-1",
-        campaignAssetId: "legacy-product-1",
-        briefId: "legacy-brief-1",
+        legacyCampaignProductId: "legacy-product-1",
+        legacyBriefId: "legacy-brief-1",
         status: UceApplicationStatus.PENDING,
         source: "DIRECT",
         appliedAt: new Date("2026-08-15T00:00:00Z"),
@@ -116,6 +120,13 @@ describe("CampaignApplicationService development authority", () => {
 
     const result = await service.listApplicants("brand-1", "campaign-1");
 
+    expect(prisma.uceApplication.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
+        }),
+      }),
+    );
     expect(prisma.uceCampaignCollaboration.findMany).not.toHaveBeenCalled();
     expect(prisma.uceCampaignCreator.upsert).not.toHaveBeenCalled();
     expect(result.applicants[0]).toMatchObject({
@@ -142,6 +153,7 @@ describe("CampaignApplicationService development authority", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           id: applicationId,
+          authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
           status: UceApplicationStatus.PENDING,
         }),
       }),
