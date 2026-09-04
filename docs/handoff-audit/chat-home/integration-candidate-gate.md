@@ -25,7 +25,7 @@ Production remains **blocked** until `PRODUCTION_RELEASE_AUTHORIZED` + exact SHA
 
 | Field | Value |
 |-------|-------|
-| `backend_integration_sha` | `695cc482296314b0e089f10b861ea7ca5641cfa0` |
+| `backend_integration_sha` | `73168eaed6710483b0fd744a200fd7713ca5f989` |
 | `frontend_integration_sha` | `251048074b46b1edf909a6d734c1f1b31ad5a040` |
 | Branch (both) | `integration/chat-home-v1` |
 | Base | `origin/development` (BE `2f03819` / FE `f4e6c49` at branch create) |
