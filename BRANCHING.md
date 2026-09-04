@@ -94,6 +94,20 @@ git push piyush feature/<short-task-name>
 git push piyush development
 ```
 
+## In-flight (not yet in `development`)
+
+Hold these until review closes / PR merges. Do **not** base new module work on them
+unless the handoff explicitly depends on them.
+
+| Work | Branch (BE + FE) | Status (2026-09-04) |
+|------|------------------|---------------------|
+| C-01 / C-05 Creator Entry + Settings | `feature/c01-c05-creator-integration` | Under Piyush review (pass-2). **Not** merged to `origin/development`. Resume here for follow-up fixes only. |
+
+Pass-2 tip SHAs (clone review):  
+BE `d8a3f23cfac6288b745823b60d8c0e38e3ba8b90` · FE `11cb12b635806983d2f2b2d8ca4b8b3b61da1f43`
+
+---
+
 ## Required Checks Before Merge
 
 ```bash
