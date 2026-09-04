@@ -34,9 +34,10 @@ Every gate / named failure uses exactly one of:
 
 | File | Purpose |
 |------|---------|
-| `commands-to-run.md` | Exact PowerShell commands (no-skip DB rules) |
+| `commands-to-run.md` | Exact PowerShell + Part B deploy pointers |
 | `integration-part1-report.md` | Architecture / authority / gate matrix |
 | `integration-part1-test-results.md` | Suite counts, named fails, SHAs |
+| `integration-candidate-gate.md` | §10 INTEGRATION_CANDIDATE + D0; **stop** until human auth |
 | `../MODULE-AUDIT-TESTING-PLAYBOOK.md` | Reusable process (same as C-01/C-05) |
 
 Handoff docx copies live under `docs/brand-home/product-docs/handoff-docs/` (local).  
@@ -47,4 +48,6 @@ Raw tee logs: `docs/handoff-audit/.logs/` and `docs/brand-home/_*.log` (local; u
 1. Part 1 report + test-results complete with vocabulary above.  
 2. Commands in `commands-to-run.md` executed; postgres skip count **0** where env set.  
 3. No Creator Chat / EXECUTE / streaming added.  
-4. Human authorizes merge; then Part B (dev deploy) separately.
+4. [`integration-candidate-gate.md`](./integration-candidate-gate.md) reviewed.  
+5. Human issues `INTEGRATION_MERGE_AUTHORIZED`, then `DEV_DEPLOY_AUTHORIZED` for D1–D3.  
+6. Production only with `PRODUCTION_RELEASE_AUTHORIZED` + exact SHAs.

@@ -150,3 +150,48 @@ Test Files  xx passed | yy failed (zz)
 ```
 
 Include command name and whether **skip count was 0** for DB suites.
+
+---
+
+## 7. Part B — Dev deploy (only after human auth)
+
+**Gate packet:** [`integration-candidate-gate.md`](./integration-candidate-gate.md)  
+**Runbook:** [`docs/deployment/README.md`](../../deployment/README.md)
+
+Do **not** run until:
+
+1. `INTEGRATION_MERGE_AUTHORIZED` — PR/merge `integration/chat-home-v1` → `origin/development`, freeze SHAs  
+2. `DEV_DEPLOY_AUTHORIZED` — then D1–D3 below  
+
+Production requires separate `PRODUCTION_RELEASE_AUTHORIZED` + exact SHAs.
+
+### D0 — Preflight (no deploy)
+
+Confirm tip SHAs, Gemini intent `gemini-3.5-flash`, pending migrations vs target DB, WSL path (not `/mnt/c/`).
+
+### D1 — Backend `sst deploy --stage dev` (WSL)
+
+```bash
+# From WSL clone of backend (not /mnt/c/)
+export AWS_PROFILE=creator-dev
+npx sst deploy --stage dev
+```
+
+Verify deployed task env includes **`GEMINI_MODEL=gemini-3.5-flash`** (SST default / Secrets).
+
+Identity: API `https://api.dev.thecreatorshop.in`, health `/health/live`.
+
+### D2 — Deployed backend smoke
+
+- `/health/live` and `/health/ready`  
+- Authenticated Brand Chat / Brand Home happy path against **dev**  
+- Cross-brand deny still holds  
+
+### D3 — Frontend `sst deploy --stage dev` (WSL)
+
+```bash
+export AWS_PROFILE=creator-dev
+npx sst deploy --stage dev
+```
+
+Dashboard: `https://dashboard.dev.thecreatorshop.in` — Brand Home + Chat smoke.
