@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import {
   AuthMethodType,
+  EmailOtpPurpose,
   OrganizationKind,
   UserAuthState,
   UserRole,
@@ -20,7 +21,10 @@ import { hashPasswordAsync } from "../../../shared/crypto/password.util";
 import { AuthService } from "../../auth/auth.service";
 import { GoogleAuthService } from "../../auth/google-auth.service";
 import { establishInitialBrandOwner } from "../../brand-settings/team/initial-brand-owner";
-import { lockBrandTeam } from "../../brand-settings/team/brand-team-policy";
+import {
+  lockAdmissionEmail,
+  lockBrandTeam,
+} from "../../brand-settings/team/brand-team-policy";
 import { BrandCentreScanService } from "../../brand-centre/services/brand-centre-scan.service";
 import { inspectSterileProvisionalCreator } from "../../../shared/identity/sterile-provisional-creator.policy";
 import {
@@ -117,6 +121,8 @@ export class BrandVerificationService {
   /**
    * Unified password gate for OTP + Google paths.
    * Creates Brand User with hashedPassword, sets isVerified, enqueues deep scan.
+   * Accepted C-01 reclaim: sterile provisional Creators may be claimed; live
+   * Creator OTPs are superseded inside the same locked transaction.
    */
   async setPasswordAndActivate(
     brandProfileId: string,
@@ -136,120 +142,113 @@ export class BrandVerificationService {
       );
     }
 
-    const profile = await this.prisma.brandProfile.findUnique({
-      where: { id: brandProfileId },
-      select: {
-        id: true,
-        name: true,
-        domain: true,
-        isVerified: true,
-        verificationEmail: true,
-        identityConfirmedAt: true,
-        organizationId: true,
-        planStartedAt: true,
-      },
-    });
-    if (!profile) {
-      throw new NotFoundException("Brand profile not found");
-    }
-    if (!profile.identityConfirmedAt || !profile.verificationEmail) {
-      throw new BadRequestException(
-        "Confirm your work email (OTP or Google) before setting a password.",
-      );
-    }
-    if (normalizeVerificationEmail(profile.verificationEmail) !== email) {
-      throw new BadRequestException(
-        "Password email must match the verified identity email.",
-      );
-    }
-    if (profile.isVerified && profile.organizationId) {
-      throw new BadRequestException(
-        "This brand is already activated. Please sign in.",
-      );
-    }
-
     const hashedPassword = await hashPasswordAsync(password);
     const displayName = emailLocalPart(email);
 
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email },
-    });
-    if (existingUser && existingUser.role !== UserRole.BRAND) {
-      // Sterile provisional Creators may be reclaimed by Brand activation (Invariant 7).
-      // Any other non-BRAND account type is a hard conflict.
-      const sterileCheck = await inspectSterileProvisionalCreator(
-        this.prisma,
-        existingUser.id,
-      );
-      if (!sterileCheck.sterile) {
-        throw new ConflictException(
-          "This email is registered for a different account type.",
-        );
-      }
-    }
-
     const result = await this.prisma.$transaction(async (tx) => {
       await lockBrandTeam(tx, brandProfileId);
+      const profile = await tx.brandProfile.findUnique({
+        where: { id: brandProfileId },
+      });
+      if (!profile) {
+        throw new NotFoundException("Brand profile not found");
+      }
+      if (profile.isVerified && profile.organizationId) {
+        throw new ConflictException(
+          "This brand is already activated. Please sign in.",
+        );
+      }
+      if (!profile.identityConfirmedAt || !profile.verificationEmail) {
+        throw new BadRequestException(
+          "Confirm your work email (OTP or Google) before setting a password.",
+        );
+      }
+      if (normalizeVerificationEmail(profile.verificationEmail) !== email) {
+        throw new BadRequestException(
+          "Password email must match the verified identity email.",
+        );
+      }
 
-      let organizationId = profile.organizationId;
-      let userId = existingUser?.id;
+      await lockAdmissionEmail(tx, email);
+      const existing = await tx.user.findUnique({
+        where: { normalizedEmail: email },
+      });
+
       let reclaimsSterileCreator = false;
+      if (existing && existing.role !== UserRole.BRAND) {
+        const inspection = await inspectSterileProvisionalCreator(
+          tx,
+          existing.id,
+        );
+        if (!inspection.sterile) {
+          throw new ConflictException(
+            "This email belongs to another account type.",
+          );
+        }
+        reclaimsSterileCreator = true;
+        await tx.emailOtpChallenge.updateMany({
+          where: {
+            normalizedEmail: email,
+            purpose: EmailOtpPurpose.CREATOR_EMAIL_VERIFICATION,
+            consumedAt: null,
+            supersededAt: null,
+          },
+          data: { supersededAt: new Date() },
+        });
+      }
 
-      if (!organizationId) {
+      let organizationId = existing?.organizationId ?? profile.organizationId;
+      if (organizationId) {
+        const claimedProfile = await tx.brandProfile.findUnique({
+          where: { organizationId },
+          select: { id: true },
+        });
+        if (claimedProfile && claimedProfile.id !== profile.id) {
+          throw new ConflictException(
+            "This account is already associated with another Brand workspace.",
+          );
+        }
+      } else {
         const organization = await tx.organization.create({
           data: { name: profile.name, kind: OrganizationKind.BRAND },
         });
         organizationId = organization.id;
       }
 
-      if (userId) {
-        if (existingUser && existingUser.role !== UserRole.BRAND) {
-          // Re-verify sterile state inside transaction for race-safety.
-          const innerCheck = await inspectSterileProvisionalCreator(
-            tx,
-            userId,
-          );
-          if (!innerCheck.sterile) {
-            throw new ConflictException(
-              "This email is registered for a different account type.",
-            );
-          }
-          reclaimsSterileCreator = true;
-        }
-        await tx.user.update({
-          where: { id: userId },
-          data: {
-            hashedPassword,
-            emailVerifiedAt: new Date(),
-            name: existingUser?.name ?? displayName,
-            organizationId,
-            authState: UserAuthState.ACTIVE,
-            ...(reclaimsSterileCreator
-              ? { role: UserRole.BRAND, googleSubjectId: null }
-              : {}),
-          },
-        });
-      } else {
-        const user = await tx.user.create({
-          data: {
-            email,
-            name: displayName,
-            role: UserRole.BRAND,
-            organizationId,
-            hashedPassword,
-            emailVerifiedAt: new Date(),
-            authState: UserAuthState.ACTIVE,
-          },
-        });
-        userId = user.id;
-      }
+      const user = existing
+        ? await tx.user.update({
+            where: { id: existing.id },
+            data: {
+              email,
+              normalizedEmail: email,
+              name: existing.name ?? displayName,
+              role: UserRole.BRAND,
+              organizationId,
+              hashedPassword,
+              emailVerifiedAt: new Date(),
+              authState: UserAuthState.ACTIVE,
+              ...(reclaimsSterileCreator ? { googleSubjectId: null } : {}),
+            },
+          })
+        : await tx.user.create({
+            data: {
+              email,
+              normalizedEmail: email,
+              name: displayName,
+              role: UserRole.BRAND,
+              organizationId,
+              hashedPassword,
+              emailVerifiedAt: new Date(),
+              authState: UserAuthState.ACTIVE,
+            },
+          });
 
       await tx.userAuthMethod.upsert({
         where: {
-          userId_type: { userId: userId!, type: AuthMethodType.PASSWORD },
+          userId_type: { userId: user.id, type: AuthMethodType.PASSWORD },
         },
         create: {
-          userId: userId!,
+          userId: user.id,
           type: AuthMethodType.PASSWORD,
           credentialHash: hashedPassword,
           verifiedAt: new Date(),
@@ -274,7 +273,7 @@ export class BrandVerificationService {
       const ownerResult = await establishInitialBrandOwner(
         tx,
         profile.id,
-        userId!,
+        user.id,
       );
       if (ownerResult !== "CREATED" && ownerResult !== "EXISTING_TEAM") {
         throw new ConflictException(
@@ -282,7 +281,12 @@ export class BrandVerificationService {
         );
       }
 
-      return { userId: userId!, organizationId };
+      return {
+        userId: user.id,
+        organizationId,
+        domain: profile.domain,
+        brandProfileId: profile.id,
+      };
     });
 
     await this.enqueueDeepScanAfterVerify(brandProfileId);
@@ -291,8 +295,8 @@ export class BrandVerificationService {
 
     return {
       activated: true,
-      brandProfileId: profile.id,
-      domain: profile.domain,
+      brandProfileId: result.brandProfileId,
+      domain: result.domain,
       organizationId: result.organizationId,
       ...token,
     };

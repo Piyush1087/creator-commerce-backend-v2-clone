@@ -9,6 +9,19 @@ recorded in `origin-run-log.md`, then copied into each module's
 `automated-test-results.md`. Local click-through is `ui-verification.md`
 (C-01 and C-05 sections).
 
+**Reusable process for future modules:**  
+[`../MODULE-AUDIT-TESTING-PLAYBOOK.md`](../MODULE-AUDIT-TESTING-PLAYBOOK.md)  
+(file set, status vocabulary, no-skip DB rules, report/test-results templates).
+
+**Reconciliation**
+
+| Pass | Report | Test results |
+|------|--------|--------------|
+| 1 (2026-09-03) | `reconciliation-report.md` | `reconciliation-test-results.md` |
+| 2 (2026-09-04) | `reconciliation-pass-2-report.md` | `reconciliation-pass-2-test-results.md` |
+
+Do not overwrite earlier pass files; add `reconciliation-pass-N-*` for corrections.
+
 ## Origin branch
 
 | Repo | Branch | Base (`origin/development`) | Port status |
