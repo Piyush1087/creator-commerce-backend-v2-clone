@@ -13,8 +13,13 @@ concurrency:
   group: c03-recovery-block-1-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  STAGE: local
+  CHECKPOINT_DISABLE: "1"
+  PRISMA_HIDE_UPDATE_MESSAGE: "1"
+
 jobs:
-  p11d-integrity-guards:
+  p11e-fresh-and-negative:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     services:
@@ -23,19 +28,16 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: c03_recovery
+          POSTGRES_DB: c03_p11e_fresh
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d c03_recovery"
+          --health-cmd "pg_isready -U postgres -d c03_p11e_fresh"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
     env:
-      STAGE: local
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c03_recovery?schema=public
-      CHECKPOINT_DISABLE: "1"
-      PRISMA_HIDE_UPDATE_MESSAGE: "1"
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c03_p11e_fresh?schema=public
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,99 +48,244 @@ jobs:
           node-version: "20"
           cache: npm
 
-      - name: Recovery authority and P1.1C identity
+      - name: Recovery identity and evidence-only scope
         run: |
           expected_p0=6a2bd2e4b815462abc702dea34f7c368c24a0664
-          expected_p11c=ebad770291b411026542a7d53a7e6a30162bff2e
+          expected_p11d=ab8d1c022ae165846a40a8737f163bdb5ba7d65c
           original=$(git ls-remote origin refs/heads/c03/campaign-participation-v1 | cut -f 1)
           test "$original" = "$expected_p0"
-          test "$(git merge-base "$expected_p11c" HEAD)" = "$expected_p11c"
-          test "$(git rev-list --merges "$expected_p11c"..HEAD --count)" = "0"
+          test "$(git merge-base "$expected_p11d" HEAD)" = "$expected_p11d"
+          test "$(git rev-list --merges "$expected_p11d"..HEAD --count)" = "0"
           test -z "$(git status --porcelain)"
           test "$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" = "78"
+          git diff --exit-code "$expected_p11d" -- prisma/schema.prisma prisma/migrations
+          test "$(sha256sum prisma/migrations/20260910120000_c03_campaign_asset_brief_convergence/migration.sql | cut -d ' ' -f 1)" = "5f118afd089c5892d23c13881dc69e56555a4a58221787651d3982774816da5f"
+          test "$(sha256sum prisma/migrations/20260910120500_c03_application_snapshot_foundation/migration.sql | cut -d ' ' -f 1)" = "2bdba21e6c625aff5c2c8dccca2b23bcf9f4df5adb21a9a23525024123aafdf2"
+          test "$(sha256sum prisma/migrations/20260910121000_c03_invitation_ingress_idempotency_events/migration.sql | cut -d ' ' -f 1)" = "728ddc96ebd81284efabacafc3ff0f0bfc3260bb2c1f8ad47abb7fa30bd2cbf2"
+          test "$(sha256sum prisma/migrations/20260910121500_c03_integrity_guards_and_legacy_compatibility/migration.sql | cut -d ' ' -f 1)" = "fa2265935e0878ac45e533cb6ac87079ad12b665fafcc53c250a63a513fb83b5"
           jq -n \
+            --arg server_timestamp "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_fresh -Atc 'select clock_timestamp()')" \
             --arg node "$(node --version)" \
             --arg npm "$(npm --version)" \
-            --arg postgres "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_recovery -Atc 'show server_version')" \
+            --arg postgres "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_fresh -Atc 'show server_version')" \
             --arg p0 "$expected_p0" \
-            --arg p11c "$expected_p11c" \
+            --arg p11d "$expected_p11d" \
             --arg candidate "$(git rev-parse HEAD)" \
             --arg tree "$(git rev-parse HEAD^{tree})" \
-            '{node:$node,npm:$npm,postgres:$postgres,p0:$p0,p11c:$p11c,candidate:$candidate,tree:$tree}' \
-            > /tmp/c03-p11d-environment.json
-          cat /tmp/c03-p11d-environment.json
+            --arg stage_b "458875b939b738b8032409b6de72b6de70f53ed1" \
+            --arg recovery "7c7cae4ebe89a3d2305bd780aad784e8d9b46b79" \
+            --arg reconstruction "685e15a9f1baf6b5979e35137464975c958a8026" \
+            '{report:"C03_P1_1E_ENVIRONMENT_IDENTITY_V1",server_timestamp:$server_timestamp,node:$node,npm:$npm,postgres:$postgres,p0:$p0,p11d:$p11d,candidate:$candidate,tree:$tree,stage_b:$stage_b,recovery_baseline:$recovery,reconstruction:$reconstruction}' \
+            > /tmp/c03-p11e-environment.json
+          jq -e '.report == "C03_P1_1E_ENVIRONMENT_IDENTITY_V1"' /tmp/c03-p11e-environment.json
 
-      - name: Locked install and Prisma 6.19 static validation
+      - name: Locked install and Prisma 6.19 static proof
         run: |
           timeout 15m npm ci
           test "$(node -p "require('./node_modules/prisma/package.json').version")" = "6.19.3"
-          timeout 10m npm run prisma:generate
-          timeout 5m node node_modules/prisma/build/index.js format --check
-          timeout 5m node node_modules/prisma/build/index.js validate
+          timeout 10m npm run prisma:generate 2>&1 | tee /tmp/c03-p11e-prisma-generate.log
+          timeout 5m node node_modules/prisma/build/index.js format --check 2>&1 | tee /tmp/c03-p11e-prisma-format.log
+          timeout 5m node node_modules/prisma/build/index.js validate 2>&1 | tee /tmp/c03-p11e-prisma-validate.log
 
-      - name: Fresh PostgreSQL 0-to-78 replay
+      - name: Fresh PostgreSQL 0-to-78 replay and catalog proof
         run: |
+          timeout 20m npm run db:migrate:deploy 2>&1 | tee /tmp/c03-p11e-fresh-migrate.log
+          timeout 20m node node_modules/prisma/build/index.js migrate status 2>&1 | tee /tmp/c03-p11e-fresh-status.log
+          test "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_fresh -Atc 'select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null')" = "78"
+          test "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_fresh -Atc 'select count(*) from _prisma_migrations where rolled_back_at is not null or finished_at is null')" = "0"
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_fresh -Atc "SELECT jsonb_pretty(jsonb_build_object('report','C03_P1_1E_FINAL_CATALOG_V1','migrations',(SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL),'invalid_constraints',(SELECT count(*) FROM pg_constraint WHERE NOT convalidated),'c03_constraints',(SELECT count(*) FROM pg_constraint WHERE conname LIKE 'c03_%' OR conname LIKE 'uce_applications_%' OR conname LIKE 'campaign_opportunity_%' OR conname LIKE 'campaign_ingress_%' OR conname LIKE 'application_domain_%' OR conname LIKE 'application_command_%'),'c03_triggers',(SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal AND tgname LIKE 'c03_%'),'temporary_write_closed',(SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal AND tgname = 'c03_canonical_application_write_closed')))" > /tmp/c03-p11e-catalog.json
+          jq -e '.migrations == 78 and .invalid_constraints == 0 and .temporary_write_closed == 0 and .c03_constraints > 0 and .c03_triggers > 0' /tmp/c03-p11e-catalog.json
+
+      - name: Full manifest negative PostgreSQL suite
+        run: |
+          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres c03_p11a_e_fresh
           PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres c03_p11d_fresh
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11a_e_fresh?schema=public timeout 20m npm run db:migrate:deploy
           DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11d_fresh?schema=public timeout 20m npm run db:migrate:deploy
-          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11d_fresh?schema=public timeout 20m node node_modules/prisma/build/index.js migrate status
-          count=$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11d_fresh -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")
-          test "$count" = "78"
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11a_e_fresh?schema=public C03_P11A_DATABASE_TEST=true timeout 20m node node_modules/vitest/vitest.mjs run --config vitest.config.ts src/features/brand-uce/persistence/c03-p11a-campaign-brief.postgres.test.ts 2>&1 | tee /tmp/c03-p11e-cases-04-05.log
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11d_fresh?schema=public C03_P11D_DATABASE_TEST=true timeout 20m node node_modules/vitest/vitest.mjs run --config vitest.config.ts src/features/brand-uce/persistence/c03-p11d-integrity-guards.postgres.test.ts 2>&1 | tee /tmp/c03-p11e-cases-22-24.log
+          C03_P11E_DATABASE_TEST=true timeout 20m node node_modules/vitest/vitest.mjs run --config vitest.config.ts --reporter=default --reporter=json --outputFile=/tmp/c03-p11e-negative-report.json src/features/brand-uce/persistence/c03-p11e-manifest-negatives.postgres.test.ts 2>&1 | tee /tmp/c03-p11e-negative.log
+          jq -e '.success == true and .numTotalTests == 21 and .numPassedTests == 21 and .numFailedTests == 0 and .numPendingTests == 0' /tmp/c03-p11e-negative-report.json
+          jq -n '{report:"C03_P1_1E_NEGATIVE_CASE_MATRIX_V1",cases:[
+            {id:1,evidence:"manifest [01]"},{id:2,evidence:"manifest [02]"},{id:3,evidence:"manifest [03]"},
+            {id:4,evidence:"P1.1A identity/parent test"},{id:5,evidence:"P1.1A Deliverable target test"},
+            {id:6,evidence:"manifest [06]"},{id:7,evidence:"manifest [07]"},{id:8,evidence:"manifest [08]"},
+            {id:9,evidence:"manifest [09]"},{id:10,evidence:"manifest [10]"},{id:11,evidence:"manifest [11]"},
+            {id:12,evidence:"manifest [12]"},{id:13,evidence:"manifest [13]"},{id:14,evidence:"manifest [14]"},
+            {id:15,evidence:"manifest [15]"},{id:16,evidence:"manifest [16]"},{id:17,evidence:"manifest [17]"},
+            {id:18,evidence:"manifest [18]"},{id:19,evidence:"manifest [19]"},{id:20,evidence:"manifest [20]"},
+            {id:21,evidence:"manifest [21]"},{id:22,evidence:"manifest [22] + P1.1D"},
+            {id:23,evidence:"independent legacy-upgrade lane"},{id:24,evidence:"manifest [24] + P1.1D lock/architecture"}
+          ]}' > /tmp/c03-p11e-negative-matrix.json
+          test "$(jq '.cases | length' /tmp/c03-p11e-negative-matrix.json)" = "24"
 
-      - name: Seeded exact P0 74-to-78 upgrade
+      - name: Upload fresh and negative evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: c03-p11e-fresh-negative-${{ github.sha }}
+          path: |
+            /tmp/c03-p11e-environment.json
+            /tmp/c03-p11e-prisma-generate.log
+            /tmp/c03-p11e-prisma-format.log
+            /tmp/c03-p11e-prisma-validate.log
+            /tmp/c03-p11e-fresh-migrate.log
+            /tmp/c03-p11e-fresh-status.log
+            /tmp/c03-p11e-catalog.json
+            /tmp/c03-p11e-cases-04-05.log
+            /tmp/c03-p11e-cases-22-24.log
+            /tmp/c03-p11e-negative.log
+            /tmp/c03-p11e-negative-report.json
+            /tmp/c03-p11e-negative-matrix.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Fresh-lane repository integrity
         run: |
-          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres c03_p11d_upgrade74
-          git worktree add --detach /tmp/c03-p0-base 6a2bd2e4b815462abc702dea34f7c368c24a0664
-          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11d_upgrade74?schema=public timeout 20m node node_modules/prisma/build/index.js migrate deploy --schema=/tmp/c03-p0-base/prisma/schema.prisma
-          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11d_upgrade74?schema=public timeout 5m node scripts/c03-p11b-seed-legacy-applications.mjs
-          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11d_upgrade74 -v ON_ERROR_STOP=1 -c "insert into creator_entry_continuations (id, token_digest, intent, campaign_id, created_at, expires_at) values ('c0311d00-0000-4000-8000-000000000001', repeat('0', 64), 'CAMPAIGN_APPLY', 'c0311b00-0000-4000-8000-000000000002', '2026-09-01T00:00:00Z', '2026-09-02T00:00:00Z')"
-          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11d_upgrade74?schema=public timeout 10m node scripts/c03-p11-preflight.mjs | tee /tmp/c03-p11d-preflight.json
-          test "$(jq -r .result /tmp/c03-p11d-preflight.json)" = "PASS"
-          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11d_upgrade74 -At -F '|' -c "select a.id, a.status::text, md5(concat_ws('|', s.campaign_context::text, s.campaign_asset_context::text, s.brief_context::text, s.commercial_context::text, s.creator_identity::text)) from uce_applications a join uce_application_snapshots s on s.application_id = a.id order by a.id" > /tmp/c03-p11d-snapshots-74-before.txt
-          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11d_upgrade74 -At -F '|' -c "select id, token_digest, intent::text, campaign_id, coalesce(bound_user_id, ''), created_at, expires_at, coalesce(consumed_at::text, '') from creator_entry_continuations order by id" > /tmp/c03-p11d-continuations-74-before.txt
-          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11d_upgrade74?schema=public timeout 20m npm run db:migrate:deploy
-          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11d_upgrade74?schema=public timeout 20m node node_modules/prisma/build/index.js migrate status
-          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11d_upgrade74 -At -F '|' -c "select a.id, a.status::text, md5(concat_ws('|', s.campaign_context::text, s.campaign_asset_context::text, s.brief_context::text, s.commercial_context::text, s.creator_identity::text)) from uce_applications a join uce_application_snapshots s on s.application_id = a.id order by a.id" > /tmp/c03-p11d-snapshots-74-after.txt
-          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11d_upgrade74 -At -F '|' -c "select id, token_digest, intent::text, campaign_id, coalesce(bound_user_id, ''), created_at, expires_at, coalesce(consumed_at::text, '') from creator_entry_continuations order by id" > /tmp/c03-p11d-continuations-74-after.txt
-          diff -u /tmp/c03-p11d-snapshots-74-before.txt /tmp/c03-p11d-snapshots-74-after.txt
-          diff -u /tmp/c03-p11d-continuations-74-before.txt /tmp/c03-p11d-continuations-74-after.txt
-          preserved=$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11d_upgrade74 -Atc "select count(*) from uce_applications where authority_version = 'LEGACY_COMPATIBILITY' and status_version = 0")
-          test "$preserved" = "6"
-          if PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11d_upgrade74 -v ON_ERROR_STOP=1 -c "delete from uce_applications where id = 'c0311b00-0000-4000-8000-000000000010'" >/tmp/c03-p11d-legacy-delete.txt 2>&1; then exit 1; fi
-          grep -q C03_APPLICATION_DELETE_FORBIDDEN /tmp/c03-p11d-legacy-delete.txt
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
 
-      - name: Seeded accepted P1.1C 77-to-78 upgrade
-        run: |
-          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres c03_p11d_upgrade77
-          git worktree add --detach /tmp/c03-p11c-base ebad770291b411026542a7d53a7e6a30162bff2e
-          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11d_upgrade77?schema=public timeout 20m node node_modules/prisma/build/index.js migrate deploy --schema=/tmp/c03-p11c-base/prisma/schema.prisma
-          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11d_upgrade77?schema=public timeout 5m node scripts/c03-p11b-seed-legacy-applications.mjs
-          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11d_upgrade77 -v ON_ERROR_STOP=1 -c "insert into creator_entry_continuations (id, token_digest, intent, campaign_id, created_at, expires_at) values ('c0311d00-0000-4000-8000-000000000002', repeat('1', 64), 'CAMPAIGN_APPLY', 'c0311b00-0000-4000-8000-000000000002', '2026-09-01T00:00:00Z', '2026-09-02T00:00:00Z')"
-          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11d_upgrade77 -At -F '|' -c "select a.id, a.status::text, md5(concat_ws('|', s.campaign_context::text, s.campaign_asset_context::text, s.brief_context::text, s.commercial_context::text, s.creator_identity::text)) from uce_applications a join uce_application_snapshots s on s.application_id = a.id order by a.id" > /tmp/c03-p11d-snapshots-77-before.txt
-          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11d_upgrade77?schema=public timeout 20m npm run db:migrate:deploy
-          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11d_upgrade77?schema=public timeout 20m node node_modules/prisma/build/index.js migrate status
-          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11d_upgrade77 -At -F '|' -c "select a.id, a.status::text, md5(concat_ws('|', s.campaign_context::text, s.campaign_asset_context::text, s.brief_context::text, s.commercial_context::text, s.creator_identity::text)) from uce_applications a join uce_application_snapshots s on s.application_id = a.id order by a.id" > /tmp/c03-p11d-snapshots-77-after.txt
-          diff -u /tmp/c03-p11d-snapshots-77-before.txt /tmp/c03-p11d-snapshots-77-after.txt
-          test "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11d_upgrade77 -Atc 'select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null')" = "78"
-
-      - name: P1.1D guards insertion order and lock serialization
+  p11e-seeded-legacy-upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16
         env:
-          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c03_p11d_fresh?schema=public
-          C03_P11D_DATABASE_TEST: "true"
-        run: timeout 20m node node_modules/vitest/vitest.mjs run --config vitest.config.ts src/features/brand-uce/persistence/c03-p11d-integrity-guards.postgres.test.ts
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: c03_p11e_upgrade74
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d c03_p11e_upgrade74"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c03_p11e_upgrade74?schema=public
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: C01 and C05 PostgreSQL regressions
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Recovery identity and locked install
         run: |
-          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres c01_i1_p11d
-          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres c01_i5_p11d
-          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres c05_p11d
-          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c01_i1_p11d?schema=public timeout 20m npm run db:migrate:deploy
-          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c01_i5_p11d?schema=public timeout 20m npm run db:migrate:deploy
-          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c05_p11d?schema=public timeout 20m npm run db:migrate:deploy
-          C01_I1_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c01_i1_p11d?schema=public timeout 30m node node_modules/vitest/vitest.mjs run --config vitest.config.ts src/features/c01-persistence/c01-persistence-security.postgres.test.ts
-          C01_I5_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c01_i5_p11d?schema=public timeout 30m node node_modules/vitest/vitest.mjs run --config vitest.config.ts src/features/creator-entry/creator-campaign-apply-continuation.postgres.test.ts
-          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c05_p11d?schema=public C05_TEAM_DATABASE_TEST=true timeout 30m node node_modules/vitest/vitest.mjs run --config vitest.config.ts src/features/creator-settings/team/creator-team.postgres.test.ts
+          expected_p11d=ab8d1c022ae165846a40a8737f163bdb5ba7d65c
+          test "$(git merge-base "$expected_p11d" HEAD)" = "$expected_p11d"
+          git diff --exit-code "$expected_p11d" -- prisma/schema.prisma prisma/migrations
+          timeout 15m npm ci
+          timeout 10m npm run prisma:generate
 
-      - name: Architecture adapter and legacy regressions
+      - name: Exact P0 74 migration seed and preflight
+        run: |
+          git worktree add --detach /tmp/c03-p11e-p0-base 6a2bd2e4b815462abc702dea34f7c368c24a0664
+          DATABASE_URL=$DATABASE_URL timeout 20m node node_modules/prisma/build/index.js migrate deploy --schema=/tmp/c03-p11e-p0-base/prisma/schema.prisma 2>&1 | tee /tmp/c03-p11e-p0-migrate.log
+          test "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -Atc 'select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null')" = "74"
+          timeout 5m node scripts/c03-p11a-seed-legacy-canonical-brief.mjs
+          timeout 5m node scripts/c03-p11b-seed-legacy-applications.mjs
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -v ON_ERROR_STOP=1 -c "insert into creator_entry_continuations (id, token_digest, intent, campaign_id, created_at, expires_at) values ('c0311e00-0000-4000-8000-000000000001', repeat('0', 64), 'CAMPAIGN_APPLY', 'c0311b00-0000-4000-8000-000000000002', '2026-09-01T00:00:00Z', '2026-09-02T00:00:00Z')"
+          timeout 10m node scripts/c03-p11-preflight.mjs 2>&1 | tee /tmp/c03-p11e-preflight.json
+          test "$(jq -r .result /tmp/c03-p11e-preflight.json)" = "PASS"
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -At -F '|' -c "select a.id,a.status::text,a.request_id,a.campaign_creator_id,a.campaign_asset_id,a.brief_id,md5(concat_ws('|',s.campaign_context::text,s.campaign_asset_context::text,s.brief_context::text,s.commercial_context::text,s.creator_identity::text)),a.applied_at,a.created_at,a.updated_at from uce_applications a join uce_application_snapshots s on s.application_id=a.id order by a.id" > /tmp/c03-p11e-applications-before.txt
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -At -F '|' -c "select brief_id,campaign_asset_id,title,creative_requirements,is_active,created_at,updated_at from campaign_briefs order by brief_id" > /tmp/c03-p11e-briefs-before.txt
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -At -F '|' -c "select id,token_digest,intent::text,campaign_id,coalesce(bound_user_id,''),created_at,expires_at,coalesce(consumed_at::text,'') from creator_entry_continuations order by id" > /tmp/c03-p11e-continuations-before.txt
+
+      - name: Upgrade 74-to-78 and prove before/after invariants
+        run: |
+          timeout 20m npm run db:migrate:deploy 2>&1 | tee /tmp/c03-p11e-upgrade-migrate.log
+          timeout 20m node node_modules/prisma/build/index.js migrate status 2>&1 | tee /tmp/c03-p11e-upgrade-status.log
+          test "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -Atc 'select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null')" = "78"
+          test "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -Atc 'select count(*) from _prisma_migrations where rolled_back_at is not null or finished_at is null')" = "0"
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -At -F '|' -c "select a.id,a.status::text,a.request_id,a.campaign_creator_id,a.campaign_asset_id,a.brief_id,md5(concat_ws('|',s.campaign_context::text,s.campaign_asset_context::text,s.brief_context::text,s.commercial_context::text,s.creator_identity::text)),a.applied_at,a.created_at,a.updated_at from uce_applications a join uce_application_snapshots s on s.application_id=a.id order by a.id" > /tmp/c03-p11e-applications-after.txt
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -At -F '|' -c "select brief_id,campaign_asset_id,title,creative_requirements,is_active,created_at,updated_at from campaign_briefs order by brief_id" > /tmp/c03-p11e-briefs-after.txt
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -At -F '|' -c "select id,token_digest,intent::text,campaign_id,coalesce(bound_user_id,''),created_at,expires_at,coalesce(consumed_at::text,'') from creator_entry_continuations order by id" > /tmp/c03-p11e-continuations-after.txt
+          diff -u /tmp/c03-p11e-applications-before.txt /tmp/c03-p11e-applications-after.txt
+          diff -u /tmp/c03-p11e-briefs-before.txt /tmp/c03-p11e-briefs-after.txt
+          diff -u /tmp/c03-p11e-continuations-before.txt /tmp/c03-p11e-continuations-after.txt
+          test "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -Atc "select count(*) from uce_applications where authority_version='LEGACY_COMPATIBILITY' and status_version=0 and brand_profile_id is null and canonical_campaign_asset_id is null and canonical_brief_id is null")" = "6"
+          test "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -Atc "select string_agg(status::text,',' order by status::text) from uce_applications")" = "APPROVED,EXPIRED,PENDING,REJECTED,SUPERSEDED,WITHDRAWN"
+          test "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -Atc 'select count(*) from uce_application_snapshots where schema_version is null and actor_context is null and attribution_context is null')" = "6"
+          test "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -Atc "select count(*) from campaign_briefs where brief_id='c0311a00-0000-4000-8000-000000000004' and status='PUBLISHED' and creation_source='MANUAL' and creative_intent is null and creator_brief is null")" = "1"
+          test "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -Atc 'select (select count(*) from campaign_opportunity_invitations)+(select count(*) from campaign_ingress_touches)+(select count(*) from application_domain_events)+(select count(*) from application_command_receipts)')" = "0"
+          test "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -Atc 'select count(*) from pg_constraint where not convalidated')" = "0"
+          jq -n \
+            --arg server_timestamp "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -Atc 'select clock_timestamp()')" \
+            --arg statuses "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -Atc "select string_agg(status::text,',' order by status::text) from uce_applications")" \
+            --argjson migrations "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -Atc 'select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null')" \
+            --argjson legacy_applications "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -Atc "select count(*) from uce_applications where authority_version='LEGACY_COMPATIBILITY'")" \
+            --argjson synthesized_rows "$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11e_upgrade74 -Atc 'select (select count(*) from campaign_opportunity_invitations)+(select count(*) from campaign_ingress_touches)+(select count(*) from application_domain_events)+(select count(*) from application_command_receipts)')" \
+            '{report:"C03_P1_1E_LEGACY_UPGRADE_INVARIANTS_V1",server_timestamp:$server_timestamp,migrations:$migrations,legacy_applications:$legacy_applications,statuses:$statuses,synthesized_rows:$synthesized_rows,application_bytes_preserved:true,brief_bytes_preserved:true,continuation_bytes_preserved:true,constraints_validated:true}' \
+            > /tmp/c03-p11e-legacy-invariants.json
+          jq -e '.migrations == 78 and .legacy_applications == 6 and .synthesized_rows == 0 and .application_bytes_preserved and .brief_bytes_preserved and .continuation_bytes_preserved and .constraints_validated' /tmp/c03-p11e-legacy-invariants.json
+
+      - name: Upload legacy-upgrade evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: c03-p11e-legacy-upgrade-${{ github.sha }}
+          path: |
+            /tmp/c03-p11e-p0-migrate.log
+            /tmp/c03-p11e-preflight.json
+            /tmp/c03-p11e-upgrade-migrate.log
+            /tmp/c03-p11e-upgrade-status.log
+            /tmp/c03-p11e-applications-before.txt
+            /tmp/c03-p11e-applications-after.txt
+            /tmp/c03-p11e-briefs-before.txt
+            /tmp/c03-p11e-briefs-after.txt
+            /tmp/c03-p11e-continuations-before.txt
+            /tmp/c03-p11e-continuations-after.txt
+            /tmp/c03-p11e-legacy-invariants.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Legacy-lane repository integrity
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
+  p11e-runtime-regression:
+    needs:
+      - p11e-fresh-and-negative
+      - p11e-seeded-legacy-upgrade
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: c03_p11e_runtime
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d c03_p11e_runtime"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c03_p11e_runtime?schema=public
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install and runtime database
+        run: |
+          timeout 15m npm ci
+          timeout 10m npm run prisma:generate
+          timeout 20m npm run db:migrate:deploy
+
+      - name: Architecture and compatibility acceptance
         run: |
           timeout 30m node node_modules/vitest/vitest.mjs run --config vitest.config.ts \
             src/features/brand-uce/persistence/c03-p11d-integrity.architecture.test.ts \
@@ -150,76 +297,73 @@ jobs:
             src/features/brand-uce/services/campaign-application.service.test.ts \
             src/features/brand-uce/services/campaign-query.service.test.ts \
             src/features/brand-uce/services/canonical-campaign-application-read.service.test.ts \
-            src/features/brand-uce/services/canonical-campaign-brief.service.test.ts
+            src/features/brand-uce/services/canonical-campaign-brief.service.test.ts 2>&1 | tee /tmp/c03-p11e-focused.log
 
       - name: Full tests and production build
         run: |
-          timeout 45m npm test
-          timeout 20m npm run build
+          timeout 45m npm test 2>&1 | tee /tmp/c03-p11e-full-tests.log
+          timeout 20m npm run build 2>&1 | tee /tmp/c03-p11e-build.log
 
       - name: Backend startup smoke
         env:
-          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c03_p11d_fresh?schema=public
           PORT: "3303"
           PLAYWRIGHT_ENABLED: "false"
           SETTINGS_FIELD_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
-          JWT_SECRET: c03-p11d-runtime-proof
-          JWT_SECRET_DEV: c03-p11d-runtime-proof
-          JWT_SECRET_PROD: c03-p11d-runtime-proof
-          JWT_ISSUER: creatorshop-c03-p11d
-          JWT_AUDIENCE: creatorshop-c03-p11d
-          AUTH_OTP_PEPPER: c03-p11d-runtime-proof
-          AUTH_OTP_PEPPER_DEV: c03-p11d-runtime-proof
-          AUTH_OTP_PEPPER_PROD: c03-p11d-runtime-proof
-          POSTMARK_SERVER_TOKEN: c03-p11d-runtime-proof
+          JWT_SECRET: c03-p11e-runtime-proof
+          JWT_SECRET_DEV: c03-p11e-runtime-proof
+          JWT_SECRET_PROD: c03-p11e-runtime-proof
+          JWT_ISSUER: creatorshop-c03-p11e
+          JWT_AUDIENCE: creatorshop-c03-p11e
+          AUTH_OTP_PEPPER: c03-p11e-runtime-proof
+          AUTH_OTP_PEPPER_DEV: c03-p11e-runtime-proof
+          AUTH_OTP_PEPPER_PROD: c03-p11e-runtime-proof
+          POSTMARK_SERVER_TOKEN: c03-p11e-runtime-proof
           POSTMARK_OTP_TEMPLATE_ID: "1"
           POSTMARK_AUTH_OTP_TEMPLATE_ID: "1"
           POSTMARK_PASSWORD_RESET_TEMPLATE_ID: "1"
           POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID: "1"
           APP_FRONTEND_URL: http://127.0.0.1:5303
-          GEMINI_API_KEY: c03-p11d-runtime-proof
-          OPENAI_API_KEY: c03-p11d-runtime-proof
-          ZYTE_API_KEY: c03-p11d-runtime-proof
-          INSTAGRAM_API_ID: c03-p11d-runtime-proof
-          INSTAGRAM_APP_SECRET: c03-p11d-runtime-proof
+          GEMINI_API_KEY: c03-p11e-runtime-proof
+          OPENAI_API_KEY: c03-p11e-runtime-proof
+          ZYTE_API_KEY: c03-p11e-runtime-proof
+          INSTAGRAM_API_ID: c03-p11e-runtime-proof
+          INSTAGRAM_APP_SECRET: c03-p11e-runtime-proof
           CREATOR_INSTAGRAM_REDIRECT_URI: https://dashboard.dev.thecreatorshop.in/creator-marketplace/callback
-          RAZORPAY_API_KEY_ID: c03-p11d-runtime-proof
-          RAZORPAY_API_KEY_SECRET: c03-p11d-runtime-proof
-          RAZORPAY_WEBHOOK_SECRET: c03-p11d-runtime-proof
-          S3_BUCKET_NAME: creatorshop-c03-p11d-local
+          RAZORPAY_API_KEY_ID: c03-p11e-runtime-proof
+          RAZORPAY_API_KEY_SECRET: c03-p11e-runtime-proof
+          RAZORPAY_WEBHOOK_SECRET: c03-p11e-runtime-proof
+          S3_BUCKET_NAME: creatorshop-c03-p11e-local
           AWS_REGION: ap-south-1
         run: |
           timeout 3m sh -c '
-            npm run start:prod >/tmp/c03-p11d-api.log 2>&1 &
+            npm run start:prod >/tmp/c03-p11e-api.log 2>&1 &
             api_pid=$!
             trap "kill $api_pid 2>/dev/null || true" EXIT
             for attempt in $(seq 1 60); do
-              if curl --fail --silent http://127.0.0.1:3303/ >/tmp/c03-p11d-root.json; then exit 0; fi
+              if curl --fail --silent http://127.0.0.1:3303/ >/tmp/c03-p11e-root.json; then exit 0; fi
               if ! kill -0 "$api_pid" 2>/dev/null; then break; fi
               sleep 1
             done
-            sed -n "1,240p" /tmp/c03-p11d-api.log
+            sed -n "1,240p" /tmp/c03-p11e-api.log
             exit 1
           '
 
-      - name: Upload P1.1D evidence
+      - name: Upload runtime acceptance evidence
         uses: actions/upload-artifact@v4
         with:
-          name: c03-p11d-evidence-${{ github.sha }}
+          name: c03-p11e-runtime-${{ github.sha }}
           path: |
-            /tmp/c03-p11d-environment.json
-            /tmp/c03-p11d-preflight.json
-            /tmp/c03-p11d-snapshots-74-before.txt
-            /tmp/c03-p11d-snapshots-74-after.txt
-            /tmp/c03-p11d-continuations-74-before.txt
-            /tmp/c03-p11d-continuations-74-after.txt
-            /tmp/c03-p11d-snapshots-77-before.txt
-            /tmp/c03-p11d-snapshots-77-after.txt
-            /tmp/c03-p11d-legacy-delete.txt
+            /tmp/c03-p11e-focused.log
+            /tmp/c03-p11e-full-tests.log
+            /tmp/c03-p11e-build.log
+            /tmp/c03-p11e-api.log
+            /tmp/c03-p11e-root.json
           if-no-files-found: error
           retention-days: 30
 
-      - name: Final repository integrity
+      - name: Final repository and authority integrity
         run: |
+          test "$(git merge-base ab8d1c022ae165846a40a8737f163bdb5ba7d65c HEAD)" = "ab8d1c022ae165846a40a8737f163bdb5ba7d65c"
+          git diff --exit-code ab8d1c022ae165846a40a8737f163bdb5ba7d65c -- prisma/schema.prisma prisma/migrations
           git diff --exit-code
           test -z "$(git status --porcelain)"

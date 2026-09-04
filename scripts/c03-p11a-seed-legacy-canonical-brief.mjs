@@ -5,7 +5,7 @@ const parsed = databaseUrl ? new URL(databaseUrl) : null;
 if (
   !parsed ||
   !["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname) ||
-  parsed.pathname !== "/c03_p11a_upgrade"
+  !new Set(["/c03_p11a_upgrade", "/c03_p11e_upgrade74"]).has(parsed.pathname)
 ) {
   throw new Error("C03_P11A_FIXTURE_REQUIRES_DISPOSABLE_UPGRADE_DATABASE");
 }
