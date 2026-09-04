@@ -22,7 +22,7 @@ import { ProviderOAuthModule } from "../provider-oauth/provider-oauth.module";
 
 @Module({
   imports: [
-    BrandCentreModule,
+    forwardRef(() => BrandCentreModule),
     InstagramModule,
     AuthModule,
     MailModule,

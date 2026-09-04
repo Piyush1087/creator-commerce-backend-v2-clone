@@ -362,7 +362,7 @@ database("C01-I5 Campaign Apply continuation", () => {
     it("issues a digest-only, unbound 24-hour continuation from public detail authority", async () => {
       const origin = await campaign("public-issue");
       const before = await campaignMutationSnapshot(origin.campaign.id);
-      const now = new Date("2026-09-01T08:00:00.000Z");
+      const now = new Date();
       const detail = await marketplace.getPublicMarketplaceCampaignDetail(
         origin.campaign.id,
       );

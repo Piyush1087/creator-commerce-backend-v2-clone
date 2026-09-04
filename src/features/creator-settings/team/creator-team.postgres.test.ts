@@ -94,11 +94,19 @@ describe.skipIf(process.env.C05_TEAM_DATABASE_TEST !== "true")(
     });
 
     async function createUser() {
+      const organization = await prisma.organization.create({
+        data: {
+          name: `Invitee ${randomUUID()}`,
+          kind: "CREATOR",
+        },
+      });
+      organizationIds.push(organization.id);
       const user = await prisma.user.create({
         data: {
           email: `${randomUUID()}@example.test`,
           role: UserRole.CREATOR,
           authState: UserAuthState.ACTIVE,
+          organizationId: organization.id,
           emailVerifiedAt: new Date(),
         },
       });
@@ -315,11 +323,6 @@ describe.skipIf(process.env.C05_TEAM_DATABASE_TEST !== "true")(
           "ASSISTANT",
         ),
       ).rejects.toThrow();
-      await team.updateRole(
-        actor(manager.user),
-        assistant.membership.id,
-        "MANAGER",
-      );
       await expect(team.list(actor(assistant.user))).rejects.toThrow(
         "Creator workspace action denied",
       );
@@ -329,6 +332,15 @@ describe.skipIf(process.env.C05_TEAM_DATABASE_TEST !== "true")(
           allocatedRole: "ASSISTANT",
         }),
       ).rejects.toThrow("Creator workspace action denied");
+      await team.updateRole(
+        actor(manager.user),
+        assistant.membership.id,
+        "MANAGER",
+      );
+      await expect(team.list(actor(assistant.user))).resolves.toMatchObject({
+        actor: { role: CreatorTeamRole.MANAGER },
+        team: { members: expect.any(Array) },
+      });
     });
 
     it("makes cancellation and expiry terminal", async () => {

@@ -1,0 +1,138 @@
+name: C03 Backend Integration Gate
+
+on:
+  push:
+    branches:
+      - c03/campaign-participation-v1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c03-backend-integration-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  p0-execution-lock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: c03_p0
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d c03_p0"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      STAGE: local
+      PORT: "3303"
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c05_c03_p0?schema=public
+      C01_I5_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c01_i5_c03_p0?schema=public
+      C05_TEAM_DATABASE_TEST: "true"
+      PLAYWRIGHT_ENABLED: "false"
+      SETTINGS_FIELD_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      JWT_SECRET: c03-p0-non-secret-runtime-proof
+      JWT_SECRET_DEV: c03-p0-non-secret-runtime-proof
+      JWT_SECRET_PROD: c03-p0-non-secret-runtime-proof
+      JWT_ISSUER: creatorshop-c03-p0
+      JWT_AUDIENCE: creatorshop-c03-p0
+      AUTH_OTP_PEPPER: c03-p0-non-secret-runtime-proof
+      AUTH_OTP_PEPPER_DEV: c03-p0-non-secret-runtime-proof
+      AUTH_OTP_PEPPER_PROD: c03-p0-non-secret-runtime-proof
+      POSTMARK_SERVER_TOKEN: c03-p0-runtime-proof
+      POSTMARK_OTP_TEMPLATE_ID: "1"
+      POSTMARK_AUTH_OTP_TEMPLATE_ID: "1"
+      POSTMARK_PASSWORD_RESET_TEMPLATE_ID: "1"
+      POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID: "1"
+      APP_FRONTEND_URL: http://127.0.0.1:5303
+      GEMINI_API_KEY: c03-p0-runtime-proof
+      OPENAI_API_KEY: c03-p0-runtime-proof
+      ZYTE_API_KEY: c03-p0-runtime-proof
+      INSTAGRAM_API_ID: c03-p0-runtime-proof
+      INSTAGRAM_APP_SECRET: c03-p0-runtime-proof
+      CREATOR_INSTAGRAM_REDIRECT_URI: https://dashboard.dev.thecreatorshop.in/creator-marketplace/callback
+      RAZORPAY_API_KEY_ID: c03-p0-runtime-proof
+      RAZORPAY_API_KEY_SECRET: c03-p0-runtime-proof
+      RAZORPAY_WEBHOOK_SECRET: c03-p0-runtime-proof
+      S3_BUCKET_NAME: creatorshop-c03-p0-local
+      AWS_REGION: ap-south-1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Runtime and immutable base identity
+        run: |
+          node --version
+          npm --version
+          echo "base=4c5f42858b950b7cd342f8972f99f548f3daa942"
+          echo "lock_sha256=$(sha256sum package-lock.json | cut -d ' ' -f 1)"
+          echo "migration_count=$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+
+      - name: Locked install and Prisma generation
+        run: |
+          npm ci
+          npm run prisma:generate
+          npx prisma validate
+
+      - name: Fresh PostgreSQL migration replay
+        run: |
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p0?schema=public npm run db:migrate:deploy
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p0?schema=public npx prisma migrate status
+          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres -T c03_p0 c01_i5_c03_p0
+          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres -T c03_p0 c05_c03_p0
+          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres -T c03_p0 c03_p0_legacy
+
+      - name: Disposable legacy-shaped reconnaissance
+        run: |
+          legacy_tables=$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p0_legacy -Atc "select count(*) from pg_catalog.pg_tables where schemaname = 'public' and tablename in ('uce_campaigns','uce_campaign_assets','campaign_briefs','uce_campaign_briefs','uce_applications','uce_application_snapshots','uce_campaign_collaborations','collaborations','notifications')")
+          test "$legacy_tables" = "9"
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p0_legacy -v ON_ERROR_STOP=1 -c "select table_name, column_name, data_type from information_schema.columns where table_schema = 'public' and table_name in ('uce_campaigns','uce_campaign_assets','campaign_briefs','uce_campaign_briefs','uce_applications','uce_application_snapshots','uce_campaign_collaborations','collaborations','notifications') order by table_name, ordinal_position"
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p0_legacy -v ON_ERROR_STOP=1 -c "select (select count(*) from uce_campaigns) as campaigns, (select count(*) from uce_applications) as applications, (select count(*) from uce_application_snapshots) as snapshots, (select count(*) from uce_campaign_collaborations) as legacy_collaborations, (select count(*) from collaborations) as workflow_collaborations"
+
+      - name: Relevant real-PostgreSQL baseline
+        run: |
+          npx vitest run --config vitest.config.ts \
+            src/features/creator-entry/creator-campaign-apply-continuation.postgres.test.ts \
+            src/features/creator-settings/team/creator-team.postgres.test.ts
+
+      - name: Provider-neutral access fixtures
+        run: |
+          npx vitest run --config vitest.config.ts \
+            src/features/creator-entry/creator-platform-access.guard.test.ts \
+            src/features/creator-settings/team/creator-workspace-actor.service.test.ts
+
+      - name: Full baseline tests and production build
+        run: |
+          npm test
+          npm run build
+
+      - name: Backend startup smoke
+        run: |
+          npm run start:prod >/tmp/c03-p0-api.log 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3303/ >/tmp/c03-p0-root.json; then
+              break
+            fi
+            if ! kill -0 "$api_pid" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          if ! curl --fail --silent http://127.0.0.1:3303/; then
+            sed -n '1,240p' /tmp/c03-p0-api.log
+            exit 1
+          fi
