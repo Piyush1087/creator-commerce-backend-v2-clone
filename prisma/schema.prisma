@@ -472,6 +472,45 @@ enum UceApplicationSnapshotVersion {
   C03_APPLICATION_SNAPSHOT_V1
 }
 
+enum CampaignOpportunityEntrySurface {
+  DIRECT_CAMPAIGN_LINK
+  TRACKED_CAMPAIGN_SHARE
+  BRAND_INVITATION
+  CREATOR_OPPORTUNITIES
+}
+
+enum CampaignOpportunityEntryAuthorityKind {
+  DIRECT
+  SHARE
+  INVITATION
+}
+
+enum CampaignIngressTouchKind {
+  QUALIFIED_INGRESS
+  APPLICATION_CONVERSION
+}
+
+enum ApplicationCommandType {
+  SUBMIT
+  WITHDRAW
+  APPROVE
+  REJECT
+}
+
+enum ApplicationDomainEventName {
+  SUBMITTED @map("application.submitted")
+  APPROVED  @map("application.approved")
+  REJECTED  @map("application.rejected")
+  WITHDRAWN @map("application.withdrawn")
+  EXPIRED   @map("application.expired")
+}
+
+enum ApplicationEventActorClass {
+  CREATOR_TEAM_USER
+  BRAND_USER
+  SYSTEM
+}
+
 enum UceCampaignCreatorSource {
   META_MARKETPLACE
   MANUAL
@@ -1428,6 +1467,10 @@ model User {
   passwordResetChallenges            PasswordResetChallenge[]
   securityEvents                     SecurityEvent[]                   @relation("SecurityEventSubject")
   applicationActorEvidence           UceApplication[]                  @relation("ApplicationActorUser")
+  campaignInvitationsIssued          CampaignOpportunityInvitation[]   @relation("CampaignInvitationIssuer")
+  campaignInvitationsRevoked         CampaignOpportunityInvitation[]   @relation("CampaignInvitationRevoker")
+  applicationCommandReceipts         ApplicationCommandReceipt[]       @relation("ApplicationCommandActor")
+  applicationDomainEvents            ApplicationDomainEvent[]          @relation("ApplicationEventActorUser")
 
   @@index([organizationId])
   @@index([role])
@@ -1883,8 +1926,9 @@ model BrandProfile {
   dataExtractionProviderExecutionLinks DataExtractionProviderExecutionLink[]
 
   // UCE (Universal Campaign Engine)
-  uceCampaigns   UceCampaign[]
-  campaignAssets UceCampaignAsset[] @relation("CampaignAssetBrandProfile")
+  uceCampaigns            UceCampaign[]
+  campaignAssets          UceCampaignAsset[]       @relation("CampaignAssetBrandProfile")
+  applicationDomainEvents ApplicationDomainEvent[] @relation("ApplicationEventBrand")
 
   // Bridge ledger (Brand Centre → UCE)
   integrationBridgeSignals IntegrationBridgeSignalLedger[]
@@ -2690,6 +2734,9 @@ model UceCampaign {
   reportingAssets           UceCampaignReportingAssetGallery[]
   bridgeSignals             IntegrationBridgeSignalLedger[]
   creatorEntryContinuations CreatorEntryContinuation[]
+  opportunityInvitations    CampaignOpportunityInvitation[]
+  ingressTouches            CampaignIngressTouch[]
+  applicationDomainEvents   ApplicationDomainEvent[]               @relation("ApplicationEventCampaign")
 
   @@unique([id, brandProfileId])
   @@index([brandProfileId, status])
@@ -2698,19 +2745,35 @@ model UceCampaign {
 
 /// Persistence-only handoff to an already resolved canonical Campaign.
 model CreatorEntryContinuation {
-  id          String                         @id @default(uuid())
-  tokenDigest String                         @unique @map("token_digest") @db.Char(64)
-  intent      CreatorEntryContinuationIntent @default(CAMPAIGN_APPLY)
-  campaignId  String                         @map("campaign_id")
-  campaign    UceCampaign                    @relation(fields: [campaignId], references: [id], onDelete: Restrict)
-  boundUserId String?                        @map("bound_user_id")
-  boundUser   User?                          @relation(fields: [boundUserId], references: [id], onDelete: Restrict)
-  createdAt   DateTime                       @default(now()) @map("created_at")
-  expiresAt   DateTime                       @map("expires_at")
-  consumedAt  DateTime?                      @map("consumed_at")
+  id                      String                                @id @default(uuid())
+  tokenDigest             String                                @unique @map("token_digest") @db.Char(64)
+  intent                  CreatorEntryContinuationIntent        @default(CAMPAIGN_APPLY)
+  contextVersion          Int                                   @default(1) @map("context_version")
+  entrySurface            CampaignOpportunityEntrySurface       @default(DIRECT_CAMPAIGN_LINK) @map("entry_surface")
+  entryAuthorityKind      CampaignOpportunityEntryAuthorityKind @default(DIRECT) @map("entry_authority_kind")
+  campaignId              String                                @map("campaign_id")
+  campaign                UceCampaign                           @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  campaignShareId         String?                               @map("campaign_share_id")
+  campaignShare           UceCampaignShare?                     @relation("ContinuationCampaignShare", fields: [campaignId, campaignShareId], references: [campaignId, id], onDelete: Restrict, onUpdate: Restrict)
+  campaignInvitationId    String?                               @map("campaign_invitation_id")
+  campaignInvitation      CampaignOpportunityInvitation?        @relation("ContinuationCampaignInvitation", fields: [campaignId, campaignInvitationId], references: [campaignId, id], onDelete: Restrict, onUpdate: Restrict)
+  firstQualifiedTouchId   String?                               @map("first_qualified_touch_id")
+  firstQualifiedTouch     CampaignIngressTouch?                 @relation("ContinuationFirstTouch", fields: [campaignId, firstQualifiedTouchId], references: [campaignId, id], onDelete: Restrict, onUpdate: Restrict)
+  boundUserId             String?                               @map("bound_user_id")
+  boundUser               User?                                 @relation(fields: [boundUserId], references: [id], onDelete: Restrict)
+  boundCreatorWorkspaceId String?                               @map("bound_creator_workspace_id")
+  boundCreatorProfileId   String?                               @map("bound_creator_profile_id")
+  boundCreatorWorkspace   CreatorWorkspace?                     @relation("ContinuationBoundWorkspace", fields: [boundCreatorWorkspaceId, boundCreatorProfileId], references: [id, ownerProfileId], onDelete: Restrict, onUpdate: Restrict)
+  createdAt               DateTime                              @default(now()) @map("created_at")
+  expiresAt               DateTime                              @map("expires_at")
+  consumedAt              DateTime?                             @map("consumed_at")
 
   @@index([campaignId])
+  @@index([campaignShareId])
+  @@index([campaignInvitationId])
+  @@index([firstQualifiedTouchId])
   @@index([boundUserId])
+  @@index([boundCreatorWorkspaceId, boundCreatorProfileId])
   @@index([expiresAt, consumedAt])
   @@map("creator_entry_continuations")
 }
@@ -2718,21 +2781,22 @@ model CreatorEntryContinuation {
 /// Canonical read-only Campaign reference to a Brand Centre-owned entity.
 /// Legacy UceCampaignProduct records remain a separate compatibility surface.
 model UceCampaignAsset {
-  id              String                   @id @default(uuid()) @map("campaign_asset_id")
-  campaignId      String                   @map("campaign_id")
-  campaign        UceCampaign              @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  kind            UceCampaignAssetKind
-  status          UceCampaignAssetStatus   @default(ACTIVE)
-  brandProfileId  String?                  @map("brand_profile_id")
-  brandProfile    BrandProfile?            @relation("CampaignAssetBrandProfile", fields: [brandProfileId], references: [id], onDelete: Restrict)
-  offeringId      String?                  @map("offering_id")
-  offering        Offering?                @relation("CampaignAssetOffering", fields: [offeringId], references: [id], onDelete: Restrict)
-  brandOfferId    String?                  @map("brand_offer_id")
-  brandOffer      BrandOffer?              @relation("CampaignAssetBrandOffer", fields: [brandOfferId], references: [id], onDelete: Restrict)
-  createdAt       DateTime                 @default(now()) @map("created_at")
-  updatedAt       DateTime                 @updatedAt @map("updated_at")
-  canonicalBriefs CanonicalCampaignBrief[]
-  applications    UceApplication[]         @relation("CanonicalApplicationAsset")
+  id                      String                   @id @default(uuid()) @map("campaign_asset_id")
+  campaignId              String                   @map("campaign_id")
+  campaign                UceCampaign              @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  kind                    UceCampaignAssetKind
+  status                  UceCampaignAssetStatus   @default(ACTIVE)
+  brandProfileId          String?                  @map("brand_profile_id")
+  brandProfile            BrandProfile?            @relation("CampaignAssetBrandProfile", fields: [brandProfileId], references: [id], onDelete: Restrict)
+  offeringId              String?                  @map("offering_id")
+  offering                Offering?                @relation("CampaignAssetOffering", fields: [offeringId], references: [id], onDelete: Restrict)
+  brandOfferId            String?                  @map("brand_offer_id")
+  brandOffer              BrandOffer?              @relation("CampaignAssetBrandOffer", fields: [brandOfferId], references: [id], onDelete: Restrict)
+  createdAt               DateTime                 @default(now()) @map("created_at")
+  updatedAt               DateTime                 @updatedAt @map("updated_at")
+  canonicalBriefs         CanonicalCampaignBrief[]
+  applications            UceApplication[]         @relation("CanonicalApplicationAsset")
+  applicationDomainEvents ApplicationDomainEvent[] @relation("ApplicationEventAsset")
 
   @@unique([campaignId, id])
   @@unique([campaignId, brandProfileId])
@@ -2766,6 +2830,7 @@ model CanonicalCampaignBrief {
   updatedAt                  DateTime                    @updatedAt @map("updated_at")
   deliverables               CanonicalBriefDeliverable[]
   applications               UceApplication[]            @relation("CanonicalApplicationBrief")
+  applicationDomainEvents    ApplicationDomainEvent[]    @relation("ApplicationEventBrief")
 
   @@unique([campaignAssetId, id])
   @@index([campaignAssetId, status])
@@ -2849,8 +2914,11 @@ model UceApplication {
   actorMembership           CreatorWorkspaceMember?        @relation("ApplicationActorMembership", fields: [actorMembershipId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   actorRole                 CreatorTeamRole?               @map("actor_role")
   campaignInvitationId      String?                        @map("campaign_invitation_id")
+  campaignInvitation        CampaignOpportunityInvitation? @relation("ApplicationInvitation", fields: [campaignId, campaignInvitationId], references: [campaignId, id], onDelete: Restrict, onUpdate: Restrict)
   firstQualifiedTouchId     String?                        @map("first_qualified_touch_id")
+  firstQualifiedTouch       CampaignIngressTouch?          @relation("ApplicationFirstTouch", fields: [campaignId, firstQualifiedTouchId], references: [campaignId, id], onDelete: Restrict, onUpdate: Restrict)
   conversionTouchId         String?                        @map("conversion_touch_id")
+  conversionTouch           CampaignIngressTouch?          @relation("ApplicationConversionTouch", fields: [campaignId, conversionTouchId], references: [campaignId, id], onDelete: Restrict, onUpdate: Restrict)
   status                    UceApplicationStatus           @default(PENDING)
   source                    UceApplicationSource           @default(DIRECT)
   statusVersion             Int                            @default(0) @map("status_version")
@@ -2859,6 +2927,8 @@ model UceApplication {
   supersededByApplication   UceApplication?                @relation("ApplicationSupersession", fields: [supersededByApplicationId], references: [id], onDelete: Restrict)
   supersededApplications    UceApplication[]               @relation("ApplicationSupersession")
   snapshot                  UceApplicationSnapshot?
+  commandReceipts           ApplicationCommandReceipt[]
+  domainEvents              ApplicationDomainEvent[]       @relation("ApplicationEvents")
   appliedAt                 DateTime                       @default(now()) @map("applied_at")
   legacyApprovedAt          DateTime?                      @map("approved_at")
   legacyRejectedAt          DateTime?                      @map("rejected_at")
@@ -2895,6 +2965,132 @@ model UceApplicationSnapshot {
   @@map("uce_application_snapshots")
 }
 
+model CampaignOpportunityInvitation {
+  id                            String                     @id @default(uuid())
+  campaignId                    String                     @map("campaign_id")
+  campaign                      UceCampaign                @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  tokenDigest                   String                     @unique @map("token_digest") @db.Char(64)
+  intendedCreatorProfileId      String?                    @map("intended_creator_profile_id")
+  intendedCreatorProfile        CreatorProfile?            @relation("CampaignInvitationIntendedProfile", fields: [intendedCreatorProfileId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  intendedNativeInstagramIdHmac String?                    @map("intended_native_instagram_id_hmac") @db.Char(64)
+  intendedVerifiedEmailHmac     String?                    @map("intended_verified_email_hmac") @db.Char(64)
+  boundCreatorProfileId         String?                    @map("bound_creator_profile_id")
+  boundCreatorWorkspaceId       String?                    @map("bound_creator_workspace_id")
+  boundCreatorWorkspace         CreatorWorkspace?          @relation("CampaignInvitationBoundWorkspace", fields: [boundCreatorWorkspaceId, boundCreatorProfileId], references: [id, ownerProfileId], onDelete: Restrict, onUpdate: Restrict)
+  issuedByActorUserId           String                     @map("issued_by_actor_user_id")
+  issuedByActorUser             User                       @relation("CampaignInvitationIssuer", fields: [issuedByActorUserId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  issuedAt                      DateTime                   @default(now()) @map("issued_at")
+  expiresAt                     DateTime                   @map("expires_at")
+  revokedAt                     DateTime?                  @map("revoked_at")
+  revokedByActorUserId          String?                    @map("revoked_by_actor_user_id")
+  revokedByActorUser            User?                      @relation("CampaignInvitationRevoker", fields: [revokedByActorUserId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  bindingVersion                Int                        @default(0) @map("binding_version")
+  ingressTouches                CampaignIngressTouch[]     @relation("IngressInvitation")
+  continuations                 CreatorEntryContinuation[] @relation("ContinuationCampaignInvitation")
+  applications                  UceApplication[]           @relation("ApplicationInvitation")
+
+  @@unique([campaignId, id])
+  @@index([campaignId, expiresAt])
+  @@index([intendedCreatorProfileId])
+  @@index([boundCreatorWorkspaceId, boundCreatorProfileId])
+  @@map("campaign_opportunity_invitations")
+}
+
+model CampaignIngressTouch {
+  id                      String                                @id @default(uuid())
+  kind                    CampaignIngressTouchKind
+  referenceDigest         String?                               @unique @map("reference_digest") @db.Char(64)
+  campaignId              String                                @map("campaign_id")
+  campaign                UceCampaign                           @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  entrySurface            CampaignOpportunityEntrySurface       @map("entry_surface")
+  entryAuthorityKind      CampaignOpportunityEntryAuthorityKind @map("entry_authority_kind")
+  campaignShareId         String?                               @map("campaign_share_id")
+  campaignShare           UceCampaignShare?                     @relation("IngressCampaignShare", fields: [campaignId, campaignShareId], references: [campaignId, id], onDelete: Restrict, onUpdate: Restrict)
+  campaignInvitationId    String?                               @map("campaign_invitation_id")
+  campaignInvitation      CampaignOpportunityInvitation?        @relation("IngressInvitation", fields: [campaignId, campaignInvitationId], references: [campaignId, id], onDelete: Restrict, onUpdate: Restrict)
+  boundCreatorProfileId   String?                               @map("bound_creator_profile_id")
+  boundCreatorWorkspaceId String?                               @map("bound_creator_workspace_id")
+  boundCreatorWorkspace   CreatorWorkspace?                     @relation("IngressBoundWorkspace", fields: [boundCreatorWorkspaceId, boundCreatorProfileId], references: [id, ownerProfileId], onDelete: Restrict, onUpdate: Restrict)
+  utmSource               String?                               @map("utm_source") @db.VarChar(100)
+  utmMedium               String?                               @map("utm_medium") @db.VarChar(100)
+  utmCampaign             String?                               @map("utm_campaign") @db.VarChar(100)
+  utmContent              String?                               @map("utm_content") @db.VarChar(200)
+  utmTerm                 String?                               @map("utm_term") @db.VarChar(200)
+  occurredAt              DateTime                              @default(now()) @map("occurred_at")
+  boundAt                 DateTime?                             @map("bound_at")
+  createdAt               DateTime                              @default(now()) @map("created_at")
+  continuations           CreatorEntryContinuation[]            @relation("ContinuationFirstTouch")
+  firstTouchApplications  UceApplication[]                      @relation("ApplicationFirstTouch")
+  conversionApplications  UceApplication[]                      @relation("ApplicationConversionTouch")
+
+  @@unique([campaignId, id])
+  @@index([campaignId, occurredAt])
+  @@index([campaignShareId])
+  @@index([campaignInvitationId])
+  @@index([boundCreatorWorkspaceId, boundCreatorProfileId])
+  @@map("campaign_ingress_touches")
+}
+
+model ApplicationCommandReceipt {
+  id                   String                 @id @default(uuid())
+  commandType          ApplicationCommandType @map("command_type")
+  actorUserId          String                 @map("actor_user_id")
+  actorUser            User                   @relation("ApplicationCommandActor", fields: [actorUserId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  authoritySubjectId   String                 @map("authority_subject_id")
+  idempotencyKeyDigest String                 @map("idempotency_key_digest") @db.Char(64)
+  requestFingerprint   String                 @map("request_fingerprint") @db.Char(64)
+  applicationId        String                 @map("application_id")
+  application          UceApplication         @relation(fields: [applicationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  transitionId         String                 @unique @map("transition_id")
+  transition           ApplicationDomainEvent @relation("CommandReceiptTransition", fields: [transitionId], references: [transitionId], onDelete: Restrict, onUpdate: Restrict)
+  createdAt            DateTime               @default(now()) @map("created_at")
+
+  @@unique([commandType, actorUserId, authoritySubjectId, idempotencyKeyDigest], map: "application_command_receipts_scope_key")
+  @@index([applicationId, createdAt])
+  @@map("application_command_receipts")
+}
+
+model ApplicationDomainEvent {
+  id                        String                     @id @default(uuid())
+  transitionId              String                     @unique @map("transition_id")
+  applicationId             String                     @map("application_id")
+  application               UceApplication             @relation("ApplicationEvents", fields: [applicationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  applicationVersion        Int                        @map("application_version")
+  eventName                 ApplicationDomainEventName @map("event_name")
+  eventVersion              Int                        @default(1) @map("event_version")
+  occurredAt                DateTime                   @default(now()) @map("occurred_at")
+  fromStatus                UceApplicationStatus?      @map("from_status")
+  toStatus                  UceApplicationStatus       @map("to_status")
+  actorClass                ApplicationEventActorClass @map("actor_class")
+  actorUserId               String?                    @map("actor_user_id")
+  actorUser                 User?                      @relation("ApplicationEventActorUser", fields: [actorUserId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  actorMembershipId         String?                    @map("actor_membership_id")
+  actorMembership           CreatorWorkspaceMember?    @relation("ApplicationEventActorMembership", fields: [actorMembershipId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  actorRole                 CreatorTeamRole?           @map("actor_role")
+  subjectCreatorProfileId   String                     @map("subject_creator_profile_id")
+  subjectCreatorWorkspaceId String                     @map("subject_creator_workspace_id")
+  subjectCreatorWorkspace   CreatorWorkspace           @relation("ApplicationEventSubjectWorkspace", fields: [subjectCreatorWorkspaceId, subjectCreatorProfileId], references: [id, ownerProfileId], onDelete: Restrict, onUpdate: Restrict)
+  brandProfileId            String                     @map("brand_profile_id")
+  brandProfile              BrandProfile               @relation("ApplicationEventBrand", fields: [brandProfileId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  campaignId                String                     @map("campaign_id")
+  campaign                  UceCampaign                @relation("ApplicationEventCampaign", fields: [campaignId, brandProfileId], references: [id, brandProfileId], onDelete: Restrict, onUpdate: Restrict)
+  canonicalCampaignAssetId  String                     @map("canonical_campaign_asset_id")
+  canonicalCampaignAsset    UceCampaignAsset           @relation("ApplicationEventAsset", fields: [campaignId, canonicalCampaignAssetId], references: [campaignId, id], onDelete: Restrict, onUpdate: Restrict)
+  canonicalBriefId          String                     @map("canonical_brief_id")
+  canonicalBrief            CanonicalCampaignBrief     @relation("ApplicationEventBrief", fields: [canonicalCampaignAssetId, canonicalBriefId], references: [campaignAssetId, id], onDelete: Restrict, onUpdate: Restrict)
+  approvedCollaborationId   String?                    @map("approved_collaboration_id")
+  commandReceipt            ApplicationCommandReceipt? @relation("CommandReceiptTransition")
+  createdAt                 DateTime                   @default(now()) @map("created_at")
+
+  @@unique([applicationId, applicationVersion])
+  @@index([applicationId, occurredAt])
+  @@index([campaignId, occurredAt])
+  @@index([subjectCreatorWorkspaceId, occurredAt])
+  @@index([brandProfileId, occurredAt])
+  @@index([actorMembershipId])
+  @@map("application_domain_events")
+}
+
 model UceCampaignShare {
   id             String                          @id @default(uuid())
   requestId      String                          @unique @map("request_id")
@@ -2903,9 +3099,12 @@ model UceCampaignShare {
   channel        UceCampaignShareChannel
   trackingToken  String                          @unique @map("tracking_token")
   trackingEvents UceCampaignShareTrackingEvent[]
+  ingressTouches CampaignIngressTouch[]          @relation("IngressCampaignShare")
+  continuations  CreatorEntryContinuation[]      @relation("ContinuationCampaignShare")
   initiatedAt    DateTime                        @default(now()) @map("initiated_at")
   createdAt      DateTime                        @default(now()) @map("created_at")
 
+  @@unique([campaignId, id])
   @@index([campaignId, initiatedAt])
   @@map("uce_campaign_shares")
 }
@@ -3316,22 +3515,23 @@ model CreatorProfile {
   createdAt                  DateTime @default(now()) @map("created_at")
   updatedAt                  DateTime @updatedAt @map("updated_at")
 
-  bankDetails               CreatorBankDetails[]
-  shippingAddresses         CreatorShippingAddress[]
-  legalProfile              CreatorLegalProfile?
-  payoutDestinations        CreatorPayoutDestination[]
-  settlementProfile         CreatorSettlementProfile?
-  payoutProfile             CreatorPayoutProfile?
-  payoutObligations         CreatorPayoutObligation[]
-  ownedWorkspaces           CreatorWorkspace[]              @relation("CreatorWorkspaceOwner")
-  workspaceSeats            CreatorWorkspaceMember[]        @relation("CreatorWorkspaceMemberProfile")
-  socialIntegrations        CreatorSocialIntegration[]
-  providerOAuthTransactions ProviderOAuthTransaction[]
-  coPilotThreads            CreatorCoPilotThread[]
-  coPilotMessageFeedback    CreatorCoPilotMessageFeedback[]
-  coPilotInteractionLogs    CreatorCoPilotInteractionLog[]
-  uceCollaborations         UceCampaignCollaboration[]
-  campaignCreators          UceCampaignCreator[]
+  bankDetails                 CreatorBankDetails[]
+  shippingAddresses           CreatorShippingAddress[]
+  legalProfile                CreatorLegalProfile?
+  payoutDestinations          CreatorPayoutDestination[]
+  settlementProfile           CreatorSettlementProfile?
+  payoutProfile               CreatorPayoutProfile?
+  payoutObligations           CreatorPayoutObligation[]
+  ownedWorkspaces             CreatorWorkspace[]              @relation("CreatorWorkspaceOwner")
+  workspaceSeats              CreatorWorkspaceMember[]        @relation("CreatorWorkspaceMemberProfile")
+  socialIntegrations          CreatorSocialIntegration[]
+  providerOAuthTransactions   ProviderOAuthTransaction[]
+  coPilotThreads              CreatorCoPilotThread[]
+  coPilotMessageFeedback      CreatorCoPilotMessageFeedback[]
+  coPilotInteractionLogs      CreatorCoPilotInteractionLog[]
+  uceCollaborations           UceCampaignCollaboration[]
+  campaignCreators            UceCampaignCreator[]
+  intendedCampaignInvitations CampaignOpportunityInvitation[] @relation("CampaignInvitationIntendedProfile")
 
   @@map("creator_profiles")
 }
@@ -3558,29 +3758,34 @@ model CreatorWorkspace {
   createdAt               DateTime       @default(now()) @map("created_at")
   updatedAt               DateTime       @updatedAt @map("updated_at")
 
-  members             CreatorWorkspaceMember[]
-  invitations         CreatorWorkspaceInvitation[]
-  subjectApplications UceApplication[]             @relation("ApplicationSubjectWorkspace")
+  members                  CreatorWorkspaceMember[]
+  invitations              CreatorWorkspaceInvitation[]
+  subjectApplications      UceApplication[]                @relation("ApplicationSubjectWorkspace")
+  boundCampaignInvitations CampaignOpportunityInvitation[] @relation("CampaignInvitationBoundWorkspace")
+  boundIngressTouches      CampaignIngressTouch[]          @relation("IngressBoundWorkspace")
+  boundEntryContinuations  CreatorEntryContinuation[]      @relation("ContinuationBoundWorkspace")
+  applicationDomainEvents  ApplicationDomainEvent[]        @relation("ApplicationEventSubjectWorkspace")
 
   @@unique([id, ownerProfileId])
   @@map("creator_workspaces")
 }
 
 model CreatorWorkspaceMember {
-  id                       String           @id @default(uuid())
-  workspaceId              String           @map("workspace_id")
-  workspace                CreatorWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  assignedProfileId        String?          @map("assigned_profile_id")
-  assignedProfile          CreatorProfile?  @relation("CreatorWorkspaceMemberProfile", fields: [assignedProfileId], references: [id], onDelete: SetNull)
-  userId                   String?          @map("user_id")
-  user                     User?            @relation("CreatorWorkspaceMemberUser", fields: [userId], references: [id], onDelete: SetNull)
-  associatedEmail          String           @map("associated_email") @db.VarChar(255)
-  securityRole             CreatorTeamRole  @default(ASSISTANT) @map("security_role_token")
-  isActive                 Boolean          @default(true) @map("is_active_active")
-  joinedAt                 DateTime?        @map("joined_at")
-  createdAt                DateTime         @default(now()) @map("created_at")
-  updatedAt                DateTime         @updatedAt @map("updated_at")
-  applicationActorEvidence UceApplication[] @relation("ApplicationActorMembership")
+  id                       String                   @id @default(uuid())
+  workspaceId              String                   @map("workspace_id")
+  workspace                CreatorWorkspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assignedProfileId        String?                  @map("assigned_profile_id")
+  assignedProfile          CreatorProfile?          @relation("CreatorWorkspaceMemberProfile", fields: [assignedProfileId], references: [id], onDelete: SetNull)
+  userId                   String?                  @map("user_id")
+  user                     User?                    @relation("CreatorWorkspaceMemberUser", fields: [userId], references: [id], onDelete: SetNull)
+  associatedEmail          String                   @map("associated_email") @db.VarChar(255)
+  securityRole             CreatorTeamRole          @default(ASSISTANT) @map("security_role_token")
+  isActive                 Boolean                  @default(true) @map("is_active_active")
+  joinedAt                 DateTime?                @map("joined_at")
+  createdAt                DateTime                 @default(now()) @map("created_at")
+  updatedAt                DateTime                 @updatedAt @map("updated_at")
+  applicationActorEvidence UceApplication[]         @relation("ApplicationActorMembership")
+  applicationDomainEvents  ApplicationDomainEvent[] @relation("ApplicationEventActorMembership")
 
   @@unique([workspaceId, associatedEmail])
   @@index([associatedEmail, isActive])

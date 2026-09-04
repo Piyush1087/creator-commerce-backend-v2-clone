@@ -5,6 +5,8 @@ const parsed = databaseUrl ? new URL(databaseUrl) : null;
 const allowedDatabases = new Set([
   "/c03_p11b_upgrade74",
   "/c03_p11b_upgrade75",
+  "/c03_p11c_upgrade74",
+  "/c03_p11c_upgrade76",
 ]);
 if (
   !parsed ||
