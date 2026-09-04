@@ -17,7 +17,7 @@ Status vocabulary: `PASS` / `FIXED` / `GENUINE_AUTHORITY_CONFLICT` / `ENVIRONMEN
 
 | Repo | Branch | SHA |
 |---|---|---|
-| Backend | `feature/c01-c05-creator-integration` | `756162b71011dd23302a8c34e46b701edfc424e8` |
+| Backend | `feature/c01-c05-creator-integration` | `54825343c0ba07a41fb0219dffea321445fec8fa` |
 | Frontend | `feature/c01-c05-creator-integration` | `11cb12b635806983d2f2b2d8ca4b8b3b61da1f43` |
 
 Logs: `docs/handoff-audit/.logs/recon-pass2-*` (local only, not committed)
