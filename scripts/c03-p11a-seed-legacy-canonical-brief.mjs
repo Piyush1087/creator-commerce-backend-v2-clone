@@ -23,7 +23,7 @@ try {
   await prisma.$transaction(async (tx) => {
     await tx.$executeRawUnsafe(
       `INSERT INTO brand_profiles
-        (id, domain, name, industry, brand_values, policy_flags, created_at, updated_at)
+        (id, domain, brand_name, industry, brand_values, policy_flags, created_at, updated_at)
        VALUES ($1, $2, $3, $4, ARRAY[]::text[], ARRAY[]::text[], NOW(), NOW())`,
       ids.brand,
       "c03-p11a-upgrade.example.test",
