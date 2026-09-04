@@ -30,10 +30,10 @@ describe.skipIf(process.env.C03_P11D_DATABASE_TEST !== "true")(
       transactionOptions: { maxWait: 10_000, timeout: 15_000 },
     });
     const lockService = new CampaignLifecycleLockService();
-    const brandIds = [randomUUID(), randomUUID()];
-    const campaignIds = [randomUUID(), randomUUID()];
-    const assetIds = [randomUUID(), randomUUID()];
-    const briefIds = [randomUUID(), randomUUID()];
+    const brandIds = Array.from({ length: 6 }, () => randomUUID());
+    const campaignIds = Array.from({ length: 6 }, () => randomUUID());
+    const assetIds = Array.from({ length: 6 }, () => randomUUID());
+    const briefIds = Array.from({ length: 6 }, () => randomUUID());
     const creatorOrganizationId = randomUUID();
     const creatorUserId = randomUUID();
     const creatorProfileId = randomUUID();
@@ -245,12 +245,17 @@ describe.skipIf(process.env.C03_P11D_DATABASE_TEST !== "true")(
       await createCanonicalApplication(
         snapshotFirstApplicationId,
         "SNAPSHOT_FIRST",
+        0,
       );
-      await createCanonicalApplication(eventFirstApplicationId, "EVENT_FIRST");
+      await createCanonicalApplication(
+        eventFirstApplicationId,
+        "EVENT_FIRST",
+        1,
+      );
       await createCanonicalApplication(
         terminalApplicationId,
         "SNAPSHOT_FIRST",
-        1,
+        2,
       );
     });
 
@@ -272,15 +277,15 @@ describe.skipIf(process.env.C03_P11D_DATABASE_TEST !== "true")(
       await expect(
         prisma.$transaction(async (tx) => {
           const id = randomUUID();
-          await insertApplication(tx, id);
-          await insertSubmittedEvent(tx, id);
+          await insertApplication(tx, id, 3);
+          await insertSubmittedEvent(tx, id, 3);
         }),
       ).rejects.toThrow(/C03_CANONICAL_APPLICATION_REQUIRES_ONE_SNAPSHOT/);
 
       await expect(
         prisma.$transaction(async (tx) => {
           const id = randomUUID();
-          await insertApplication(tx, id);
+          await insertApplication(tx, id, 4);
           await insertSnapshot(tx, id);
         }),
       ).rejects.toThrow(/C03_CANONICAL_APPLICATION_REQUIRES_MATCHING_EVENT/);
@@ -289,7 +294,7 @@ describe.skipIf(process.env.C03_P11D_DATABASE_TEST !== "true")(
     it("rejects invalid submission actors and immutable identity/version mutation", async () => {
       await expect(
         prisma.$transaction(async (tx) => {
-          await insertApplication(tx, randomUUID(), 0, brandActorUserId);
+          await insertApplication(tx, randomUUID(), 5, brandActorUserId);
         }),
       ).rejects.toThrow(/C03_APPLICATION_ACTOR_EVIDENCE_INVALID/);
 
@@ -386,10 +391,10 @@ describe.skipIf(process.env.C03_P11D_DATABASE_TEST !== "true")(
             actorRole: CreatorTeamRole.OWNER,
             subjectCreatorProfileId: creatorProfileId,
             subjectCreatorWorkspaceId: creatorWorkspaceId,
-            brandProfileId: brandIds[1],
-            campaignId: campaignIds[1],
-            canonicalCampaignAssetId: assetIds[1],
-            canonicalBriefId: briefIds[1],
+            brandProfileId: brandIds[2],
+            campaignId: campaignIds[2],
+            canonicalCampaignAssetId: assetIds[2],
+            canonicalBriefId: briefIds[2],
           },
         });
       });
