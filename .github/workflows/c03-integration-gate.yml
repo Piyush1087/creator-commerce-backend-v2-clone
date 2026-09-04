@@ -33,37 +33,7 @@ jobs:
           --health-retries 20
     env:
       STAGE: local
-      PORT: "3303"
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c05_c03_p0?schema=public
-      C01_I5_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c01_i5_c03_p0?schema=public
-      C05_TEAM_DATABASE_TEST: "true"
-      PLAYWRIGHT_ENABLED: "false"
-      SETTINGS_FIELD_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
-      JWT_SECRET: c03-p0-non-secret-runtime-proof
-      JWT_SECRET_DEV: c03-p0-non-secret-runtime-proof
-      JWT_SECRET_PROD: c03-p0-non-secret-runtime-proof
-      JWT_ISSUER: creatorshop-c03-p0
-      JWT_AUDIENCE: creatorshop-c03-p0
-      AUTH_OTP_PEPPER: c03-p0-non-secret-runtime-proof
-      AUTH_OTP_PEPPER_DEV: c03-p0-non-secret-runtime-proof
-      AUTH_OTP_PEPPER_PROD: c03-p0-non-secret-runtime-proof
-      POSTMARK_SERVER_TOKEN: c03-p0-runtime-proof
-      POSTMARK_OTP_TEMPLATE_ID: "1"
-      POSTMARK_AUTH_OTP_TEMPLATE_ID: "1"
-      POSTMARK_PASSWORD_RESET_TEMPLATE_ID: "1"
-      POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID: "1"
-      APP_FRONTEND_URL: http://127.0.0.1:5303
-      GEMINI_API_KEY: c03-p0-runtime-proof
-      OPENAI_API_KEY: c03-p0-runtime-proof
-      ZYTE_API_KEY: c03-p0-runtime-proof
-      INSTAGRAM_API_ID: c03-p0-runtime-proof
-      INSTAGRAM_APP_SECRET: c03-p0-runtime-proof
-      CREATOR_INSTAGRAM_REDIRECT_URI: https://dashboard.dev.thecreatorshop.in/creator-marketplace/callback
-      RAZORPAY_API_KEY_ID: c03-p0-runtime-proof
-      RAZORPAY_API_KEY_SECRET: c03-p0-runtime-proof
-      RAZORPAY_WEBHOOK_SECRET: c03-p0-runtime-proof
-      S3_BUCKET_NAME: creatorshop-c03-p0-local
-      AWS_REGION: ap-south-1
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c03_p0?schema=public
     steps:
       - uses: actions/checkout@v4
 
@@ -102,6 +72,10 @@ jobs:
           PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p0_legacy -v ON_ERROR_STOP=1 -c "select (select count(*) from uce_campaigns) as campaigns, (select count(*) from uce_applications) as applications, (select count(*) from uce_application_snapshots) as snapshots, (select count(*) from uce_campaign_collaborations) as legacy_collaborations, (select count(*) from collaborations) as workflow_collaborations"
 
       - name: Relevant real-PostgreSQL baseline
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c05_c03_p0?schema=public
+          C01_I5_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c01_i5_c03_p0?schema=public
+          C05_TEAM_DATABASE_TEST: "true"
         run: |
           npx vitest run --config vitest.config.ts \
             src/features/creator-entry/creator-campaign-apply-continuation.postgres.test.ts \
@@ -119,6 +93,35 @@ jobs:
           npm run build
 
       - name: Backend startup smoke
+        env:
+          PORT: "3303"
+          PLAYWRIGHT_ENABLED: "false"
+          SETTINGS_FIELD_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          JWT_SECRET: c03-p0-non-secret-runtime-proof
+          JWT_SECRET_DEV: c03-p0-non-secret-runtime-proof
+          JWT_SECRET_PROD: c03-p0-non-secret-runtime-proof
+          JWT_ISSUER: creatorshop-c03-p0
+          JWT_AUDIENCE: creatorshop-c03-p0
+          AUTH_OTP_PEPPER: c03-p0-non-secret-runtime-proof
+          AUTH_OTP_PEPPER_DEV: c03-p0-non-secret-runtime-proof
+          AUTH_OTP_PEPPER_PROD: c03-p0-non-secret-runtime-proof
+          POSTMARK_SERVER_TOKEN: c03-p0-runtime-proof
+          POSTMARK_OTP_TEMPLATE_ID: "1"
+          POSTMARK_AUTH_OTP_TEMPLATE_ID: "1"
+          POSTMARK_PASSWORD_RESET_TEMPLATE_ID: "1"
+          POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID: "1"
+          APP_FRONTEND_URL: http://127.0.0.1:5303
+          GEMINI_API_KEY: c03-p0-runtime-proof
+          OPENAI_API_KEY: c03-p0-runtime-proof
+          ZYTE_API_KEY: c03-p0-runtime-proof
+          INSTAGRAM_API_ID: c03-p0-runtime-proof
+          INSTAGRAM_APP_SECRET: c03-p0-runtime-proof
+          CREATOR_INSTAGRAM_REDIRECT_URI: https://dashboard.dev.thecreatorshop.in/creator-marketplace/callback
+          RAZORPAY_API_KEY_ID: c03-p0-runtime-proof
+          RAZORPAY_API_KEY_SECRET: c03-p0-runtime-proof
+          RAZORPAY_WEBHOOK_SECRET: c03-p0-runtime-proof
+          S3_BUCKET_NAME: creatorshop-c03-p0-local
+          AWS_REGION: ap-south-1
         run: |
           npm run start:prod >/tmp/c03-p0-api.log 2>&1 &
           api_pid=$!
