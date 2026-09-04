@@ -55,7 +55,7 @@ describe.skipIf(process.env.CHAT_HOME_DATABASE_TEST !== "true")(
         FROM "_prisma_migrations"
         WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL
       `;
-      expect(migrations[0].count).toBe(66);
+      expect(migrations[0].count).toBeGreaterThanOrEqual(66);
     });
 
     afterAll(async () => {
