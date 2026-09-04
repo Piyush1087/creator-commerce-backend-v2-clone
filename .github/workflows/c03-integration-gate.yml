@@ -36,6 +36,8 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c03_p0?schema=public
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -44,9 +46,14 @@ jobs:
 
       - name: Runtime and immutable base identity
         run: |
+          expected_base=4c5f42858b950b7cd342f8972f99f548f3daa942
+          remote_base=$(git ls-remote origin refs/heads/development | cut -f 1)
+          test "$remote_base" = "$expected_base"
+          git merge-base --is-ancestor "$expected_base" HEAD
+          test -z "$(git status --porcelain)"
           node --version
           npm --version
-          echo "base=4c5f42858b950b7cd342f8972f99f548f3daa942"
+          echo "base=$expected_base"
           echo "lock_sha256=$(sha256sum package-lock.json | cut -d ' ' -f 1)"
           echo "migration_count=$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
 
@@ -66,10 +73,14 @@ jobs:
 
       - name: Disposable legacy-shaped reconnaissance
         run: |
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p0_legacy?schema=public node scripts/c03-p0-seed-legacy-fixture.mjs
           legacy_tables=$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p0_legacy -Atc "select count(*) from pg_catalog.pg_tables where schemaname = 'public' and tablename in ('uce_campaigns','uce_campaign_assets','campaign_briefs','uce_campaign_briefs','uce_applications','uce_application_snapshots','uce_campaign_collaborations','collaborations','notifications')")
           test "$legacy_tables" = "9"
           PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p0_legacy -v ON_ERROR_STOP=1 -c "select table_name, column_name, data_type from information_schema.columns where table_schema = 'public' and table_name in ('uce_campaigns','uce_campaign_assets','campaign_briefs','uce_campaign_briefs','uce_applications','uce_application_snapshots','uce_campaign_collaborations','collaborations','notifications') order by table_name, ordinal_position"
-          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p0_legacy -v ON_ERROR_STOP=1 -c "select (select count(*) from uce_campaigns) as campaigns, (select count(*) from uce_applications) as applications, (select count(*) from uce_application_snapshots) as snapshots, (select count(*) from uce_campaign_collaborations) as legacy_collaborations, (select count(*) from collaborations) as workflow_collaborations"
+          legacy_counts=$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p0_legacy -Atc "select concat_ws('|', (select count(*) from uce_campaigns), (select count(*) from uce_applications), (select count(*) from uce_application_snapshots), (select count(*) from uce_campaign_collaborations), (select count(*) from collaborations), (select count(*) from uce_campaign_assets), (select count(*) from campaign_briefs))")
+          test "$legacy_counts" = "1|1|1|1|0|0|0"
+          legacy_assumption_rows=$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p0_legacy -Atc "select count(*) from uce_applications a join uce_campaign_creators cc on cc.id = a.campaign_creator_id join uce_campaign_products p on p.product_id = a.campaign_asset_id join uce_campaign_briefs b on b.brief_id = a.brief_id join uce_campaign_commercials c on c.campaign_id = a.campaign_id join uce_campaign_targeting t on t.campaign_id = a.campaign_id join uce_campaign_collaborations lc on lc.campaign_id = a.campaign_id and lc.instagram_handle = cc.social_handle where cc.creator_profile_id is null and b.product_id is null and a.status = 'PENDING' and a.source = 'DIRECT' and p.inventory_count = 0 and c.compensation_type = 'NEGOTIABLE' and c.negotiable_min_fee = 0 and c.negotiable_max_fee = 0 and c.advance_payment_percentage = 30 and t.visibility_scopes @> ARRAY['EVERYONE', 'ELIGIBLE_ONLY']::\"UceVisibilityScope\"[] and cardinality(t.visibility_scopes) = 2 and lc.invitation_token is not null")
+          test "$legacy_assumption_rows" = "1"
 
       - name: Relevant real-PostgreSQL baseline
         env:
@@ -139,3 +150,8 @@ jobs:
             sed -n '1,240p' /tmp/c03-p0-api.log
             exit 1
           fi
+
+      - name: Final repository integrity
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
