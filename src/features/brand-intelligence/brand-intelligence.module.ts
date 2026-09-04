@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 import { ServiceabilityProcessorExecutor } from "./processors/serviceability/serviceability-processor.executor";
 import { ServiceabilityPersistenceHook } from "./processors/serviceability/serviceability-persistence.hook";
 import { ServiceabilityStateRepository } from "./processors/serviceability/serviceability-state.repository";
@@ -217,7 +217,7 @@ const internalProviders = [
   imports: [
     DataExtractionModule,
     BrandCanonicalStateModule,
-    NotificationsModule,
+    forwardRef(() => NotificationsModule),
   ],
   providers: internalProviders,
   exports: internalProviders,

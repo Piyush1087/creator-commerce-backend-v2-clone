@@ -46,23 +46,22 @@ Production remains **blocked** until `PRODUCTION_RELEASE_AUTHORIZED` + exact SHA
 | `migration_history` | **PASS** | Local disposable rehearse: **74** migrations applied (`chat_home_integ` etc.) |
 | `backend_build` | **PASS** | `nest build` |
 | `backend_targeted` | **PASS** | Unit 152; self-seed postgres 8; workspace auth postgres 11 |
-| `backend_full_suite` | **ENVIRONMENT_BLOCKED** | Not required for candidate; scoped evidence used. Optional later |
+| `backend_full_suite` | **FAIL** (local) | 15 failed / 1209 passed; failures not Chat/Home suites — see test-results B8. Do **not** claim PASS |
 | `frontend_targeted` | **PASS** | 105 Chat/Home scoped |
-| `frontend_full_suite` | **ENVIRONMENT_BLOCKED** | Not run; scoped + build used |
+| `frontend_full_suite` | **FAIL** (local) | 23 failed / 816 passed; failing files are auth/onboarding/billing — see test-results F4 |
 | `production_builds` | **PASS** | FE `npm run build`; BE nest build |
 | `cross_brand_authorization` | **PASS** | Workspace auth unit + postgres |
 | `p7_c1_boundary` | **PASS** | `resolveBrandProfileIdForWorkspace` vs activity-aware path |
-| `breaker` | **NONE** | No Product/security authority conflict |
+| `breaker` | **NONE** | No Product/security authority conflict; Nest boot circular-dep **FIXED** with forwardRef |
 
-### Named ENVIRONMENT_BLOCKED (not Product fails)
+### Named ENVIRONMENT_BLOCKED / open (not Product fails)
 
 | Item | Class |
 |------|-------|
-| P5-A / P5-B postgres (`chat_home_p3_module_boundary_01` fixture rows) | **ENVIRONMENT_BLOCKED** |
-| Intelligence contracts verify CLI (`--source`/`--commit`) | **ENVIRONMENT_BLOCKED** |
-| Local UI smoke | **ENVIRONMENT_BLOCKED** (deferred to Part B D2/D3) |
-
-**`GENUINE_AUTHORITY_CONFLICT`:** none.
+| P5-A / P5-B postgres (no fixture dump) | **ENVIRONMENT_BLOCKED** — ran with flags ON |
+| Intelligence contracts verify (dirty worktree) | **ENVIRONMENT_BLOCKED** |
+| Authenticated local browser Home/Chat smoke | **ENVIRONMENT_BLOCKED** — unauth route smoke PASS; full UI needs Brand session |
+| Dev/prod deploy smoke | **NOT RUN** — hold until merge + deploy auth |
 
 Evidence detail: [`integration-part1-report.md`](./integration-part1-report.md), [`integration-part1-test-results.md`](./integration-part1-test-results.md).
 

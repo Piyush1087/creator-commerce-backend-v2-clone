@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 import { ScheduleModule } from "@nestjs/schedule";
 
 import { PrismaModule } from "../../prisma/prisma.module";
@@ -43,7 +43,7 @@ import { PlannerAggregateWorker } from "./workers/planner-aggregate.worker";
     PrismaModule,
     AuthModule,
     BrandCanonicalStateModule,
-    BrandIntelligenceModule,
+    forwardRef(() => BrandIntelligenceModule),
     DataExtractionModule,
     ScheduleModule,
     SubscriptionCapabilityModule,

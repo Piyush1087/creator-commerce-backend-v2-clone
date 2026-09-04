@@ -59,13 +59,15 @@ Does **not** reopen Product P0–P7. Deferred: Creator Chat, EXECUTE, streaming,
 | 5 | BE Chat/Home unit + architecture | **PASS** | 152 passed (postgres skipped in that run) |
 | 6 | BE self-seeding postgres (conversation + HTTP) | **PASS** | 8/8, skip 0 |
 | 7 | BE workspace auth postgres (P7-C1) | **PASS** | 11/11, skip 0 |
-| 8 | BE P5-A / P5-B fixture postgres | **ENVIRONMENT_BLOCKED** | Empty `chat_home_p3_module_boundary_01` — needs clone acceptance fixture rows (ledger). No checked-in seed script |
-| 9 | FE typecheck | **FIXED** | Was broken by merge drop; restored origin files → `tsc -b` exit 0 |
+| 8 | BE P5-A / P5-B fixture postgres | **ENVIRONMENT_BLOCKED** | Flags ON; no fixture dump / rows |
+| 9 | FE typecheck | **FIXED** | Merge-dropped files restored |
 | 10 | FE Chat/Home scoped vitest | **PASS** | 105/105 |
 | 11 | FE production build | **PASS** | exit 0 |
-| 12 | Intelligence contracts verify CLI | **ENVIRONMENT_BLOCKED** | Script requires `--source`/`--commit`; not blocking architecture evidence |
-| 13 | UI smoke (local) | **ENVIRONMENT_BLOCKED** | Not re-run this pass; Part B covers deployed smoke |
-| 14 | Full BE/FE `npm test` | Not required for Part 1 mail if scoped + builds pass; optional later |
+| 12 | Intelligence contracts verify CLI | **ENVIRONMENT_BLOCKED** | Dirty worktree rejects `--verify` |
+| 13 | Local unauth API + FE shell smoke | **PASS** | health 200; Home/Chat 401; FE 200. Authenticated UI **ENVIRONMENT_BLOCKED** |
+| 14 | Full BE `npm test` | **FAIL** | 15 failed / 1209 passed — not Chat suite; see test-results |
+| 15 | Full FE `npm test` | **FAIL** | 23 failed / 816 passed — auth/onboarding/billing |
+| 16 | Nest local boot (Notifications cycle) | **FIXED** | forwardRef BI↔Notifications↔BrandCentre |
 
 **`GENUINE_AUTHORITY_CONFLICT`:** none.
 
