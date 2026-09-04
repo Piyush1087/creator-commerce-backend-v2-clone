@@ -13,7 +13,7 @@ Status vocabulary: `PASS` / `FIXED` / `GENUINE_AUTHORITY_CONFLICT` / `ENVIRONMEN
 
 | Repo | Branch | SHA |
 |------|--------|-----|
-| Backend | `integration/chat-home-v1` | `0deee06f8eb0dd8b702fc273c6089b0ee35c2281` (+ this results file) |
+| Backend | `integration/chat-home-v1` | `e732a134639baba3a7c48d8768ccc981d6a5a439` |
 | Frontend | `integration/chat-home-v1` | `251048074b46b1edf909a6d734c1f1b31ad5a040` |
 
 Accepted source runtimes (ancestors): BE `00e1299ec2e97497bc6d81aeda808d6edd3b482a` · FE `1cf2e3bd93425f60fb3d40692320078aea567794`
