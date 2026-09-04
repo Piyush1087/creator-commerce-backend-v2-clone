@@ -8,7 +8,7 @@ import {
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IntelligenceCurrentProjectionError } from "./intelligence-current-projection.error";
 import {
-  resolveIntelligenceSubject,
+  findExistingIntelligenceSubject,
   type IntelligenceSubjectSelector,
 } from "../subject/intelligence-subject.resolver";
 
@@ -152,7 +152,7 @@ export interface ProjectionComponentRecord {
 
 export interface ProjectionRepositorySnapshot {
   readonly brandId: string;
-  readonly subjectId: string;
+  readonly subjectId?: string;
   readonly objectSemanticId: string;
   readonly components: readonly ProjectionComponentRecord[];
   readonly evidenceReferences: readonly ProjectionEvidenceReferenceRecord[];
@@ -192,11 +192,20 @@ export class IntelligenceCurrentProjectionRepository {
     subjectSelector?: IntelligenceSubjectSelector,
   ): Promise<ProjectionRepositorySnapshot> {
     try {
-      const subject = await resolveIntelligenceSubject(
+      const subject = await findExistingIntelligenceSubject(
         this.prisma,
         brandId,
         subjectSelector,
       );
+      if (!subject) {
+        return {
+          brandId,
+          objectSemanticId,
+          components: [],
+          evidenceReferences: [],
+          businessStateReferences: [],
+        };
+      }
       return await this.prisma.$transaction(
         async (transaction) => {
           const rows = await transaction.intelligenceCurrentComponent.findMany({

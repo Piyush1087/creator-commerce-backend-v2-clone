@@ -37,6 +37,15 @@ export class ProductConsumerService {
 
   async read(user: AuthUser, offeringId: string) {
     const brandId = await this.auth.resolveBrandProfileId(user);
+    return this.readResolvedProduct(brandId, offeringId);
+  }
+
+  async readForWorkspace(user: AuthUser, offeringId: string) {
+    const brandId = await this.auth.resolveBrandProfileIdForWorkspace(user);
+    return this.readResolvedProduct(brandId, offeringId);
+  }
+
+  private async readResolvedProduct(brandId: string, offeringId: string) {
     const offering = await this.canonicalOfferings.read(brandId, offeringId);
     if (!offering) throw new NotFoundException("Offering not found");
 

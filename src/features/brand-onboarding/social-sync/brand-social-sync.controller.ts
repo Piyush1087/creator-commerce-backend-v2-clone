@@ -9,7 +9,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ThrottlerGuard } from "@nestjs/throttler";
-import { IsEmail, IsNotEmpty, IsOptional, IsString, Length } from "class-validator";
+import { IsEmail, IsNotEmpty, IsString, Length } from "class-validator";
 
 import type { RequestWithAuthUser } from "../../auth/auth.controller";
 import { JwtAuthGuard } from "../../auth/jwt-auth.guard";
@@ -29,6 +29,10 @@ class ConnectInstagramDto {
   @IsString()
   @IsNotEmpty()
   redirectUri!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  state!: string;
 }
 
 class InviteDto {
@@ -65,9 +69,19 @@ class InviteConnectDto {
   @IsNotEmpty()
   redirectUri!: string;
 
-  @IsOptional()
   @IsString()
-  unused?: string;
+  @IsNotEmpty()
+  state!: string;
+}
+
+class InviteOauthUrlQueryDto {
+  @IsString()
+  @IsNotEmpty()
+  token!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  redirectUri!: string;
 }
 
 @Controller("api/v1/brand/social-sync")
@@ -77,20 +91,14 @@ export class BrandSocialSyncController {
 
   @Get("instagram/oauth-url")
   @UseGuards(JwtAuthGuard)
-  oauthUrl(
-    @Req() req: RequestWithAuthUser,
-    @Query() query: OauthUrlQueryDto,
-  ) {
+  oauthUrl(@Req() req: RequestWithAuthUser, @Query() query: OauthUrlQueryDto) {
     return this.socialSync.getOauthUrl(req.user, query.redirectUri);
   }
 
   @Post("instagram/connect")
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
-  connect(
-    @Req() req: RequestWithAuthUser,
-    @Body() body: ConnectInstagramDto,
-  ) {
+  connect(@Req() req: RequestWithAuthUser, @Body() body: ConnectInstagramDto) {
     return this.socialSync.connectInstagram(req.user, body);
   }
 
@@ -126,6 +134,12 @@ export class BrandSocialSyncController {
     return this.socialSync.connectInstagramForInvite(body.token, {
       code: body.code,
       redirectUri: body.redirectUri,
+      state: body.state,
     });
+  }
+
+  @Get("invite/instagram/oauth-url")
+  inviteOauthUrl(@Query() query: InviteOauthUrlQueryDto) {
+    return this.socialSync.getInviteOauthUrl(query.token, query.redirectUri);
   }
 }

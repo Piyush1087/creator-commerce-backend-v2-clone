@@ -10,6 +10,7 @@ import { BrandEscrowModule } from "../brand-escrow/brand-escrow.module";
 import { CollaborationModule } from "../collaboration/collaboration.module";
 import { PricingModule } from "../pricing/pricing.module";
 import { GeminiJsonClient } from "../brand-onboarding/integrations/gemini/gemini-json.client";
+import { CoPilotPersistenceModule } from "./co-pilot-persistence.module";
 
 import { CO_PILOT_AI_MODULES } from "./core/ai-module.contract";
 import { CoPilotModuleRegistry } from "./core/module-registry";
@@ -36,10 +37,6 @@ import { CoPilotResponseGroundingService } from "./services/co-pilot-response-gr
 import { CoPilotScopeRouterService } from "./services/co-pilot-scope-router.service";
 import { CoPilotSlotSessionService } from "./services/co-pilot-slot-session.service";
 import { CoPilotUsageService } from "./services/co-pilot-usage.service";
-import {
-  CoPilotInteractionLogService,
-  CoPilotThreadService,
-} from "./services/co-pilot-thread.service";
 import { BrandCentreCoPilotToolsService } from "./tools/brand-centre.tools";
 import { PlannerCoPilotToolsService } from "./tools/planner.tools";
 import { CoPilotBrandCentreJobService } from "./services/co-pilot-brand-centre-job.service";
@@ -57,11 +54,10 @@ import { EscrowCoPilotToolsService } from "./tools/escrow.tools";
     BrandEscrowModule,
     CollaborationModule,
     PricingModule,
+    CoPilotPersistenceModule,
   ],
   controllers: [CoPilotController],
   providers: [
-    CoPilotThreadService,
-    CoPilotInteractionLogService,
     CoPilotSlotSessionService,
     CoPilotIntentService,
     CoPilotHitlService,
@@ -98,14 +94,7 @@ import { EscrowCoPilotToolsService } from "./tools/escrow.tools";
         campaignList: UceCampaignListAiModule,
         brandCentre: BrandCentreAiModule,
         planner: BrandCentrePlannerAiModule,
-      ) => [
-        escrow,
-        collab,
-        brandSettings,
-        campaignList,
-        brandCentre,
-        planner,
-      ],
+      ) => [escrow, collab, brandSettings, campaignList, brandCentre, planner],
       inject: [
         EscrowAiModule,
         CollaborationAiModule,

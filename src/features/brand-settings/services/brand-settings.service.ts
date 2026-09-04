@@ -37,20 +37,8 @@ import {
   BRAND_SETTINGS_MAX_SEATS,
   BrandSettingsAccessService,
 } from "./brand-settings-access.service";
-
-export const BILLING_REQUIRED_FIELDS = [
-  "legal_entity_name",
-  "legal_entity_type",
-  "billing_country_code",
-  "billing_address",
-] as const;
-
-type BillingReadinessSource = {
-  registeredCompanyName: string | null;
-  legalEntityType: string | null;
-  billingCountryCode: string | null;
-  corporateBillingAddress: string | null;
-} | null;
+import { billingReadiness } from "../billing/billing-readiness";
+export { billingReadiness } from "../billing/billing-readiness";
 
 const CANONICAL_NOTIFICATION_CATEGORIES = [
   [SettingsNotificationCategory.BILLING_SUBSCRIPTION, "Billing & Subscription"],
@@ -535,22 +523,6 @@ export class BrandSettingsService {
   cancelTeamInvitation(user: AuthUser, invitationId: string) {
     return this.team.cancel(user, invitationId);
   }
-}
-
-export function billingReadiness(profile: BillingReadinessSource) {
-  const missingRequiredFields: (typeof BILLING_REQUIRED_FIELDS)[number][] = [];
-  if (!profile?.registeredCompanyName?.trim())
-    missingRequiredFields.push("legal_entity_name");
-  if (!profile?.legalEntityType?.trim())
-    missingRequiredFields.push("legal_entity_type");
-  if (!profile?.billingCountryCode?.trim())
-    missingRequiredFields.push("billing_country_code");
-  if (!profile?.corporateBillingAddress?.trim())
-    missingRequiredFields.push("billing_address");
-  return {
-    is_complete_for_paid_conversion: missingRequiredFields.length === 0,
-    missing_required_fields: missingRequiredFields,
-  };
 }
 
 function splitDisplayName(name: string | null | undefined): {

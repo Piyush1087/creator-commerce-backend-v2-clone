@@ -120,6 +120,7 @@ export function intelligenceField(
   });
   return {
     semanticId: object.objectSemanticId,
+    objectState: object.objectState,
     current:
       object.assembledValue.state === "VALUE"
         ? { kind: "VALUE", value }
@@ -127,6 +128,7 @@ export function intelligenceField(
     readiness: object.consumerReadiness,
     resultReadiness: object.resultReadiness,
     freshness: object.freshness,
+    changedAt: object.changedAt,
     authority: authorityPresentation(object.authority),
     editability: "POLICY_PENDING",
     candidate: candidateNotice(object.candidateSummary),

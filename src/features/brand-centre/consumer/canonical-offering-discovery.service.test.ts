@@ -18,12 +18,23 @@ const user: AuthUser = {
 
 function fixture(rows: readonly Record<string, unknown>[]) {
   const resolveBrandProfileId = vi.fn().mockResolvedValue("brand-a");
+  const resolveBrandProfileIdForWorkspace = vi
+    .fn()
+    .mockResolvedValue("brand-a");
   const findMany = vi.fn().mockResolvedValue(rows);
   const service = new CanonicalOfferingDiscoveryService(
-    { resolveBrandProfileId } as unknown as BrandCentreAuthService,
+    {
+      resolveBrandProfileId,
+      resolveBrandProfileIdForWorkspace,
+    } as unknown as BrandCentreAuthService,
     { offering: { findMany } } as unknown as PrismaService,
   );
-  return { service, resolveBrandProfileId, findMany };
+  return {
+    service,
+    resolveBrandProfileId,
+    resolveBrandProfileIdForWorkspace,
+    findMany,
+  };
 }
 
 describe("canonical Offering discovery", () => {
@@ -87,6 +98,19 @@ describe("canonical Offering discovery", () => {
     const { service, findMany } = fixture([]);
     await expect(service.list(user)).resolves.toEqual({ offerings: [] });
     expect(findMany).toHaveBeenCalledOnce();
+  });
+
+  it("uses workspace resolution without Brand Centre activity", async () => {
+    const {
+      service,
+      resolveBrandProfileId,
+      resolveBrandProfileIdForWorkspace,
+    } = fixture([]);
+    await expect(service.listForWorkspace(user)).resolves.toEqual({
+      offerings: [],
+    });
+    expect(resolveBrandProfileIdForWorkspace).toHaveBeenCalledWith(user);
+    expect(resolveBrandProfileId).not.toHaveBeenCalled();
   });
 
   it("fails closed if persistence violates the resolved-state predicate", async () => {

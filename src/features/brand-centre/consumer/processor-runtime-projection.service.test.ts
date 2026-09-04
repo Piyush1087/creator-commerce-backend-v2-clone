@@ -42,6 +42,32 @@ const current = (
   }) as CurrentIntelligenceObjectProjection;
 
 describe("processor-scoped Brand runtime projection", () => {
+  it("returns idle no-current runtime without creating a missing subject", async () => {
+    const create = vi.fn();
+    const findFirst = vi.fn();
+    const service = new ProcessorRuntimeProjectionService({
+      intelligenceSubject: {
+        findUnique: async () => null,
+        create,
+      },
+      intelligenceProcessorExecution: { findFirst },
+    } as unknown as PrismaService);
+
+    const projection = await service.read("brand", []);
+
+    expect(create).not.toHaveBeenCalled();
+    expect(findFirst).not.toHaveBeenCalled();
+    expect(Object.keys(projection)).toEqual(BRAND_PROCESSOR_IDS);
+    expect(
+      Object.values(projection).every(
+        (entry) =>
+          entry.activity === "IDLE" &&
+          entry.readiness === "UNKNOWN" &&
+          !entry.hasCurrent,
+      ),
+    ).toBe(true);
+  });
+
   it("projects all seven independently without fabricating a dependency cause", async () => {
     const rows = new Map<string, Row | null>([
       ["brand_communication", row("COMPLETED")],

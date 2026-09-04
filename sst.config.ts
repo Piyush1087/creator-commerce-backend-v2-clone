@@ -180,7 +180,8 @@ export default $config({
       PARALLEL_SEARCH_MAX_CHARS_TOTAL:
         process.env.PARALLEL_SEARCH_MAX_CHARS_TOTAL ?? "24000",
       GEMINI_API_KEY: process.env.GEMINI_API_KEY as string,
-      GEMINI_MODEL: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+      // Chat Home default; override via GEMINI_MODEL in deploy .env.
+      GEMINI_MODEL: process.env.GEMINI_MODEL ?? "gemini-3.5-flash",
       GATEKEEPER_GEMINI_MODEL:
         process.env.GATEKEEPER_GEMINI_MODEL ??
         process.env.GEMINI_MODEL ??

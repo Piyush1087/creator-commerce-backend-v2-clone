@@ -34,8 +34,17 @@ export class BrandConsumerService {
   ) {}
 
   async read(user: AuthUser) {
-    // Brand selection is exclusively derived from the authenticated organization.
     const brandId = await this.auth.resolveBrandProfileId(user);
+    return this.readResolvedBrand(brandId);
+  }
+
+  async readForWorkspace(user: AuthUser) {
+    const brandId = await this.auth.resolveBrandProfileIdForWorkspace(user);
+    return this.readResolvedBrand(brandId);
+  }
+
+  private async readResolvedBrand(brandId: string) {
+    // Brand selection is exclusively derived from the authenticated organization.
     const [anchors, visual, locations, objects] = await Promise.all([
       this.canonical.read({
         brandId,

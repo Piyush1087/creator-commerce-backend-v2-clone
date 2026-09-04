@@ -12,6 +12,7 @@ import { ThrottlerGuard } from "@nestjs/throttler";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { Reflector } from "@nestjs/core";
+import { AuthSessionService } from "../../auth/auth-session.service";
 import { JwtAuthGuard } from "../../auth/jwt-auth.guard";
 import type { INestApplication } from "@nestjs/common";
 import type { PrismaService } from "../../../prisma/prisma.service";
@@ -80,6 +81,12 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
     let baseUrl: string;
     const secret = randomBytes(32).toString("hex");
     const jwt = new JwtService({ secret });
+    const config = new ConfigService({
+      JWT_SECRET: secret,
+      JWT_ISSUER: "creator-shop-brand-consumer-test",
+      JWT_AUDIENCE: "creator-shop-brand-consumer-test-client",
+    });
+    const sessions = new AuthSessionService(db, jwt, config);
 
     async function brand() {
       const org = await prisma.organization.create({
@@ -100,9 +107,27 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         id: randomUUID(),
         organizationId: org.id,
         role: "BRAND",
-        email: "test@example.test",
+        email: `${randomUUID()}@example.test`,
         name: "Test",
       };
+      await prisma.user.create({
+        data: {
+          id: user.id,
+          organizationId: org.id,
+          role: "BRAND",
+          authState: "ACTIVE",
+          email: user.email,
+          name: user.name,
+          emailVerifiedAt: new Date(),
+        },
+      });
+      await prisma.brandTeamMember.create({
+        data: {
+          brandProfileId: b.id,
+          userId: user.id,
+          role: "BRAND_OWNER",
+        },
+      });
       return { b, user };
     }
 
@@ -373,7 +398,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         ),
       );
       // Use real JWT verification and the real ownership service; only rate limiting is irrelevant here.
-      new JwtStrategy(new ConfigService({ JWT_SECRET: secret }));
+      new JwtStrategy(config, sessions);
       Reflect.defineMetadata(
         "design:paramtypes",
         [BrandConsumerService],
@@ -648,7 +673,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         },
       );
 
-      const token = jwt.sign({ sub: user.id, ...user });
+      const { accessToken: token } = await sessions.create(user.id);
       const response = await fetch(`${baseUrl}/api/v1/brand-centre/brand`, {
         headers: { authorization: `Bearer ${token}` },
       });
@@ -858,10 +883,10 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
       expect((await fetch(`${baseUrl}/api/v1/brand-centre/brand`)).status).toBe(
         401,
       );
-      const token = (user: AuthUser) => jwt.sign({ sub: user.id, ...user });
+      const { accessToken: token } = await sessions.create(a.user.id);
       const response = await fetch(
         `${baseUrl}/api/v1/brand-centre/brand?brandId=${b.b.id}`,
-        { headers: { authorization: `Bearer ${token(a.user)}` } },
+        { headers: { authorization: `Bearer ${token}` } },
       );
       expect(response.status).toBe(200);
       const result = await response.json();
@@ -874,17 +899,41 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         "secret.png",
       ])
         expect(JSON.stringify(result)).not.toContain(forbidden);
-      const denied = await fetch(`${baseUrl}/api/v1/brand-centre/brand`, {
-        headers: {
-          authorization: `Bearer ${token({ ...a.user, role: "CREATOR" })}`,
+      const creatorId = randomUUID();
+      await prisma.user.create({
+        data: {
+          id: creatorId,
+          role: "CREATOR",
+          authState: "ACTIVE",
+          email: `${randomUUID()}@example.test`,
+          name: "Creator",
+          emailVerifiedAt: new Date(),
         },
       });
+      const { accessToken: creatorToken } = await sessions.create(creatorId);
+      const denied = await fetch(`${baseUrl}/api/v1/brand-centre/brand`, {
+        headers: { authorization: `Bearer ${creatorToken}` },
+      });
       expect(denied.status).toBe(403);
+      const organizationlessUserId = randomUUID();
+      await prisma.user.create({
+        data: {
+          id: organizationlessUserId,
+          role: "BRAND",
+          authState: "ACTIVE",
+          email: `${randomUUID()}@example.test`,
+          name: "Organizationless Brand",
+          emailVerifiedAt: new Date(),
+        },
+      });
+      const { accessToken: organizationlessToken } = await sessions.create(
+        organizationlessUserId,
+      );
       const noOrganization = await fetch(
         `${baseUrl}/api/v1/brand-centre/brand`,
         {
           headers: {
-            authorization: `Bearer ${token({ ...a.user, organizationId: null })}`,
+            authorization: `Bearer ${organizationlessToken}`,
           },
         },
       );

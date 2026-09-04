@@ -14,6 +14,16 @@ export class CanonicalOfferingDiscoveryService {
 
   async list(user: AuthUser) {
     const brandProfileId = await this.auth.resolveBrandProfileId(user);
+    return this.listForBrand(brandProfileId);
+  }
+
+  async listForWorkspace(user: AuthUser) {
+    const brandProfileId =
+      await this.auth.resolveBrandProfileIdForWorkspace(user);
+    return this.listForBrand(brandProfileId);
+  }
+
+  private async listForBrand(brandProfileId: string) {
     const rows = await this.prisma.offering.findMany({
       where: {
         brandProfileId,
@@ -31,20 +41,63 @@ export class CanonicalOfferingDiscoveryService {
     });
 
     return CanonicalOfferingIndexResponseSchema.parse({
-      offerings: rows.map((row) => {
-        if (!row.canonicalKind || !row.canonicalLifecycle) {
-          throw new Error(
-            "Canonical Offering discovery returned unresolved state",
-          );
-        }
-        return {
-          offeringId: row.id,
-          name: row.name,
-          kind: row.canonicalKind,
-          subtype: row.canonicalSubtype,
-          lifecycle: row.canonicalLifecycle,
-        };
-      }),
+      offerings: rows.map((row) => this.mapRow(row)),
     });
+  }
+
+  async listBounded(user: AuthUser, limit: number) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(user);
+    return this.listBoundedForBrand(brandProfileId, limit);
+  }
+
+  async listBoundedForWorkspace(user: AuthUser, limit: number) {
+    const brandProfileId =
+      await this.auth.resolveBrandProfileIdForWorkspace(user);
+    return this.listBoundedForBrand(brandProfileId, limit);
+  }
+
+  private async listBoundedForBrand(brandProfileId: string, limit: number) {
+    const boundedLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+    const rows = await this.prisma.offering.findMany({
+      where: {
+        brandProfileId,
+        canonicalKind: { not: null },
+        canonicalLifecycle: { not: null },
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: boundedLimit + 1,
+      select: {
+        id: true,
+        name: true,
+        canonicalKind: true,
+        canonicalSubtype: true,
+        canonicalLifecycle: true,
+      },
+    });
+    return {
+      ...CanonicalOfferingIndexResponseSchema.parse({
+        offerings: rows.slice(0, boundedLimit).map((row) => this.mapRow(row)),
+      }),
+      truncated: rows.length > boundedLimit,
+    };
+  }
+
+  private mapRow(row: {
+    id: string;
+    name: string;
+    canonicalKind: string | null;
+    canonicalSubtype: string | null;
+    canonicalLifecycle: string | null;
+  }) {
+    if (!row.canonicalKind || !row.canonicalLifecycle) {
+      throw new Error("Canonical Offering discovery returned unresolved state");
+    }
+    return {
+      offeringId: row.id,
+      name: row.name,
+      kind: row.canonicalKind,
+      subtype: row.canonicalSubtype,
+      lifecycle: row.canonicalLifecycle,
+    };
   }
 }

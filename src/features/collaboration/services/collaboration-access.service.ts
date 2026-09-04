@@ -7,6 +7,7 @@ import { UserRole } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
+import { BrandWorkspaceAuthorizationService } from "../../brand-centre/brand-workspace-authorization.service";
 
 export const COLLABORATION_THREAD_INCLUDE = {
   campaign: { select: { name: true, brandProfileId: true } },
@@ -59,23 +60,13 @@ export const COLLABORATION_THREAD_INCLUDE = {
 
 @Injectable()
 export class CollaborationAccessService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly workspace: BrandWorkspaceAuthorizationService,
+  ) {}
 
   async resolveBrandProfileId(user: AuthUser): Promise<string> {
-    if (user.role !== UserRole.BRAND) {
-      throw new ForbiddenException("Brand access required");
-    }
-    if (!user.organizationId) {
-      throw new ForbiddenException("Brand organization not linked");
-    }
-    const profile = await this.prisma.brandProfile.findFirst({
-      where: { organizationId: user.organizationId },
-      select: { id: true },
-    });
-    if (!profile) {
-      throw new NotFoundException("Brand profile not found");
-    }
-    return profile.id;
+    return (await this.workspace.resolveBrandContext(user)).brandProfileId;
   }
 
   async assertThreadForUser(user: AuthUser, collaborationId: string) {

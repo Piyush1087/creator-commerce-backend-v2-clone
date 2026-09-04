@@ -78,8 +78,11 @@ export function emptyProductObject(
   return {
     semanticId,
     current: { kind: "NO_CURRENT" },
+    objectState: "NO_CURRENT",
     readiness: "NOT_READY",
+    resultReadiness: "NOT_READY",
     freshness: "UNKNOWN",
+    changedAt: null,
     authority: "observed",
     candidate: noCandidate,
     lineage: {
@@ -98,12 +101,15 @@ export function mapProductObject(
   const semanticId = projection.objectSemanticId as ProductObjectSemanticId;
   return {
     semanticId,
+    objectState: projection.objectState,
     current:
       projection.assembledValue.state === "VALUE"
         ? { kind: "VALUE", value: projection.assembledValue.value }
         : { kind: projection.assembledValue.state },
     readiness: projection.consumerReadiness,
+    resultReadiness: projection.resultReadiness,
     freshness: projection.freshness,
+    changedAt: projection.changedAt,
     authority: authorityPresentation(projection.authority),
     candidate: {
       status: projection.candidateSummary.status,
