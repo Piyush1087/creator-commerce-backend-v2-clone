@@ -39,6 +39,7 @@ describe.skipIf(process.env.C03_P11D_DATABASE_TEST !== "true")(
     const creatorProfileId = randomUUID();
     const creatorWorkspaceId = randomUUID();
     const creatorMembershipId = randomUUID();
+    const brandActorOrganizationId = randomUUID();
     const brandActorUserId = randomUUID();
     const snapshotFirstApplicationId = randomUUID();
     const eventFirstApplicationId = randomUUID();
@@ -223,6 +224,13 @@ describe.skipIf(process.env.C03_P11D_DATABASE_TEST !== "true")(
         },
       });
       const brandEmail = `c03-p11d-brand-${brandActorUserId}@example.test`;
+      await prisma.organization.create({
+        data: {
+          id: brandActorOrganizationId,
+          name: "C03 P1.1D Wrong-Role Brand Actor",
+          kind: OrganizationKind.BRAND,
+        },
+      });
       await prisma.user.create({
         data: {
           id: brandActorUserId,
@@ -230,6 +238,7 @@ describe.skipIf(process.env.C03_P11D_DATABASE_TEST !== "true")(
           normalizedEmail: brandEmail,
           role: UserRole.BRAND,
           authState: UserAuthState.ACTIVE,
+          organizationId: brandActorOrganizationId,
         },
       });
 
