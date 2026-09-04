@@ -129,6 +129,7 @@ describe("Campaign reconciliation authorization boundaries", () => {
     const service = new BrandUceCampaignAssetService(
       prisma as never,
       {} as never,
+      {} as never,
     );
 
     await service.listSelectable("brand-1");
@@ -165,6 +166,7 @@ describe("Campaign reconciliation authorization boundaries", () => {
     const service = new BrandUceCampaignAssetService(
       prisma as never,
       access as never,
+      {} as never,
     );
 
     await expect(
@@ -194,6 +196,7 @@ describe("Campaign reconciliation authorization boundaries", () => {
     const service = new BrandUceCampaignAssetService(
       prisma as never,
       access as never,
+      {} as never,
     );
 
     await service.listForCampaign("brand-1", "campaign-1");
@@ -225,6 +228,7 @@ describe("Campaign reconciliation authorization boundaries", () => {
       const service = new BrandUceCampaignAssetService(
         prisma as never,
         access as never,
+        {} as never,
       );
 
       await expect(
@@ -250,6 +254,7 @@ describe("Campaign reconciliation authorization boundaries", () => {
     const service = new CanonicalCampaignBriefService(
       prisma as never,
       access as never,
+      {} as never,
     );
 
     await expect(
@@ -275,6 +280,7 @@ describe("Campaign reconciliation authorization boundaries", () => {
     const service = new CanonicalCampaignBriefService(
       prisma as never,
       access as never,
+      {} as never,
     );
 
     await expect(
@@ -328,8 +334,16 @@ describe("Campaign reconciliation authorization boundaries", () => {
       deliverables: [],
     };
     const tx = {
+      uceCampaign: {
+        findFirst: vi.fn().mockResolvedValue({
+          status: UceCampaignStatus.DRAFT,
+        }),
+      },
       canonicalBriefDeliverable: { deleteMany: vi.fn() },
-      canonicalCampaignBrief: { update: vi.fn().mockResolvedValue(updated) },
+      canonicalCampaignBrief: {
+        findFirst: vi.fn().mockResolvedValue(updated),
+        update: vi.fn().mockResolvedValue(updated),
+      },
     };
     const prisma = {
       canonicalCampaignBrief: {
@@ -345,6 +359,7 @@ describe("Campaign reconciliation authorization boundaries", () => {
     const service = new CanonicalCampaignBriefService(
       prisma as never,
       access as never,
+      { lockCampaign: vi.fn().mockResolvedValue(undefined) } as never,
     );
 
     await service.update("brand-1", "campaign-1", "brief-1", {

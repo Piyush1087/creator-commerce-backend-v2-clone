@@ -13,6 +13,7 @@ const applicationId = "3dc7e4b2-6b69-4c58-b5f0-0ed03256e451";
 function approvalHarness(claimCount = 1, capabilityError?: Error) {
   const application = {
     id: applicationId,
+    authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
     campaignId: "campaign-1",
     campaignCreatorId: "creator-1",
     legacyCampaignProductId: "legacy-product-1",
@@ -53,7 +54,7 @@ function approvalHarness(claimCount = 1, capabilityError?: Error) {
     uceCampaignPerformanceAggregate: { update: vi.fn() },
   };
   const prisma = {
-    uceApplication: { findMany: vi.fn() },
+    uceApplication: { findMany: vi.fn(), count: vi.fn().mockResolvedValue(0) },
     uceCampaignCollaboration: { findMany: vi.fn() },
     uceCampaignCreator: { upsert: vi.fn() },
     $transaction: vi.fn().mockImplementation((callback) => callback(tx)),
@@ -108,6 +109,7 @@ describe("CampaignApplicationService development authority", () => {
     prisma.uceApplication.findMany.mockResolvedValue([
       {
         id: applicationId,
+        authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
         campaignCreatorId: "creator-1",
         legacyCampaignProductId: "legacy-product-1",
         legacyBriefId: "legacy-brief-1",
@@ -135,6 +137,27 @@ describe("CampaignApplicationService development authority", () => {
       canonicalCampaignAssetId: null,
       canonicalBriefId: null,
       referenceAuthority: "LEGACY_COMPATIBILITY",
+    });
+  });
+
+  it("returns a stable unavailable handoff instead of treating canonical rows as legacy", async () => {
+    const { service, prisma } = approvalHarness();
+    prisma.uceApplication.findMany.mockResolvedValue([]);
+    prisma.uceApplication.count.mockResolvedValue(1);
+
+    const result = await service.listApplicants("brand-1", "campaign-1");
+
+    expect(result).toEqual({
+      state: "UNAVAILABLE",
+      reason: "C03_CANONICAL_APPLICATION_HANDOFF_NOT_AVAILABLE",
+      canonicalApplicationCount: 1,
+      applicants: [],
+    });
+    expect(prisma.uceApplication.count).toHaveBeenCalledWith({
+      where: {
+        campaignId: "campaign-1",
+        authorityVersion: UceApplicationAuthorityVersion.C03_CANONICAL,
+      },
     });
   });
 

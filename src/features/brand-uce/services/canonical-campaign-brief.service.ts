@@ -30,6 +30,7 @@ import {
   type CanonicalBriefDeliverableInput,
 } from "../schemas/canonical-campaign-brief.schema";
 import { BrandUceAccessService } from "./brand-uce-access.service";
+import { CampaignLifecycleLockService } from "./campaign-lifecycle-lock.service";
 
 const TERMINAL = new Set<UceCampaignStatus>([
   UceCampaignStatus.COMPLETED,
@@ -64,6 +65,7 @@ export class CanonicalCampaignBriefService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: BrandUceAccessService,
+    private readonly campaignLock: CampaignLifecycleLockService,
   ) {}
 
   async list(brandProfileId: string, campaignId: string) {
@@ -96,6 +98,8 @@ export class CanonicalCampaignBriefService {
     validateMaterializedGraph(deliverables);
     const briefId = randomUUID();
     const row = await this.prisma.$transaction(async (tx) => {
+      await this.lockAndAssertWritable(tx, brandProfileId, campaignId);
+      await this.assertActiveAsset(campaignId, input.campaign_asset_id, tx);
       await tx.canonicalCampaignBrief.create({
         data: {
           id: briefId,
@@ -142,15 +146,24 @@ export class CanonicalCampaignBriefService {
         updatePublishedCanonicalBriefSchema.safeParse(dto),
         "Published Brief update validation failed",
       );
-      const row = await this.prisma.canonicalCampaignBrief.update({
-        where: { id: briefId },
-        data: {
-          briefName: presentational.brief_name,
-          creativeIntent: presentational.creative_intent,
-          creatorBrief: presentational.creator_brief,
-          creatorRequirements: presentational.creator_requirements,
-        },
-        include: briefInclude,
+      const row = await this.prisma.$transaction(async (tx) => {
+        await this.lockAndAssertWritable(tx, brandProfileId, campaignId);
+        const locked = await this.findOwnedBrief(campaignId, briefId, tx);
+        if (locked.status === UceBriefStatus.DRAFT) {
+          throw new ConflictException(
+            "The Brief lifecycle changed while the update was waiting.",
+          );
+        }
+        return tx.canonicalCampaignBrief.update({
+          where: { id: briefId },
+          data: {
+            briefName: presentational.brief_name,
+            creativeIntent: presentational.creative_intent,
+            creatorBrief: presentational.creator_brief,
+            creatorRequirements: presentational.creator_requirements,
+          },
+          include: briefInclude,
+        });
       });
       return mapCanonicalBrief(row);
     }
@@ -165,11 +178,18 @@ export class CanonicalCampaignBriefService {
     if (deliverables) validateMaterializedGraph(deliverables);
 
     const row = await this.prisma.$transaction(async (tx) => {
+      await this.lockAndAssertWritable(tx, brandProfileId, campaignId);
+      const locked = await this.findOwnedBrief(campaignId, briefId, tx);
+      if (locked.status !== UceBriefStatus.DRAFT) {
+        throw new ConflictException(
+          "The Brief lifecycle changed while the update was waiting.",
+        );
+      }
       if (deliverables) {
         await replaceDeliverablesByIdentity(
           tx,
           briefId,
-          existing.deliverables.map((item) => item.id),
+          locked.deliverables.map((item) => item.id),
           deliverables,
         );
       }
@@ -207,14 +227,24 @@ export class CanonicalCampaignBriefService {
     await this.assertInstagramEnabled(campaignId);
     assertPublishable(existing);
 
-    const row = await this.prisma.canonicalCampaignBrief.update({
-      where: { id: briefId },
-      data: {
-        status: UceBriefStatus.PUBLISHED,
-        publishedAt: existing.publishedAt ?? new Date(),
-        pausedAt: null,
-      },
-      include: briefInclude,
+    const row = await this.prisma.$transaction(async (tx) => {
+      await this.lockAndAssertWritable(tx, brandProfileId, campaignId);
+      const locked = await this.findOwnedBrief(campaignId, briefId, tx);
+      if (locked.status !== UceBriefStatus.DRAFT) {
+        throw new ConflictException("Only a DRAFT Brief can be published.");
+      }
+      await this.assertActiveAsset(campaignId, locked.campaignAssetId, tx);
+      await this.assertInstagramEnabled(campaignId, tx);
+      assertPublishable(locked);
+      return tx.canonicalCampaignBrief.update({
+        where: { id: briefId },
+        data: {
+          status: UceBriefStatus.PUBLISHED,
+          publishedAt: locked.publishedAt ?? new Date(),
+          pausedAt: null,
+        },
+        include: briefInclude,
+      });
     });
     return mapCanonicalBrief(row);
   }
@@ -229,10 +259,17 @@ export class CanonicalCampaignBriefService {
     if (existing.status !== UceBriefStatus.PUBLISHED) {
       throw new ConflictException("Only a PUBLISHED Brief can be paused.");
     }
-    const row = await this.prisma.canonicalCampaignBrief.update({
-      where: { id: briefId },
-      data: { status: UceBriefStatus.PAUSED, pausedAt: new Date() },
-      include: briefInclude,
+    const row = await this.prisma.$transaction(async (tx) => {
+      await this.lockAndAssertWritable(tx, brandProfileId, campaignId);
+      const locked = await this.findOwnedBrief(campaignId, briefId, tx);
+      if (locked.status !== UceBriefStatus.PUBLISHED) {
+        throw new ConflictException("Only a PUBLISHED Brief can be paused.");
+      }
+      return tx.canonicalCampaignBrief.update({
+        where: { id: briefId },
+        data: { status: UceBriefStatus.PAUSED, pausedAt: new Date() },
+        include: briefInclude,
+      });
     });
     return mapCanonicalBrief(row);
   }
@@ -251,16 +288,30 @@ export class CanonicalCampaignBriefService {
     await this.assertInstagramEnabled(campaignId);
     assertPublishable(existing);
 
-    const row = await this.prisma.canonicalCampaignBrief.update({
-      where: { id: briefId },
-      data: { status: UceBriefStatus.PUBLISHED, pausedAt: null },
-      include: briefInclude,
+    const row = await this.prisma.$transaction(async (tx) => {
+      await this.lockAndAssertWritable(tx, brandProfileId, campaignId);
+      const locked = await this.findOwnedBrief(campaignId, briefId, tx);
+      if (locked.status !== UceBriefStatus.PAUSED) {
+        throw new ConflictException("Only a PAUSED Brief can be resumed.");
+      }
+      await this.assertActiveAsset(campaignId, locked.campaignAssetId, tx);
+      await this.assertInstagramEnabled(campaignId, tx);
+      assertPublishable(locked);
+      return tx.canonicalCampaignBrief.update({
+        where: { id: briefId },
+        data: { status: UceBriefStatus.PUBLISHED, pausedAt: null },
+        include: briefInclude,
+      });
     });
     return mapCanonicalBrief(row);
   }
 
-  private async findOwnedBrief(campaignId: string, briefId: string) {
-    const row = await this.prisma.canonicalCampaignBrief.findFirst({
+  private async findOwnedBrief(
+    campaignId: string,
+    briefId: string,
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
+  ) {
+    const row = await client.canonicalCampaignBrief.findFirst({
       where: { id: briefId, campaignAsset: { campaignId } },
       include: briefInclude,
     });
@@ -268,8 +319,12 @@ export class CanonicalCampaignBriefService {
     return row;
   }
 
-  private async assertActiveAsset(campaignId: string, assetId: string) {
-    const asset = await this.prisma.uceCampaignAsset.findFirst({
+  private async assertActiveAsset(
+    campaignId: string,
+    assetId: string,
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
+  ) {
+    const asset = await client.uceCampaignAsset.findFirst({
       where: {
         id: assetId,
         campaignId,
@@ -284,8 +339,11 @@ export class CanonicalCampaignBriefService {
     }
   }
 
-  private async assertInstagramEnabled(campaignId: string) {
-    const strategy = await this.prisma.uceCampaignStrategy.findUnique({
+  private async assertInstagramEnabled(
+    campaignId: string,
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
+  ) {
+    const strategy = await client.uceCampaignStrategy.findUnique({
       where: { campaignId },
       select: { platforms: true },
     });
@@ -300,6 +358,20 @@ export class CanonicalCampaignBriefService {
     if (TERMINAL.has(status)) {
       throw new ConflictException("This Campaign is read-only.");
     }
+  }
+
+  private async lockAndAssertWritable(
+    tx: Prisma.TransactionClient,
+    brandProfileId: string,
+    campaignId: string,
+  ) {
+    await this.campaignLock.lockCampaign(tx, campaignId);
+    const campaign = await tx.uceCampaign.findFirst({
+      where: { id: campaignId, brandProfileId },
+      select: { status: true },
+    });
+    if (!campaign) throw new NotFoundException("Campaign not found");
+    this.assertWritable(campaign.status);
   }
 }
 

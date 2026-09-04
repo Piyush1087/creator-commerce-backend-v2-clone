@@ -24,6 +24,7 @@ describe("P3 domain commit-boundary enforcement", () => {
         prisma as never,
         { assertCampaignOwned: vi.fn() } as never,
         capabilities as never,
+        { lockCampaign: vi.fn() } as never,
       );
       await expect(
         service[method]("brand-1", "campaign-1"),

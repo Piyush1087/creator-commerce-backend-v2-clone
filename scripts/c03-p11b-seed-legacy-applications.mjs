@@ -7,6 +7,8 @@ const allowedDatabases = new Set([
   "/c03_p11b_upgrade75",
   "/c03_p11c_upgrade74",
   "/c03_p11c_upgrade76",
+  "/c03_p11d_upgrade74",
+  "/c03_p11d_upgrade77",
 ]);
 if (
   !parsed ||

@@ -23,6 +23,7 @@ import {
   type CanonicalCampaignWizardPayload,
 } from "../schemas/canonical-campaign-wizard.schema";
 import { BrandUceCampaignService } from "./brand-uce-campaign.service";
+import { CampaignLifecycleLockService } from "./campaign-lifecycle-lock.service";
 import {
   canonicalDerivedProjection,
   resolveCanonicalCampaignReadiness,
@@ -145,6 +146,7 @@ export class CanonicalCampaignCreateService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly legacyCampaigns: BrandUceCampaignService,
+    private readonly campaignLock: CampaignLifecycleLockService,
   ) {}
 
   async createDraft(brandProfileId: string) {
@@ -219,6 +221,14 @@ export class CanonicalCampaignCreateService {
     validateDraftCrossField(definition);
 
     await this.prisma.$transaction(async (tx) => {
+      await this.campaignLock.lockCampaign(tx, campaignId);
+      const locked = await tx.uceCampaign.findFirst({
+        where: { id: campaignId, brandProfileId },
+        select: { status: true },
+      });
+      if (locked?.status !== UceCampaignStatus.DRAFT) {
+        throw new BadRequestException("Only DRAFT Campaigns can be autosaved.");
+      }
       if (patch.path === "strategy.campaign_name") {
         await tx.uceCampaign.update({
           where: { id: campaignId },
@@ -355,6 +365,14 @@ export class CanonicalCampaignCreateService {
     };
 
     await this.prisma.$transaction(async (tx) => {
+      await this.campaignLock.lockCampaign(tx, campaignId);
+      const lockedCampaign = await tx.uceCampaign.findFirst({
+        where: { id: campaignId, brandProfileId },
+        select: { status: true },
+      });
+      if (lockedCampaign?.status !== UceCampaignStatus.DRAFT) {
+        throw new BadRequestException("Only DRAFT Campaigns can be published.");
+      }
       await tx.uceCampaign.update({
         where: { id: campaignId },
         data: {

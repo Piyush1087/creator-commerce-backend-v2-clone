@@ -1,10 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import {
-  Prisma,
-  UceBriefStatus,
-  UceCampaignAssetStatus,
-  UceVisibilityScope,
-} from "@prisma/client";
+import { Prisma, UceBriefStatus, UceCampaignAssetStatus } from "@prisma/client";
 import { z } from "zod";
 
 import { PrismaService } from "../../../prisma/prisma.service";
@@ -30,6 +25,7 @@ const storedDefinitionSchema = z
     targeting: z.record(z.unknown()),
     commercials: z
       .object({
+        compensation_model: z.enum(["FIXED", "NEGOTIABLE"]),
         receives_brand_support: z.boolean(),
         brand_support_type: z
           .enum([
@@ -197,9 +193,11 @@ export function projectCanonicalCampaignForApplication(
   );
   const validDefinition = definition.success ? definition.data : null;
   const visibility = resolveVisibility(campaign, validDefinition);
-  const platforms = campaign.strategy?.platforms.length
-    ? campaign.strategy.platforms
-    : (validDefinition?.strategy.platforms ?? []);
+  const platforms = validDefinition
+    ? campaign.strategy?.platforms.length
+      ? campaign.strategy.platforms
+      : validDefinition.strategy.platforms
+    : [];
   const commercial = resolveCommercial(campaign, validDefinition);
 
   return {
@@ -227,6 +225,7 @@ export function projectCanonicalCampaignForApplication(
           id: brief.id,
           campaignAssetId: brief.campaignAssetId,
           status: brief.status,
+          creationSource: brief.creationSource,
           applicationSelection:
             asset.status === UceCampaignAssetStatus.ACTIVE && readiness.ready
               ? ({ state: "AVAILABLE" } as const)
@@ -273,16 +272,6 @@ function resolveVisibility(
   if (legacy.length === 1) {
     return { state: "AVAILABLE" as const, value: legacy[0] };
   }
-  const authored = definition?.strategy.campaign_visibility;
-  if (authored) {
-    const value: UceVisibilityScope =
-      authored === "PUBLIC"
-        ? UceVisibilityScope.EVERYONE
-        : authored === "ELIGIBLE_CREATORS_ONLY"
-          ? UceVisibilityScope.ELIGIBLE_ONLY
-          : UceVisibilityScope.INVITED_ONLY;
-    return { state: "AVAILABLE" as const, value };
-  }
   return {
     state: "UNAVAILABLE" as const,
     reason: "CAMPAIGN_VISIBILITY_CONFIGURATION_INVALID" as const,
@@ -303,6 +292,7 @@ function resolveCommercial(
     return {
       state: "AVAILABLE" as const,
       canonicalVersion: 1 as const,
+      compensationType: commercial.compensationType,
       commercialOffer: commercial.commercialOffer,
       currency: commercial.currency,
       receivesBrandSupport: commercial.receivesBrandSupport,
@@ -315,6 +305,10 @@ function resolveCommercial(
     return {
       state: "AVAILABLE" as const,
       canonicalVersion: 1 as const,
+      compensationType:
+        definition.commercials.compensation_model === "FIXED"
+          ? ("FIXED_FEE" as const)
+          : ("NEGOTIABLE" as const),
       commercialOffer: new Prisma.Decimal(
         definition.commercials.commercial_offer,
       ),

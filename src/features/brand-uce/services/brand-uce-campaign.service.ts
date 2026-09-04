@@ -25,6 +25,7 @@ import {
 } from "../validation";
 import { decimalToNumber } from "../utils/uce-decimal.util";
 import { BrandUceAccessService } from "./brand-uce-access.service";
+import { CampaignLifecycleLockService } from "./campaign-lifecycle-lock.service";
 import { isApplicationSelectableBrief } from "./canonical-campaign-application-read.service";
 
 const PROSPECT_STATUSES = ["PROSPECT_CURATED", "PROSPECT_INVITED"] as const;
@@ -48,6 +49,7 @@ export class BrandUceCampaignService {
     private readonly prisma: PrismaService,
     private readonly access: BrandUceAccessService,
     private readonly subscriptionCapabilities: SubscriptionCapabilityService,
+    private readonly campaignLock: CampaignLifecycleLockService,
   ) {}
 
   async listAggregates(brandProfileId: string) {
@@ -457,30 +459,43 @@ export class BrandUceCampaignService {
       );
     }
 
-    if (body.campaign_name?.trim()) {
-      await this.prisma.uceCampaign.update({
-        where: { id: campaignId },
-        data: { name: body.campaign_name.trim() },
+    await this.prisma.$transaction(async (tx) => {
+      await this.campaignLock.lockCampaign(tx, campaignId);
+      const locked = await tx.uceCampaign.findFirst({
+        where: { id: campaignId, brandProfileId },
+        select: { status: true },
       });
-    }
+      if (locked?.status !== UceCampaignStatus.DRAFT) {
+        throw new BadRequestException(
+          "Only DRAFT campaigns can be edited from co-pilot.",
+        );
+      }
 
-    if (body.marketing_objective) {
-      await this.prisma.uceCampaignStrategy.updateMany({
-        where: { campaignId },
-        data: { coreObjective: body.marketing_objective },
-      });
-    }
+      if (body.campaign_name?.trim()) {
+        await tx.uceCampaign.update({
+          where: { id: campaignId },
+          data: { name: body.campaign_name.trim() },
+        });
+      }
 
-    if (
-      body.budget_allocation !== undefined &&
-      Number.isFinite(body.budget_allocation) &&
-      body.budget_allocation > 0
-    ) {
-      await this.prisma.uceCampaignCommercials.updateMany({
-        where: { campaignId },
-        data: { totalCampaignBudgetPool: body.budget_allocation },
-      });
-    }
+      if (body.marketing_objective) {
+        await tx.uceCampaignStrategy.updateMany({
+          where: { campaignId },
+          data: { coreObjective: body.marketing_objective },
+        });
+      }
+
+      if (
+        body.budget_allocation !== undefined &&
+        Number.isFinite(body.budget_allocation) &&
+        body.budget_allocation > 0
+      ) {
+        await tx.uceCampaignCommercials.updateMany({
+          where: { campaignId },
+          data: { totalCampaignBudgetPool: body.budget_allocation },
+        });
+      }
+    });
 
     return this.getCampaignShell(brandProfileId, campaignId);
   }
@@ -514,14 +529,28 @@ export class BrandUceCampaignService {
       );
     }
 
-    const canEdit = await this.canEditCampaignEssentials(campaignId);
-    if (!canEdit) {
-      throw new ConflictException(
-        "Campaign name, budget, and inventory can only be edited before any creator applications or active collaborations exist.",
-      );
-    }
-
     await this.prisma.$transaction(async (tx) => {
+      await this.campaignLock.lockCampaign(tx, campaignId);
+      const lockedCampaign = await tx.uceCampaign.findFirst({
+        where: { id: campaignId, brandProfileId },
+        select: { status: true },
+      });
+      if (
+        !lockedCampaign ||
+        lockedCampaign.status === UceCampaignStatus.COMPLETED ||
+        lockedCampaign.status === UceCampaignStatus.ARCHIVED
+      ) {
+        throw new BadRequestException(
+          "Completed or archived campaigns cannot be edited.",
+        );
+      }
+      const canEdit = await this.canEditCampaignEssentials(campaignId, tx);
+      if (!canEdit) {
+        throw new ConflictException(
+          "Campaign name, budget, and inventory can only be edited before any creator applications or active collaborations exist.",
+        );
+      }
+
       if (body.campaign_name?.trim()) {
         await tx.uceCampaign.update({
           where: { id: campaignId },
@@ -568,49 +597,53 @@ export class BrandUceCampaignService {
   ) {
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
 
-    const existing = await this.prisma.uceCampaign.findFirst({
-      where: { id: campaignId, brandProfileId },
-    });
-    if (!existing) {
-      throw new BadRequestException("Campaign not found");
-    }
+    return this.prisma.$transaction(async (tx) => {
+      await this.campaignLock.lockCampaign(tx, campaignId);
+      const existing = await tx.uceCampaign.findFirst({
+        where: { id: campaignId, brandProfileId },
+      });
+      if (!existing) {
+        throw new BadRequestException("Campaign not found");
+      }
 
-    if (status === UceCampaignStatus.PUBLISHED) {
-      if (existing.status !== UceCampaignStatus.DRAFT) {
+      if (
+        status === UceCampaignStatus.PUBLISHED &&
+        existing.status !== UceCampaignStatus.DRAFT
+      ) {
         throw new BadRequestException("Only DRAFT campaigns can be published.");
       }
-    }
 
-    if (status === UceCampaignStatus.PAUSED) {
-      if (existing.status !== UceCampaignStatus.LIVE) {
+      if (
+        status === UceCampaignStatus.PAUSED &&
+        existing.status !== UceCampaignStatus.LIVE
+      ) {
         throw new BadRequestException("Only LIVE campaigns can be paused.");
       }
-    }
 
-    if (status === UceCampaignStatus.LIVE) {
-      if (
-        existing.status !== UceCampaignStatus.PAUSED &&
-        existing.status !== UceCampaignStatus.PUBLISHED
-      ) {
-        throw new BadRequestException(
-          "Only PUBLISHED or PAUSED campaigns can become LIVE.",
-        );
-      }
-      if (existing.status === UceCampaignStatus.PUBLISHED) {
-        const checklist = await this.buildActivationChecklist(campaignId);
-        const blockers = checklist.filter((c) => !c.satisfied);
-        if (blockers.length > 0) {
-          throw new BadRequestException({
-            message:
-              "Campaign cannot go LIVE until execution-readiness checklist criteria are met",
-            checklist,
-          });
+      if (status === UceCampaignStatus.LIVE) {
+        if (
+          existing.status !== UceCampaignStatus.PAUSED &&
+          existing.status !== UceCampaignStatus.PUBLISHED
+        ) {
+          throw new BadRequestException(
+            "Only PUBLISHED or PAUSED campaigns can become LIVE.",
+          );
+        }
+        if (existing.status === UceCampaignStatus.PUBLISHED) {
+          const checklist = await this.buildActivationChecklist(campaignId, tx);
+          const blockers = checklist.filter((c) => !c.satisfied);
+          if (blockers.length > 0) {
+            throw new BadRequestException({
+              message:
+                "Campaign cannot go LIVE until execution-readiness checklist criteria are met",
+              checklist,
+            });
+          }
         }
       }
-    }
 
-    if (status === UceCampaignStatus.COMPLETED) {
       if (
+        status === UceCampaignStatus.COMPLETED &&
         existing.status !== UceCampaignStatus.LIVE &&
         existing.status !== UceCampaignStatus.PAUSED
       ) {
@@ -618,30 +651,31 @@ export class BrandUceCampaignService {
           "Only LIVE or PAUSED campaigns can be completed.",
         );
       }
-    }
 
-    if (status === UceCampaignStatus.ARCHIVED) {
-      if (existing.status !== UceCampaignStatus.COMPLETED) {
+      if (
+        status === UceCampaignStatus.ARCHIVED &&
+        existing.status !== UceCampaignStatus.COMPLETED
+      ) {
         throw new BadRequestException(
           "Only COMPLETED campaigns can be archived.",
         );
       }
-    }
 
-    const updated = await this.prisma.uceCampaign.update({
-      where: { id: campaignId },
-      data: { status },
+      const updated = await tx.uceCampaign.update({
+        where: { id: campaignId },
+        data: { status },
+      });
+
+      return {
+        campaign_id: updated.id,
+        campaign_name: updated.name,
+        current_status: updated.status,
+        pause_warning:
+          updated.status === UceCampaignStatus.PAUSED
+            ? "Campaign Paused. Inbound application links are offline. Active collaboration workflows remain accessible for processing."
+            : null,
+      };
     });
-
-    return {
-      campaign_id: updated.id,
-      campaign_name: updated.name,
-      current_status: updated.status,
-      pause_warning:
-        updated.status === UceCampaignStatus.PAUSED
-          ? "Campaign Paused. Inbound application links are offline. Active collaboration workflows remain accessible for processing."
-          : null,
-    };
   }
 
   async pauseCampaign(brandProfileId: string, campaignId: string) {
@@ -1007,12 +1041,15 @@ export class BrandUceCampaignService {
     };
   }
 
-  private async buildActivationChecklist(campaignId: string) {
+  private async buildActivationChecklist(
+    campaignId: string,
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
+  ) {
     const [assetCount, briefs, commercials] = await Promise.all([
-      this.prisma.uceCampaignAsset.count({
+      client.uceCampaignAsset.count({
         where: { campaignId, status: UceCampaignAssetStatus.ACTIVE },
       }),
-      this.prisma.canonicalCampaignBrief.findMany({
+      client.canonicalCampaignBrief.findMany({
         where: {
           campaignAsset: {
             campaignId,
@@ -1022,7 +1059,7 @@ export class BrandUceCampaignService {
         },
         include: { deliverables: true },
       }),
-      this.prisma.uceCampaignCommercials.findUnique({ where: { campaignId } }),
+      client.uceCampaignCommercials.findUnique({ where: { campaignId } }),
     ]);
 
     const briefCount = briefs.filter((brief) =>
@@ -1054,8 +1091,9 @@ export class BrandUceCampaignService {
 
   private async canEditCampaignEssentials(
     campaignId: string,
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
   ): Promise<boolean> {
-    const blockingRows = await this.prisma.uceCampaignCollaboration.count({
+    const blockingRows = await client.uceCampaignCollaboration.count({
       where: {
         campaignId,
         collabStatus: { in: ESSENTIALS_EDIT_BLOCKING_STATUSES },

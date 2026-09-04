@@ -55,6 +55,7 @@ describe("Campaign lifecycle canonical readiness reconciliation", () => {
       prisma as never,
       access as never,
       { assertCapability: vi.fn() } as never,
+      { lockCampaign: vi.fn() } as never,
     );
 
     const checklist = await service.getActivationChecklist(

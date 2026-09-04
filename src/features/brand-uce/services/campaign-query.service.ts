@@ -10,7 +10,10 @@ import {
 import { PrismaService } from "../../../prisma/prisma.service";
 import { CampaignApplicationService } from "./campaign-application.service";
 import { resolveHydrationOutcome } from "./campaign-query.hydration";
-import { isApplicationSelectableBrief } from "./canonical-campaign-application-read.service";
+import {
+  isApplicationSelectableBrief,
+  projectCanonicalCampaignForApplication,
+} from "./canonical-campaign-application-read.service";
 
 export type SurfaceState = "READY" | "EMPTY" | "UNAVAILABLE" | "ERROR";
 export type CapabilityPresentation = "ENABLED" | "DISABLED" | "HIDDEN";
@@ -161,6 +164,7 @@ export class CampaignQueryService {
     if (!campaign) {
       throw new NotFoundException("Campaign not found");
     }
+    const canonicalRead = projectCanonicalCampaignForApplication(campaign);
 
     const applicationCounts = await this.resolveApplicationCounts(campaignId);
     const creationSource =
@@ -222,23 +226,23 @@ export class CampaignQueryService {
     const readiness = resolveCampaignPageReadiness({
       status,
       budgetPool:
-        campaign.commercials?.canonicalVersion === 1
-          ? Number(campaign.commercials.totalCampaignBudgetPool)
+        canonicalRead.campaign.commercial.state === "AVAILABLE"
+          ? Number(canonicalRead.campaign.commercial.totalCampaignBudget)
           : null,
-      assets: campaign.assets.map((asset) => ({
+      assets: canonicalRead.assets.map((asset) => ({
         status: asset.status,
-        briefs: asset.canonicalBriefs.map((brief) => ({
+        briefs: asset.briefs.map((brief) => ({
           status: brief.status,
-          briefName: brief.briefName,
-          creativeIntent: brief.creativeIntent,
-          creatorBrief: brief.creatorBrief,
-          briefType: brief.briefType,
-          platform: brief.platform,
-          briefLevelGuidance: brief.briefLevelGuidance,
-          referenceContent: brief.referenceContent,
-          usageRights: brief.usageRights,
-          creatorRequirements: brief.creatorRequirements,
-          deliverables: brief.deliverables.map((deliverable) => ({
+          briefName: brief.definition.briefName,
+          creativeIntent: brief.definition.creativeIntent,
+          creatorBrief: brief.definition.creatorBrief,
+          briefType: brief.definition.briefType,
+          platform: brief.definition.platform,
+          briefLevelGuidance: brief.definition.briefLevelGuidance,
+          referenceContent: brief.definition.referenceContent,
+          usageRights: brief.definition.usageRights,
+          creatorRequirements: brief.definition.creatorRequirements,
+          deliverables: brief.definition.deliverables.map((deliverable) => ({
             id: deliverable.id,
             format: deliverable.format,
             displayOrder: deliverable.displayOrder,
@@ -433,41 +437,38 @@ export class CampaignQueryService {
       details: {
         state: "READY" as SurfaceState,
         objective: campaign.strategy?.coreObjective ?? null,
-        platforms: campaign.strategy?.platforms ?? [],
-        visibilityScopes: campaign.targeting?.visibilityScope
-          ? [campaign.targeting.visibilityScope]
-          : campaign.targeting?.visibilityScopes.length === 1
-            ? campaign.targeting.visibilityScopes
+        platforms: canonicalRead.campaign.platforms,
+        visibilityScopes:
+          canonicalRead.campaign.visibility.state === "AVAILABLE"
+            ? [canonicalRead.campaign.visibility.value]
             : [],
         visibilityConfigurationState:
-          campaign.targeting?.visibilityScope ||
-          campaign.targeting?.visibilityScopes.length === 1
+          canonicalRead.campaign.visibility.state === "AVAILABLE"
             ? "AVAILABLE"
-            : "CAMPAIGN_VISIBILITY_CONFIGURATION_INVALID",
+            : canonicalRead.campaign.visibility.reason,
         compensationType:
-          campaign.commercials?.canonicalVersion === 1
-            ? campaign.commercials.compensationType
+          canonicalRead.campaign.commercial.state === "AVAILABLE"
+            ? canonicalRead.campaign.commercial.compensationType
             : null,
         commercialOffer:
-          campaign.commercials?.canonicalVersion === 1 &&
-          campaign.commercials.commercialOffer != null
-            ? Number(campaign.commercials.commercialOffer)
+          canonicalRead.campaign.commercial.state === "AVAILABLE"
+            ? Number(canonicalRead.campaign.commercial.commercialOffer)
             : null,
         currency:
-          campaign.commercials?.canonicalVersion === 1
-            ? campaign.commercials.currency
+          canonicalRead.campaign.commercial.state === "AVAILABLE"
+            ? canonicalRead.campaign.commercial.currency
             : null,
         budgetPool:
-          campaign.commercials?.canonicalVersion === 1
-            ? Number(campaign.commercials.totalCampaignBudgetPool)
+          canonicalRead.campaign.commercial.state === "AVAILABLE"
+            ? Number(canonicalRead.campaign.commercial.totalCampaignBudget)
             : null,
         commercialConfigurationState:
-          campaign.commercials?.canonicalVersion === 1
+          canonicalRead.campaign.commercial.state === "AVAILABLE"
             ? "AVAILABLE"
-            : "CAMPAIGN_COMMERCIAL_CONFIGURATION_INVALID",
+            : canonicalRead.campaign.commercial.reason,
         timelineType: campaign.strategy?.timelineType ?? null,
         applicationDeadline:
-          campaign.applicationDeadline?.toISOString() ?? null,
+          canonicalRead.campaign.applicationDeadline?.toISOString() ?? null,
       },
     };
   }

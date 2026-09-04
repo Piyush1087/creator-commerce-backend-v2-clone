@@ -52,7 +52,10 @@ const payload = {
 
 function setup(industry = "D2C") {
   const tx = {
-    uceCampaign: { update: vi.fn().mockResolvedValue({}) },
+    uceCampaign: {
+      findFirst: vi.fn().mockResolvedValue({ status: UceCampaignStatus.DRAFT }),
+      update: vi.fn().mockResolvedValue({}),
+    },
     uceCampaignReportingSnapshot: { create: vi.fn().mockResolvedValue({}) },
   };
   const prisma = {
@@ -83,6 +86,7 @@ function setup(industry = "D2C") {
     service: new CanonicalCampaignCreateService(
       prisma as never,
       legacy as never,
+      { lockCampaign: vi.fn().mockResolvedValue(undefined) } as never,
     ),
   };
 }

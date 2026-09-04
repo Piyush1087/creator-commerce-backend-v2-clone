@@ -16,6 +16,7 @@ import { BrandUceProductService } from "./services/brand-uce-product.service";
 import { BrandUceReportingService } from "./services/brand-uce-reporting.service";
 import { CampaignApplicationService } from "./services/campaign-application.service";
 import { CampaignCommandService } from "./services/campaign-command.service";
+import { CampaignLifecycleLockService } from "./services/campaign-lifecycle-lock.service";
 import { CampaignQueryService } from "./services/campaign-query.service";
 import { CanonicalCampaignCreateService } from "./services/canonical-campaign-create.service";
 import { CanonicalCampaignDraftReadService } from "./services/canonical-campaign-draft-read.service";
@@ -44,6 +45,7 @@ import { CanonicalCampaignApplicationReadService } from "./services/canonical-ca
     CampaignApplicationService,
     CampaignQueryService,
     CampaignCommandService,
+    CampaignLifecycleLockService,
     CanonicalCampaignCreateService,
     CanonicalCampaignDraftReadService,
     CanonicalCampaignReadinessService,
@@ -56,6 +58,7 @@ import { CanonicalCampaignApplicationReadService } from "./services/canonical-ca
     CampaignApplicationService,
     CampaignQueryService,
     CampaignCommandService,
+    CampaignLifecycleLockService,
     CanonicalCampaignCreateService,
     CanonicalCampaignApplicationReadService,
   ],

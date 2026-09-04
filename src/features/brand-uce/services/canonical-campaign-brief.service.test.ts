@@ -85,6 +85,9 @@ function row(status: UceBriefStatus = UceBriefStatus.DRAFT) {
 }
 
 function fixture(status: UceCampaignStatus = UceCampaignStatus.DRAFT) {
+  const uceCampaign = {
+    findFirst: vi.fn().mockResolvedValue({ status }),
+  };
   const canonicalCampaignBrief = {
     create: vi.fn().mockResolvedValue({ id: ids.brief }),
     findMany: vi.fn().mockResolvedValue([]),
@@ -98,13 +101,16 @@ function fixture(status: UceCampaignStatus = UceCampaignStatus.DRAFT) {
     updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
   };
+  const uceCampaignAsset = {
+    findFirst: vi.fn().mockResolvedValue({ id: ids.asset }),
+  };
+  const uceCampaignStrategy = {
+    findUnique: vi.fn().mockResolvedValue({ platforms: ["INSTAGRAM"] }),
+  };
   const prisma = {
-    uceCampaignAsset: {
-      findFirst: vi.fn().mockResolvedValue({ id: ids.asset }),
-    },
-    uceCampaignStrategy: {
-      findUnique: vi.fn().mockResolvedValue({ platforms: ["INSTAGRAM"] }),
-    },
+    uceCampaign,
+    uceCampaignAsset,
+    uceCampaignStrategy,
     canonicalCampaignBrief,
     canonicalBriefDeliverable,
     $transaction: vi.fn(
@@ -112,8 +118,18 @@ function fixture(status: UceCampaignStatus = UceCampaignStatus.DRAFT) {
         callback: (tx: {
           canonicalCampaignBrief: typeof canonicalCampaignBrief;
           canonicalBriefDeliverable: typeof canonicalBriefDeliverable;
+          uceCampaign: typeof uceCampaign;
+          uceCampaignAsset: typeof uceCampaignAsset;
+          uceCampaignStrategy: typeof uceCampaignStrategy;
         }) => unknown,
-      ) => callback({ canonicalCampaignBrief, canonicalBriefDeliverable }),
+      ) =>
+        callback({
+          canonicalCampaignBrief,
+          canonicalBriefDeliverable,
+          uceCampaign,
+          uceCampaignAsset,
+          uceCampaignStrategy,
+        }),
     ),
   };
   const access = {
@@ -123,6 +139,7 @@ function fixture(status: UceCampaignStatus = UceCampaignStatus.DRAFT) {
     service: new CanonicalCampaignBriefService(
       prisma as never,
       access as never,
+      { lockCampaign: vi.fn().mockResolvedValue(undefined) } as never,
     ),
     prisma,
     access,

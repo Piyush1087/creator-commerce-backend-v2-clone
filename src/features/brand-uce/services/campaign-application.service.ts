@@ -37,6 +37,38 @@ function defaultMilestoneDeadline(days = 14): Date {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 }
 
+const CANONICAL_HANDOFF_NOT_AVAILABLE =
+  "C03_CANONICAL_APPLICATION_HANDOFF_NOT_AVAILABLE";
+
+type LegacyApplicationShape = {
+  authorityVersion: UceApplicationAuthorityVersion;
+  campaignCreatorId: string | null;
+  legacyCampaignProductId: string | null;
+  legacyBriefId: string | null;
+  campaignCreator: { socialHandle: string; email?: string | null } | null;
+};
+
+function assertLegacyApplicationShape(
+  application: LegacyApplicationShape,
+): asserts application is LegacyApplicationShape & {
+  authorityVersion: typeof UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY;
+  campaignCreatorId: string;
+  legacyCampaignProductId: string;
+  legacyBriefId: string;
+  campaignCreator: { socialHandle: string; email?: string | null };
+} {
+  if (
+    application.authorityVersion !==
+      UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY ||
+    !application.campaignCreator ||
+    !application.campaignCreatorId ||
+    !application.legacyCampaignProductId ||
+    !application.legacyBriefId
+  ) {
+    throw new ConflictException("C03_LEGACY_APPLICATION_SHAPE_INVALID");
+  }
+}
+
 @Injectable()
 export class CampaignApplicationService {
   constructor(
@@ -149,64 +181,71 @@ export class CampaignApplicationService {
   async listApplicants(brandProfileId: string, campaignId: string) {
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
 
-    const rows = await this.prisma.uceApplication.findMany({
-      where: {
-        campaignId,
-        authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
-        status: {
-          in: [
-            UceApplicationStatus.PENDING,
-            UceApplicationStatus.APPROVED,
-            UceApplicationStatus.REJECTED,
-            UceApplicationStatus.SUPERSEDED,
-          ],
+    const [rows, canonicalCount] = await Promise.all([
+      this.prisma.uceApplication.findMany({
+        where: {
+          campaignId,
+          authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
+          status: {
+            in: [
+              UceApplicationStatus.PENDING,
+              UceApplicationStatus.APPROVED,
+              UceApplicationStatus.REJECTED,
+              UceApplicationStatus.SUPERSEDED,
+            ],
+          },
         },
-      },
-      include: { campaignCreator: true },
-      orderBy: { appliedAt: "desc" },
-      take: 50,
+        include: { campaignCreator: true },
+        orderBy: { appliedAt: "desc" },
+        take: 50,
+      }),
+      this.prisma.uceApplication.count({
+        where: {
+          campaignId,
+          authorityVersion: UceApplicationAuthorityVersion.C03_CANONICAL,
+        },
+      }),
+    ]);
+
+    const applicants = rows.map((row) => {
+      assertLegacyApplicationShape(row);
+      return {
+        applicationId: row.id,
+        campaignCreatorId: row.campaignCreatorId,
+        name: row.campaignCreator.socialHandle,
+        category: "Creator",
+        followers: "—",
+        engagement: "—",
+        avatarInitials: row.campaignCreator.socialHandle
+          .slice(0, 2)
+          .toUpperCase(),
+        applicationStatus: row.status as
+          | "PENDING"
+          | "APPROVED"
+          | "REJECTED"
+          | "SUPERSEDED"
+          | "WITHDRAWN"
+          | "EXPIRED",
+        source: row.source,
+        appliedAt: row.appliedAt.toISOString(),
+        campaignAssetId: row.legacyCampaignProductId,
+        briefId: row.legacyBriefId,
+        canonicalCampaignAssetId: null,
+        canonicalBriefId: null,
+        referenceAuthority: "LEGACY_COMPATIBILITY" as const,
+        intelligenceStatus: "UNAVAILABLE" as const,
+      };
     });
 
     return {
-      state: rows.length ? ("READY" as const) : ("EMPTY" as const),
-      applicants: rows.flatMap((row) => {
-        if (
-          !row.campaignCreator ||
-          !row.campaignCreatorId ||
-          !row.legacyCampaignProductId ||
-          !row.legacyBriefId
-        ) {
-          return [];
-        }
-        return [
-          {
-            applicationId: row.id,
-            campaignCreatorId: row.campaignCreatorId,
-            name: row.campaignCreator.socialHandle,
-            category: "Creator",
-            followers: "—",
-            engagement: "—",
-            avatarInitials: row.campaignCreator.socialHandle
-              .slice(0, 2)
-              .toUpperCase(),
-            applicationStatus: row.status as
-              | "PENDING"
-              | "APPROVED"
-              | "REJECTED"
-              | "SUPERSEDED"
-              | "WITHDRAWN"
-              | "EXPIRED",
-            source: row.source,
-            appliedAt: row.appliedAt.toISOString(),
-            campaignAssetId: row.legacyCampaignProductId,
-            briefId: row.legacyBriefId,
-            canonicalCampaignAssetId: null,
-            canonicalBriefId: null,
-            referenceAuthority: "LEGACY_COMPATIBILITY" as const,
-            intelligenceStatus: "UNAVAILABLE" as const,
-          },
-        ];
-      }),
+      state: rows.length
+        ? ("READY" as const)
+        : canonicalCount > 0
+          ? ("UNAVAILABLE" as const)
+          : ("EMPTY" as const),
+      reason: canonicalCount > 0 ? CANONICAL_HANDOFF_NOT_AVAILABLE : null,
+      canonicalApplicationCount: canonicalCount,
+      applicants,
     };
   }
 
@@ -236,16 +275,7 @@ export class CampaignApplicationService {
         include: { campaignCreator: true },
       });
       if (!application) throw new NotFoundException("Application not found");
-      if (
-        !application.campaignCreator ||
-        !application.campaignCreatorId ||
-        !application.legacyCampaignProductId ||
-        !application.legacyBriefId
-      ) {
-        throw new BadRequestException(
-          "Legacy Application compatibility data is unavailable",
-        );
-      }
+      assertLegacyApplicationShape(application);
       if (application.status !== UceApplicationStatus.PENDING) {
         throw new BadRequestException(
           "Only PENDING applications can be approved",
@@ -472,16 +502,7 @@ export class CampaignApplicationService {
       include: { campaignCreator: true },
     });
     if (!application) throw new NotFoundException("Application not found");
-    if (
-      !application.campaignCreator ||
-      !application.campaignCreatorId ||
-      !application.legacyCampaignProductId ||
-      !application.legacyBriefId
-    ) {
-      throw new BadRequestException(
-        "Legacy Application compatibility data is unavailable",
-      );
-    }
+    assertLegacyApplicationShape(application);
     if (application.status !== UceApplicationStatus.PENDING) {
       throw new BadRequestException(
         "Only PENDING applications can be rejected",
