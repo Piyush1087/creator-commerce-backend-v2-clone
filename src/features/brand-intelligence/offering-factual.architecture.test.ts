@@ -98,7 +98,7 @@ describe("Product Intelligence P4 architecture", () => {
       readdirSync(join(process.cwd(), "prisma", "migrations"), {
         withFileTypes: true,
       }).filter((entry) => entry.isDirectory()),
-    ).toHaveLength(74);
+    ).toHaveLength(75);
     expect(
       readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8"),
     ).not.toContain("offering_factual_profile");

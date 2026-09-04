@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import {
+  UceBriefStatus,
   UceCampaignAssetStatus,
   UceCampaignStatus,
   UceCollabStatus,
@@ -8,6 +9,7 @@ import {
 import { PrismaService } from "../../../prisma/prisma.service";
 import { CampaignApplicationService } from "./campaign-application.service";
 import { resolveHydrationOutcome } from "./campaign-query.hydration";
+import { isApplicationSelectableBrief } from "./canonical-campaign-application-read.service";
 
 export type SurfaceState = "READY" | "EMPTY" | "UNAVAILABLE" | "ERROR";
 export type CapabilityPresentation = "ENABLED" | "DISABLED" | "HIDDEN";
@@ -36,12 +38,28 @@ type CampaignPageReadinessInput = {
   assets: Array<{
     status: UceCampaignAssetStatus;
     briefs: Array<{
-      isActive: boolean;
-      title: string;
-      creativeRequirements: string;
+      status: UceBriefStatus;
+      briefName: string | null;
+      creativeIntent: string | null;
+      creatorBrief: string | null;
+      briefType: "CREATOR_LED" | "BRAND_LED" | null;
+      platform: "INSTAGRAM" | "TIKTOK" | "YOUTUBE" | null;
+      briefLevelGuidance: unknown;
+      referenceContent: unknown;
+      usageRights: unknown;
+      creatorRequirements: string | null;
       deliverables: Array<{
-        quantity: number;
-        creativeRequirements: string;
+        id: string;
+        format:
+          | "REEL_VIDEO"
+          | "STORY"
+          | "PHOTOSHOOT"
+          | "BANNER_CAROUSEL"
+          | null;
+        displayOrder: number | null;
+        configuration: unknown;
+        creativeGuidance: unknown;
+        amplifyTargetDeliverableId: string | null;
       }>;
     }>;
   }>;
@@ -54,18 +72,7 @@ export function resolveCampaignPageReadiness(
     (asset) => asset.status === UceCampaignAssetStatus.ACTIVE,
   );
   const readyBriefs = activeAssets.flatMap((asset) =>
-    asset.briefs.filter(
-      (brief) =>
-        brief.isActive &&
-        brief.title.trim().length >= 5 &&
-        brief.creativeRequirements.trim().length >= 10 &&
-        brief.deliverables.length > 0 &&
-        brief.deliverables.every(
-          (deliverable) =>
-            deliverable.quantity > 0 &&
-            deliverable.creativeRequirements.trim().length >= 5,
-        ),
-    ),
+    asset.briefs.filter((brief) => isApplicationSelectableBrief(brief)),
   );
   const missingRequirements = [
     ...(activeAssets.length > 0 ? [] : ["campaign_asset"]),
@@ -154,17 +161,9 @@ export class CampaignQueryService {
       throw new NotFoundException("Campaign not found");
     }
 
-    const [applicationCounts, provenanceRows] = await Promise.all([
-      this.resolveApplicationCounts(campaignId),
-      this.prisma.$queryRaw<Array<{ creation_source: string | null }>>`
-        SELECT "creation_source"
-        FROM "uce_campaigns"
-        WHERE "id" = ${campaignId}
-        LIMIT 1
-      `,
-    ]);
+    const applicationCounts = await this.resolveApplicationCounts(campaignId);
     const creationSource =
-      provenanceRows[0]?.creation_source === "AI_RECOMMENDED"
+      campaign.creationSource === "AI_RECOMMENDED"
         ? ("AI_RECOMMENDED" as const)
         : ("MANUAL" as const);
 
@@ -193,30 +192,59 @@ export class CampaignQueryService {
         null,
       briefs: asset.canonicalBriefs.map((brief) => ({
         briefId: brief.id,
-        name: brief.title,
-        status: brief.isActive ? ("PUBLISHED" as const) : ("PAUSED" as const),
-        creativeRequirements: brief.creativeRequirements,
+        name: brief.briefName,
+        status: brief.status,
+        creationSource: brief.creationSource,
+        creativeIntent: brief.creativeIntent,
+        creatorBrief: brief.creatorBrief,
+        briefType: brief.briefType,
+        platform: brief.platform,
+        briefLevelGuidance: brief.briefLevelGuidance,
+        referenceContent: brief.referenceContent,
+        usageRights: brief.usageRights,
+        creatorRequirements: brief.creatorRequirements,
+        legacyCreativeRequirements: brief.legacyCreativeRequirements,
         deliverables: brief.deliverables.map((deliverable) => ({
           deliverableId: deliverable.id,
-          format: deliverable.format,
-          quantity: deliverable.quantity,
-          creativeRequirements: deliverable.creativeRequirements,
-          publishingRequired: deliverable.publishingRequired,
+          format: deliverable.format ?? deliverable.legacyFormat,
+          canonicalFormat: deliverable.format,
+          displayOrder: deliverable.displayOrder,
+          configuration: deliverable.configuration,
+          creativeGuidance: deliverable.creativeGuidance,
+          amplifyTargetDeliverableId: deliverable.amplifyTargetDeliverableId,
+          legacyQuantity: deliverable.legacyQuantity,
+          legacyCreativeRequirements: deliverable.legacyCreativeRequirements,
+          legacyPublishingRequired: deliverable.legacyPublishingRequired,
         })),
       })),
     }));
     const readiness = resolveCampaignPageReadiness({
       status,
-      budgetPool: campaign.commercials
-        ? Number(campaign.commercials.totalCampaignBudgetPool)
-        : null,
+      budgetPool:
+        campaign.commercials?.canonicalVersion === 1
+          ? Number(campaign.commercials.totalCampaignBudgetPool)
+          : null,
       assets: campaign.assets.map((asset) => ({
         status: asset.status,
         briefs: asset.canonicalBriefs.map((brief) => ({
-          isActive: brief.isActive,
-          title: brief.title,
-          creativeRequirements: brief.creativeRequirements,
-          deliverables: brief.deliverables,
+          status: brief.status,
+          briefName: brief.briefName,
+          creativeIntent: brief.creativeIntent,
+          creatorBrief: brief.creatorBrief,
+          briefType: brief.briefType,
+          platform: brief.platform,
+          briefLevelGuidance: brief.briefLevelGuidance,
+          referenceContent: brief.referenceContent,
+          usageRights: brief.usageRights,
+          creatorRequirements: brief.creatorRequirements,
+          deliverables: brief.deliverables.map((deliverable) => ({
+            id: deliverable.id,
+            format: deliverable.format,
+            displayOrder: deliverable.displayOrder,
+            configuration: deliverable.configuration,
+            creativeGuidance: deliverable.creativeGuidance,
+            amplifyTargetDeliverableId: deliverable.amplifyTargetDeliverableId,
+          })),
         })),
       })),
     });
@@ -404,13 +432,41 @@ export class CampaignQueryService {
       details: {
         state: "READY" as SurfaceState,
         objective: campaign.strategy?.coreObjective ?? null,
-        platforms: campaign.strategy?.platformDeliverables ?? null,
-        visibilityScopes: campaign.targeting?.visibilityScopes ?? [],
-        compensationType: campaign.commercials?.compensationType ?? null,
-        budgetPool: campaign.commercials
-          ? Number(campaign.commercials.totalCampaignBudgetPool)
-          : null,
+        platforms: campaign.strategy?.platforms ?? [],
+        visibilityScopes: campaign.targeting?.visibilityScope
+          ? [campaign.targeting.visibilityScope]
+          : campaign.targeting?.visibilityScopes.length === 1
+            ? campaign.targeting.visibilityScopes
+            : [],
+        visibilityConfigurationState:
+          campaign.targeting?.visibilityScope ||
+          campaign.targeting?.visibilityScopes.length === 1
+            ? "AVAILABLE"
+            : "CAMPAIGN_VISIBILITY_CONFIGURATION_INVALID",
+        compensationType:
+          campaign.commercials?.canonicalVersion === 1
+            ? campaign.commercials.compensationType
+            : null,
+        commercialOffer:
+          campaign.commercials?.canonicalVersion === 1 &&
+          campaign.commercials.commercialOffer != null
+            ? Number(campaign.commercials.commercialOffer)
+            : null,
+        currency:
+          campaign.commercials?.canonicalVersion === 1
+            ? campaign.commercials.currency
+            : null,
+        budgetPool:
+          campaign.commercials?.canonicalVersion === 1
+            ? Number(campaign.commercials.totalCampaignBudgetPool)
+            : null,
+        commercialConfigurationState:
+          campaign.commercials?.canonicalVersion === 1
+            ? "AVAILABLE"
+            : "CAMPAIGN_COMMERCIAL_CONFIGURATION_INVALID",
         timelineType: campaign.strategy?.timelineType ?? null,
+        applicationDeadline:
+          campaign.applicationDeadline?.toISOString() ?? null,
       },
     };
   }

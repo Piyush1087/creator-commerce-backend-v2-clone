@@ -133,6 +133,39 @@ export class BrandUceController {
     );
   }
 
+  @Post("campaigns/:campaignId/canonical-briefs/:briefId/publish")
+  @HttpCode(200)
+  async publishCanonicalBrief(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Param("briefId") briefId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.canonicalBriefs.publish(brandProfileId, campaignId, briefId);
+  }
+
+  @Post("campaigns/:campaignId/canonical-briefs/:briefId/pause")
+  @HttpCode(200)
+  async pauseCanonicalBrief(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Param("briefId") briefId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.canonicalBriefs.pause(brandProfileId, campaignId, briefId);
+  }
+
+  @Post("campaigns/:campaignId/canonical-briefs/:briefId/resume")
+  @HttpCode(200)
+  async resumeCanonicalBrief(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Param("briefId") briefId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.canonicalBriefs.resume(brandProfileId, campaignId, briefId);
+  }
+
   @Get("campaigns/aggregates")
   async listAggregates(@Req() req: RequestWithAuthUser) {
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);

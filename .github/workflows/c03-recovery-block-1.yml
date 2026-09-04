@@ -1,0 +1,125 @@
+name: C03 Recovery Block 1
+
+on:
+  push:
+    branches:
+      - c03/recovery-campaign-participation-v1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c03-recovery-block-1-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  p11a-campaign-asset-brief:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: c03_recovery
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d c03_recovery"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      STAGE: local
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c03_recovery?schema=public
+      CHECKPOINT_DISABLE: "1"
+      PRISMA_HIDE_UPDATE_MESSAGE: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Recovery authority and immutable base identity
+        run: |
+          expected_p0=6a2bd2e4b815462abc702dea34f7c368c24a0664
+          original=$(git ls-remote origin refs/heads/c03/campaign-participation-v1 | cut -f 1)
+          test "$original" = "$expected_p0"
+          git merge-base --is-ancestor "$expected_p0" HEAD
+          test "$(git merge-base "$expected_p0" HEAD)" = "$expected_p0"
+          test -z "$(git status --porcelain)"
+          test "$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" = "75"
+          node --version
+          npm --version
+          echo "p0=$expected_p0"
+          echo "candidate=$(git rev-parse HEAD)"
+          echo "tree=$(git rev-parse HEAD^{tree})"
+
+      - name: Locked install and Prisma 6.19 static validation
+        run: |
+          timeout 15m npm ci
+          test "$(node -p "require('./node_modules/prisma/package.json').version")" = "6.19.3"
+          timeout 10m npm run prisma:generate
+          timeout 5m node node_modules/prisma/build/index.js format --check
+          timeout 5m node node_modules/prisma/build/index.js validate
+
+      - name: Fresh PostgreSQL 0-to-75 replay
+        run: |
+          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres c03_p11a_fresh
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11a_fresh?schema=public timeout 20m npm run db:migrate:deploy
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11a_fresh?schema=public timeout 20m node node_modules/prisma/build/index.js migrate status
+
+      - name: Seeded P0 74-to-75 upgrade and preflight
+        run: |
+          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres c03_p11a_upgrade
+          git worktree add --detach /tmp/c03-p0-base 6a2bd2e4b815462abc702dea34f7c368c24a0664
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11a_upgrade?schema=public timeout 20m node node_modules/prisma/build/index.js migrate deploy --schema=/tmp/c03-p0-base/prisma/schema.prisma
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11a_upgrade?schema=public timeout 5m node scripts/c03-p11a-seed-legacy-canonical-brief.mjs
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11a_upgrade?schema=public timeout 10m node scripts/c03-p11-preflight.mjs | tee /tmp/c03-p11a-preflight.json
+          test "$(jq -r .result /tmp/c03-p11a-preflight.json)" = "PASS"
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11a_upgrade?schema=public timeout 20m npm run db:migrate:deploy
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/c03_p11a_upgrade?schema=public timeout 20m node node_modules/prisma/build/index.js migrate status
+          backfill=$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11a_upgrade -Atc "select concat_ws('|', status, creation_source, is_active, creative_intent is null, creator_brief is null, brief_type is null, platform is null) from campaign_briefs where brief_id = 'c0311a00-0000-4000-8000-000000000004'")
+          test "$backfill" = "PUBLISHED|MANUAL|t|t|t|t|t"
+          deliverable=$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d c03_p11a_upgrade -Atc "select concat_ws('|', format, quantity, canonical_format is null, display_order is null) from campaign_brief_deliverables where deliverable_id = 'c0311a00-0000-4000-8000-000000000005'")
+          test "$deliverable" = "Instagram Reel|1|t|t"
+
+      - name: P1.1A real PostgreSQL negative invariants
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/c03_p11a_fresh?schema=public
+          C03_P11A_DATABASE_TEST: "true"
+        run: |
+          timeout 20m node node_modules/vitest/vitest.mjs run --config vitest.config.ts src/features/brand-uce/persistence/c03-p11a-campaign-brief.postgres.test.ts
+
+      - name: Canonical Campaign and Brief focused tests
+        run: |
+          timeout 30m node node_modules/vitest/vitest.mjs run --config vitest.config.ts \
+            src/features/brand-uce/services/canonical-campaign-brief.service.test.ts \
+            src/features/brand-uce/services/canonical-campaign-application-read.service.test.ts \
+            src/features/brand-uce/services/canonical-campaign-create.service.test.ts \
+            src/features/brand-uce/services/canonical-campaign-readiness.service.test.ts \
+            src/features/brand-uce/services/campaign-query.service.test.ts
+
+      - name: Full tests and production build
+        run: |
+          timeout 45m npm test
+          timeout 20m npm run build
+
+      - name: Upload P1.1A preflight evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: c03-p11a-preflight-${{ github.sha }}
+          path: /tmp/c03-p11a-preflight.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Final repository integrity
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"

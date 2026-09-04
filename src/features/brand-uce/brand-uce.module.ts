@@ -21,6 +21,7 @@ import { CanonicalCampaignCreateService } from "./services/canonical-campaign-cr
 import { CanonicalCampaignDraftReadService } from "./services/canonical-campaign-draft-read.service";
 import { CanonicalCampaignReadinessService } from "./services/canonical-campaign-readiness.service";
 import { CanonicalCampaignBriefService } from "./services/canonical-campaign-brief.service";
+import { CanonicalCampaignApplicationReadService } from "./services/canonical-campaign-application-read.service";
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { CanonicalCampaignBriefService } from "./services/canonical-campaign-bri
     CanonicalCampaignCreateService,
     CanonicalCampaignDraftReadService,
     CanonicalCampaignReadinessService,
+    CanonicalCampaignApplicationReadService,
   ],
   exports: [
     BrandUceCampaignService,
@@ -55,6 +57,7 @@ import { CanonicalCampaignBriefService } from "./services/canonical-campaign-bri
     CampaignQueryService,
     CampaignCommandService,
     CanonicalCampaignCreateService,
+    CanonicalCampaignApplicationReadService,
   ],
 })
 export class BrandUceModule {}

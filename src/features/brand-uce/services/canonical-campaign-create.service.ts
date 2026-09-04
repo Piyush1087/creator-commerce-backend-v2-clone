@@ -2,9 +2,11 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import {
   Prisma,
   UceApplicationScope,
+  UceBrandSupportType,
   UceCampaignObjective,
   UceCampaignStatus,
   UceCompensationType,
+  UceMediaPlatform,
   UcePayoutTerms,
   UceTimelineStructure,
   UceVisibilityScope,
@@ -154,16 +156,11 @@ export class CanonicalCampaignCreateService {
         // as canonical Campaign name and is replaced only after a valid name autosaves.
         name: "",
         status: UceCampaignStatus.DRAFT,
+        creationSource: "MANUAL",
+        canonicalDefinition: draft as Prisma.InputJsonValue,
       },
       select: { id: true, status: true },
     });
-
-    await this.prisma.$executeRaw`
-      UPDATE "uce_campaigns"
-      SET "creation_source" = 'MANUAL',
-          "canonical_definition" = ${JSON.stringify(draft)}::jsonb
-      WHERE "id" = ${campaign.id}
-    `;
 
     return {
       campaignId: campaign.id,
@@ -179,7 +176,7 @@ export class CanonicalCampaignCreateService {
   ) {
     const campaign = await this.prisma.uceCampaign.findFirst({
       where: { id: campaignId, brandProfileId },
-      select: { id: true, status: true },
+      select: { id: true, status: true, canonicalDefinition: true },
     });
     if (!campaign) throw new BadRequestException("Campaign draft not found.");
     if (campaign.status !== UceCampaignStatus.DRAFT) {
@@ -189,15 +186,7 @@ export class CanonicalCampaignCreateService {
     const patch = canonicalCampaignDraftPatchSchema.parse(input);
     const value = parseCanonicalDraftValue(patch.path, patch.value);
 
-    const rows = await this.prisma.$queryRaw<
-      Array<{ canonical_definition: unknown }>
-    >`
-      SELECT "canonical_definition"
-      FROM "uce_campaigns"
-      WHERE "id" = ${campaignId}
-      LIMIT 1
-    `;
-    const current = rows[0]?.canonical_definition;
+    const current = campaign.canonicalDefinition;
     const definition: CanonicalDraftDefinition =
       current &&
       typeof current === "object" &&
@@ -236,12 +225,10 @@ export class CanonicalCampaignCreateService {
           data: { name: value as string },
         });
       }
-      await tx.$executeRaw`
-        UPDATE "uce_campaigns"
-        SET "canonical_definition" = ${JSON.stringify(definition)}::jsonb,
-            "updated_at" = NOW()
-        WHERE "id" = ${campaignId}
-      `;
+      await tx.uceCampaign.update({
+        where: { id: campaignId },
+        data: { canonicalDefinition: definition as Prisma.InputJsonValue },
+      });
     });
 
     return {
@@ -320,6 +307,7 @@ export class CanonicalCampaignCreateService {
         platforms: ["INSTAGRAM"],
         canonicalObjective: objective,
       } as Prisma.InputJsonValue,
+      platforms: [UceMediaPlatform.INSTAGRAM],
     };
 
     const targetingData = {
@@ -339,6 +327,7 @@ export class CanonicalCampaignCreateService {
       ),
       disqualifyingKeywords: [],
       visibilityScopes: [visibility],
+      visibilityScope: visibility,
       applicationScope: legacyApplicationScope(
         payload.strategy.campaign_visibility,
       ),
@@ -354,6 +343,15 @@ export class CanonicalCampaignCreateService {
       totalCampaignBudgetPool: payload.commercials.total_campaign_budget,
       advancePaymentPercentage: payload.commercials.advance_payment_percentage,
       finalBalanceTerms: legacyPayout(payload.commercials.payout_terms),
+      canonicalVersion: 1,
+      commercialOffer: payload.commercials.commercial_offer,
+      currency: readiness.currency,
+      receivesBrandSupport: payload.commercials.receives_brand_support,
+      brandSupportType: payload.commercials.brand_support_type
+        ? UceBrandSupportType[payload.commercials.brand_support_type]
+        : null,
+      brandSupportEstimatedValue:
+        payload.commercials.brand_support_estimated_value ?? null,
     };
 
     await this.prisma.$transaction(async (tx) => {
@@ -362,6 +360,8 @@ export class CanonicalCampaignCreateService {
         data: {
           name: payload.strategy.campaign_name,
           status: UceCampaignStatus.PUBLISHED,
+          creationSource: "MANUAL",
+          canonicalDefinition: canonicalDefinition as Prisma.InputJsonValue,
           performanceAggregate: { upsert: { create: {}, update: {} } },
           strategy: { upsert: { create: strategyData, update: strategyData } },
           targeting: {
@@ -380,14 +380,6 @@ export class CanonicalCampaignCreateService {
           lastApiSyncTimestamp: new Date(),
         },
       });
-
-      await tx.$executeRaw`
-        UPDATE "uce_campaigns"
-        SET "creation_source" = 'MANUAL',
-            "canonical_definition" = ${JSON.stringify(canonicalDefinition)}::jsonb,
-            "updated_at" = NOW()
-        WHERE "id" = ${campaignId}
-      `;
     });
 
     return this.legacyCampaigns.getCampaignShell(brandProfileId, campaignId);

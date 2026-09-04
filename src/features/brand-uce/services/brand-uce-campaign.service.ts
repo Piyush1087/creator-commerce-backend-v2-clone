@@ -25,6 +25,7 @@ import {
 } from "../validation";
 import { decimalToNumber } from "../utils/uce-decimal.util";
 import { BrandUceAccessService } from "./brand-uce-access.service";
+import { isApplicationSelectableBrief } from "./canonical-campaign-application-read.service";
 
 const PROSPECT_STATUSES = ["PROSPECT_CURATED", "PROSPECT_INVITED"] as const;
 
@@ -1007,25 +1008,29 @@ export class BrandUceCampaignService {
   }
 
   private async buildActivationChecklist(campaignId: string) {
-    const [assetCount, briefCount, commercials] = await Promise.all([
+    const [assetCount, briefs, commercials] = await Promise.all([
       this.prisma.uceCampaignAsset.count({
         where: { campaignId, status: UceCampaignAssetStatus.ACTIVE },
       }),
-      this.prisma.canonicalCampaignBrief.count({
+      this.prisma.canonicalCampaignBrief.findMany({
         where: {
           campaignAsset: {
             campaignId,
             status: UceCampaignAssetStatus.ACTIVE,
           },
-          isActive: true,
-          deliverables: { some: { quantity: { gt: 0 } } },
+          status: "PUBLISHED",
         },
+        include: { deliverables: true },
       }),
       this.prisma.uceCampaignCommercials.findUnique({ where: { campaignId } }),
     ]);
 
+    const briefCount = briefs.filter((brief) =>
+      isApplicationSelectableBrief(brief),
+    ).length;
+
     const budgetOk =
-      commercials != null &&
+      commercials?.canonicalVersion === 1 &&
       decimalToNumber(commercials.totalCampaignBudgetPool) > 0;
 
     return [

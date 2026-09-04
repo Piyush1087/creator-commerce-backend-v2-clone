@@ -13,11 +13,37 @@ describe("Campaign lifecycle canonical readiness reconciliation", () => {
   it("builds go-live readiness from canonical Assets and nested Briefs", async () => {
     const prisma = {
       uceCampaignAsset: { count: vi.fn().mockResolvedValue(1) },
-      canonicalCampaignBrief: { count: vi.fn().mockResolvedValue(1) },
+      canonicalCampaignBrief: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            status: "PUBLISHED",
+            briefName: "Creator launch Brief",
+            creativeIntent: "Demonstrate a credible daily routine.",
+            creatorBrief: "Show the product in natural daylight.",
+            briefType: "CREATOR_LED",
+            platform: "INSTAGRAM",
+            briefLevelGuidance: null,
+            referenceContent: null,
+            usageRights: null,
+            creatorRequirements: null,
+            deliverables: [
+              {
+                id: "deliverable-1",
+                format: "REEL_VIDEO",
+                displayOrder: 0,
+                configuration: null,
+                creativeGuidance: null,
+                amplifyTargetDeliverableId: null,
+              },
+            ],
+          },
+        ]),
+      },
       uceCampaignCommercials: {
-        findUnique: vi
-          .fn()
-          .mockResolvedValue({ totalCampaignBudgetPool: 1000 }),
+        findUnique: vi.fn().mockResolvedValue({
+          totalCampaignBudgetPool: 1000,
+          canonicalVersion: 1,
+        }),
       },
       uceCampaignProduct: { count: vi.fn() },
       uceCampaignBrief: { count: vi.fn() },

@@ -577,6 +577,37 @@ enum UceMediaPlatform {
   YOUTUBE
 }
 
+enum UceBriefStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+}
+
+enum UceBriefCreationSource {
+  MANUAL
+  AI_RECOMMENDED
+}
+
+enum UceBriefType {
+  CREATOR_LED
+  BRAND_LED
+}
+
+enum UceDeliverableFormat {
+  REEL_VIDEO
+  STORY
+  PHOTOSHOOT
+  BANNER_CAROUSEL
+}
+
+enum UceBrandSupportType {
+  PRODUCT
+  SERVICE
+  EXPERIENCE
+  ACCESS_SUBSCRIPTION
+  OTHER
+}
+
 // ============================================================================
 // COLLABORATION (Unified Brand + Creator workflow)
 // ============================================================================
@@ -2619,13 +2650,17 @@ model BrandPlannerCard {
 // ============================================================================
 
 model UceCampaign {
-  id             String            @id @default(uuid())
-  brandProfileId String            @map("brand_profile_id")
-  brandProfile   BrandProfile      @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  name           String            @map("campaign_name")
-  status         UceCampaignStatus @default(DRAFT) @map("current_status")
-  createdAt      DateTime          @default(now()) @map("created_at")
-  updatedAt      DateTime          @updatedAt @map("updated_at")
+  id                  String            @id @default(uuid())
+  brandProfileId      String            @map("brand_profile_id")
+  brandProfile        BrandProfile      @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  name                String            @map("campaign_name")
+  status              UceCampaignStatus @default(DRAFT) @map("current_status")
+  creationSource      String            @default("MANUAL") @map("creation_source")
+  canonicalDefinition Json?             @map("canonical_definition")
+  liveAt              DateTime?         @map("live_at")
+  applicationDeadline DateTime?         @map("application_deadline")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
 
   performanceAggregate      UceCampaignPerformanceAggregate?
   strategy                  UceCampaignStrategy?
@@ -2645,6 +2680,7 @@ model UceCampaign {
   bridgeSignals             IntegrationBridgeSignalLedger[]
   creatorEntryContinuations CreatorEntryContinuation[]
 
+  @@unique([id, brandProfileId])
   @@index([brandProfileId, status])
   @@map("uce_campaigns")
 }
@@ -2686,6 +2722,7 @@ model UceCampaignAsset {
   updatedAt       DateTime                 @updatedAt @map("updated_at")
   canonicalBriefs CanonicalCampaignBrief[]
 
+  @@unique([campaignId, id])
   @@unique([campaignId, brandProfileId])
   @@unique([campaignId, offeringId])
   @@unique([campaignId, brandOfferId])
@@ -2695,32 +2732,55 @@ model UceCampaignAsset {
 
 /// Canonical Brief; ownership is always nested beneath a Campaign Asset.
 model CanonicalCampaignBrief {
-  id                   String                      @id @default(uuid()) @map("brief_id")
-  campaignAssetId      String                      @map("campaign_asset_id")
-  campaignAsset        UceCampaignAsset            @relation(fields: [campaignAssetId], references: [id], onDelete: Restrict)
-  title                String
-  creativeRequirements String                      @map("creative_requirements") @db.Text
-  isActive             Boolean                     @default(true) @map("is_active")
-  createdAt            DateTime                    @default(now()) @map("created_at")
-  updatedAt            DateTime                    @updatedAt @map("updated_at")
-  deliverables         CanonicalBriefDeliverable[]
+  id                         String                      @id @default(uuid()) @map("brief_id")
+  campaignAssetId            String                      @map("campaign_asset_id")
+  campaignAsset              UceCampaignAsset            @relation(fields: [campaignAssetId], references: [id], onDelete: Restrict)
+  status                     UceBriefStatus              @default(DRAFT)
+  creationSource             UceBriefCreationSource      @default(MANUAL) @map("creation_source")
+  briefName                  String?                     @map("title")
+  creativeIntent             String?                     @map("creative_intent") @db.Text
+  creatorBrief               String?                     @map("creator_brief") @db.Text
+  briefType                  UceBriefType?               @map("brief_type")
+  platform                   UceMediaPlatform?
+  briefLevelGuidance         Json?                       @map("brief_level_guidance")
+  referenceContent           Json?                       @map("reference_content")
+  usageRights                Json?                       @map("usage_rights")
+  creatorRequirements        String?                     @map("creator_requirements") @db.Text
+  publishedAt                DateTime?                   @map("published_at")
+  pausedAt                   DateTime?                   @map("paused_at")
+  legacyCreativeRequirements String?                     @map("creative_requirements") @db.Text
+  legacyIsActive             Boolean                     @default(false) @map("is_active")
+  createdAt                  DateTime                    @default(now()) @map("created_at")
+  updatedAt                  DateTime                    @updatedAt @map("updated_at")
+  deliverables               CanonicalBriefDeliverable[]
 
-  @@index([campaignAssetId, isActive])
+  @@unique([campaignAssetId, id])
+  @@index([campaignAssetId, status])
+  @@index([campaignAssetId, legacyIsActive])
   @@map("campaign_briefs")
 }
 
 model CanonicalBriefDeliverable {
-  id                   String                 @id @default(uuid()) @map("deliverable_id")
-  briefId              String                 @map("brief_id")
-  brief                CanonicalCampaignBrief @relation(fields: [briefId], references: [id], onDelete: Cascade)
-  format               String
-  quantity             Int
-  creativeRequirements String                 @map("creative_requirements") @db.Text
-  publishingRequired   Boolean                @map("publishing_required")
-  createdAt            DateTime               @default(now()) @map("created_at")
-  updatedAt            DateTime               @updatedAt @map("updated_at")
+  id                         String                      @id @default(uuid()) @map("deliverable_id")
+  briefId                    String                      @map("brief_id")
+  brief                      CanonicalCampaignBrief      @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  format                     UceDeliverableFormat?       @map("canonical_format")
+  displayOrder               Int?                        @map("display_order")
+  configuration              Json?
+  creativeGuidance           Json?                       @map("creative_guidance")
+  amplifyTargetDeliverableId String?                     @map("amplify_target_deliverable_id")
+  amplifyTargetDeliverable   CanonicalBriefDeliverable?  @relation("DeliverableAmplification", fields: [briefId, amplifyTargetDeliverableId], references: [briefId, id], onDelete: Restrict, onUpdate: Restrict)
+  amplifiedByDeliverables    CanonicalBriefDeliverable[] @relation("DeliverableAmplification")
+  legacyFormat               String?                     @map("format")
+  legacyQuantity             Int?                        @map("quantity")
+  legacyCreativeRequirements String?                     @map("creative_requirements") @db.Text
+  legacyPublishingRequired   Boolean?                    @map("publishing_required")
+  createdAt                  DateTime                    @default(now()) @map("created_at")
+  updatedAt                  DateTime                    @updatedAt @map("updated_at")
 
+  @@unique([briefId, id])
   @@index([briefId])
+  @@index([amplifyTargetDeliverableId])
   @@map("campaign_brief_deliverables")
 }
 
@@ -2847,6 +2907,7 @@ model UceCampaignStrategy {
   dynamicDaysLimit     Int?                 @map("dynamic_days_limit")
   coreObjective        UceCampaignObjective @map("core_objective")
   platformDeliverables Json                 @map("platform_deliverables")
+  platforms            UceMediaPlatform[]   @default([])
 
   @@map("uce_campaign_strategy")
 }
@@ -2863,21 +2924,29 @@ model UceCampaignTargeting {
   targetLocations       String[]             @default([]) @map("target_locations")
   disqualifyingKeywords String[]             @default([]) @map("disqualifying_keywords")
   visibilityScopes      UceVisibilityScope[] @default([EVERYONE]) @map("visibility_scopes")
+  visibilityScope       UceVisibilityScope?  @map("visibility_scope")
+  targetingVersion      Int                  @default(1) @map("targeting_version")
   applicationScope      UceApplicationScope  @default(EVERYONE) @map("application_scope")
 
   @@map("uce_campaign_targeting")
 }
 
 model UceCampaignCommercials {
-  campaignId               String              @id @map("campaign_id")
-  campaign                 UceCampaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  compensationType         UceCompensationType @map("compensation_type")
-  fixedFeeAmount           Decimal?            @default(0) @map("fixed_fee_amount") @db.Decimal(12, 2)
-  negotiableMinFee         Decimal?            @default(0) @map("negotiable_min_fee") @db.Decimal(12, 2)
-  negotiableMaxFee         Decimal?            @default(0) @map("negotiable_max_fee") @db.Decimal(12, 2)
-  totalCampaignBudgetPool  Decimal             @map("total_campaign_budget_pool") @db.Decimal(14, 2)
-  advancePaymentPercentage Int                 @default(30) @map("advance_payment_percentage")
-  finalBalanceTerms        UcePayoutTerms      @default(NET_30) @map("final_balance_terms")
+  campaignId                 String               @id @map("campaign_id")
+  campaign                   UceCampaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  compensationType           UceCompensationType  @map("compensation_type")
+  fixedFeeAmount             Decimal?             @default(0) @map("fixed_fee_amount") @db.Decimal(12, 2)
+  negotiableMinFee           Decimal?             @default(0) @map("negotiable_min_fee") @db.Decimal(12, 2)
+  negotiableMaxFee           Decimal?             @default(0) @map("negotiable_max_fee") @db.Decimal(12, 2)
+  totalCampaignBudgetPool    Decimal              @map("total_campaign_budget_pool") @db.Decimal(14, 2)
+  advancePaymentPercentage   Int                  @default(30) @map("advance_payment_percentage")
+  finalBalanceTerms          UcePayoutTerms       @default(NET_30) @map("final_balance_terms")
+  canonicalVersion           Int?                 @map("canonical_version")
+  commercialOffer            Decimal?             @map("commercial_offer") @db.Decimal(12, 2)
+  currency                   String?              @db.Char(3)
+  receivesBrandSupport       Boolean?             @map("receives_brand_support")
+  brandSupportType           UceBrandSupportType? @map("brand_support_type")
+  brandSupportEstimatedValue Decimal?             @map("brand_support_estimated_value") @db.Decimal(12, 2)
 
   @@map("uce_campaign_commercials")
 }

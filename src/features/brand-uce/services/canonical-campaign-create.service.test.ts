@@ -54,7 +54,6 @@ function setup(industry = "D2C") {
   const tx = {
     uceCampaign: { update: vi.fn().mockResolvedValue({}) },
     uceCampaignReportingSnapshot: { create: vi.fn().mockResolvedValue({}) },
-    $executeRaw: vi.fn().mockResolvedValue(1),
   };
   const prisma = {
     uceCampaign: {
@@ -96,9 +95,10 @@ describe("CanonicalCampaignCreateService publication readiness integration", () 
 
     await service.publishDraft("brand-1", "campaign-1", payload);
 
-    const canonicalDefinition = JSON.parse(
-      tx.$executeRaw.mock.calls[0][1] as string,
-    ) as { derived: unknown };
+    const update = tx.uceCampaign.update.mock.calls[0][0] as {
+      data: { canonicalDefinition: { derived: unknown } };
+    };
+    const canonicalDefinition = update.data.canonicalDefinition;
     expect(canonicalDefinition.derived).toEqual(
       canonicalDerivedProjection(readiness),
     );

@@ -1,4 +1,8 @@
-import { UceCampaignAssetStatus, UceCampaignStatus } from "@prisma/client";
+import {
+  UceBriefStatus,
+  UceCampaignAssetStatus,
+  UceCampaignStatus,
+} from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -10,13 +14,24 @@ const readyAsset = {
   status: UceCampaignAssetStatus.ACTIVE,
   briefs: [
     {
-      isActive: true,
-      title: "Creator launch brief",
-      creativeRequirements: "Show the product in natural daylight.",
+      status: UceBriefStatus.PUBLISHED,
+      briefName: "Creator launch brief",
+      creativeIntent: "Demonstrate a credible daily routine.",
+      creatorBrief: "Show the product in natural daylight.",
+      briefType: "CREATOR_LED" as const,
+      platform: "INSTAGRAM" as const,
+      briefLevelGuidance: null,
+      referenceContent: null,
+      usageRights: null,
+      creatorRequirements: null,
       deliverables: [
         {
-          quantity: 1,
-          creativeRequirements: "Open with a clear product hook.",
+          id: "deliverable-1",
+          format: "REEL_VIDEO" as const,
+          displayOrder: 0,
+          configuration: null,
+          creativeGuidance: { openingHook: true },
+          amplifyTargetDeliverableId: null,
         },
       ],
     },
@@ -38,6 +53,8 @@ function queryHarness() {
         id: "campaign-1",
         name: "Canonical Campaign",
         status: UceCampaignStatus.PUBLISHED,
+        creationSource: "MANUAL",
+        applicationDeadline: null,
         products: [],
         assets: [
           {
@@ -57,16 +74,31 @@ function queryHarness() {
             canonicalBriefs: [
               {
                 id: "brief-1",
-                title: "Creator launch brief",
-                creativeRequirements: "Show the product in natural daylight.",
-                isActive: true,
+                campaignAssetId: "asset-1",
+                status: UceBriefStatus.PUBLISHED,
+                creationSource: "MANUAL",
+                briefName: "Creator launch brief",
+                creativeIntent: "Demonstrate a credible daily routine.",
+                creatorBrief: "Show the product in natural daylight.",
+                briefType: "CREATOR_LED",
+                platform: "INSTAGRAM",
+                briefLevelGuidance: null,
+                referenceContent: null,
+                usageRights: null,
+                creatorRequirements: null,
+                legacyCreativeRequirements: null,
                 deliverables: [
                   {
                     id: "deliverable-1",
-                    format: "Instagram Reel",
-                    quantity: 1,
-                    creativeRequirements: "Open with a clear product hook.",
-                    publishingRequired: true,
+                    format: "REEL_VIDEO",
+                    displayOrder: 0,
+                    configuration: null,
+                    creativeGuidance: { openingHook: true },
+                    amplifyTargetDeliverableId: null,
+                    legacyFormat: null,
+                    legacyQuantity: null,
+                    legacyCreativeRequirements: null,
+                    legacyPublishingRequired: null,
                   },
                 ],
               },
@@ -78,6 +110,9 @@ function queryHarness() {
         commercials: {
           compensationType: "FIXED_FEE",
           totalCampaignBudgetPool: 1000,
+          canonicalVersion: 1,
+          commercialOffer: 100,
+          currency: "INR",
         },
         collaborations: [],
       }),
@@ -90,7 +125,7 @@ function queryHarness() {
       update: mutations.update,
       delete: mutations.delete,
     },
-    $queryRaw: vi.fn().mockResolvedValue([{ creation_source: "MANUAL" }]),
+    $queryRaw: vi.fn(),
     $executeRaw: mutations.executeRaw,
     $transaction: mutations.transaction,
   };
@@ -157,6 +192,8 @@ describe("Campaign Page readiness and workspace projection", () => {
       id: "campaign-legacy",
       name: "Legacy-only Campaign",
       status: UceCampaignStatus.LIVE,
+      creationSource: "MANUAL",
+      applicationDeadline: null,
       products: [
         {
           id: "legacy-product-1",
@@ -177,6 +214,9 @@ describe("Campaign Page readiness and workspace projection", () => {
       commercials: {
         compensationType: "FIXED_FEE",
         totalCampaignBudgetPool: 1000,
+        canonicalVersion: null,
+        commercialOffer: null,
+        currency: null,
       },
       collaborations: [],
     });
@@ -201,7 +241,11 @@ describe("Campaign Page readiness and workspace projection", () => {
     });
     expect(page.readiness).toEqual({
       ready: false,
-      missingRequirements: ["campaign_asset", "canonical_brief"],
+      missingRequirements: [
+        "campaign_asset",
+        "canonical_brief",
+        "campaign_budget",
+      ],
       remediation: [
         {
           requirement: "campaign_asset",
@@ -210,6 +254,10 @@ describe("Campaign Page readiness and workspace projection", () => {
         {
           requirement: "canonical_brief",
           message: "Create a canonical Brief beneath an active Campaign Asset.",
+        },
+        {
+          requirement: "campaign_budget",
+          message: "Configure a positive Campaign budget.",
         },
       ],
       activeAssetCount: 0,
