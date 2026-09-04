@@ -17,7 +17,7 @@ Status vocabulary: `PASS` / `FIXED` / `GENUINE_AUTHORITY_CONFLICT` / `ENVIRONMEN
 
 | Repo | Branch | SHA |
 |------|--------|-----|
-| Backend | `integration/chat-home-v1` | *(tip after boot-fix + docs commit — use `git rev-parse HEAD`)* |
+| Backend | `integration/chat-home-v1` | `0ad6443beb17047ae2676223abf8f33e28905bf6` |
 | Frontend | `integration/chat-home-v1` | `251048074b46b1edf909a6d734c1f1b31ad5a040` |
 
 Accepted source runtimes (ancestors): BE `00e1299ec2e97497bc6d81aeda808d6edd3b482a` · FE `1cf2e3bd93425f60fb3d40692320078aea567794`
