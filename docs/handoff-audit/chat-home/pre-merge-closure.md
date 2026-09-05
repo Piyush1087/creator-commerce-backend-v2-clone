@@ -1,4 +1,4 @@
-# Chat Home V1 — Pre-Merge Closure (Piyush authority)
+# Chat Home V1 â€” Pre-Merge Closure (Piyush authority)
 
 **Authority:** Piyush pre-merge closure mail (bounded integration-validation / release-hygiene).
 **Date:** 2026-09-05
@@ -16,7 +16,7 @@ Vocabulary: `PASS` / `FIXED` / `GENUINE_AUTHORITY_CONFLICT` / `ENVIRONMENT_BLOCK
 | Backend | `https://github.com/growth-verse/creator-commerce-backend-v2.git` | see Final SHAs below | `2f03819a6ef974a26afd98064909de6f7b2a04a2` |
 | Frontend | `https://github.com/growth-verse/creator-commerce-frontend-v2.git` | see Final SHAs below | `f4e6c49b61c49ecf784961c5d770f9fb050c288b` |
 
-Clone mirror (review only): `piyush` → `Piyush1087/*-clone`.
+Clone mirror (review only): `piyush` â†’ `Piyush1087/*-clone`.
 
 **Development moved since integration branch create?**
 No. Merge-base equals `origin/development` on both repos (`ahead` only on integration; `behind` = 0).
@@ -66,17 +66,17 @@ Logs: `premerge-fe-baseline-full.log`, `premerge-fe-candidate-full-rerun.log`.
 
 | Item | Action |
 |------|--------|
-| BE `route-webhook.service.test` | **FIXED** — ConfigService mock ignores empty `.env` `RAZORPAY_ROUTE_WEBHOOK_SECRET=` |
-| BE DE-W1.0F architecture imports assert | **FIXED** — allow Chat `NotificationsModule`/`forwardRef` while requiring DE + BrandCanonical imports |
-| BE `notifications-module-wiring` | **FIXED** — asserts updated to merged development CreatorSettings/Instagram shapes |
-| FE obsolete `social-sync-view.test.ts` | **FIXED** — removed; tested Settings APIs not used by development `SocialSyncView` |
-| FE `google-id-token.test.ts` | **FIXED** — `vi.stubEnv` for unset client ID |
+| BE `route-webhook.service.test` | **FIXED** â€” ConfigService mock ignores empty `.env` `RAZORPAY_ROUTE_WEBHOOK_SECRET=` |
+| BE DE-W1.0F architecture imports assert | **FIXED** â€” allow Chat `NotificationsModule`/`forwardRef` while requiring DE + BrandCanonical imports |
+| BE `notifications-module-wiring` | **FIXED** â€” asserts updated to merged development CreatorSettings/Instagram shapes |
+| FE obsolete `social-sync-view.test.ts` | **FIXED** â€” removed; tested Settings APIs not used by development `SocialSyncView` |
+| FE `google-id-token.test.ts` | **FIXED** â€” `vi.stubEnv` for unset client ID |
 
-**Merge bar:** zero candidate-only failures — **PASS**.
+**Merge bar:** zero candidate-only failures â€” **PASS**.
 
 ---
 
-## 3. Intelligence contracts verification — PASS
+## 3. Intelligence contracts verification â€” PASS
 
 Official CLI (design of the tool):
 
@@ -95,7 +95,7 @@ Note: architecture YAML lives in `Piyush1087/dummy_tcs`, not in the backend tree
 
 ---
 
-## 4. Gemini SST fallback — restored
+## 4. Gemini SST fallback â€” restored
 
 `sst.config.ts` generic fallback:
 
@@ -112,32 +112,32 @@ Matches `origin/development`.
 
 | Gate | Result |
 |------|--------|
-| P7-C1 workspace auth postgres | **PASS** — 11/11 (`premerge-be-p7c1-reconfirm.log`) |
+| P7-C1 workspace auth postgres | **PASS** â€” 11/11 (`premerge-be-p7c1-reconfirm.log`) |
 | Backend `nest build` | **PASS** |
 | Frontend `tsc -b` | **PASS** |
 | Frontend `npm run build` | **PASS** |
 | `git diff --check` vs `origin/development` | **PASS** after trailing-whitespace doc cleanup (commit on tip) |
-| Migration integrity | **PASS** — 74 migration folders; accepted PI SQL blobs unchanged: `9718a592…`, `e00ea913…`, `e9b4252f…` |
+| Migration integrity | **PASS** â€” 74 migration folders; accepted PI SQL blobs unchanged: `9718a592â€¦`, `e00ea913â€¦`, `e9b4252fâ€¦` |
 
-P5 fixture + authenticated browser smoke: **deferred** to D1–D3 per mail (do not block merge).
+P5 fixture + authenticated browser smoke: **deferred** to D1â€“D3 per mail (do not block merge).
 
 ---
 
 ## 6. Final candidate SHAs
 
-Fill after the closure commit + push (this file’s tip):
+Fill after the closure commit + push (this fileâ€™s tip):
 
 | Repo | Branch | SHA |
 |------|--------|-----|
-| Backend | `integration/chat-home-v1` | *(pushed tip)* |
-| Frontend | `integration/chat-home-v1` | *(pushed tip)* |
+| Backend | `integration/chat-home-v1` | d3f4f4717f802cecc7265925d200a0b10ec5d106 |
+| Frontend | `integration/chat-home-v1` | d3f4f4717f802cecc7265925d200a0b10ec5d106 |
 
-Accepted runtimes still ancestors: BE `00e1299e…` · FE `1cf2e3bd…`.
+Accepted runtimes still ancestors: BE `00e1299eâ€¦` Â· FE `1cf2e3bdâ€¦`.
 
 ---
 
 ## 7. Ask
 
 Please authorize **`INTEGRATION_MERGE_AUTHORIZED`** for merge of these tips into `origin/development`.
-After merge is confirmed, we can proceed to **dev deploy + D1–D3 smoke**.
+After merge is confirmed, we can proceed to **dev deploy + D1â€“D3 smoke**.
 **Production remains separately gated.**
