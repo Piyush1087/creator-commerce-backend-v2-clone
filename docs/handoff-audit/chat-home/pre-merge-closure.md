@@ -125,19 +125,17 @@ P5 fixture + authenticated browser smoke: **deferred** to D1â€“D3 per mail 
 
 ## 6. Final candidate SHAs
 
-Fill after the closure commit + push (this fileâ€™s tip):
-
 | Repo | Branch | SHA |
 |------|--------|-----|
-| Backend | `integration/chat-home-v1` | ed3d9cdb331dbc73d3f669d268e1ce61fab39a06 |
-| Frontend | `integration/chat-home-v1` | ed3d9cdb331dbc73d3f669d268e1ce61fab39a06 |
+| Backend | `integration/chat-home-v1` | `0b11eefe987b44f8310e015ac701fc420cf43613` |
+| Frontend | `integration/chat-home-v1` | `83aa665a008958eb50859d975e8955b9486583b0` |
 
-Accepted runtimes still ancestors: BE `00e1299eâ€¦` Â· FE `1cf2e3bdâ€¦`.
+Accepted runtimes still ancestors: BE `00e1299e…` · FE `1cf2e3bd…`.
 
 ---
 
 ## 7. Ask
 
 Please authorize **`INTEGRATION_MERGE_AUTHORIZED`** for merge of these tips into `origin/development`.
-After merge is confirmed, we can proceed to **dev deploy + D1â€“D3 smoke**.
+After merge is confirmed, we can proceed to **dev deploy + D1–D3 smoke**.
 **Production remains separately gated.**
