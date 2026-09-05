@@ -127,7 +127,7 @@ P5 fixture + authenticated browser smoke: **deferred** to D1â€“D3 per mail 
 
 | Repo | Branch | SHA |
 |------|--------|-----|
-| Backend | `integration/chat-home-v1` | `942fb4680604edd8d4242c201c32345ac6e5d00d` |
+| Backend | `integration/chat-home-v1` | `ea37cbc4929f934c6b85eac3083e5cb5956b654f` |
 | Frontend | `integration/chat-home-v1` | `83aa665a008958eb50859d975e8955b9486583b0` |
 
 Accepted runtimes still ancestors: BE `00e1299e…` · FE `1cf2e3bd…`.
