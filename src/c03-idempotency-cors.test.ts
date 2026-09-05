@@ -12,6 +12,7 @@ import { ApplicationSubmitService } from "./features/campaign-applications/appli
 import { ApplicationSubmitContextService } from "./features/campaign-applications/application-submit-context.service";
 import { ApplicationTerminalService } from "./features/campaign-applications/application-terminal.service";
 import { ApplicationHistoryService } from "./features/campaign-applications/application-history.service";
+import { NotificationDispatchService } from "./features/notifications/services/notification-dispatch.service";
 import { CampaignApplicationsController } from "./features/campaign-applications/campaign-applications.controller";
 import { privateApplicationResponse } from "./features/campaign-applications/campaign-applications.module";
 
@@ -47,6 +48,7 @@ describe("C03 canonical idempotency CORS contract", () => {
         PrismaService,
         CreatorWorkspaceActorService,
         ApplicationSubmitContextService,
+        NotificationDispatchService,
       ],
       ApplicationSubmitService,
     );
@@ -57,6 +59,7 @@ describe("C03 canonical idempotency CORS contract", () => {
         { provide: PrismaService, useValue: {} },
         { provide: CreatorWorkspaceActorService, useValue: { resolve } },
         { provide: ApplicationSubmitContextService, useValue: {} },
+        { provide: NotificationDispatchService, useValue: {} },
         { provide: ApplicationTerminalService, useValue: {} },
         { provide: ApplicationHistoryService, useValue: {} },
       ],

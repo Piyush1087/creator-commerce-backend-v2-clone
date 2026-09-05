@@ -11,7 +11,7 @@ export type CollaborationThreadRow = {
   creator_user_id: string;
   campaign_id: string;
   campaign_name: string;
-  brief_id: string;
+  brief_id: string | null;
   brief_title: string;
   creator_display_name: string | null;
   creator_handle: string | null;

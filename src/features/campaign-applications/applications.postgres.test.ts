@@ -20,7 +20,13 @@ describe.skipIf(process.env.C03_P13_DATABASE_TEST !== "true")(
     const h = applicationHarness(prisma);
     beforeAll(async () => {
       const url = new URL(process.env.DATABASE_URL ?? "");
-      if (url.hostname !== "localhost" || url.pathname !== "/c03_p13")
+      if (
+        url.hostname !== "localhost" ||
+        url.pathname !==
+          (process.env.C03_P14_DATABASE_TEST === "true"
+            ? "/c03_p14_handoff"
+            : "/c03_p13")
+      )
         throw new Error("C03_P13_DISPOSABLE_DATABASE_REQUIRED");
       await prisma.$connect();
     });
@@ -510,7 +516,7 @@ describe.skipIf(process.env.C03_P13_DATABASE_TEST !== "true")(
       ).toBe(0);
     });
 
-    it("canonical approval fails closed with no approved event, receipt, Collaboration or sibling mutation", async () => {
+    it("canonical approval uses the installed P1.4 handoff with event and receipt", async () => {
       const f = await fixture(),
         first = await submit(f);
       await expect(
@@ -521,22 +527,20 @@ describe.skipIf(process.env.C03_P13_DATABASE_TEST !== "true")(
           "APPROVE",
           randomUUID(),
         ),
-      ).rejects.toMatchObject({
-        response: { code: "C03_CANONICAL_APPLICATION_HANDOFF_NOT_AVAILABLE" },
-      });
+      ).resolves.toMatchObject({ status: "APPROVED" });
       expect(
         (await h.history.detail(f.owner.user, first.applicationId)).status,
-      ).toBe("PENDING");
+      ).toBe("APPROVED");
       expect(
         await prisma.applicationDomainEvent.count({
           where: { applicationId: first.applicationId, eventName: "APPROVED" },
         }),
-      ).toBe(0);
+      ).toBe(1);
       expect(
         await prisma.applicationCommandReceipt.count({
           where: { applicationId: first.applicationId, commandType: "APPROVE" },
         }),
-      ).toBe(0);
+      ).toBe(1);
       expect(
         await prisma.uceCampaignCollaboration.count({
           where: { campaignId: f.c.campaign.id },

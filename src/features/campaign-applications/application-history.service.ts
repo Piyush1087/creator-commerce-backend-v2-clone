@@ -11,7 +11,7 @@ import type { AuthUser } from "../auth/types/auth-user";
 import { CreatorWorkspaceActorService } from "../creator-settings/team/creator-workspace-actor.service";
 
 export type ApplicationWithSnapshot = Prisma.UceApplicationGetPayload<{
-  include: { snapshot: true };
+  include: { snapshot: true; collaboration: { select: { id: true } } };
 }>;
 const cursorSchema = z
   .object({ appliedAt: z.string().datetime(), id: z.string().uuid() })
@@ -96,7 +96,7 @@ export function projectApplication(
       Boolean(
         actor?.allowedActions.includes("CAMPAIGN_APPLICATION_WITHDRAW_PENDING"),
       ),
-    collaborationId: null,
+    collaborationId: row.collaboration?.id ?? null,
   };
 }
 
@@ -142,7 +142,7 @@ export class ApplicationHistoryService {
               }
             : {}),
         },
-        include: { snapshot: true },
+        include: { snapshot: true, collaboration: { select: { id: true } } },
         orderBy: [{ appliedAt: "desc" }, { id: "desc" }],
         take: 21,
       });
@@ -173,7 +173,7 @@ export class ApplicationHistoryService {
           subjectCreatorProfileId: actor.subjectCreatorProfileId,
           subjectCreatorWorkspaceId: actor.workspaceId,
         },
-        include: { snapshot: true },
+        include: { snapshot: true, collaboration: { select: { id: true } } },
       });
       if (!row) throw new NotFoundException({ code: "APPLICATION_NOT_FOUND" });
       return projectApplication(row, actor, true);

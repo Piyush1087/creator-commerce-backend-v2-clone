@@ -178,7 +178,7 @@ describe("CampaignApplicationService development authority", () => {
         {
           applicationId,
           referenceAuthority: "C03_CANONICAL",
-          canApprove: false,
+          canApprove: true,
           canReject: true,
           campaign: { name: "Historical Campaign" },
           commercial: { offer: "100", currency: "INR" },

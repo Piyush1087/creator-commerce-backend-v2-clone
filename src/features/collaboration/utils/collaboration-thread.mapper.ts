@@ -10,6 +10,8 @@ import {
   BrandProfile,
   User,
   CreatorProfile,
+  UceApplicationSnapshot,
+  Prisma,
 } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 
@@ -21,7 +23,11 @@ import type {
 
 type ThreadSource = Collaboration & {
   campaign: Pick<UceCampaign, "name">;
-  brief: Pick<UceCampaignBrief, "internalTitle" | "creativeGuidelines">;
+  brief: Pick<UceCampaignBrief, "internalTitle" | "creativeGuidelines"> | null;
+  sourceApplication?: {
+    canonicalBriefId: string | null;
+    snapshot: UceApplicationSnapshot | null;
+  } | null;
   brandProfile: Pick<BrandProfile, "name">;
   creatorUser: Pick<User, "name" | "email"> & {
     creatorProfile: Pick<
@@ -35,10 +41,36 @@ type ThreadSource = Collaboration & {
   media: CollaborationMedia[];
 };
 
+function snapshotText(
+  value: Prisma.JsonValue | undefined,
+  key: string,
+): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return typeof value[key] === "string" ? value[key] : null;
+}
+function historicalContext(row: ThreadSource) {
+  const snapshot = row.sourceApplication?.snapshot;
+  if (row.sourceApplicationId && !snapshot)
+    throw new Error("C03_COLLABORATION_SNAPSHOT_MISSING");
+  return {
+    campaignName: snapshot
+      ? (snapshotText(snapshot.campaignContext, "name") ?? "Campaign")
+      : row.campaign.name,
+    briefId: row.sourceApplication?.canonicalBriefId ?? row.briefId,
+    briefTitle: snapshot
+      ? (snapshotText(snapshot.briefContext, "briefName") ?? "Brief")
+      : (row.brief?.internalTitle ?? "Brief"),
+    creativeGuidelines: snapshot
+      ? snapshotText(snapshot.briefContext, "creatorBrief")
+      : (row.brief?.creativeGuidelines ?? null),
+  };
+}
+
 export function mapCollaborationThreadRow(
   row: ThreadSource,
   viewerRole: "BRAND" | "CREATOR",
 ): CollaborationThreadRow {
+  const historical = historicalContext(row);
   const profile = row.creatorUser.creatorProfile;
   const handle =
     profile?.instagramHandle ??
@@ -50,9 +82,9 @@ export function mapCollaborationThreadRow(
     brand_profile_id: row.brandProfileId,
     creator_user_id: row.creatorUserId,
     campaign_id: row.campaignId,
-    campaign_name: row.campaign.name,
-    brief_id: row.briefId,
-    brief_title: row.brief.internalTitle,
+    campaign_name: historical.campaignName,
+    brief_id: historical.briefId,
+    brief_title: historical.briefTitle,
     creator_display_name: profile?.displayName ?? row.creatorUser.name,
     creator_handle: handle,
     brand_name: row.brandProfile.name,
@@ -63,9 +95,7 @@ export function mapCollaborationThreadRow(
     fulfillment_issue_count: row.fulfillmentIssueCount,
     revision_count: row.revisionCount,
     unread_count:
-      viewerRole === "BRAND"
-        ? row.unreadCountBrand
-        : row.unreadCountCreator,
+      viewerRole === "BRAND" ? row.unreadCountBrand : row.unreadCountCreator,
     last_message_snippet: row.lastMessageSnippet,
     last_message_at: row.lastMessageAt?.toISOString() ?? null,
     is_paused: row.isPaused,
@@ -74,6 +104,7 @@ export function mapCollaborationThreadRow(
 }
 
 export function mapCollaborationDetail(row: ThreadSource) {
+  const historical = historicalContext(row);
   const commercials = row.commercials;
   const profile = row.creatorUser.creatorProfile;
   const handle =
@@ -89,10 +120,15 @@ export function mapCollaborationDetail(row: ThreadSource) {
     : null;
   const initialQuoteNum = commercials?.initialQuote
     ? decimalToNumber(commercials.initialQuote)
-    : 0;
+    : row.sourceApplicationId
+      ? null
+      : 0;
 
   const displayQuote =
-    finalQuoteNum ?? brandCounterNum ?? initialQuoteNum ?? 0;
+    finalQuoteNum ??
+    brandCounterNum ??
+    initialQuoteNum ??
+    (row.sourceApplicationId ? null : 0);
 
   return {
     thread: {
@@ -101,14 +137,20 @@ export function mapCollaborationDetail(row: ThreadSource) {
       payoutMode: row.payoutMode,
       industry: row.industry,
       negotiationRound: row.negotiationRound,
+      ...(row.sourceApplicationId
+        ? {
+            sourceApplicationId: row.sourceApplicationId,
+            handoffCommercialState: row.handoffCommercialState,
+          }
+        : {}),
       fulfillmentIssueCount: row.fulfillmentIssueCount,
       revisionCount: row.revisionCount,
       isTerminated: row.isTerminated,
       isPaused: row.isPaused,
-      campaign: { name: row.campaign.name },
+      campaign: { name: historical.campaignName },
       brief: {
-        internalTitle: row.brief.internalTitle,
-        creativeGuidelines: row.brief.creativeGuidelines,
+        internalTitle: historical.briefTitle,
+        creativeGuidelines: historical.creativeGuidelines,
       },
       brandProfile: { name: row.brandProfile.name },
       creatorUser: {
@@ -127,7 +169,7 @@ export function mapCollaborationDetail(row: ThreadSource) {
       ? {
           initial_quote: initialQuoteNum,
           brand_counter_offer: brandCounterNum,
-          final_quote: finalQuoteNum ?? 0,
+          final_quote: finalQuoteNum ?? (row.sourceApplicationId ? null : 0),
           product_retail_value: decimalToNumber(commercials.productRetailValue),
           is_final_offer: commercials.isFinalOffer,
           advance_30_amount: decimalToNumber(commercials.advance30Amount),
@@ -171,7 +213,9 @@ export function mapCollaborationDetail(row: ThreadSource) {
   };
 }
 
-export function mapMessageRow(msg: CollaborationMessage): CollaborationMessageRow {
+export function mapMessageRow(
+  msg: CollaborationMessage,
+): CollaborationMessageRow {
   return {
     message_id: msg.id,
     kind: msg.kind,

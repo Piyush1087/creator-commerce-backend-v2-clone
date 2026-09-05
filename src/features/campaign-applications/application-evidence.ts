@@ -43,8 +43,14 @@ export async function appendApplicationEvent(
   actor: EventActor,
   now: Date,
   command?: { type: ApplicationCommandType; identity: CommandIdentity },
+  handoff?: {
+    transitionId?: string;
+    approvedCollaborationId?: string;
+    /** Transactional outbox only; never external I/O. Runs before receipt. */
+    enqueue?: (transitionId: string) => Promise<unknown>;
+  },
 ) {
-  const transitionId = randomUUID();
+  const transitionId = handoff?.transitionId ?? randomUUID();
   const actorUserId =
     actor.kind === "CREATOR_TEAM_USER"
       ? actor.actor.actorUserId
@@ -54,6 +60,7 @@ export async function appendApplicationEvent(
   await tx.applicationDomainEvent.create({
     data: {
       transitionId,
+      approvedCollaborationId: handoff?.approvedCollaborationId,
       applicationId: application.id,
       applicationVersion: application.statusVersion,
       eventName,
@@ -77,6 +84,7 @@ export async function appendApplicationEvent(
       canonicalBriefId: application.canonicalBriefId,
     },
   });
+  await handoff?.enqueue?.(transitionId);
   if (command && actorUserId)
     await tx.applicationCommandReceipt.create({
       data: {

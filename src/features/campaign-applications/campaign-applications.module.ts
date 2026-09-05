@@ -21,6 +21,8 @@ import { ApplicationSubmitService } from "./application-submit.service";
 import { ApplicationTerminalService } from "./application-terminal.service";
 import { ApplicationHistoryService } from "./application-history.service";
 import { CampaignApplicationsController } from "./campaign-applications.controller";
+import { ApplicationHandoffModule } from "../collaboration/application-handoff.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 
 export function privateApplicationResponse(
   _req: Request,
@@ -36,6 +38,8 @@ export function privateApplicationResponse(
 @Module({
   imports: [
     PrismaModule,
+    ApplicationHandoffModule,
+    NotificationsModule,
     AuthModule,
     BrandCentreModule,
     CreatorTeamModule,

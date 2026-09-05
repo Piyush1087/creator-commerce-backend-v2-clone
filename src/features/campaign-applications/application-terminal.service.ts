@@ -6,6 +6,9 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
+import { randomUUID } from "node:crypto";
+import { ApprovedApplicationCollaborationPort } from "./approved-application-collaboration.port";
+import { NotificationDispatchService } from "../notifications/services/notification-dispatch.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../auth/types/auth-user";
 import { BrandCentreAuthService } from "../brand-centre/brand-centre-auth.service";
@@ -30,6 +33,8 @@ export class ApplicationTerminalService {
     private readonly prisma: PrismaService,
     private readonly actors: CreatorWorkspaceActorService,
     private readonly brands: BrandCentreAuthService,
+    private readonly collaboration: ApprovedApplicationCollaborationPort,
+    private readonly notifications: NotificationDispatchService,
   ) {}
 
   async withdraw(user: AuthUser, applicationId: string, key: unknown) {
@@ -138,17 +143,10 @@ export class ApplicationTerminalService {
         if (!campaign || application.brandProfileId !== brandProfileId)
           throw this.notFound();
         this.assertPending(application);
-        if (kind === "APPROVE") {
-          // P1.4 must implement the trusted atomic handoff before this boundary
-          // can transition. There is deliberately no legacy provision fallback.
-          throw new ConflictException({
-            code: "C03_CANONICAL_APPLICATION_HANDOFF_NOT_AVAILABLE",
-          });
-        }
         return this.transition(
           tx,
           application,
-          "REJECTED",
+          kind === "APPROVE" ? "APPROVED" : "REJECTED",
           { kind: "BRAND_USER", actorUserId: user.id },
           identity,
         );
@@ -224,11 +222,12 @@ export class ApplicationTerminalService {
   private async transition(
     tx: Prisma.TransactionClient,
     application: CanonicalApplication,
-    status: "WITHDRAWN" | "REJECTED" | "EXPIRED",
+    status: "WITHDRAWN" | "REJECTED" | "EXPIRED" | "APPROVED",
     actor: EventActor,
     identity?: CommandIdentity,
   ) {
     this.assertPending(application);
+    const transitionId = randomUUID();
     const now = new Date();
     const changed = await tx.uceApplication.updateMany({
       where: {
@@ -240,6 +239,13 @@ export class ApplicationTerminalService {
     });
     if (changed.count !== 1)
       throw new ConflictException({ code: "APPLICATION_TRANSITION_CONFLICT" });
+    const approved =
+      status === "APPROVED"
+        ? await this.collaboration.provisionFromApprovedApplication(tx, {
+            applicationId: application.id,
+            approvalTransitionId: transitionId,
+          })
+        : undefined;
     return appendApplicationEvent(
       tx,
       {
@@ -252,8 +258,45 @@ export class ApplicationTerminalService {
       actor,
       now,
       identity
-        ? { type: status === "WITHDRAWN" ? "WITHDRAW" : "REJECT", identity }
+        ? {
+            type:
+              status === "WITHDRAWN"
+                ? "WITHDRAW"
+                : status === "APPROVED"
+                  ? "APPROVE"
+                  : "REJECT",
+            identity,
+          }
         : undefined,
+      {
+        transitionId,
+        approvedCollaborationId: approved?.collaborationId,
+        enqueue:
+          status === "APPROVED" || status === "REJECTED"
+            ? () =>
+                this.notifications.enqueueWithinTransaction(tx, {
+                  creatorWorkspaceId: application.subjectCreatorWorkspaceId,
+                  eventType:
+                    status === "APPROVED"
+                      ? "campaigns.application_approved"
+                      : "campaigns.application_rejected",
+                  source: {
+                    sourceType: "c03_application",
+                    sourceId: application.id,
+                    transitionId,
+                  },
+                  payload: {
+                    application_id: application.id,
+                    campaign_id: application.campaignId,
+                    ...(approved
+                      ? { collaboration_id: approved.collaborationId }
+                      : {}),
+                  },
+                  triggerUserId:
+                    actor.kind === "BRAND_USER" ? actor.actorUserId : undefined,
+                })
+            : undefined,
+      },
     );
   }
 

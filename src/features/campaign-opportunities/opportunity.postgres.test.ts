@@ -62,7 +62,11 @@ describe.skipIf(process.env.C03_P12_DATABASE_TEST !== "true")(
     beforeAll(async () => {
       const url = new URL(process.env.DATABASE_URL ?? "");
       const database =
-        process.env.C03_P13_DATABASE_TEST === "true" ? "/c03_p13" : "/c03_p12";
+        process.env.C03_P14_DATABASE_TEST === "true"
+          ? "/c03_p14_handoff"
+          : process.env.C03_P13_DATABASE_TEST === "true"
+            ? "/c03_p13"
+            : "/c03_p12";
       if (url.hostname !== "localhost" || url.pathname !== database)
         throw new Error("C03_P12_DISPOSABLE_DATABASE_REQUIRED");
       await prisma.$connect();

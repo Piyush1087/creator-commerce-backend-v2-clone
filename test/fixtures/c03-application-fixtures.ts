@@ -13,6 +13,9 @@ import { ApplicationSubmitContextService } from "../../src/features/campaign-app
 import { ApplicationSubmitService } from "../../src/features/campaign-applications/application-submit.service";
 import { ApplicationTerminalService } from "../../src/features/campaign-applications/application-terminal.service";
 import { ApplicationHistoryService } from "../../src/features/campaign-applications/application-history.service";
+import { ApprovedApplicationCollaborationService } from "../../src/features/collaboration/services/approved-application-collaboration.service";
+import { NotificationDispatchService } from "../../src/features/notifications/services/notification-dispatch.service";
+import { NotificationRecipientPolicyService } from "../../src/features/notifications/services/notification-recipient-policy.service";
 
 export function applicationHarness(prisma: PrismaClient) {
   const db = prisma as unknown as PrismaService;
@@ -31,13 +34,26 @@ export function applicationHarness(prisma: PrismaClient) {
     invitations,
   );
   const brands = new BrandCentreAuthService(db, {} as never);
+  const notifications = new NotificationDispatchService(
+    db,
+    new NotificationRecipientPolicyService(db),
+  );
+  const collaboration = new ApprovedApplicationCollaborationService();
   return {
     actors,
     contexts,
     invitations,
     brands,
-    submit: new ApplicationSubmitService(db, actors, contexts),
-    terminal: new ApplicationTerminalService(db, actors, brands),
+    notifications,
+    collaboration,
+    submit: new ApplicationSubmitService(db, actors, contexts, notifications),
+    terminal: new ApplicationTerminalService(
+      db,
+      actors,
+      brands,
+      collaboration,
+      notifications,
+    ),
     history: new ApplicationHistoryService(db, actors),
   };
 }

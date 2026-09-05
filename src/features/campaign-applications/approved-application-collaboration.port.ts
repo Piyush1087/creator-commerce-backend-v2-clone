@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
-/** P1.4 supplies this transactional port. P1.3 registers no implementation. */
+/** Narrow Collaboration-owned handoff; the Application caller owns the transaction. */
 export abstract class ApprovedApplicationCollaborationPort {
   abstract provisionFromApprovedApplication(
     tx: Prisma.TransactionClient,

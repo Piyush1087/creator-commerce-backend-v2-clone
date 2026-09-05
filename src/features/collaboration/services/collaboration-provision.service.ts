@@ -114,12 +114,11 @@ export class CollaborationProvisionService {
     tx: Tx,
     input: ProvisionCollaborationInput,
   ) {
-    const existing = await tx.collaboration.findUnique({
+    const existing = await tx.collaboration.findFirst({
       where: {
-        campaignId_creatorUserId: {
-          campaignId: input.campaignId,
-          creatorUserId: input.creatorUserId,
-        },
+        campaignId: input.campaignId,
+        creatorUserId: input.creatorUserId,
+        sourceApplicationId: null,
       },
     });
     if (existing) {

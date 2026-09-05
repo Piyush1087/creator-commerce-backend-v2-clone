@@ -1,4 +1,14 @@
-import { forwardRef, Module } from "@nestjs/common";
+import {
+  forwardRef,
+  Module,
+  RequestMethod,
+  type NestModule,
+  type MiddlewareConsumer,
+} from "@nestjs/common";
+import type { Request, Response, NextFunction } from "express";
+import { CreatorTeamModule } from "../creator-settings/team/creator-team.module";
+import { CreatorNotificationsController } from "./creator-notifications.controller";
+import { CreatorNotificationQueryService } from "./services/creator-notification-query.service";
 import { ScheduleModule } from "@nestjs/schedule";
 
 import { MailModule } from "../../mail/mail.module";
@@ -17,13 +27,15 @@ import { NotificationRecipientPolicyService } from "./services/notification-reci
 @Module({
   imports: [
     ScheduleModule,
+    CreatorTeamModule,
     MailModule,
     forwardRef(() => BrandCentreModule),
     forwardRef(() => BrandSettingsModule),
   ],
-  controllers: [NotificationsController],
+  controllers: [NotificationsController, CreatorNotificationsController],
   providers: [
     NotificationAccessService,
+    CreatorNotificationQueryService,
     NotificationDispatchService,
     NotificationProcessorService,
     NotificationChannelService,
@@ -34,4 +46,18 @@ import { NotificationRecipientPolicyService } from "./services/notification-reci
   ],
   exports: [NotificationDispatchService, NotificationProcessorService],
 })
-export class NotificationsModule {}
+export class NotificationsModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply((_req: Request, res: Response, next: NextFunction) => {
+        res.setHeader("Cache-Control", "private, no-store");
+        res.vary("Authorization");
+        res.vary("Cookie");
+        next();
+      })
+      .forRoutes(
+        { path: "api/v1/creator/notifications", method: RequestMethod.ALL },
+        { path: "api/v1/creator/notifications/*", method: RequestMethod.ALL },
+      );
+  }
+}

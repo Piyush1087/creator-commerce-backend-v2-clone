@@ -23,6 +23,12 @@ export class NotificationProcessorService {
     const definition = getEventDefinition(job.eventType);
     if (!definition)
       throw new Error(`Unknown notification event: ${job.eventType}`);
+    if (
+      Boolean(job.workspaceId) === Boolean(job.creatorWorkspaceId) ||
+      Boolean(job.creatorWorkspaceId) !==
+        (definition.recipientPolicy === "CREATOR_WORKSPACE_ACTIVE_TEAM")
+    )
+      throw new Error("NOTIFICATION_SCOPE_INVALID");
     const result = await this.prisma.$transaction(async (tx) => {
       const snapshots = await tx.notificationJobRecipient.findMany({
         where: { jobId: job.id },
@@ -30,14 +36,25 @@ export class NotificationProcessorService {
       });
       const notification = await tx.notification.upsert({
         where: {
-          workspaceId_eventType_semanticEventKey: {
-            workspaceId: job.workspaceId,
-            eventType: definition.eventType,
-            semanticEventKey: job.semanticEventKey,
-          },
+          ...(job.creatorWorkspaceId
+            ? {
+                creatorWorkspaceId_eventType_semanticEventKey: {
+                  creatorWorkspaceId: job.creatorWorkspaceId,
+                  eventType: definition.eventType,
+                  semanticEventKey: job.semanticEventKey,
+                },
+              }
+            : {
+                workspaceId_eventType_semanticEventKey: {
+                  workspaceId: job.workspaceId!,
+                  eventType: definition.eventType,
+                  semanticEventKey: job.semanticEventKey,
+                },
+              }),
         },
         create: {
           workspaceId: job.workspaceId,
+          creatorWorkspaceId: job.creatorWorkspaceId,
           triggerUserId: job.triggerUserId,
           eventType: definition.eventType,
           urgencyLevel: definition.urgencyLevel,

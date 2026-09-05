@@ -127,7 +127,7 @@ describe("P1.3 command and HTTP boundaries", () => {
       await app.close();
     }
   });
-  it("canonical implementation has no provider, legacy handoff, inventory or notification invocation", () => {
+  it("canonical implementation has no provider, legacy handoff, inventory or external notification dispatch", () => {
     for (const file of [
       "application-submit.service.ts",
       "application-submit-context.service.ts",
@@ -138,7 +138,7 @@ describe("P1.3 command and HTTP boundaries", () => {
         "utf8",
       );
       expect(source).not.toMatch(
-        /fetch\(|axios|\.log\(|\.warn\(|\.error\(|uceCampaignCollaboration\.(create|update)|inventoryCount|enqueueWithinTransaction|provisionFromUceApproval/,
+        /fetch\(|axios|\.log\(|\.warn\(|\.error\(|uceCampaignCollaboration\.(create|update)|inventoryCount|notifications\.dispatch\(|provisionFromUceApproval/,
       );
     }
   });

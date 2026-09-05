@@ -1946,6 +1946,7 @@ model BrandProfile {
   withdrawalAccounts        BrandWithdrawalAccount[]
   notificationSettings      BrandNotificationSetting[]
   notifications             Notification[]
+  notificationJobs          NotificationJob[]
   notificationPreferences   UserBrandNotificationPreference[]
   integrations              BrandIntegration[]
   providerOAuthTransactions ProviderOAuthTransaction[]
@@ -2927,6 +2928,7 @@ model UceApplication {
   supersededByApplication   UceApplication?                @relation("ApplicationSupersession", fields: [supersededByApplicationId], references: [id], onDelete: Restrict)
   supersededApplications    UceApplication[]               @relation("ApplicationSupersession")
   snapshot                  UceApplicationSnapshot?
+  collaboration             Collaboration?
   commandReceipts           ApplicationCommandReceipt[]
   domainEvents              ApplicationDomainEvent[]       @relation("ApplicationEvents")
   appliedAt                 DateTime                       @default(now()) @map("applied_at")
@@ -3079,6 +3081,7 @@ model ApplicationDomainEvent {
   canonicalBriefId          String                     @map("canonical_brief_id")
   canonicalBrief            CanonicalCampaignBrief     @relation("ApplicationEventBrief", fields: [canonicalCampaignAssetId, canonicalBriefId], references: [campaignAssetId, id], onDelete: Restrict, onUpdate: Restrict)
   approvedCollaborationId   String?                    @map("approved_collaboration_id")
+  approvedCollaboration     Collaboration?             @relation("ApplicationApprovedCollaboration", fields: [approvedCollaborationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   commandReceipt            ApplicationCommandReceipt? @relation("CommandReceiptTransition")
   createdAt                 DateTime                   @default(now()) @map("created_at")
 
@@ -3749,14 +3752,16 @@ model UserBrandNotificationPreference {
 }
 
 model CreatorWorkspace {
-  id                      String         @id @default(uuid())
-  ownerProfileId          String         @map("owner_profile_id")
-  ownerProfile            CreatorProfile @relation("CreatorWorkspaceOwner", fields: [ownerProfileId], references: [id], onDelete: Cascade)
-  organizationId          String         @unique @map("organization_id")
-  organization            Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  organizationDisplayName String         @default("My Creative Workspace") @map("organization_display_name") @db.VarChar(150)
-  createdAt               DateTime       @default(now()) @map("created_at")
-  updatedAt               DateTime       @updatedAt @map("updated_at")
+  notifications           Notification[]
+  notificationJobs        NotificationJob[]
+  id                      String            @id @default(uuid())
+  ownerProfileId          String            @map("owner_profile_id")
+  ownerProfile            CreatorProfile    @relation("CreatorWorkspaceOwner", fields: [ownerProfileId], references: [id], onDelete: Cascade)
+  organizationId          String            @unique @map("organization_id")
+  organization            Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  organizationDisplayName String            @default("My Creative Workspace") @map("organization_display_name") @db.VarChar(150)
+  createdAt               DateTime          @default(now()) @map("created_at")
+  updatedAt               DateTime          @updatedAt @map("updated_at")
 
   members                  CreatorWorkspaceMember[]
   invitations              CreatorWorkspaceInvitation[]
@@ -3967,18 +3972,27 @@ model MetricPostPulse {
 // COLLABORATION WORKFLOW MODELS
 // ============================================================================
 
+enum CollaborationHandoffCommercialState {
+  FIXED_AGREED
+  AWAITING_CREATOR_PROPOSAL
+}
+
 model Collaboration {
-  id             String              @id @default(uuid())
-  brandProfileId String              @map("brand_id")
-  brandProfile   BrandProfile        @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  creatorUserId  String              @map("creator_id")
-  creatorUser    User                @relation("CollaborationCreator", fields: [creatorUserId], references: [id], onDelete: Restrict)
-  campaignId     String              @map("campaign_id")
-  campaign       UceCampaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  briefId        String              @map("brief_id")
-  brief          UceCampaignBrief    @relation(fields: [briefId], references: [id], onDelete: Restrict)
-  productId      String?             @map("product_id")
-  product        UceCampaignProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  sourceApplicationId    String?                              @unique @map("source_application_id")
+  sourceApplication      UceApplication?                      @relation(fields: [sourceApplicationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  approvalEvents         ApplicationDomainEvent[]             @relation("ApplicationApprovedCollaboration")
+  handoffCommercialState CollaborationHandoffCommercialState? @map("handoff_commercial_state")
+  id                     String                               @id @default(uuid())
+  brandProfileId         String                               @map("brand_id")
+  brandProfile           BrandProfile                         @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  creatorUserId          String                               @map("creator_id")
+  creatorUser            User                                 @relation("CollaborationCreator", fields: [creatorUserId], references: [id], onDelete: Restrict)
+  campaignId             String                               @map("campaign_id")
+  campaign               UceCampaign                          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  briefId                String?                              @map("brief_id")
+  brief                  UceCampaignBrief?                    @relation(fields: [briefId], references: [id], onDelete: Restrict)
+  productId              String?                              @map("product_id")
+  product                UceCampaignProduct?                  @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   ucePipelineCollaborationId String?                   @unique @map("uce_pipeline_collaboration_id")
   ucePipelineCollaboration   UceCampaignCollaboration? @relation(fields: [ucePipelineCollaborationId], references: [id], onDelete: SetNull)
@@ -4012,7 +4026,7 @@ model Collaboration {
   collaborationRefundInstructions CollaborationRefundInstruction[]
   fundingLotAllocations           CollaborationFundingLotAllocation[]
 
-  @@unique([campaignId, creatorUserId])
+  @@index([campaignId, creatorUserId])
   @@index([brandProfileId, currentStage])
   @@index([creatorUserId, currentStage])
   @@index([lastMessageAt])
@@ -4861,28 +4875,32 @@ model CreatorCoPilotInteractionLog {
 // ============================================================================
 
 model Notification {
-  id               String                        @id @default(uuid())
-  workspaceId      String                        @map("workspace_id")
-  brandProfile     BrandProfile                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  triggerUserId    String?                       @map("trigger_user_id")
-  triggerUser      User?                         @relation("NotificationTriggerUser", fields: [triggerUserId], references: [id], onDelete: SetNull)
-  eventType        String                        @map("event_type") @db.VarChar(100)
-  urgencyLevel     NotificationUrgencyLevel      @map("urgency_level")
-  semanticEventKey String?                       @map("semantic_event_key") @db.VarChar(200)
-  category         SettingsNotificationCategory?
-  actionable       Boolean?
-  emailPolicy      NotificationEmailPolicy?      @map("email_policy")
-  inAppPolicy      NotificationInAppPolicy?      @map("in_app_policy")
-  payload          Json
-  createdAt        DateTime                      @default(now()) @map("created_at")
-  updatedAt        DateTime                      @updatedAt @map("updated_at")
+  creatorWorkspaceId String?                       @map("creator_workspace_id")
+  creatorWorkspace   CreatorWorkspace?             @relation(fields: [creatorWorkspaceId], references: [id], onDelete: Cascade)
+  id                 String                        @id @default(uuid())
+  workspaceId        String?                       @map("workspace_id")
+  brandProfile       BrandProfile?                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  triggerUserId      String?                       @map("trigger_user_id")
+  triggerUser        User?                         @relation("NotificationTriggerUser", fields: [triggerUserId], references: [id], onDelete: SetNull)
+  eventType          String                        @map("event_type") @db.VarChar(100)
+  urgencyLevel       NotificationUrgencyLevel      @map("urgency_level")
+  semanticEventKey   String?                       @map("semantic_event_key") @db.VarChar(200)
+  category           SettingsNotificationCategory?
+  actionable         Boolean?
+  emailPolicy        NotificationEmailPolicy?      @map("email_policy")
+  inAppPolicy        NotificationInAppPolicy?      @map("in_app_policy")
+  payload            Json
+  createdAt          DateTime                      @default(now()) @map("created_at")
+  updatedAt          DateTime                      @updatedAt @map("updated_at")
 
   recipients      NotificationRecipient[]
   emailDeliveries NotificationEmailDelivery[]
 
   @@unique([workspaceId, eventType, semanticEventKey])
+  @@unique([creatorWorkspaceId, eventType, semanticEventKey], map: "notifications_creator_scope_semantic_key")
   @@index([workspaceId])
   @@index([workspaceId, eventType, createdAt])
+  @@index([creatorWorkspaceId, createdAt])
   @@map("notifications")
 }
 
@@ -4931,8 +4949,11 @@ model NotificationEmailDelivery {
 }
 
 model NotificationJob {
+  creatorWorkspaceId  String?                  @map("creator_workspace_id")
+  creatorWorkspace    CreatorWorkspace?        @relation(fields: [creatorWorkspaceId], references: [id], onDelete: Cascade)
+  brandProfile        BrandProfile?            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   id                  String                   @id @default(uuid())
-  workspaceId         String                   @map("workspace_id")
+  workspaceId         String?                  @map("workspace_id")
   eventType           String                   @map("event_type") @db.VarChar(100)
   urgencyLevel        NotificationUrgencyLevel @map("urgency_level")
   semanticEventKey    String                   @map("semantic_event_key") @db.VarChar(200)
@@ -4955,6 +4976,7 @@ model NotificationJob {
   recipientSnapshots NotificationJobRecipient[]
 
   @@unique([workspaceId, eventType, semanticEventKey])
+  @@unique([creatorWorkspaceId, eventType, semanticEventKey], map: "notification_jobs_creator_scope_semantic_key")
   @@index([status, scheduledAt])
   @@map("notification_jobs")
 }

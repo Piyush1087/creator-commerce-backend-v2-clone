@@ -18,6 +18,7 @@ import {
   canonicalApplication,
 } from "./application-evidence";
 import { ApplicationSubmitContextService } from "./application-submit-context.service";
+import { NotificationDispatchService } from "../notifications/services/notification-dispatch.service";
 
 /** JSON serialization is confined to server-authored snapshot projections. */
 function json(value: unknown): Prisma.InputJsonObject {
@@ -30,6 +31,7 @@ export class ApplicationSubmitService {
     private readonly prisma: PrismaService,
     private readonly actors: CreatorWorkspaceActorService,
     private readonly contexts: ApplicationSubmitContextService,
+    private readonly notifications: NotificationDispatchService,
   ) {}
 
   async submit(
@@ -203,6 +205,23 @@ export class ApplicationSubmitService {
           { kind: "CREATOR_TEAM_USER", actor },
           now,
           { type: "SUBMIT", identity },
+          {
+            enqueue: (transitionId) =>
+              this.notifications.enqueueWithinTransaction(tx, {
+                workspaceId: application.brandProfileId,
+                eventType: "campaigns.application_received",
+                source: {
+                  sourceType: "c03_application",
+                  sourceId: application.id,
+                  transitionId,
+                },
+                payload: {
+                  application_id: application.id,
+                  campaign_id: application.campaignId,
+                },
+                triggerUserId: actor.actorUserId,
+              }),
+          },
         );
       },
       { timeout: 30_000, maxWait: 10_000 },

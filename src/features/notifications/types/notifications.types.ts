@@ -24,6 +24,8 @@ export type NotificationEventType =
   | "escrow.brand_return_partial"
   | "escrow.brand_return_completed"
   | "campaigns.application_received"
+  | "campaigns.application_approved"
+  | "campaigns.application_rejected"
   | "collaborations.media_submitted_for_review"
   | "intelligence.execution_completed"
   | "intelligence.execution_failed"
@@ -31,6 +33,7 @@ export type NotificationEventType =
   | "integration.instagram_token_expired";
 
 export type NotificationRecipientPolicy =
+  | "CREATOR_WORKSPACE_ACTIVE_TEAM"
   | "OWNER_FINANCE"
   | "OWNER_CAMPAIGN_MANAGERS"
   | "OWNER_FINANCE_PLUS_ACTIVE_TRIGGERING_CM"
@@ -42,8 +45,11 @@ export type NotificationSourceIdentity = {
   transitionId: string;
 };
 
-export type NotificationDispatchInput = {
-  workspaceId: string;
+export type NotificationScope =
+  | { workspaceId: string; creatorWorkspaceId?: never }
+  | { workspaceId?: never; creatorWorkspaceId: string };
+
+export type NotificationDispatchInput = NotificationScope & {
   eventType: NotificationEventType;
   source: NotificationSourceIdentity;
   payload: NotificationPayload;
@@ -78,7 +84,8 @@ export type NotificationRealtimePayload = {
 
 export type ClaimedNotificationJob = {
   id: string;
-  workspaceId: string;
+  workspaceId: string | null;
+  creatorWorkspaceId?: string | null;
   eventType: string;
   semanticEventKey: string;
   claimToken: string;

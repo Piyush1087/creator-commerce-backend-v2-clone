@@ -241,7 +241,7 @@ export class CampaignApplicationService {
           campaignId,
           authorityVersion: UceApplicationAuthorityVersion.C03_CANONICAL,
         },
-        include: { snapshot: true },
+        include: { snapshot: true, collaboration: { select: { id: true } } },
         orderBy: [{ appliedAt: "desc" }, { id: "desc" }],
         take: 50,
       }),
@@ -295,7 +295,8 @@ export class CampaignApplicationService {
         source: row.source,
         campaignAssetId: row.canonicalCampaignAssetId,
         briefId: row.canonicalBriefId,
-        canApprove: false,
+        canApprove: row.status === "PENDING",
+        canApprovePending: row.status === "PENDING",
         canReject: row.status === "PENDING",
       };
     });

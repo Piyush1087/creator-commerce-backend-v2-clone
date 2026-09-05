@@ -10,6 +10,7 @@ import type { AuthUser } from "../../auth/types/auth-user";
 import { BrandWorkspaceAuthorizationService } from "../../brand-centre/brand-workspace-authorization.service";
 
 export const COLLABORATION_THREAD_INCLUDE = {
+  sourceApplication: { select: { canonicalBriefId: true, snapshot: true } },
   campaign: { select: { name: true, brandProfileId: true } },
   brief: { select: { internalTitle: true, creativeGuidelines: true } },
   brandProfile: { select: { name: true, id: true } },
