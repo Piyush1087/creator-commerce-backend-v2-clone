@@ -32,7 +32,7 @@ export function negotiateBrandPayoutsRepresentation(
       if (!qualityParameter) return true;
 
       const quality = Number(qualityParameter.slice(2));
-      return Number.isFinite(quality) && quality > 0;
+      return Number.isFinite(quality) && quality > 0 && quality <= 1;
     });
 
   return explicitlyAcceptsV2 ? "V2" : "LEGACY";

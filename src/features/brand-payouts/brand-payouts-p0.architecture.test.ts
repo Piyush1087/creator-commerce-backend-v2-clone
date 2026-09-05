@@ -58,7 +58,7 @@ describe("Brand Payouts P0 architecture boundaries", () => {
     }
   });
 
-  it("does not wire P0 scaffolding into the legacy runtime", () => {
+  it("wires only the accepted P1 read port beside the legacy fallback", () => {
     const runtime = [
       "src/features/brand-payouts/brand-payouts.controller.ts",
       "src/features/brand-payouts/brand-payouts.module.ts",
@@ -67,11 +67,14 @@ describe("Brand Payouts P0 architecture boundaries", () => {
       .map(read)
       .join("\n");
 
-    expect(runtime).not.toContain("BrandPayoutsQueryPortV2");
-    expect(runtime).not.toContain("negotiateBrandPayoutsRepresentation");
+    expect(runtime).toContain("BrandPayoutsQueryPortV2");
+    expect(runtime).toContain("negotiateBrandPayoutsRepresentation");
     expect(runtime).not.toContain("CreatorPayoutReadinessPort");
     expect(runtime).not.toContain("CreatorPayoutProviderPort");
     expect(runtime).not.toContain("CollaborationPayoutInstructionIntakePortV1");
+    expect(runtime).not.toContain("@Post");
+    expect(runtime).not.toContain("approveReserve");
+    expect(runtime).not.toContain("createTransfer");
   });
 
   it("keeps the current Campaign Manager fallback explicitly fail closed", () => {

@@ -17,6 +17,20 @@ export class BrandCentreAuthService {
   ) {}
 
   async resolveBrandProfileId(user: AuthUser): Promise<string> {
+    const brandProfileId = await this.resolveCurrentBrandProfileId(user);
+
+    await this.sessionEviction.evictIfInactive(brandProfileId);
+    await this.sessionEviction.touchActivity(brandProfileId);
+
+    return brandProfileId;
+  }
+
+  /** Financial GET projections must not refresh activity or evict sessions. */
+  resolveBrandProfileIdReadOnly(user: AuthUser): Promise<string> {
+    return this.resolveCurrentBrandProfileId(user);
+  }
+
+  private async resolveCurrentBrandProfileId(user: AuthUser): Promise<string> {
     const current = await this.prisma.user.findUnique({
       where: { id: user.id },
       include: {
@@ -45,12 +59,7 @@ export class BrandCentreAuthService {
     if (candidates.length !== 1) {
       throw new ForbiddenException("Active Brand team membership required");
     }
-    const brandProfileId = candidates[0].brandProfileId;
-
-    await this.sessionEviction.evictIfInactive(brandProfileId);
-    await this.sessionEviction.touchActivity(brandProfileId);
-
-    return brandProfileId;
+    return candidates[0].brandProfileId;
   }
 
   async resolveBrandProfile(user: AuthUser) {
