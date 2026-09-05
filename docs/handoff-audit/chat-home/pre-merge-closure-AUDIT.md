@@ -8,7 +8,7 @@
 
 | Repo | Branch | SHA |
 |------|--------|-----|
-| Backend | `integration/chat-home-v1` | `df1b8d35579383a9e7a9b351de4142bd157343de` |
+| Backend | `integration/chat-home-v1` | `942fb4680604edd8d4242c201c32345ac6e5d00d` |
 | Frontend | `integration/chat-home-v1` | `83aa665a008958eb50859d975e8955b9486583b0` |
 
 Untracked only: `docs/brand-home/` (local handoff copies), `docs/handoff-audit/.logs/` (tee logs). Not required in git.
