@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { CampaignOpportunityModule } from "./features/campaign-opportunities/campaign-opportunity.module";
 import { ConfigModule } from "@nestjs/config";
 import { ThrottlerModule } from "@nestjs/throttler";
 
@@ -34,6 +35,7 @@ import { S3Module } from "./shared/s3/s3.module";
 
 @Module({
   imports: [
+    CampaignOpportunityModule,
     ConfigModule.forRoot({
       isGlobal: true,
     }),

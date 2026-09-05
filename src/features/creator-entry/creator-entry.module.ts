@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { CampaignOpportunityContextModule } from "../campaign-opportunities/campaign-opportunity-context.module";
 
 import { PrismaModule } from "../../prisma/prisma.module";
 import { AuthModule } from "../auth/auth.module";
@@ -20,6 +21,7 @@ import { CreatorPlatformAccessGuard } from "./creator-platform-access.guard";
 
 @Module({
   imports: [
+    CampaignOpportunityContextModule,
     PrismaModule,
     AuthModule,
     CreatorSettingsModule,

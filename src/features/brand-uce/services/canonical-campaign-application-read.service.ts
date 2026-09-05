@@ -86,12 +86,21 @@ const storedDefinitionSchema = z
 
 const campaignApplicationReadInclude =
   Prisma.validator<Prisma.UceCampaignInclude>()({
+    brandProfile: {
+      select: { name: true, description: true, logoUrl: true, domain: true },
+    },
     strategy: true,
     targeting: true,
     commercials: true,
     assets: {
       orderBy: { createdAt: "asc" },
       include: {
+        offering: {
+          select: { name: true, description: true, imageUrl: true, url: true },
+        },
+        brandOffer: {
+          select: { offerName: true, description: true, entityLink: true },
+        },
         canonicalBriefs: {
           orderBy: { createdAt: "asc" },
           include: {
@@ -104,9 +113,22 @@ const campaignApplicationReadInclude =
     },
   });
 
-type CampaignApplicationReadRow = Prisma.UceCampaignGetPayload<{
+type CompleteCampaignApplicationReadRow = Prisma.UceCampaignGetPayload<{
   include: typeof campaignApplicationReadInclude;
 }>;
+type CompleteAssetRead = CompleteCampaignApplicationReadRow["assets"][number];
+type CampaignApplicationReadRow = Omit<
+  CompleteCampaignApplicationReadRow,
+  "brandProfile" | "assets"
+> & {
+  brandProfile?: CompleteCampaignApplicationReadRow["brandProfile"];
+  assets: Array<
+    Omit<CompleteAssetRead, "offering" | "brandOffer"> & {
+      offering?: Partial<NonNullable<CompleteAssetRead["offering"]>> | null;
+      brandOffer?: Partial<NonNullable<CompleteAssetRead["brandOffer"]>> | null;
+    }
+  >;
+};
 
 export type CanonicalBriefReadinessInput = {
   status: UceBriefStatus;
@@ -175,6 +197,14 @@ export function isApplicationSelectableBrief(
 export class CanonicalCampaignApplicationReadService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async resolveOpportunity(tx: Prisma.TransactionClient, campaignId: string) {
+    const campaign = await tx.uceCampaign.findUnique({
+      where: { id: campaignId },
+      include: campaignApplicationReadInclude,
+    });
+    return campaign ? projectCanonicalCampaignForApplication(campaign) : null;
+  }
+
   async resolve(brandProfileId: string, campaignId: string) {
     const campaign = await this.prisma.uceCampaign.findFirst({
       where: { id: campaignId, brandProfileId },
@@ -206,6 +236,10 @@ export function projectCanonicalCampaignForApplication(
       id: campaign.id,
       brandProfileId: campaign.brandProfileId,
       name: campaign.name,
+      brand: campaign.brandProfile ?? null,
+      objective: campaign.strategy?.coreObjective ?? null,
+      publishingStart: campaign.strategy?.fixedStartDate ?? null,
+      publishingEnd: campaign.strategy?.fixedEndDate ?? null,
       status: campaign.status,
       creationSource: campaign.creationSource,
       liveAt: campaign.liveAt,
@@ -219,6 +253,8 @@ export function projectCanonicalCampaignForApplication(
       campaignId: asset.campaignId,
       kind: asset.kind,
       status: asset.status,
+      offering: asset.offering ?? null,
+      offer: asset.brandOffer ?? null,
       briefs: asset.canonicalBriefs.map((brief) => {
         const readiness = resolveCanonicalBriefReadiness(brief);
         return {
@@ -267,8 +303,18 @@ function resolveVisibility(
   definition: z.infer<typeof storedDefinitionSchema> | null,
 ) {
   const persisted = campaign.targeting?.visibilityScope;
-  if (persisted) return { state: "AVAILABLE" as const, value: persisted };
   const legacy = campaign.targeting?.visibilityScopes ?? [];
+  if (
+    persisted &&
+    (legacy.length === 0 || (legacy.length === 1 && legacy[0] === persisted))
+  ) {
+    return { state: "AVAILABLE" as const, value: persisted };
+  }
+  if (persisted)
+    return {
+      state: "UNAVAILABLE" as const,
+      reason: "CAMPAIGN_VISIBILITY_CONFIGURATION_INVALID" as const,
+    };
   if (legacy.length === 1) {
     return { state: "AVAILABLE" as const, value: legacy[0] };
   }

@@ -1,3 +1,4 @@
+import { evaluateInstagramOpportunity } from "../../../shared/creator/instagram-opportunity-capability";
 import {
   BadRequestException,
   ConflictException,
@@ -380,36 +381,12 @@ export class CreatorInstagramSettingsService {
   private lifecycleState(
     integration: CreatorSocialIntegration,
   ): CreatorInstagramSettingsLifecycleState {
-    if (this.isDisconnected(integration)) {
-      return "DISCONNECTED_IDENTITY_RETAINED";
-    }
-    if (this.isHealthy(integration)) return "CONNECTED_HEALTHY";
-    if (
-      integration.authorizationHealth ===
-      ProviderAuthorizationHealth.PROVIDER_ACCESS_BLOCKED
-    ) {
-      return "PROVIDER_BLOCKED_RECOVERABLE";
-    }
-    if (
-      integration.authorizationHealth ===
-        ProviderAuthorizationHealth.REAUTHORIZATION_REQUIRED ||
-      integration.basicAuthorizationCapability ===
-        ProviderCapabilityState.UNAVAILABLE ||
-      integration.tokenStateCondition === OAuthTokenStatus.EXPIRED
-    ) {
-      return "RECONNECT_REQUIRED";
-    }
-    return "REVALIDATION_REQUIRED";
+    return evaluateInstagramOpportunity(integration, new Date()).lifecycleState;
   }
 
   private isHealthy(integration: CreatorSocialIntegration): boolean {
-    return (
-      !this.isDisconnected(integration) &&
-      integration.tokenStateCondition === OAuthTokenStatus.ACTIVE &&
-      integration.authorizationHealth === ProviderAuthorizationHealth.USABLE &&
-      integration.basicAuthorizationCapability ===
-        ProviderCapabilityState.AVAILABLE
-    );
+    return evaluateInstagramOpportunity(integration, new Date())
+      .usableForOpportunity;
   }
 
   private isDisconnected(integration: CreatorSocialIntegration): boolean {
