@@ -1,9 +1,9 @@
-# Chat Engine + Brand Home V1 — origin integration audit
+# Chat Engine + Brand Home V1 â€” origin integration audit
 
 Origin integration of the **accepted** Brand-side Chat Engine + Brand Home V1
 runtime onto current `origin/development` (isolated branch).
 
-**Do not** reopen Product P0–P7. This is integration / validation / release prep only.
+**Do not** reopen Product P0â€“P7. This is integration / validation / release prep only.
 
 ## Canonical authority (handoff)
 
@@ -22,7 +22,7 @@ runtime onto current `origin/development` (isolated branch).
 | Backend | `integration/chat-home-v1` | From `origin/development` + merge runtime `00e1299` |
 | Frontend | `integration/chat-home-v1` | From `origin/development` + merge runtime `1cf2e3b` |
 
-Also in-flight (separate): `feature/c01-c05-creator-integration` — **not** merged to `development` yet. Do not base Chat/Home on it.
+Also in-flight (separate): `feature/c01-c05-creator-integration` â€” **not** merged to `development` yet. Do not base Chat/Home on it.
 
 ## Status vocabulary
 
@@ -37,17 +37,17 @@ Every gate / named failure uses exactly one of:
 | `commands-to-run.md` | Exact PowerShell + Part B deploy pointers |
 | `integration-part1-report.md` | Architecture / authority / gate matrix |
 | `integration-part1-test-results.md` | Suite counts, named fails, SHAs |
-| `integration-candidate-gate.md` | §10 INTEGRATION_CANDIDATE + D0; **stop** until human auth |
+| `integration-candidate-gate.md` | Â§10 INTEGRATION_CANDIDATE + D0; **stop** until human auth |
 | `../MODULE-AUDIT-TESTING-PLAYBOOK.md` | Reusable process (same as C-01/C-05) |
 
-Handoff docx copies live under `docs/brand-home/product-docs/handoff-docs/` (local).  
+Handoff docx copies live under `docs/brand-home/product-docs/handoff-docs/` (local).
 Raw tee logs: `docs/handoff-audit/.logs/` and `docs/brand-home/_*.log` (local; usually not committed).
 
 ## Gate before merge to `development`
 
-1. Part 1 report + test-results complete with vocabulary above.  
-2. Commands in `commands-to-run.md` executed; postgres skip count **0** where env set.  
-3. No Creator Chat / EXECUTE / streaming added.  
-4. [`integration-candidate-gate.md`](./integration-candidate-gate.md) reviewed.  
-5. Human issues `INTEGRATION_MERGE_AUTHORIZED`, then `DEV_DEPLOY_AUTHORIZED` for D1–D3.  
+1. Part 1 report + test-results complete with vocabulary above.
+2. Commands in `commands-to-run.md` executed; postgres skip count **0** where env set.
+3. No Creator Chat / EXECUTE / streaming added.
+4. [`integration-candidate-gate.md`](./integration-candidate-gate.md) reviewed.
+5. Human issues `INTEGRATION_MERGE_AUTHORIZED`, then `DEV_DEPLOY_AUTHORIZED` for D1â€“D3.
 6. Production only with `PRODUCTION_RELEASE_AUTHORIZED` + exact SHAs.

@@ -1,11 +1,11 @@
-# CHAT_HOME_V1_INTEGRATION_CANDIDATE — Gate Packet
+# CHAT_HOME_V1_INTEGRATION_CANDIDATE â€” Gate Packet
 
-**Authority:** `CHAT_HOME_V1_DEVELOPER_INTEGRATION_RELEASE_AUTHORITY_V1`  
-**Handoffs (source of truth):** Developer Handoff + AI Worker Integration & Production Initiation (`c00aacaf…`)  
-**Date:** 2026-09-04  
+**Authority:** `CHAT_HOME_V1_DEVELOPER_INTEGRATION_RELEASE_AUTHORITY_V1`
+**Handoffs (source of truth):** Developer Handoff + AI Worker Integration & Production Initiation (`c00aacafâ€¦`)
+**Date:** 2026-09-04
 **Status vocabulary:** `PASS` / `FIXED` / `GENUINE_AUTHORITY_CONFLICT` / `ENVIRONMENT_BLOCKED`
 
-This packet is the handoff §10 gate **before** merging into `development` or deploying.  
+This packet is the handoff Â§10 gate **before** merging into `development` or deploying.
 Production remains **blocked** until `PRODUCTION_RELEASE_AUTHORIZED` + exact SHAs.
 
 ---
@@ -36,7 +36,7 @@ Production remains **blocked** until `PRODUCTION_RELEASE_AUTHORIZED` + exact SHA
 
 ---
 
-## Handoff §10 gate fields
+## Handoff Â§10 gate fields
 
 | Field | Status | Notes |
 |-------|--------|-------|
@@ -46,9 +46,9 @@ Production remains **blocked** until `PRODUCTION_RELEASE_AUTHORIZED` + exact SHA
 | `migration_history` | **PASS** | Local disposable rehearse: **74** migrations applied (`chat_home_integ` etc.) |
 | `backend_build` | **PASS** | `nest build` |
 | `backend_targeted` | **PASS** | Unit 152; self-seed postgres 8; workspace auth postgres 11 |
-| `backend_full_suite` | **FAIL** (local) | 15 failed / 1209 passed; failures not Chat/Home suites — see test-results B8. Do **not** claim PASS |
+| `backend_full_suite` | **FAIL** (local) | 15 failed / 1209 passed; failures not Chat/Home suites â€” see test-results B8. Do **not** claim PASS |
 | `frontend_targeted` | **PASS** | 105 Chat/Home scoped |
-| `frontend_full_suite` | **FAIL** (local) | 23 failed / 816 passed; failing files are auth/onboarding/billing — see test-results F4 |
+| `frontend_full_suite` | **FAIL** (local) | 23 failed / 816 passed; failing files are auth/onboarding/billing â€” see test-results F4 |
 | `production_builds` | **PASS** | FE `npm run build`; BE nest build |
 | `cross_brand_authorization` | **PASS** | Workspace auth unit + postgres |
 | `p7_c1_boundary` | **PASS** | `resolveBrandProfileIdForWorkspace` vs activity-aware path |
@@ -58,10 +58,10 @@ Production remains **blocked** until `PRODUCTION_RELEASE_AUTHORIZED` + exact SHA
 
 | Item | Class |
 |------|-------|
-| P5-A / P5-B postgres (no fixture dump) | **ENVIRONMENT_BLOCKED** — ran with flags ON |
+| P5-A / P5-B postgres (no fixture dump) | **ENVIRONMENT_BLOCKED** â€” ran with flags ON |
 | Intelligence contracts verify (dirty worktree) | **ENVIRONMENT_BLOCKED** |
-| Authenticated local browser Home/Chat smoke | **ENVIRONMENT_BLOCKED** — unauth route smoke PASS; full UI needs Brand session |
-| Dev/prod deploy smoke | **NOT RUN** — hold until merge + deploy auth |
+| Authenticated local browser Home/Chat smoke | **ENVIRONMENT_BLOCKED** â€” unauth route smoke PASS; full UI needs Brand session |
+| Dev/prod deploy smoke | **NOT RUN** â€” hold until merge + deploy auth |
 
 Evidence detail: [`integration-part1-report.md`](./integration-part1-report.md), [`integration-part1-test-results.md`](./integration-part1-test-results.md).
 
@@ -71,7 +71,7 @@ Evidence detail: [`integration-part1-report.md`](./integration-part1-report.md),
 
 | Debt | Status now | Next |
 |------|------------|------|
-| Reconcile into divergent `development` | **Pending** — candidate ready, **not merged** | Needs `INTEGRATION_MERGE_AUTHORIZED` |
+| Reconcile into divergent `development` | **Pending** â€” candidate ready, **not merged** | Needs `INTEGRATION_MERGE_AUTHORIZED` |
 | Validate migration history vs **target** envs (dev/prod RDS) | Local disposable **PASS**; target env **not yet** | After merge: review pending set before/on ECS migrate |
 | Deployed backend `GEMINI_MODEL=gemini-3.5-flash` | Local `.env` + SST default set; **dev ECS not verified** | D0/D1: confirm SST/ECS env explicitly |
 
@@ -79,24 +79,24 @@ Deferred Product (out of this authority): Creator Chat, EXECUTE Chat, provider a
 
 ---
 
-## D0 — Dev release preflight (readiness, not deploy)
+## D0 â€” Dev release preflight (readiness, not deploy)
 
 | Check | Status |
 |-------|--------|
 | Deploy identity BE | SST `creatorshop-be`, `ap-south-1`, profile `creator-dev`, API `https://api.dev.thecreatorshop.in`, health `/health/live` |
 | Deploy identity FE | SST `creatorshop-fe`, dashboard `https://dashboard.dev.thecreatorshop.in` |
-| Runbook | [`docs/deployment/README.md`](../../deployment/README.md) — deploy from **WSL**, not `/mnt/c/` |
+| Runbook | [`docs/deployment/README.md`](../../deployment/README.md) â€” deploy from **WSL**, not `/mnt/c/` |
 | `GEMINI_MODEL` | Must be explicit `gemini-3.5-flash` on deployed task (local `.env` already; SST fallback now `gemini-3.5-flash`) |
 | `GEMINI_API_KEY` | Server-side only; not in FE/git |
-| Pending migrations on tip | **74** folders; PI three preserved; C-01’s 8 migrations **not** on this branch |
-| C-01/C-05 | Still on `feature/c01-c05-creator-integration` — separate; do not mix into this deploy without its own merge |
+| Pending migrations on tip | **74** folders; PI three preserved; C-01â€™s 8 migrations **not** on this branch |
+| C-01/C-05 | Still on `feature/c01-c05-creator-integration` â€” separate; do not mix into this deploy without its own merge |
 
 ---
 
 ## Required human authorizations (stop here)
 
-1. **`INTEGRATION_MERGE_AUTHORIZED`** — merge/PR `integration/chat-home-v1` → `development` (origin). Freeze resulting `development` SHAs as **dev release candidates**.  
-2. **`DEV_DEPLOY_AUTHORIZED`** — then D1 backend `sst deploy --stage dev`, D2 smoke, D3 frontend deploy.  
-3. **`PRODUCTION_RELEASE_AUTHORIZED`** + exact SHAs — Part C only; **not** implied by this packet.
+1. **`INTEGRATION_MERGE_AUTHORIZED`** â€” merge/PR `integration/chat-home-v1` â†’ `development` (origin). Freeze resulting `development` SHAs as **dev release candidates**.
+2. **`DEV_DEPLOY_AUTHORIZED`** â€” then D1 backend `sst deploy --stage dev`, D2 smoke, D3 frontend deploy.
+3. **`PRODUCTION_RELEASE_AUTHORIZED`** + exact SHAs â€” Part C only; **not** implied by this packet.
 
 Without (1)/(2), do **not** merge or deploy.
