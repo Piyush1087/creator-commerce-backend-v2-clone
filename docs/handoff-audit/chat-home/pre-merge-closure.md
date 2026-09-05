@@ -129,8 +129,8 @@ Fill after the closure commit + push (this fileâ€™s tip):
 
 | Repo | Branch | SHA |
 |------|--------|-----|
-| Backend | `integration/chat-home-v1` | d3f4f4717f802cecc7265925d200a0b10ec5d106 |
-| Frontend | `integration/chat-home-v1` | d3f4f4717f802cecc7265925d200a0b10ec5d106 |
+| Backend | `integration/chat-home-v1` | ed3d9cdb331dbc73d3f669d268e1ce61fab39a06 |
+| Frontend | `integration/chat-home-v1` | ed3d9cdb331dbc73d3f669d268e1ce61fab39a06 |
 
 Accepted runtimes still ancestors: BE `00e1299eâ€¦` Â· FE `1cf2e3bdâ€¦`.
 
