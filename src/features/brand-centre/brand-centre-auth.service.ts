@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { UserAuthState, UserRole } from "@prisma/client";
+import { UserAuthState, UserRole, type Prisma } from "@prisma/client";
 
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../auth/types/auth-user";
@@ -17,7 +17,21 @@ export class BrandCentreAuthService {
   ) {}
 
   async resolveBrandProfileId(user: AuthUser): Promise<string> {
-    const current = await this.prisma.user.findUnique({
+    const brandProfileId = await this.resolveBrandProfileIdInTransaction(
+      this.prisma,
+      user,
+    );
+    await this.sessionEviction.evictIfInactive(brandProfileId);
+    await this.sessionEviction.touchActivity(brandProfileId);
+    return brandProfileId;
+  }
+
+  /** Reuse current Brand membership authority without session side effects. */
+  async resolveBrandProfileIdInTransaction(
+    tx: Prisma.TransactionClient,
+    user: AuthUser,
+  ): Promise<string> {
+    const current = await tx.user.findUnique({
       where: { id: user.id },
       include: {
         brandTeamMemberships: {
@@ -45,12 +59,7 @@ export class BrandCentreAuthService {
     if (candidates.length !== 1) {
       throw new ForbiddenException("Active Brand team membership required");
     }
-    const brandProfileId = candidates[0].brandProfileId;
-
-    await this.sessionEviction.evictIfInactive(brandProfileId);
-    await this.sessionEviction.touchActivity(brandProfileId);
-
-    return brandProfileId;
+    return candidates[0].brandProfileId;
   }
 
   async resolveBrandProfile(user: AuthUser) {

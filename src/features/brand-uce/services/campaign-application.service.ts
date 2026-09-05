@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import {
   UceApplicationAuthorityVersion,
@@ -18,6 +19,9 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import type { AuthUser } from "../../auth/types/auth-user";
+import { ApplicationTerminalService } from "../../campaign-applications/application-terminal.service";
+import { projectApplication } from "../../campaign-applications/application-history.service";
 import { buildPhaseSyncPatch } from "../../../shared/uce/uce-production-phase.util";
 import { CollaborationProvisionService } from "../../collaboration/services/collaboration-provision.service";
 import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
@@ -77,7 +81,40 @@ export class CampaignApplicationService {
     private readonly pipeline: BrandUcePipelineService,
     private readonly collaborationProvision: CollaborationProvisionService,
     private readonly subscriptionCapabilities: SubscriptionCapabilityService,
+    @Optional()
+    private readonly canonicalTerminals?: ApplicationTerminalService,
   ) {}
+
+  async routeDecision(
+    user: AuthUser,
+    brandProfileId: string,
+    campaignId: string,
+    applicationId: string,
+    command: "APPROVE" | "REJECT",
+    key: unknown,
+    reason?: string,
+  ) {
+    await this.access.assertCampaignOwned(brandProfileId, campaignId);
+    const row = await this.prisma.uceApplication.findFirst({
+      where: { id: applicationId, campaignId },
+      select: { authorityVersion: true },
+    });
+    if (!row) throw new NotFoundException({ code: "APPLICATION_NOT_FOUND" });
+    if (row.authorityVersion === "C03_CANONICAL") {
+      if (!this.canonicalTerminals)
+        throw new ConflictException({ code: CANONICAL_HANDOFF_NOT_AVAILABLE });
+      return this.canonicalTerminals.decide(
+        user,
+        campaignId,
+        applicationId,
+        command,
+        key,
+      );
+    }
+    return command === "APPROVE"
+      ? this.approve(brandProfileId, campaignId, applicationId, user.id)
+      : this.reject(brandProfileId, campaignId, applicationId, user.id, reason);
+  }
 
   /**
    * Explicit compatibility command. This is intentionally never invoked by a
@@ -181,7 +218,7 @@ export class CampaignApplicationService {
   async listApplicants(brandProfileId: string, campaignId: string) {
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
 
-    const [rows, canonicalCount] = await Promise.all([
+    const [rows, canonicalRows, canonicalCount] = await Promise.all([
       this.prisma.uceApplication.findMany({
         where: {
           campaignId,
@@ -197,6 +234,15 @@ export class CampaignApplicationService {
         },
         include: { campaignCreator: true },
         orderBy: { appliedAt: "desc" },
+        take: 50,
+      }),
+      this.prisma.uceApplication.findMany({
+        where: {
+          campaignId,
+          authorityVersion: UceApplicationAuthorityVersion.C03_CANONICAL,
+        },
+        include: { snapshot: true },
+        orderBy: [{ appliedAt: "desc" }, { id: "desc" }],
         take: 50,
       }),
       this.prisma.uceApplication.count({
@@ -237,15 +283,34 @@ export class CampaignApplicationService {
       };
     });
 
+    const canonical = canonicalRows.map((row) => {
+      const projection = projectApplication(row);
+      return {
+        ...projection,
+        name:
+          typeof projection.creator.displayName === "string"
+            ? projection.creator.displayName
+            : "Creator",
+        applicationStatus: row.status,
+        source: row.source,
+        campaignAssetId: row.canonicalCampaignAssetId,
+        briefId: row.canonicalBriefId,
+        canApprove: false,
+        canReject: row.status === "PENDING",
+      };
+    });
     return {
-      state: rows.length
-        ? ("READY" as const)
-        : canonicalCount > 0
-          ? ("UNAVAILABLE" as const)
+      state:
+        rows.length || canonical.length
+          ? ("READY" as const)
           : ("EMPTY" as const),
-      reason: canonicalCount > 0 ? CANONICAL_HANDOFF_NOT_AVAILABLE : null,
+      reason: null,
       canonicalApplicationCount: canonicalCount,
-      applicants,
+      applicants: [...applicants, ...canonical].sort(
+        (a, b) =>
+          b.appliedAt.localeCompare(a.appliedAt) ||
+          b.applicationId.localeCompare(a.applicationId),
+      ),
     };
   }
 

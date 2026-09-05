@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { PrismaModule } from "../../prisma/prisma.module";
+import { CampaignApplicationsModule } from "../campaign-applications/campaign-applications.module";
 import { AuthModule } from "../auth/auth.module";
 import { BrandCentreModule } from "../brand-centre/brand-centre.module";
 import { CollaborationModule } from "../collaboration/collaboration.module";
@@ -27,6 +28,7 @@ import { CanonicalCampaignApplicationReadService } from "./services/canonical-ca
 @Module({
   imports: [
     PrismaModule,
+    CampaignApplicationsModule,
     AuthModule,
     BrandCentreModule,
     CollaborationModule,

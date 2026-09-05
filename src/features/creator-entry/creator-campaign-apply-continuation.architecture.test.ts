@@ -96,15 +96,21 @@ describe("C01-I5 Campaign Apply continuation architecture", () => {
     expect(controller).not.toMatch(/return \{ present,.*campaign/s);
   });
 
-  it("preserves the separately guarded explicit Apply command and direct entry action", () => {
+  it("preserves explicit canonical Submit, retires legacy Apply and keeps direct entry separate", () => {
     const controller = source(
       "src/features/creator-uce/creator-uce.controller.ts",
     );
-    expect(controller).toContain(
-      "@UseGuards(ThrottlerGuard, JwtAuthGuard, CreatorPlatformAccessGuard)",
-    );
+    expect(controller).toContain("@UseGuards(ThrottlerGuard, JwtAuthGuard)");
     expect(controller).toContain('@Post("campaigns/:campaignId/apply")');
-    expect(controller).toContain("this.campaigns.applyToCampaign");
+    expect(controller).toContain("LEGACY_APPLICATION_ENDPOINT_RETIRED");
+    expect(controller).toContain("new GoneException");
+    expect(controller).not.toContain("this.campaigns.applyToCampaign");
+    const canonical = source(
+      "src/features/campaign-applications/campaign-applications.controller.ts",
+    );
+    expect(canonical).toContain('@Post("campaigns/:campaignId/applications")');
+    expect(canonical).toContain("@UseGuards(JwtAuthGuard)");
+    expect(canonical).toContain("this.submits.submit");
     expect(
       source("src/features/creator-entry/creator-entry-state.service.ts"),
     ).toContain('return "CREATOR_WORKSPACE_ENTRY"');

@@ -106,19 +106,21 @@ describe("CampaignApplicationService development authority", () => {
   });
   it("lists UceApplications without invoking legacy synchronization", async () => {
     const { service, prisma } = approvalHarness();
-    prisma.uceApplication.findMany.mockResolvedValue([
-      {
-        id: applicationId,
-        authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
-        campaignCreatorId: "creator-1",
-        legacyCampaignProductId: "legacy-product-1",
-        legacyBriefId: "legacy-brief-1",
-        status: UceApplicationStatus.PENDING,
-        source: "DIRECT",
-        appliedAt: new Date("2026-08-15T00:00:00Z"),
-        campaignCreator: { socialHandle: "creator" },
-      },
-    ]);
+    prisma.uceApplication.findMany
+      .mockResolvedValueOnce([
+        {
+          id: applicationId,
+          authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
+          campaignCreatorId: "creator-1",
+          legacyCampaignProductId: "legacy-product-1",
+          legacyBriefId: "legacy-brief-1",
+          status: UceApplicationStatus.PENDING,
+          source: "DIRECT",
+          appliedAt: new Date("2026-08-15T00:00:00Z"),
+          campaignCreator: { socialHandle: "creator" },
+        },
+      ])
+      .mockResolvedValueOnce([]);
 
     const result = await service.listApplicants("brand-1", "campaign-1");
 
@@ -140,25 +142,57 @@ describe("CampaignApplicationService development authority", () => {
     });
   });
 
-  it("returns a stable unavailable handoff instead of treating canonical rows as legacy", async () => {
+  it("lists canonical snapshot authority without invoking legacy handoff", async () => {
     const { service, prisma } = approvalHarness();
-    prisma.uceApplication.findMany.mockResolvedValue([]);
     prisma.uceApplication.count.mockResolvedValue(1);
+    prisma.uceApplication.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: applicationId,
+          authorityVersion: "C03_CANONICAL",
+          campaignId: "campaign-1",
+          canonicalCampaignAssetId: "asset-1",
+          canonicalBriefId: "brief-1",
+          status: "PENDING",
+          statusVersion: 1,
+          appliedAt: new Date("2026-08-15T00:00:00Z"),
+          terminalAt: null,
+          source: "DIRECT",
+          snapshot: {
+            campaignContext: { name: "Historical Campaign" },
+            briefContext: { briefName: "Historical Brief" },
+            campaignAssetContext: {},
+            commercialContext: { offer: "100", currency: "INR" },
+          },
+        },
+      ]);
 
     const result = await service.listApplicants("brand-1", "campaign-1");
 
-    expect(result).toEqual({
-      state: "UNAVAILABLE",
-      reason: "C03_CANONICAL_APPLICATION_HANDOFF_NOT_AVAILABLE",
+    expect(result).toMatchObject({
+      state: "READY",
+      reason: null,
       canonicalApplicationCount: 1,
-      applicants: [],
+      applicants: [
+        {
+          applicationId,
+          referenceAuthority: "C03_CANONICAL",
+          canApprove: false,
+          canReject: true,
+          campaign: { name: "Historical Campaign" },
+          commercial: { offer: "100", currency: "INR" },
+        },
+      ],
     });
-    expect(prisma.uceApplication.count).toHaveBeenCalledWith({
-      where: {
-        campaignId: "campaign-1",
-        authorityVersion: UceApplicationAuthorityVersion.C03_CANONICAL,
-      },
-    });
+    expect(prisma.uceApplication.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          campaignId: "campaign-1",
+          authorityVersion: UceApplicationAuthorityVersion.C03_CANONICAL,
+        },
+      }),
+    );
   });
 
   it("keeps approval and Collaboration provisioning in one transaction", async () => {

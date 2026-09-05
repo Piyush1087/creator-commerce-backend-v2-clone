@@ -89,6 +89,7 @@ async function bootstrap() {
       "Accept",
       "Origin",
       "X-Requested-With",
+      "Idempotency-Key",
       "x-idempotency-key",
       "x-session-id",
     ],

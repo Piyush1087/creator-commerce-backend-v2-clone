@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  Headers,
   Param,
   Patch,
   Post,
@@ -601,13 +602,16 @@ export class BrandUceController {
     @Req() req: RequestWithAuthUser,
     @Param("campaignId") campaignId: string,
     @Param("applicationId") applicationId: string,
+    @Headers("idempotency-key") key?: string,
   ) {
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
-    return this.campaignApplications.approve(
+    return this.campaignApplications.routeDecision(
+      req.user,
       brandProfileId,
       campaignId,
       applicationId,
-      req.user.id,
+      "APPROVE",
+      key,
     );
   }
 
@@ -618,13 +622,16 @@ export class BrandUceController {
     @Param("campaignId") campaignId: string,
     @Param("applicationId") applicationId: string,
     @Body() body: { reason?: string },
+    @Headers("idempotency-key") key?: string,
   ) {
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
-    return this.campaignApplications.reject(
+    return this.campaignApplications.routeDecision(
+      req.user,
       brandProfileId,
       campaignId,
       applicationId,
-      req.user.id,
+      "REJECT",
+      key,
       body?.reason,
     );
   }
