@@ -1,7 +1,7 @@
 # Chat Home V1 — Pre-Merge Closure AUDIT (vs Piyush mail)
 
-**Authority:** Piyush pre-merge closure mail (verbatim requirements below).  
-**Audit date:** 2026-09-05  
+**Authority:** Piyush pre-merge closure mail (verbatim requirements below).
+**Audit date:** 2026-09-05
 **Auditor method:** re-read mail → confirm commits on remotes → recompute differential from logs → fresh reconfirm commands.
 
 **Final tips audited (committed + pushed origin/piyush):**
@@ -108,8 +108,8 @@ Untracked only: `docs/brand-home/` (local handoff copies), `docs/handoff-audit/.
 
 ## Bottom line
 
-Against Piyush’s mail as authority: **all merge-blocking gates are met**.  
-One packet hygiene issue (stale BE SHA in closure doc) is corrected in this audit commit.  
+Against Piyush’s mail as authority: **all merge-blocking gates are met**.
+One packet hygiene issue (stale BE SHA in closure doc) is corrected in this audit commit.
 Remaining full-suite failures are **pre-existing on baseline** (or baseline-only), not candidate-only regressions.
 
 **Do not merge or deploy until he sends `INTEGRATION_MERGE_AUTHORIZED`.**
