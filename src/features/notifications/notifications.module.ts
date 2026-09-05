@@ -18,7 +18,7 @@ import { NotificationRecipientPolicyService } from "./services/notification-reci
   imports: [
     ScheduleModule,
     MailModule,
-    BrandCentreModule,
+    forwardRef(() => BrandCentreModule),
     forwardRef(() => BrandSettingsModule),
   ],
   controllers: [NotificationsController],
