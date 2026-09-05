@@ -71,6 +71,9 @@ export default $config({
     const authSuffix = $app.stage === "prod" ? "PROD" : "DEV";
     const JWT_SECRET = requiredEnv(`JWT_SECRET_${authSuffix}`);
     const AUTH_OTP_PEPPER = requiredEnv(`AUTH_OTP_PEPPER_${authSuffix}`);
+    const C03_INVITATION_IDENTITY_HMAC_PEPPER = requiredEnv(
+      `C03_INVITATION_IDENTITY_HMAC_PEPPER_${authSuffix}`,
+    );
 
     const defaultFrontendUrl =
       $app.stage === "prod"
@@ -121,6 +124,7 @@ export default $config({
       AUTH_OTP_TTL: "10m",
       AUTH_RESET_TTL: "30m",
       AUTH_OTP_PEPPER,
+      C03_INVITATION_IDENTITY_HMAC_PEPPER,
       S3_BUCKET_NAME: filesBucket.name,
       AWS_REGION: process.env.AWS_REGION ?? "ap-south-1",
       POSTMARK_SERVER_TOKEN: process.env.POSTMARK_SERVER_TOKEN as string,
