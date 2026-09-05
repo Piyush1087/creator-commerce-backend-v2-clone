@@ -86,6 +86,8 @@ export interface BrandPayoutsLegacyLimitationV2 {
 
 export type BrandPayoutsReadAction =
   | "VIEW_DETAIL"
+  | "ADD_FUNDS"
+  | "REQUEST_BRAND_RETURN"
   | "OPEN_SETTINGS_ADD_FUNDS"
   | "OPEN_SETTINGS_BRAND_RETURN"
   | "DOWNLOAD_FINANCIAL_ACTIVITY_CSV";

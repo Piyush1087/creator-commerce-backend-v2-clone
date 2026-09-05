@@ -17,7 +17,7 @@ const categories = new Set([
 
 describe("BS-05 canonical notification policy", () => {
   it("registers only complete immutable canonical policies", () => {
-    expect(Object.keys(NOTIFICATION_EVENT_REGISTRY)).toHaveLength(23);
+    expect(Object.keys(NOTIFICATION_EVENT_REGISTRY)).toHaveLength(27);
     for (const definition of Object.values(NOTIFICATION_EVENT_REGISTRY)) {
       expect(categories.has(definition.category)).toBe(true);
       expect(["CRITICAL", "ACTION_REQUIRED", "INFORMATIONAL"]).toContain(
@@ -32,6 +32,43 @@ describe("BS-05 canonical notification policy", () => {
         "SOURCE_TYPE_SOURCE_ID_TRANSITION_ID",
       );
       expect(Object.isFrozen(definition)).toBe(true);
+    }
+  });
+
+  it("binds launch-path Payouts notices to scoped, redacted policies and safe links", () => {
+    expect(
+      NOTIFICATION_EVENT_REGISTRY["payouts.reserve_approval_required"],
+    ).toMatchObject({
+      recipientPolicy: "OWNER_FINANCE",
+      inAppPolicy: "REQUIRED",
+      emailPolicy: "OPTIONAL",
+      deepLinkPath: "/brand/payouts",
+    });
+    for (const eventType of [
+      "payouts.creator_setup_blocking",
+      "payouts.provider_action_required",
+      "payouts.transfer_failed_or_reconciliation_required",
+    ] as const) {
+      expect(NOTIFICATION_EVENT_REGISTRY[eventType]).toMatchObject({
+        recipientPolicy: "OWNER_FINANCE_PLUS_ACTIVE_TRIGGERING_CM",
+        inAppPolicy: "REQUIRED",
+        emailPolicy: "OPTIONAL",
+        deepLinkPath:
+          "/brand/payouts?obligation=payout-obligation:{obligation_id}",
+      });
+    }
+    for (const eventType of [
+      "escrow.funding_credited",
+      "escrow.brand_return_action_required",
+      "escrow.brand_return_partial",
+      "escrow.brand_return_completed",
+    ] as const) {
+      expect(NOTIFICATION_EVENT_REGISTRY[eventType].deepLinkPath).toContain(
+        "/brand/payouts",
+      );
+      expect(NOTIFICATION_EVENT_REGISTRY[eventType].recipientPolicy).toBe(
+        "OWNER_FINANCE",
+      );
     }
   });
 

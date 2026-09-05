@@ -10,6 +10,7 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import { resolveBrandFinancialCommandSurface } from "../../../shared/config/brand-financial-command-surface";
 import {
   projectBrandPayoutsViewerV2,
   type BrandPayoutsFullFinancialAuthorizationScopeV1,
@@ -598,7 +599,7 @@ function missingVaultOverview(
           availableSource("BRAND_RETURNS"),
         ],
         legacy_limitations: [],
-        available_actions: [],
+        available_actions: overviewActions(scope, request.asOf, null),
         payload: {
           projection: "FULL_FINANCIAL",
           available_funds: unavailable("VAULT_NOT_ESTABLISHED"),
@@ -660,23 +661,39 @@ function emptyCampaignManagerReturns(
 function overviewActions(
   scope: BrandPayoutsFullFinancialAuthorizationScopeV1,
   asOf: Date,
-  vault: VaultRow,
+  vault: VaultRow | null,
 ): BrandPayoutsAvailableActionV2[] {
-  const version = `vault:${vault.updatedAt.toISOString()}`;
-  return [
+  const version = vault
+    ? `vault:${vault.updatedAt.toISOString()}`
+    : `vault:not-established:${scope.authorizationVersion}`;
+  const activeSurface = resolveBrandFinancialCommandSurface();
+  const actions: BrandPayoutsAvailableActionV2[] = [
     {
-      action: "OPEN_SETTINGS_ADD_FUNDS",
-      resource_reference: "brand-settings:secure-escrow:add-funds",
+      action:
+        activeSurface === "PAYOUTS" ? "ADD_FUNDS" : "OPEN_SETTINGS_ADD_FUNDS",
+      resource_reference:
+        activeSurface === "PAYOUTS"
+          ? "brand-payouts:vault:add-funds"
+          : "brand-settings:secure-escrow:add-funds",
       resource_version: version,
       authorized_as_of: utcInstant(asOf),
     },
-    {
-      action: "OPEN_SETTINGS_BRAND_RETURN",
-      resource_reference: "brand-settings:secure-escrow:brand-return",
+  ];
+  if (vault) {
+    actions.push({
+      action:
+        activeSurface === "PAYOUTS"
+          ? "REQUEST_BRAND_RETURN"
+          : "OPEN_SETTINGS_BRAND_RETURN",
+      resource_reference:
+        activeSurface === "PAYOUTS"
+          ? "brand-payouts:vault:brand-return"
+          : "brand-settings:secure-escrow:brand-return",
       resource_version: `${version}:${scope.authorizationVersion}`,
       authorized_as_of: utcInstant(asOf),
-    },
-  ];
+    });
+  }
+  return actions;
 }
 
 function availableSource(
