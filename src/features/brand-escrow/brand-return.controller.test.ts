@@ -1,5 +1,5 @@
 import { ForbiddenException } from "@nestjs/common";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BrandEscrowController } from "./brand-escrow.controller";
 
@@ -26,18 +26,25 @@ function harness() {
       brand_return_request_id: "return-1",
     }),
   };
+  const escrow = {
+    createCardTopUpIntent: vi.fn().mockResolvedValue({
+      funding_load_id: "load-1",
+    }),
+  };
   const controller = new BrandEscrowController(
     {} as never,
     workspaceAuth as never,
     {} as never,
-    {} as never,
+    escrow as never,
     {} as never,
     {} as never,
     {} as never,
     brandReturns as never,
   );
-  return { brandReturns, controller, workspaceAuth };
+  return { brandReturns, controller, escrow, workspaceAuth };
 }
+
+afterEach(() => vi.unstubAllEnvs());
 
 describe("BS04 Brand Return controller authorization", () => {
   it.each(["BRAND_OWNER", "FINANCE_ADMIN"])(
@@ -71,5 +78,61 @@ describe("BS04 Brand Return controller authorization", () => {
       }),
     ).rejects.toThrow("Financial mutation denied");
     expect(brandReturns.requestReturn).not.toHaveBeenCalled();
+  });
+
+  it("atomically admits only the configured command surface for both mutations", async () => {
+    vi.stubEnv("BRAND_PAYOUTS_COMMAND_SURFACE", "PAYOUTS");
+    const { brandReturns, controller, escrow } = harness();
+    const topUp = {
+      target_allocation: 5000,
+      idempotency_key: "6c786ed8-938c-4cb7-99eb-f9f49946c1aa",
+    };
+    const brandReturn = {
+      amount: 25,
+      idempotency_identity: "6c786ed8-938c-4cb7-99eb-f9f49946c1aa",
+    };
+
+    await expect(
+      controller.createTopUpIntent(request("BRAND_OWNER"), topUp, "PAYOUTS"),
+    ).resolves.toMatchObject({ funding_load_id: "load-1" });
+    await expect(
+      controller.requestBrandReturn(
+        request("FINANCE_ADMIN"),
+        brandReturn,
+        "PAYOUTS",
+      ),
+    ).resolves.toMatchObject({ brand_return_request_id: "return-1" });
+
+    await expect(
+      controller.createTopUpIntent(request("BRAND_OWNER"), topUp, "SETTINGS"),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: "BRAND_FINANCIAL_COMMAND_SURFACE_INACTIVE",
+      }),
+    });
+    await expect(
+      controller.requestBrandReturn(
+        request("BRAND_OWNER"),
+        brandReturn,
+        undefined,
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: "BRAND_FINANCIAL_COMMAND_SURFACE_INACTIVE",
+      }),
+    });
+    expect(escrow.createCardTopUpIntent).toHaveBeenCalledOnce();
+    expect(brandReturns.requestReturn).toHaveBeenCalledOnce();
+  });
+
+  it("keeps missing-header Settings compatibility during rollback", async () => {
+    vi.stubEnv("BRAND_PAYOUTS_COMMAND_SURFACE", "SETTINGS");
+    const { controller } = harness();
+    await expect(
+      controller.requestBrandReturn(request("BRAND_OWNER"), {
+        amount: 25,
+        idempotency_identity: "6c786ed8-938c-4cb7-99eb-f9f49946c1aa",
+      }),
+    ).resolves.toMatchObject({ brand_return_request_id: "return-1" });
   });
 });
