@@ -16,13 +16,20 @@ import type { PrismaService } from "../../prisma/prisma.service";
 import { CollaborationAccessService } from "./services/collaboration-access.service";
 import { CollaborationDestinationService } from "./services/collaboration-destination.service";
 import { CollaborationNegotiationService } from "./services/collaboration-negotiation.service";
+import { CollaborationWorkerService } from "./services/collaboration-worker.service";
+import { CollaborationBriefPackService } from "./services/collaboration-brief-pack.service";
 
 describe.skipIf(process.env.C04_B2_DATABASE_TEST !== "true")(
   "C04 shared Collaboration PostgreSQL runtime",
   () => {
-    const db = new PrismaClient({ transactionOptions: { timeout: 30000, maxWait: 10000 } });
+    const db = new PrismaClient({
+      transactionOptions: { timeout: 30000, maxWait: 10000 },
+    });
     const h = applicationHarness(db);
-    const access = new CollaborationAccessService(db as PrismaService, h.actors);
+    const access = new CollaborationAccessService(
+      db as PrismaService,
+      h.actors,
+    );
     const realtime = { broadcast: vi.fn().mockResolvedValue(undefined) } as any;
     const negotiation = new CollaborationNegotiationService(
       db as PrismaService,
@@ -37,10 +44,20 @@ describe.skipIf(process.env.C04_B2_DATABASE_TEST !== "true")(
       access,
       realtime,
     );
+    const worker = new CollaborationWorkerService(
+      db as PrismaService,
+      {} as any,
+      {} as any,
+      realtime,
+    );
+    const briefPack = new CollaborationBriefPackService(access);
 
     beforeAll(async () => {
       const url = new URL(process.env.DATABASE_URL ?? "");
-      if (url.hostname !== "localhost" || url.pathname !== "/c04_b2_runtime_20260906") {
+      if (
+        url.hostname !== "localhost" ||
+        url.pathname !== "/c04_b2_runtime_20260906"
+      ) {
         throw new Error("C04_B2_ISOLATED_DATABASE_REQUIRED");
       }
       await db.$connect();
@@ -86,11 +103,22 @@ describe.skipIf(process.env.C04_B2_DATABASE_TEST !== "true")(
         proposedFee: agreement.minimumCreatorFeeSnapshot!.toNumber(),
         currency: agreement.currency,
       };
-      await negotiation.submitCreatorProposal(f.owner.user, f.collaboration.id, command);
-      await negotiation.submitCreatorProposal(f.owner.user, f.collaboration.id, command);
+      await negotiation.submitCreatorProposal(
+        f.owner.user,
+        f.collaboration.id,
+        command,
+      );
+      await negotiation.submitCreatorProposal(
+        f.owner.user,
+        f.collaboration.id,
+        command,
+      );
       expect(
         await db.collaborationEvent.count({
-          where: { collaborationId: f.collaboration.id, eventType: "CREATOR_PROPOSAL_SUBMITTED" },
+          where: {
+            collaborationId: f.collaboration.id,
+            eventType: "CREATOR_PROPOSAL_SUBMITTED",
+          },
         }),
       ).toBe(1);
       expect(
@@ -102,7 +130,10 @@ describe.skipIf(process.env.C04_B2_DATABASE_TEST !== "true")(
 
     it("rejects below-minimum and wrong-currency proposals without mutation", async () => {
       for (const mutation of [
-        (minimum: number, currency: string) => ({ proposedFee: minimum - 1, currency }),
+        (minimum: number, currency: string) => ({
+          proposedFee: minimum - 1,
+          currency,
+        }),
         (minimum: number) => ({ proposedFee: minimum, currency: "USD" }),
       ]) {
         const f = await approved();
@@ -111,11 +142,16 @@ describe.skipIf(process.env.C04_B2_DATABASE_TEST !== "true")(
           negotiation.submitCreatorProposal(f.owner.user, f.collaboration.id, {
             commandId: randomUUID(),
             expectedAggregateVersion: f.collaboration.aggregateVersion,
-            ...mutation(agreement.minimumCreatorFeeSnapshot!.toNumber(), agreement.currency),
+            ...mutation(
+              agreement.minimumCreatorFeeSnapshot!.toNumber(),
+              agreement.currency,
+            ),
           }),
         ).rejects.toBeDefined();
         expect(
-          await db.collaborationEvent.count({ where: { collaborationId: f.collaboration.id } }),
+          await db.collaborationEvent.count({
+            where: { collaborationId: f.collaboration.id },
+          }),
         ).toBe(1);
       }
     });
@@ -124,24 +160,48 @@ describe.skipIf(process.env.C04_B2_DATABASE_TEST !== "true")(
       const managerFixture = await approved();
       const manager = await teamFixture(db, managerFixture.owner, "MANAGER");
       const agreement = managerFixture.collaboration.commercialAgreement!;
-      await negotiation.submitCreatorProposal(manager.user, managerFixture.collaboration.id, {
-        commandId: randomUUID(),
-        expectedAggregateVersion: managerFixture.collaboration.aggregateVersion,
-        proposedFee: agreement.minimumCreatorFeeSnapshot!.toNumber(),
-        currency: agreement.currency,
-      });
+      await negotiation.submitCreatorProposal(
+        manager.user,
+        managerFixture.collaboration.id,
+        {
+          commandId: randomUUID(),
+          expectedAggregateVersion:
+            managerFixture.collaboration.aggregateVersion,
+          proposedFee: agreement.minimumCreatorFeeSnapshot!.toNumber(),
+          currency: agreement.currency,
+        },
+      );
       const event = await db.collaborationEvent.findFirstOrThrow({
-        where: { collaborationId: managerFixture.collaboration.id, eventType: "CREATOR_PROPOSAL_SUBMITTED" },
+        where: {
+          collaborationId: managerFixture.collaboration.id,
+          eventType: "CREATOR_PROPOSAL_SUBMITTED",
+        },
       });
-      expect(event).toMatchObject({ actorUserId: manager.user.id, actorMembershipId: manager.member.id, actorRole: "MANAGER" });
+      expect(event).toMatchObject({
+        actorUserId: manager.user.id,
+        actorMembershipId: manager.member.id,
+        actorRole: "MANAGER",
+      });
 
       const assistantFixture = await approved();
-      const assistant = await teamFixture(db, assistantFixture.owner, "ASSISTANT");
+      const assistant = await teamFixture(
+        db,
+        assistantFixture.owner,
+        "ASSISTANT",
+      );
       await expect(
-        access.assertThreadForUser(assistant.user, assistantFixture.collaboration.id, "COMMAND"),
+        access.assertThreadForUser(
+          assistant.user,
+          assistantFixture.collaboration.id,
+          "COMMAND",
+        ),
       ).rejects.toBeInstanceOf(ForbiddenException);
       await expect(
-        access.assertThreadForUser(assistant.user, assistantFixture.collaboration.id, "CHAT"),
+        access.assertThreadForUser(
+          assistant.user,
+          assistantFixture.collaboration.id,
+          "CHAT",
+        ),
       ).resolves.toBeTruthy();
     });
 
@@ -168,10 +228,14 @@ describe.skipIf(process.env.C04_B2_DATABASE_TEST !== "true")(
         sourceContactId: contact.id,
         sourceContactUpdatedAt: contact.updatedAt.toISOString(),
       });
-      const stored = await db.collaborationDeliveryDestination.findUniqueOrThrow({
-        where: { collaborationId: f.collaboration.id },
+      const stored =
+        await db.collaborationDeliveryDestination.findUniqueOrThrow({
+          where: { collaborationId: f.collaboration.id },
+        });
+      expect(stored).toMatchObject({
+        sourceType: "C05_DEFAULT",
+        confirmedByRole: "OWNER",
       });
-      expect(stored).toMatchObject({ sourceType: "C05_DEFAULT", confirmedByRole: "OWNER" });
       expect(stored.destinationContentHash).toMatch(/^[a-f0-9]{64}$/);
       await expect(
         destination.override(f.owner.user, f.collaboration.id, {
@@ -184,6 +248,62 @@ describe.skipIf(process.env.C04_B2_DATABASE_TEST !== "true")(
           countryCode: "IN",
         }),
       ).rejects.toBeDefined();
+    });
+
+    it("projects SYSTEM message, notifications and socket invalidation independently and idempotently", async () => {
+      const f = await approved();
+      const agreement = f.collaboration.commercialAgreement!;
+      await negotiation.submitCreatorProposal(
+        f.owner.user,
+        f.collaboration.id,
+        {
+          commandId: randomUUID(),
+          expectedAggregateVersion: f.collaboration.aggregateVersion,
+          proposedFee: agreement.minimumCreatorFeeSnapshot!.toNumber(),
+          currency: agreement.currency,
+        },
+      );
+      while (await worker.processOneOutbox()) {
+        // Drain this disposable candidate queue.
+      }
+      expect(
+        await db.collaborationProjectionOutbox.count({
+          where: { collaborationId: f.collaboration.id, state: "COMPLETED" },
+        }),
+      ).toBe(3);
+      expect(
+        await db.collaborationMessage.count({
+          where: { collaborationId: f.collaboration.id, kind: "SYSTEM" },
+        }),
+      ).toBe(1);
+      expect(
+        await db.notification.count({
+          where: {
+            semanticEventKey: { not: null },
+            payload: { path: ["collaborationId"], equals: f.collaboration.id },
+          },
+        }),
+      ).toBe(2);
+      expect(await worker.processOneOutbox()).toBe(false);
+      expect(
+        await db.collaborationMessage.count({
+          where: { collaborationId: f.collaboration.id, kind: "SYSTEM" },
+        }),
+      ).toBe(1);
+    });
+
+    it("serves a persisted snapshot-only CollaborationBriefPackV1", async () => {
+      const f = await approved(false);
+      const pack = await briefPack.get(f.owner.user, f.collaboration.id);
+      expect(pack).toMatchObject({
+        schemaVersion: 1,
+        collaboration: {
+          collaborationId: f.collaboration.id,
+          sourceApplicationId: f.application.applicationId,
+        },
+      });
+      expect(JSON.stringify(pack)).not.toContain("destinationContentHash");
+      expect(JSON.stringify(pack)).not.toContain("actorMembershipId");
     });
   },
 );

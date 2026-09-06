@@ -1,4 +1,5 @@
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
+import { readFileSync } from "node:fs";
 import { CollaborationActorClass, UserRole } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
@@ -167,5 +168,21 @@ describe("C04 event audit and projection fan-out", () => {
     expect(
       createMany.mock.calls[0][0].data.map((row: any) => row.projectionType),
     ).toEqual(["SYSTEM_MESSAGE", "NOTIFICATION", "SOCKET_INVALIDATION"]);
+  });
+});
+
+describe("C04 legacy cutover", () => {
+  it("routes legacy Brand application decisions to HTTP 410 before legacy mutation", () => {
+    const source = readFileSync(
+      "src/features/brand-uce/services/campaign-application.service.ts",
+      "utf8",
+    );
+    const route = source.slice(
+      source.indexOf("async routeDecision"),
+      source.indexOf("syncLegacyApplicantsCompatibilityCommand"),
+    );
+    expect(route).toContain("C04_LEGACY_APPLICATION_WRITER_RETIRED");
+    expect(route).not.toContain("this.approve(");
+    expect(route).not.toContain("this.reject(");
   });
 });
