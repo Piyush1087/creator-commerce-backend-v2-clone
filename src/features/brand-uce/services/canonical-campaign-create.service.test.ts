@@ -1,5 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
-import { UceCampaignStatus } from "@prisma/client";
+import { UceCampaignStatus, UcePayoutTerms } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
 import { CanonicalCampaignCreateService } from "./canonical-campaign-create.service";
@@ -89,6 +89,50 @@ function setup(industry = "D2C") {
 }
 
 describe("CanonicalCampaignCreateService publication readiness integration", () => {
+  it.each([
+    ["NET_7", UcePayoutTerms.NET_7],
+    ["NET_15", UcePayoutTerms.NET_15],
+    ["NET_30", UcePayoutTerms.NET_30],
+    ["NET_45", UcePayoutTerms.NET_45],
+    ["NET_60", UcePayoutTerms.NET_60],
+  ] as const)(
+    "preserves %s exactly in canonical and relational persistence",
+    async (payoutTerm, expectedRelationalTerm) => {
+      const { service, tx } = setup();
+      const termPayload = {
+        ...payload,
+        commercials: { ...payload.commercials, payout_terms: payoutTerm },
+      };
+
+      await service.publishDraft("brand-1", "campaign-1", termPayload);
+
+      const update = tx.uceCampaign.update.mock.calls[0][0] as {
+        data: {
+          commercials: {
+            upsert: {
+              create: { finalBalanceTerms: UcePayoutTerms };
+              update: { finalBalanceTerms: UcePayoutTerms };
+            };
+          };
+        };
+      };
+      const canonicalDefinition = JSON.parse(
+        tx.$executeRaw.mock.calls[0][1] as string,
+      ) as { commercials: { payout_terms: string } };
+
+      expect(update.data.commercials.upsert.create.finalBalanceTerms).toBe(
+        expectedRelationalTerm,
+      );
+      expect(update.data.commercials.upsert.update.finalBalanceTerms).toBe(
+        expectedRelationalTerm,
+      );
+      expect(canonicalDefinition.commercials.payout_terms).toBe(payoutTerm);
+      if (payoutTerm === "NET_45" || payoutTerm === "NET_60") {
+        expect(expectedRelationalTerm).not.toBe(UcePayoutTerms.NET_30);
+      }
+    },
+  );
+
   it("persists the exact projection returned by the shared resolver", async () => {
     const { service, tx } = setup();
     const readiness = resolveCanonicalCampaignReadiness("PULSE", "D2C", "IN");

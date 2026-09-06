@@ -70,12 +70,17 @@ function legacyApplicationScope(
   return UceApplicationScope.EVERYONE;
 }
 
-function legacyPayout(
+function canonicalPayout(
   value: CanonicalCampaignWizardPayload["commercials"]["payout_terms"],
 ): UcePayoutTerms {
-  if (value === "NET_7") return UcePayoutTerms.NET_7;
-  if (value === "NET_15") return UcePayoutTerms.NET_15;
-  return UcePayoutTerms.NET_30;
+  const payoutTerms: Record<typeof value, UcePayoutTerms> = {
+    NET_7: UcePayoutTerms.NET_7,
+    NET_15: UcePayoutTerms.NET_15,
+    NET_30: UcePayoutTerms.NET_30,
+    NET_45: UcePayoutTerms.NET_45,
+    NET_60: UcePayoutTerms.NET_60,
+  };
+  return payoutTerms[value];
 }
 
 function sectionAndField(path: CanonicalCampaignDraftPath) {
@@ -353,7 +358,7 @@ export class CanonicalCampaignCreateService {
       negotiableMaxFee: 0,
       totalCampaignBudgetPool: payload.commercials.total_campaign_budget,
       advancePaymentPercentage: payload.commercials.advance_payment_percentage,
-      finalBalanceTerms: legacyPayout(payload.commercials.payout_terms),
+      finalBalanceTerms: canonicalPayout(payload.commercials.payout_terms),
     };
 
     await this.prisma.$transaction(async (tx) => {
