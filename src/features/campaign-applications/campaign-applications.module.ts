@@ -20,6 +20,7 @@ import { ApplicationSubmitContextService } from "./application-submit-context.se
 import { ApplicationSubmitService } from "./application-submit.service";
 import { ApplicationTerminalService } from "./application-terminal.service";
 import { ApplicationHistoryService } from "./application-history.service";
+import { CreatorBriefPackService } from "./creator-brief-pack.service";
 import { CampaignApplicationsController } from "./campaign-applications.controller";
 import { ApplicationHandoffModule } from "../collaboration/application-handoff.module";
 import { NotificationsModule } from "../notifications/notifications.module";
@@ -51,6 +52,7 @@ export function privateApplicationResponse(
     ApplicationSubmitService,
     ApplicationTerminalService,
     ApplicationHistoryService,
+    CreatorBriefPackService,
     CampaignOpportunityPolicyService,
     CanonicalCampaignApplicationReadService,
     {
@@ -70,6 +72,7 @@ export class CampaignApplicationsModule implements NestModule {
           "api/v1/creator/applications",
           "api/v1/creator/applications/:applicationId",
           "api/v1/creator/applications/:applicationId/withdraw",
+          "api/v1/creator/applications/:applicationId/brief-pack",
           "api/v1/brand-uce/campaigns/:campaignId/applications",
           "api/v1/brand-uce/campaigns/:campaignId/applications/:applicationId/approve",
           "api/v1/brand-uce/campaigns/:campaignId/applications/:applicationId/reject",

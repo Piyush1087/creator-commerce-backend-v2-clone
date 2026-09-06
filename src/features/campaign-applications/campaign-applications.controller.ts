@@ -16,6 +16,7 @@ import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { ApplicationSubmitService } from "./application-submit.service";
 import { ApplicationTerminalService } from "./application-terminal.service";
 import { ApplicationHistoryService } from "./application-history.service";
+import { CreatorBriefPackService } from "./creator-brief-pack.service";
 
 @Controller("api/v1/creator")
 @UseGuards(JwtAuthGuard)
@@ -24,6 +25,7 @@ export class CampaignApplicationsController {
     private readonly submits: ApplicationSubmitService,
     private readonly terminals: ApplicationTerminalService,
     private readonly history: ApplicationHistoryService,
+    private readonly briefPacks: CreatorBriefPackService,
   ) {}
 
   @Post("campaigns/:campaignId/applications")
@@ -51,6 +53,14 @@ export class CampaignApplicationsController {
     @Param("applicationId", ParseUUIDPipe) applicationId: string,
   ) {
     return this.history.detail(req.user, applicationId);
+  }
+
+  @Get("applications/:applicationId/brief-pack")
+  briefPack(
+    @Req() req: RequestWithAuthUser,
+    @Param("applicationId", ParseUUIDPipe) applicationId: string,
+  ) {
+    return this.briefPacks.get(req.user, applicationId);
   }
 
   @Post("applications/:applicationId/withdraw")
