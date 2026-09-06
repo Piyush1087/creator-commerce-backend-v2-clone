@@ -15,13 +15,17 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
-import { buildPhaseSyncPatch, mapContentFormatFromTags } from "../../../shared/uce/uce-production-phase.util";
+import {
+  buildPhaseSyncPatch,
+  mapContentFormatFromTags,
+} from "../../../shared/uce/uce-production-phase.util";
 import { CreatorEligibilityService } from "../../creator-marketplace/services/creator-eligibility.service";
 import type { CreatorAudienceDemographicsMatrix } from "../../creator-marketplace/types/creator-audience.types";
 import { isInvitedCollaboration } from "../../creator-marketplace/utils/visibility-scope.util";
 import type { CreatorApplyToCampaignDto } from "../dto/creator-apply.dto";
 import { normalizeInstagramHandle } from "../../brand-uce/utils/instagram-handle.util";
 import { decimalToNumber } from "../../brand-uce/utils/uce-decimal.util";
+import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
 
 type AuthUser = { id: string; email: string; role: UserRole };
 
@@ -30,6 +34,7 @@ export class CreatorUceCampaignsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eligibility: CreatorEligibilityService,
+    private readonly subscriptionCapabilities: SubscriptionCapabilityService,
   ) {}
 
   async listOpenCampaigns(user: AuthUser) {
@@ -116,8 +121,14 @@ export class CreatorUceCampaignsService {
       include: { targeting: true },
     });
     if (!campaign || !campaign.targeting) {
-      throw new NotFoundException("Campaign not found or not open for applications");
+      throw new NotFoundException(
+        "Campaign not found or not open for applications",
+      );
     }
+    await this.subscriptionCapabilities.assertCapability(
+      campaign.brandProfileId,
+      "APPLICATION_CREATE",
+    );
 
     const handle = normalizeInstagramHandle(profile.instagramHandle);
 
@@ -181,7 +192,9 @@ export class CreatorUceCampaignsService {
       existing &&
       existing.collabStatus !== UceCollabStatus.APPLICANT_REJECTED
     ) {
-      throw new ConflictException("You already have a pipeline row for this campaign");
+      throw new ConflictException(
+        "You already have a pipeline row for this campaign",
+      );
     }
 
     const milestoneDeadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -197,7 +210,9 @@ export class CreatorUceCampaignsService {
 
     const collab = await this.prisma.$transaction(async (tx) => {
       if (existing?.collabStatus === UceCollabStatus.APPLICANT_REJECTED) {
-        await tx.uceCampaignCollaboration.delete({ where: { id: existing.id } });
+        await tx.uceCampaignCollaboration.delete({
+          where: { id: existing.id },
+        });
       }
 
       const created = await tx.uceCampaignCollaboration.create({
@@ -208,7 +223,9 @@ export class CreatorUceCampaignsService {
           instagramHandle: handle,
           creatorEmail: user.email,
           creatorProfileId: profile.id,
-          contentFormatType: mapContentFormatFromTags(brief.deliverableFormatTags),
+          contentFormatType: mapContentFormatFromTags(
+            brief.deliverableFormatTags,
+          ),
           matchScore: dto.match_score ?? 0,
           collabStatus: UceCollabStatus.APPLICANT_PENDING,
           negotiationState: UceNegotiationSubState.CREATOR_COUNTER,

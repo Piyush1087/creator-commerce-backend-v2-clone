@@ -6,6 +6,7 @@ import {
   IntelligenceReadiness,
   type Prisma,
 } from "@prisma/client";
+import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
 
 const TERMINAL = new Set<IntelligenceProcessorExecutionStatus>([
   IntelligenceProcessorExecutionStatus.COMPLETED,
@@ -15,6 +16,8 @@ const TERMINAL = new Set<IntelligenceProcessorExecutionStatus>([
 
 @Injectable()
 export class ExecutionAggregationService {
+  constructor(private readonly notifications?: NotificationDispatchService) {}
+
   async refreshInTransaction(
     tx: Prisma.TransactionClient,
     executionId: string,
@@ -22,7 +25,7 @@ export class ExecutionAggregationService {
   ): Promise<void> {
     const parent = await tx.intelligenceExecution.findUniqueOrThrow({
       where: { id: executionId },
-      select: { status: true },
+      select: { status: true, aggregateResult: true, brandId: true },
     });
     if (parent.status === IntelligenceExecutionStatus.CANCELLED) return;
     const children = await tx.intelligenceProcessorExecution.findMany({
@@ -92,5 +95,41 @@ export class ExecutionAggregationService {
       where: { id: executionId },
       data: { status, aggregateResult: aggregate, completedAt: now },
     });
+    const wasTerminal =
+      parent.status === IntelligenceExecutionStatus.COMPLETED ||
+      parent.status === IntelligenceExecutionStatus.FAILED;
+    if (wasTerminal) return;
+    if (
+      status === IntelligenceExecutionStatus.COMPLETED &&
+      (aggregate === IntelligenceExecutionAggregateResult.SUCCEEDED ||
+        aggregate === IntelligenceExecutionAggregateResult.PARTIAL)
+    ) {
+      await this.notifications?.enqueueWithinTransaction(tx, {
+        workspaceId: parent.brandId,
+        eventType: "intelligence.execution_completed",
+        source: {
+          sourceType: "intelligence_execution",
+          sourceId: executionId,
+          transitionId: `terminal:COMPLETED:${aggregate}`,
+        },
+        payload: { execution_id: executionId, aggregate_result: aggregate },
+        triggerUserId: null,
+      });
+    } else if (
+      status === IntelligenceExecutionStatus.FAILED &&
+      aggregate === IntelligenceExecutionAggregateResult.FAILED
+    ) {
+      await this.notifications?.enqueueWithinTransaction(tx, {
+        workspaceId: parent.brandId,
+        eventType: "intelligence.execution_failed",
+        source: {
+          sourceType: "intelligence_execution",
+          sourceId: executionId,
+          transitionId: "terminal:FAILED:FAILED",
+        },
+        payload: { execution_id: executionId, aggregate_result: aggregate },
+        triggerUserId: null,
+      });
+    }
   }
 }

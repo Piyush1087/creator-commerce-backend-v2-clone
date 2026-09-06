@@ -28,7 +28,7 @@ export const FeatureStagingSchema = z.object({
 export const AccountSignupSchema = z.object({
   onboardingTrackId: z.string().uuid(),
   email: z.string().trim().toLowerCase().email(),
-  password: z.string().min(6).max(100),
+  password: z.string().min(8).max(128),
 });
 
 export const EmailOtpVerificationSchema = z.object({

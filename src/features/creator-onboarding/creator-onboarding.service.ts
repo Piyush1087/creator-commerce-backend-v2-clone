@@ -9,10 +9,12 @@ import {
 } from "@nestjs/common";
 import {
   ActivatedModule,
+  AuthMethodType,
   CreatorTeamRole,
   OAuthTokenStatus,
   OnboardingStatus,
   SocialNetworkProvider,
+  UserAuthState,
   UserRole,
 } from "@prisma/client";
 
@@ -20,6 +22,8 @@ import { AuthService } from "../auth/auth.service";
 import type { AuthUser } from "../auth/types/auth-user";
 import { PrismaService } from "../../prisma/prisma.service";
 import { assignUniquePublicSlug } from "../../shared/creator/assign-public-slug.util";
+import { hashPasswordAsync } from "../../shared/crypto/password.util";
+import { normalizeEmail } from "../../shared/identity/normalize-email";
 import { InstagramConnectService } from "../instagram/instagram-connect.service";
 import { GeminiHandleEligibilityService } from "./eligibility/gemini-handle-eligibility.service";
 import { CreatorAiSyncService } from "./services/creator-ai-sync.service";
@@ -128,8 +132,8 @@ export class CreatorOnboardingService {
     password: string;
   }) {
     const track = await this.getApprovedTrack(args.onboardingTrackId);
-    const email = args.email.trim().toLowerCase();
-    const hashedPassword = this.auth.hashPassword(args.password);
+    const email = normalizeEmail(args.email);
+    const hashedPassword = await hashPasswordAsync(args.password);
 
     if (track.status === OnboardingStatus.ACCOUNT_CREATED && track.userId) {
       return this.resumeOrRestartSignup(track, email, hashedPassword);
@@ -147,7 +151,9 @@ export class CreatorOnboardingService {
       throw new BadRequestException("Complete module staging before signup.");
     }
 
-    const existing = await this.prisma.user.findUnique({ where: { email } });
+    const existing = await this.prisma.user.findUnique({
+      where: { normalizedEmail: email },
+    });
     if (existing) {
       throw new ConflictException(
         "An account with this email already exists. Sign in or use a different email.",
@@ -168,7 +174,9 @@ export class CreatorOnboardingService {
     hashedPassword: string,
   ) {
     if (!track.userId) {
-      throw new BadRequestException("Signup session is incomplete. Start again from modules.");
+      throw new BadRequestException(
+        "Signup session is incomplete. Start again from modules.",
+      );
     }
 
     const linkedUser = await this.prisma.user.findUnique({
@@ -187,9 +195,25 @@ export class CreatorOnboardingService {
     }
 
     if (linkedUser.email === email) {
-      await this.prisma.user.update({
-        where: { id: linkedUser.id },
-        data: { hashedPassword },
+      await this.prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: linkedUser.id },
+          data: { hashedPassword },
+        });
+        await tx.userAuthMethod.upsert({
+          where: {
+            userId_type: {
+              userId: linkedUser.id,
+              type: AuthMethodType.PASSWORD,
+            },
+          },
+          create: {
+            userId: linkedUser.id,
+            type: AuthMethodType.PASSWORD,
+            credentialHash: hashedPassword,
+          },
+          update: { credentialHash: hashedPassword, disabledAt: null },
+        });
       });
       const otpResult = await this.otp.sendOtp(email);
       return {
@@ -201,7 +225,9 @@ export class CreatorOnboardingService {
       };
     }
 
-    const emailTaken = await this.prisma.user.findUnique({ where: { email } });
+    const emailTaken = await this.prisma.user.findUnique({
+      where: { normalizedEmail: email },
+    });
     if (emailTaken) {
       throw new ConflictException(
         "An account with this email already exists. Sign in or use a different email.",
@@ -227,52 +253,22 @@ export class CreatorOnboardingService {
     hashedPassword: string,
   ) {
     const displayName = email.split("@")[0] ?? "creator";
-    const publicSlug = await assignUniquePublicSlug(
-      this.prisma,
-      track.instagramHandle,
-    );
 
     const user = await this.prisma.$transaction(async (tx) => {
       const createdUser = await tx.user.create({
         data: {
           email,
+          normalizedEmail: email,
           name: displayName,
           role: UserRole.CREATOR,
           hashedPassword,
-        },
-      });
-
-      const creatorProfile = await tx.creatorProfile.create({
-        data: {
-          userId: createdUser.id,
-          displayName,
-          instagramHandle: track.instagramHandle,
-          publicSlug,
-        },
-      });
-
-      await tx.userProfile.create({
-        data: {
-          userId: createdUser.id,
-          displayName,
-        },
-      });
-
-      const workspace = await tx.creatorWorkspace.create({
-        data: {
-          ownerProfileId: creatorProfile.id,
-          organizationDisplayName: `${displayName}'s Studio`,
-        },
-      });
-
-      await tx.creatorWorkspaceMember.create({
-        data: {
-          workspaceId: workspace.id,
-          assignedProfileId: creatorProfile.id,
-          associatedEmail: email,
-          securityRole: CreatorTeamRole.OWNER,
-          isActive: true,
-          joinedAt: new Date(),
+          authState: UserAuthState.PROVISIONAL,
+          authMethods: {
+            create: {
+              type: AuthMethodType.PASSWORD,
+              credentialHash: hashedPassword,
+            },
+          },
         },
       });
 
@@ -293,22 +289,74 @@ export class CreatorOnboardingService {
       email,
       onboardingTrackId: track.id,
       otp: otpResult,
-      message: "Account created. Verify your email to continue.",
+      message: "Verify your email to create your creator workspace.",
     };
   }
 
   async verifyOtp(email: string, otpCode: string) {
     await this.otp.verifyOtp(email, otpCode);
+    const normalizedEmail = normalizeEmail(email);
     const user = await this.prisma.user.findUnique({
-      where: { email: email.trim().toLowerCase() },
+      where: { normalizedEmail },
+      include: { creatorOnboardingTrack: true },
     });
-    if (!user || user.role !== UserRole.CREATOR) {
+    if (
+      !user ||
+      user.role !== UserRole.CREATOR ||
+      user.authState !== UserAuthState.PROVISIONAL ||
+      !user.creatorOnboardingTrack
+    ) {
       throw new NotFoundException("Creator account not found.");
     }
-
-    await this.prisma.creatorOnboardingTrack.updateMany({
-      where: { userId: user.id },
-      data: { status: OnboardingStatus.OTP_VERIFIED },
+    const track = user.creatorOnboardingTrack;
+    const publicSlug = await assignUniquePublicSlug(
+      this.prisma,
+      track.instagramHandle,
+    );
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`CREATOR_ACTIVATE:${user.id}`}, 0))::text`;
+      const current = await tx.user.findUnique({ where: { id: user.id } });
+      if (!current || current.authState !== UserAuthState.PROVISIONAL) {
+        throw new ConflictException("Creator account is already activated.");
+      }
+      const creatorProfile = await tx.creatorProfile.create({
+        data: {
+          userId: user.id,
+          displayName: user.name ?? "creator",
+          instagramHandle: track.instagramHandle,
+          publicSlug,
+        },
+      });
+      await tx.userProfile.create({
+        data: { userId: user.id, displayName: user.name ?? "creator" },
+      });
+      const workspace = await tx.creatorWorkspace.create({
+        data: {
+          ownerProfileId: creatorProfile.id,
+          organizationDisplayName: `${user.name ?? "Creator"}'s Studio`,
+        },
+      });
+      await tx.creatorWorkspaceMember.create({
+        data: {
+          workspaceId: workspace.id,
+          assignedProfileId: creatorProfile.id,
+          associatedEmail: normalizedEmail,
+          securityRole: CreatorTeamRole.OWNER,
+          isActive: true,
+          joinedAt: new Date(),
+        },
+      });
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          authState: UserAuthState.ACTIVE,
+          emailVerifiedAt: new Date(),
+        },
+      });
+      await tx.creatorOnboardingTrack.update({
+        where: { id: track.id },
+        data: { status: OnboardingStatus.OTP_VERIFIED },
+      });
     });
 
     return this.auth.issueTokenForUserId(user.id);
@@ -378,7 +426,8 @@ export class CreatorOnboardingService {
         onboardingTrackId: track.id,
         status: "processing",
         mode: "instagram" as const,
-        message: "AI engine sync started. Dashboard data will populate shortly.",
+        message:
+          "AI engine sync started. Dashboard data will populate shortly.",
       };
     }
 

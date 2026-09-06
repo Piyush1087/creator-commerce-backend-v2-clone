@@ -2,7 +2,11 @@ import { randomUUID } from "node:crypto";
 import { ForbiddenException } from "@nestjs/common";
 import {
   BrandRole,
+  LeakBucket,
+  LeakPlannerStatus,
+  PerformanceColor,
   PrismaClient,
+  PriorityRank,
   UserAuthState,
   UserRole,
 } from "@prisma/client";
@@ -127,6 +131,61 @@ describe.skipIf(process.env.BRAND_WORKSPACE_DATABASE_TEST !== "true")(
         });
       },
     );
+
+    it("does not touch BrandProfile or evict leaks during generic workspace resolution", async () => {
+      const { brand, user } = await workspace();
+      await prisma.brandTeamMember.create({
+        data: {
+          brandProfileId: brand.id,
+          userId: user.id,
+          role: BrandRole.BRAND_OWNER,
+        },
+      });
+      await prisma.brandProfile.update({
+        where: { id: brand.id },
+        data: {
+          brandCentreLastActiveAt: new Date(Date.now() - 31 * 60 * 1000),
+        },
+      });
+      const leak = await prisma.brandPerformanceLeak.create({
+        data: {
+          brandProfileId: brand.id,
+          insightTitle: "P7-C1 pure authorization leak",
+          shortDescription: "Generic authorization must not archive this row",
+          priorityRank: PriorityRank.HIGH,
+          leakBucket: LeakBucket.PDP,
+          performanceStatus: PerformanceColor.RED,
+          projectedLiftPercentage: 6.5,
+          drawerDeepDive: { evidence: ["P7-C1 authorization"] },
+          plannerStatus: LeakPlannerStatus.PUSHED_TO_PLANNER,
+        },
+      });
+      const snapshot = () =>
+        Promise.all([
+          prisma.brandProfile.findUniqueOrThrow({
+            where: { id: brand.id },
+            select: {
+              brandCentreLastActiveAt: true,
+              updatedAt: true,
+            },
+          }),
+          prisma.brandPerformanceLeak.findUniqueOrThrow({
+            where: { id: leak.id },
+          }),
+        ]);
+      const before = await snapshot();
+
+      await expect(service.resolveBrandContext(user)).resolves.toMatchObject({
+        brandProfileId: brand.id,
+        membership: {
+          brandProfileId: brand.id,
+          userId: user.id,
+          isActive: true,
+        },
+      });
+
+      expect(await snapshot()).toEqual(before);
+    });
 
     it("allows Campaign Manager context but denies financial mutation", async () => {
       const { brand, user } = await workspace();

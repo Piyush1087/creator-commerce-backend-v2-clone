@@ -16,6 +16,7 @@ import { JwtService } from "@nestjs/jwt";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { PrismaService } from "../../../prisma/prisma.service";
+import { AuthSessionService } from "../../auth/auth-session.service";
 import { JwtAuthGuard } from "../../auth/jwt-auth.guard";
 import { JwtStrategy } from "../../auth/jwt.strategy";
 import type { AuthUser } from "../../auth/types/auth-user";
@@ -38,7 +39,6 @@ import { DataExtractionPersistenceService } from "../../data-extraction/evidence
 import { BrandCentreAuthService } from "../brand-centre-auth.service";
 import { BrandCentreSessionEvictionService } from "../services/brand-centre-session-eviction.service";
 import { CanonicalOfferingStateService } from "../services/canonical-offering-state.service";
-import { CanonicalOfferingDiscoveryService } from "./canonical-offering-discovery.service";
 import { ProcessorRuntimeProjectionService } from "./processor-runtime-projection.service";
 import { ProductConsumerController } from "./product-consumer.controller";
 import { ProductConsumerService } from "./product-consumer.service";
@@ -99,7 +99,6 @@ database("Product consumer exact-Offering PostgreSQL surface", () => {
     new BrandCentreSessionEvictionService(db),
   );
   const canonical = new CanonicalOfferingStateService(db);
-  const discovery = new CanonicalOfferingDiscoveryService(auth, db);
   const runtime = new ProcessorRuntimeProjectionService(db);
   const service = new ProductConsumerService(
     auth,
@@ -117,6 +116,12 @@ database("Product consumer exact-Offering PostgreSQL surface", () => {
     createHash("sha256").update(JSON.stringify(value)).digest("hex");
   const secret = randomBytes(32).toString("hex");
   const jwt = new JwtService({ secret });
+  const config = new ConfigService({
+    JWT_SECRET: secret,
+    JWT_ISSUER: "creator-shop-product-consumer-test",
+    JWT_AUDIENCE: "creator-shop-product-consumer-test-client",
+  });
+  const sessions = new AuthSessionService(db, jwt, config);
   let app: INestApplication;
   let baseUrl: string;
 
@@ -139,6 +144,24 @@ database("Product consumer exact-Offering PostgreSQL surface", () => {
       email: `${label}@example.test`,
       name: label,
     };
+    await prisma.user.create({
+      data: {
+        id: user.id,
+        organizationId: organization.id,
+        role: "BRAND",
+        authState: "ACTIVE",
+        email: user.email,
+        name: user.name,
+        emailVerifiedAt: new Date(),
+      },
+    });
+    await prisma.brandTeamMember.create({
+      data: {
+        brandProfileId: profile.id,
+        userId: user.id,
+        role: "BRAND_OWNER",
+      },
+    });
     return { profile, user };
   }
 
@@ -419,19 +442,16 @@ database("Product consumer exact-Offering PostgreSQL surface", () => {
         "src/features/brand-intelligence/generated/contract-bundles",
       ),
     );
-    new JwtStrategy(new ConfigService({ JWT_SECRET: secret }));
+    new JwtStrategy(config, sessions);
     Reflect.defineMetadata(
       "design:paramtypes",
-      [ProductConsumerService, CanonicalOfferingDiscoveryService],
+      [ProductConsumerService],
       ProductConsumerController,
     );
     Reflect.defineMetadata("design:paramtypes", [Reflector], JwtAuthGuard);
     const module = await Test.createTestingModule({
       controllers: [ProductConsumerController],
-      providers: [
-        { provide: ProductConsumerService, useValue: service },
-        { provide: CanonicalOfferingDiscoveryService, useValue: discovery },
-      ],
+      providers: [{ provide: ProductConsumerService, useValue: service }],
     })
       .overrideGuard(ThrottlerGuard)
       .useValue({ canActivate: () => true })
@@ -445,143 +465,6 @@ database("Product consumer exact-Offering PostgreSQL surface", () => {
     await app?.close();
     await prisma.$disconnect();
   });
-
-  it("serves an authenticated empty canonical Offering collection", async () => {
-    const { user } = await brand("discovery-empty");
-    const token = jwt.sign({ sub: user.id, ...user });
-    expect(
-      (await fetch(`${baseUrl}/api/v1/brand-centre/offerings`)).status,
-    ).toBe(401);
-
-    const response = await fetch(`${baseUrl}/api/v1/brand-centre/offerings`, {
-      headers: { authorization: `Bearer ${token}` },
-    });
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ offerings: [] });
-  });
-
-  it("lists only resolved own-Brand canonical Offerings in stable order", async () => {
-    const own = await brand("discovery-own");
-    const foreign = await brand("discovery-foreign");
-    const definitions = [
-      ["PRODUCT", "ACTIVE", "Canonical Product"],
-      ["SERVICE", "DRAFT_INCOMPLETE", "Canonical Service"],
-      ["EXPERIENCE", "PAUSED_INACTIVE", "Canonical Experience"],
-      ["COLLECTION", "ACTIVE", "Canonical Bundle"],
-      ["TREATMENT", "ACTIVE", "Canonical Treatment"],
-    ] as const;
-    const items = await Promise.all(
-      definitions.map(([legacyType, lifecycle, name]) =>
-        canonical.createCanonical({
-          brandProfileId: own.profile.id,
-          legacyType,
-          lifecycle,
-          name,
-          url: `https://shop.example.test/discovery/${randomUUID()}`,
-        }),
-      ),
-    );
-    const createdAt = new Date("2026-08-28T00:00:00.000Z");
-    await prisma.offering.updateMany({
-      where: { id: { in: items.map((item) => item.id) } },
-      data: { createdAt },
-    });
-    const foreignItem = await offering(
-      foreign.profile.id,
-      "Foreign Discovery Offering",
-    );
-    const unresolved = await prisma.offering.create({
-      data: {
-        brandProfileId: own.profile.id,
-        type: "MODULE",
-        canonicalKind: null,
-        canonicalLifecycle: null,
-        name: "Unresolved Historical Module",
-        url: `https://shop.example.test/discovery/${randomUUID()}`,
-        isActive: false,
-      },
-    });
-    const before = {
-      subjects: await prisma.intelligenceSubject.count({
-        where: { brandId: own.profile.id },
-      }),
-      executions: await prisma.intelligenceExecution.count({
-        where: { brandId: own.profile.id },
-      }),
-      capabilityExecutions:
-        await prisma.dataExtractionCapabilityExecution.count({
-          where: { brandId: own.profile.id },
-        }),
-      priceRevisions: await prisma.offeringPriceRevision.count({
-        where: { brandProfileId: own.profile.id },
-      }),
-    };
-    const token = jwt.sign({ sub: own.user.id, ...own.user });
-    const response = await fetch(
-      `${baseUrl}/api/v1/brand-centre/offerings?brandId=${foreign.profile.id}`,
-      { headers: { authorization: `Bearer ${token}` } },
-    );
-    expect(response.status).toBe(200);
-    const result = await response.json();
-    const expected = [...items]
-      .sort((left, right) => left.id.localeCompare(right.id))
-      .map((item) => ({
-        offeringId: item.id,
-        name: item.name,
-        kind: item.canonicalKind,
-        subtype: item.canonicalSubtype,
-        lifecycle: item.canonicalLifecycle,
-      }));
-    expect(result).toEqual({ offerings: expected });
-    expect(
-      result.offerings.every(
-        (item: Record<string, unknown>) =>
-          Object.keys(item).sort().join(",") ===
-          "kind,lifecycle,name,offeringId,subtype",
-      ),
-    ).toBe(true);
-    expect(result.offerings.map((item: { kind: string }) => item.kind)).toEqual(
-      expect.arrayContaining(["PRODUCT", "SERVICE", "EXPERIENCE", "BUNDLE"]),
-    );
-    expect(
-      result.offerings.map((item: { lifecycle: string }) => item.lifecycle),
-    ).toEqual(
-      expect.arrayContaining(["ACTIVE", "DRAFT_INCOMPLETE", "PAUSED_INACTIVE"]),
-    );
-    expect(result.offerings).toContainEqual(
-      expect.objectContaining({ kind: "SERVICE", subtype: "TREATMENT" }),
-    );
-    expect(JSON.stringify(result)).not.toContain(foreignItem.id);
-    expect(JSON.stringify(result)).not.toContain(unresolved.id);
-    expect(JSON.stringify(result)).not.toContain("canonicalPrice");
-    expect(JSON.stringify(result)).not.toContain("processorRuntime");
-    expect(JSON.stringify(result)).not.toContain("intelligence");
-    expect(JSON.stringify(result)).not.toContain("isDeepScanned");
-    expect({
-      subjects: await prisma.intelligenceSubject.count({
-        where: { brandId: own.profile.id },
-      }),
-      executions: await prisma.intelligenceExecution.count({
-        where: { brandId: own.profile.id },
-      }),
-      capabilityExecutions:
-        await prisma.dataExtractionCapabilityExecution.count({
-          where: { brandId: own.profile.id },
-        }),
-      priceRevisions: await prisma.offeringPriceRevision.count({
-        where: { brandProfileId: own.profile.id },
-      }),
-    }).toEqual(before);
-
-    for (const item of result.offerings as Array<{ offeringId: string }>) {
-      const detail = await fetch(
-        `${baseUrl}/api/v1/brand-centre/offerings/${item.offeringId}/intelligence`,
-        { headers: { authorization: `Bearer ${token}` } },
-      );
-      expect(detail.status).toBe(200);
-      expect((await detail.json()).offering.id).toBe(item.offeringId);
-    }
-  }, 30_000);
 
   it("returns no-intelligence without writes and never promotes commercial Evidence to canonical price", async () => {
     const { profile, user } = await brand("no-intelligence");
@@ -872,7 +755,7 @@ database("Product consumer exact-Offering PostgreSQL surface", () => {
     await expect(service.read(a.user, foreign.id)).rejects.toMatchObject({
       status: 404,
     });
-    const token = jwt.sign({ sub: a.user.id, ...a.user });
+    const { accessToken: token } = await sessions.create(a.user.id);
     expect(
       (
         await fetch(

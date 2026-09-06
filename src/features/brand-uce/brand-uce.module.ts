@@ -4,6 +4,7 @@ import { PrismaModule } from "../../prisma/prisma.module";
 import { AuthModule } from "../auth/auth.module";
 import { BrandCentreModule } from "../brand-centre/brand-centre.module";
 import { CollaborationModule } from "../collaboration/collaboration.module";
+import { SubscriptionCapabilityModule } from "../pricing/subscription-capability.module";
 import { BrandUceController } from "./brand-uce.controller";
 import { CanonicalCampaignCreateController } from "./canonical-campaign-create.controller";
 import { BrandUceAccessService } from "./services/brand-uce-access.service";
@@ -22,7 +23,13 @@ import { CanonicalCampaignReadinessService } from "./services/canonical-campaign
 import { CanonicalCampaignBriefService } from "./services/canonical-campaign-brief.service";
 
 @Module({
-  imports: [PrismaModule, AuthModule, BrandCentreModule, CollaborationModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    BrandCentreModule,
+    CollaborationModule,
+    SubscriptionCapabilityModule,
+  ],
   controllers: [BrandUceController, CanonicalCampaignCreateController],
   providers: [
     BrandUceAccessService,

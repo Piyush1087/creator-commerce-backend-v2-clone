@@ -3,6 +3,7 @@ import {
   BrandCentreJobStatus,
   BudgetAllocationPhase,
   IntelStatus,
+  InstagramIgHandleProvenance,
   Prisma,
   ScanStatus,
 } from "@prisma/client";
@@ -170,6 +171,8 @@ export class DeepScanWorker {
       const tiktok = normalizeSocialHandle(data.brandProfile?.tiktokHandle);
       if (ig) {
         profilePatch.igHandle = ig;
+        profilePatch.igHandleProvenance =
+          InstagramIgHandleProvenance.WEBSITE_DERIVED;
       }
       if (yt) {
         profilePatch.ytHandle = yt;

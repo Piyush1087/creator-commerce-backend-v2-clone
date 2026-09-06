@@ -4,7 +4,7 @@ import type { IntelligenceProcessorExecutionStatus } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { CurrentIntelligenceObjectProjection } from "../../brand-intelligence/projection/intelligence-current-projection.types";
 import type { ConsumerRuntimeActivity } from "./brand-consumer.types";
-import { resolveIntelligenceSubject } from "../../brand-intelligence/subject/intelligence-subject.resolver";
+import { findExistingIntelligenceSubject } from "../../brand-intelligence/subject/intelligence-subject.resolver";
 import {
   BRAND_PROCESSOR_IDS,
   BRAND_PROCESSOR_OBJECT_OWNERSHIP,
@@ -54,21 +54,23 @@ export class ProcessorRuntimeProjectionService {
     brandId: string,
     objects: readonly CurrentIntelligenceObjectProjection[],
   ): Promise<BrandProcessorRuntimeProjection> {
-    const subject = await resolveIntelligenceSubject(this.prisma, brandId);
+    const subject = await findExistingIntelligenceSubject(this.prisma, brandId);
     const currentObjects = new Set(
       objects
         .filter((object) => object.objectState !== "NO_CURRENT")
         .map((object) => object.objectSemanticId),
     );
-    const latest = await Promise.all(
-      BRAND_PROCESSOR_IDS.map((processorId) =>
-        this.prisma.intelligenceProcessorExecution.findFirst({
-          where: { brandId, subjectId: subject.id, processorId },
-          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-          select: executionSelect,
-        }),
-      ),
-    );
+    const latest = subject
+      ? await Promise.all(
+          BRAND_PROCESSOR_IDS.map((processorId) =>
+            this.prisma.intelligenceProcessorExecution.findFirst({
+              where: { brandId, subjectId: subject.id, processorId },
+              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+              select: executionSelect,
+            }),
+          ),
+        )
+      : BRAND_PROCESSOR_IDS.map(() => null);
     return Object.fromEntries(
       BRAND_PROCESSOR_IDS.map((processorId, index) => {
         const hasCurrent = BRAND_PROCESSOR_OBJECT_OWNERSHIP[processorId].some(

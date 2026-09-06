@@ -8,11 +8,14 @@ import {
   Param,
   Post,
   Req,
+  Res,
   UseGuards,
 } from "@nestjs/common";
+import type { Response } from "express";
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 
 import type { RequestWithAuthUser } from "../auth/auth.controller";
+import { setRefreshCookie } from "../auth/auth-cookie.util";
 import { Public } from "../auth/decorators/public.decorator";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { CreatorOnboardingService } from "./creator-onboarding.service";
@@ -84,14 +87,18 @@ export class CreatorOnboardingController {
   @Public()
   @Post("verify-otp")
   @HttpCode(200)
-  verifyOtp(
+  async verifyOtp(
     @Body(new ZodValidationPipe(EmailOtpVerificationSchema))
     body: {
       email: string;
       otpCode: string;
     },
+    @Res({ passthrough: true }) response: Response,
   ) {
-    return this.onboarding.verifyOtp(body.email, body.otpCode);
+    const result = await this.onboarding.verifyOtp(body.email, body.otpCode);
+    setRefreshCookie(response, result.refreshToken);
+    const { refreshToken: _refreshToken, ...publicResult } = result;
+    return publicResult;
   }
 
   @UseGuards(JwtAuthGuard)
