@@ -1,5 +1,15 @@
-import { UceMilestoneStage } from "@prisma/client";
-import { IsEnum, IsOptional, IsString, IsUUID, MaxLength } from "class-validator";
+import { CollaborationLifecycle, CollaborationStage } from "@prisma/client";
+import { Type } from "class-transformer";
+import {
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+} from "class-validator";
 
 export class ListCollaborationThreadsQueryDto {
   @IsOptional()
@@ -11,11 +21,22 @@ export class ListCollaborationThreadsQueryDto {
   brief_id?: string;
 
   @IsOptional()
-  @IsEnum(UceMilestoneStage)
-  stage?: UceMilestoneStage;
+  @IsEnum(CollaborationStage)
+  stage?: CollaborationStage;
+
+  @IsOptional()
+  @IsEnum(CollaborationLifecycle)
+  lifecycle?: CollaborationLifecycle;
 
   @IsOptional()
   @IsString()
   @MaxLength(120)
   search?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
 }

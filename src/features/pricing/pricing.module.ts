@@ -18,6 +18,8 @@ import { SubscriptionLifecycleService } from "./services/subscription-lifecycle.
 import { SubscriptionAccessService } from "./services/subscription-access.service";
 import { SubscriptionCapabilityModule } from "./subscription-capability.module";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { BusinessGeographyFinancialPolicyService } from "./services/business-geography-financial-policy.service";
+import { PlanCommercialPolicyService } from "./services/plan-commercial-policy.service";
 
 @Module({
   imports: [
@@ -40,6 +42,8 @@ import { NotificationsModule } from "../notifications/notifications.module";
     PricingInvoiceService,
     PricingWebhookService,
     SubscriptionLifecycleReconciliationScheduler,
+    BusinessGeographyFinancialPolicyService,
+    PlanCommercialPolicyService,
   ],
   exports: [
     SubscriptionCapabilityModule,
@@ -48,6 +52,8 @@ import { NotificationsModule } from "../notifications/notifications.module";
     SubscriptionLifecycleService,
     SubscriptionAccessService,
     GeoRoutingService,
+    BusinessGeographyFinancialPolicyService,
+    PlanCommercialPolicyService,
   ],
 })
 export class PricingModule {}

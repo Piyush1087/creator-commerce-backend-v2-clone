@@ -43,6 +43,7 @@ import { BrandReturnWebhookService } from "./services/brand-return-webhook.servi
 import { EscrowFundingAttributionService } from "./services/escrow-funding-attribution.service";
 import { EscrowFundingSourceReconciliationService } from "./services/escrow-funding-source-reconciliation.service";
 import { CreatorPayoutProfileModule } from "./creator-payout-profile.module";
+import { CollaborationEscrowReserveService } from "./services/collaboration-escrow-reserve.service";
 
 @Module({
   imports: [
@@ -92,6 +93,7 @@ import { CreatorPayoutProfileModule } from "./creator-payout-profile.module";
     },
     BrandReturnWebhookEventParser,
     BrandReturnWebhookService,
+    CollaborationEscrowReserveService,
   ],
   exports: [
     BrandEscrowService,
@@ -105,6 +107,7 @@ import { CreatorPayoutProfileModule } from "./creator-payout-profile.module";
     RouteReconciliationService,
     BrandReturnService,
     EscrowFundingSourceReconciliationService,
+    CollaborationEscrowReserveService,
   ],
 })
 export class BrandEscrowModule {}

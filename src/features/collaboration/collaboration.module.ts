@@ -7,13 +7,36 @@ import { CollaborationController } from "./collaboration.controller";
 import { CollaborationGateway } from "./collaboration.gateway";
 import { CollaborationAccessService } from "./services/collaboration-access.service";
 import { CollaborationCreatorProfileService } from "./services/collaboration-creator-profile.service";
+import { CollaborationExceptionService } from "./services/collaboration-exception.service";
+import { CollaborationFulfillmentService } from "./services/collaboration-fulfillment.service";
+import { CollaborationFeedbackService } from "./services/collaboration-feedback.service";
 import { CollaborationProvisionService } from "./services/collaboration-provision.service";
+import { CollaborationProductionService } from "./services/collaboration-production.service";
+import { CollaborationPublishingService } from "./services/collaboration-publishing.service";
+import {
+  CollaborationFundingGateway,
+  DeferredCollaborationFundingGateway,
+} from "./services/collaboration-funding.gateway";
+import { CollaborationNegotiationService } from "./services/collaboration-negotiation.service";
+import { CollaborationPaymentCapabilityService } from "./services/collaboration-payment-capability.service";
 import { CollaborationRealtimeService } from "./services/collaboration-realtime.service";
+import { CollaborationQueryService } from "./services/collaboration-query.service";
 import { CollaborationService } from "./services/collaboration.service";
+import { CollaborationSecurementService } from "./services/collaboration-securement.service";
+import { CollaborationDestinationService } from "./services/collaboration-destination.service";
+import { CollaborationWorkerService } from "./services/collaboration-worker.service";
+import { CollaborationTrustedConfirmationService } from "./services/collaboration-trusted-confirmation.service";
+import { CollaborationBriefPackService } from "./services/collaboration-brief-pack.service";
+import {
+  CollaborationSettlementGateway,
+  DeferredCollaborationSettlementGateway,
+} from "./services/collaboration-settlement.gateway";
+import { CollaborationSettlementService } from "./services/collaboration-settlement.service";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { NotificationProcessorService } from "../notifications/services/notification-processor.service";
-import { SubscriptionCapabilityModule } from "../pricing/subscription-capability.module";
 import { BrandEscrowModule } from "../brand-escrow/brand-escrow.module";
+import { PricingModule } from "../pricing/pricing.module";
+import { CreatorTeamModule } from "../creator-settings/team/creator-team.module";
 
 @Module({
   imports: [
@@ -21,18 +44,50 @@ import { BrandEscrowModule } from "../brand-escrow/brand-escrow.module";
     AuthModule,
     BrandCentreModule,
     NotificationsModule,
-    SubscriptionCapabilityModule,
     BrandEscrowModule,
+    PricingModule,
+    CreatorTeamModule,
   ],
   controllers: [CollaborationController],
   providers: [
     CollaborationGateway,
     CollaborationAccessService,
+    CollaborationExceptionService,
     CollaborationProvisionService,
+    CollaborationNegotiationService,
+    CollaborationPaymentCapabilityService,
+    CollaborationSecurementService,
+    CollaborationDestinationService,
+    CollaborationWorkerService,
+    CollaborationTrustedConfirmationService,
+    CollaborationBriefPackService,
+    CollaborationFulfillmentService,
+    CollaborationFeedbackService,
+    CollaborationTrustedConfirmationService,
+    CollaborationProductionService,
+    CollaborationPublishingService,
+    CollaborationSettlementService,
+    {
+      provide: CollaborationSettlementGateway,
+      useClass: DeferredCollaborationSettlementGateway,
+    },
+    {
+      provide: CollaborationFundingGateway,
+      useClass: DeferredCollaborationFundingGateway,
+    },
     CollaborationRealtimeService,
+    CollaborationQueryService,
     CollaborationService,
     CollaborationCreatorProfileService,
   ],
-  exports: [CollaborationProvisionService, CollaborationService],
+  exports: [
+    CollaborationProvisionService,
+    CollaborationExceptionService,
+    CollaborationProductionService,
+    CollaborationPublishingService,
+    CollaborationSettlementService,
+    CollaborationFeedbackService,
+    CollaborationService,
+  ],
 })
 export class CollaborationModule {}
