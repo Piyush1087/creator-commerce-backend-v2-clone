@@ -20,6 +20,22 @@ export class BrandWorkspaceAuthorizationService {
   /** Resolve the existing Brand scope, then require explicit active membership. */
   async resolveBrandContext(user: AuthUser): Promise<BrandWorkspaceContext> {
     const brandProfileId = await this.brandAuth.resolveBrandProfileId(user);
+    return this.resolveMembership(user, brandProfileId);
+  }
+
+  /** Financial GET projections resolve current authority without write effects. */
+  async resolveBrandContextReadOnly(
+    user: AuthUser,
+  ): Promise<BrandWorkspaceContext> {
+    const brandProfileId =
+      await this.brandAuth.resolveBrandProfileIdReadOnly(user);
+    return this.resolveMembership(user, brandProfileId);
+  }
+
+  private async resolveMembership(
+    user: AuthUser,
+    brandProfileId: string,
+  ): Promise<BrandWorkspaceContext> {
     const membership = await this.prisma.brandTeamMember.findUnique({
       where: {
         brandProfileId_userId: { brandProfileId, userId: user.id },

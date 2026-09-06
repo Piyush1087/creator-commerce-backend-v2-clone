@@ -31,6 +31,18 @@ export class BrandCentreAuthService {
     tx: Prisma.TransactionClient,
     user: AuthUser,
   ): Promise<string> {
+    return this.resolveCurrentBrandProfileId(user, tx);
+  }
+
+  /** Financial GET projections must not refresh activity or evict sessions. */
+  resolveBrandProfileIdReadOnly(user: AuthUser): Promise<string> {
+    return this.resolveCurrentBrandProfileId(user);
+  }
+
+  private async resolveCurrentBrandProfileId(
+    user: AuthUser,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<string> {
     const current = await tx.user.findUnique({
       where: { id: user.id },
       include: {
