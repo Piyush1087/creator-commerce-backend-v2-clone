@@ -726,6 +726,10 @@ export function projectCanonicalCollaborationDetail(
           applicationProposedFee: decimalOrNull(
             agreement.applicationProposedFee,
           ),
+          creatorProposedFee: decimalOrNull(agreement.creatorProposedFee),
+          minimumCreatorFeeSnapshot: decimalOrNull(
+            agreement.minimumCreatorFeeSnapshot,
+          ),
           brandCounterFee: decimalOrNull(agreement.brandCounterFee),
           agreedCreatorFee: decimalOrNull(agreement.agreedCreatorFee),
           currency: agreement.currency,
@@ -765,6 +769,20 @@ export function projectCanonicalCollaborationDetail(
           escrowLockRef: agreement.escrowLockRef,
         }
       : null,
+    physicalDestination: snapshot?.physicalDeliveryRequired
+      ? {
+          required: true,
+          confirmed: row.deliveryDestination !== null,
+          sourceType: row.deliveryDestination?.sourceType ?? null,
+          confirmedAt:
+            row.deliveryDestination?.confirmedAt.toISOString() ?? null,
+        }
+      : {
+          required: false,
+          confirmed: false,
+          sourceType: null,
+          confirmedAt: null,
+        },
     fulfillment: row.fulfillment
       ? {
           applies: snapshot?.receivesBrandSupport ?? null,

@@ -28,6 +28,7 @@ import {
 } from "../utils/collaboration-command-support";
 import { CollaborationAccessService } from "./collaboration-access.service";
 import { CollaborationRealtimeService } from "./collaboration-realtime.service";
+import { projectCanonicalCollaborationDetail } from "../utils/collaboration-thread.mapper";
 
 type DestinationData = {
   recipientName: string;
@@ -202,7 +203,10 @@ export class CollaborationDestinationService {
       });
     });
     void this.realtime.broadcast(collaborationId, "thread.updated");
-    return { collaborationId, confirmed: true };
+    return projectCanonicalCollaborationDetail(
+      await this.access.assertThreadForUser(user, collaborationId),
+      "CREATOR",
+    );
   }
 
   private hash(value: unknown) {
