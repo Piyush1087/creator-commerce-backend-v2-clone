@@ -14,7 +14,7 @@ import {
   CampaignIngressService,
 } from "./campaign-ingress.service";
 import { evaluateInstagramOpportunity } from "../../shared/creator/instagram-opportunity-capability";
-import type { CampaignOpportunityService } from "./campaign-opportunity.service";
+import { CampaignOpportunityService } from "./campaign-opportunity.service";
 
 describe("C03 transport and dependency contracts", () => {
   it.each([
@@ -189,4 +189,85 @@ describe("C03 canonical eligibility", () => {
       ).result,
     ).toBe("INELIGIBLE");
   });
+});
+
+describe("Opportunity service eligibility evaluation with invitation context", () => {
+  it.each([
+    ["ELIGIBLE_ONLY", "ABSENT", true],
+    ["ELIGIBLE_ONLY", "VALID", true],
+    ["EVERYONE", "VALID", false],
+    ["INVITED_ONLY", "VALID", false],
+  ] as const)(
+    "%s + %s evaluates eligibility: %s",
+    async (visibility, invitation, required) => {
+      const actor = {
+        subjectCreatorProfileId: "subject",
+        workspaceId: "workspace",
+      };
+      const tx = {
+        creatorSocialIntegration: {
+          findUnique: vi.fn().mockResolvedValue({
+            nativePlatformUserId: "fixture",
+            tokenStateCondition: "ACTIVE",
+            tokenExpiresAt: new Date("2099-01-01"),
+            disconnectedAt: null,
+            authorizationHealth: "USABLE",
+            basicAuthorizationCapability: "AVAILABLE",
+          }),
+        },
+        campaignOpportunityInvitation: {
+          findMany: vi
+            .fn()
+            .mockResolvedValue(
+              invitation === "VALID" ? [{ id: "invitation" }] : [],
+            ),
+        },
+        campaignIngressTouch: { findFirst: vi.fn().mockResolvedValue(null) },
+        uceApplication: {
+          count: vi.fn().mockResolvedValue(0),
+          findMany: vi.fn().mockResolvedValue([]),
+        },
+      };
+      const evaluateEligibility = vi.fn().mockResolvedValue({
+        result: "ELIGIBLE",
+        targetingVersion: 1,
+        creatorFactsVersion: "1",
+      });
+      const evaluatePolicy = vi
+        .fn()
+        .mockReturnValue({ state: "LOCKED", reason: "TEST_PROJECTION" });
+      const service = new CampaignOpportunityService(
+        {
+          $transaction: (callback: (client: typeof tx) => unknown) =>
+            callback(tx),
+        } as never,
+        { resolveInTransaction: vi.fn().mockResolvedValue(actor) } as never,
+        {
+          resolveOpportunity: vi.fn().mockResolvedValue({
+            campaign: {
+              id: "campaign",
+              brandProfileId: "brand",
+              visibility: { state: "AVAILABLE", value: visibility },
+            },
+            assets: [],
+          }),
+        } as never,
+        { evaluate: evaluatePolicy } as never,
+        { evaluate: evaluateEligibility } as never,
+        { validateAndBind: vi.fn().mockResolvedValue("VALID") } as never,
+        {} as never,
+        {} as never,
+      );
+      await service.detail("campaign", { role: "CREATOR" } as never);
+      expect(evaluateEligibility).toHaveBeenCalledTimes(required ? 1 : 0);
+      expect(evaluatePolicy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eligibility: expect.objectContaining({
+            result: required ? "ELIGIBLE" : "UNAVAILABLE",
+          }),
+          invitation,
+        }),
+      );
+    },
+  );
 });

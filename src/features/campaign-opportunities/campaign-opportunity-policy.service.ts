@@ -107,7 +107,7 @@ export class CampaignOpportunityPolicyService {
     const visibility = campaign.visibility.value;
     const visibilityEntitled =
       visibility === "EVERYONE" ||
-      input.invitation === "VALID" ||
+      (visibility === "INVITED_ONLY" && input.invitation === "VALID") ||
       (visibility === "ELIGIBLE_ONLY" &&
         input.eligibility.result === "ELIGIBLE");
     if (
@@ -149,7 +149,6 @@ export class CampaignOpportunityPolicyService {
     }
     if (
       visibility === "ELIGIBLE_ONLY" &&
-      input.invitation !== "VALID" &&
       input.eligibility.result !== "ELIGIBLE"
     ) {
       return lock(

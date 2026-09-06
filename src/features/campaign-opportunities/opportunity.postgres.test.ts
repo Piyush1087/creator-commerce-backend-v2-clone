@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import * as F from "../../../test/fixtures/c03-application-fixtures";
 import {
   PrismaClient,
   type CampaignOpportunityInvitation,
@@ -62,11 +63,13 @@ describe.skipIf(process.env.C03_P12_DATABASE_TEST !== "true")(
     beforeAll(async () => {
       const url = new URL(process.env.DATABASE_URL ?? "");
       const database =
-        process.env.C03_P14_DATABASE_TEST === "true"
-          ? "/c03_p14_handoff"
-          : process.env.C03_P13_DATABASE_TEST === "true"
-            ? "/c03_p13"
-            : "/c03_p12";
+        process.env.C03_P6_CORRECTION_TEST === "true"
+          ? "/c03_p6_correction"
+          : process.env.C03_P14_DATABASE_TEST === "true"
+            ? "/c03_p14_handoff"
+            : process.env.C03_P13_DATABASE_TEST === "true"
+              ? "/c03_p13"
+              : "/c03_p12";
       if (url.hostname !== "localhost" || url.pathname !== database)
         throw new Error("C03_P12_DISPOSABLE_DATABASE_REQUIRED");
       await prisma.$connect();
@@ -396,6 +399,149 @@ describe.skipIf(process.env.C03_P12_DATABASE_TEST !== "true")(
       );
     }, 30_000);
 
+    it.each([
+      ["ELIGIBLE_ONLY", "ELIGIBLE", true],
+      ["ELIGIBLE_ONLY", "INELIGIBLE", false],
+      ["ELIGIBLE_ONLY", "UNAVAILABLE", false],
+      ["INVITED_ONLY", "INELIGIBLE", true],
+      ["INVITED_ONLY", "UNAVAILABLE", true],
+    ] as const)(
+      "compound entitlement %s + VALID + %s",
+      async (visibility, eligibility, allowed) => {
+        const owner = await F.creatorFixture(prisma),
+          brand = await F.brandFixture(prisma);
+        const fixture = await F.campaignFixture(prisma, brand.brand.id, 1);
+        await prisma.uceCampaignTargeting.update({
+          where: { campaignId: fixture.campaign.id },
+          data: {
+            visibilityScope: visibility,
+            visibilityScopes: [visibility],
+            followerTiers: eligibility === "INELIGIBLE" ? ["MEGA"] : [],
+            creatorArchetypes:
+              eligibility === "UNAVAILABLE" ? ["unsupported"] : [],
+          },
+        });
+        const invitation = await F.boundInvitationFixture(
+          prisma,
+          owner,
+          fixture.campaign.id,
+        );
+        const detail = await service.detail(fixture.campaign.id, owner.user);
+        if (allowed)
+          expect(detail).toMatchObject({ state: "AUTHORIZED", canApply: true });
+        else
+          expect(detail).toEqual({
+            schemaVersion: 1,
+            state: "LOCKED",
+            reason: "ELIGIBILITY_" + eligibility,
+            recoveryAction:
+              eligibility === "UNAVAILABLE" ? "RETRY_LATER" : null,
+          });
+        const items = (await service.collection(owner.user)).items;
+        expect(
+          items.some((item) => item.campaign.id === fixture.campaign.id),
+        ).toBe(allowed);
+        const counts = async () =>
+          Promise.all([
+            prisma.uceApplication.count(),
+            prisma.uceApplicationSnapshot.count(),
+            prisma.applicationDomainEvent.count(),
+            prisma.applicationCommandReceipt.count(),
+            prisma.collaboration.count(),
+          ]);
+        const before = await counts();
+        const harness = F.applicationHarness(prisma);
+        if (allowed) {
+          const result = await harness.submit.submit(
+            owner.user,
+            fixture.campaign.id,
+            fixture.selection(),
+            randomUUID(),
+          );
+          expect(result.applicationId).toBeTruthy();
+          const snapshot =
+            await prisma.uceApplicationSnapshot.findUniqueOrThrow({
+              where: { applicationId: result.applicationId },
+            });
+          expect(snapshot.attributionContext).toMatchObject({
+            campaignInvitationId: invitation.id,
+          });
+        } else {
+          await expect(
+            harness.submit.submit(
+              owner.user,
+              fixture.campaign.id,
+              fixture.selection(),
+              randomUUID(),
+            ),
+          ).rejects.toMatchObject({
+            response: { code: "ELIGIBILITY_" + eligibility },
+          });
+          expect(await counts()).toEqual(before);
+        }
+        expect(
+          await prisma.campaignOpportunityInvitation.findUniqueOrThrow({
+            where: { id: invitation.id },
+          }),
+        ).toMatchObject({
+          boundCreatorProfileId: owner.profile.id,
+          boundCreatorWorkspaceId: owner.workspace.id,
+          bindingVersion: 1,
+        });
+      },
+    );
+    it("preserves eligible-only invitation continuation and safe attribution", async () => {
+      const owner = await F.creatorFixture(prisma),
+        brand = await F.brandFixture(prisma);
+      const fixture = await F.campaignFixture(prisma, brand.brand.id, 1);
+      await prisma.uceCampaignTargeting.update({
+        where: { campaignId: fixture.campaign.id },
+        data: {
+          visibilityScope: "ELIGIBLE_ONLY",
+          visibilityScopes: ["ELIGIBLE_ONLY"],
+        },
+      });
+      const invitation = await invite(
+        fixture.campaign.id,
+        owner.user,
+        owner.profile.id,
+      );
+      const issued = await service.issue(fixture.campaign.id, owner.user, {
+        invitationCredential: invitation.raw,
+        attribution: { utm_source: "p6-invitation" },
+      });
+      expect(
+        await continuations.resolve(owner.user, issued.continuationToken),
+      ).toMatchObject({
+        status: "READY_TO_RETURN",
+        campaign: { campaignId: fixture.campaign.id },
+      });
+      const stored = await store.lookupByOpaqueToken(issued.continuationToken);
+      expect(stored).toMatchObject({
+        campaignInvitationId: invitation.row.id,
+        boundCreatorProfileId: owner.profile.id,
+        boundCreatorWorkspaceId: owner.workspace.id,
+      });
+      const result = await F.applicationHarness(prisma).submit.submit(
+        owner.user,
+        fixture.campaign.id,
+        fixture.selection(),
+        randomUUID(),
+      );
+      const row = await prisma.uceApplication.findUniqueOrThrow({
+        where: { id: result.applicationId },
+      });
+      expect(row.campaignInvitationId).toBe(invitation.row.id);
+      const snapshot = await prisma.uceApplicationSnapshot.findUniqueOrThrow({
+        where: { applicationId: row.id },
+      });
+      expect(snapshot.attributionContext).toMatchObject({
+        campaignInvitationId: invitation.row.id,
+        firstQualifiedTouch: { campaignInvitationId: invitation.row.id },
+        conversionTouch: { campaignInvitationId: invitation.row.id },
+      });
+      expect(JSON.stringify(snapshot)).not.toContain(invitation.raw);
+    });
     it("rejects inactive Team membership on protected reads", async () => {
       const owner = await creator(),
         c = await campaign();

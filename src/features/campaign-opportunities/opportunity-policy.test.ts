@@ -182,7 +182,7 @@ describe("C03 finite Opportunity matrix", () => {
       cell.visibility === "EVERYONE" ||
       (cell.visibility === "ELIGIBLE_ONLY" &&
         cell.eligibility === "ELIGIBLE") ||
-      cell.invitation === "VALID";
+      (cell.visibility === "INVITED_ONLY" && cell.invitation === "VALID");
     const authorized = creator && cell.ig === 1 && entitled;
     const expected = authorized
       ? "AUTHORIZED"
@@ -246,5 +246,112 @@ describe("C03 finite Opportunity matrix", () => {
       usableForOpportunity: false,
       recoveryAction: "RECONNECT_INSTAGRAM",
     });
+  });
+});
+
+describe("visibility-specific invitation entitlement regression", () => {
+  const policy = new CampaignOpportunityPolicyService();
+  const evaluate = (
+    visibility: "EVERYONE" | "ELIGIBLE_ONLY" | "INVITED_ONLY",
+    eligibility: "ELIGIBLE" | "INELIGIBLE" | "UNAVAILABLE",
+    invitation: InvitationResult,
+  ) => {
+    const campaign = opportunityFixture();
+    campaign.campaign.visibility = { state: "AVAILABLE", value: visibility };
+    return policy.evaluate({
+      campaign,
+      now,
+      requestClass: "AUTHENTICATED_CREATOR",
+      actor: {
+        actorUserId: "actor",
+        actorMembershipId: "member",
+        actorRole: "OWNER",
+        workspaceId: "workspace",
+        organizationId: "org",
+        subjectCreatorProfileId: "subject",
+        subjectOwnerUserId: "owner",
+        allowedActions: creatorWorkspaceActionsForRole("OWNER"),
+      },
+      instagram: evaluateInstagramOpportunity(healthy, now),
+      eligibility: {
+        result: eligibility,
+        targetingVersion: 1,
+        creatorFactsVersion: "1",
+      },
+      invitation,
+      applicationBlockedReason: null,
+      qualifiedContext: true,
+    });
+  };
+  it.each(["INELIGIBLE", "UNAVAILABLE"] as const)(
+    "ELIGIBLE_ONLY + %s + VALID invitation stays redacted",
+    (eligibility) => {
+      expect(evaluate("ELIGIBLE_ONLY", eligibility, "VALID")).toEqual({
+        schemaVersion: 1,
+        state: "LOCKED",
+        reason: "ELIGIBILITY_" + eligibility,
+        recoveryAction: eligibility === "UNAVAILABLE" ? "RETRY_LATER" : null,
+      });
+    },
+  );
+  it.each(["INELIGIBLE", "UNAVAILABLE"] as const)(
+    "INVITED_ONLY + %s + VALID invitation stays authorized",
+    (eligibility) => {
+      expect(evaluate("INVITED_ONLY", eligibility, "VALID").state).toBe(
+        "AUTHORIZED",
+      );
+    },
+  );
+  it.each([
+    "ABSENT",
+    "VALID",
+    "EXPIRED",
+    "REVOKED",
+    "SUBJECT_MISMATCH",
+  ] as const)(
+    "ELIGIBLE_ONLY eligibility survives invitation %s",
+    (invitation) => {
+      expect(evaluate("ELIGIBLE_ONLY", "ELIGIBLE", invitation).state).toBe(
+        "AUTHORIZED",
+      );
+      for (const eligibility of ["INELIGIBLE", "UNAVAILABLE"] as const) {
+        expect(evaluate("ELIGIBLE_ONLY", eligibility, invitation)).toEqual({
+          schemaVersion: 1,
+          state: "LOCKED",
+          reason: "ELIGIBILITY_" + eligibility,
+          recoveryAction: eligibility === "UNAVAILABLE" ? "RETRY_LATER" : null,
+        });
+      }
+      for (const eligibility of [
+        "ELIGIBLE",
+        "INELIGIBLE",
+        "UNAVAILABLE",
+      ] as const)
+        expect(evaluate("EVERYONE", eligibility, invitation).state).toBe(
+          "AUTHORIZED",
+        );
+    },
+  );
+  it.each([
+    ["ELIGIBLE_ONLY", "ELIGIBLE", "VALID"],
+    ["EVERYONE", "INELIGIBLE", "VALID"],
+    ["EVERYONE", "UNAVAILABLE", "ABSENT"],
+  ] as const)(
+    "%s + %s + %s remains authorized",
+    (visibility, eligibility, invitation) => {
+      expect(evaluate(visibility, eligibility, invitation).state).toBe(
+        "AUTHORIZED",
+      );
+    },
+  );
+  it("preserves proven invitation continuation without eligible-only entitlement", () => {
+    const campaign = opportunityFixture();
+    campaign.campaign.visibility = {
+      state: "AVAILABLE",
+      value: "ELIGIBLE_ONLY",
+    };
+    const access = evaluate("ELIGIBLE_ONLY", "INELIGIBLE", "VALID");
+    expect(access.state).toBe("LOCKED");
+    expect(policy.canStartContinuation(campaign, access, true)).toBe(true);
   });
 });

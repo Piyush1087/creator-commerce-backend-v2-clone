@@ -94,8 +94,7 @@ export class CampaignOpportunityService {
     const eligibility =
       actor &&
       campaign?.campaign.visibility.state === "AVAILABLE" &&
-      campaign.campaign.visibility.value === "ELIGIBLE_ONLY" &&
-      invitation !== "VALID"
+      campaign.campaign.visibility.value === "ELIGIBLE_ONLY"
         ? await this.eligibility.evaluate(
             tx,
             campaignId,
