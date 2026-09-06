@@ -48,6 +48,10 @@ import { CollaborationPaymentCapabilityService } from "./collaboration-payment-c
 import { PlanCommercialPolicyService } from "../../pricing/services/plan-commercial-policy.service";
 import { BusinessGeographyFinancialPolicyService } from "../../pricing/services/business-geography-financial-policy.service";
 import { calculateCommercialReserve } from "../utils/collaboration-financial-calculation";
+import {
+  exactCampaignPaymentTerm,
+  financialAuthorityHash,
+} from "../utils/collaboration-financial-authority";
 
 @Injectable()
 export class CollaborationNegotiationService {
@@ -437,6 +441,28 @@ export class CollaborationNegotiationService {
             };
       const version = row.aggregateVersion + 1;
       const now = new Date();
+      const campaignPaymentTerm = exactCampaignPaymentTerm(
+        agreement.campaignPaymentTermSnapshot,
+      );
+      const agreementHash = financialAuthorityHash({
+        agreementId: agreement.id,
+        agreementVersion: agreement.agreementVersion,
+        collaborationId,
+        campaignId: row.campaignId,
+        creatorProfileId: row.creatorProfileId,
+        creatorFee: fee.toFixed(2),
+        currency: agreement.currency,
+        campaignPaymentTerm,
+        advancePercentage: agreement.advancePercentageSnapshot,
+        advanceAmount: advanceAmount.toFixed(2),
+        balanceAmount: balanceAmount.toFixed(2),
+        platformCommissionAmount: reserve.platformCommissionAmount.toFixed(2),
+        platformCommissionGstAmount:
+          reserve.platformCommissionGstAmount.toFixed(2),
+        reserveAmount: reserve.requiredSecuredAmount.toFixed(2),
+        paymentRail: agreement.paymentRail,
+        lockedAt: now.toISOString(),
+      });
       await tx.collaborationCommercialAgreement.update({
         where: { collaborationId },
         data: {
@@ -456,6 +482,7 @@ export class CollaborationNegotiationService {
           negotiationState: CollaborationNegotiationState.LOCKED,
           securementState,
           termsLockedAt: now,
+          agreementHash,
           securementCompletedAt:
             securementState === CollaborationSecurementState.NOT_REQUIRED
               ? now
@@ -499,6 +526,10 @@ export class CollaborationNegotiationService {
           requiredSecuredAmount: reserve.requiredSecuredAmount.toString(),
           currency: agreement.currency,
           securementState,
+          commercialAgreementId: agreement.id,
+          commercialAgreementVersion: agreement.agreementVersion,
+          commercialAgreementHash: agreementHash,
+          campaignPaymentTerm,
         },
       });
     });

@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { ConflictException, Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
@@ -5,6 +7,7 @@ import { z } from "zod";
 import { ApprovedApplicationCollaborationPort } from "../../campaign-applications/approved-application-collaboration.port";
 import { canonicalApplication } from "../../campaign-applications/application-evidence";
 import { mapBrandIndustryToCollaborationIndustry } from "../utils/map-collaboration-industry.util";
+import { exactCampaignPaymentTerm } from "../utils/collaboration-financial-authority";
 
 const identity = z.object({ id: z.string().min(1) }).passthrough();
 const commercial = z
@@ -127,7 +130,7 @@ export class ApprovedApplicationCollaborationService extends ApprovedApplication
         code: "C03_APPLICATION_CREATOR_IDENTITY_CONFLICT",
       });
 
-    const [brand, deliverables] = await Promise.all([
+    const [brand, deliverables, campaignCommercials] = await Promise.all([
       tx.brandProfile.findUniqueOrThrow({
         where: { id: app.brandProfileId },
         select: {
@@ -141,12 +144,22 @@ export class ApprovedApplicationCollaborationService extends ApprovedApplication
         where: { briefId: app.canonicalBriefId },
         orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
       }),
+      tx.uceCampaignCommercials.findUnique({
+        where: { campaignId: app.campaignId },
+        select: { finalBalanceTerms: true },
+      }),
     ]);
+    const campaignPaymentTerm = exactCampaignPaymentTerm(
+      campaignCommercials?.finalBalanceTerms,
+    );
     const fixed = terms.compensationModel === "FIXED";
     const physicalDeliveryRequired =
       terms.receivesBrandSupport === true &&
       terms.brandSupportType === "PRODUCT";
     const offer = new Prisma.Decimal(terms.offer);
+    const agreementId = randomUUID();
+    const lockedAt = fixed ? new Date() : null;
+    const agreementHash = null;
     const created = await tx.collaboration.create({
       data: {
         authorityVersion: "CANONICAL_V1",
@@ -206,6 +219,7 @@ export class ApprovedApplicationCollaborationService extends ApprovedApplication
         },
         commercialAgreement: {
           create: {
+            id: agreementId,
             negotiationState: fixed
               ? "NOT_REQUIRED"
               : "AWAITING_CREATOR_PROPOSAL",
@@ -219,7 +233,10 @@ export class ApprovedApplicationCollaborationService extends ApprovedApplication
             paymentRail: "PLATFORM_ESCROW",
             securementState: fixed ? "AWAITING_ESCROW_FUNDING" : null,
             requiredSecuredAmount: fixed ? offer : null,
-            termsLockedAt: fixed ? new Date() : null,
+            termsLockedAt: lockedAt,
+            agreementVersion: 1,
+            agreementHash,
+            campaignPaymentTermSnapshot: campaignPaymentTerm,
           },
         },
         fulfillment: { create: { state: "NOT_STARTED" } },
@@ -250,7 +267,13 @@ export class ApprovedApplicationCollaborationService extends ApprovedApplication
             actorClass: "SYSTEM",
             correlationId: input.approvalTransitionId,
             aggregateVersion: 1,
-            payload: { sourceApplicationId: app.id },
+            payload: {
+              sourceApplicationId: app.id,
+              commercialAgreementId: agreementId,
+              commercialAgreementVersion: 1,
+              commercialAgreementHash: agreementHash,
+              campaignPaymentTerm,
+            },
           },
         },
       },

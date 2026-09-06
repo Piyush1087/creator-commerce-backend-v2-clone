@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { Injectable } from "@nestjs/common";
 import {
   CollaborationActorClass,
@@ -12,6 +14,9 @@ import {
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
+import { BrandWorkspaceAuthorizationService } from "../../brand-centre/brand-workspace-authorization.service";
+import { BusinessGeographyFinancialPolicyService } from "../../pricing/services/business-geography-financial-policy.service";
+import { PlanCommercialPolicyService } from "../../pricing/services/plan-commercial-policy.service";
 import {
   commandConflict,
   unauthorizedActor,
@@ -41,6 +46,11 @@ import {
 } from "./collaboration-access.service";
 import { CollaborationFundingGateway } from "./collaboration-funding.gateway";
 import { CollaborationRealtimeService } from "./collaboration-realtime.service";
+import {
+  exactCampaignPaymentTerm,
+  financialAuthorityHash,
+} from "../utils/collaboration-financial-authority";
+import { calculateCommercialReserve } from "../utils/collaboration-financial-calculation";
 
 export type TrustedFundingConfirmationActor = {
   actorClass: "SYSTEM";
@@ -53,6 +63,7 @@ export class CollaborationSecurementService {
     private readonly access: CollaborationAccessService,
     private readonly realtime: CollaborationRealtimeService,
     private readonly funding: CollaborationFundingGateway,
+    private readonly brandWorkspace: BrandWorkspaceAuthorizationService,
   ) {}
 
   async requestEscrowFunding(
@@ -61,6 +72,7 @@ export class CollaborationSecurementService {
     raw: unknown,
   ) {
     this.assertRole(user, UserRole.BRAND);
+    const brandContext = await this.brandWorkspace.resolveBrandContext(user);
     const input = parseCommand(collaborationCommandEnvelopeSchema, raw);
     const fingerprint = requestFingerprint(input);
     await this.access.assertThreadForUser(user, collaborationId, "COMMAND");
@@ -76,6 +88,9 @@ export class CollaborationSecurementService {
       )
         return;
       const row = await this.load(tx, collaborationId);
+      if (row.brandProfileId !== brandContext.brandProfileId) {
+        unauthorizedActor("Collaboration is outside this Brand workspace");
+      }
       this.assertSecurement(row);
       assertExpectedVersion(
         row.aggregateVersion,
@@ -102,31 +117,160 @@ export class CollaborationSecurementService {
           row.aggregateVersion,
         );
       }
-      const required = agreement.requiredSecuredAmount;
-      if (required === null)
-        commandConflict(
-          "INVALID_STATE",
-          "Required secured amount is missing",
-          row.aggregateVersion,
-        );
-      if (
-        !agreement.agreedCreatorFee ||
-        !agreement.platformCommissionAmount ||
-        !agreement.platformCommissionGstAmount
-      ) {
+      if (!agreement.agreedCreatorFee || !row.creatorProfileId) {
         commandConflict(
           "INVALID_STATE",
           "Locked financial policy snapshot is incomplete",
           row.aggregateVersion,
         );
       }
+      const campaignPaymentTerm = exactCampaignPaymentTerm(
+        agreement.campaignPaymentTermSnapshot,
+      );
+      let platformCommissionAmount = agreement.platformCommissionAmount;
+      let platformCommissionGstAmount = agreement.platformCommissionGstAmount;
+      let required = agreement.requiredSecuredAmount;
+      let agreementHash = agreement.agreementHash;
+      if (
+        !platformCommissionAmount ||
+        !platformCommissionGstAmount ||
+        !required ||
+        !agreementHash
+      ) {
+        const planPolicy =
+          await new PlanCommercialPolicyService().resolveForBrand(
+            row.brandProfileId,
+            tx,
+          );
+        const geographyPolicy =
+          new BusinessGeographyFinancialPolicyService().resolve(
+            row.brandProfile.countryCode,
+          );
+        const calculation = calculateCommercialReserve(
+          agreement.agreedCreatorFee,
+          planPolicy.platformCommissionRate,
+          geographyPolicy.platformCommissionGstRate,
+        );
+        platformCommissionAmount = calculation.platformCommissionAmount;
+        platformCommissionGstAmount = calculation.platformCommissionGstAmount;
+        required = calculation.requiredSecuredAmount;
+        agreementHash = financialAuthorityHash({
+          agreementId: agreement.id,
+          agreementVersion: agreement.agreementVersion,
+          collaborationId,
+          campaignId: row.campaignId,
+          creatorProfileId: row.creatorProfileId,
+          creatorFee: agreement.agreedCreatorFee.toFixed(2),
+          currency: agreement.currency,
+          campaignPaymentTerm,
+          platformCommissionAmount: platformCommissionAmount.toFixed(2),
+          platformCommissionGstAmount: platformCommissionGstAmount.toFixed(2),
+          reserveAmount: required.toFixed(2),
+          paymentRail: agreement.paymentRail,
+          lockedAt: agreement.termsLockedAt?.toISOString(),
+        });
+        await tx.collaborationCommercialAgreement.update({
+          where: { collaborationId },
+          data: {
+            pricingTierSnapshot: planPolicy.tier,
+            businessCountryCodeSnapshot: geographyPolicy.countryCode,
+            financialPolicyVersionSnapshot: `${planPolicy.policyVersion}|${geographyPolicy.policyVersion}`,
+            platformCommissionRateSnapshot: planPolicy.platformCommissionRate,
+            platformCommissionAmount,
+            platformCommissionGstRateSnapshot:
+              geographyPolicy.platformCommissionGstRate,
+            platformCommissionGstAmount,
+            requiredSecuredAmount: required,
+            agreementHash,
+          },
+        });
+      }
+      const instructionId = randomUUID();
+      const instructionVersion =
+        (await tx.collaborationReserveInstruction.count({
+          where: { collaborationId },
+        })) + 1;
+      const instructionHash = financialAuthorityHash({
+        instructionId,
+        instructionVersion,
+        requestId: input.commandId,
+        collaborationId,
+        brandProfileId: row.brandProfileId,
+        campaignId: row.campaignId,
+        creatorProfileId: row.creatorProfileId,
+        commercialAgreementId: agreement.id,
+        commercialAgreementVersion: agreement.agreementVersion,
+        commercialAgreementHash: agreementHash,
+        campaignPaymentTerm,
+        currency: agreement.currency,
+        creatorFee: agreement.agreedCreatorFee.toFixed(2),
+        platformCommissionAmount: platformCommissionAmount.toFixed(2),
+        platformCommissionGstAmount: platformCommissionGstAmount.toFixed(2),
+        reserveAmount: required.toFixed(2),
+        requestedBy: user.id,
+      });
+      await tx.collaborationReserveInstruction.create({
+        data: {
+          id: instructionId,
+          requestId: input.commandId,
+          collaborationId,
+          commercialAgreementId: agreement.id,
+          agreementVersion: agreement.agreementVersion,
+          agreementHash,
+          instructionVersion,
+          instructionHash,
+          brandProfileId: row.brandProfileId,
+          campaignId: row.campaignId,
+          creatorProfileId: row.creatorProfileId,
+          currency: agreement.currency,
+          creatorFee: agreement.agreedCreatorFee,
+          platformCommissionAmount,
+          platformCommissionGstAmount,
+          reserveAmount: required,
+          requestedByUserId: user.id,
+          status: "REQUESTED",
+          idempotencyKey: input.commandId,
+        },
+      });
+      if (
+        this.brandWorkspace.isFinancialReadOnly(brandContext.membership.role)
+      ) {
+        const version = row.aggregateVersion + 1;
+        await tx.collaborationCommercialAgreement.update({
+          where: { collaborationId },
+          data: { fundingInstructionRef: instructionId },
+        });
+        await this.bump(tx, collaborationId, row.aggregateVersion);
+        await appendCommandEvent(tx, {
+          collaborationId,
+          eventType: "ESCROW_FUNDING_REQUESTED",
+          actorClass: CollaborationActorClass.BRAND,
+          actorUserId: user.id,
+          commandId: input.commandId,
+          aggregateVersion: version,
+          requestFingerprint: fingerprint,
+          payload: {
+            reserveStatus: "INSTRUCTION_PUBLISHED",
+            reserveInstructionId: instructionId,
+            reserveInstructionVersion: instructionVersion,
+            reserveInstructionHash: instructionHash,
+            commercialAgreementId: agreement.id,
+            commercialAgreementVersion: agreement.agreementVersion,
+            commercialAgreementHash: agreementHash,
+            campaignPaymentTerm,
+            requiredSecuredAmount: required.toString(),
+            currency: agreement.currency,
+          },
+        });
+        return;
+      }
       const reserve = await this.funding.reserveFunds(tx, {
         collaborationId,
         brandProfileId: row.brandProfileId,
         currency: agreement.currency,
         creatorGrossFee: agreement.agreedCreatorFee,
-        platformCommissionAmount: agreement.platformCommissionAmount,
-        platformCommissionGstAmount: agreement.platformCommissionGstAmount,
+        platformCommissionAmount,
+        platformCommissionGstAmount,
         requiredSecuredAmount: required,
       });
       const version = row.aggregateVersion + 1;
@@ -191,6 +335,13 @@ export class CollaborationSecurementService {
               ? reserve.shortfallAmount.toString()
               : undefined,
           currency: agreement.currency,
+          reserveInstructionId: instructionId,
+          reserveInstructionVersion: instructionVersion,
+          reserveInstructionHash: instructionHash,
+          commercialAgreementId: agreement.id,
+          commercialAgreementVersion: agreement.agreementVersion,
+          commercialAgreementHash: agreementHash,
+          campaignPaymentTerm,
         },
       });
     });

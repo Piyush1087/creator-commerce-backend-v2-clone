@@ -35,6 +35,7 @@ import {
   validateAdminEconomicAllocation,
 } from "../utils/collaboration-exception.policy";
 import { resolveFinancialOutcome } from "../utils/collaboration-financial-resolution.policy";
+import { appendFinancialAuthority } from "../utils/collaboration-financial-authority.persistence";
 import { projectCanonicalCollaborationDetail } from "../utils/collaboration-thread.mapper";
 import {
   COLLABORATION_THREAD_INCLUDE,
@@ -165,13 +166,26 @@ export class CollaborationExceptionService {
         decidedAt: now,
         resolvedAt: now,
       };
-      await tx.collaborationFinancialResolution.upsert({
-        where: { collaborationId: row.id },
-        create: {
-          collaborationId: row.id,
-          ...adminResolution,
+      const resolutionRecord = await tx.collaborationFinancialResolution.upsert(
+        {
+          where: { collaborationId: row.id },
+          create: {
+            collaborationId: row.id,
+            ...adminResolution,
+          },
+          update: adminResolution,
         },
-        update: adminResolution,
+      );
+      await appendFinancialAuthority(tx, {
+        collaborationId: row.id,
+        agreement: row.commercialAgreement!,
+        creatorEntitlement: resolution.creatorGrossEntitlementAmount,
+        brandRefundEntitlement:
+          resolution.brandCommercialRefundEntitlementAmount,
+        settlementEligibleAt: now,
+        resolutionType: input.reasonCode,
+        sourceFinancialRef: resolutionRecord.id,
+        effectiveAt: now,
       });
       await this.persistTerminal(tx, row, {
         lifecycle: CollaborationLifecycle.TERMINATED,
@@ -287,20 +301,35 @@ export class CollaborationExceptionService {
       const policy = resolveDeterministicExceptionPolicy(row, action);
       const resolution = this.deterministicResolution(row, policy);
       const now = new Date();
-      await tx.collaborationFinancialResolution.upsert({
-        where: { collaborationId },
-        create: {
-          collaborationId,
-          ...resolution,
-          reasonText: input.reasonText,
-          resolutionEvidence: input.evidenceRef
-            ? ({ evidenceRef: input.evidenceRef } as Prisma.InputJsonValue)
-            : undefined,
-          decidedAt: now,
-          resolvedAt: now,
+      const resolutionRecord = await tx.collaborationFinancialResolution.upsert(
+        {
+          where: { collaborationId },
+          create: {
+            collaborationId,
+            ...resolution,
+            reasonText: input.reasonText,
+            resolutionEvidence: input.evidenceRef
+              ? ({ evidenceRef: input.evidenceRef } as Prisma.InputJsonValue)
+              : undefined,
+            decidedAt: now,
+            resolvedAt: now,
+          },
+          update: {},
         },
-        update: {},
-      });
+      );
+      if (row.commercialAgreement?.agreementHash) {
+        await appendFinancialAuthority(tx, {
+          collaborationId,
+          agreement: row.commercialAgreement,
+          creatorEntitlement: resolution.creatorGrossEntitlementAmount,
+          brandRefundEntitlement:
+            resolution.brandCommercialRefundEntitlementAmount,
+          settlementEligibleAt: now,
+          resolutionType: policy.endedReasonCode,
+          sourceFinancialRef: resolutionRecord.id,
+          effectiveAt: now,
+        });
+      }
       await this.persistTerminal(tx, row, {
         lifecycle: policy.lifecycle,
         reasonCode: policy.endedReasonCode,

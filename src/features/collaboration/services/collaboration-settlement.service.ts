@@ -30,6 +30,7 @@ import {
   requestFingerprint,
 } from "../utils/collaboration-command-support";
 import { resolveFinancialOutcome } from "../utils/collaboration-financial-resolution.policy";
+import { appendFinancialAuthority } from "../utils/collaboration-financial-authority.persistence";
 import { COLLABORATION_THREAD_INCLUDE } from "./collaboration-access.service";
 import { CollaborationRealtimeService } from "./collaboration-realtime.service";
 import { CollaborationSettlementGateway } from "./collaboration-settlement.gateway";
@@ -84,16 +85,18 @@ export class CollaborationSettlementService {
         "NORMAL_SUCCESS",
       );
       const now = new Date();
-      await tx.collaborationFinancialResolution.upsert({
-        where: { collaborationId: row.id },
-        create: {
-          collaborationId: row.id,
-          ...resolution,
-          decidedAt: now,
-          resolvedAt: now,
+      const resolutionRecord = await tx.collaborationFinancialResolution.upsert(
+        {
+          where: { collaborationId: row.id },
+          create: {
+            collaborationId: row.id,
+            ...resolution,
+            decidedAt: now,
+            resolvedAt: now,
+          },
+          update: { ...resolution, decidedAt: now, resolvedAt: now },
         },
-        update: { ...resolution, decidedAt: now, resolvedAt: now },
-      });
+      );
       await tx.collaborationSettlement.upsert({
         where: { collaborationId: row.id },
         create: {
@@ -123,6 +126,17 @@ export class CollaborationSettlementService {
           currency: resolution.currency,
           eligibleAt: now,
         },
+      });
+      await appendFinancialAuthority(tx, {
+        collaborationId: row.id,
+        agreement: row.commercialAgreement!,
+        creatorEntitlement: resolution.creatorGrossEntitlementAmount,
+        brandRefundEntitlement:
+          resolution.brandCommercialRefundEntitlementAmount,
+        settlementEligibleAt: now,
+        resolutionType: "NORMAL_SUCCESS",
+        sourceFinancialRef: resolutionRecord.id,
+        effectiveAt: now,
       });
       await this.bump(tx, row);
       await appendCommandEvent(tx, {
