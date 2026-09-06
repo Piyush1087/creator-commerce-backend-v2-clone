@@ -64,7 +64,11 @@ describe("C-03 P1.1D persistence and runtime architecture", () => {
           /status\s*:/.test(source),
       );
 
-    expect(writers.map(({ path }) => path.split("/src/")[1]).sort()).toEqual([
+    expect(
+      writers
+        .map(({ path }) => path.replaceAll("\\", "/").split("/src/")[1])
+        .sort(),
+    ).toEqual([
       "features/brand-uce/services/brand-uce-campaign.service.ts",
       "features/brand-uce/services/canonical-campaign-create.service.ts",
     ]);

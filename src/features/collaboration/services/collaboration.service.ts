@@ -4,7 +4,6 @@ import {
   Injectable,
 } from "@nestjs/common";
 import {
-  CollaborationEscrowStatus,
   CollaborationIndustryType,
   CollaborationMediaReviewStatus,
   CollaborationMessageKind,
@@ -17,7 +16,10 @@ import {
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
+import { BrandWorkspaceAuthorizationService } from "../../brand-centre/brand-workspace-authorization.service";
+import { BrandEscrowComputationService } from "../../brand-escrow/services/brand-escrow-computation.service";
 import { splitEscrowQuote } from "../../brand-uce/utils/uce-decimal.util";
+import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
 import type {
   AcceptCommercialsDto,
   BrandCounterOfferDto,
@@ -38,7 +40,6 @@ import {
   assertBrandCanCounter,
   assertComplianceNotVerified,
   assertCreatorCanSubmitQuote,
-  assertEscrowNotFunded,
   assertLivePostNotSubmitted,
   assertLogisticsNotDispatched,
   assertNoPendingMedia,
@@ -65,6 +66,9 @@ export class CollaborationService {
     private readonly prisma: PrismaService,
     private readonly access: CollaborationAccessService,
     private readonly realtime: CollaborationRealtimeService,
+    private readonly escrowReserve: BrandEscrowComputationService,
+    private readonly brandWorkspace: BrandWorkspaceAuthorizationService,
+    private readonly notifications: NotificationDispatchService,
   ) {}
 
   async listThreads(
@@ -362,29 +366,65 @@ export class CollaborationService {
   async fundEscrow(
     user: AuthUser,
     collaborationId: string,
-    dto: FundEscrowDto,
+    _dto: FundEscrowDto,
   ) {
     if (user.role !== UserRole.BRAND) {
       throw new ForbiddenException("Brand access required");
     }
+    const context = await this.brandWorkspace.resolveBrandContext(user);
     const thread = await this.access.assertThreadForUser(user, collaborationId);
     this.assertLegacyCommercialCompatibility(thread);
-    this.assertStage(thread, UceMilestoneStage.STAGE_2_SECUREMENT);
+    if (thread.brandProfileId !== context.brandProfileId) {
+      throw new ForbiddenException(
+        "Collaboration is outside this Brand workspace",
+      );
+    }
+    const alreadyAdvanced =
+      thread.currentStage === UceMilestoneStage.STAGE_3_LOGISTICS;
+    if (!alreadyAdvanced) {
+      this.assertStage(thread, UceMilestoneStage.STAGE_2_SECUREMENT);
+    }
     if (thread.payoutMode !== CollaborationPayoutMode.ESCROW) {
       throw new BadRequestException(
         "Escrow funding only applies to ESCROW mode",
       );
     }
-    assertEscrowNotFunded(thread.commercials);
+    const reserve = await this.escrowReserve.executeStage2Lock({
+      collaborationId,
+      brandProfileId: thread.brandProfileId,
+      grossCreatorQuote: 0,
+      expectedTdsPercentage: 0,
+    });
+    if (reserve.state !== "FUNDED") {
+      if (reserve.state === "AWAITING_FUNDS") {
+        const commercial =
+          await this.prisma.collaborationCommercial.findUniqueOrThrow({
+            where: { collaborationId },
+            select: { finalQuote: true },
+          });
+        const requiredReserve = String(reserve.required_reserve);
+        await this.notifications?.dispatch({
+          workspaceId: thread.brandProfileId,
+          eventType: "escrow.collaboration_awaiting_funds",
+          source: {
+            sourceType: "collaboration_escrow_requirement",
+            sourceId: collaborationId,
+            transitionId: `awaiting_funds:${commercial.finalQuote?.toString() ?? "unknown"}:${requiredReserve}`,
+          },
+          payload: {
+            collaboration_id: collaborationId,
+            required_reserve: reserve.required_reserve,
+          },
+          triggerUserId: user.id,
+        });
+      }
+      return this.broadcastAndReturnThread(user, collaborationId);
+    }
+    if (alreadyAdvanced) {
+      return this.broadcastAndReturnThread(user, collaborationId);
+    }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.collaborationCommercial.update({
-        where: { collaborationId },
-        data: {
-          escrowVaultId: dto.escrow_vault_id ?? `vault_${collaborationId}`,
-          escrowStatus: CollaborationEscrowStatus.FUNDED,
-        },
-      });
       await tx.collaboration.update({
         where: { id: collaborationId },
         data: { currentStage: UceMilestoneStage.STAGE_3_LOGISTICS },
@@ -640,7 +680,7 @@ export class CollaborationService {
     const autoApprovalDeadline = new Date(Date.now() + 72 * 60 * 60 * 1000);
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.collaborationMedia.create({
+      const mediaReview = await tx.collaborationMedia.create({
         data: {
           collaborationId,
           phase: dto.phase,
@@ -658,6 +698,20 @@ export class CollaborationService {
         `Media submitted (v${versionNumber}). 72-hour review clock started.`,
         { unreadBrand: true },
       );
+      await this.notifications?.enqueueWithinTransaction(tx, {
+        workspaceId: thread.brandProfileId,
+        eventType: "collaborations.media_submitted_for_review",
+        source: {
+          sourceType: "collaboration_media_review",
+          sourceId: mediaReview.id,
+          transitionId: "submitted_for_review",
+        },
+        payload: {
+          collaboration_id: collaborationId,
+          media_review_id: mediaReview.id,
+        },
+        triggerUserId: null,
+      });
     });
 
     return this.broadcastAndReturnThread(user, collaborationId);
@@ -793,16 +847,8 @@ export class CollaborationService {
         where: { collaborationId },
         data: {
           isComplianceVerified: true,
-          isFinalPayoutReleased:
-            thread.payoutMode === CollaborationPayoutMode.ESCROW,
         },
       });
-      if (thread.payoutMode === CollaborationPayoutMode.ESCROW) {
-        await tx.collaborationCommercial.update({
-          where: { collaborationId },
-          data: { escrowStatus: CollaborationEscrowStatus.SETTLED },
-        });
-      }
       await tx.collaboration.update({
         where: { id: collaborationId },
         data: { currentStage: UceMilestoneStage.STAGE_6_FEEDBACK_SYNC },
