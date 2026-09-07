@@ -35,6 +35,8 @@ The submitted amount is stored as a canonical `VARCHAR(15)` decimal string and c
 | Schema/build | Prisma format, validate, generate and Nest production build passed |
 | Startup | built AppModule started on loopback; `/`, `/health/live`, and `/health` returned HTTP 200; database reported `up`; process stopped cleanly |
 
+Both fresh and populated databases reported all 85 migrations applied and current. A full Prisma database-to-schema diff also reported the repository's pre-existing physical-name and unrelated historical drift; it reported no missing C04 migration-85 column, relation, constraint, trigger, enum, or index. The only C04-table entries were names for two indexes that predate migration 85, so no unrelated rename migration was introduced.
+
 ## Scope and safety
 
 Only the bounded C04 schema, additive migration 85, collaboration runtime, focused tests, and this handoff evidence changed. All database activity used owned loopback disposable PostgreSQL. No provider credential was supplied to a financial provider, no provider method/action was invoked, no AWS or production action occurred, no non-disposable database was mutated, and no canonical merge was performed.

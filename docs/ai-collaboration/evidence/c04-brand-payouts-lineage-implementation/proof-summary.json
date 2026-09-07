@@ -19,6 +19,9 @@
     "focused_unit_contract_tests": "PASS_41_OF_41",
     "focused_postgresql_tests": "PASS_6_OF_6",
     "prisma_validate_generate": "PASS",
+    "migration_status_fresh_and_populated": "PASS_85_CURRENT",
+    "migration_85_semantic_drift": "NONE",
+    "repository_preexisting_name_and_unrelated_drift": "OBSERVED_UNCHANGED_OUT_OF_SCOPE",
     "build": "PASS",
     "startup_root_liveness_database_health": "PASS_HTTP_200"
   },
