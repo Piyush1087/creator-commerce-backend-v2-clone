@@ -23,6 +23,7 @@ import { FailClosedCreatorPayoutProviderService } from "./services/fail-closed-c
 import { PayoutObligationIntakeService } from "./services/payout-obligation-intake.service";
 import { PrismaCreatorPayoutReadinessService } from "./services/prisma-creator-payout-readiness.service";
 import { ProviderNeutralPayoutService } from "./services/provider-neutral-payout.service";
+import { BrandPayoutsQueryService } from "./services/brand-payouts-query.service";
 
 describe.skipIf(process.env.BRAND_PAYOUTS_WAVE_B_DATABASE_TEST !== "true")(
   "Brand Payouts Wave B PostgreSQL normal path",
@@ -189,8 +190,69 @@ describe.skipIf(process.env.BRAND_PAYOUTS_WAVE_B_DATABASE_TEST !== "true")(
       );
     }
 
+    function reserveQuery() {
+      return new BrandPayoutsQueryService(
+        db as PrismaService,
+        {
+          decode: vi.fn().mockImplementation(({ requestAsOf }) => ({
+            asOf: requestAsOf,
+            lastRecordedAt: null,
+            lastStableId: null,
+          })),
+          encode: vi.fn().mockReturnValue("test-only-signed-cursor"),
+        } as never,
+        { assertDatabaseUtc: vi.fn().mockResolvedValue(undefined) } as never,
+        {} as never,
+        {} as never,
+      );
+    }
+
     it("serializes same-command replay to exactly one reserve effect and rejects changed/cross-Brand commands", async () => {
       const f = await canonicalFixture();
+      const asOf = new Date(Date.now() + 1_000);
+      for (const role of ["BRAND_OWNER", "FINANCE_ADMIN"] as const) {
+        const read = await reserveQuery().listReserveRequests({
+          authorization: {
+            kind: "FULL_FINANCIAL",
+            brandProfileId: f.brand.brand.id,
+            membershipId: f.membership.id,
+            role,
+            authorizedAsOf: asOf,
+            authorizationVersion: "membership:test",
+          },
+          asOf,
+          limit: 25,
+        });
+        expect(read.sections[0].payload).toContainEqual(
+          expect.objectContaining({
+            reserve_request_id: f.instruction.requestId,
+            reserve_instruction_id: f.instruction.id,
+            public_reference: `reserve-request:${f.instruction.requestId}`,
+            status: "APPROVAL_REQUIRED",
+            approval_required: true,
+            reserve_value: { amount: "118.0000", currency: "INR" },
+          }),
+        );
+        expect(read.sections[0].available_actions).toContainEqual(
+          expect.objectContaining({
+            action: "APPROVE_RESERVE",
+            resource_reference: f.instruction.id,
+          }),
+        );
+      }
+      const crossBrandRead = await reserveQuery().listReserveRequests({
+        authorization: {
+          kind: "FULL_FINANCIAL",
+          brandProfileId: randomUUID(),
+          membershipId: randomUUID(),
+          role: "BRAND_OWNER",
+          authorizedAsOf: asOf,
+          authorizationVersion: "membership:cross-brand",
+        },
+        asOf,
+        limit: 25,
+      });
+      expect(crossBrandRead.sections[0].payload).toEqual([]);
       const service = reserveService(f);
       const command = {
         reserve_instruction_id: f.instruction.id,

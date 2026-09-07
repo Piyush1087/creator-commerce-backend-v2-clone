@@ -22,6 +22,7 @@ import {
   type BrandPayoutsBrandReturnItemV2,
   type BrandPayoutsBrandReturnsResponseV2,
   type BrandPayoutsOverviewResponseV2,
+  type BrandPayoutsReserveRequestItemV2,
   type BrandPayoutsReserveRequestsResponseV2,
 } from "../contracts/brand-payouts-v2.contract";
 import type {
@@ -91,6 +92,36 @@ type VaultRow = Prisma.BrandEscrowVaultGetPayload<{
 }>;
 type BrandReturnRow = Prisma.BrandReturnRequestGetPayload<{
   select: typeof brandReturnSelect;
+}>;
+
+const reserveInstructionSelect =
+  Prisma.validator<Prisma.CollaborationReserveInstructionSelect>()({
+    id: true,
+    requestId: true,
+    collaborationId: true,
+    brandProfileId: true,
+    campaignId: true,
+    currency: true,
+    reserveAmount: true,
+    instructionVersion: true,
+    status: true,
+    requestedAt: true,
+    supersededBy: {
+      select: { id: true, requestedAt: true },
+      orderBy: [{ requestedAt: "asc" }, { id: "asc" }],
+    },
+    payoutReserveApproval: {
+      select: {
+        status: true,
+        failureCode: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    },
+  });
+
+type ReserveInstructionRow = Prisma.CollaborationReserveInstructionGetPayload<{
+  select: typeof reserveInstructionSelect;
 }>;
 
 @Injectable()
@@ -456,6 +487,58 @@ export class BrandPayoutsQueryService implements BrandPayoutsQueryPortV2 {
       authorization: request.authorization,
       requestAsOf: request.asOf,
     });
+    if (request.authorization.kind === "NO_FINANCIAL_ROWS") {
+      return emptyCampaignManagerReserveRequests(request, boundary.asOf);
+    }
+    await this.environment.assertDatabaseUtc();
+    const limit = Math.min(Math.max(request.limit, 1), 100);
+    const target = limit + 1;
+    const batchSize = Math.max(target, 100);
+    let scanAt = boundary.lastRecordedAt;
+    let scanId = boundary.lastStableId
+      ? stripReference(boundary.lastStableId, "reserve-request:")
+      : null;
+    let exhausted = false;
+    const projected: Array<{
+      readonly item: BrandPayoutsReserveRequestItemV2;
+      readonly requestedAt: Date;
+    }> = [];
+    while (projected.length < target && !exhausted) {
+      const rows = await this.prisma.collaborationReserveInstruction.findMany({
+        where: {
+          brandProfileId: request.authorization.brandProfileId,
+          requestedAt: { lte: scanAt ?? boundary.asOf },
+          ...(scanAt && scanId
+            ? {
+                OR: [
+                  { requestedAt: { lt: scanAt } },
+                  { requestedAt: scanAt, requestId: { lt: scanId } },
+                ],
+              }
+            : {}),
+        },
+        select: reserveInstructionSelect,
+        orderBy: [{ requestedAt: "desc" }, { requestId: "desc" }],
+        take: batchSize,
+      });
+      exhausted = rows.length < batchSize;
+      for (const row of rows) {
+        const item = projectReserveRequest(row, boundary.asOf);
+        if (statuses.length === 0 || statuses.includes(item.status)) {
+          projected.push({ item, requestedAt: row.requestedAt });
+        }
+      }
+      const last = rows.at(-1);
+      if (!last) break;
+      scanAt = last.requestedAt;
+      scanId = last.requestId;
+    }
+    const pageRows = projected.slice(0, limit);
+    const hasNext = projected.length > limit || !exhausted;
+    const last = pageRows.at(-1);
+    const observedAt = maxObservedAt(
+      pageRows.map(({ item }) => new Date(item.last_observed_at)),
+    );
     return {
       schema_version: BRAND_PAYOUTS_V2_SCHEMA_VERSION,
       as_of: utcInstant(boundary.asOf),
@@ -463,29 +546,120 @@ export class BrandPayoutsQueryService implements BrandPayoutsQueryPortV2 {
       sections: [
         {
           section_id: "RESERVE_REQUESTS",
-          coverage: "UNAVAILABLE",
+          coverage: "COMPLETE",
           freshness: "CURRENT",
-          source_observed_at: null,
-          source_coverage: [
-            unavailableSource(
-              "COLLABORATION_RESERVE_REQUESTS",
-              request.authorization.kind === "NO_FINANCIAL_ROWS"
-                ? "CANONICAL_ENTITY_SCOPE_UNAVAILABLE"
-                : "C04_RESERVE_REQUEST_SOURCE_NOT_AVAILABLE",
-            ),
-          ],
+          source_observed_at: observedAt ? utcInstant(observedAt) : null,
+          source_coverage: [availableSource("COLLABORATION_RESERVE_REQUESTS")],
           legacy_limitations: [],
-          available_actions: [],
-          payload: [],
+          available_actions: pageRows
+            .filter(({ item }) => item.approval_required)
+            .map(({ item }) => ({
+              action: "APPROVE_RESERVE" as const,
+              resource_reference: item.reserve_instruction_id,
+              resource_version: item.resource_version,
+              authorized_as_of: utcInstant(boundary.asOf),
+            })),
+          payload: pageRows.map(({ item }) => item),
           page: {
-            next_cursor: null,
-            page_complete: true,
-            source_complete: false,
+            next_cursor:
+              hasNext && last
+                ? this.cursors.encode({
+                    endpoint: "reserve-requests",
+                    filterKey,
+                    authorization: request.authorization,
+                    asOf: boundary.asOf,
+                    lastRecordedAt: last.requestedAt,
+                    lastStableId: last.item.public_reference,
+                  })
+                : null,
+            page_complete: !hasNext,
+            source_complete: true,
           },
         },
       ],
     };
   }
+}
+
+function projectReserveRequest(
+  row: ReserveInstructionRow,
+  asOf: Date,
+): BrandPayoutsReserveRequestItemV2 {
+  const superseded = row.supersededBy.some(
+    (candidate) => candidate.requestedAt.getTime() <= asOf.getTime(),
+  );
+  const candidateApproval = row.payoutReserveApproval;
+  const approval =
+    candidateApproval && candidateApproval.createdAt.getTime() <= asOf.getTime()
+      ? candidateApproval
+      : null;
+  const eligible = row.status === "REQUESTED" && !superseded && !approval;
+  const status = superseded
+    ? "SUPERSEDED"
+    : approval
+      ? approval.status
+      : eligible
+        ? "APPROVAL_REQUIRED"
+        : "LEGACY_UNRECONCILED";
+  const observedAt = approval?.updatedAt ?? row.requestedAt;
+  return {
+    reserve_request_id: row.requestId,
+    reserve_instruction_id: row.id,
+    public_reference: `reserve-request:${row.requestId}`,
+    resource_version: `reserve-instruction:v${row.instructionVersion}`,
+    campaign_id: row.campaignId,
+    collaboration_id: row.collaborationId,
+    status,
+    reserve_value: exactMoney(row.reserveAmount, row.currency),
+    approval_required: eligible,
+    requested_at: utcInstant(row.requestedAt),
+    last_observed_at: utcInstant(observedAt),
+    action_required_reason_code:
+      approval?.failureCode ??
+      (row.status === "REQUESTED" || superseded
+        ? null
+        : "RESERVE_INSTRUCTION_NOT_APPROVAL_ELIGIBLE"),
+    legacy:
+      status === "LEGACY_UNRECONCILED"
+        ? {
+            classification: "LEGACY_UNRECONCILED",
+            limitation_reason_code: "RESERVE_INSTRUCTION_STATE_UNRECONCILED",
+          }
+        : null,
+  };
+}
+
+function emptyCampaignManagerReserveRequests(
+  request: BrandPayoutsReserveRequestsPageRequestV2,
+  asOf: Date,
+): BrandPayoutsReserveRequestsResponseV2 {
+  return {
+    schema_version: BRAND_PAYOUTS_V2_SCHEMA_VERSION,
+    as_of: utcInstant(asOf),
+    viewer: projectBrandPayoutsViewerV2(request.authorization),
+    sections: [
+      {
+        section_id: "RESERVE_REQUESTS",
+        coverage: "UNAVAILABLE",
+        freshness: "CURRENT",
+        source_observed_at: null,
+        source_coverage: [
+          unavailableSource(
+            "COLLABORATION_RESERVE_REQUESTS",
+            "CANONICAL_ENTITY_SCOPE_UNAVAILABLE",
+          ),
+        ],
+        legacy_limitations: [],
+        available_actions: [],
+        payload: [],
+        page: {
+          next_cursor: null,
+          page_complete: true,
+          source_complete: false,
+        },
+      },
+    ],
+  };
 }
 
 function projectBrandReturn(
@@ -697,7 +871,11 @@ function overviewActions(
 }
 
 function availableSource(
-  source: "VAULT" | "FINANCIAL_LEDGER" | "BRAND_RETURNS",
+  source:
+    | "VAULT"
+    | "FINANCIAL_LEDGER"
+    | "BRAND_RETURNS"
+    | "COLLABORATION_RESERVE_REQUESTS",
 ) {
   return {
     source,

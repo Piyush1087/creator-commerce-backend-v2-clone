@@ -86,6 +86,7 @@ export interface BrandPayoutsLegacyLimitationV2 {
 
 export type BrandPayoutsReadAction =
   | "VIEW_DETAIL"
+  | "APPROVE_RESERVE"
   | "ADD_FUNDS"
   | "REQUEST_BRAND_RETURN"
   | "OPEN_SETTINGS_ADD_FUNDS"
@@ -277,6 +278,8 @@ export type BrandPayoutsReserveRequestStatus =
 
 export interface BrandPayoutsReserveRequestItemV2 {
   readonly reserve_request_id: string;
+  /** Server-owned command identity. It is distinct from the business request. */
+  readonly reserve_instruction_id: string;
   readonly public_reference: string;
   readonly resource_version: string;
   readonly campaign_id: string;
