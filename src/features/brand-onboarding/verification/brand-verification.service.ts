@@ -6,7 +6,13 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { AuthMethodType, UserAuthState, UserRole } from "@prisma/client";
+import {
+  AuthMethodType,
+  EmailOtpPurpose,
+  OrganizationKind,
+  UserAuthState,
+  UserRole,
+} from "@prisma/client";
 import { addMinutes } from "date-fns";
 
 import { MailService } from "../../../mail/mail.service";
@@ -15,8 +21,12 @@ import { hashPasswordAsync } from "../../../shared/crypto/password.util";
 import { AuthService } from "../../auth/auth.service";
 import { GoogleAuthService } from "../../auth/google-auth.service";
 import { establishInitialBrandOwner } from "../../brand-settings/team/initial-brand-owner";
-import { lockBrandTeam } from "../../brand-settings/team/brand-team-policy";
+import {
+  lockAdmissionEmail,
+  lockBrandTeam,
+} from "../../brand-settings/team/brand-team-policy";
 import { BrandCentreScanService } from "../../brand-centre/services/brand-centre-scan.service";
+import { inspectSterileProvisionalCreator } from "../../../shared/identity/sterile-provisional-creator.policy";
 import {
   emailDomainFromAddress,
   emailDomainMatchesBrandDomain,
@@ -27,9 +37,6 @@ import {
   verificationCodeIdentifier,
 } from "./brand-verification-email.util";
 
-/** Pre-prod stub code. PROD: set BRAND_VERIFICATION_USE_REAL_OTP=true in .env */
-const STUB_OTP_CODE = "123456";
-
 const OTP_TTL_MINUTES = 10;
 const MAX_VERIFY_ATTEMPTS = 3;
 const SEND_LIMIT_PER_WINDOW = 3;
@@ -39,13 +46,6 @@ type PostmarkInactiveError = {
   statusCode?: number;
   message?: string;
 };
-
-/**
- * @see docs/brand-onboarding/VERIFICATION_OTP_TOGGLE.md
- */
-function isRealBrandVerificationOtpEnabled(): boolean {
-  return process.env.BRAND_VERIFICATION_USE_REAL_OTP === "true";
-}
 
 @Injectable()
 export class BrandVerificationService {
@@ -60,16 +60,10 @@ export class BrandVerificationService {
   ) {}
 
   async sendOtp(brandProfileId: string, rawEmail: string) {
-    if (!isRealBrandVerificationOtpEnabled()) {
-      return this.sendOtpStub(brandProfileId, rawEmail);
-    }
     return this.sendOtpReal(brandProfileId, rawEmail);
   }
 
   async verifyOtp(brandProfileId: string, rawEmail: string, rawOtp: string) {
-    if (!isRealBrandVerificationOtpEnabled()) {
-      return this.verifyOtpStub(brandProfileId, rawEmail, rawOtp);
-    }
     return this.verifyOtpReal(brandProfileId, rawEmail, rawOtp);
   }
 
@@ -127,6 +121,8 @@ export class BrandVerificationService {
   /**
    * Unified password gate for OTP + Google paths.
    * Creates Brand User with hashedPassword, sets isVerified, enqueues deep scan.
+   * Accepted C-01 reclaim: sterile provisional Creators may be claimed; live
+   * Creator OTPs are superseded inside the same locked transaction.
    */
   async setPasswordAndActivate(
     brandProfileId: string,
@@ -146,95 +142,113 @@ export class BrandVerificationService {
       );
     }
 
-    const profile = await this.prisma.brandProfile.findUnique({
-      where: { id: brandProfileId },
-      select: {
-        id: true,
-        name: true,
-        domain: true,
-        isVerified: true,
-        verificationEmail: true,
-        identityConfirmedAt: true,
-        organizationId: true,
-        planStartedAt: true,
-      },
-    });
-    if (!profile) {
-      throw new NotFoundException("Brand profile not found");
-    }
-    if (!profile.identityConfirmedAt || !profile.verificationEmail) {
-      throw new BadRequestException(
-        "Confirm your work email (OTP or Google) before setting a password.",
-      );
-    }
-    if (normalizeVerificationEmail(profile.verificationEmail) !== email) {
-      throw new BadRequestException(
-        "Password email must match the verified identity email.",
-      );
-    }
-    if (profile.isVerified && profile.organizationId) {
-      throw new BadRequestException(
-        "This brand is already activated. Please sign in.",
-      );
-    }
-
     const hashedPassword = await hashPasswordAsync(password);
     const displayName = emailLocalPart(email);
 
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email },
-    });
-    if (existingUser && existingUser.role !== UserRole.BRAND) {
-      throw new ConflictException(
-        "This email is registered for a different account type.",
-      );
-    }
-
     const result = await this.prisma.$transaction(async (tx) => {
       await lockBrandTeam(tx, brandProfileId);
+      const profile = await tx.brandProfile.findUnique({
+        where: { id: brandProfileId },
+      });
+      if (!profile) {
+        throw new NotFoundException("Brand profile not found");
+      }
+      if (profile.isVerified && profile.organizationId) {
+        throw new ConflictException(
+          "This brand is already activated. Please sign in.",
+        );
+      }
+      if (!profile.identityConfirmedAt || !profile.verificationEmail) {
+        throw new BadRequestException(
+          "Confirm your work email (OTP or Google) before setting a password.",
+        );
+      }
+      if (normalizeVerificationEmail(profile.verificationEmail) !== email) {
+        throw new BadRequestException(
+          "Password email must match the verified identity email.",
+        );
+      }
 
-      let organizationId = profile.organizationId;
-      let userId = existingUser?.id;
+      await lockAdmissionEmail(tx, email);
+      const existing = await tx.user.findUnique({
+        where: { normalizedEmail: email },
+      });
 
-      if (!organizationId) {
+      let reclaimsSterileCreator = false;
+      if (existing && existing.role !== UserRole.BRAND) {
+        const inspection = await inspectSterileProvisionalCreator(
+          tx,
+          existing.id,
+        );
+        if (!inspection.sterile) {
+          throw new ConflictException(
+            "This email belongs to another account type.",
+          );
+        }
+        reclaimsSterileCreator = true;
+        await tx.emailOtpChallenge.updateMany({
+          where: {
+            normalizedEmail: email,
+            purpose: EmailOtpPurpose.CREATOR_EMAIL_VERIFICATION,
+            consumedAt: null,
+            supersededAt: null,
+          },
+          data: { supersededAt: new Date() },
+        });
+      }
+
+      let organizationId = existing?.organizationId ?? profile.organizationId;
+      if (organizationId) {
+        const claimedProfile = await tx.brandProfile.findUnique({
+          where: { organizationId },
+          select: { id: true },
+        });
+        if (claimedProfile && claimedProfile.id !== profile.id) {
+          throw new ConflictException(
+            "This account is already associated with another Brand workspace.",
+          );
+        }
+      } else {
         const organization = await tx.organization.create({
-          data: { name: profile.name },
+          data: { name: profile.name, kind: OrganizationKind.BRAND },
         });
         organizationId = organization.id;
       }
 
-      if (userId) {
-        await tx.user.update({
-          where: { id: userId },
-          data: {
-            hashedPassword,
-            emailVerifiedAt: new Date(),
-            name: existingUser?.name ?? displayName,
-            organizationId,
-            authState: UserAuthState.ACTIVE,
-          },
-        });
-      } else {
-        const user = await tx.user.create({
-          data: {
-            email,
-            name: displayName,
-            role: UserRole.BRAND,
-            organizationId,
-            hashedPassword,
-            emailVerifiedAt: new Date(),
-            authState: UserAuthState.ACTIVE,
-          },
-        });
-        userId = user.id;
-      }
+      const user = existing
+        ? await tx.user.update({
+            where: { id: existing.id },
+            data: {
+              email,
+              normalizedEmail: email,
+              name: existing.name ?? displayName,
+              role: UserRole.BRAND,
+              organizationId,
+              hashedPassword,
+              emailVerifiedAt: new Date(),
+              authState: UserAuthState.ACTIVE,
+              ...(reclaimsSterileCreator ? { googleSubjectId: null } : {}),
+            },
+          })
+        : await tx.user.create({
+            data: {
+              email,
+              normalizedEmail: email,
+              name: displayName,
+              role: UserRole.BRAND,
+              organizationId,
+              hashedPassword,
+              emailVerifiedAt: new Date(),
+              authState: UserAuthState.ACTIVE,
+            },
+          });
 
       await tx.userAuthMethod.upsert({
         where: {
-          userId_type: { userId: userId!, type: AuthMethodType.PASSWORD },
+          userId_type: { userId: user.id, type: AuthMethodType.PASSWORD },
         },
         create: {
-          userId: userId!,
+          userId: user.id,
           type: AuthMethodType.PASSWORD,
           credentialHash: hashedPassword,
           verifiedAt: new Date(),
@@ -259,7 +273,7 @@ export class BrandVerificationService {
       const ownerResult = await establishInitialBrandOwner(
         tx,
         profile.id,
-        userId!,
+        user.id,
       );
       if (ownerResult !== "CREATED" && ownerResult !== "EXISTING_TEAM") {
         throw new ConflictException(
@@ -267,7 +281,12 @@ export class BrandVerificationService {
         );
       }
 
-      return { userId: userId!, organizationId };
+      return {
+        userId: user.id,
+        organizationId,
+        domain: profile.domain,
+        brandProfileId: profile.id,
+      };
     });
 
     await this.enqueueDeepScanAfterVerify(brandProfileId);
@@ -276,8 +295,8 @@ export class BrandVerificationService {
 
     return {
       activated: true,
-      brandProfileId: profile.id,
-      domain: profile.domain,
+      brandProfileId: result.brandProfileId,
+      domain: result.domain,
       organizationId: result.organizationId,
       ...token,
     };
@@ -299,98 +318,7 @@ export class BrandVerificationService {
     });
   }
 
-  /** PRE-PROD: no Postmark / no VerificationCode rows. Logged stub code 123456. */
-  private async sendOtpStub(brandProfileId: string, rawEmail: string) {
-    const email = normalizeVerificationEmail(rawEmail);
-    if (!isValidVerificationEmail(email)) {
-      throw new BadRequestException(
-        "Please enter a valid email address (e.g., name@brand.in)",
-      );
-    }
-
-    const profile = await this.prisma.brandProfile.findUnique({
-      where: { id: brandProfileId },
-      select: { id: true, domain: true },
-    });
-    if (!profile) {
-      throw new NotFoundException("Brand profile not found");
-    }
-
-    if (!emailDomainMatchesBrandDomain(email, profile.domain)) {
-      const emailDomain = emailDomainFromAddress(email);
-      throw new BadRequestException(
-        `The email domain (@${emailDomain}) doesn't match your website (${profile.domain}). Please use your work email, or go back and re-enter your website.`,
-      );
-    }
-
-    const expiresAt = addMinutes(new Date(), OTP_TTL_MINUTES);
-    this.logger.warn(
-      `[STUB OTP] brandProfileId=${brandProfileId} email=${email} code=${STUB_OTP_CODE} — set BRAND_VERIFICATION_USE_REAL_OTP=true for Postmark`,
-    );
-
-    return {
-      sent: true,
-      expiresInMinutes: OTP_TTL_MINUTES,
-      expiresAt: expiresAt.toISOString(),
-    };
-  }
-
-  /** PRE-PROD: accepts only STUB_OTP_CODE; confirms identity only (password gate sets isVerified). */
-  private async verifyOtpStub(
-    brandProfileId: string,
-    rawEmail: string,
-    rawOtp: string,
-  ) {
-    const email = normalizeVerificationEmail(rawEmail);
-    const otp = rawOtp.trim();
-
-    if (!isValidVerificationEmail(email)) {
-      throw new BadRequestException(
-        "Please enter a valid email address (e.g., name@brand.in)",
-      );
-    }
-
-    const profile = await this.prisma.brandProfile.findUnique({
-      where: { id: brandProfileId },
-      select: { id: true, domain: true },
-    });
-    if (!profile) {
-      throw new NotFoundException("Brand profile not found");
-    }
-
-    if (!emailDomainMatchesBrandDomain(email, profile.domain)) {
-      const emailDomain = emailDomainFromAddress(email);
-      throw new BadRequestException(
-        `The email domain (@${emailDomain}) doesn't match your website (${profile.domain}). Please use your work email, or go back and re-enter your website.`,
-      );
-    }
-
-    if (otp !== STUB_OTP_CODE) {
-      throw new UnauthorizedException(
-        "Incorrect code. Please check your email and try again.",
-      );
-    }
-
-    await this.markIdentityConfirmed(brandProfileId, email);
-
-    this.logger.warn(
-      `[STUB OTP] identity confirmed brandProfileId=${brandProfileId} email=${email} — password still required`,
-    );
-
-    return {
-      identityConfirmed: true,
-      brandProfileId: profile.id,
-      domain: profile.domain,
-      email,
-      nextStep: "password" as const,
-    };
-  }
-
-  // ---------------------------------------------------------------------------
-  // PROD — real OTP (Postmark + VerificationCode). Active when
-  // BRAND_VERIFICATION_USE_REAL_OTP=true. Do not delete.
-  // ---------------------------------------------------------------------------
-
+  /** Production Postmark + random code. */
   private async sendOtpReal(brandProfileId: string, rawEmail: string) {
     const email = normalizeVerificationEmail(rawEmail);
     if (!isValidVerificationEmail(email)) {
@@ -435,9 +363,11 @@ export class BrandVerificationService {
       },
     });
 
-    this.logger.log(
-      `Brand verification OTP brandProfileId=${brandProfileId} email=${email} code=${otpCode} expiresAt=${expiresAt.toISOString()}`,
-    );
+    if ((process.env.STAGE ?? "").trim().toLowerCase() !== "prod") {
+      this.logger.warn(
+        `[OTP] purpose=BRAND_VERIFICATION email=${email} brandProfileId=${brandProfileId} code=${otpCode} expiresAt=${expiresAt.toISOString()}`,
+      );
+    }
 
     try {
       await this.mail.sendOtp(email, otpCode, emailLocalPart(email));

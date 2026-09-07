@@ -36,6 +36,7 @@ import {
   InstagramOAuthClient,
   InstagramTokenRefreshError,
 } from "../../instagram/instagram-oauth.client";
+import { ProviderOAuthTransactionService } from "../../provider-oauth/provider-oauth-transaction.service";
 import { BrandInstagramDeletionService } from "../services/brand-instagram-deletion.service";
 import {
   BrandInstagramOAuthStateService,
@@ -66,7 +67,9 @@ describe.skipIf(process.env.BS06_DATABASE_TEST !== "true")(
     const access = new BrandSettingsAccessService(db, workspaceAuthorization);
     const oauth = new InstagramOAuthClient();
     const graph = new InstagramGraphClient();
-    const states = new BrandInstagramOAuthStateService(db);
+    const states = new BrandInstagramOAuthStateService(
+      new ProviderOAuthTransactionService(db),
+    );
     const deletion = new BrandInstagramDeletionService(db, access);
     const socialSync = new BrandSocialSyncService(
       db,
@@ -155,7 +158,7 @@ describe.skipIf(process.env.BS06_DATABASE_TEST !== "true")(
 
     async function makeWorkspace() {
       const organization = await prisma.organization.create({
-        data: { name: "BS06 P1 fixture" },
+        data: { name: "BS06 P1 fixture", kind: "BRAND" },
       });
       createdOrganizationIds.push(organization.id);
       const brand = await prisma.brandProfile.create({
@@ -259,7 +262,7 @@ describe.skipIf(process.env.BS06_DATABASE_TEST !== "true")(
       const second = await start(workspace.owner);
       expect(first).toMatch(/^[A-Za-z0-9_-]{43}$/);
       expect(second).not.toBe(first);
-      const row = await prisma.brandInstagramOAuthState.findUniqueOrThrow({
+      const row = await prisma.providerOAuthTransaction.findUniqueOrThrow({
         where: { stateHash: hashInstagramSettingsState(first) },
       });
       expect(row).toMatchObject({
@@ -304,13 +307,13 @@ describe.skipIf(process.env.BS06_DATABASE_TEST !== "true")(
           state = `${state[0] === "A" ? "B" : "A"}${state.slice(1)}`;
         }
         if (failure === "expired") {
-          await prisma.brandInstagramOAuthState.update({
+          await prisma.providerOAuthTransaction.update({
             where: { stateHash },
             data: { expiresAt: new Date(Date.now() - 1000) },
           });
         }
         if (failure === "consumed") {
-          await prisma.brandInstagramOAuthState.update({
+          await prisma.providerOAuthTransaction.update({
             where: { stateHash },
             data: { consumedAt: new Date() },
           });
@@ -876,7 +879,7 @@ describe.skipIf(process.env.BS06_DATABASE_TEST !== "true")(
         }),
       ).toMatchObject({ igHandle: null, igHandleProvenance: "META_DIRECT" });
       expect(
-        await prisma.brandInstagramOAuthState.findUniqueOrThrow({
+        await prisma.providerOAuthTransaction.findUniqueOrThrow({
           where: {
             stateHash: hashState(outstandingState),
           },

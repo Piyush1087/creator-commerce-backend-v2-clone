@@ -14,6 +14,7 @@ import { ThrottlerGuard } from "@nestjs/throttler";
 
 import type { RequestWithAuthUser } from "../auth/auth.controller";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { CreatorPlatformAccessGuard } from "../creator-entry/creator-platform-access.guard";
 import { ClaimInvitationDto } from "./dto/claim-invitation.dto";
 import { MarketplaceQueryDto } from "./dto/marketplace-query.dto";
 import { CreatorInvitationService } from "./services/creator-invitation.service";
@@ -24,7 +25,7 @@ import { CreatorMarketplaceService } from "./services/creator-marketplace.servic
  * Route prefix mirrors product docs: /creator/marketplace (API layer).
  */
 @Controller("api/v1/creator/marketplace")
-@UseGuards(ThrottlerGuard, JwtAuthGuard)
+@UseGuards(ThrottlerGuard, JwtAuthGuard, CreatorPlatformAccessGuard)
 export class CreatorMarketplaceController {
   constructor(
     private readonly marketplace: CreatorMarketplaceService,
@@ -75,7 +76,10 @@ export class CreatorMarketplaceController {
 
   @Post("invitations/claim")
   @HttpCode(200)
-  claimInvitation(@Req() req: RequestWithAuthUser, @Body() body: ClaimInvitationDto) {
+  claimInvitation(
+    @Req() req: RequestWithAuthUser,
+    @Body() body: ClaimInvitationDto,
+  ) {
     return this.invitations.claimInvitation(req.user, body.invite_token);
   }
 }

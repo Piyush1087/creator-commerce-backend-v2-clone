@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { PrismaModule } from "../../prisma/prisma.module";
 import { AuthModule } from "../auth/auth.module";
+import { CreatorEntryModule } from "../creator-entry/creator-entry.module";
 import { CreatorMarketplaceController } from "./creator-marketplace.controller";
 import { PublicMarketplaceController } from "./public-marketplace.controller";
 import { CreatorCampaignsController } from "./creator-campaigns.controller";
@@ -12,9 +13,10 @@ import { CreatorMarketplaceService } from "./services/creator-marketplace.servic
 import { CreatorCampaignsWorkspaceService } from "./services/creator-campaigns-workspace.service";
 import { CreatorCampaignsPanicService } from "./services/creator-campaigns-panic.service";
 import { CreatorCampaignsCommandService } from "./services/creator-campaigns-command.service";
+import { CampaignApplyContinuationIssuanceService } from "./services/campaign-apply-continuation-issuance.service";
 
 @Module({
-  imports: [PrismaModule, AuthModule],
+  imports: [PrismaModule, AuthModule, CreatorEntryModule],
   controllers: [
     CreatorMarketplaceController,
     PublicMarketplaceController,
@@ -28,6 +30,7 @@ import { CreatorCampaignsCommandService } from "./services/creator-campaigns-com
     CreatorCampaignsWorkspaceService,
     CreatorCampaignsPanicService,
     CreatorCampaignsCommandService,
+    CampaignApplyContinuationIssuanceService,
   ],
   exports: [CreatorEligibilityService, CreatorAffinityService],
 })

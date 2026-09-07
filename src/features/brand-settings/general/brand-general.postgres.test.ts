@@ -152,7 +152,7 @@ describe.skipIf(process.env.BS01_DATABASE_TEST !== "true")(
       name: string | null = "Ada Byron Lovelace",
     ) {
       const org = await prisma.organization.create({
-        data: { name: "Workspace Organization" },
+        data: { name: "Workspace Organization", kind: "BRAND" },
       });
       orgIds.push(org.id);
       const brand = await prisma.brandProfile.create({

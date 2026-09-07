@@ -37,7 +37,10 @@ export class MailService {
     displayName: string;
     expiresInMinutes: number;
   }): Promise<string> {
-    const templateId = this.requiredTemplateId("POSTMARK_AUTH_OTP_TEMPLATE_ID");
+    const templateId = this.requiredTemplateId(
+      "POSTMARK_OTP_TEMPLATE_ID",
+      "POSTMARK_AUTH_OTP_TEMPLATE_ID",
+    );
     return this.sendAuthenticationMessage(() =>
       this.postmarkClient.sendEmailWithTemplate({
         From: process.env.POSTMARK_AUTH_FROM ?? "no-reply@thecreatorshop.in",
@@ -92,6 +95,43 @@ export class MailService {
     expiresAt: Date;
     rawToken: string;
   }): Promise<void> {
+    await this.dispatchTeamInvitationEmail({
+      to: args.email,
+      acceptPath: "/brand/team-invitations/accept",
+      rawToken: args.rawToken,
+      templateModel: {
+        brand_name: args.brandName,
+        invited_role: args.role,
+        expires_at: args.expiresAt.toISOString(),
+      },
+    });
+  }
+
+  async sendCreatorTeamInvitation(args: {
+    email: string;
+    workspaceName: string;
+    role: string;
+    expiresAt: Date;
+    rawToken: string;
+  }): Promise<void> {
+    await this.dispatchTeamInvitationEmail({
+      to: args.email,
+      acceptPath: "/creator/team-invitations/accept",
+      rawToken: args.rawToken,
+      templateModel: {
+        workspace_name: args.workspaceName,
+        invited_role: args.role,
+        expires_at: args.expiresAt.toISOString(),
+      },
+    });
+  }
+
+  private async dispatchTeamInvitationEmail(args: {
+    to: string;
+    acceptPath: string;
+    rawToken: string;
+    templateModel: Record<string, string>;
+  }): Promise<void> {
     const configuredId = process.env.POSTMARK_TEAM_INVITE_TEMPLATE_ID;
     const templateId = Number(configuredId);
     const frontend = process.env.APP_FRONTEND_URL;
@@ -113,18 +153,16 @@ export class MailService {
     ) {
       throw new Error("APP_FRONTEND_URL must be an HTTP(S) origin");
     }
-    const link = new URL("/brand/team-invitations/accept", origin);
+    const link = new URL(args.acceptPath, origin);
     // A fragment keeps the bearer token out of frontend HTTP/access logs.
     link.hash = new URLSearchParams({ token: args.rawToken }).toString();
     try {
       const response = await this.postmarkClient.sendEmailWithTemplate({
         From: "no-reply@thecreatorshop.in",
-        To: args.email,
+        To: args.to,
         TemplateId: templateId,
         TemplateModel: {
-          brand_name: args.brandName,
-          invited_role: args.role,
-          expires_at: args.expiresAt.toISOString(),
+          ...args.templateModel,
           acceptance_url: link.toString(),
         },
         MessageStream: "outbound",
@@ -207,12 +245,14 @@ export class MailService {
     });
   }
 
-  private requiredTemplateId(name: string): number {
-    const value = Number(process.env[name]);
-    if (!Number.isSafeInteger(value) || value <= 0) {
-      throw new Error(`${name} is missing or invalid`);
+  private requiredTemplateId(...names: string[]): number {
+    for (const name of names) {
+      const value = Number(process.env[name]);
+      if (Number.isSafeInteger(value) && value > 0) {
+        return value;
+      }
     }
-    return value;
+    throw new Error(`${names[0]} is missing or invalid`);
   }
 
   private async sendAuthenticationMessage(

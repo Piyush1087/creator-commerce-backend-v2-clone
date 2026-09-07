@@ -6,6 +6,8 @@ import { AuthModule } from "../auth/auth.module";
 
 import { CreatorCentreModule } from "../creator-centre/creator-centre.module";
 
+import { CreatorEntryModule } from "../creator-entry/creator-entry.module";
+
 import { CreatorSettingsModule } from "../creator-settings/creator-settings.module";
 
 import { GeminiJsonClient } from "../brand-onboarding/integrations/gemini/gemini-json.client";
@@ -45,6 +47,8 @@ import { CreatorCoPilotToolsService } from "./tools/creator-centre.tools";
     CreatorSettingsModule,
 
     CreatorCentreModule,
+
+    CreatorEntryModule,
 
   ],
 

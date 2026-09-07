@@ -16,13 +16,18 @@ import {
   vi,
 } from "vitest";
 import type { PrismaService } from "../../../prisma/prisma.service";
-import { decryptField } from "../../../shared/crypto/field-encryption.util";
+import {
+  decryptField,
+  encryptField,
+} from "../../../shared/crypto/field-encryption.util";
 import { BrandCentreAuthService } from "../../brand-centre/brand-centre-auth.service";
 import { BrandCentreSessionEvictionService } from "../../brand-centre/services/brand-centre-session-eviction.service";
 import { BrandWorkspaceAuthorizationService } from "../../brand-centre/brand-workspace-authorization.service";
 import { InstagramOAuthClient } from "../../instagram/instagram-oauth.client";
 import { InstagramGraphClient } from "../../instagram/instagram-graph.client";
+import { ProviderOAuthTransactionService } from "../../provider-oauth/provider-oauth-transaction.service";
 import { BrandSettingsAccessService } from "../services/brand-settings-access.service";
+import { BrandInstagramDeletionService } from "../services/brand-instagram-deletion.service";
 import { BrandSettingsIntegrationsService } from "../services/brand-settings-integrations.service";
 import {
   BrandInstagramOAuthStateService,
@@ -64,13 +69,17 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
     );
     const oauth = new InstagramOAuthClient();
     const graph = new InstagramGraphClient();
-    const states = new BrandInstagramOAuthStateService(db);
+    const states = new BrandInstagramOAuthStateService(
+      new ProviderOAuthTransactionService(db),
+    );
+    const deletion = new BrandInstagramDeletionService(db, access);
     const service = new BrandSettingsIntegrationsService(
       db,
       access,
       oauth,
       graph,
       states,
+      deletion,
     );
     const orgIds: string[] = [];
     const brandIds: string[] = [];
@@ -135,7 +144,7 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
     });
     async function workspace() {
       const org = await prisma.organization.create({
-        data: { name: "BS06 fixture" },
+        data: { name: "BS06 fixture", kind: "BRAND" },
       });
       orgIds.push(org.id);
       const brand = await prisma.brandProfile.create({
@@ -146,6 +155,7 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
           organizationId: org.id,
           isVerified: true,
           igHandle: "brand",
+          igHandleProvenance: "USER_ENTERED",
         },
       });
       brandIds.push(brand.id);
@@ -154,6 +164,8 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
           email: `${randomUUID()}@example.test`,
           role: "BRAND",
           organizationId: org.id,
+          authState: "ACTIVE",
+          emailVerifiedAt: new Date(),
         },
       });
       const membership = await prisma.brandTeamMember.create({
@@ -190,7 +202,7 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
       const second = await start(w);
       expect(raw).toMatch(/^[A-Za-z0-9_-]{43}$/);
       expect(second === raw).toBe(false);
-      const row = await prisma.brandInstagramOAuthState.findUniqueOrThrow({
+      const row = await prisma.providerOAuthTransaction.findUniqueOrThrow({
         where: { stateHash: hashInstagramSettingsState(raw) },
       });
       expect(row.brandProfileId).toBe(w.brand.id);
@@ -226,12 +238,12 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
       if (failure === "altered")
         state = (state[0] === "A" ? "B" : "A") + state.slice(1);
       if (failure === "expired")
-        await prisma.brandInstagramOAuthState.update({
+        await prisma.providerOAuthTransaction.update({
           where,
           data: { expiresAt: new Date(Date.now() - 1000) },
         });
       if (failure === "consumed")
-        await prisma.brandInstagramOAuthState.update({
+        await prisma.providerOAuthTransaction.update({
           where,
           data: { consumedAt: new Date() },
         });
@@ -242,6 +254,8 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
             email: `${randomUUID()}@example.test`,
             role: "BRAND",
             organizationId: w.org.id,
+            authState: "ACTIVE",
+            emailVerifiedAt: new Date(),
           },
         });
         await prisma.brandTeamMember.create({
@@ -261,7 +275,7 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
       expect(me).not.toHaveBeenCalled();
       if (["wrong-user", "wrong-brand", "redirect"].includes(failure)) {
         expect(
-          (await prisma.brandInstagramOAuthState.findUniqueOrThrow({ where }))
+          (await prisma.providerOAuthTransaction.findUniqueOrThrow({ where }))
             .consumedAt,
         ).toBeNull();
         await expect(connect(w, state)).resolves.toMatchObject({
@@ -336,16 +350,11 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
       );
     });
 
-    it.each([
-      ["OVERWRITE_HANDLE", true],
-      ["CANCEL_CONNECT", true],
-      ["OVERWRITE_HANDLE", false],
-      ["CANCEL_CONNECT", false],
-    ] as const)(
-      "stages mismatch until explicit %s (prior active=%s)",
-      async (resolution, active) => {
+    it.each([true, false])(
+      "accepts provider handle refresh during ordinary connection (prior active=%s)",
+      async (active) => {
         const w = await workspace();
-        const prior = active ? await connected(w) : null;
+        if (active) await connected(w);
         const incomingToken = syntheticToken();
         exchange.mockResolvedValueOnce({
           accessToken: incomingToken,
@@ -359,78 +368,28 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
         me.mockClear();
         const result = await connect(w, await start(w));
         expect(result).toMatchObject({
-          conflict: true,
-          code: "IDENTITY_CONFLICT",
-          currentPlatformHandle: "@brand",
-          inboundOauthHandle: "@otherbrand",
+          conflict: false,
+          connected: true,
+          handle: "@otherbrand",
         });
         const row = await prisma.brandIntegration.findUniqueOrThrow({
           where: { id: result.integrationId },
         });
-        expect(row.isActive).toBe(active);
-        expect(row.status).toBe(active ? "CONNECTED" : "DISCONNECTED");
-        expect(
-          row.accessTokenEncrypted === (prior?.accessTokenEncrypted ?? null),
-        ).toBe(true);
-        expect(
-          decryptField(row.pendingAccessTokenEncrypted!) === incomingToken,
-        ).toBe(true);
-        expect(row.pendingAccessTokenEncrypted === incomingToken).toBe(false);
+        expect(row.isActive).toBe(true);
+        expect(row.status).toBe("CONNECTED");
+        expect(decryptField(row.accessTokenEncrypted!)).toBe(incomingToken);
         expect(
           (
             await prisma.brandProfile.findUniqueOrThrow({
               where: { id: w.brand.id },
             })
           ).igHandle,
-        ).toBe("brand");
-        await service.resolveIdentityConflict(w.user, {
-          integrationId: row.id,
-          currentPlatformHandle: "@brand",
-          inboundOauthHandle: "@otherbrand",
-          resolution,
-        });
-        const resolved = await prisma.brandIntegration.findUniqueOrThrow({
-          where: { id: row.id },
-        });
-        expect(resolved).toMatchObject({
+        ).toBe("otherbrand");
+        expect(row).toMatchObject({
           pendingAccessTokenEncrypted: null,
           pendingGrantedScopes: [],
           pendingTokenExpiresAt: null,
         });
-        if (resolution === "OVERWRITE_HANDLE") {
-          expect(resolved).toMatchObject({
-            isActive: true,
-            status: "CONNECTED",
-            currentPlatformHandle: "@otherbrand",
-          });
-          expect(
-            decryptField(resolved.accessTokenEncrypted!) === incomingToken,
-          ).toBe(true);
-          expect(
-            (
-              await prisma.brandProfile.findUniqueOrThrow({
-                where: { id: w.brand.id },
-              })
-            ).igHandle,
-          ).toBe("otherbrand");
-        } else {
-          expect(resolved).toMatchObject({
-            isActive: active,
-            status: active ? "CONNECTED" : "DISCONNECTED",
-            grantedScopes: prior?.grantedScopes ?? [],
-          });
-          expect(
-            resolved.accessTokenEncrypted ===
-              (prior?.accessTokenEncrypted ?? null),
-          ).toBe(true);
-          expect(
-            (
-              await prisma.brandProfile.findUniqueOrThrow({
-                where: { id: w.brand.id },
-              })
-            ).igHandle,
-          ).toBe("brand");
-        }
       },
     );
 
@@ -478,7 +437,7 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
       });
     });
 
-    it("credential removal requires confirmation and reports retained history", async () => {
+    it("credential removal requires confirmation and returns a completed deletion receipt", async () => {
       const w = await workspace();
       const row = await connected(w);
       await prisma.brandIntegration.update({
@@ -501,19 +460,16 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
         confirmDeleteData: true,
       });
       expect(result).toMatchObject({
-        disconnected: true,
-        credentialsRemoved: true,
-        futureIngestionStopped: true,
-        historicalDataRetained: true,
+        state: "COMPLETED",
+        completedAt: expect.any(String),
       });
-      expect("purged" in result).toBe(false);
       expect(
         await prisma.brandIntegration.findUniqueOrThrow({
           where: { id: row.id },
         }),
       ).toMatchObject({
         isActive: false,
-        status: "DISCONNECTED",
+        status: "CONNECTED",
         accessTokenEncrypted: null,
         refreshTokenEncrypted: null,
         grantedScopes: [],
@@ -585,33 +541,36 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
       ).rejects.toMatchObject({ status: 404 });
     });
 
-    it("active campaign interlock blocks disconnect and credential removal", async () => {
+    it("explicit disconnect and credential removal remain deterministic with active campaigns", async () => {
       const w = await workspace();
       const row = await connected(w);
       const count = vi.spyOn(prisma.uceCampaign, "count").mockResolvedValue(1);
       try {
-        for (const action of [
-          "DISCONNECT_INTEGRATION",
-          "DELETE_INGESTED_DATA",
-        ] as const)
-          await expect(
-            service.manageAction(w.user, {
-              integrationId: row.id,
-              action,
-              confirmDeleteData: true,
-            }),
-          ).rejects.toMatchObject({ status: 400 });
+        await expect(
+          service.manageAction(w.user, {
+            integrationId: row.id,
+            action: "DISCONNECT_INTEGRATION",
+          }),
+        ).resolves.toMatchObject({ ok: true });
+        await expect(
+          service.manageAction(w.user, {
+            integrationId: row.id,
+            action: "DELETE_INGESTED_DATA",
+            confirmDeleteData: true,
+          }),
+        ).resolves.toMatchObject({ state: "COMPLETED" });
         expect(
           await prisma.brandIntegration.findUniqueOrThrow({
             where: { id: row.id },
           }),
-        ).toMatchObject({ isActive: true, status: "CONNECTED" });
+        ).toMatchObject({ isActive: false, status: "DISCONNECTED" });
       } finally {
         count.mockRestore();
       }
     });
 
-    it("expiry changes only expired active Instagram connections, including partial ones", async () => {
+    it("refresh scans only due active Instagram connections, including partial ones", async () => {
+      await prisma.brandIntegration.updateMany({ data: { isActive: false } });
       const cases: {
         status: BrandIntegrationStatus;
         expired: boolean;
@@ -641,31 +600,40 @@ describe.skipIf(process.env.BS06_LEGACY_DATABASE_TEST !== "true")(
               status: c.status,
               isActive: c.active,
               currentPlatformHandle: "@brand",
+              accessTokenEncrypted:
+                c.status === "DISCONNECTED"
+                  ? null
+                  : encryptField(syntheticToken()),
               tokenExpiresAt: new Date(
-                Date.now() + (c.expired ? -1000 : 3600000),
+                Date.now() + (c.expired ? -1000 : 8 * 86400000),
               ),
+              tokenIssuedAt: new Date(Date.now() - 2 * 86400000),
             },
           }),
         );
       }
       expect(await service.markExpiredTokens()).toEqual({
         scanned: 2,
-        expired: 2,
+        expired: 0,
       });
       for (let i = 0; i < rows.length; i++) {
         const current = await prisma.brandIntegration.findUniqueOrThrow({
           where: { id: rows[i].id },
         });
-        expect(current.status).toBe(i < 2 ? "TOKEN_EXPIRED" : cases[i].status);
+        expect(current.status).toBe(cases[i].status);
       }
     });
 
     it("expiry sweep does not overwrite a concurrent reconnect", async () => {
+      await prisma.brandIntegration.updateMany({ data: { isActive: false } });
       const w = await workspace();
       const row = await connected(w);
       await prisma.brandIntegration.update({
         where: { id: row.id },
-        data: { tokenExpiresAt: new Date(Date.now() - 1000) },
+        data: {
+          tokenExpiresAt: new Date(Date.now() - 1000),
+          tokenIssuedAt: new Date(Date.now() - 2 * 86400000),
+        },
       });
       const original = prisma.brandIntegration.findMany.bind(
         prisma.brandIntegration,

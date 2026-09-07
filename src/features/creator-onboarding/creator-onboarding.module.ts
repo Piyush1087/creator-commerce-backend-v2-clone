@@ -11,7 +11,6 @@ import { CreatorOnboardingPurgeService } from "./creator-onboarding-purge.servic
 import { CreatorOnboardingService } from "./creator-onboarding.service";
 import { GeminiHandleEligibilityService } from "./eligibility/gemini-handle-eligibility.service";
 import { CreatorAiSyncService } from "./services/creator-ai-sync.service";
-import { CreatorSignupOtpService } from "./verification/creator-signup-otp.service";
 
 @Module({
   imports: [PrismaModule, AuthModule, InstagramModule, MailModule],
@@ -21,7 +20,6 @@ import { CreatorSignupOtpService } from "./verification/creator-signup-otp.servi
     CreatorOnboardingPurgeService,
     CreatorOnboardingPurgeScheduler,
     GeminiHandleEligibilityService,
-    CreatorSignupOtpService,
     CreatorAiSyncService,
     GeminiJsonClient,
   ],

@@ -19,6 +19,7 @@ import { CoPilotModule } from "./features/co-pilot/co-pilot.module";
 import { ChatModule } from "./features/chat/chat.module";
 import { CreatorCoPilotModule } from "./features/creator-co-pilot/creator-co-pilot.module";
 import { CreatorCentreModule } from "./features/creator-centre/creator-centre.module";
+import { CreatorEntryModule } from "./features/creator-entry/creator-entry.module";
 import { CreatorMarketplaceModule } from "./features/creator-marketplace/creator-marketplace.module";
 import { CreatorOnboardingModule } from "./features/creator-onboarding/creator-onboarding.module";
 import { CreatorPayoutsModule } from "./features/creator-payouts/creator-payouts.module";
@@ -68,6 +69,7 @@ import { S3Module } from "./shared/s3/s3.module";
     ChatModule,
     CreatorMarketplaceModule,
     CreatorOnboardingModule,
+    CreatorEntryModule,
     CreatorCentreModule,
     CreatorCoPilotModule,
     InstagramModule,

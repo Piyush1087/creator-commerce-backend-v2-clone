@@ -2,6 +2,7 @@ import {
   Injectable,
   HttpException,
   HttpStatus,
+  Logger,
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -37,11 +38,21 @@ type IssueOtpInput = {
 
 @Injectable()
 export class EmailOtpService {
+  private readonly logger = new Logger(EmailOtpService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly mail: MailService,
   ) {}
+
+  private isProduction(): boolean {
+    return (
+      (this.config.get<string>("STAGE") ?? process.env.STAGE ?? "")
+        .trim()
+        .toLowerCase() === "prod"
+    );
+  }
 
   async issue(input: IssueOtpInput): Promise<void> {
     const normalizedEmail = normalizeEmail(input.email);
@@ -110,6 +121,12 @@ export class EmailOtpService {
     });
     if (!challenge) return;
 
+    if (!this.isProduction()) {
+      this.logger.warn(
+        `[OTP] purpose=${input.purpose} email=${normalizedEmail} code=${code} expiresAt=${expiresAt.toISOString()}`,
+      );
+    }
+
     try {
       const messageId = await this.mail.sendAuthenticationOtp({
         to: normalizedEmail,
@@ -137,7 +154,12 @@ export class EmailOtpService {
               : AuthDeliveryStatus.DELIVERY_UNKNOWN,
         },
       });
-      throw new Error("Authentication email dispatch failed");
+      if (this.isProduction()) {
+        throw new Error("Authentication email dispatch failed");
+      }
+      this.logger.warn(
+        `[OTP] Postmark send failed — code still valid from log. purpose=${input.purpose} email=${normalizedEmail}`,
+      );
     }
   }
 
@@ -156,7 +178,9 @@ export class EmailOtpService {
           purpose: args.purpose,
           consumedAt: null,
           supersededAt: null,
-          deliveryStatus: AuthDeliveryStatus.MESSAGE_ACCEPTED,
+          ...(this.isProduction()
+            ? { deliveryStatus: AuthDeliveryStatus.MESSAGE_ACCEPTED }
+            : {}),
         },
         orderBy: { createdAt: "desc" },
       });

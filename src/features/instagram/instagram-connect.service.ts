@@ -7,6 +7,8 @@ import {
 import {
   InstagramProfessionalAccountType,
   OAuthTokenStatus,
+  ProviderAuthorizationHealth,
+  ProviderCapabilityState,
   Prisma,
   SocialNetworkProvider,
 } from "@prisma/client";
@@ -83,7 +85,8 @@ export class InstagramConnectService {
       );
     }
 
-    const expiresAt = addSeconds(new Date(), tokenResult.expiresInSeconds);
+    const now = new Date();
+    const expiresAt = addSeconds(now, tokenResult.expiresInSeconds);
     const encryptedToken = encryptField(tokenResult.accessToken);
 
     await this.prisma.$transaction(async (tx) => {
@@ -108,6 +111,13 @@ export class InstagramConnectService {
           ],
           tokenStateCondition: OAuthTokenStatus.ACTIVE,
           tokenExpiresAt: expiresAt,
+          tokenIssuedAt: now,
+          authorizationGeneration: 1,
+          credentialVersion: 1,
+          authorizationHealth: ProviderAuthorizationHealth.USABLE,
+          basicAuthorizationCapability: ProviderCapabilityState.AVAILABLE,
+          insightsCapability: ProviderCapabilityState.UNKNOWN,
+          lastAuthorizationValidatedAt: now,
           professionalAccountType: me.accountType,
           mediaCountCache: me.mediaCount,
           lastMetadataSyncAt: new Date(),
@@ -120,6 +130,15 @@ export class InstagramConnectService {
           oauthAccessTokenEncrypted: encryptedToken,
           tokenStateCondition: OAuthTokenStatus.ACTIVE,
           tokenExpiresAt: expiresAt,
+          tokenRefreshedAt: now,
+          authorizationGeneration: { increment: 1 },
+          credentialVersion: { increment: 1 },
+          authorizationHealth: ProviderAuthorizationHealth.USABLE,
+          authorizationHealthReasonCode: null,
+          basicAuthorizationCapability: ProviderCapabilityState.AVAILABLE,
+          insightsCapability: ProviderCapabilityState.UNKNOWN,
+          lastAuthorizationValidatedAt: now,
+          disconnectedAt: null,
           professionalAccountType: me.accountType,
           mediaCountCache: me.mediaCount,
           lastMetadataSyncAt: new Date(),

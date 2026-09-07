@@ -89,7 +89,6 @@ export class AuthController {
       response,
       await this.googleAuth.signInWithGoogle({
         idToken: dto.idToken,
-        onboardingTrackId: dto.onboardingTrackId,
       }),
     );
   }

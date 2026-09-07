@@ -10,7 +10,7 @@
  * interaction acceptance.
  *
  * Re-running the script resets only this fixture's Collaboration and children.
- * Login for both accounts uses the local OTP stub: 123456.
+ * Login for both accounts uses password or email OTP (code is logged by the API in non-prod).
  */
 import {
   CollaborationActorClass,
@@ -533,7 +533,7 @@ async function main() {
     console.log("Local Collaboration acceptance fixture ready.");
     console.log(`  Brand:         ${fixture.brandUser.email}`);
     console.log(`  Creator:       ${fixture.creatorUser.email}`);
-    console.log("  OTP:           123456");
+    console.log("  OTP:           check the API log in non-prod ([OTP] ...)");
     console.log(`  Application:   ${fixture.application.id} (APPROVED)`);
     console.log(`  Collaboration: ${fixture.collaboration.id} (ACTIVE)`);
     console.log("  Stage:         NEGOTIATION");

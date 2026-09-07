@@ -108,7 +108,7 @@ For Prisma through the tunnel, use **`localhost:5435`**, not the RDS hostname an
    - `ZYTE_API_KEY` (+ optional `ZYTE_API_URL`, `ZYTE_REQUEST_TIMEOUT_MS`)
    - `GEMINI_API_KEY`
    - `PLAYWRIGHT_ENABLED` — leave unset (or `true`) so deployed ECS runs Zyte + Playwright; Docker image installs Chromium
-   - OTP stays stubbed on **dev** (`CREATOR/BRAND_VERIFICATION_USE_REAL_OTP` forced `false` in SST for non-prod)
+   - OTP: random 6-digit codes via Postmark. Non-prod also logs `[OTP]` in the API process.
 2. AWS SSO:
 
    ```bash
