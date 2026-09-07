@@ -34,7 +34,16 @@ export class CreatorWorkspaceActorService {
     workspaceId?: string,
   ): Promise<CreatorWorkspaceActorContext> {
     return this.prisma.$transaction((tx) =>
-      this.resolveInTransaction(tx, actor, workspaceId),
+      this.resolveWithMode(tx, actor, workspaceId, true),
+    );
+  }
+
+  resolveReadOnly(
+    actor: AuthUser,
+    workspaceId?: string,
+  ): Promise<CreatorWorkspaceActorContext> {
+    return this.prisma.$transaction((tx) =>
+      this.resolveWithMode(tx, actor, workspaceId, false),
     );
   }
 
@@ -42,6 +51,23 @@ export class CreatorWorkspaceActorService {
     tx: Prisma.TransactionClient,
     actor: AuthUser,
     workspaceId?: string,
+  ): Promise<CreatorWorkspaceActorContext> {
+    return this.resolveWithMode(tx, actor, workspaceId, true);
+  }
+
+  resolveReadOnlyInTransaction(
+    tx: Prisma.TransactionClient,
+    actor: AuthUser,
+    workspaceId?: string,
+  ): Promise<CreatorWorkspaceActorContext> {
+    return this.resolveWithMode(tx, actor, workspaceId, false);
+  }
+
+  private async resolveWithMode(
+    tx: Prisma.TransactionClient,
+    actor: AuthUser,
+    workspaceId: string | undefined,
+    reconcileLegacyOwner: boolean,
   ): Promise<CreatorWorkspaceActorContext> {
     if (actor.role !== UserRole.CREATOR) {
       throw new ForbiddenException("Creator access required");
@@ -76,7 +102,7 @@ export class CreatorWorkspaceActorService {
 
     // Compatibility reconciliation only: old Owner rows are bound through the
     // canonical ownerProfile.userId relationship, never email metadata.
-    if (ownedWorkspaces[0]) {
+    if (ownedWorkspaces[0] && reconcileLegacyOwner) {
       await this.ensureCanonicalOwnerMembership(tx, ownedWorkspaces[0]);
     }
 
@@ -105,7 +131,11 @@ export class CreatorWorkspaceActorService {
 
     const membership = memberships[0];
     const workspace = membership.workspace;
-    await this.ensureCanonicalOwnerMembership(tx, workspace);
+    if (reconcileLegacyOwner) {
+      await this.ensureCanonicalOwnerMembership(tx, workspace);
+    } else {
+      await this.assertCanonicalOwnerMembership(tx, workspace);
+    }
     this.assertCanonicalSubject(workspace);
 
     if (
@@ -208,6 +238,36 @@ export class CreatorWorkspaceActorService {
       throw new ConflictException({
         code: "CREATOR_OWNER_MEMBERSHIP_INCONSISTENT",
         message: "Creator Owner identity does not match the subject profile.",
+      });
+    }
+  }
+
+  private async assertCanonicalOwnerMembership(
+    tx: Prisma.TransactionClient,
+    workspace: WorkspaceIdentity,
+  ): Promise<void> {
+    const owners = await tx.creatorWorkspaceMember.findMany({
+      where: {
+        workspaceId: workspace.id,
+        securityRole: CreatorTeamRole.OWNER,
+        isActive: true,
+      },
+      select: { assignedProfileId: true, userId: true },
+      take: 2,
+    });
+    if (owners.length !== 1) {
+      throw new ConflictException({
+        code: "CREATOR_ONE_OWNER_INVARIANT_VIOLATED",
+        message: "Creator workspace must have exactly one active Owner.",
+      });
+    }
+    if (
+      owners[0].assignedProfileId !== workspace.ownerProfileId ||
+      owners[0].userId !== workspace.ownerProfile.userId
+    ) {
+      throw new ConflictException({
+        code: "CREATOR_OWNER_MEMBERSHIP_INCONSISTENT",
+        message: "Creator Owner authority is inconsistent.",
       });
     }
   }

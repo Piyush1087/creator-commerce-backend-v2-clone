@@ -41,6 +41,7 @@ import { CampaignIngressService } from "./campaign-ingress.service";
       useClass: CanonicalCampaignOpportunityEligibility,
     },
   ],
+  exports: [CampaignOpportunityService],
 })
 export class CampaignOpportunityModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

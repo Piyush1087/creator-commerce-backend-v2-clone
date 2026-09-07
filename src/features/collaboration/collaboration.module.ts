@@ -37,6 +37,7 @@ import { NotificationProcessorService } from "../notifications/services/notifica
 import { BrandEscrowModule } from "../brand-escrow/brand-escrow.module";
 import { PricingModule } from "../pricing/pricing.module";
 import { CreatorTeamModule } from "../creator-settings/team/creator-team.module";
+import { CollaborationHomeReadService } from "./services/collaboration-home-read.service";
 
 @Module({
   imports: [
@@ -79,6 +80,7 @@ import { CreatorTeamModule } from "../creator-settings/team/creator-team.module"
     CollaborationQueryService,
     CollaborationService,
     CollaborationCreatorProfileService,
+    CollaborationHomeReadService,
   ],
   exports: [
     CollaborationProvisionService,
@@ -88,6 +90,7 @@ import { CreatorTeamModule } from "../creator-settings/team/creator-team.module"
     CollaborationSettlementService,
     CollaborationFeedbackService,
     CollaborationService,
+    CollaborationHomeReadService,
   ],
 })
 export class CollaborationModule {}
