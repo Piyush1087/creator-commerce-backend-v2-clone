@@ -32,7 +32,7 @@ describe("Creator Home ownership and persistence boundaries", () => {
       readdirSync(resolve("prisma/migrations"), { withFileTypes: true }).filter(
         (entry) => entry.isDirectory(),
       ),
-    ).toHaveLength(84);
+    ).toHaveLength(85);
     const schema = readFileSync(resolve("prisma/schema.prisma"), "utf8");
     expect(schema).not.toMatch(/model (Creator)?Home(Activity|Event|Cache)?\b/);
   });
