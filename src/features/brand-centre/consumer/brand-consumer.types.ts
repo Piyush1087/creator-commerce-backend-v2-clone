@@ -30,6 +30,8 @@ export interface ConsumerField<T = unknown> {
   };
 }
 export interface ConsumerIntelligenceField extends ConsumerField {
+  objectState: "NO_CURRENT" | "PARTIAL_CURRENT" | "CURRENT";
+  changedAt: string | null;
   mixedGeneration: boolean;
   componentMeta: Record<string, Omit<ConsumerField, "current">>;
 }

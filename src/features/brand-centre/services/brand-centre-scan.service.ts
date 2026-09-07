@@ -10,6 +10,7 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
 import { BrandCentreJobDispatcherService } from "./brand-centre-job-dispatcher.service";
 
 export type ScanStatusResponse = {
@@ -33,6 +34,7 @@ export class BrandCentreScanService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly dispatcher: BrandCentreJobDispatcherService,
+    private readonly subscriptionCapabilities: SubscriptionCapabilityService,
   ) {}
 
   async getScanStatus(brandProfileId: string): Promise<ScanStatusResponse> {
@@ -81,6 +83,19 @@ export class BrandCentreScanService {
    * Creates job row only; worker implementation follows in next slice.
    */
   async enqueueDeepScan(brandProfileId: string): Promise<{ jobId: string }> {
+    return this.enqueueDeepScanInternal(brandProfileId, true);
+  }
+
+  async enqueueOnboardingDeepScan(
+    brandProfileId: string,
+  ): Promise<{ jobId: string }> {
+    return this.enqueueDeepScanInternal(brandProfileId, false);
+  }
+
+  private async enqueueDeepScanInternal(
+    brandProfileId: string,
+    enforceCapability: boolean,
+  ): Promise<{ jobId: string }> {
     const active = await this.prisma.brandCentreJob.findFirst({
       where: {
         brandProfileId,
@@ -93,6 +108,13 @@ export class BrandCentreScanService {
 
     if (active) {
       return { jobId: active.id };
+    }
+
+    if (enforceCapability) {
+      await this.subscriptionCapabilities.assertCapability(
+        brandProfileId,
+        "AI_SCAN_START",
+      );
     }
 
     const job = await this.prisma.$transaction(async (tx) => {

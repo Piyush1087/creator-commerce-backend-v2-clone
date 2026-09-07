@@ -13,6 +13,7 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
 import type { CreateCampaignWizardDto } from "../dto/brand-uce-campaign.dto";
 import { IntegratedCampaignWizardPayloadSchema } from "../schemas/uce-wizard.schema";
 import {
@@ -45,6 +46,7 @@ export class BrandUceCampaignService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: BrandUceAccessService,
+    private readonly subscriptionCapabilities: SubscriptionCapabilityService,
   ) {}
 
   async listAggregates(brandProfileId: string) {
@@ -655,6 +657,10 @@ export class BrandUceCampaignService {
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.flatten());
     }
+    await this.subscriptionCapabilities.assertCapability(
+      brandProfileId,
+      "CAMPAIGN_PUBLISH",
+    );
     return this.patchStatus(
       brandProfileId,
       campaignId,
@@ -664,6 +670,10 @@ export class BrandUceCampaignService {
 
   /** Move PUBLISHED → LIVE when execution-ready, or keep legacy alias for go-live. */
   async goLiveCampaign(brandProfileId: string, campaignId: string) {
+    await this.subscriptionCapabilities.assertCapability(
+      brandProfileId,
+      "CAMPAIGN_PUBLISH",
+    );
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
     const existing = await this.prisma.uceCampaign.findFirst({
       where: { id: campaignId, brandProfileId },
@@ -679,6 +689,10 @@ export class BrandUceCampaignService {
 
   /** Resume a PAUSED campaign back to LIVE. */
   async resumeCampaign(brandProfileId: string, campaignId: string) {
+    await this.subscriptionCapabilities.assertCapability(
+      brandProfileId,
+      "CAMPAIGN_PUBLISH",
+    );
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
     const existing = await this.prisma.uceCampaign.findFirst({
       where: { id: campaignId, brandProfileId },

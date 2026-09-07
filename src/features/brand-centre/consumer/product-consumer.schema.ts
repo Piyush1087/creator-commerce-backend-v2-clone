@@ -53,8 +53,11 @@ export const ProductIntelligenceObjectSchema = z
       "offering_actionability_profile",
     ]),
     current: currentSchema,
+    objectState: z.enum(["NO_CURRENT", "PARTIAL_CURRENT", "CURRENT"]),
     readiness: readinessSchema,
+    resultReadiness: readinessSchema,
     freshness: freshnessSchema,
+    changedAt: z.string().datetime().nullable(),
     authority: authoritySchema,
     candidate: candidateSchema,
     lineage: z

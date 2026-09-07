@@ -85,3 +85,47 @@ export async function resolveIntelligenceSubject(
     subjectRef: brandId,
   });
 }
+
+/**
+ * Consumer/read boundary. Unlike resolveIntelligenceSubject, this function
+ * never materializes missing Intelligence state.
+ */
+export async function findExistingIntelligenceSubject(
+  client: SubjectClient,
+  brandId: string,
+  selector: IntelligenceSubjectSelector = { type: "BRAND" },
+): Promise<IntelligenceSubject | null> {
+  if (selector.type === "OFFERING") {
+    const offering = await client.offering.findUnique({
+      where: {
+        brandProfileId_id: { brandProfileId: brandId, id: selector.ref },
+      },
+      select: { id: true },
+    });
+    if (!offering) {
+      throw new IntelligencePersistenceError(
+        "TENANCY_VIOLATION",
+        "Offering Intelligence subject must be an exact Offering of the requested Brand",
+      );
+    }
+    return client.intelligenceSubject.findUnique({
+      where: {
+        brandId_subjectType_subjectRef: {
+          brandId,
+          subjectType: IntelligenceSubjectType.OFFERING,
+          subjectRef: offering.id,
+        },
+      },
+    });
+  }
+
+  return client.intelligenceSubject.findUnique({
+    where: {
+      brandId_subjectType_subjectRef: {
+        brandId,
+        subjectType: IntelligenceSubjectType.BRAND,
+        subjectRef: brandId,
+      },
+    },
+  });
+}

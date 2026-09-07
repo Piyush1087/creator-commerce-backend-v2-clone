@@ -14,6 +14,7 @@ import {
 import { subDays, subHours } from "date-fns";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
 import { BrandCentreJobDispatcherService } from "./brand-centre-job-dispatcher.service";
 
 const STALE_HOURS = 24;
@@ -28,6 +29,7 @@ export class BrandCentreIntelligenceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly dispatcher: BrandCentreJobDispatcherService,
+    private readonly subscriptionCapabilities: SubscriptionCapabilityService,
   ) {}
 
   async getIntelligence(brandProfileId: string) {
@@ -123,6 +125,10 @@ export class BrandCentreIntelligenceService {
   }
 
   async enqueueRefresh(brandProfileId: string): Promise<{ jobId: string }> {
+    await this.subscriptionCapabilities.assertCapability(
+      brandProfileId,
+      "AI_SCAN_START",
+    );
     await this.reconcileOrphanedIntelligenceJobs(brandProfileId);
 
     const active = await this.prisma.brandCentreJob.findFirst({
@@ -169,9 +175,7 @@ export class BrandCentreIntelligenceService {
       where: {
         brandProfileId,
         isArchived,
-        ...(isArchived
-          ? { archivedAt: { gte: archivedSince } }
-          : {}),
+        ...(isArchived ? { archivedAt: { gte: archivedSince } } : {}),
       },
       orderBy: [{ priorityRank: "asc" }, { createdAt: "desc" }],
     });

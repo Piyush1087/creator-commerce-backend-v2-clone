@@ -1,9 +1,14 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import {
   CollaborationEscrowStatus,
   EscrowTransactionType,
   UserRole,
 } from "@prisma/client";
+import { Decimal } from "@prisma/client/runtime/library";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
@@ -26,7 +31,10 @@ function resolveCreatorHandle(row: {
   creatorUser: {
     name: string | null;
     email: string;
-    creatorProfile: { displayName: string | null; instagramHandle: string | null } | null;
+    creatorProfile: {
+      displayName: string | null;
+      instagramHandle: string | null;
+    } | null;
   };
 }): string {
   const profile = row.creatorUser.creatorProfile;
@@ -37,17 +45,6 @@ function resolveCreatorHandle(row: {
     row.creatorUser.email.split("@")[0] ??
     "creator"
   );
-}
-
-function resolveUpiVpa(
-  stored: string | null | undefined,
-  brandDomain: string,
-): string {
-  if (stored) {
-    return stored;
-  }
-  const slug = brandDomain.replace(/[^a-z0-9]/gi, "").toLowerCase();
-  return `${slug || "brand"}.escrow@razorpay`;
 }
 
 @Injectable()
@@ -65,7 +62,12 @@ export class BrandPayoutsService {
     const brandProfileId = await this.brandAuth.resolveBrandProfileId(user);
     const brand = await this.prisma.brandProfile.findUnique({
       where: { id: brandProfileId },
-      select: { id: true, name: true, domain: true, payoutsWorkspaceRole: true },
+      select: {
+        id: true,
+        name: true,
+        domain: true,
+        payoutsWorkspaceRole: true,
+      },
     });
 
     if (!brand) {
@@ -109,6 +111,7 @@ export class BrandPayoutsService {
         ledger: [],
         escrow_locks: [],
         disbursals: [],
+        creator_payouts: [],
       };
     }
 
@@ -131,6 +134,20 @@ export class BrandPayoutsService {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
+
+    const payoutObligations =
+      await this.prisma.creatorPayoutObligation.findMany({
+        where: { brandProfileId },
+        include: {
+          payoutProfile: true,
+          transfers: {
+            include: { reversals: true },
+            orderBy: { attemptSequence: "desc" },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      });
 
     const collaborationIds = [
       ...new Set(
@@ -205,6 +222,33 @@ export class BrandPayoutsService {
         };
       });
 
+    const creator_payouts = payoutObligations.map((obligation) => {
+      const transfer = obligation.transfers[0] ?? null;
+      const reversedAmount = transfer?.reversals
+        .filter((row) => row.state === "PROCESSED")
+        .reduce((total, row) => total.add(row.amount), new Decimal(0));
+      return {
+        obligation_id: obligation.id,
+        settlement_instruction_id: obligation.settlementInstructionId,
+        collaboration_id: obligation.collaborationId,
+        obligation_type: obligation.obligationType,
+        business_status: obligation.status,
+        entitlement_amount: decimalToNumber(obligation.entitlementAmount),
+        currency: obligation.currency,
+        payment_due_at: obligation.paymentDueAt?.toISOString() ?? null,
+        provider_readiness: obligation.payoutProfile.operationalEligibility,
+        setup_status: obligation.payoutProfile.onboardingStatus,
+        bank_status: obligation.payoutProfile.bankStatus,
+        blocked_reason: obligation.blockedReason,
+        transfer_state: transfer?.state ?? null,
+        settlement_state: transfer?.settlementState ?? null,
+        on_hold: transfer?.onHold ?? false,
+        settled_at: transfer?.settledAt?.toISOString() ?? null,
+        reversed_amount: reversedAmount ? decimalToNumber(reversedAmount) : 0,
+        action_required: obligation.status === "BLOCKED",
+      };
+    });
+
     return {
       workspace_role: brand.payoutsWorkspaceRole,
       vault_missing: false,
@@ -218,13 +262,14 @@ export class BrandPayoutsService {
         account_name: `Aura Escrow Account — ${brand.name}`,
         corporate_account_number: vault.virtual_account_number,
         ifsc_code: vault.ifsc_code,
-        upi_vpa: resolveUpiVpa(vault.upi_vpa, brand.domain),
+        upi_vpa: vault.upi_vpa,
         bank_partner: vault.bank_name,
         razorpay_virtual_account_id: vault.razorpay_virtual_account_id,
       },
       ledger,
       escrow_locks,
       disbursals,
+      creator_payouts,
     };
   }
 }

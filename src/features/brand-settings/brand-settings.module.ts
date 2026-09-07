@@ -6,7 +6,7 @@ import { BrandTeamInvitationsService } from "./services/brand-team-invitations.s
 import { BrandTeamService } from "./services/brand-team.service";
 
 import { BrandCentreModule } from "../brand-centre/brand-centre.module";
-import { InstagramModule } from "../instagram/instagram.module";
+import { InstagramProviderClientModule } from "../instagram/instagram-provider-client.module";
 import { BrandSettingsController } from "./brand-settings.controller";
 import { BrandIntegrationTokenExpiryScheduler } from "./schedulers/brand-integration-token-expiry.scheduler";
 import { BrandSettingsAccessService } from "./services/brand-settings-access.service";
@@ -22,8 +22,8 @@ import { ProviderOAuthModule } from "../provider-oauth/provider-oauth.module";
 
 @Module({
   imports: [
-    BrandCentreModule,
-    InstagramModule,
+    forwardRef(() => BrandCentreModule),
+    InstagramProviderClientModule,
     AuthModule,
     MailModule,
     ProviderOAuthModule,

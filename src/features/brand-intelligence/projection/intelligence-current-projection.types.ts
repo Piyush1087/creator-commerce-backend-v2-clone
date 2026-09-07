@@ -119,6 +119,7 @@ export interface CurrentIntelligenceObjectProjection {
   readonly consumerReadiness: IntelligenceProjectionReadiness;
   readonly resultReadiness: IntelligenceProjectionReadiness;
   readonly freshness: IntelligenceProjectionFreshness;
+  readonly changedAt: string | null;
   readonly authority: IntelligenceProjectionAuthority | "MIXED" | null;
   readonly sourceClass: string | "MIXED" | null;
   readonly mixedGeneration: boolean;

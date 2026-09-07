@@ -109,7 +109,9 @@ export class IntelligenceCurrentProjectionService implements IntelligenceCurrent
     );
     return {
       brandId: request.brandId,
-      ...(request.subject ? { subjectId: snapshot.subjectId } : {}),
+      ...(request.subject && snapshot.subjectId
+        ? { subjectId: snapshot.subjectId }
+        : {}),
       objectSemanticId: request.objectSemanticId,
       objectContract: objectContracts.length === 1 ? objectContracts[0] : null,
       objectContractVersions: objectContracts,
@@ -121,6 +123,7 @@ export class IntelligenceCurrentProjectionService implements IntelligenceCurrent
       freshness: aggregateFreshness(
         components.map((component) => component.freshness),
       ),
+      changedAt: latestGenerationTimestamp(components),
       authority: aggregateString(
         components.map((component) => component.authority),
       ),
@@ -173,7 +176,9 @@ export class IntelligenceCurrentProjectionService implements IntelligenceCurrent
       return {
         projectionState: "NO_CURRENT",
         brandId: request.brandId,
-        ...(request.subject ? { subjectId: snapshot.subjectId } : {}),
+        ...(request.subject && snapshot.subjectId
+          ? { subjectId: snapshot.subjectId }
+          : {}),
         objectSemanticId: request.objectSemanticId,
         componentSemanticPath: request.componentSemanticPath,
         pathSchemeVersion: 1,
@@ -407,6 +412,19 @@ function aggregateString<T extends string>(
   const distinct = [...new Set(values)];
   if (!distinct.length) return null;
   return distinct.length === 1 ? distinct[0] : "MIXED";
+}
+
+function latestGenerationTimestamp(
+  components: readonly CurrentIntelligenceComponentProjection[],
+): string | null {
+  if (components.length === 0) return null;
+  return components.reduce(
+    (latest, component) =>
+      component.generationCreatedAt > latest
+        ? component.generationCreatedAt
+        : latest,
+    components[0].generationCreatedAt,
+  );
 }
 
 function uniqueContracts(

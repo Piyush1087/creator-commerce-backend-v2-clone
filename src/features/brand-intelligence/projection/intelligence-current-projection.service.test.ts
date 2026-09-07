@@ -29,6 +29,7 @@ function component(
     freshness: string;
     protectionState: string;
     pendingCandidateCount: number;
+    generationCreatedAt: string;
   }> = {},
 ): ProjectionComponentRecord {
   const objectGenerationId =
@@ -80,7 +81,9 @@ function component(
       readiness: options.generationReadiness ?? readiness,
       freshnessAtGeneration: "CURRENT",
       presentationOrder: null,
-      createdAt: new Date("2026-08-25T12:00:00.000Z"),
+      createdAt: new Date(
+        options.generationCreatedAt ?? "2026-08-25T12:00:00.000Z",
+      ),
       objectGeneration: {
         id: objectGenerationId,
         brandId,
@@ -160,6 +163,7 @@ describe("W1.0F current Intelligence projection", () => {
       consumerReadiness: "NOT_READY",
       resultReadiness: "NOT_READY",
       freshness: "UNKNOWN",
+      changedAt: null,
     });
     await expect(
       service.readComponent({
@@ -199,6 +203,7 @@ describe("W1.0F current Intelligence projection", () => {
       generationReadiness: "READY",
       freshness: "UNKNOWN",
       contractVersion: "1.1",
+      generationCreatedAt: "2026-08-25T13:00:00.000Z",
     });
     const { service } = harness(
       snapshot([root, field], {
@@ -241,6 +246,7 @@ describe("W1.0F current Intelligence projection", () => {
       sourceClass: "MIXED",
       mixedGeneration: true,
       mixedContractVersion: true,
+      changedAt: "2026-08-25T13:00:00.000Z",
       candidateSummary: {
         status: "CONFLICT",
         pendingCount: 2,

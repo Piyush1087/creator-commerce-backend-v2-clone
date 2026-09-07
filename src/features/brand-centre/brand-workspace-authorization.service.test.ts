@@ -91,8 +91,16 @@ describe("BrandWorkspaceAuthorizationService current authority", () => {
       expect(prisma.user.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: actor.id } }),
       );
+      expect(sessions.evictIfInactive).not.toHaveBeenCalled();
+      expect(sessions.touchActivity).not.toHaveBeenCalled();
     },
   );
+
+  it("keeps Brand Centre session activity on the explicit activity-aware path", async () => {
+    await expect(auth.resolveBrandProfileId(actor)).resolves.toBe("brand-1");
+    expect(sessions.evictIfInactive).toHaveBeenCalledWith("brand-1");
+    expect(sessions.touchActivity).toHaveBeenCalledWith("brand-1");
+  });
 
   it("denies immediately after current membership removal", async () => {
     prisma.user.findUnique.mockResolvedValue(

@@ -1,0 +1,1454 @@
+run_id: chat-home-v1
+execution_mode: HYBRID_RUN
+
+authority:
+  repository: Piyush1087/dummy_tcs
+  branch: main
+  sha: d69ba6b8cb331bfa36b450307d9defcd26d09c6e
+  intelligence_architecture:
+    branch: agent/product-intelligence-v1-contracts
+    sha: bbb0be3345c36e9cc7c4f06ca68fb491b742b83f
+
+accepted_checkpoints:
+  p0:
+    gate: P0_PRODUCT_INTELLIGENCE_CONVERGENCE_ACCEPTED
+    merge_sha: 0efdcae0b114378762ae9c4fa7edbb064e5b0a79
+    checkpoint_sha: 87e6e82a1d0442fb1943f06e63a9bcb8b1a095e6
+    ie_review: PASS
+    systems_review: PASS
+  p1:
+    gate: P1_INTELLIGENCE_CONSUMER_CONTRACT_ACCEPTED
+    implementation_sha: e0ce85086bf5696e967f3c82c34936caa6339414
+    checkpoint_sha: 17ebca265faa088a03b1433e06bef3acc3baeb99
+    ie_review: PASS
+    systems_review: PASS
+  p2:
+    gate: P2_CHAT_FOUNDATION_ACCEPTED
+    implementation_sha: baf2102e6f6f96ddbd6458590c1af7438be846be
+    checkpoint_sha: 0eec694d44cbb8d72b12a8381c977e5d296fb629
+    systems_review: PASS
+
+backend:
+  repository: Piyush1087/creator-commerce-backend-v2-clone
+  active_source:
+    branch: program/brand-settings-mvp
+    sha: 517531682f6286d5ee45bd48ec4e145e96d583a7
+  product_intelligence_source:
+    branch: phase-g/product-intelligence-v1
+    sha: f3a2d7b19f5692ad10e5d13751ee880e1604f93a
+
+phase:
+  id: P3
+  status: CANDIDATE_READY_FOR_SYSTEMS_REVIEW
+
+deferred_dependencies:
+  canonical_offering_discovery:
+    source_sha: 17214722dc20abf23c8dce935a58050a017f6639
+    source_branch: development
+    capability: offering.list
+    integration_status: INTEGRATED
+    integration_sha: 1fa5f34f72782b142244e3e8ff0395ae03ff574b
+    reuse_required: true
+    auto_import_parent_price_refresh: false
+
+p1_contract:
+  common_consumer_version: "1.0"
+  engine_registration_version: "1.0"
+  domain_payload_version: "1.0"
+  registry_storage: CODE_ONLY
+  registered_engines:
+    - engine_id: brand_intelligence
+      supported_subject_types:
+        - BRAND
+      object_count: 10
+    - engine_id: product_intelligence
+      supported_subject_types:
+        - OFFERING
+      object_count: 3
+  direct_persistence_access: false
+  domain_payload_flattened: false
+  chat_runtime_implemented: false
+
+integration:
+  branch: program/chat-home-v1
+  merge_base: a67afb5e4877605fb7a1b6401434e13f84b96cba
+  checkpoint_sha: 0efdcae0b114378762ae9c4fa7edbb064e5b0a79
+  p0_merge_sha: 0efdcae0b114378762ae9c4fa7edbb064e5b0a79
+  merge_strategy: THREE_WAY_NO_FF_NO_COMMIT
+
+preflight:
+  worktree_initially_clean: true
+  authority_verified: true
+  remote_sources_verified: true
+  target_branch_absent_locally_and_remotely: true
+  active_unique_commits: 31
+  product_intelligence_unique_commits: 21
+  patch_equivalent_commits: []
+
+conflicts:
+  - path: src/features/brand-centre/services/brand-centre-dna.service.ts
+    resolution: Preserve active subscription capability and Instagram provenance behavior together with accepted canonical Offering behavior.
+  - path: src/features/brand-intelligence/brand-intelligence.module.ts
+    resolution: Import Data Extraction, canonical Brand state, and Notifications modules together.
+  - path: src/features/data-extraction/evidence/intelligence/data-extraction-intelligence-evidence.architecture.test.ts
+    resolution: Assert all three converged module dependencies without weakening the DE adapter boundary checks.
+
+migration_policy:
+  new_chat_home_migrations: 0
+  conversation_migration_required: false
+  accepted_product_intelligence_migrations:
+    - 20260827223000_product_intelligence_v1_canonical_offering_foundation
+    - 20260827234500_product_intelligence_v1_generic_intelligence_subject_scope
+    - 20260828120000_data_extraction_offering_commercial_evidence
+  accepted_migration_blobs:
+    20260827223000_product_intelligence_v1_canonical_offering_foundation: 9718a592525b3b4551519acd8a520cd50d110eee
+    20260827234500_product_intelligence_v1_generic_intelligence_subject_scope: e00ea913ccd91e8cad5b09ba888c7e9abdecc935
+    20260828120000_data_extraction_offering_commercial_evidence: e9b4252f579ebe8550cbefae9834acf8be253a4f
+  gates:
+    fresh_combined:
+      status: PASS
+      applied_migrations: 66
+      failed_migrations: 0
+    active_to_converged_upgrade:
+      status: PASS
+      active_migrations: 63
+      accepted_pi_migrations_applied: 3
+      final_migrations: 66
+
+diagnostics:
+  - id: P0_BREAKER_CLASSIFICATION_01
+    original_breaker: PRODUCTION_RUNTIME_FAILURE
+    area: notifications
+    finding: KNOWN_ACTIVE_BASELINE_NONDETERMINISM
+    classification: ENVIRONMENT_OR_NONDETERMINISTIC_FAILURE
+    convergence_causation: NOT_PROVEN
+    active_baseline_reproduced: true
+    candidate_reproduced_during_diagnostic: false
+    notification_code_changed_by_p0: false
+    notification_schema_changed_by_p0: false
+    pi_migrations_touch_notification_schema: false
+    fix_authorized: false
+    disposition: P0_RESUME_AUTHORIZED
+  - id: P0_BREAKER_CLASSIFICATION_02
+    area: subscription_lifecycle
+    classification: PRE_EXISTING_TIME_DEPENDENT_TEST_FIXTURE_DEFECT
+    convergence_causation: NOT_PROVEN
+    runtime_fix_authorized: false
+    product_semantic_change: false
+    test_harness_correction_authorized: true
+    correction:
+      file: src/features/pricing/services/subscription-lifecycle.p2.test.ts
+      type: FUTURE_EFFECTIVE_DATE_FIXTURE
+      semantic_scope: TEST_ONLY
+
+legacy_harness_observations:
+  classification: NON_GATING_LEGACY_HARNESS_OBSERVATIONS
+  items:
+    - area: BS01
+      finding: The legacy final-tree fixture is incompatible with final BS12 JWT and session fixture assumptions.
+    - area: BS06_P1C1
+      finding: The historical migration harness requires a pre-migration seeded fixture that is absent from a full migrated clone.
+    - area: BS06_LEGACY_PROVIDER
+      finding: The legacy provider harness uses provisional or superseded provider semantics; the current reconciliation suite passed 22 of 22 tests.
+
+tests:
+  targeted_subscription_lifecycle_unit:
+    status: PASS
+    passed: 11
+    failed: 0
+    skipped: 0
+  targeted_subscription_access_unit:
+    status: PASS
+    passed: 4
+    failed: 0
+    skipped: 0
+  targeted_subscription_lifecycle_postgres:
+    status: PASS
+    passed: 2
+    failed: 0
+    skipped: 0
+    disposable_migrations_applied: 66
+  standard_full_suite:
+    status: PASS
+    attempts: 1
+    passed: 1000
+    failed: 0
+    skipped: 481
+    notification_variance_observed: false
+  final_validation:
+    intelligence_contracts_verify: PASS
+    architecture_commit: bbb0be3345c36e9cc7c4f06ca68fb491b742b83f
+    backend_build: PASS
+    prisma_validate: PASS
+    git_diff_check: PASS
+    unresolved_merge_entries: 0
+
+p1_validation:
+  targeted_common_consumer:
+    status: PASS
+    files: 5
+    passed: 23
+    failed: 0
+    skipped: 0
+  existing_consumer_non_database:
+    status: PASS
+    files_passed: 4
+    files_skipped: 2
+    passed: 12
+    failed: 0
+    skipped: 12
+  brand_consumer_postgres:
+    status: PASS
+    passed: 8
+    failed: 0
+    skipped: 0
+    disposable_migrations_applied: 66
+    fixture_alignment:
+      classification: PRE_EXISTING_ACCEPTED_AUTH_HARNESS_DRIFT
+      scope: TEST_ONLY
+      server_authoritative_sessions_used: true
+      persisted_brand_membership_used: true
+      production_auth_semantics_changed: false
+  product_consumer_postgres:
+    status: PASS
+    passed: 4
+    failed: 0
+    skipped: 0
+    disposable_migrations_applied: 66
+  standard_full_suite:
+    status: PASS
+    attempts: 1
+    passed: 1023
+    failed: 0
+    skipped: 481
+    notification_variance_observed: false
+  final_validation:
+    prisma_generate: PASS
+    prisma_validate: PASS
+    intelligence_contracts_verify: PASS
+    intelligence_architecture_commit: bbb0be3345c36e9cc7c4f06ca68fb491b742b83f
+    backend_build: PASS
+    git_diff_check: PASS
+  migrations:
+    count_before: 66
+    count_after: 66
+    new_migrations: 0
+    accepted_pi_migration_hashes_unchanged: true
+
+p1_checkpoint:
+  implementation_sha: e0ce85086bf5696e967f3c82c34936caa6339414
+  final_checkpoint_sha: 17ebca265faa088a03b1433e06bef3acc3baeb99
+  ie_review: PASS
+  systems_review: PASS
+  target_gate: P1_INTELLIGENCE_CONSUMER_CONTRACT_ACCEPTED
+
+p1_semantic_differential:
+  base_sha: 87e6e82a1d0442fb1943f06e63a9bcb8b1a095e6
+  changed_files:
+    COMMON_CONSUMER_CONTRACT:
+      - src/features/intelligence-consumer/intelligence-consumer.contract.ts
+      - src/features/intelligence-consumer/intelligence-consumer.mapper.ts
+      - src/features/intelligence-consumer/intelligence-consumer.schema.ts
+    ENGINE_REGISTRATION:
+      - src/app.module.ts
+      - src/features/brand-centre/brand-centre.module.ts
+      - src/features/intelligence-consumer/intelligence-consumer.module.ts
+      - src/features/intelligence-consumer/intelligence-consumer.registry.ts
+      - src/features/intelligence-consumer/intelligence-consumer.service.ts
+      - src/features/intelligence-consumer/intelligence-consumer.tokens.ts
+    BRAND_ADAPTER:
+      - src/features/intelligence-consumer/adapters/brand-intelligence-consumer.adapter.ts
+    PRODUCT_ADAPTER:
+      - src/features/intelligence-consumer/adapters/product-intelligence-consumer.adapter.ts
+    TEST:
+      - src/features/brand-centre/consumer/brand-consumer.postgres.test.ts
+      - src/features/intelligence-consumer/adapters/brand-intelligence-consumer.adapter.test.ts
+      - src/features/intelligence-consumer/adapters/product-intelligence-consumer.adapter.test.ts
+      - src/features/intelligence-consumer/intelligence-consumer.architecture.test.ts
+      - src/features/intelligence-consumer/intelligence-consumer.registry.test.ts
+      - src/features/intelligence-consumer/intelligence-consumer.schema.test.ts
+    EXECUTION_LEDGER:
+      - docs/ai-collaboration/chat-home-v1-execution-ledger.yaml
+  unchanged_semantics:
+    brand_consumer_contract: true
+    product_consumer_contract: true
+    product_processor_ownership: true
+    product_object_ownership: true
+    canonical_offering_runtime: true
+    intelligence_persistence: true
+    data_extraction_persistence: true
+    prisma_schema: true
+    accepted_pi_migrations: true
+    chat_runtime_absent: true
+
+p2_contract:
+  capability_registry: CODE_ONLY
+  planned_first_slice_capabilities: 9
+  implemented_business_capabilities: 0
+  execute_capabilities: 0
+  conversation_storage: EXISTING_COPILOT_TABLES
+  conversation_scope: USER_X_BRAND_X_CONVERSATION
+  conversation_migration_required: false
+  chat_context_persisted_as_truth: false
+  legacy_memory_used: false
+  model_gateway: EXISTING_GEMINI_JSON_CLIENT
+  native_model_tool_calling_required: false
+  personal_memory: false
+  vector_memory: false
+  provider_actions: false
+  new_migrations: 0
+
+p2_validation:
+  targeted_chat:
+    status: PASS
+    files: 6
+    passed: 21
+    failed: 0
+    skipped: 0
+  conversation_postgres:
+    status: PASS
+    passed: 3
+    failed: 0
+    skipped: 0
+    disposable_migrations_applied: 66
+    same_brand_cross_user: PASS
+    cross_brand: PASS
+    inactive_membership: PASS
+    persistence_reload: PASS
+    legacy_shared_storage_service_path: PASS
+  legacy_copilot_regression:
+    status: PASS
+    existing_unit_passed: 7
+    existing_unit_failed: 0
+    ownership_reconciled_in_controller_and_hitl: true
+  p1_regression:
+    status: PASS
+    non_database_passed: 35
+    brand_consumer_postgres_passed: 8
+    product_consumer_postgres_passed: 4
+    failed: 0
+  standard_full_suite:
+    status: PASS
+    attempts: 1
+    passed: 1044
+    failed: 0
+    skipped: 484
+    notification_variance_observed: false
+  final_validation:
+    prisma_generate: PASS
+    prisma_validate: PASS
+    intelligence_contracts_verify: PASS
+    intelligence_architecture_commit: bbb0be3345c36e9cc7c4f06ca68fb491b742b83f
+    backend_build: PASS
+    git_diff_check: PASS
+    changed_scope_lint: PASS
+    full_repository_lint: PRE_EXISTING_BASELINE_FAILURE_816_UNMODIFIED_FORMATTING_ERRORS
+  migrations:
+    count_before: 66
+    count_after: 66
+    new_migrations: 0
+    accepted_pi_migration_hashes_unchanged: true
+
+p2_security_review:
+  same_brand_cross_user_isolation: PASS
+  cross_brand_isolation: PASS
+  server_authoritative_actor: PASS
+  server_authoritative_workspace: PASS
+  untrusted_route_hint_contained: PASS
+  untrusted_entity_hint_contained: PASS
+  legacy_thread_bypass: BLOCKED
+  unscoped_assistant_message_write: false
+  unscoped_hitl_lookup_or_write: false
+  model_output_used_as_authorization: false
+  credential_or_token_logging: false
+  conversation_history_used_as_business_truth: false
+
+p2_semantic_differential:
+  base_sha: 17ebca265faa088a03b1433e06bef3acc3baeb99
+  classifications:
+    CHAT_CAPABILITY_FOUNDATION:
+      - src/features/chat/capabilities
+    CHAT_CONTEXT:
+      - src/features/chat/context
+    CONVERSATION_PRIVACY_RECONCILIATION:
+      - src/features/co-pilot/services/co-pilot-thread.service.ts
+      - src/features/co-pilot/services/co-pilot-feedback.service.ts
+      - src/features/co-pilot/services/co-pilot-hitl.service.ts
+    CHAT_CONVERSATION_FACADE:
+      - src/features/chat/conversation
+      - src/features/co-pilot/co-pilot-persistence.module.ts
+    MODEL_GATEWAY:
+      - src/features/chat/model
+    RESPONSE_CONTRACT:
+      - src/features/chat/response
+    TELEMETRY:
+      - src/features/chat/telemetry
+    LEGACY_COPILOT_CALLSITE_RECONCILIATION:
+      - src/features/co-pilot/co-pilot.controller.ts
+      - src/features/co-pilot/co-pilot.module.ts
+    TEST:
+      - src/features/chat
+    APP_MODULE_WIRING:
+      - src/app.module.ts
+    EXECUTION_LEDGER:
+      - docs/ai-collaboration/chat-home-v1-execution-ledger.yaml
+  unchanged_semantics:
+    business_capability_handlers: true
+    chat_http_controller_absent: true
+    provider_readiness_absent: true
+    provider_actions_absent: true
+    recommendation_engine_absent: true
+    workflow_engine_absent: true
+    intelligence_consumer_contract: true
+    product_semantics: true
+    prisma_schema: true
+    accepted_pi_migrations: true
+    deferred_offering_discovery: true
+
+p2_checkpoint:
+  implementation_sha: baf2102e6f6f96ddbd6458590c1af7438be846be
+  final_checkpoint_sha: 0eec694d44cbb8d72b12a8381c977e5d296fb629
+  systems_review: PASS
+  target_gate: P2_CHAT_FOUNDATION_ACCEPTED
+
+p3_contract:
+  first_slice_capabilities: 9
+  implemented_capabilities: 9
+  execute_capabilities: 0
+  capability_availability: AVAILABLE
+  handler_count: 9
+  planning:
+    max_passes: 2
+    max_distinct_executions: 10
+    duplicate_key: CAPABILITY_ID_PLUS_VALIDATED_INPUT
+    reads_before_navigation: true
+    autonomous_loop: false
+  canonical_brand_source: CANONICAL_BRAND_STATE_READER
+  canonical_brand_adapter: BrandCurrentReadService
+  offering_list_source:
+    service: CanonicalOfferingDiscoveryService
+    commit: 17214722dc20abf23c8dce935a58050a017f6639
+    integration_sha: 1fa5f34f72782b142244e3e8ff0395ae03ff574b
+    parent_sha: 30cfab84604b8865d8270557f98267928cdfc502
+    parent_imported: false
+  offering_read_source: CanonicalOfferingStateService
+  intelligence_source: IntelligenceConsumerService
+  campaign_source: BrandUceCampaignService
+  navigation:
+    destinations:
+      - HOME
+      - BRAND_CENTRE
+      - OFFERINGS
+      - CAMPAIGNS
+    business_mutation: false
+    model_is_authority: false
+    arbitrary_urls: false
+  conversation_history:
+    persistent_existing_storage: true
+    max_messages: 12
+    max_message_characters: 2000
+    max_total_characters: 12000
+    is_business_truth: false
+  model:
+    gateway: ChatModelGateway
+    underlying_client: GeminiJsonClient
+    native_tool_calling: false
+    chain_of_thought_persisted: false
+  http_routes:
+    - POST /api/v1/chat/conversations
+    - GET /api/v1/chat/conversations
+    - GET /api/v1/chat/conversations/:conversationId
+    - PATCH /api/v1/chat/conversations/:conversationId
+    - POST /api/v1/chat/conversations/:conversationId/turns
+  provider_actions: false
+  business_mutations: false
+  new_migrations: 0
+
+p3_capability_map:
+  workspace.context.read:
+    class: READ
+    source: ChatContext
+    handler: WorkspaceContextReadHandler
+    availability: AVAILABLE
+  brand.current.read:
+    class: READ
+    source: BrandCurrentReadService/CANONICAL_BRAND_STATE_READER
+    handler: BrandCurrentReadHandler
+    availability: AVAILABLE
+  offering.list:
+    class: READ
+    source: CanonicalOfferingDiscoveryService
+    handler: OfferingListHandler
+    availability: AVAILABLE
+  offering.read:
+    class: READ
+    source: CanonicalOfferingStateService
+    handler: OfferingReadHandler
+    availability: AVAILABLE
+  brand_intelligence.current.read:
+    class: READ
+    source: IntelligenceConsumerService/brand_intelligence/BRAND
+    handler: BrandIntelligenceCurrentReadHandler
+    availability: AVAILABLE
+  product_intelligence.current.read:
+    class: READ
+    source: IntelligenceConsumerService/product_intelligence/OFFERING
+    handler: ProductIntelligenceCurrentReadHandler
+    availability: AVAILABLE
+  campaign.list:
+    class: READ
+    source: BrandUceCampaignService.listCampaigns
+    handler: CampaignListHandler
+    availability: AVAILABLE
+  campaign.read:
+    class: READ
+    source: BrandUceCampaignService.getCampaignShell
+    handler: CampaignReadHandler
+    availability: AVAILABLE
+  app.navigate:
+    class: NAVIGATE
+    source: ChatNavigationRegistry
+    handler: AppNavigateHandler
+    availability: AVAILABLE
+
+p3_validation:
+  targeted_chat:
+    status: PASS
+    passed: 62
+    failed: 0
+    skipped: 7
+  offering_discovery:
+    status: PASS
+    passed: 4
+    failed: 0
+    skipped: 0
+  orchestration_first_verticals:
+    status: PASS
+    passed: 9
+    failed: 0
+    skipped: 0
+  chat_postgresql:
+    status: PASS
+    conversation_passed: 3
+    http_passed: 4
+    failed: 0
+    skipped: 0
+    disposable_migrations_applied: 66
+  p1_intelligence_regression:
+    status: PASS
+    passed: 23
+    failed: 0
+    skipped: 0
+    semantics_unchanged: true
+  brand_consumer_postgresql:
+    status: PASS
+    passed: 8
+    failed: 0
+    skipped: 0
+  product_consumer_regression:
+    status: PASS
+    non_database_passed: 4
+    postgresql_passed: 4
+    failed: 0
+    skipped: 0
+  campaign_regression:
+    status: PASS
+    passed: 4
+    failed: 0
+    skipped: 0
+  legacy_copilot_regression:
+    status: PASS
+    passed: 7
+    failed: 0
+    skipped: 0
+  combined_postgresql_final:
+    status: PASS
+    passed: 19
+    failed: 0
+    skipped: 0
+    database: DISPOSABLE_LOCAL_CHAT_HOME_P3
+    applied_migrations: 66
+  standard_full_suite:
+    status: PASS
+    attempts: 1
+    passed: 1085
+    failed: 0
+    skipped: 488
+    notification_variance_observed: false
+  final_validation:
+    prisma_generate: PASS
+    prisma_validate: PASS
+    intelligence_contracts_verify: PASS
+    intelligence_architecture_commit: bbb0be3345c36e9cc7c4f06ca68fb491b742b83f
+    backend_build: PASS
+    git_diff_check: PASS
+    changed_scope_prettier: PASS
+    changed_scope_lint: PASS
+    full_repository_lint: PRE_EXISTING_BASELINE_FAILURE_770_UNMODIFIED_FORMATTING_ERRORS
+  migrations:
+    count_before: 66
+    count_after: 66
+    new_migrations: 0
+    accepted_pi_migration_hashes_unchanged: true
+  diagnostic_attempts:
+    - area: OFFERING_DISCOVERY_CLI
+      result: HARNESS_COMMAND_CORRECTED
+      detail: Vitest rejected the Jest-only --runInBand flag; the corrected command passed 4 of 4.
+      production_failure: false
+    - area: CHAT_HTTP_POSTGRES_TEST_MODULE
+      result: HARNESS_METADATA_CORRECTED
+      detail: The first HTTP harness attempt lacked Vitest constructor metadata; explicit Nest injections produced a 7 of 7 pass.
+      production_failure: false
+    - area: REPEATED_PRODUCT_POSTGRES_FIXTURE
+      result: DISPOSABLE_FIXTURE_CONTAMINATION
+      detail: A repeat run against a previously used disposable database collided on fixed test emails; a newly migrated empty database passed the combined 19 of 19 gate.
+      production_failure: false
+    - area: PRISMA_VALIDATE_ENVIRONMENT
+      result: COMMAND_ENVIRONMENT_CORRECTED
+      detail: The first validate command omitted DATABASE_URL; validation passed with the isolated disposable URL.
+      production_failure: false
+
+p3_security_review:
+  same_brand_cross_user_isolation: PASS
+  cross_brand_isolation: PASS
+  foreign_offering_isolation: PASS
+  foreign_campaign_isolation: PASS
+  server_authoritative_actor: PASS
+  server_authoritative_brand: PASS
+  request_authority_injection: PASS
+  route_hint_authority_escalation: BLOCKED
+  model_authority_injection: PASS
+  history_not_business_truth: PASS
+  stale_disclosure: PASS
+  grounding_integrity: PASS
+  navigation_integrity: PASS
+  direct_prisma_in_chat_capabilities_or_orchestration: false
+  legacy_copilot_business_tools_used: false
+  processor_execution_from_chat: false
+  data_extraction_execution_from_chat: false
+  provider_actions: false
+  credential_or_token_logging: false
+
+p3_semantic_differential:
+  base_sha: 0eec694d44cbb8d72b12a8381c977e5d296fb629
+  classifications:
+    OFFERING_DISCOVERY_INTEGRATION:
+      - src/features/brand-centre/consumer/canonical-offering-discovery.schema.ts
+      - src/features/brand-centre/consumer/canonical-offering-discovery.service.ts
+    CAPABILITY_IMPLEMENTATION:
+      - src/features/chat/capabilities
+    DOMAIN_READ_ACCESSIBILITY:
+      - src/features/brand-centre/consumer/brand-current-read.service.ts
+      - src/features/brand-centre/brand-centre.module.ts
+    CHAT_ORCHESTRATION:
+      - src/features/chat/orchestration
+    CHAT_HTTP_API:
+      - src/features/chat/chat.controller.ts
+      - src/features/chat/chat-http.schema.ts
+      - src/features/chat/chat-zod-validation.pipe.ts
+    MODEL_PLANNING_EXTENSION:
+      - src/features/chat/model
+    GROUNDING_RESPONSE_CLASSIFICATION_NAVIGATION:
+      - src/features/chat/response
+      - src/features/chat/capabilities/chat-navigation.registry.ts
+    MODULE_WIRING:
+      - src/features/chat/chat.module.ts
+    TEST:
+      - src/features/chat
+      - src/features/brand-centre/consumer/brand-current-read.service.test.ts
+      - src/features/brand-centre/consumer/canonical-offering-discovery.service.test.ts
+    EXECUTION_LEDGER:
+      - docs/ai-collaboration/chat-home-v1-execution-ledger.yaml
+  unchanged_semantics:
+    intelligence_consumer_contract: true
+    intelligence_current_candidate_separation: true
+    intelligence_readiness_freshness_authority: true
+    product_semantics: true
+    campaign_semantics: true
+    prisma_schema: true
+    accepted_pi_migrations: true
+
+p3_checkpoint:
+  offering_discovery_integration_sha: 1fa5f34f72782b142244e3e8ff0395ae03ff574b
+  implementation_sha: 3c5f5eb8a95ee15901838676e57f1a66118e7c36
+  final_checkpoint_sha: 93aa0c2da61b41415561d7f435c5c062c8b59a51
+  systems_review: ACCEPTED
+  accepted_gate: P3_BACKEND_FIRST_CHAT_SLICE_ACCEPTED
+
+runtime_corrections:
+  - id: P4_HUMAN_GATE_BACKEND_STARTUP_01
+    discovered_during: P4_HUMAN_E2E_GATE
+    classification: PRE_EXISTING_ACTIVE_BASELINE_MODULE_WIRING_RUNTIME_DEFECT
+    resolution_classification: BOUNDED_MODULE_BOUNDARY_RECONCILIATION
+    introduced_by_p3: false
+    starting_committed_sha: 93aa0c2da61b41415561d7f435c5c062c8b59a51
+    correction_sha: 6683c83d86172273d71923d1cf11da392da29368
+    systems_review: ACCEPTED
+    accepted_gate: P4_BACKEND_RUNTIME_RECONCILIATION_ACCEPTED
+    diagnostic:
+      original_scc_size: 8
+      original_scc:
+        - BrandCentreModule
+        - BrandIntelligenceModule
+        - NotificationsModule
+        - BrandSettingsModule
+        - InstagramModule
+        - CreatorSettingsModule
+        - BrandEscrowModule
+        - PricingModule
+      residual_scc_size: 4
+      residual_scc:
+        - BrandCentreModule
+        - BrandIntelligenceModule
+        - NotificationsModule
+        - BrandSettingsModule
+    narrow_boundaries:
+      creator_payout_profile:
+        source_pattern: C05_ACCEPTED
+        module: CreatorPayoutProfileModule
+        single_provider_owner: true
+      instagram_provider_clients:
+        source_pattern: C05_ACCEPTED
+        module: InstagramProviderClientModule
+        oauth_client_single_provider_owner: true
+        graph_client_single_provider_owner: true
+    forward_refs:
+      required:
+        - NotificationsModule -> BrandCentreModule
+        - BrandSettingsModule -> BrandCentreModule
+      preserved_existing:
+        - NotificationsModule -> BrandSettingsModule
+        - BrandSettingsModule -> NotificationsModule
+      rejected_experimental:
+        - BrandEscrowModule -> BrandCentreModule
+        - PricingModule -> BrandCentreModule
+      unexpected_added: false
+    semantic_change:
+      product: false
+      intelligence: false
+      chat: false
+      settings: false
+      escrow: false
+      pricing: false
+      notifications: false
+      instagram_provider: false
+      creator_settings: false
+      campaign: false
+      collaboration: false
+      authorization_policy: false
+    schema_change: false
+    migration_required: false
+    migrations_applied: 66
+    startup:
+      database_classification: LOCAL_DISPOSABLE
+      run_1: PASS
+      run_2: PASS
+      health: PASS
+      health_http_status: 200
+      health_database_status: up
+      scratch_canonical_differential: NONE
+    validation:
+      wiring_test:
+        status: PASS
+        passed: 3
+        failed: 0
+        skipped: 0
+      standard_full_suite:
+        status: PASS
+        attempts: 1
+        passed: 1088
+        failed: 0
+        skipped: 488
+      known_notification_p2002_variance_observed: true
+      prisma_generate: PASS
+      prisma_validate: PASS
+      intelligence_contracts_verify: PASS
+      backend_build: PASS
+      git_diff_check: PASS
+
+p4_backend_runtime_acceptance:
+  status: ACCEPTED
+  gate: P4_BACKEND_RUNTIME_RECONCILIATION_ACCEPTED
+  runtime_sha: 6683c83d86172273d71923d1cf11da392da29368
+  frontend_checkpoint_unchanged: 20b14055017409d1d6b9d972f3a0dfccd79014a7
+  human_gate_status: READY_TO_RESUME
+  p5_authorized: false
+
+future_architecture_debt:
+  - id: BRAND_WORKSPACE_ACCESS_BOUNDARY_COUPLED_TO_BRAND_CENTRE
+    status: NONBLOCKING_FOR_P4
+    description: Notifications, Brand Settings, Escrow, Pricing, Campaign, and Collaboration consume Brand workspace/auth through BrandCentreModule; extraction is not semantics-free because BrandCentreAuthService also performs Brand Centre session activity and eviction.
+  - id: NOTIFICATION_ACCESS_COUPLED_TO_BRAND_SETTINGS
+    status: NONBLOCKING_FOR_P4
+  - id: LEGACY_INSTAGRAM_CREATOR_SETTINGS_COUPLING
+    status: NONBLOCKING_FOR_P4
+  - id: CAMPAIGN_COLLABORATION_SHARED_ACCESS_BOUNDARY
+    status: NONBLOCKING_FOR_P4
+  - id: PRICING_BRAND_SETTINGS_BILLING_READINESS_COUPLING
+    status: LEGITIMATE_CURRENTLY_ACYCLIC
+
+production_shaped_runtime_corrections:
+  - id: P4_CHAT_MODEL_CONTRACT_01
+
+    discovered_during:
+      P4_HUMAN_E2E_H3
+
+    classification:
+      CHAT_MODEL_PROVIDER_OUTPUT_AND_INPUT_CONTRACT_RUNTIME_DEFECT
+
+    introduced_by_p3: true
+
+    failures:
+      - planner_root_array_instead_of_object
+      - capability_specific_required_input_not_materialized
+
+    correction:
+      capability_selection_structured_output: true
+      server_materializability_filter: true
+      capability_specific_input_materialization: true
+      authorized_entity_enum_constraints: true
+      synthesis_structured_output: true
+
+      final_plan_zod_validation_preserved: true
+      final_capability_input_validation_preserved: true
+      final_authorization_preserved: true
+      final_grounding_validation_preserved: true
+
+    semantic_change:
+      product: false
+      capability_catalog: false
+      authorization: false
+      grounding: false
+      persistence: false
+      response_contract: false
+      intelligence: false
+      campaign: false
+      navigation: false
+
+    schema_change: false
+    migration_required: false
+
+    human_gate:
+      status: PAUSED_PENDING_SYSTEMS_REVIEW
+
+p4_current_state:
+  status: ACCEPTED
+  backend_runtime_sha: 1b9ed44b54df13e7357e91f16410b4df549a753c
+  frontend_runtime_sha: 20b14055017409d1d6b9d972f3a0dfccd79014a7
+  frontend_human_evidence_sha: 18e8363ac40b30a9248e6b529b857d3aa20e1fc0
+
+breaker: NONE
+next_phase: P5_B_PROACTIVE_BRAND_HOME_AGGREGATION
+
+p5_a_remaining_canonical_reads_and_navigation:
+  authority: P5_A_REMAINING_CANONICAL_READS_AND_NAVIGATION
+  status: ACCEPTED
+  authorized_starting_sha: 1b9ed44b54df13e7357e91f16410b4df549a753c
+  systems_review:
+    decision: ACCEPT
+    mode: RETROACTIVE
+    accepted_runtime_sha: 0ec9888dd9212cd31e6f46de2ee39ec2ccf586fa
+    reviewed_against_original_p5_a_gate: true
+  checkpoint_governance:
+    created_before_canonical_parent_review: true
+    original_creation_procedurally_premature: true
+    runtime_rejected: false
+    retroactively_adopted: true
+    history_rewrite_required: false
+  scope:
+    capabilities_added:
+      - collaboration.list
+      - collaboration.read
+      - workspace.readiness.read
+      - provider.readiness.read
+    navigation_destinations_added:
+      - COLLABORATIONS
+      - SETTINGS
+      - SETTINGS_INTEGRATIONS
+      - SETTINGS_BILLING
+    descriptor_count: 13
+    execute_capability_count: 0
+  narrow_module_boundaries:
+    collaboration_consumer_module: true
+    brand_settings_consumer_module: true
+    brand_workspace_readiness_module: true
+    chat_imports_full_collaboration_module: false
+    chat_imports_full_brand_settings_module: false
+    new_forward_refs: 0
+    new_scc_detected: false
+  canonical_read_evidence:
+    collaboration_list_read_only: PASS
+    collaboration_exact_read_read_only: PASS
+    workflow_collaboration_id_used: true
+    cross_brand_denial: PASS
+    sensitive_fields_exposed: false
+    collaboration_business_state_mutated: false
+    primary_workspace_state: READY
+    primary_subscription_state: FULL_ACCESS
+    primary_billing_state: READY
+    primary_instagram_state: READY
+    second_brand_instagram_state: ACTION_REQUIRED
+    external_provider_called: false
+    tokens_or_provider_ids_exposed: false
+  planner_and_navigation_evidence:
+    planner_core_algorithm_changed: false
+    collaboration_materializability_added: true
+    collaboration_id_enum_authorized_only: true
+    two_pass_named_collaboration_supported: true
+    unauthorized_collaboration_navigation_rejected: true
+    settings_entity_rejected: true
+  tests:
+    collaboration_consumer:
+      status: PASS
+      passed: 5
+      failed: 0
+    workspace_and_provider_readiness:
+      status: PASS
+      passed: 12
+      failed: 0
+    chat_capability_and_handler:
+      status: PASS
+      passed: 18
+      failed: 0
+    model_gateway:
+      status: PASS
+      passed: 15
+      failed: 0
+    navigation:
+      status: PASS
+      passed: 9
+      failed: 0
+    full_chat_scope:
+      status: PASS
+      passed: 83
+      failed: 0
+      skipped: 12
+    fixture_service_integration:
+      status: PASS
+      passed: 5
+      failed: 0
+  validation:
+    prisma_generate: PASS
+    prisma_validate: PASS
+    changed_scope_lint: PASS
+    changed_scope_lint_file_count: 32
+    repository_lint_baseline:
+      method: DETACHED_WORKTREE_AT_AUTHORIZED_STARTING_SHA
+      sha: 1b9ed44b54df13e7357e91f16410b4df549a753c
+      result: FAIL
+      error_count: 719
+      warning_count: 0
+      affected_file_count: 111
+      prettier_error_count: 719
+      source_writes_or_formatting: false
+    repository_lint_current_tree:
+      result: FAIL
+      error_count: 754
+      warning_count: 0
+      affected_file_count: 117
+      prettier_error_count: 754
+      changed_p5_a_files_with_lint_findings: 0
+    lint_disposition:
+      baseline_repository_formatting_debt_present: true
+      p5_a_changed_scope: PASS
+      p5_a_changed_scope_error_count: 0
+      absolute_repository_count_delta:
+        starting_errors: 719
+        current_errors: 754
+        delta: 35
+        classification: UNRESOLVED_NONCOMPARABLE_AGGREGATE
+        attributable_to_p5_a_changed_files: false
+      unrelated_remediation_authorized: false
+      blocks_p5_a_acceptance: false
+    backend_build: PASS
+    git_diff_check: PASS
+  runtime:
+    nest_initialized: true
+    port: 3000
+    health_http_status: 200
+    database_status: up
+    stable_repeated_probe: PASS
+  fixture_postcheck:
+    database: chat_home_p3_module_boundary_01
+    reference_time: 2026-09-03T06:00:00.000Z
+    fixture_manifest_present: true
+    migration_count_before: 66
+    migration_count_after: 66
+    new_migrations: 0
+    prisma_schema_changed: false
+    second_brand_intelligence_subject_count: 0
+    collaboration_state_preserved: true
+    provider_state_preserved: true
+    subscription_state_preserved: true
+    billing_state_preserved: true
+  semantic_differential:
+    product: UNCHANGED
+    existing_chat_capabilities: UNCHANGED
+    planner_algorithm: UNCHANGED
+    conversation_persistence: UNCHANGED
+    grounding: UNCHANGED
+    campaign: UNCHANGED
+    collaboration_mutations: UNCHANGED
+    settings_mutations: UNCHANGED
+    provider_mutations: UNCHANGED
+    billing: UNCHANGED
+    frontend: UNCHANGED
+    database_schema: UNCHANGED
+  next_phase_authorization:
+    p5_b: true
+    p5_b_started: false
+    p5_c: false
+    p6: false
+  breaker: NONE
+
+p5_b_proactive_brand_home_aggregation:
+  authority: P5_B_PROACTIVE_BRAND_HOME_AGGREGATION
+  status: ACCEPTED
+  accepted_runtime_sha: 75ad00464464d7a2fd5a5ac11a0d2107625a0b09
+  authorized_starting_sha: 8737f3327beeb41c74e3e7f76062d42f4e853153
+  accepted_p5_a_runtime_authority: 0ec9888dd9212cd31e6f46de2ee39ec2ccf586fa
+  systems_review:
+    decision: ACCEPT
+    prior_decision: BOUNDED_CORRECTION_REQUIRED
+    original_candidate_sha: 49566e014795174cb03a826cc05dc6c3a5b10d96
+  correction:
+    id: P5_B_SOURCE_STATE_CONTRACT_01
+    source_freshness_added: true
+    source_observed_at_added: true
+    partial_source_semantics_corrected: true
+  scope:
+    intelligence_consumer_reads: EXISTING_ONLY_NO_CREATE
+    intelligence_write_resolution: CREATE_OR_READ_PRESERVED
+    intelligence_changed_at: MAX_CURRENT_PROMOTED_COMPONENT_GENERATION_CREATED_AT
+    no_current_changed_at: null
+    recommendation_basis_authority: EXECUTED_AUTHORIZED_GROUNDING_RESULT_REFS_ONLY
+    proposals: NON_MUTATING
+    home_endpoint: GET /api/v1/brand/home
+    home_aggregation: REQUEST_TIME_DETERMINISTIC
+    home_persistence_added: false
+    gemini_home_authority: false
+    capability_descriptor_count: 13
+    execute_capability_count: 0
+  intelligence_pure_read_evidence:
+    existing_brand_subject_read_without_write: PASS
+    missing_brand_subject_result: NO_CURRENT
+    missing_brand_subject_created: false
+    existing_offering_subject_read_without_write: PASS
+    missing_offering_subject_result: NO_CURRENT
+    missing_offering_subject_created: false
+    exact_offering_ownership_required: true
+    second_brand_subject_count_before: 0
+    second_brand_subject_count_after: 0
+    object_generation_delta: 0
+    component_generation_delta: 0
+    current_component_delta: 0
+    no_current_contract:
+      object_state: NO_CURRENT
+      consumer_readiness: NOT_READY
+      result_readiness: NOT_READY
+      freshness: UNKNOWN
+      changed_at: null
+  intelligence_metadata:
+    changed_at_added: true
+    definition: MAX_CURRENT_PROMOTED_COMPONENT_GENERATION_CREATED_AT
+    fixture_brand_changed_at: 2026-09-03T04:00:00.000Z
+    fixture_product_changed_at: 2026-09-03T04:30:00.000Z
+  recommendation_validation:
+    unknown_basis_ref_rejected: true
+    non_invoked_basis_ref_rejected: true
+    foreign_unexecuted_basis_ref_rejected: true
+    executed_grounding_basis_accepted: true
+    non_mutating_enforced: true
+    execution_claims_prohibited: true
+  brand_home:
+    contract_version: "1.0"
+    source_state_contract:
+      freshness_required: true
+      observed_at_required: true
+      observed_at_definition: HOME_REQUEST_EVALUATION_TIME
+      canonical_source_freshness: CURRENT_ON_SUCCESS_UNKNOWN_WHEN_UNAVAILABLE
+      provider_health_distinct_from_source_read_state: true
+      no_current_intelligence_state: READY
+      no_current_intelligence_freshness: UNKNOWN
+      stale_last_good_forces_partial: false
+      material_intelligence_partial_propagates: true
+      duplicate_limitations_suppressed: true
+    stable_sections:
+      - NEEDS_ATTENTION
+      - CREATOR_SHOP_HAS_LEARNED
+      - OPPORTUNITIES_NEXT_ACTIONS
+      - CURRENT_MOMENTUM
+    section_order_correct: true
+    priority_tiers:
+      - BLOCKED_FAILED_ACTION_REQUIRED
+      - DEADLINE_SLA_TIME_SENSITIVE
+      - MATERIAL_SETUP_CAPABILITY_BLOCKER
+      - MATERIAL_OPPORTUNITY
+      - NEW_OR_CHANGED_INTELLIGENCE
+      - MEANINGFUL_MOMENTUM
+    priority_is_deterministic_server_logic: true
+    fixed_clock_supported: true
+    duplicate_suppression:
+      attention_suppresses_same_collaboration_momentum: true
+      opportunity_suppresses_duplicate_learned_action: true
+      unrelated_same_entity_items_survive: true
+    bounds:
+      collaborations: 50
+      offerings: 20
+      campaigns: 50
+      product_intelligence: BOUNDED_BY_OFFERINGS
+    partial_source_policy: PRESERVES_OTHER_VALID_SECTIONS
+  fixture_http_evidence:
+    database: chat_home_p3_module_boundary_01
+    reference_clock: 2026-09-03T06:00:00.000Z
+    primary:
+      http_status: 200
+      top_level_status: READY
+      all_source_observed_at: 2026-09-03T06:00:00.000Z
+      brand_intelligence_source_freshness: CURRENT
+      product_intelligence_source_freshness: CURRENT
+      needs_attention: COLLABORATION_ACTION_OVERDUE
+      learned: BRAND_DIFFERENTIATION_CURRENT
+      learned_changed_at: 2026-09-03T04:00:00.000Z
+      opportunity: OFFERING_ACTIONABILITY_CURRENT
+      opportunity_changed_at: 2026-09-03T04:30:00.000Z
+      momentum: CAMPAIGN_LIVE_MOMENTUM
+      momentum_changed_at: 2026-09-03T05:00:00.000Z
+      four_sections_present: true
+      navigation_metadata_valid: true
+    second_brand:
+      http_status: 200
+      top_level_status: READY
+      provider_blocker: INSTAGRAM_REVALIDATION_REQUIRED
+      provider_source_state: READY
+      provider_source_freshness: UNKNOWN
+      brand_intelligence_source_freshness: UNKNOWN
+      product_intelligence_source_freshness: UNKNOWN
+      all_source_observed_at: 2026-09-03T06:00:00.000Z
+      cross_brand_data_present: false
+      intelligence_subject_count_before: 0
+      intelligence_subject_count_after: 0
+  business_read_purity:
+    collaboration_mutated: false
+    uce_collaboration_mutated: false
+    provider_mutated: false
+    subscription_mutated: false
+    billing_mutated: false
+    campaign_mutated: false
+    intelligence_state_mutated_by_read: false
+  external_actions:
+    gemini_home_calls: 0
+    meta_calls: 0
+    razorpay_calls: 0
+    email_calls: 0
+    notification_delivery_calls: 0
+  tests:
+    intelligence_pure_read:
+      status: PASS
+      passed: 7
+      failed: 0
+    intelligence_changed_at:
+      status: PASS
+      passed: 14
+      failed: 0
+    recommendation_validation:
+      status: PASS
+      passed: 13
+      failed: 0
+    home_contract:
+      status: PASS
+      passed: 4
+      failed: 0
+    home_classifier:
+      status: PASS
+      passed: 6
+      failed: 0
+    home_priority_dedup:
+      status: PASS
+      passed: 4
+      failed: 0
+    home_postgresql_http:
+      status: PASS
+      passed: 3
+      failed: 0
+    p5_a_regression:
+      status: PASS
+      passed: 59
+      failed: 0
+    full_chat_scope:
+      status: PASS
+      passed: 88
+      failed: 0
+      skipped: 12
+    standard_full_suite:
+      status: PASS
+      attempts: 1
+      passed: 1164
+      failed: 0
+      skipped: 496
+      notification_variance_observed: false
+    source_state_correction:
+      status: PASS
+      schema_passed: 4
+      aggregation_passed: 6
+      classifier_passed: 6
+      priority_dedup_passed: 4
+      postgresql_http_passed: 3
+      intelligence_pure_read_passed: 4
+      p5_a_regression_passed: 59
+      chat_passed: 88
+      chat_skipped: 12
+  validation:
+    prisma_generate: PASS
+    prisma_validate: PASS
+    intelligence_contracts_verify: PASS
+    intelligence_architecture_commit: bbb0be3345c36e9cc7c4f06ca68fb491b742b83f
+    backend_build: PASS
+    git_diff_check: PASS
+    changed_scope_lint: PASS
+    changed_scope_lint_file_count: 46
+    correction_changed_scope_lint_file_count: 6
+    repository_wide_lint_run: false
+  module_graph:
+    forward_ref_count_before: 7
+    forward_ref_count_after: 7
+    new_forward_refs: 0
+    scc_count_before: 1
+    scc_count_after: 1
+    new_scc_detected: false
+  migrations:
+    count_before: 66
+    count_after: 66
+    new_migrations: 0
+    prisma_schema_changed: false
+  runtime:
+    nest_initialized: true
+    port: 3000
+    health_http_status: 200
+    database_status: up
+    stable_repeated_probe: PASS
+    primary_home_http_status: 200
+    second_brand_home_http_status: 200
+    source_state_correction_reverified: true
+  semantic_differential:
+    product: UNCHANGED
+    p5_a_capabilities: UNCHANGED
+    planner: UNCHANGED
+    authorization: UNCHANGED
+    conversation_persistence: UNCHANGED
+    campaign: UNCHANGED
+    collaboration: UNCHANGED
+    settings: UNCHANGED
+    provider: UNCHANGED
+    billing: UNCHANGED
+    intelligence_product_meaning: UNCHANGED
+    frontend: UNCHANGED
+    database_schema: UNCHANGED
+  next_phase_authorization:
+    p5_b_accepted: true
+    p5_c: true
+    p6: false
+  breaker: NONE
+
+p5_c_production_shaped_backend_real_gemini_acceptance:
+  authority: P5_C_PRODUCTION_SHAPED_BACKEND_REAL_GEMINI_ACCEPTANCE
+  status: PRODUCTION_SHAPED_EVIDENCE_COMPLETE_PENDING_SYSTEMS_ACCEPTANCE
+  accepted_p5_b_runtime: 75ad00464464d7a2fd5a5ac11a0d2107625a0b09
+  final_runtime_candidate: 4beddc4615e97a4872e3e91b9fb3d352c155f5a7
+  credential_block:
+    status: RECOVERED
+    cause: API_KEY_INVALID_FROM_STALE_OR_WRONG_PROCESS_CREDENTIAL
+  credential_recovery:
+    source: ACTIVE_AWS_ECS_TASK_DEFINITION_ENVIRONMENT_ENTRY
+    service_task_context: creatorshop-be-dev-apiclusterCluster/api
+    aws_profile: creator-dev
+    region: ap-south-1
+    injection: PROCESS_ONLY
+    model: gemini-3.5-flash
+    provider_check: PASS
+  git_tracking_block:
+    status: RECOVERED
+    cause: STALE_LOCAL_REMOTE_TRACKING_REF
+    canonical_github_ref_remained_valid: true
+  retained_production_shaped_evidence:
+    r1_collaboration_attention:
+      status: PASS
+      invoked_capabilities:
+        - collaboration.list
+        - collaboration.read
+      permanent_chat_persistence: PASS
+    r2_named_collaboration_read:
+      status: PASS
+      invoked_capabilities:
+        - collaboration.list
+        - collaboration.read
+      collaboration_id: 5f100000-0000-4000-8000-000000000005
+    r3_collaboration_navigation:
+      status: PASS
+      navigation_target: COLLABORATIONS
+      collaboration_id: 5f100000-0000-4000-8000-000000000005
+    r4_workspace_readiness:
+      status: PASS
+      invoked_capability: workspace.readiness.read
+      workspace: READY
+      subscription: FULL_ACCESS
+      billing: READY
+    r5_instagram_readiness:
+      status: PASS
+      invoked_capability: provider.readiness.read
+      provider: INSTAGRAM
+      readiness: READY
+      reconnect_recommendation_present: false
+    r6_settings_navigation:
+      status: PASS
+      navigation_target: SETTINGS_INTEGRATIONS
+      entity_ref_present: false
+    r7_original:
+      status: FAIL
+      failure: RECOMMENDATION_BASIS_REFS_EMPTY
+    r7_architecture_correction:
+      correction_sha: 4beddc4615e97a4872e3e91b9fb3d352c155f5a7
+      canonical_read_fallback_result_refs: true
+      existing_intelligence_semantic_result_refs_unchanged: true
+      recommendation_basis_minimum: 1
+      recommendation_basis_subset_of_executed_authorized_grounding: true
+    r7_corrected:
+      status: PASS
+      recommendation_present: true
+      non_mutating: true
+      basis_ref_count: 2
+      basis_refs_authorized: true
+  r8_non_mutating_proposal:
+    status: PASS
+    conversation_id: 6423a180-04b2-4f5c-98be-f3c7a09565e3
+    conversation_status: ANSWERED
+    http_status: 201
+    planning_passes: 2
+    invoked_capabilities:
+      - collaboration.list
+      - collaboration.read
+    entity_refs:
+      - type: BRAND
+        id: 1af76731-f357-434f-96d3-2a37e5045e96
+      - type: COLLABORATION
+        id: 5f100000-0000-4000-8000-000000000005
+      - type: CAMPAIGN
+        id: 310e6b52-2001-4642-ba8d-d82190aa1ed1
+    grounding_result_refs:
+      - canonical:collaboration.list:f6a12bc1596cd0702b4878ebe52ea78ed36ffd2b839e3db5a0a146679dc4b5b8
+      - canonical:collaboration.read:bfd06766bd034b24a4e2c9fbd23438e2471e6bba4835cfa410725e137ecdfecc
+    recommendation:
+      present: true
+      non_mutating: true
+      basis_refs:
+        - canonical:collaboration.read:bfd06766bd034b24a4e2c9fbd23438e2471e6bba4835cfa410725e137ecdfecc
+    limitations: []
+    freshness_notes:
+      - CURRENT_AS_OF_LAST_UPDATE_2026_09_03T06_00_00Z
+    prepared_overdue_collaboration_represented_truthfully: true
+    execute_capability_used: false
+    provider_action_performed: false
+    execution_claim_present: false
+  campaign_regression:
+    status: PASS
+    conversation_id: f90d1509-2f60-4fc9-ba34-e391d974840a
+    conversation_status: ANSWERED
+    http_status: 201
+    planning_passes: 2
+    invoked_capabilities:
+      - campaign.list
+    grounding_result_refs:
+      - canonical:campaign.list:c68875c0a284d3f8c9e4963d24971382e56303026ed8ee2a4ab5f157a0bb53fe
+    campaign_entity_refs:
+      summer_launch_acceptance: 310e6b52-2001-4642-ba8d-d82190aa1ed1
+      p5_momentum_acceptance_campaign: 5f100000-0000-4000-8000-00000000000f
+    recommendation:
+      present: true
+      non_mutating: true
+      basis_refs:
+        - canonical:campaign.list:c68875c0a284d3f8c9e4963d24971382e56303026ed8ee2a4ab5f157a0bb53fe
+    summer_launch_present: true
+    momentum_campaign_present: true
+    fabricated_campaign: false
+  conversation_persistence:
+    status: PASS
+    conversation_id: 6423a180-04b2-4f5c-98be-f3c7a09565e3
+    reload_http_status: 200
+    user_message_persisted: true
+    assistant_message_persisted: true
+  business_purity:
+    collaboration_mutated: false
+    uce_collaboration_mutated: false
+    provider_mutated: false
+    subscription_mutated: false
+    billing_mutated: false
+    campaign_mutated: false
+    intelligence_mutated: false
+  second_brand_intelligence_pure_read:
+    brand_id: 5f100000-0000-4000-8000-00000000000b
+    intelligence_subject_before: 0
+    intelligence_subject_after: 0
+    object_generation_before: 0
+    object_generation_after: 0
+    object_generation_delta: 0
+    component_generation_before: 0
+    component_generation_after: 0
+    component_generation_delta: 0
+    current_component_before: 0
+    current_component_after: 0
+    current_component_delta: 0
+  external_actions:
+    real_gemini_chat_calls: EXPECTED
+    meta_calls: 0
+    instagram_provider_calls: 0
+    razorpay_calls: 0
+    email_sends: 0
+    notification_deliveries: 0
+    token_refreshes: 0
+  sensitive_log_review:
+    gemini_key_exposed: false
+    jwt_secret_exposed: false
+    acceptance_password_exposed: false
+    provider_token_exposed: false
+    bank_detail_exposed: false
+    digital_access_credential_exposed: false
+    private_collaboration_message_content_exposed: false
+  tests:
+    full_backend_suite:
+      status: PASS
+      attempts: 1
+      test_files_passed: 179
+      test_files_skipped: 42
+      passed: 1173
+      failed: 0
+      skipped: 496
+  validation:
+    prisma_generate: PASS
+    prisma_validate: PASS
+    intelligence_contracts_verify: PASS
+    intelligence_architecture_commit: bbb0be3345c36e9cc7c4f06ca68fb491b742b83f
+    backend_build: PASS
+    git_diff_check: PASS
+  migrations:
+    count_before: 66
+    count_after: 66
+    new_migrations: 0
+    prisma_schema_changed: false
+  capability_architecture_postcheck:
+    descriptor_count: 13
+    execute_capability_count: 0
+    planner_core_algorithm_changed: false
+    new_forward_refs: 0
+    new_scc_detected: false
+  source_freeze:
+    backend_runtime_source_changed: false
+    frontend_changed: false
+    frontend_head: 18e8363ac40b30a9248e6b529b857d3aa20e1fc0
+    ledger_only_change: true
+  systems_acceptance:
+    p5_c_accepted: false
+    p5_backend_full_brand_v1_accepted: false
+    systems_review_ready: true
+  next_phase_authorization:
+    p6: false
+  breaker: NONE
