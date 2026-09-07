@@ -72,9 +72,9 @@ describe("Brand Payouts P0 architecture boundaries", () => {
     expect(runtime).not.toContain("CreatorPayoutReadinessPort");
     expect(runtime).not.toContain("CreatorPayoutProviderPort");
     expect(runtime).not.toContain("CollaborationPayoutInstructionIntakePortV1");
-    expect(runtime).not.toContain("@Post");
-    expect(runtime).not.toContain("approveReserve");
-    expect(runtime).not.toContain("createTransfer");
+    expect(runtime).toContain('@Post("reserve-approvals")');
+    expect(runtime).toContain("approveReserve");
+    expect(runtime).not.toContain("RazorpayRouteAdapter");
   });
 
   it("keeps the current Campaign Manager fallback explicitly fail closed", () => {

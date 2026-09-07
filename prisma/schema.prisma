@@ -1132,6 +1132,74 @@ enum CreatorPayoutObligationStatus {
   REVERSED
 }
 
+enum FinancialReserveApprovalStatus {
+  APPROVED_AWAITING_EXECUTION
+  EXECUTING
+  AWAITING_FUNDS
+  ACTION_REQUIRED
+  COMPLETED
+  SUPERSEDED
+}
+
+enum FinancialReserveExecutionOutcome {
+  CLAIMED
+  SUCCEEDED
+  SHORTFALL
+  RETRYABLE_FAILURE
+  TERMINAL_FAILURE
+  SUPERSEDED
+}
+
+enum PayoutObligationProvenanceMode {
+  LEGACY_UNRECONCILED
+  CANONICAL_C04
+}
+
+enum PayoutObligationLifecycle {
+  SCHEDULED
+  READY_QUEUED
+  PROCESSING
+  SETTLED
+  FAILED_RETRYABLE
+  ACTION_REQUIRED
+  LEGACY_UNRECONCILED
+}
+
+enum PayoutObligationGate {
+  NOT_YET_DUE
+  CREATOR_SETUP_REQUIRED
+  UNSUPPORTED_GEOGRAPHY_OR_RAIL
+  FUNDING_REQUIRED
+  RESOLUTION_BLOCKED
+  PROVIDER_UNAVAILABLE
+  READY
+}
+
+enum PayoutTransferSnapshotMode {
+  LEGACY_UNRECONCILED
+  CURRENT_C05
+}
+
+enum PayoutTransferDisposition {
+  SUCCEEDED
+  RETRYABLE_FAILURE
+  TERMINAL_FAILURE
+  AMBIGUOUS_RECONCILIATION_REQUIRED
+}
+
+enum PayoutReceiptEntityType {
+  TRANSFER_ATTEMPT
+  OBLIGATION
+}
+
+enum PayoutReceiptEventClass {
+  TRANSFER_ACCEPTED
+  TRANSFER_PROCESSED
+  TRANSFER_FAILED
+  TRANSFER_HELD
+  SETTLEMENT_RECORDED
+}
+
 enum RouteTransferState {
   CREATED
   PENDING
@@ -4350,6 +4418,7 @@ model CollaborationReserveInstruction {
   supersededBy                   CollaborationReserveInstruction[]            @relation("ReserveInstructionSupersession")
   trustedConfirmations           CollaborationTrustedConfirmation[]
   financialAuthorityInstructions CollaborationFinancialAuthorityInstruction[]
+  payoutReserveApproval          FinancialReserveApproval?
 
   @@unique([collaborationId, instructionVersion], map: "c04_reserve_collab_version_key")
   @@unique([collaborationId, idempotencyKey], map: "c04_reserve_collab_idempotency_key")
@@ -4387,6 +4456,7 @@ model CollaborationFinancialAuthorityInstruction {
   fundingConfirmation      CollaborationTrustedConfirmation?            @relation(fields: [fundingConfirmationId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "c04_entitlement_confirmation_fk")
   reserveInstructionId     String?                                      @map("reserve_instruction_id")
   reserveInstruction       CollaborationReserveInstruction?             @relation(fields: [reserveInstructionId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "c04_entitlement_reserve_fk")
+  payoutObligation         CreatorPayoutObligation?
 
   @@unique([collaborationId, kind, instructionVersion], map: "c04_financial_collab_kind_version_key")
   @@index([commercialAgreementId], map: "c04_financial_agreement_idx")
@@ -4737,6 +4807,7 @@ model CollaborationTrustedConfirmation {
   lineageAppliedAt               DateTime?                                        @map("lineage_applied_at")
   applicationState               CollaborationFundingConfirmationApplicationState @default(LEGACY_APPLIED) @map("application_state")
   financialAuthorityInstructions CollaborationFinancialAuthorityInstruction[]
+  payoutReserveApproval          FinancialReserveApproval?
 
   @@unique([confirmationType, confirmationId])
   @@index([collaborationId, appliedAt])
@@ -5098,35 +5169,58 @@ model CreatorPayoutProfile {
 }
 
 model CreatorPayoutObligation {
-  id                      String                           @id @default(uuid()) @map("obligation_id")
-  settlementInstructionId String                           @unique @map("settlement_instruction_id")
-  collaborationId         String                           @map("collaboration_id")
-  collaboration           Collaboration                    @relation(fields: [collaborationId], references: [id], onDelete: Restrict)
-  vaultId                 String                           @map("vault_id")
-  vault                   BrandEscrowVault                 @relation(fields: [vaultId], references: [id], onDelete: Restrict)
-  brandProfileId          String                           @map("brand_id")
-  brandProfile            BrandProfile                     @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
-  creatorProfileId        String                           @map("creator_profile_id")
-  creatorProfile          CreatorProfile                   @relation(fields: [creatorProfileId], references: [id], onDelete: Restrict)
-  payoutProfileId         String                           @map("payout_profile_id")
-  payoutProfile           CreatorPayoutProfile             @relation(fields: [payoutProfileId], references: [id], onDelete: Restrict)
-  obligationType          CreatorPayoutObligationType      @map("obligation_type")
-  entitlementAmount       Decimal                          @map("entitlement_amount") @db.Decimal(15, 4)
-  currency                String                           @db.VarChar(3)
-  status                  CreatorPayoutObligationStatus    @default(ELIGIBLE)
-  instructionIssuedAt     DateTime                         @map("instruction_issued_at")
-  paymentDueAt            DateTime?                        @map("payment_due_at")
-  blockedReason           String?                          @map("blocked_reason") @db.VarChar(100)
-  settledAt               DateTime?                        @map("settled_at")
-  terminalAt              DateTime?                        @map("terminal_at")
-  createdAt               DateTime                         @default(now()) @map("created_at")
-  updatedAt               DateTime                         @updatedAt @map("updated_at")
-  transfers               RouteTransferAttempt[]
-  fundingAllocations      CreatorPayoutFundingAllocation[]
+  id                          String                                      @id @default(uuid()) @map("obligation_id")
+  settlementInstructionId     String                                      @unique @map("settlement_instruction_id")
+  collaborationId             String                                      @map("collaboration_id")
+  collaboration               Collaboration                               @relation(fields: [collaborationId], references: [id], onDelete: Restrict)
+  vaultId                     String                                      @map("vault_id")
+  vault                       BrandEscrowVault                            @relation(fields: [vaultId], references: [id], onDelete: Restrict)
+  brandProfileId              String                                      @map("brand_id")
+  brandProfile                BrandProfile                                @relation(fields: [brandProfileId], references: [id], onDelete: Restrict)
+  creatorProfileId            String                                      @map("creator_profile_id")
+  creatorProfile              CreatorProfile                              @relation(fields: [creatorProfileId], references: [id], onDelete: Restrict)
+  payoutProfileId             String                                      @map("payout_profile_id")
+  payoutProfile               CreatorPayoutProfile                        @relation(fields: [payoutProfileId], references: [id], onDelete: Restrict)
+  obligationType              CreatorPayoutObligationType                 @map("obligation_type")
+  entitlementAmount           Decimal                                     @map("entitlement_amount") @db.Decimal(15, 4)
+  currency                    String                                      @db.VarChar(3)
+  status                      CreatorPayoutObligationStatus               @default(ELIGIBLE)
+  instructionIssuedAt         DateTime                                    @map("instruction_issued_at")
+  paymentDueAt                DateTime?                                   @map("payment_due_at")
+  blockedReason               String?                                     @map("blocked_reason") @db.VarChar(100)
+  settledAt                   DateTime?                                   @map("settled_at")
+  terminalAt                  DateTime?                                   @map("terminal_at")
+  createdAt                   DateTime                                    @default(now()) @map("created_at")
+  updatedAt                   DateTime                                    @updatedAt @map("updated_at")
+  provenanceMode              PayoutObligationProvenanceMode              @default(LEGACY_UNRECONCILED) @map("provenance_mode")
+  authorityInstructionId      String?                                     @unique(map: "bp_m1_obligation_authority_key") @map("authority_instruction_id")
+  authorityInstruction        CollaborationFinancialAuthorityInstruction? @relation(fields: [authorityInstructionId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "bp_m1_obligation_authority_fk")
+  authorityInstructionKind    String?                                     @map("authority_instruction_kind") @db.VarChar(48)
+  authorityInstructionVersion Int?                                        @map("authority_instruction_version")
+  authorityInstructionHash    String?                                     @map("authority_instruction_hash") @db.Char(64)
+  commercialAgreementId       String?                                     @map("commercial_agreement_id")
+  agreementVersion            Int?                                        @map("agreement_version")
+  agreementHash               String?                                     @map("agreement_hash") @db.Char(64)
+  reserveInstructionId        String?                                     @map("reserve_instruction_id")
+  fundingConfirmationId       String?                                     @map("funding_confirmation_id")
+  intakeRecordedAt            DateTime?                                   @map("intake_recorded_at")
+  settlementEligibleAt        DateTime?                                   @map("settlement_eligible_at")
+  paymentTermSnapshot         UcePayoutTerms?                             @map("payment_term_snapshot")
+  dueRuleVersion              String?                                     @map("due_rule_version") @db.VarChar(40)
+  dueEvidenceRecordedAt       DateTime?                                   @map("due_evidence_recorded_at")
+  lifecycle                   PayoutObligationLifecycle?
+  currentGate                 PayoutObligationGate?                       @map("current_gate")
+  amountSettled               Decimal                                     @default(0) @map("amount_settled") @db.Decimal(15, 4)
+  amountOutstanding           Decimal?                                    @map("amount_outstanding") @db.Decimal(15, 4)
+  transfers                   RouteTransferAttempt[]
+  fundingAllocations          CreatorPayoutFundingAllocation[]
+  reconciledReceipts          PayoutReconciledReceipt[]
 
   @@index([brandProfileId, status, createdAt])
   @@index([collaborationId, status])
   @@index([creatorProfileId, status])
+  @@index([lifecycle, currentGate, paymentDueAt, id], map: "bp_m1_obligation_due_work_idx")
+  @@index([collaborationId, commercialAgreementId, authorityInstructionVersion], map: "bp_m1_obligation_authority_lookup_idx")
   @@map("creator_payout_obligations")
 }
 
@@ -5150,36 +5244,139 @@ model CreatorPayoutFundingAllocation {
 }
 
 model RouteTransferAttempt {
-  id                  String                  @id @default(uuid()) @map("transfer_attempt_id")
-  obligationId        String                  @map("obligation_id")
-  obligation          CreatorPayoutObligation @relation(fields: [obligationId], references: [id], onDelete: Restrict)
-  attemptSequence     Int                     @map("attempt_sequence")
-  profileStateVersion Int                     @map("profile_state_version")
-  provider            String                  @default("RAZORPAY_ROUTE") @db.VarChar(40)
-  idempotencyKey      String                  @unique @map("idempotency_key")
-  transferId          String?                 @unique @map("transfer_id")
-  amount              Decimal                 @db.Decimal(15, 4)
-  currency            String                  @db.VarChar(3)
-  state               RouteTransferState      @default(CREATED)
-  settlementState     RouteSettlementState    @default(PENDING) @map("settlement_state")
-  onHold              Boolean                 @default(false) @map("on_hold")
-  onHoldUntil         DateTime?               @map("on_hold_until")
-  providerState       String?                 @map("provider_state") @db.VarChar(100)
-  settlementId        String?                 @unique @map("settlement_id")
-  diagnosticPayload   Json?                   @map("diagnostic_payload")
-  initiatedAt         DateTime                @default(now()) @map("initiated_at")
-  providerAcceptedAt  DateTime?               @map("provider_accepted_at")
-  processedAt         DateTime?               @map("processed_at")
-  releasedAt          DateTime?               @map("released_at")
-  settledAt           DateTime?               @map("settled_at")
-  failedAt            DateTime?               @map("failed_at")
-  createdAt           DateTime                @default(now()) @map("created_at")
-  updatedAt           DateTime                @updatedAt @map("updated_at")
-  reversals           RouteTransferReversal[]
+  id                          String                     @id @default(uuid()) @map("transfer_attempt_id")
+  obligationId                String                     @map("obligation_id")
+  obligation                  CreatorPayoutObligation    @relation(fields: [obligationId], references: [id], onDelete: Restrict)
+  attemptSequence             Int                        @map("attempt_sequence")
+  profileStateVersion         Int                        @map("profile_state_version")
+  provider                    String                     @default("RAZORPAY_ROUTE") @db.VarChar(40)
+  idempotencyKey              String                     @unique @map("idempotency_key")
+  transferId                  String?                    @unique @map("transfer_id")
+  amount                      Decimal                    @db.Decimal(15, 4)
+  currency                    String                     @db.VarChar(3)
+  state                       RouteTransferState         @default(CREATED)
+  settlementState             RouteSettlementState       @default(PENDING) @map("settlement_state")
+  onHold                      Boolean                    @default(false) @map("on_hold")
+  onHoldUntil                 DateTime?                  @map("on_hold_until")
+  providerState               String?                    @map("provider_state") @db.VarChar(100)
+  settlementId                String?                    @unique @map("settlement_id")
+  diagnosticPayload           Json?                      @map("diagnostic_payload")
+  initiatedAt                 DateTime                   @default(now()) @map("initiated_at")
+  providerAcceptedAt          DateTime?                  @map("provider_accepted_at")
+  processedAt                 DateTime?                  @map("processed_at")
+  releasedAt                  DateTime?                  @map("released_at")
+  settledAt                   DateTime?                  @map("settled_at")
+  failedAt                    DateTime?                  @map("failed_at")
+  createdAt                   DateTime                   @default(now()) @map("created_at")
+  updatedAt                   DateTime                   @updatedAt @map("updated_at")
+  reversals                   RouteTransferReversal[]
+  snapshotMode                PayoutTransferSnapshotMode @default(LEGACY_UNRECONCILED) @map("snapshot_mode")
+  destinationId               String?                    @map("destination_id")
+  destinationVersion          Int?                       @map("destination_version")
+  providerMappingId           String?                    @map("provider_mapping_id")
+  mappingProvider             String?                    @map("mapping_provider") @db.VarChar(40)
+  readinessCheckedAt          DateTime?                  @map("readiness_checked_at")
+  destinationCountrySnapshot  String?                    @map("destination_country_snapshot") @db.Char(2)
+  destinationCurrencySnapshot String?                    @map("destination_currency_snapshot") @db.Char(3)
+  queuedAt                    DateTime?                  @map("queued_at")
+  executionStartedAt          DateTime?                  @map("execution_started_at")
+  providerRequestCompletedAt  DateTime?                  @map("provider_request_completed_at")
+  failureRecordedAt           DateTime?                  @map("failure_recorded_at")
+  finalDisposition            PayoutTransferDisposition? @map("final_disposition")
+  finalDispositionRecordedAt  DateTime?                  @map("final_disposition_recorded_at")
+  finalReasonCode             String?                    @map("final_reason_code") @db.VarChar(80)
+  reconciledReceipts          PayoutReconciledReceipt[]
 
   @@unique([obligationId, attemptSequence])
   @@index([obligationId, state, createdAt])
+  @@index([finalDisposition, queuedAt, id], map: "bp_m1_transfer_work_idx")
+  @@index([destinationId, destinationVersion, providerMappingId], map: "bp_m1_transfer_destination_lookup_idx")
   @@map("route_transfer_attempts")
+}
+
+model FinancialReserveApproval {
+  id                          String                             @id @default(uuid())
+  reserveInstructionId        String                             @unique(map: "bp_m1_reserve_instruction_key") @map("reserve_instruction_id")
+  reserveInstruction          CollaborationReserveInstruction    @relation(fields: [reserveInstructionId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "bp_m1_reserve_instruction_fk")
+  requestId                   String                             @unique(map: "bp_m1_reserve_request_key") @map("request_id")
+  collaborationId             String                             @map("collaboration_id")
+  commercialAgreementId       String                             @map("commercial_agreement_id")
+  brandProfileId              String                             @map("brand_profile_id")
+  instructionVersion          Int                                @map("instruction_version")
+  instructionHash             String                             @map("instruction_hash") @db.Char(64)
+  agreementVersion            Int                                @map("agreement_version")
+  agreementHash               String                             @map("agreement_hash") @db.Char(64)
+  creatorFee                  Decimal                            @map("creator_fee") @db.Decimal(14, 2)
+  platformCommissionAmount    Decimal                            @map("platform_commission_amount") @db.Decimal(14, 2)
+  platformCommissionGstAmount Decimal                            @map("platform_commission_gst_amount") @db.Decimal(14, 2)
+  approvedReserveAmount       Decimal                            @map("approved_reserve_amount") @db.Decimal(14, 2)
+  currency                    String                             @db.VarChar(3)
+  requestedByUserId           String                             @map("requested_by_user_id")
+  requestedByMembershipId     String                             @map("requested_by_membership_id")
+  requestedByRole             BrandRole                          @map("requested_by_role")
+  requestedAt                 DateTime                           @map("requested_at")
+  requesterObservedAt         DateTime                           @map("requester_observed_at")
+  approvedByUserId            String                             @map("approved_by_user_id")
+  approvedByMembershipId      String                             @map("approved_by_membership_id")
+  approvedByRole              BrandRole                          @map("approved_by_role")
+  approvedAt                  DateTime                           @default(now()) @map("approved_at")
+  status                      FinancialReserveApprovalStatus     @default(APPROVED_AWAITING_EXECUTION)
+  stateVersion                Int                                @default(0) @map("state_version")
+  idempotencyKey              String                             @map("idempotency_key")
+  executionStartedAt          DateTime?                          @map("execution_started_at")
+  executionCompletedAt        DateTime?                          @map("execution_completed_at")
+  executionFailedAt           DateTime?                          @map("execution_failed_at")
+  failureCode                 String?                            @map("failure_code") @db.VarChar(80)
+  escrowLockId                String?                            @unique(map: "bp_m1_reserve_escrow_lock_key") @map("escrow_lock_id")
+  ledgerTransactionId         String?                            @unique(map: "bp_m1_reserve_ledger_key") @map("ledger_transaction_id")
+  trustedConfirmationId       String?                            @unique(map: "bp_m1_reserve_confirmation_key") @map("trusted_confirmation_id")
+  trustedConfirmation         CollaborationTrustedConfirmation?  @relation(fields: [trustedConfirmationId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "bp_m1_reserve_confirmation_fk")
+  createdAt                   DateTime                           @default(now()) @map("created_at")
+  updatedAt                   DateTime                           @updatedAt @map("updated_at")
+  attempts                    FinancialReserveExecutionAttempt[]
+
+  @@unique([brandProfileId, idempotencyKey], map: "bp_m1_reserve_brand_idempotency_key")
+  @@index([status, updatedAt, id], map: "bp_m1_reserve_claim_idx")
+  @@index([brandProfileId, status, createdAt], map: "bp_m1_reserve_brand_status_idx")
+  @@index([collaborationId], map: "bp_m1_reserve_collaboration_idx")
+  @@map("financial_reserve_approvals")
+}
+
+model FinancialReserveExecutionAttempt {
+  id              String                           @id @default(uuid())
+  approvalId      String                           @map("approval_id")
+  approval        FinancialReserveApproval         @relation(fields: [approvalId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "bp_m1_attempt_approval_fk")
+  attemptSequence Int                              @map("attempt_sequence")
+  claimToken      String                           @unique(map: "bp_m1_attempt_claim_key") @map("claim_token")
+  leaseExpiresAt  DateTime                         @map("lease_expires_at")
+  outcome         FinancialReserveExecutionOutcome @default(CLAIMED)
+  failureCode     String?                          @map("failure_code") @db.VarChar(80)
+  startedAt       DateTime                         @default(now()) @map("started_at")
+  completedAt     DateTime?                        @map("completed_at")
+  createdAt       DateTime                         @default(now()) @map("created_at")
+
+  @@unique([approvalId, attemptSequence], map: "bp_m1_attempt_approval_sequence_key")
+  @@index([outcome, leaseExpiresAt, approvalId], map: "bp_m1_attempt_lease_idx")
+  @@map("financial_reserve_execution_attempts")
+}
+
+model PayoutReconciledReceipt {
+  id                 String                  @id @default(uuid())
+  dedupeIdentity     String                  @unique @map("dedupe_identity")
+  entityType         PayoutReceiptEntityType @map("entity_type")
+  eventClass         PayoutReceiptEventClass @map("event_class")
+  transferAttemptId  String                  @map("transfer_attempt_id")
+  transferAttempt    RouteTransferAttempt    @relation(fields: [transferAttemptId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "bp_m1_receipt_transfer_fk")
+  obligationId       String                  @map("obligation_id")
+  obligation         CreatorPayoutObligation @relation(fields: [obligationId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "bp_m1_receipt_obligation_fk")
+  receivedAt         DateTime                @map("received_at")
+  providerOccurredAt DateTime?               @map("provider_occurred_at")
+  reconciledAt       DateTime                @map("reconciled_at")
+  createdAt          DateTime                @default(now()) @map("created_at")
+
+  @@index([transferAttemptId, receivedAt, id], map: "bp_m1_receipt_transfer_time_idx")
+  @@index([obligationId, receivedAt, id], map: "bp_m1_receipt_obligation_time_idx")
+  @@map("payout_reconciled_receipts")
 }
 
 model RouteTransferReversal {

@@ -88,6 +88,7 @@ import { CreatorTeamModule } from "../creator-settings/team/creator-team.module"
     CollaborationSettlementService,
     CollaborationFeedbackService,
     CollaborationService,
+    CollaborationTrustedConfirmationService,
   ],
 })
 export class CollaborationModule {}

@@ -1,11 +1,13 @@
 import {
   Controller,
+  Body,
   ForbiddenException,
   Get,
   Headers,
   Inject,
   NotAcceptableException,
   Param,
+  Post,
   Query,
   Req,
   Res,
@@ -27,12 +29,14 @@ import {
   BrandPayoutsObligationsQueryDto,
   BrandPayoutsReserveRequestsQueryDto,
 } from "./dto/brand-payouts-query.dto";
+import { parseApproveReserveCommand } from "./dto/brand-payouts-command.dto";
 import {
   BRAND_PAYOUTS_QUERY_PORT_V2,
   type BrandPayoutsQueryPortV2,
 } from "./ports/brand-payouts-read.port";
 import { BrandPayoutsAuthorizationService } from "./services/brand-payouts-authorization.service";
 import { BrandPayoutsService } from "./services/brand-payouts.service";
+import { FinancialReserveService } from "./services/financial-reserve.service";
 
 @Controller("api/v1/brand/payouts")
 @UseGuards(ThrottlerGuard, JwtAuthGuard)
@@ -42,7 +46,23 @@ export class BrandPayoutsController {
     private readonly authorization: BrandPayoutsAuthorizationService,
     @Inject(BRAND_PAYOUTS_QUERY_PORT_V2)
     private readonly payouts: BrandPayoutsQueryPortV2,
+    private readonly reserveCommands?: FinancialReserveService,
   ) {}
+
+  @Post("reserve-approvals")
+  async approveReserve(
+    @Req() req: RequestWithAuthUser,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    if (!this.reserveCommands)
+      throw new Error("Reserve command service unavailable");
+    return this.reserveCommands.approveAndExecute(
+      req.user,
+      parseApproveReserveCommand(body),
+    );
+  }
 
   @Get()
   async getPayoutsHub(
