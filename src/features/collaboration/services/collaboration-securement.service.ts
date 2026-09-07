@@ -185,11 +185,20 @@ export class CollaborationSecurementService {
           },
         });
       }
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`c04-reserve:${collaborationId}`}, 0))`;
+      const priorInstruction = await tx.collaborationReserveInstruction.findFirst({
+        where: {
+          collaborationId,
+          commercialAgreementId: agreement.id,
+          supersededBy: { none: {} },
+        },
+        orderBy: { instructionVersion: "desc" },
+        select: { id: true, instructionVersion: true, trustedConfirmations: { where: { applicationState: "APPLIED" }, select: { id: true }, take: 1 } },
+      });
+      if (priorInstruction?.trustedConfirmations.length)
+        commandConflict("INVALID_STATE", "A completed reserve instruction cannot be superseded", row.aggregateVersion);
       const instructionId = randomUUID();
-      const instructionVersion =
-        (await tx.collaborationReserveInstruction.count({
-          where: { collaborationId },
-        })) + 1;
+      const instructionVersion = (priorInstruction?.instructionVersion ?? 0) + 1;
       const instructionHash = financialAuthorityHash({
         instructionId,
         instructionVersion,
@@ -230,9 +239,12 @@ export class CollaborationSecurementService {
           requestedByUserId: user.id,
           status: "REQUESTED",
           idempotencyKey: input.commandId,
+          supersedesInstructionId: priorInstruction?.id,
         },
       });
       if (
+        (row.authorityVersion === "CANONICAL_V1" &&
+          agreement.paymentRail === "PLATFORM_ESCROW") ||
         this.brandWorkspace.isFinancialReadOnly(brandContext.membership.role)
       ) {
         const version = row.aggregateVersion + 1;
@@ -352,6 +364,7 @@ export class CollaborationSecurementService {
     actor: TrustedFundingConfirmationActor,
     collaborationId: string,
     raw: unknown,
+    transactionClient?: Prisma.TransactionClient,
   ) {
     if (actor.actorClass !== CollaborationActorClass.SYSTEM) {
       unauthorizedActor("Escrow confirmation requires a trusted SYSTEM path");
@@ -362,7 +375,7 @@ export class CollaborationSecurementService {
       aggregateVersion: number;
       securementState: CollaborationSecurementState;
     };
-    await this.prisma.$transaction(async (tx) => {
+    const apply = async (tx: Prisma.TransactionClient) => {
       if (
         await replayOrThrow(
           tx,
@@ -495,9 +508,16 @@ export class CollaborationSecurementService {
           ? CollaborationSecurementState.COMPLETED
           : CollaborationSecurementState.PROCESSING_FUNDING,
       };
-    });
-    void this.realtime.broadcast(collaborationId, "thread.updated");
+    };
+    if (transactionClient) await apply(transactionClient);
+    else await this.prisma.$transaction(apply);
+    if (!transactionClient)
+      void this.realtime.broadcast(collaborationId, "thread.updated");
     return { collaborationId, ...response };
+  }
+
+  async broadcastConfirmationApplied(collaborationId: string) {
+    await this.realtime.broadcast(collaborationId, "thread.updated");
   }
 
   reportManualPayment(user: AuthUser, collaborationId: string, raw: unknown) {
