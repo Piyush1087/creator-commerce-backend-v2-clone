@@ -1,11 +1,8 @@
 import { Module } from "@nestjs/common";
 
-
-
 import { AuthModule } from "../auth/auth.module";
 
 import { CreatorCentreModule } from "../creator-centre/creator-centre.module";
-
 import { CreatorEntryModule } from "../creator-entry/creator-entry.module";
 
 import { CreatorSettingsModule } from "../creator-settings/creator-settings.module";
@@ -34,12 +31,8 @@ import { CreatorCoPilotUsageService } from "./services/creator-co-pilot-usage.se
 
 import { CreatorCoPilotToolsService } from "./tools/creator-centre.tools";
 
-
-
 @Module({
-
   imports: [
-
     PrismaModule,
 
     AuthModule,
@@ -47,15 +40,12 @@ import { CreatorCoPilotToolsService } from "./tools/creator-centre.tools";
     CreatorSettingsModule,
 
     CreatorCentreModule,
-
     CreatorEntryModule,
-
   ],
 
   controllers: [CreatorCoPilotController],
 
   providers: [
-
     CreatorCoPilotThreadService,
 
     CreatorCoPilotOrchestratorService,
@@ -75,13 +65,8 @@ import { CreatorCoPilotToolsService } from "./tools/creator-centre.tools";
     CreatorCoPilotToolsService,
 
     GeminiJsonClient,
-
   ],
 
   exports: [CreatorCoPilotThreadService, CreatorCoPilotOrchestratorService],
-
 })
-
 export class CreatorCoPilotModule {}
-
-

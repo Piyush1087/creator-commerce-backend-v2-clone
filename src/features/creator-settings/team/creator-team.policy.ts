@@ -35,7 +35,10 @@ const OWNER_ACTIONS: readonly CreatorWorkspaceAction[] =
   CREATOR_WORKSPACE_ACTIONS;
 
 const MANAGER_ACTIONS: readonly CreatorWorkspaceAction[] = OWNER_ACTIONS;
-const ASSISTANT_ACTIONS: readonly CreatorWorkspaceAction[] = [];
+const ASSISTANT_ACTIONS: readonly CreatorWorkspaceAction[] = [
+  "CAMPAIGN_OPPORTUNITY_VIEW",
+  "CAMPAIGN_APPLICATION_APPLY",
+];
 
 export function creatorWorkspaceActionsForRole(
   role: CreatorWorkspaceActorRole,

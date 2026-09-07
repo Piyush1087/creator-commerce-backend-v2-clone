@@ -19,7 +19,7 @@ describe.skipIf(process.env.BS08_DATABASE_TEST !== "true")(
       }
 
       const organization = await prisma.organization.create({
-        data: { name: "BS08 Lifecycle Workspace" },
+        data: { name: "BS08 Lifecycle Workspace", kind: "BRAND" },
       });
       organizationId = organization.id;
       const brand = await prisma.brandProfile.create({

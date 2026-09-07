@@ -1,0 +1,379 @@
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma, UceBriefStatus, UceCampaignAssetStatus } from "@prisma/client";
+import { z } from "zod";
+
+import { PrismaService } from "../../../prisma/prisma.service";
+import {
+  storedCanonicalBriefPublishSchema,
+  validateCanonicalDeliverableGraph,
+} from "../schemas/canonical-campaign-brief.schema";
+
+const storedDefinitionSchema = z
+  .object({
+    version: z.literal("1.2"),
+    creationSource: z.enum(["MANUAL", "AI_RECOMMENDED"]),
+    strategy: z
+      .object({
+        platforms: z.array(z.enum(["INSTAGRAM", "TIKTOK", "YOUTUBE"])).min(1),
+        campaign_visibility: z.enum([
+          "PUBLIC",
+          "ELIGIBLE_CREATORS_ONLY",
+          "INVITE_ONLY",
+        ]),
+      })
+      .passthrough(),
+    targeting: z.record(z.unknown()),
+    commercials: z
+      .object({
+        compensation_model: z.enum(["FIXED", "NEGOTIABLE"]),
+        receives_brand_support: z.boolean(),
+        brand_support_type: z
+          .enum([
+            "PRODUCT",
+            "SERVICE",
+            "EXPERIENCE",
+            "ACCESS_SUBSCRIPTION",
+            "OTHER",
+          ])
+          .optional()
+          .nullable(),
+        brand_support_estimated_value: z
+          .number()
+          .finite()
+          .min(0)
+          .optional()
+          .nullable(),
+        commercial_offer: z.number().finite().min(0),
+        total_campaign_budget: z.number().finite().min(0),
+      })
+      .passthrough(),
+    derived: z.object({ currency: z.enum(["INR", "USD"]) }).passthrough(),
+  })
+  .passthrough()
+  .superRefine((value, ctx) => {
+    if (
+      !value.commercials.receives_brand_support &&
+      (value.commercials.brand_support_type != null ||
+        value.commercials.brand_support_estimated_value != null)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["commercials", "receives_brand_support"],
+        message: "Brand-support values must be empty when support is disabled.",
+      });
+    }
+    if (
+      value.commercials.receives_brand_support &&
+      !value.commercials.brand_support_type
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["commercials", "brand_support_type"],
+        message: "Brand support type is required.",
+      });
+    }
+    if (
+      value.commercials.total_campaign_budget <
+      value.commercials.commercial_offer
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["commercials", "total_campaign_budget"],
+        message: "Campaign budget is lower than the commercial offer.",
+      });
+    }
+  });
+
+const campaignApplicationReadInclude =
+  Prisma.validator<Prisma.UceCampaignInclude>()({
+    brandProfile: {
+      select: { name: true, description: true, logoUrl: true, domain: true },
+    },
+    strategy: true,
+    targeting: true,
+    commercials: true,
+    assets: {
+      orderBy: { createdAt: "asc" },
+      include: {
+        offering: {
+          select: { name: true, description: true, imageUrl: true, url: true },
+        },
+        brandOffer: {
+          select: { offerName: true, description: true, entityLink: true },
+        },
+        canonicalBriefs: {
+          orderBy: { createdAt: "asc" },
+          include: {
+            deliverables: {
+              orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+            },
+          },
+        },
+      },
+    },
+  });
+
+type CompleteCampaignApplicationReadRow = Prisma.UceCampaignGetPayload<{
+  include: typeof campaignApplicationReadInclude;
+}>;
+type CompleteAssetRead = CompleteCampaignApplicationReadRow["assets"][number];
+type CampaignApplicationReadRow = Omit<
+  CompleteCampaignApplicationReadRow,
+  "brandProfile" | "assets"
+> & {
+  brandProfile?: CompleteCampaignApplicationReadRow["brandProfile"];
+  assets: Array<
+    Omit<CompleteAssetRead, "offering" | "brandOffer"> & {
+      offering?: Partial<NonNullable<CompleteAssetRead["offering"]>> | null;
+      brandOffer?: Partial<NonNullable<CompleteAssetRead["brandOffer"]>> | null;
+    }
+  >;
+};
+
+export type CanonicalBriefReadinessInput = {
+  status: UceBriefStatus;
+  briefName: string | null;
+  creativeIntent: string | null;
+  creatorBrief: string | null;
+  briefType: "CREATOR_LED" | "BRAND_LED" | null;
+  platform: "INSTAGRAM" | "TIKTOK" | "YOUTUBE" | null;
+  briefLevelGuidance: unknown;
+  referenceContent: unknown;
+  usageRights: unknown;
+  creatorRequirements: string | null;
+  deliverables: Array<{
+    id: string;
+    format: "REEL_VIDEO" | "STORY" | "PHOTOSHOOT" | "BANNER_CAROUSEL" | null;
+    displayOrder: number | null;
+    configuration: unknown;
+    creativeGuidance: unknown;
+    amplifyTargetDeliverableId: string | null;
+  }>;
+};
+
+export function resolveCanonicalBriefReadiness(
+  brief: CanonicalBriefReadinessInput,
+) {
+  if (brief.status !== UceBriefStatus.PUBLISHED) {
+    return { ready: false as const, reason: "BRIEF_NOT_PUBLISHED" as const };
+  }
+  const parsed = storedCanonicalBriefPublishSchema.safeParse(brief);
+  if (!parsed.success) {
+    return {
+      ready: false as const,
+      reason: "BRIEF_DEFINITION_INCOMPLETE" as const,
+      missingRequirements: [
+        ...new Set(parsed.error.issues.map((issue) => String(issue.path[0]))),
+      ],
+    };
+  }
+  try {
+    validateCanonicalDeliverableGraph(
+      parsed.data.deliverables.map((item) => ({
+        deliverable_id: item.id,
+        format: item.format,
+        display_order: item.displayOrder,
+        configuration: item.configuration,
+        creative_guidance: item.creativeGuidance,
+        amplify_target_deliverable_id: item.amplifyTargetDeliverableId,
+      })),
+    );
+  } catch {
+    return {
+      ready: false as const,
+      reason: "BRIEF_DELIVERABLE_GRAPH_INVALID" as const,
+    };
+  }
+  return { ready: true as const };
+}
+
+export function isApplicationSelectableBrief(
+  brief: CanonicalBriefReadinessInput,
+) {
+  return resolveCanonicalBriefReadiness(brief).ready;
+}
+
+@Injectable()
+export class CanonicalCampaignApplicationReadService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async resolveOpportunity(tx: Prisma.TransactionClient, campaignId: string) {
+    const campaign = await tx.uceCampaign.findUnique({
+      where: { id: campaignId },
+      include: campaignApplicationReadInclude,
+    });
+    return campaign ? projectCanonicalCampaignForApplication(campaign) : null;
+  }
+
+  async resolve(brandProfileId: string, campaignId: string) {
+    const campaign = await this.prisma.uceCampaign.findFirst({
+      where: { id: campaignId, brandProfileId },
+      include: campaignApplicationReadInclude,
+    });
+    if (!campaign) throw new NotFoundException("Campaign not found");
+    return projectCanonicalCampaignForApplication(campaign);
+  }
+}
+
+export function projectCanonicalCampaignForApplication(
+  campaign: CampaignApplicationReadRow,
+) {
+  const definition = storedDefinitionSchema.safeParse(
+    campaign.canonicalDefinition,
+  );
+  const validDefinition = definition.success ? definition.data : null;
+  const visibility = resolveVisibility(campaign, validDefinition);
+  const platforms = validDefinition
+    ? campaign.strategy?.platforms.length
+      ? campaign.strategy.platforms
+      : validDefinition.strategy.platforms
+    : [];
+  const commercial = resolveCommercial(campaign, validDefinition);
+
+  return {
+    adapterVersion: "C03_CAMPAIGN_APPLICATION_READ_V1" as const,
+    campaign: {
+      id: campaign.id,
+      brandProfileId: campaign.brandProfileId,
+      name: campaign.name,
+      brand: campaign.brandProfile ?? null,
+      objective: campaign.strategy?.coreObjective ?? null,
+      publishingStart: campaign.strategy?.fixedStartDate ?? null,
+      publishingEnd: campaign.strategy?.fixedEndDate ?? null,
+      status: campaign.status,
+      creationSource: campaign.creationSource,
+      liveAt: campaign.liveAt,
+      applicationDeadline: campaign.applicationDeadline,
+      platforms,
+      visibility,
+      commercial,
+    },
+    assets: campaign.assets.map((asset) => ({
+      id: asset.id,
+      campaignId: asset.campaignId,
+      kind: asset.kind,
+      status: asset.status,
+      offering: asset.offering ?? null,
+      offer: asset.brandOffer ?? null,
+      briefs: asset.canonicalBriefs.map((brief) => {
+        const readiness = resolveCanonicalBriefReadiness(brief);
+        return {
+          id: brief.id,
+          campaignAssetId: brief.campaignAssetId,
+          status: brief.status,
+          creationSource: brief.creationSource,
+          applicationSelection:
+            asset.status === UceCampaignAssetStatus.ACTIVE && readiness.ready
+              ? ({ state: "AVAILABLE" } as const)
+              : ({
+                  state: "UNAVAILABLE",
+                  reason:
+                    asset.status !== UceCampaignAssetStatus.ACTIVE
+                      ? "CAMPAIGN_ASSET_NOT_ACTIVE"
+                      : readiness.reason,
+                } as const),
+          definition: {
+            briefName: brief.briefName,
+            creativeIntent: brief.creativeIntent,
+            creatorBrief: brief.creatorBrief,
+            briefType: brief.briefType,
+            platform: brief.platform,
+            briefLevelGuidance: brief.briefLevelGuidance,
+            referenceContent: brief.referenceContent,
+            usageRights: brief.usageRights,
+            creatorRequirements: brief.creatorRequirements,
+            deliverables: brief.deliverables.map((deliverable) => ({
+              id: deliverable.id,
+              format: deliverable.format,
+              displayOrder: deliverable.displayOrder,
+              configuration: deliverable.configuration,
+              creativeGuidance: deliverable.creativeGuidance,
+              amplifyTargetDeliverableId:
+                deliverable.amplifyTargetDeliverableId,
+            })),
+          },
+        };
+      }),
+    })),
+  };
+}
+
+function resolveVisibility(
+  campaign: CampaignApplicationReadRow,
+  definition: z.infer<typeof storedDefinitionSchema> | null,
+) {
+  const persisted = campaign.targeting?.visibilityScope;
+  const legacy = campaign.targeting?.visibilityScopes ?? [];
+  if (
+    persisted &&
+    (legacy.length === 0 || (legacy.length === 1 && legacy[0] === persisted))
+  ) {
+    return { state: "AVAILABLE" as const, value: persisted };
+  }
+  if (persisted)
+    return {
+      state: "UNAVAILABLE" as const,
+      reason: "CAMPAIGN_VISIBILITY_CONFIGURATION_INVALID" as const,
+    };
+  if (legacy.length === 1) {
+    return { state: "AVAILABLE" as const, value: legacy[0] };
+  }
+  return {
+    state: "UNAVAILABLE" as const,
+    reason: "CAMPAIGN_VISIBILITY_CONFIGURATION_INVALID" as const,
+  };
+}
+
+function resolveCommercial(
+  campaign: CampaignApplicationReadRow,
+  definition: z.infer<typeof storedDefinitionSchema> | null,
+) {
+  const commercial = campaign.commercials;
+  if (
+    commercial?.canonicalVersion === 1 &&
+    commercial.commercialOffer != null &&
+    commercial.currency != null &&
+    commercial.receivesBrandSupport != null
+  ) {
+    return {
+      state: "AVAILABLE" as const,
+      canonicalVersion: 1 as const,
+      compensationType: commercial.compensationType,
+      commercialOffer: commercial.commercialOffer,
+      currency: commercial.currency,
+      receivesBrandSupport: commercial.receivesBrandSupport,
+      brandSupportType: commercial.brandSupportType,
+      brandSupportEstimatedValue: commercial.brandSupportEstimatedValue,
+      totalCampaignBudget: commercial.totalCampaignBudgetPool,
+    };
+  }
+  if (definition) {
+    return {
+      state: "AVAILABLE" as const,
+      canonicalVersion: 1 as const,
+      compensationType:
+        definition.commercials.compensation_model === "FIXED"
+          ? ("FIXED_FEE" as const)
+          : ("NEGOTIABLE" as const),
+      commercialOffer: new Prisma.Decimal(
+        definition.commercials.commercial_offer,
+      ),
+      currency: definition.derived.currency,
+      receivesBrandSupport: definition.commercials.receives_brand_support,
+      brandSupportType: definition.commercials.brand_support_type ?? null,
+      brandSupportEstimatedValue:
+        definition.commercials.brand_support_estimated_value == null
+          ? null
+          : new Prisma.Decimal(
+              definition.commercials.brand_support_estimated_value,
+            ),
+      totalCampaignBudget: new Prisma.Decimal(
+        definition.commercials.total_campaign_budget,
+      ),
+    };
+  }
+  return {
+    state: "UNAVAILABLE" as const,
+    reason: "CAMPAIGN_COMMERCIAL_CONFIGURATION_INVALID" as const,
+  };
+}

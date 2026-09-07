@@ -2,14 +2,16 @@ import { describe, expect, it, vi } from "vitest";
 import { NotificationDispatchService } from "./notification-dispatch.service";
 
 describe("NotificationDispatchService semantic dispatch", () => {
-  it("uses one database upsert boundary and registry policy", async () => {
+  it("uses one create-if-absent boundary and registry policy", async () => {
     const tx = {
       brandProfile: { findUnique: vi.fn().mockResolvedValue({ id: "brand" }) },
       notificationJob: {
-        upsert: vi.fn().mockResolvedValue({ id: "job-1" }),
+        createMany: vi.fn().mockResolvedValue({ count: 1 }),
         findUniqueOrThrow: vi
           .fn()
+          .mockResolvedValueOnce({ id: "job-1" })
           .mockResolvedValueOnce({ snapshotFinalizedAt: null })
+          .mockResolvedValueOnce({ id: "job-1" })
           .mockResolvedValueOnce({ snapshotFinalizedAt: new Date() }),
         update: vi.fn().mockResolvedValue({}),
       },
@@ -46,14 +48,20 @@ describe("NotificationDispatchService semantic dispatch", () => {
     };
     await expect(service.dispatch(input)).resolves.toEqual({ job_id: "job-1" });
     await expect(service.dispatch(input)).resolves.toEqual({ job_id: "job-1" });
-    const first = tx.notificationJob.upsert.mock.calls[0][0];
-    const second = tx.notificationJob.upsert.mock.calls[1][0];
-    expect(first.where).toEqual(second.where);
-    expect(first.create).toMatchObject({
+    const first = tx.notificationJob.createMany.mock.calls[0][0];
+    const second = tx.notificationJob.createMany.mock.calls[1][0];
+    expect(first.data[0]).toMatchObject({
       urgencyLevel: "CRITICAL",
       eventType: input.eventType,
+      workspaceId: input.workspaceId,
     });
-    expect(first.update).toEqual({});
+    expect(second.data[0]).toMatchObject({
+      eventType: first.data[0].eventType,
+      workspaceId: first.data[0].workspaceId,
+      semanticEventKey: first.data[0].semanticEventKey,
+    });
+    expect(first.skipDuplicates).toBe(true);
+    expect(second.skipDuplicates).toBe(true);
     expect(tx.notificationJobRecipient.createMany).toHaveBeenCalledTimes(1);
   });
 

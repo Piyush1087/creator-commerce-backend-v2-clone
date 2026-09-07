@@ -2,6 +2,8 @@ import {
   ConflictException,
   GoneException,
   Injectable,
+  Inject,
+  Optional,
   NotFoundException,
 } from "@nestjs/common";
 import { CreatorEntryContinuationIntent } from "@prisma/client";
@@ -15,6 +17,11 @@ import {
 } from "./creator-entry-continuation.store";
 import { CreatorEntryStateService } from "./creator-entry-state.service";
 import { CREATOR_ENTRY_ERROR } from "./creator-entry.types";
+import {
+  CAMPAIGN_CONTINUATION_CONTEXT,
+  type CampaignContinuationContextPort,
+  type CampaignContinuationSeed,
+} from "./campaign-continuation-context.port";
 
 export const CREATOR_CAMPAIGN_CONTINUATION_TTL_MS = 24 * 60 * 60 * 1000;
 export const CREATOR_CAMPAIGN_CONTINUATION_IDEMPOTENCY_GRACE_MS =
@@ -26,11 +33,15 @@ export class CreatorCampaignApplyContinuationService {
     private readonly store: CreatorEntryContinuationStore,
     private readonly contexts: CreatorCanonicalContextService,
     private readonly state: CreatorEntryStateService,
+    @Optional()
+    @Inject(CAMPAIGN_CONTINUATION_CONTEXT)
+    private readonly contextBinding?: CampaignContinuationContextPort,
   ) {}
 
   async issueResolvedCampaign(
     campaignId: string,
     now = new Date(),
+    context?: CampaignContinuationSeed,
   ): Promise<{
     intent: CreatorEntryContinuationIntent;
     continuationToken: string;
@@ -43,6 +54,7 @@ export class CreatorCampaignApplyContinuationService {
       campaignId,
       boundUserId: null,
       expiresAt,
+      context,
     });
     return {
       intent: CreatorEntryContinuationIntent.CAMPAIGN_APPLY,
@@ -55,12 +67,18 @@ export class CreatorCampaignApplyContinuationService {
     if (!isCreatorEntryContinuationToken(continuationToken)) {
       this.assertAvailable({ outcome: "NOT_FOUND" });
     }
-    await this.contexts.resolve(user.id);
+    if (!this.contextBinding) await this.contexts.resolve(user.id);
     const binding = await this.store.bindForAuthenticatedUser({
       opaqueToken: continuationToken,
       userId: user.id,
       now,
     });
+    this.assertAvailable(binding);
+    const ownerUserId = await this.contextBinding?.bind(
+      user,
+      continuationToken,
+      now,
+    );
     if (binding.outcome === "CONSUMED") {
       this.assertConsumedRetryAvailable(binding, now);
       return {
@@ -70,7 +88,9 @@ export class CreatorCampaignApplyContinuationService {
     }
     this.assertAvailable(binding);
 
-    const entryState = await this.state.read(user);
+    const entryState = ownerUserId
+      ? await this.state.readCanonicalOwner(ownerUserId)
+      : await this.state.read(user);
     if (!entryState.canEnterCreatorPlatform) {
       return {
         status: "PENDING_CREATOR_ENTRY" as const,

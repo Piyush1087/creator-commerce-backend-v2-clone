@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  Headers,
   Param,
   Patch,
   Post,
@@ -131,6 +132,39 @@ export class BrandUceController {
       briefId,
       body,
     );
+  }
+
+  @Post("campaigns/:campaignId/canonical-briefs/:briefId/publish")
+  @HttpCode(200)
+  async publishCanonicalBrief(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Param("briefId") briefId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.canonicalBriefs.publish(brandProfileId, campaignId, briefId);
+  }
+
+  @Post("campaigns/:campaignId/canonical-briefs/:briefId/pause")
+  @HttpCode(200)
+  async pauseCanonicalBrief(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Param("briefId") briefId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.canonicalBriefs.pause(brandProfileId, campaignId, briefId);
+  }
+
+  @Post("campaigns/:campaignId/canonical-briefs/:briefId/resume")
+  @HttpCode(200)
+  async resumeCanonicalBrief(
+    @Req() req: RequestWithAuthUser,
+    @Param("campaignId") campaignId: string,
+    @Param("briefId") briefId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
+    return this.canonicalBriefs.resume(brandProfileId, campaignId, briefId);
   }
 
   @Get("campaigns/aggregates")
@@ -568,13 +602,16 @@ export class BrandUceController {
     @Req() req: RequestWithAuthUser,
     @Param("campaignId") campaignId: string,
     @Param("applicationId") applicationId: string,
+    @Headers("idempotency-key") key?: string,
   ) {
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
-    return this.campaignApplications.approve(
+    return this.campaignApplications.routeDecision(
+      req.user,
       brandProfileId,
       campaignId,
       applicationId,
-      req.user.id,
+      "APPROVE",
+      key,
     );
   }
 
@@ -585,13 +622,16 @@ export class BrandUceController {
     @Param("campaignId") campaignId: string,
     @Param("applicationId") applicationId: string,
     @Body() body: { reason?: string },
+    @Headers("idempotency-key") key?: string,
   ) {
     const brandProfileId = await this.auth.resolveBrandProfileId(req.user);
-    return this.campaignApplications.reject(
+    return this.campaignApplications.routeDecision(
+      req.user,
       brandProfileId,
       campaignId,
       applicationId,
-      req.user.id,
+      "REJECT",
+      key,
       body?.reason,
     );
   }

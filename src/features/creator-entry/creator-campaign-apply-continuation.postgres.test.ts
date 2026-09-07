@@ -107,7 +107,12 @@ database("C01-I5 Campaign Apply continuation", () => {
   });
 
   beforeEach(async () => {
-    await prisma.creatorEntryContinuation.deleteMany();
+    // C-03 makes continuation evidence non-deletable in normal runtime DML.
+    // This suite is restricted to a disposable c01_i5_* database, so TRUNCATE
+    // resets test isolation without weakening or bypassing the production guard.
+    await prisma.$executeRawUnsafe(
+      'TRUNCATE TABLE "creator_entry_continuations"',
+    );
     await prisma.uceCollaborationAuditLog.deleteMany();
     await prisma.uceApplication.deleteMany();
     await prisma.uceCampaignCollaboration.deleteMany();

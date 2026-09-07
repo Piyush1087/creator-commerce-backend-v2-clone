@@ -1,18 +1,23 @@
-import { ConflictException } from "@nestjs/common";
-import { UceApplicationStatus, UceCampaignStatus } from "@prisma/client";
+import { ConflictException, ForbiddenException } from "@nestjs/common";
+import {
+  UceApplicationAuthorityVersion,
+  UceApplicationStatus,
+  UceCampaignStatus,
+} from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
 import { CampaignApplicationService } from "./campaign-application.service";
 
 const applicationId = "3dc7e4b2-6b69-4c58-b5f0-0ed03256e451";
 
-function approvalHarness(claimCount = 1) {
+function approvalHarness(claimCount = 1, capabilityError?: Error) {
   const application = {
     id: applicationId,
+    authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
     campaignId: "campaign-1",
     campaignCreatorId: "creator-1",
-    campaignAssetId: "legacy-product-1",
-    briefId: "legacy-brief-1",
+    legacyCampaignProductId: "legacy-product-1",
+    legacyBriefId: "legacy-brief-1",
     status: UceApplicationStatus.PENDING,
     campaignCreator: {
       socialHandle: "creator",
@@ -49,7 +54,7 @@ function approvalHarness(claimCount = 1) {
     uceCampaignPerformanceAggregate: { update: vi.fn() },
   };
   const prisma = {
-    uceApplication: { findMany: vi.fn() },
+    uceApplication: { findMany: vi.fn(), count: vi.fn().mockResolvedValue(0) },
     uceCampaignCollaboration: { findMany: vi.fn() },
     uceCampaignCreator: { upsert: vi.fn() },
     $transaction: vi.fn().mockImplementation((callback) => callback(tx)),
@@ -58,35 +63,74 @@ function approvalHarness(claimCount = 1) {
     assertCampaignOwned: vi.fn().mockResolvedValue({ id: "campaign-1" }),
   };
   const pipeline = { rejectApplicant: vi.fn() };
+  const collaborationProvision = {
+    ensureCreatorUserInTransaction: vi.fn().mockResolvedValue("user-1"),
+    provisionFromUceApprovalInTransaction: vi.fn().mockResolvedValue({
+      collaboration_id: "collaboration-1",
+    }),
+    broadcastProvisioned: vi.fn().mockResolvedValue(undefined),
+  };
+  const subscriptionCapabilities = {
+    assertCapability: capabilityError
+      ? vi.fn().mockRejectedValue(capabilityError)
+      : vi.fn().mockResolvedValue(undefined),
+  };
   return {
     tx,
     prisma,
+    collaborationProvision,
     service: new CampaignApplicationService(
       prisma as never,
       access as never,
       pipeline as never,
+      collaborationProvision as never,
+      subscriptionCapabilities as never,
     ),
   };
 }
 
 describe("CampaignApplicationService development authority", () => {
+  it("denies Collaboration creation before claiming or mutating an Application", async () => {
+    const { service, prisma, tx, collaborationProvision } = approvalHarness(
+      1,
+      new ForbiddenException("SUBSCRIPTION_RESTRICTED"),
+    );
+    await expect(
+      service.approve("brand-1", "campaign-1", applicationId, "actor-1"),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(tx.uceApplication.updateMany).not.toHaveBeenCalled();
+    expect(
+      collaborationProvision.provisionFromUceApprovalInTransaction,
+    ).not.toHaveBeenCalled();
+  });
   it("lists UceApplications without invoking legacy synchronization", async () => {
     const { service, prisma } = approvalHarness();
-    prisma.uceApplication.findMany.mockResolvedValue([
-      {
-        id: applicationId,
-        campaignCreatorId: "creator-1",
-        campaignAssetId: "legacy-product-1",
-        briefId: "legacy-brief-1",
-        status: UceApplicationStatus.PENDING,
-        source: "DIRECT",
-        appliedAt: new Date("2026-08-15T00:00:00Z"),
-        campaignCreator: { socialHandle: "creator" },
-      },
-    ]);
+    prisma.uceApplication.findMany
+      .mockResolvedValueOnce([
+        {
+          id: applicationId,
+          authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
+          campaignCreatorId: "creator-1",
+          legacyCampaignProductId: "legacy-product-1",
+          legacyBriefId: "legacy-brief-1",
+          status: UceApplicationStatus.PENDING,
+          source: "DIRECT",
+          appliedAt: new Date("2026-08-15T00:00:00Z"),
+          campaignCreator: { socialHandle: "creator" },
+        },
+      ])
+      .mockResolvedValueOnce([]);
 
     const result = await service.listApplicants("brand-1", "campaign-1");
 
+    expect(prisma.uceApplication.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
+        }),
+      }),
+    );
     expect(prisma.uceCampaignCollaboration.findMany).not.toHaveBeenCalled();
     expect(prisma.uceCampaignCreator.upsert).not.toHaveBeenCalled();
     expect(result.applicants[0]).toMatchObject({
@@ -98,8 +142,61 @@ describe("CampaignApplicationService development authority", () => {
     });
   });
 
-  it("approves Applications without auto-provisioning Collaboration", async () => {
-    const { service, tx } = approvalHarness();
+  it("lists canonical snapshot authority without invoking legacy handoff", async () => {
+    const { service, prisma } = approvalHarness();
+    prisma.uceApplication.count.mockResolvedValue(1);
+    prisma.uceApplication.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: applicationId,
+          authorityVersion: "C03_CANONICAL",
+          campaignId: "campaign-1",
+          canonicalCampaignAssetId: "asset-1",
+          canonicalBriefId: "brief-1",
+          status: "PENDING",
+          statusVersion: 1,
+          appliedAt: new Date("2026-08-15T00:00:00Z"),
+          terminalAt: null,
+          source: "DIRECT",
+          snapshot: {
+            campaignContext: { name: "Historical Campaign" },
+            briefContext: { briefName: "Historical Brief" },
+            campaignAssetContext: {},
+            commercialContext: { offer: "100", currency: "INR" },
+          },
+        },
+      ]);
+
+    const result = await service.listApplicants("brand-1", "campaign-1");
+
+    expect(result).toMatchObject({
+      state: "READY",
+      reason: null,
+      canonicalApplicationCount: 1,
+      applicants: [
+        {
+          applicationId,
+          referenceAuthority: "C03_CANONICAL",
+          canApprove: true,
+          canReject: true,
+          campaign: { name: "Historical Campaign" },
+          commercial: { offer: "100", currency: "INR" },
+        },
+      ],
+    });
+    expect(prisma.uceApplication.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          campaignId: "campaign-1",
+          authorityVersion: UceApplicationAuthorityVersion.C03_CANONICAL,
+        },
+      }),
+    );
+  });
+
+  it("keeps approval and Collaboration provisioning in one transaction", async () => {
+    const { service, tx, collaborationProvision } = approvalHarness();
 
     const result = await service.approve(
       "brand-1",
@@ -113,23 +210,43 @@ describe("CampaignApplicationService development authority", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           id: applicationId,
+          authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
           status: UceApplicationStatus.PENDING,
         }),
       }),
     );
-    expect(result).toEqual({
-      ok: true,
-      applicationId,
+    expect(
+      collaborationProvision.ensureCreatorUserInTransaction,
+    ).toHaveBeenCalledWith(tx, "creator@example.com", "creator");
+    expect(
+      collaborationProvision.provisionFromUceApprovalInTransaction,
+    ).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        campaignId: "campaign-1",
+        productId: "legacy-product-1",
+        briefId: "legacy-brief-1",
+        allowExisting: false,
+      }),
+    );
+    expect(collaborationProvision.broadcastProvisioned).toHaveBeenCalledWith(
+      "collaboration-1",
+    );
+    expect(result).toMatchObject({
       status: "APPROVED",
+      workflowCollaborationId: "collaboration-1",
     });
-    expect(result).not.toHaveProperty("workflowCollaborationId");
   });
 
-  it("preserves the compare-and-set concurrency guard and does not provision", async () => {
-    const { service } = approvalHarness(0);
+  it("preserves the compare-and-set concurrency guard before provisioning", async () => {
+    const { service, collaborationProvision } = approvalHarness(0);
 
     await expect(
       service.approve("brand-1", "campaign-1", applicationId, "actor-1"),
     ).rejects.toBeInstanceOf(ConflictException);
+    expect(
+      collaborationProvision.provisionFromUceApprovalInTransaction,
+    ).not.toHaveBeenCalled();
+    expect(collaborationProvision.broadcastProvisioned).not.toHaveBeenCalled();
   });
 });

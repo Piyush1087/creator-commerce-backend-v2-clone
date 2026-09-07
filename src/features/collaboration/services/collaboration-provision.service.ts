@@ -4,53 +4,67 @@ import {
   Injectable,
 } from "@nestjs/common";
 import {
-  CollaborationEventKind,
-  CollaborationFulfillmentState,
+  CollaborationEscrowStatus,
   CollaborationMessageKind,
-  CollaborationNegotiationState,
-  CollaborationPaymentRail,
   CollaborationPayoutMode,
-  CollaborationPublicationAuthorizationState,
-  CollaborationPublishingState,
-  CollaborationSecurementState,
-  CollaborationStage,
-  CollaborationStageStatus,
   Prisma,
-  UceApplicationStatus,
   UceMilestoneStage,
+  UserAuthState,
   UserRole,
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
-import {
-  provisionCollaborationSchema,
-  type ProvisionCollaborationInput,
-} from "../schemas/provision-collaboration.schema";
-import { mapCollaborationThreadRow } from "../utils/collaboration-thread.mapper";
+import { normalizeEmail } from "../../../shared/identity/normalize-email";
+import { splitEscrowQuote } from "../../brand-uce/utils/uce-decimal.util";
 import { mapBrandIndustryToCollaborationIndustry } from "../utils/map-collaboration-industry.util";
-import { resolveProvisioningNegotiationState } from "../utils/collaboration-provisioning-initialization";
+import {
+  mapCollaborationThreadRow,
+  toDecimal,
+} from "../utils/collaboration-thread.mapper";
 import { COLLABORATION_THREAD_INCLUDE } from "./collaboration-access.service";
 import { CollaborationRealtimeService } from "./collaboration-realtime.service";
-import { PlanCommercialPolicyService } from "../../pricing/services/plan-commercial-policy.service";
-import { BusinessGeographyFinancialPolicyService } from "../../pricing/services/business-geography-financial-policy.service";
-import { calculateCommercialReserve } from "../utils/collaboration-financial-calculation";
 
-const toJson = (value: unknown): Prisma.InputJsonValue =>
-  JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+export type ProvisionCollaborationInput = {
+  brandProfileId: string;
+  campaignId: string;
+  briefId: string;
+  creatorUserId: string;
+  productId?: string | null;
+  ucePipelineCollaborationId?: string;
+  payoutMode?: CollaborationPayoutMode;
+  initialQuote?: number;
+  productRetailValue?: number;
+  advancePercent?: number;
+  welcomeMessage?: string;
+  allowExisting?: boolean;
+};
+
+type Tx = Prisma.TransactionClient;
 
 @Injectable()
 export class CollaborationProvisionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtime: CollaborationRealtimeService,
-    private readonly planPolicies: PlanCommercialPolicyService,
-    private readonly geographyPolicies: BusinessGeographyFinancialPolicyService,
   ) {}
 
-  async ensureCreatorUser(email: string, instagramHandle?: string) {
-    const normalizedEmail = email.trim().toLowerCase();
-    const existing = await this.prisma.user.findUnique({
-      where: { email: normalizedEmail },
+  async ensureCreatorUser(
+    email: string,
+    instagramHandle?: string,
+  ): Promise<string> {
+    return this.prisma.$transaction((tx) =>
+      this.ensureCreatorUserInTransaction(tx, email, instagramHandle),
+    );
+  }
+
+  async ensureCreatorUserInTransaction(
+    tx: Tx,
+    email: string,
+    instagramHandle?: string,
+  ): Promise<string> {
+    const normalizedEmail = normalizeEmail(email);
+    const existing = await tx.user.findUnique({
+      where: { normalizedEmail },
       include: { creatorProfile: true },
     });
     if (existing) {
@@ -60,7 +74,7 @@ export class CollaborationProvisionService {
         );
       }
       if (!existing.creatorProfile && instagramHandle) {
-        await this.prisma.creatorProfile.create({
+        await tx.creatorProfile.create({
           data: {
             userId: existing.id,
             instagramHandle: instagramHandle.replace(/^@/, ""),
@@ -70,316 +84,169 @@ export class CollaborationProvisionService {
       return existing.id;
     }
 
-    const user = await this.prisma.user.create({
+    const user = await tx.user.create({
       data: {
         email: normalizedEmail,
+        normalizedEmail,
         role: UserRole.CREATOR,
+        authState: UserAuthState.PROVISIONAL,
         creatorProfile: instagramHandle
-          ? { create: { instagramHandle: instagramHandle.replace(/^@/, "") } }
+          ? {
+              create: {
+                instagramHandle: instagramHandle.replace(/^@/, ""),
+              },
+            }
           : { create: {} },
       },
     });
     return user.id;
   }
 
-  async provisionFromApprovedApplication(
-    rawInput: ProvisionCollaborationInput,
+  async provisionFromUceApproval(input: ProvisionCollaborationInput) {
+    const result = await this.prisma.$transaction((tx) =>
+      this.provisionFromUceApprovalInTransaction(tx, input),
+    );
+    await this.broadcastProvisioned(result.collaboration_id);
+    return result;
+  }
+
+  async provisionFromUceApprovalInTransaction(
+    tx: Tx,
+    input: ProvisionCollaborationInput,
   ) {
-    const parsed = provisionCollaborationSchema.safeParse(rawInput);
-    if (!parsed.success) {
-      throw new BadRequestException(parsed.error.flatten());
-    }
-    const input = parsed.data;
-
-    const existing = await this.prisma.collaboration.findUnique({
-      where: { sourceApplicationId: input.sourceApplicationId },
-      include: COLLABORATION_THREAD_INCLUDE,
-    });
-    if (existing) return mapCollaborationThreadRow(existing, "BRAND");
-
-    const application = await this.prisma.uceApplication.findUnique({
-      where: { id: input.sourceApplicationId },
-      include: {
-        campaign: { include: { brandProfile: true, commercials: true } },
-        campaignCreator: {
-          include: {
-            creatorUser: { include: { creatorProfile: true } },
-            creatorProfile: true,
-          },
-        },
-        campaignAsset: true,
-        brief: {
-          include: { deliverables: { orderBy: { displayOrder: "asc" } } },
-        },
-        snapshot: true,
-        legacyPipelineCollaboration: true,
+    const existing = await tx.collaboration.findFirst({
+      where: {
+        campaignId: input.campaignId,
+        creatorUserId: input.creatorUserId,
+        sourceApplicationId: null,
       },
     });
-    if (!application || application.status !== UceApplicationStatus.APPROVED) {
-      throw new BadRequestException(
-        "Source Application must exist and be APPROVED",
-      );
-    }
-
-    const deliverables = application.brief.deliverables;
-    const applicability = new Map(
-      input.deliverablePublishingApplicability.map((item) => [
-        item.sourceBriefDeliverableId,
-        item.publishingRequired,
-      ]),
-    );
-    const sourceIds = new Set(deliverables.map((item) => item.id));
-    if (
-      deliverables.length === 0 ||
-      applicability.size !== deliverables.length ||
-      [...applicability.keys()].some((id) => !sourceIds.has(id))
-    ) {
-      throw new BadRequestException(
-        "Publishing applicability must explicitly and exactly cover every source Brief Deliverable",
-      );
-    }
-
-    const commercials = application.campaign.commercials;
-    if (!commercials) {
-      throw new BadRequestException(
-        "Campaign commercial configuration is required",
-      );
-    }
-    const advancePercentage = commercials.advancePaymentPercentage;
-    if (
-      !Number.isInteger(advancePercentage) ||
-      advancePercentage < 0 ||
-      advancePercentage > 100
-    ) {
-      throw new BadRequestException(
-        "Campaign advance percentage must be an integer from 0 to 100",
-      );
-    }
-    const currency = commercials.currency.toUpperCase();
-    if (!/^[A-Z]{3}$/.test(currency)) {
-      throw new BadRequestException(
-        "Campaign commercial currency must be ISO-4217 shaped",
-      );
-    }
-
-    const negotiationState = resolveProvisioningNegotiationState(
-      commercials.compensationType,
-    );
-    const negotiationRequired =
-      negotiationState !== CollaborationNegotiationState.NOT_REQUIRED;
-    const fixedAgreedFee = negotiationRequired
-      ? null
-      : (application.proposedFee ?? commercials.fixedFeeAmount);
-    if (!negotiationRequired && fixedAgreedFee === null) {
-      throw new BadRequestException(
-        "Fixed Campaign compensation requires an authoritative fixed fee",
-      );
-    }
-    const advanceAmount = fixedAgreedFee?.mul(advancePercentage).div(100);
-    const balanceAmount = fixedAgreedFee?.minus(advanceAmount ?? 0);
-    const fixedPolicy = !negotiationRequired
-      ? await this.prisma.$transaction(async (tx) => {
-          const plan = await this.planPolicies.resolveForBrand(
-            application.campaign.brandProfileId,
-            tx,
-          );
-          const geography = this.geographyPolicies.resolve(
-            application.campaign.brandProfile.countryCode,
-          );
-          return {
-            plan,
-            geography,
-            reserve: calculateCommercialReserve(
-              fixedAgreedFee!,
-              plan.platformCommissionRate,
-              geography.platformCommissionGstRate,
-            ),
-          };
-        })
-      : null;
-    const securementState = negotiationRequired
-      ? null
-      : fixedAgreedFee!.greaterThan(0)
-        ? CollaborationSecurementState.AWAITING_ESCROW_FUNDING
-        : CollaborationSecurementState.NOT_REQUIRED;
-    const canonicalStage = negotiationRequired
-      ? CollaborationStage.NEGOTIATION
-      : securementState === CollaborationSecurementState.AWAITING_ESCROW_FUNDING
-        ? CollaborationStage.SECUREMENT
-        : commercials.receivesBrandSupport
-          ? CollaborationStage.FULFILLMENT
-          : CollaborationStage.PRODUCTION;
-
-    const creatorUserId =
-      application.campaignCreator.creatorUserId ??
-      application.campaignCreator.creatorUser?.id ??
-      application.campaignCreator.creatorProfile?.userId;
-    if (!creatorUserId) {
-      throw new BadRequestException(
-        "Approved Application is missing a linked Creator user",
-      );
-    }
-
-    const welcome = `Congrats! You're approved for ${application.campaign.name}. View your brief and secure your spot.`;
-    try {
-      const created = await this.prisma.$transaction(async (tx) => {
-        const thread = await tx.collaboration.create({
-          data: {
-            sourceApplicationId: application.id,
-            campaignCreatorId: application.campaignCreatorId,
-            campaignAssetId: application.campaignAssetId,
-            brandProfileId: application.campaign.brandProfileId,
-            creatorUserId,
-            campaignId: application.campaignId,
-            briefId: application.briefId,
-            productId: application.campaignAssetId,
-            ucePipelineCollaborationId:
-              application.legacyPipelineCollaborationId ?? undefined,
-            currentStage: UceMilestoneStage.STAGE_1_NEGOTIATION,
-            canonicalStage,
-            currentStageStatus: CollaborationStageStatus.IN_PROGRESS,
-            payoutMode: CollaborationPayoutMode.ESCROW,
-            // Retained only for the legacy read model. Canonical Fulfillment is
-            // initialized exclusively from the locked Campaign Brand Support fields.
-            industry: mapBrandIndustryToCollaborationIndustry(
-              application.campaign.brandProfile.industry,
-              application.campaign.brandProfile.brandRoutingType,
-            ),
-            snapshot: {
-              create: {
-                campaignContext: toJson(application.campaign),
-                campaignAssetContext: toJson(application.campaignAsset),
-                briefContext: toJson(application.brief),
-                applicationContext: toJson(application.snapshot ?? application),
-                creatorContext: toJson(application.campaignCreator.creatorUser),
-                brandContext: toJson(application.campaign.brandProfile),
-                receivesBrandSupport: commercials.receivesBrandSupport,
-                brandSupportType: commercials.brandSupportType,
-                brandSupportEstimatedValue:
-                  commercials.brandSupportEstimatedValue,
-                campaignCommercialContext: toJson(commercials),
-                advancePercentageSnapshot: advancePercentage,
-                commercialCurrency: currency,
-              },
-            },
-            commercialAgreement: {
-              create: {
-                negotiationState,
-                applicationProposedFee: application.proposedFee,
-                agreedCreatorFee: fixedAgreedFee,
-                currency,
-                advancePercentageSnapshot: advancePercentage,
-                advanceAmount,
-                balanceAmount,
-                pricingTierSnapshot: fixedPolicy?.plan.tier,
-                businessCountryCodeSnapshot: fixedPolicy?.geography.countryCode,
-                financialPolicyVersionSnapshot: fixedPolicy
-                  ? `${fixedPolicy.plan.policyVersion}|${fixedPolicy.geography.policyVersion}`
-                  : undefined,
-                platformCommissionRateSnapshot:
-                  fixedPolicy?.plan.platformCommissionRate,
-                platformCommissionAmount:
-                  fixedPolicy?.reserve.platformCommissionAmount,
-                platformCommissionGstRateSnapshot:
-                  fixedPolicy?.geography.platformCommissionGstRate,
-                platformCommissionGstAmount:
-                  fixedPolicy?.reserve.platformCommissionGstAmount,
-                paymentRail: CollaborationPaymentRail.PLATFORM_ESCROW,
-                securementState,
-                requiredSecuredAmount:
-                  fixedPolicy?.reserve.requiredSecuredAmount,
-                termsLockedAt: negotiationRequired ? null : new Date(),
-              },
-            },
-            fulfillment: {
-              create: {
-                state: commercials.receivesBrandSupport
-                  ? canonicalStage === CollaborationStage.FULFILLMENT
-                    ? CollaborationFulfillmentState.AWAITING_BRAND_FULFILLMENT
-                    : CollaborationFulfillmentState.NOT_STARTED
-                  : CollaborationFulfillmentState.SKIPPED,
-              },
-            },
-            deliverables: {
-              create: deliverables.map((deliverable) => {
-                const publishingRequired = applicability.get(deliverable.id);
-                if (publishingRequired === undefined) {
-                  throw new BadRequestException(
-                    "Unresolved publishing applicability",
-                  );
-                }
-                return {
-                  sourceBriefDeliverableId: deliverable.id,
-                  displayOrder: deliverable.displayOrder,
-                  definitionSnapshot: toJson(deliverable),
-                  publishingRequired,
-                  publishing: {
-                    create: publishingRequired
-                      ? {
-                          state:
-                            CollaborationPublishingState.AWAITING_PUBLISHING,
-                          authorizationState:
-                            CollaborationPublicationAuthorizationState.NOT_AUTHORIZED,
-                        }
-                      : {
-                          state:
-                            CollaborationPublishingState.PUBLISHING_NOT_REQUIRED,
-                          authorizationState:
-                            CollaborationPublicationAuthorizationState.NOT_REQUIRED,
-                        },
-                  },
-                };
-              }),
-            },
-            commercials: { create: {} },
-            logistics: { create: {} },
-            finalization: { create: {} },
-          },
-          include: COLLABORATION_THREAD_INCLUDE,
-        });
-        await tx.collaborationEvent.create({
-          data: {
-            collaborationId: thread.id,
-            kind: CollaborationEventKind.DOMAIN,
-            eventType: "COLLABORATION_PROVISIONED",
-            actorClass: "SYSTEM",
-            commandId: input.commandId,
-            aggregateVersion: 1,
-            payload: { sourceApplicationId: application.id },
-          },
-        });
-        await tx.collaborationMessage.create({
-          data: {
-            collaborationId: thread.id,
-            kind: CollaborationMessageKind.SYSTEM,
-            systemEventTag: "COLLABORATION_PROVISIONED",
-            body: welcome,
-          },
-        });
-        await tx.collaboration.update({
-          where: { id: thread.id },
-          data: {
-            lastMessageSnippet: welcome.slice(0, 200),
-            lastMessageAt: new Date(),
-            unreadCountCreator: { increment: 1 },
-          },
-        });
-        return thread;
-      });
-      void this.realtime.broadcast(created.id, "thread.updated");
-      return mapCollaborationThreadRow(created, "BRAND");
-    } catch (error) {
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        error.code === "P2002"
-      ) {
+    if (existing) {
+      if (input.allowExisting === false) {
         throw new ConflictException(
-          "Collaboration already exists for this source Application",
+          "A Collaboration already exists for this campaign and creator",
         );
       }
-      throw error;
+      const row = await tx.collaboration.findUniqueOrThrow({
+        where: { id: existing.id },
+        include: COLLABORATION_THREAD_INCLUDE,
+      });
+      return mapCollaborationThreadRow(row, "BRAND");
     }
+
+    const campaign = await tx.uceCampaign.findFirst({
+      where: { id: input.campaignId, brandProfileId: input.brandProfileId },
+      include: {
+        brandProfile: {
+          select: { industry: true, brandRoutingType: true },
+        },
+        commercials: true,
+      },
+    });
+    if (!campaign) {
+      throw new BadRequestException("Campaign not found for brand");
+    }
+
+    const brief = await tx.uceCampaignBrief.findFirst({
+      where: { id: input.briefId, campaignId: input.campaignId },
+    });
+    if (!brief) {
+      throw new BadRequestException("Brief not found for campaign");
+    }
+
+    const creator = await tx.user.findUnique({
+      where: { id: input.creatorUserId },
+    });
+    if (!creator) {
+      throw new BadRequestException("Creator user not found");
+    }
+
+    const payoutMode = input.payoutMode ?? CollaborationPayoutMode.ESCROW;
+
+    const advancePercent =
+      input.advancePercent ??
+      campaign.commercials?.advancePaymentPercentage ??
+      30;
+    const quote = input.initialQuote ?? 0;
+    const { advance30Value, balance70Value } = splitEscrowQuote(
+      quote,
+      advancePercent,
+    );
+
+    const industry = mapBrandIndustryToCollaborationIndustry(
+      campaign.brandProfile.industry,
+      campaign.brandProfile.brandRoutingType,
+    );
+
+    const welcome =
+      input.welcomeMessage ??
+      `Congrats! You're approved for ${campaign.name}. View your brief and secure your spot.`;
+
+    try {
+      const thread = await tx.collaboration.create({
+        data: {
+          brandProfileId: input.brandProfileId,
+          creatorUserId: input.creatorUserId,
+          campaignId: input.campaignId,
+          briefId: input.briefId,
+          productId: input.productId ?? undefined,
+          ucePipelineCollaborationId: input.ucePipelineCollaborationId,
+          currentStage: UceMilestoneStage.STAGE_1_NEGOTIATION,
+          payoutMode,
+          industry,
+          commercials: {
+            create: {
+              initialQuote: toDecimal(quote),
+              productRetailValue: toDecimal(input.productRetailValue ?? 0),
+              advance30Amount: toDecimal(advance30Value),
+              balance70Amount: toDecimal(balance70Value),
+              escrowStatus:
+                payoutMode === CollaborationPayoutMode.BARTER
+                  ? null
+                  : CollaborationEscrowStatus.AWAITING_FUNDS,
+            },
+          },
+          logistics: { create: {} },
+          finalization: { create: {} },
+        },
+        include: COLLABORATION_THREAD_INCLUDE,
+      });
+
+      await tx.collaborationMessage.create({
+        data: {
+          collaborationId: thread.id,
+          kind: CollaborationMessageKind.SYSTEM,
+          systemEventTag: "STAGE_1_STARTED",
+          body: welcome,
+        },
+      });
+
+      await tx.collaboration.update({
+        where: { id: thread.id },
+        data: {
+          lastMessageSnippet: welcome.slice(0, 200),
+          lastMessageAt: new Date(),
+          unreadCountCreator: { increment: 1 },
+        },
+      });
+
+      return mapCollaborationThreadRow(thread, "BRAND");
+    } catch (err) {
+      if (
+        typeof err === "object" &&
+        err !== null &&
+        "code" in err &&
+        err.code === "P2002"
+      ) {
+        throw new ConflictException(
+          "Collaboration thread already exists for this campaign and creator",
+        );
+      }
+      throw err;
+    }
+  }
+
+  async broadcastProvisioned(collaborationId: string) {
+    await this.realtime.broadcast(collaborationId, "thread.updated");
   }
 }

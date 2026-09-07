@@ -10,21 +10,19 @@ export class CanonicalCampaignDraftReadService {
   async getDraft(brandProfileId: string, campaignId: string) {
     const campaign = await this.prisma.uceCampaign.findFirst({
       where: { id: campaignId, brandProfileId },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        status: true,
+        creationSource: true,
+        canonicalDefinition: true,
+      },
     });
     if (!campaign) throw new BadRequestException("Campaign draft not found.");
     if (campaign.status !== UceCampaignStatus.DRAFT) {
       throw new BadRequestException("Campaign is no longer a DRAFT.");
     }
 
-    const rows = await this.prisma.$queryRaw<Array<{ canonical_definition: unknown }>>`
-      SELECT "canonical_definition"
-      FROM "uce_campaigns"
-      WHERE "id" = ${campaignId}
-      LIMIT 1
-    `;
-
-    const definition = rows[0]?.canonical_definition;
+    const definition = campaign.canonicalDefinition;
     const draft =
       definition &&
       typeof definition === "object" &&
@@ -36,7 +34,7 @@ export class CanonicalCampaignDraftReadService {
     return {
       campaignId: campaign.id,
       status: campaign.status,
-      creationSource: "MANUAL" as const,
+      creationSource: campaign.creationSource,
       draft,
     };
   }

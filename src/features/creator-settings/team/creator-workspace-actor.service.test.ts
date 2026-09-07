@@ -127,7 +127,18 @@ describe("C05 Creator subject/actor resolution", () => {
       expect(context.actorRole).toBe(role);
       expect(context.subjectCreatorProfileId).toBe(workspace.ownerProfileId);
       expect(context.subjectOwnerUserId).toBe(ownerUser.id);
-      expect(context.allowedActions).toHaveLength(count);
+      expect(
+        context.allowedActions.filter(
+          (action) => !action.startsWith("CAMPAIGN_"),
+        ),
+      ).toHaveLength(count);
+      expect(context.allowedActions).toContain("CAMPAIGN_OPPORTUNITY_VIEW");
+      expect(context.allowedActions).toContain("CAMPAIGN_APPLICATION_APPLY");
+      expect(
+        context.allowedActions.includes(
+          "CAMPAIGN_APPLICATION_WITHDRAW_PENDING",
+        ),
+      ).toBe(role !== CreatorTeamRole.ASSISTANT);
     },
   );
 

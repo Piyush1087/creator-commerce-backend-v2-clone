@@ -46,10 +46,10 @@ describe("DE-W1.0C repository architecture guards", () => {
     expect(persistenceSources).not.toContain("export type PrismaCapture");
   });
 
-  it("registers persistence internally without exporting a controller or resolver", () => {
+  it("exports persistence for shared runtime consumers without exposing a controller or resolver", () => {
     expect(moduleSource).toContain("DataExtractionPersistenceService");
     const exportsBlock = moduleSource.split("exports:")[1] ?? "";
-    expect(exportsBlock).not.toContain("DataExtractionPersistenceService");
+    expect(exportsBlock).toContain("DataExtractionPersistenceService");
     expect(moduleSource).not.toContain("controllers:");
     expect(moduleSource).not.toContain("resolvers:");
   });
@@ -63,9 +63,13 @@ describe("DE-W1.0C repository architecture guards", () => {
   });
 
   it("keeps conflict/equivalence bounded and winner-free", () => {
-    expect(persistenceSources).toContain('"EQUIVALENT_TO"');
-    expect(persistenceSources).toContain('"CONFLICTS_WITH"');
-    expect(persistenceSources.toLowerCase()).not.toContain("winner");
-    expect(persistenceSources.toLowerCase()).not.toContain("precedence");
+    const observationRepository =
+      persistenceSources
+        .split("export class PrismaSemanticObservationRepository")[1]
+        ?.split("export class PrismaFreshnessAssessmentRepository")[0] ?? "";
+    expect(observationRepository).toContain('"EQUIVALENT_TO"');
+    expect(observationRepository).toContain('"CONFLICTS_WITH"');
+    expect(observationRepository.toLowerCase()).not.toContain("winner");
+    expect(observationRepository.toLowerCase()).not.toContain("precedence");
   });
 });

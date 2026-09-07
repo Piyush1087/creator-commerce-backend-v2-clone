@@ -12,7 +12,11 @@ function definition(objective?: string) {
 }
 
 function setup(options?: {
-  campaign?: { id: string; status: UceCampaignStatus } | null;
+  campaign?: {
+    id: string;
+    status: UceCampaignStatus;
+    canonicalDefinition?: unknown;
+  } | null;
   objective?: string;
   industry?: string;
   countryCode?: string | null;
@@ -26,6 +30,7 @@ function setup(options?: {
           : (options?.campaign ?? {
               id: "campaign-1",
               status: UceCampaignStatus.DRAFT,
+              canonicalDefinition: definition(options?.objective),
             }),
       ),
       update: vi.fn(),
@@ -42,11 +47,7 @@ function setup(options?: {
       ),
     },
     uceCampaignReportingSnapshot: { create: vi.fn() },
-    $queryRaw: vi
-      .fn()
-      .mockResolvedValue([
-        { canonical_definition: definition(options?.objective) },
-      ]),
+    $queryRaw: vi.fn(),
     $executeRaw: vi.fn(),
     $transaction: vi.fn(),
   };
@@ -124,7 +125,7 @@ describe("CanonicalCampaignReadinessService", () => {
     ).rejects.toEqual(new BadRequestException("Campaign draft not found."));
     expect(prisma.uceCampaign.findFirst).toHaveBeenCalledWith({
       where: { id: "campaign-other", brandProfileId: "brand-1" },
-      select: { id: true, status: true },
+      select: { id: true, status: true, canonicalDefinition: true },
     });
     expect(prisma.$queryRaw).not.toHaveBeenCalled();
   });
@@ -154,7 +155,9 @@ describe("CanonicalCampaignReadinessService", () => {
 
   it("propagates unexpected operational failures to the application error layer", async () => {
     const { service, prisma } = setup({ objective: "PULSE" });
-    prisma.$queryRaw.mockRejectedValueOnce(new Error("database unavailable"));
+    prisma.uceCampaign.findFirst.mockRejectedValueOnce(
+      new Error("database unavailable"),
+    );
 
     await expect(service.getReadiness("brand-1", "campaign-1")).rejects.toThrow(
       "database unavailable",

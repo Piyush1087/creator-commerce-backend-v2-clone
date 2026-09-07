@@ -1,0 +1,143 @@
+run_id: C01-PRE-I7-CONTINUATION-DURABILITY
+execution_mode: BOUNDED_CORRECTION
+
+backend:
+  starting_sha: aa3b726534165f7a8bc8018c40113b8e14d4db60
+  branch: c01/pre-i7-continuation-durability
+  final_sha: null
+frontend:
+  starting_sha: 17e44abf68d9e107cdaad6454d1ba9c73c05a680
+  branch: c01/i6-creator-entry-frontend-reconciliation
+  final_sha: null
+
+continuation_transport:
+  authority: POSTGRESQL_CONTINUATION_ROW
+  browser_reference: HTTPONLY_FIRST_PARTY_OPAQUE_COOKIE
+  cookie:
+    name: tcs_creator_apply_continuation
+    domain: HOST_ONLY
+    path: /api/v1/creator-entry/campaign-apply/continuation
+    http_only: true
+    same_site: LAX
+    secure: PRODUCTION_REFRESH_COOKIE_CONVENTION
+    maximum_lifetime: MINIMUM_OF_ORIGINAL_EXPIRY_AND_24_HOURS
+  raw_token:
+    json_response: FORBIDDEN
+    javascript_visibility: NONE
+    url_visibility: NONE
+    logging: NONE
+    persistence: SHA256_DIGEST_ONLY
+
+public_issuance_contract:
+  route: POST_/api/v1/public/marketplace/campaigns/:campaignId/apply-continuation
+  authentication: NONE
+  request_body: NONE
+  throttle: 20_PER_60_SECONDS
+  response:
+    intent: CAMPAIGN_APPLY
+    expires_at: SERVER_DERIVED
+    continuation_present: true
+  set_cookie: HTTPONLY_FIRST_PARTY_OPAQUE_REFERENCE
+
+presence_contract:
+  route: GET_/api/v1/creator-entry/campaign-apply/continuation/status
+  authentication: NONE
+  throttle: 60_PER_60_SECONDS
+  response: BOOLEAN_PRESENT_ONLY
+  malformed_unknown_expired_or_grace_ended: FALSE_AND_CLEAR_COOKIE
+  database_row_creation: NONE
+
+discard_contract:
+  route: POST_/api/v1/creator-entry/campaign-apply/continuation/discard
+  authentication: NONE
+  throttle: 20_PER_60_SECONDS
+  effect: CLEAR_EXACT_COOKIE_SCOPE_ONLY
+  database_mutation: NONE
+  response:
+    present: false
+
+resolve_contract:
+  route: POST_/api/v1/creator-entry/campaign-apply/continuation/resolve
+  authentication: SHARED_JWT_REQUIRED
+  creator_platform_guard: NONE
+  request_body: NONE
+  token_source: HTTPONLY_COOKIE_ONLY
+  pending: RETAIN_COOKIE_AND_SERVER_REFERENCE
+  ready: SHORTEN_COOKIE_TO_MINIMUM_OF_ORIGINAL_EXPIRY_AND_10_MINUTES
+  expired_or_unknown: CLEAR_COOKIE
+  identity_conflict: RETAIN_COOKIE
+
+idempotency_contract:
+  same_user_consumed_retry: READY_TO_RETURN_WITH_PERSISTED_SEMANTIC_HANDOFF
+  maximum_grace: MINIMUM_OF_ORIGINAL_EXPIRY_AND_10_MINUTES_AFTER_CONSUMPTION
+  after_grace: NOT_FOUND_AND_CLEAR_COOKIE
+  different_user_consumed_retry: CREATOR_ENTRY_CONTINUATION_IDENTITY_CONFLICT
+
+frontend_recovery:
+  source: SERVER_BACKED_BOOLEAN_PRESENCE
+  javascript_token_storage: NONE
+  browser_close_reopen: RECOVER_FROM_HTTPONLY_COOKIE
+  pending: SERVER_REFERENCE_RETAINED
+  ready: RETURN_TO_ORIGINATING_CAMPAIGN
+  explicit_discard: SERVER_COOKIE_CLEAR
+  invitation_sign_in_return: UNCHANGED
+
+campaign_application_auto_creation:
+  policy: FORBIDDEN
+  observed: NONE
+campaign_mutations: NONE
+campaign_entities_unchanged:
+  - UceApplication
+  - UceCampaignCreator
+  - UceCampaignCollaboration
+  - UceCampaign
+  - UceCampaignPerformanceAggregate
+  - UceCollaborationAuditLog_CREATOR_APPLIED
+
+tests:
+  correction_postgresql: PASS_21_OF_21
+  correction_architecture: PASS_8_OF_8
+  cookie_unit: PASS_4_OF_4
+  transport: PASS_8_OF_8
+  combined_correction_acceptance: PASS_41_OF_41
+  browser_close_fresh_client_postgresql: PASS
+  frontend_focused: PASS_26_OF_26
+  backend_full_repository_suite: PASS_166_FILES_1103_PASSED_43_DATABASE_GATED_FILES_605_SKIPPED
+  frontend_full_repository_suite: PASS_86_FILES_676_PASSED
+  backend_production_build: PASS
+  frontend_production_build: PASS_IN_FRONTEND_REPOSITORY
+  frontend_typecheck: PASS_IN_FRONTEND_REPOSITORY
+  prisma_format: PASS_NO_SCHEMA_DIFF
+  prisma_validate: PASS
+  prisma_generate: PASS
+  fresh_migration_replay: PASS_ALL_70_IN_TWO_DISPOSABLE_DATABASES
+  migration_status: PASS_70_CURRENT
+  scoped_eslint: PASS
+  git_diff_check: PASS
+
+regressions:
+  i1_persistence_security: PASS_30_OF_30
+  i2_account_auth_provisioning_state: PASS_35_OF_35
+  i3_initial_instagram_and_guard: PASS_32_OF_32
+  i4_instagram_continuity_and_guard: PASS_38_OF_38
+  shared_authentication: PASS_22_OF_22
+  legacy_creator_onboarding_retirement: PASS_10_OF_10
+  campaign_apply_public_query_schema_auth_lifecycle: PASS_30_OF_30
+  brand_instagram_legacy_postgresql: PASS_27_OF_27
+  brand_instagram_unit: PASS_22_OF_22
+  brand_instagram_reconciliation_postgresql: PASS_22_OF_22
+  brand_instagram_historical_migration: PASS_1_OF_1
+
+migrations: NONE
+migration_count:
+  starting: 70
+  final: 70
+meta_changes: NONE
+persistent_db_changes: NONE
+production_or_shared_db_mutations: NONE
+historical_persistent_migration_blocker: ACTIVE
+
+deviations: NONE
+checkpoint: null
+next_authorized_boundary: SYSTEMS_REVIEW_THEN_AUTONOMOUS_I7
+stop_reason: STOP_FOR_SYSTEMS_REVIEW_DO_NOT_START_I7

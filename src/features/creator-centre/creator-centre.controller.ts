@@ -13,6 +13,7 @@ import type { RequestWithAuthUser } from "../auth/auth.controller";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { CreatorPlatformAccessGuard } from "../creator-entry/creator-platform-access.guard";
 import { ZodValidationPipe } from "../creator-onboarding/pipes/zod-validation.pipe";
+import { CreatorPlatformAccessGuard } from "../creator-entry/creator-platform-access.guard";
 import { CreatorCentreService } from "./creator-centre.service";
 import {
   AnalyticsFilterQuerySchema,
