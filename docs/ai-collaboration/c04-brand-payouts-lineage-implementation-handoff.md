@@ -10,7 +10,8 @@ Status: `COMPLETE`
 - implementation source commit: `5a4f70075da13f9e49bdc501097fe0f571c3f405`
 - implementation source tree: `a02866045c4ba70ed9012e47c9e7ee285a213ac5`
 - migration identity: `20260911125000_c04_brand_payouts_reserve_entitlement_lineage`
-- migration SQL SHA-256: `aa5c1900d06a1c240413be547f8ebe23b933085f93c766b51fdd2933bf91da0f`
+- migration SQL SHA-256 (Git-canonical raw bytes): `6e384abdaf7cf9fa35973ca31e1a5cb541f60bd328937ff3d27844b9dfdb4d72`
+- superseded reported migration SHA-256: `aa5c1900d06a1c240413be547f8ebe23b933085f93c766b51fdd2933bf91da0f` (metadata error; not a durable Git-object hash)
 - migration count: `84 -> 85`
 
 ## Implemented invariant
