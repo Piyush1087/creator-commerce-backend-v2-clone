@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "result": "COMPLETE",
+  "migration": {
+    "count_before": 84,
+    "count_after": 85,
+    "identity": "20260911125000_c04_brand_payouts_reserve_entitlement_lineage",
+    "sql_sha256": "aa5c1900d06a1c240413be547f8ebe23b933085f93c766b51fdd2933bf91da0f"
+  },
+  "gates": {
+    "decimal_non_rounding": "PASS",
+    "fresh_0_to_85": "PASS",
+    "populated_84_to_85": "PASS",
+    "direct_sql_negative_matrix": "PASS",
+    "concurrency_replay_idempotency": "PASS",
+    "lineage_and_supersession": "PASS",
+    "rbac_cross_brand": "PASS",
+    "rollback_retry": "PASS",
+    "focused_unit_contract_tests": "PASS_41_OF_41",
+    "focused_postgresql_tests": "PASS_6_OF_6",
+    "prisma_validate_generate": "PASS",
+    "build": "PASS",
+    "startup_root_liveness_database_health": "PASS_HTTP_200"
+  },
+  "decimal_proof": {
+    "canonical_125_25": "COMMITTED",
+    "noncanonical_125_251": "REJECTED_C04_FUNDING_LINEAGE_MISMATCH",
+    "noncanonical_row_count": 0,
+    "maximum_999999999999_99_format": true,
+    "maximum_999999999999_99_range": true
+  },
+  "concurrency_proof": {
+    "connections": 2,
+    "loser_blocked_until_winner_commit": true,
+    "loser_result": "UNIQUE_IDENTITY_CONFLICT",
+    "financial_authority_count": 1,
+    "canonical_event_count": 1
+  },
+  "rollback_retry_proof": {
+    "forced_failure_new_column_count": 0,
+    "failed_migration_rows": 1,
+    "resolved_rolled_back": true,
+    "retry": "PASS",
+    "final_status": "UP_TO_DATE"
+  },
+  "startup": {
+    "root": { "status": 200, "body": { "name": "TheCreatorShop API", "status": "ready" } },
+    "liveness": { "status": 200, "body": { "status": "ok" } },
+    "database_health": { "status": 200, "database": "up" },
+    "controlled_shutdown": true
+  },
+  "provider_actions": "NONE",
+  "non_disposable_database_mutation": "NONE",
+  "aws_or_production_action": "NONE",
+  "canonical_merge": "NONE",
+  "complete_blocker_set": []
+}

@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0",
+  "scope": "C04_BRAND_PAYOUTS_LINEAGE_IMPLEMENTATION",
+  "base_sha": "fc4d4b59e2a44d7ddced6bc5dde5119c501ec275",
+  "implementation_sha": "5a4f70075da13f9e49bdc501097fe0f571c3f405",
+  "implementation_tree": "a02866045c4ba70ed9012e47c9e7ee285a213ac5",
+  "migration_identity": "20260911125000_c04_brand_payouts_reserve_entitlement_lineage",
+  "migration_sql_sha256": "aa5c1900d06a1c240413be547f8ebe23b933085f93c766b51fdd2933bf91da0f",
+  "upstream_evidence_sha": "ce3865ca5adb17063df5ef59824a3a97dfc4ede8",
+  "decisions": [
+    {
+      "issue": "DECIMAL(14,2) coerced 125.251 to 125.25 before a scale constraint could observe the submitted value.",
+      "classification": "FINANCIAL_SAFETY_REQUIRED",
+      "chosen_correction": "Store the normalized amount as VARCHAR(15), validate its canonical two-decimal grammar first, then cast only for positive, maximum, reserve, projection, and event comparisons.",
+      "rejected_alternative": "A DECIMAL(14,2) column plus a scale CHECK cannot reject a value already rounded by the typmod.",
+      "proof": "125.25 committed; 125.251 failed with C04_FUNDING_LINEAGE_MISMATCH and left zero rows; 999999999999.99 passed format and range checks.",
+      "residual_risk": "NONE within the frozen INR/two-decimal C04 contract."
+    },
+    {
+      "issue": "A trusted funding confirmation and resulting entitlement could previously exist without exact reserve lineage.",
+      "classification": "MVP_LAUNCH_REQUIRED",
+      "chosen_correction": "Add canonical lineage columns, relations, indexes, final-shape checks, deferred projection/event validation, and append-only guards in additive migration 85.",
+      "rejected_alternative": "Application-only checks would leave direct SQL and concurrent transactions outside the invariant.",
+      "proof": "Fresh and populated migrations, direct-SQL negative matrix, exact lineage projection, supersession rejection, and append-only mutation rejection passed.",
+      "residual_risk": "Legacy rows remain explicitly LEGACY_UNRECONCILED; no inferred backfill was attempted."
+    },
+    {
+      "issue": "Concurrent duplicate confirmation delivery must not create duplicate authority or event state.",
+      "classification": "FINANCIAL_SAFETY_REQUIRED",
+      "chosen_correction": "Insert the final APPLIED identity inside the same transaction before financial mutation; rely on the unique identity as the serialization winner and perform a strict post-P2002 winner reread for replay.",
+      "rejected_alternative": "A preflight existence check has a race window and cannot establish exactly-once mutation.",
+      "proof": "Two connections raced: the second blocked until winner commit, then uniqueness resolved the race; final authority count 1 and event count 1; replay unit tests proved zero second mutation/broadcast.",
+      "residual_risk": "NONE for the bounded confirmation identity and canonical tuple."
+    },
+    {
+      "issue": "Prisma/runtime integration required reverse-relation naming and literal-enum typing parity.",
+      "classification": "UPSTREAM_DEPENDENCY_REQUIRED",
+      "chosen_correction": "Align the reserve reverse relation with runtime selection and preserve the confirmation disposition as a literal enum; add the entitlement lineage index to Prisma schema parity.",
+      "rejected_alternative": null,
+      "proof": "Prisma validate/generate, 41 focused tests, Nest build, and full AppModule startup passed.",
+      "residual_risk": "NONE."
+    },
+    {
+      "issue": "Existing legacy confirmations and authorities have no trustworthy source data for an exact lineage backfill.",
+      "classification": "DEFERRED_POST_MVP",
+      "chosen_correction": "Retain explicit LEGACY_UNRECONCILED and LEGACY_APPLIED states with nullable lineage fields.",
+      "rejected_alternative": "An inferred backfill would fabricate financial provenance and is outside standing authority.",
+      "proof": "Populated 84-to-85 upgrade preserved seeded legacy records and their explicit legacy states.",
+      "residual_risk": "Legacy data cannot claim canonical lineage until a separately authorized evidence-backed reconciliation exists."
+    }
+  ]
+}
