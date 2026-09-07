@@ -5,7 +5,8 @@
   "implementation_sha": "5a4f70075da13f9e49bdc501097fe0f571c3f405",
   "implementation_tree": "a02866045c4ba70ed9012e47c9e7ee285a213ac5",
   "migration_identity": "20260911125000_c04_brand_payouts_reserve_entitlement_lineage",
-  "migration_sql_sha256": "aa5c1900d06a1c240413be547f8ebe23b933085f93c766b51fdd2933bf91da0f",
+  "migration_sql_sha256": "6e384abdaf7cf9fa35973ca31e1a5cb541f60bd328937ff3d27844b9dfdb4d72",
+  "superseded_reported_migration_sql_sha256": "aa5c1900d06a1c240413be547f8ebe23b933085f93c766b51fdd2933bf91da0f",
   "upstream_evidence_sha": "ce3865ca5adb17063df5ef59824a3a97dfc4ede8",
   "decisions": [
     {
