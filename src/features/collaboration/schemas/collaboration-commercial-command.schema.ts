@@ -37,7 +37,9 @@ export const confirmEscrowFundingSchema = z
     ...commandEnvelope,
     fundingConfirmationRef: evidenceRef,
     escrowLockRef: evidenceRef,
-    confirmedAmount: z.coerce.number().finite().nonnegative(),
+    confirmedAmount: z
+      .string()
+      .regex(/^(?:0|[1-9]\d{0,11})(?:\.\d{1,4})?$/),
     currency: z
       .string()
       .trim()

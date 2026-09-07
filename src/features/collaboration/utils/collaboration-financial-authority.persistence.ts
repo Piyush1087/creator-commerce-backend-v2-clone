@@ -12,6 +12,13 @@ type AgreementAuthority = {
   currency: string;
 };
 
+/** Reconstructs the byte-identical hash from the persisted canonical authority projection. */
+export function reconstructFinancialAuthorityInstructionHash(
+  persistedAuthority: Record<string, unknown>,
+) {
+  return financialAuthorityHash(persistedAuthority);
+}
+
 export async function appendFinancialAuthority(
   tx: Prisma.TransactionClient,
   input: {
@@ -23,6 +30,8 @@ export async function appendFinancialAuthority(
     resolutionType: string;
     sourceFinancialRef: string;
     effectiveAt: Date;
+    fundingConfirmationId?: string;
+    reserveInstructionId?: string;
   },
 ) {
   if (!input.agreement.agreementHash) {
@@ -66,6 +75,17 @@ export async function appendFinancialAuthority(
       : []),
   ];
   for (const definition of definitions) {
+    const canonicalCreatorLineage =
+      definition.kind === "CREATOR_ENTITLEMENT" &&
+      input.resolutionType === "NORMAL_SUCCESS";
+    if (
+      canonicalCreatorLineage &&
+      (!input.fundingConfirmationId || !input.reserveInstructionId)
+    )
+      commandConflict(
+        "INVALID_STATE",
+        "Normal Creator entitlement requires exact protected-funding lineage",
+      );
     const prior = await tx.collaborationFinancialAuthorityInstruction.findFirst(
       {
         where: {
@@ -101,6 +121,12 @@ export async function appendFinancialAuthority(
       sourceFinancialRef: input.sourceFinancialRef,
       supersedesInstructionId: prior?.id ?? null,
       effectiveAt: input.effectiveAt.toISOString(),
+      ...(canonicalCreatorLineage
+        ? {
+            fundingConfirmationId: input.fundingConfirmationId!,
+            reserveInstructionId: input.reserveInstructionId!,
+          }
+        : {}),
     };
     await tx.collaborationFinancialAuthorityInstruction.create({
       data: {
@@ -111,7 +137,7 @@ export async function appendFinancialAuthority(
         agreementHash: input.agreement.agreementHash,
         kind: definition.kind,
         instructionVersion,
-        instructionHash: financialAuthorityHash(authority),
+        instructionHash: reconstructFinancialAuthorityInstructionHash(authority),
         amount: definition.amount,
         currency: input.agreement.currency,
         creatorEntitlementEffect: definition.creatorEffect,
@@ -122,6 +148,15 @@ export async function appendFinancialAuthority(
         sourceFinancialRef: input.sourceFinancialRef,
         supersedesInstructionId: prior?.id,
         effectiveAt: input.effectiveAt,
+        fundingLineageMode: canonicalCreatorLineage
+          ? "CANONICAL_PAYOUTS_V1"
+          : "LEGACY_UNRECONCILED",
+        fundingConfirmationId: canonicalCreatorLineage
+          ? input.fundingConfirmationId
+          : undefined,
+        reserveInstructionId: canonicalCreatorLineage
+          ? input.reserveInstructionId
+          : undefined,
       },
     });
   }
