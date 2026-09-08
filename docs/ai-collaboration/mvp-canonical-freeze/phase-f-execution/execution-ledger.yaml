@@ -38,6 +38,6 @@ runs:
     fresh_db_migrate: NOT_PROVEN
     validation_gate: NOT_RUN
     checkpoints:
-      frontend: PENDING_THIS_COMMIT
-      backend: PENDING_THIS_COMMIT
-      dummy_tcs: PENDING_THIS_COMMIT
+      frontend: da76da297ab9c32bbe128a233f5f4ff517794241
+      backend: 8ce12656ec68e4709b8fe77b8ab91412c726d122
+      dummy_tcs: 52842bb4c63808371f34237d4af37869d5c6d9cf
