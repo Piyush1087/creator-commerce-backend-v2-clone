@@ -10,6 +10,9 @@ function harness() {
     offering: { findMany: vi.fn(), findFirst: vi.fn() },
     brandOffer: { findMany: vi.fn(), findFirst: vi.fn() },
     uceCampaignProduct: { create: vi.fn() },
+    uceCampaign: {
+      findFirst: vi.fn().mockResolvedValue({ status: "DRAFT" }),
+    },
     uceCampaignAsset: {
       create: vi.fn().mockImplementation(({ data }) => ({
         id: "asset-1",
@@ -28,14 +31,22 @@ function harness() {
       })),
       findMany: vi.fn(),
     },
+    $transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
+      callback(prisma),
+    ),
   };
   const access = {
     assertCampaignOwned: vi.fn().mockResolvedValue({ id: "campaign-1" }),
   };
+  const campaignLock = { lockCampaign: vi.fn().mockResolvedValue(undefined) };
   return {
     prisma,
     access,
-    service: new BrandUceCampaignAssetService(prisma as never, access as never),
+    service: new BrandUceCampaignAssetService(
+      prisma as never,
+      access as never,
+      campaignLock as never,
+    ),
   };
 }
 

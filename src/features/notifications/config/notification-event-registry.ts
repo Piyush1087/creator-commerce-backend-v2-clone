@@ -18,6 +18,28 @@ const billing = (seed: Omit<EventSeed, "category" | "recipientPolicy">) =>
   });
 
 export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
+  "campaigns.application_approved": event({
+    eventType: "campaigns.application_approved",
+    category: "CAMPAIGNS_APPLICATIONS",
+    urgencyLevel: "INFORMATIONAL",
+    actionable: true,
+    inAppPolicy: "REQUIRED",
+    emailPolicy: "OPTIONAL",
+    recipientPolicy: "CREATOR_WORKSPACE_ACTIVE_TEAM",
+    deepLinkPath: "/creator/campaigns/applications/{application_id}",
+    title: "Application approved",
+  }),
+  "campaigns.application_rejected": event({
+    eventType: "campaigns.application_rejected",
+    category: "CAMPAIGNS_APPLICATIONS",
+    urgencyLevel: "INFORMATIONAL",
+    actionable: false,
+    inAppPolicy: "REQUIRED",
+    emailPolicy: "OPTIONAL",
+    recipientPolicy: "CREATOR_WORKSPACE_ACTIVE_TEAM",
+    deepLinkPath: "/creator/campaigns/applications/{application_id}",
+    title: "Application rejected",
+  }),
   "billing.subscription_payment_failed": billing({
     eventType: "billing.subscription_payment_failed",
     urgencyLevel: "CRITICAL",

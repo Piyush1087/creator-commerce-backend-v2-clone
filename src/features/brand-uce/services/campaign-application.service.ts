@@ -3,8 +3,10 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import {
+  UceApplicationAuthorityVersion,
   UceApplicationSource,
   UceApplicationStatus,
   UceCampaignCreatorIngestionMethod,
@@ -12,9 +14,18 @@ import {
   UceCampaignStatus,
   UceCollabStatus,
   UceMediaPlatform,
+  UceMilestoneStage,
+  UceNegotiationSubState,
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import type { AuthUser } from "../../auth/types/auth-user";
+import { ApplicationTerminalService } from "../../campaign-applications/application-terminal.service";
+import { projectApplication } from "../../campaign-applications/application-history.service";
+import { buildPhaseSyncPatch } from "../../../shared/uce/uce-production-phase.util";
+import { CollaborationProvisionService } from "../../collaboration/services/collaboration-provision.service";
+import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
+import { decimalToNumber, splitEscrowQuote } from "../utils/uce-decimal.util";
 import {
   approveApplicationInputSchema,
   rejectApplicationInputSchema,
@@ -26,13 +37,84 @@ function normalizeHandle(handle: string): string {
   return handle.trim().replace(/^@/, "").toLowerCase();
 }
 
+function defaultMilestoneDeadline(days = 14): Date {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+}
+
+const CANONICAL_HANDOFF_NOT_AVAILABLE =
+  "C03_CANONICAL_APPLICATION_HANDOFF_NOT_AVAILABLE";
+
+type LegacyApplicationShape = {
+  authorityVersion: UceApplicationAuthorityVersion;
+  campaignCreatorId: string | null;
+  legacyCampaignProductId: string | null;
+  legacyBriefId: string | null;
+  campaignCreator: { socialHandle: string; email?: string | null } | null;
+};
+
+function assertLegacyApplicationShape(
+  application: LegacyApplicationShape,
+): asserts application is LegacyApplicationShape & {
+  authorityVersion: typeof UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY;
+  campaignCreatorId: string;
+  legacyCampaignProductId: string;
+  legacyBriefId: string;
+  campaignCreator: { socialHandle: string; email?: string | null };
+} {
+  if (
+    application.authorityVersion !==
+      UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY ||
+    !application.campaignCreator ||
+    !application.campaignCreatorId ||
+    !application.legacyCampaignProductId ||
+    !application.legacyBriefId
+  ) {
+    throw new ConflictException("C03_LEGACY_APPLICATION_SHAPE_INVALID");
+  }
+}
+
 @Injectable()
 export class CampaignApplicationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: BrandUceAccessService,
     private readonly pipeline: BrandUcePipelineService,
+    private readonly collaborationProvision: CollaborationProvisionService,
+    private readonly subscriptionCapabilities: SubscriptionCapabilityService,
+    @Optional()
+    private readonly canonicalTerminals?: ApplicationTerminalService,
   ) {}
+
+  async routeDecision(
+    user: AuthUser,
+    brandProfileId: string,
+    campaignId: string,
+    applicationId: string,
+    command: "APPROVE" | "REJECT",
+    key: unknown,
+    reason?: string,
+  ) {
+    await this.access.assertCampaignOwned(brandProfileId, campaignId);
+    const row = await this.prisma.uceApplication.findFirst({
+      where: { id: applicationId, campaignId },
+      select: { authorityVersion: true },
+    });
+    if (!row) throw new NotFoundException({ code: "APPLICATION_NOT_FOUND" });
+    if (row.authorityVersion === "C03_CANONICAL") {
+      if (!this.canonicalTerminals)
+        throw new ConflictException({ code: CANONICAL_HANDOFF_NOT_AVAILABLE });
+      return this.canonicalTerminals.decide(
+        user,
+        campaignId,
+        applicationId,
+        command,
+        key,
+      );
+    }
+    return command === "APPROVE"
+      ? this.approve(brandProfileId, campaignId, applicationId, user.id)
+      : this.reject(brandProfileId, campaignId, applicationId, user.id, reason);
+  }
 
   /**
    * Explicit compatibility command. This is intentionally never invoked by a
@@ -85,8 +167,9 @@ export class CampaignApplicationService {
       const existing = await this.prisma.uceApplication.findFirst({
         where: {
           campaignId,
+          authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
           campaignCreatorId: creator.id,
-          briefId: row.briefId,
+          legacyBriefId: row.briefId,
           status: {
             in: [
               UceApplicationStatus.PENDING,
@@ -105,14 +188,15 @@ export class CampaignApplicationService {
 
       await this.prisma.uceApplication.create({
         data: {
-          requestId: `legacy-${row.id}`,
+          authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
+          legacyRequestId: `legacy-${row.id}`,
           campaignId,
           campaignCreatorId: creator.id,
-          campaignAssetId: assetId,
-          briefId: row.briefId,
+          legacyCampaignProductId: assetId,
+          legacyBriefId: row.briefId,
           status,
           source: UceApplicationSource.DIRECT,
-          rejectedAt:
+          legacyRejectedAt:
             status === UceApplicationStatus.REJECTED ? new Date() : null,
           snapshot: {
             create: {
@@ -134,26 +218,44 @@ export class CampaignApplicationService {
   async listApplicants(brandProfileId: string, campaignId: string) {
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
 
-    const rows = await this.prisma.uceApplication.findMany({
-      where: {
-        campaignId,
-        status: {
-          in: [
-            UceApplicationStatus.PENDING,
-            UceApplicationStatus.APPROVED,
-            UceApplicationStatus.REJECTED,
-            UceApplicationStatus.SUPERSEDED,
-          ],
+    const [rows, canonicalRows, canonicalCount] = await Promise.all([
+      this.prisma.uceApplication.findMany({
+        where: {
+          campaignId,
+          authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
+          status: {
+            in: [
+              UceApplicationStatus.PENDING,
+              UceApplicationStatus.APPROVED,
+              UceApplicationStatus.REJECTED,
+              UceApplicationStatus.SUPERSEDED,
+            ],
+          },
         },
-      },
-      include: { campaignCreator: true },
-      orderBy: { appliedAt: "desc" },
-      take: 50,
-    });
+        include: { campaignCreator: true },
+        orderBy: { appliedAt: "desc" },
+        take: 50,
+      }),
+      this.prisma.uceApplication.findMany({
+        where: {
+          campaignId,
+          authorityVersion: UceApplicationAuthorityVersion.C03_CANONICAL,
+        },
+        include: { snapshot: true, collaboration: { select: { id: true } } },
+        orderBy: [{ appliedAt: "desc" }, { id: "desc" }],
+        take: 50,
+      }),
+      this.prisma.uceApplication.count({
+        where: {
+          campaignId,
+          authorityVersion: UceApplicationAuthorityVersion.C03_CANONICAL,
+        },
+      }),
+    ]);
 
-    return {
-      state: rows.length ? ("READY" as const) : ("EMPTY" as const),
-      applicants: rows.map((row) => ({
+    const applicants = rows.map((row) => {
+      assertLegacyApplicationShape(row);
+      return {
         applicationId: row.id,
         campaignCreatorId: row.campaignCreatorId,
         name: row.campaignCreator.socialHandle,
@@ -172,13 +274,44 @@ export class CampaignApplicationService {
           | "EXPIRED",
         source: row.source,
         appliedAt: row.appliedAt.toISOString(),
-        campaignAssetId: row.campaignAssetId,
-        briefId: row.briefId,
+        campaignAssetId: row.legacyCampaignProductId,
+        briefId: row.legacyBriefId,
         canonicalCampaignAssetId: null,
         canonicalBriefId: null,
         referenceAuthority: "LEGACY_COMPATIBILITY" as const,
         intelligenceStatus: "UNAVAILABLE" as const,
-      })),
+      };
+    });
+
+    const canonical = canonicalRows.map((row) => {
+      const projection = projectApplication(row);
+      return {
+        ...projection,
+        name:
+          typeof projection.creator.displayName === "string"
+            ? projection.creator.displayName
+            : "Creator",
+        applicationStatus: row.status,
+        source: row.source,
+        campaignAssetId: row.canonicalCampaignAssetId,
+        briefId: row.canonicalBriefId,
+        canApprove: row.status === "PENDING",
+        canApprovePending: row.status === "PENDING",
+        canReject: row.status === "PENDING",
+      };
+    });
+    return {
+      state:
+        rows.length || canonical.length
+          ? ("READY" as const)
+          : ("EMPTY" as const),
+      reason: null,
+      canonicalApplicationCount: canonicalCount,
+      applicants: [...applicants, ...canonical].sort(
+        (a, b) =>
+          b.appliedAt.localeCompare(a.appliedAt) ||
+          b.applicationId.localeCompare(a.applicationId),
+      ),
     };
   }
 
@@ -193,13 +326,22 @@ export class CampaignApplicationService {
       throw new BadRequestException(parsed.error.flatten());
     }
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
+    await this.subscriptionCapabilities.assertCapability(
+      brandProfileId,
+      "COLLABORATION_CREATE",
+    );
 
-    await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const application = await tx.uceApplication.findFirst({
-        where: { id: applicationId, campaignId },
+        where: {
+          id: applicationId,
+          campaignId,
+          authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
+        },
         include: { campaignCreator: true },
       });
       if (!application) throw new NotFoundException("Application not found");
+      assertLegacyApplicationShape(application);
       if (application.status !== UceApplicationStatus.PENDING) {
         throw new BadRequestException(
           "Only PENDING applications can be approved",
@@ -226,7 +368,7 @@ export class CampaignApplicationService {
 
       const product = await tx.uceCampaignProduct.findFirst({
         where: {
-          id: application.campaignAssetId,
+          id: application.legacyCampaignProductId,
           campaignId,
           isActive: true,
         },
@@ -239,9 +381,9 @@ export class CampaignApplicationService {
 
       const brief = await tx.uceCampaignBrief.findFirst({
         where: {
-          id: application.briefId,
+          id: application.legacyBriefId,
           campaignId,
-          productId: application.campaignAssetId,
+          productId: application.legacyCampaignProductId,
           isActive: true,
         },
       });
@@ -255,11 +397,12 @@ export class CampaignApplicationService {
         where: {
           id: applicationId,
           campaignId,
+          authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
           status: UceApplicationStatus.PENDING,
         },
         data: {
           status: UceApplicationStatus.APPROVED,
-          approvedAt: new Date(),
+          legacyApprovedAt: new Date(),
         },
       });
       if (claimed.count !== 1) {
@@ -272,6 +415,7 @@ export class CampaignApplicationService {
       await tx.uceApplication.updateMany({
         where: {
           campaignId,
+          authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
           campaignCreatorId: application.campaignCreatorId,
           status: UceApplicationStatus.PENDING,
           id: { not: applicationId },
@@ -279,16 +423,127 @@ export class CampaignApplicationService {
         data: {
           status: UceApplicationStatus.SUPERSEDED,
           supersededByApplicationId: applicationId,
-          supersededAt: now,
+          legacySupersededAt: now,
         },
       });
 
+      const legacyCollab = await tx.uceCampaignCollaboration.findFirst({
+        where: {
+          campaignId,
+          instagramHandle: {
+            equals: application.campaignCreator.socialHandle,
+            mode: "insensitive",
+          },
+        },
+      });
+
+      const commercials = await tx.uceCampaignCommercials.findUnique({
+        where: { campaignId },
+      });
+      const advancePercent = commercials?.advancePaymentPercentage ?? 30;
+      let totalQuote = 0;
+      if (commercials) {
+        totalQuote =
+          commercials.compensationType === "FIXED_FEE"
+            ? decimalToNumber(commercials.fixedFeeAmount)
+            : decimalToNumber(commercials.negotiableMaxFee);
+      }
+      const { advance30Value, balance70Value } = splitEscrowQuote(
+        totalQuote,
+        advancePercent,
+      );
+
+      if (product.inventoryCount > 0) {
+        await tx.uceCampaignProduct.update({
+          where: { id: product.id },
+          data: { inventoryCount: { decrement: 1 } },
+        });
+      }
+
+      if (
+        legacyCollab &&
+        (legacyCollab.collabStatus === UceCollabStatus.APPLICANT_PENDING ||
+          legacyCollab.collabStatus === UceCollabStatus.APPLICANT_SHORTLISTED)
+      ) {
+        const milestoneDeadline = defaultMilestoneDeadline(14);
+        await tx.uceCampaignCollaboration.update({
+          where: { id: legacyCollab.id },
+          data: {
+            collabStatus: UceCollabStatus.ACTIVE_WORKFLOW,
+            currentMilestone: UceMilestoneStage.STAGE_1_NEGOTIATION,
+            productId: application.legacyCampaignProductId,
+            totalQuote,
+            advance30Value,
+            balance70Value,
+            negotiationState: UceNegotiationSubState.CREATOR_COUNTER,
+            currentMilestoneDeadline: milestoneDeadline,
+            ...buildPhaseSyncPatch({
+              ...legacyCollab,
+              collabStatus: UceCollabStatus.ACTIVE_WORKFLOW,
+              currentMilestone: UceMilestoneStage.STAGE_1_NEGOTIATION,
+              currentMilestoneDeadline: milestoneDeadline,
+            }),
+          },
+        });
+
+        await tx.uceCollaborationAuditLog.create({
+          data: {
+            collaborationId: legacyCollab.id,
+            stageContext: UceMilestoneStage.STAGE_1_NEGOTIATION,
+            systemEventTag: "APPLICANT_APPROVED",
+            messagePayload: `Creator ${legacyCollab.instagramHandle} approved and Collaboration created`,
+            actorIdentifier: actorId,
+          },
+        });
+
+        await tx.uceCampaignPerformanceAggregate.update({
+          where: { campaignId },
+          data: {
+            totalApplicantsCount: { decrement: 1 },
+            totalActiveCollabsCount: { increment: 1 },
+          },
+        });
+      }
+
+      const creatorUserId =
+        await this.collaborationProvision.ensureCreatorUserInTransaction(
+          tx,
+          application.campaignCreator.email,
+          application.campaignCreator.socialHandle,
+        );
+
+      const workflow =
+        await this.collaborationProvision.provisionFromUceApprovalInTransaction(
+          tx,
+          {
+            brandProfileId,
+            campaignId,
+            briefId: application.legacyBriefId,
+            creatorUserId,
+            productId: application.legacyCampaignProductId,
+            ucePipelineCollaborationId: legacyCollab?.id,
+            initialQuote: totalQuote,
+            advancePercent,
+            allowExisting: false,
+            welcomeMessage: `Congrats @${application.campaignCreator.socialHandle}! You're approved. View your brief and secure your spot.`,
+          },
+        );
+
+      return {
+        workflowCollaborationId: workflow.collaboration_id,
+      };
     });
 
-    // Application approval is Applicant truth only.
-    // Collaboration provision requires explicit deliverable_publishing_applicability
-    // via pipeline approve (clone contract) — do not invent or omit that mapping here.
-    return { ok: true, applicationId, status: "APPROVED" as const };
+    await this.collaborationProvision.broadcastProvisioned(
+      result.workflowCollaborationId,
+    );
+
+    return {
+      ok: true,
+      applicationId,
+      status: "APPROVED" as const,
+      workflowCollaborationId: result.workflowCollaborationId,
+    };
   }
 
   async reject(
@@ -305,10 +560,15 @@ export class CampaignApplicationService {
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
 
     const application = await this.prisma.uceApplication.findFirst({
-      where: { id: applicationId, campaignId },
+      where: {
+        id: applicationId,
+        campaignId,
+        authorityVersion: UceApplicationAuthorityVersion.LEGACY_COMPATIBILITY,
+      },
       include: { campaignCreator: true },
     });
     if (!application) throw new NotFoundException("Application not found");
+    assertLegacyApplicationShape(application);
     if (application.status !== UceApplicationStatus.PENDING) {
       throw new BadRequestException(
         "Only PENDING applications can be rejected",
@@ -319,7 +579,7 @@ export class CampaignApplicationService {
       where: { id: applicationId },
       data: {
         status: UceApplicationStatus.REJECTED,
-        rejectedAt: new Date(),
+        legacyRejectedAt: new Date(),
       },
     });
 

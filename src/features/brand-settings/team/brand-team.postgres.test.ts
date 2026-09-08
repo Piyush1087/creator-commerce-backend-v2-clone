@@ -395,7 +395,7 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
     });
     it.each([
       "same-org",
-      "unassigned",
+      "without-membership",
       "other-org",
       "non-brand",
       "inactive",
@@ -403,12 +403,18 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
     ])("existing recipient %s", async (kind) => {
       const w = await workspace();
       const other = kind === "other-org" ? await workspace() : null;
+      const creatorOrganization =
+        kind === "non-brand"
+          ? await prisma.organization.create({
+              data: { name: "BS-02 Creator fixture", kind: "CREATOR" },
+            })
+          : null;
+      if (creatorOrganization) orgIds.push(creatorOrganization.id);
       const user = await prisma.user.create({
         data: {
           email: freshEmail(),
           role: kind === "non-brand" ? "CREATOR" : "BRAND",
-          organizationId:
-            kind === "unassigned" ? null : (other?.org.id ?? w.org.id),
+          organizationId: creatorOrganization?.id ?? other?.org.id ?? w.org.id,
           authState: UserAuthState.ACTIVE,
         },
       });
@@ -473,13 +479,14 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
       ).toBe(2);
       expect(await anchorCount(w.brand.id)).toBe(1);
     });
-    it("serializes unassigned recipient accepting across different organizations", async () => {
+    it("serializes an organization-bound recipient accepting across different organizations", async () => {
       const a = await workspace(),
         b = await workspace();
       const user = await prisma.user.create({
         data: {
           email: freshEmail(),
           role: "BRAND",
+          organizationId: a.org.id,
           authState: UserAuthState.ACTIVE,
         },
       });
@@ -1145,6 +1152,7 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
         data: {
           email: freshEmail(),
           role: "BRAND",
+          organizationId: w.org.id,
           authState: UserAuthState.ACTIVE,
         },
       });
@@ -1222,6 +1230,7 @@ describe.skipIf(process.env.BS02_DATABASE_TEST !== "true")(
             data: {
               email,
               role: "BRAND",
+              organizationId: w.org.id,
               authState: UserAuthState.ACTIVE,
             },
           }),

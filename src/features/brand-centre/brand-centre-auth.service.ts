@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { UserAuthState, UserRole } from "@prisma/client";
+import { UserAuthState, UserRole, type Prisma } from "@prisma/client";
 
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../auth/types/auth-user";
@@ -17,7 +17,15 @@ export class BrandCentreAuthService {
   ) {}
 
   async resolveBrandProfileIdForWorkspace(user: AuthUser): Promise<string> {
-    const current = await this.prisma.user.findUnique({
+    return this.resolveBrandProfileIdInTransaction(this.prisma, user);
+  }
+
+  /** Reuse current Brand membership authority without session side effects. */
+  async resolveBrandProfileIdInTransaction(
+    tx: Prisma.TransactionClient,
+    user: AuthUser,
+  ): Promise<string> {
+    const current = await tx.user.findUnique({
       where: { id: user.id },
       include: {
         brandTeamMemberships: {

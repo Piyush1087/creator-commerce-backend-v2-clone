@@ -32,6 +32,9 @@ describe("Campaign reconciliation authorization boundaries", () => {
       list: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      publish: vi.fn(),
+      pause: vi.fn(),
+      resume: vi.fn(),
     };
     const controller = new BrandUceController(
       auth as never,
@@ -73,8 +76,11 @@ describe("Campaign reconciliation authorization boundaries", () => {
     await controller.updateCanonicalBrief(request, "campaign-1", "brief-1", {
       title: "Updated owned Brief",
     });
+    await controller.publishCanonicalBrief(request, "campaign-1", "brief-1");
+    await controller.pauseCanonicalBrief(request, "campaign-1", "brief-1");
+    await controller.resumeCanonicalBrief(request, "campaign-1", "brief-1");
 
-    expect(auth.resolveBrandProfileId).toHaveBeenCalledTimes(6);
+    expect(auth.resolveBrandProfileId).toHaveBeenCalledTimes(9);
     expect(assets.listSelectable).toHaveBeenCalledWith("brand-1");
     expect(assets.listForCampaign).toHaveBeenCalledWith(
       "brand-1",
@@ -97,6 +103,21 @@ describe("Campaign reconciliation authorization boundaries", () => {
       "brief-1",
       { title: "Updated owned Brief" },
     );
+    expect(canonicalBriefs.publish).toHaveBeenCalledWith(
+      "brand-1",
+      "campaign-1",
+      "brief-1",
+    );
+    expect(canonicalBriefs.pause).toHaveBeenCalledWith(
+      "brand-1",
+      "campaign-1",
+      "brief-1",
+    );
+    expect(canonicalBriefs.resume).toHaveBeenCalledWith(
+      "brand-1",
+      "campaign-1",
+      "brief-1",
+    );
   });
 
   it("scopes selectable Brand Centre entities to the authenticated Brand", async () => {
@@ -107,6 +128,7 @@ describe("Campaign reconciliation authorization boundaries", () => {
     };
     const service = new BrandUceCampaignAssetService(
       prisma as never,
+      {} as never,
       {} as never,
     );
 
@@ -144,6 +166,7 @@ describe("Campaign reconciliation authorization boundaries", () => {
     const service = new BrandUceCampaignAssetService(
       prisma as never,
       access as never,
+      {} as never,
     );
 
     await expect(
@@ -173,6 +196,7 @@ describe("Campaign reconciliation authorization boundaries", () => {
     const service = new BrandUceCampaignAssetService(
       prisma as never,
       access as never,
+      {} as never,
     );
 
     await service.listForCampaign("brand-1", "campaign-1");
@@ -204,6 +228,7 @@ describe("Campaign reconciliation authorization boundaries", () => {
       const service = new BrandUceCampaignAssetService(
         prisma as never,
         access as never,
+        {} as never,
       );
 
       await expect(
@@ -229,6 +254,7 @@ describe("Campaign reconciliation authorization boundaries", () => {
     const service = new CanonicalCampaignBriefService(
       prisma as never,
       access as never,
+      {} as never,
     );
 
     await expect(
@@ -254,6 +280,7 @@ describe("Campaign reconciliation authorization boundaries", () => {
     const service = new CanonicalCampaignBriefService(
       prisma as never,
       access as never,
+      {} as never,
     );
 
     await expect(
@@ -286,19 +313,41 @@ describe("Campaign reconciliation authorization boundaries", () => {
     const updated = {
       id: "brief-1",
       campaignAssetId: "asset-1",
-      title: "Updated owned Brief",
-      creativeRequirements: "Use truthful product demonstrations.",
-      isActive: true,
+      status: "DRAFT",
+      creationSource: "MANUAL",
+      briefName: "Updated owned Brief",
+      creativeIntent: null,
+      creatorBrief: null,
+      briefType: null,
+      platform: null,
+      briefLevelGuidance: null,
+      referenceContent: null,
+      usageRights: null,
+      creatorRequirements: null,
+      publishedAt: null,
+      pausedAt: null,
+      legacyCreativeRequirements: "Use truthful product demonstrations.",
+      legacyIsActive: false,
       createdAt: new Date("2026-08-15T00:00:00.000Z"),
+      updatedAt: new Date("2026-08-15T00:00:00.000Z"),
+      campaignAsset: { status: "ACTIVE" },
       deliverables: [],
     };
     const tx = {
+      uceCampaign: {
+        findFirst: vi.fn().mockResolvedValue({
+          status: UceCampaignStatus.DRAFT,
+        }),
+      },
       canonicalBriefDeliverable: { deleteMany: vi.fn() },
-      canonicalCampaignBrief: { update: vi.fn().mockResolvedValue(updated) },
+      canonicalCampaignBrief: {
+        findFirst: vi.fn().mockResolvedValue(updated),
+        update: vi.fn().mockResolvedValue(updated),
+      },
     };
     const prisma = {
       canonicalCampaignBrief: {
-        findFirst: vi.fn().mockResolvedValue({ id: "brief-1" }),
+        findFirst: vi.fn().mockResolvedValue(updated),
       },
       $transaction: vi.fn().mockImplementation((callback) => callback(tx)),
     };
@@ -310,6 +359,7 @@ describe("Campaign reconciliation authorization boundaries", () => {
     const service = new CanonicalCampaignBriefService(
       prisma as never,
       access as never,
+      { lockCampaign: vi.fn().mockResolvedValue(undefined) } as never,
     );
 
     await service.update("brand-1", "campaign-1", "brief-1", {
@@ -319,6 +369,7 @@ describe("Campaign reconciliation authorization boundaries", () => {
 
     expect(prisma.canonicalCampaignBrief.findFirst).toHaveBeenCalledWith({
       where: { id: "brief-1", campaignAsset: { campaignId: "campaign-1" } },
+      include: expect.any(Object),
     });
     expect(tx.canonicalCampaignBrief.update).toHaveBeenCalledWith(
       expect.objectContaining({

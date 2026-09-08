@@ -270,7 +270,10 @@ export class CreatorCoPilotController {
     });
 
     if (stream && payload.narrativeText) {
-      await this.emitNarrativeChunks(payload.narrativeText, stream.onNarrativeDelta);
+      await this.emitNarrativeChunks(
+        payload.narrativeText,
+        stream.onNarrativeDelta,
+      );
     }
 
     await this.threads.appendAssistantMessage({

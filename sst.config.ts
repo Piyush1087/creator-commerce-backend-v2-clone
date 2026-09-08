@@ -75,6 +75,9 @@ export default $config({
     const GATEKEEPER_PRIVACY_POLICY_VERSION = requiredEnv(
       "GATEKEEPER_PRIVACY_POLICY_VERSION",
     );
+    const C03_INVITATION_IDENTITY_HMAC_PEPPER = requiredEnv(
+      `C03_INVITATION_IDENTITY_HMAC_PEPPER_${authSuffix}`,
+    );
 
     const defaultFrontendUrl =
       $app.stage === "prod"
@@ -125,6 +128,7 @@ export default $config({
       AUTH_OTP_TTL: "10m",
       AUTH_RESET_TTL: "30m",
       AUTH_OTP_PEPPER,
+      C03_INVITATION_IDENTITY_HMAC_PEPPER,
       S3_BUCKET_NAME: filesBucket.name,
       AWS_REGION: process.env.AWS_REGION ?? "ap-south-1",
       POSTMARK_SERVER_TOKEN: process.env.POSTMARK_SERVER_TOKEN as string,
@@ -208,6 +212,14 @@ export default $config({
         process.env.OPENAI_REQUEST_TIMEOUT_MS ?? "120000",
       DATA_EXTRACTION_PROVIDER_MAX_ATTEMPTS:
         process.env.DATA_EXTRACTION_PROVIDER_MAX_ATTEMPTS ?? "3",
+      OFFERING_PRICE_REFRESH_ENABLED:
+        process.env.OFFERING_PRICE_REFRESH_ENABLED ?? "true",
+      OFFERING_PRICE_REFRESH_SCAN_INTERVAL_MINUTES:
+        process.env.OFFERING_PRICE_REFRESH_SCAN_INTERVAL_MINUTES ?? "60",
+      OFFERING_PRICE_REFRESH_INTERVAL_HOURS:
+        process.env.OFFERING_PRICE_REFRESH_INTERVAL_HOURS ?? "24",
+      OFFERING_PRICE_REFRESH_BATCH_SIZE:
+        process.env.OFFERING_PRICE_REFRESH_BATCH_SIZE ?? "20",
       INSTAGRAM_API_ID: process.env.INSTAGRAM_API_ID as string,
       INSTAGRAM_APP_SECRET: process.env.INSTAGRAM_APP_SECRET as string,
       CREATOR_INSTAGRAM_REDIRECT_URI:

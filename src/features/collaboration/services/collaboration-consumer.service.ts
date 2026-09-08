@@ -101,7 +101,9 @@ export class CollaborationConsumerService {
     return {
       collaborationId: row.id,
       campaign: row.campaign,
-      brief: { id: row.brief.id, title: row.brief.internalTitle },
+      brief: row.brief
+        ? { id: row.brief.id, title: row.brief.internalTitle }
+        : null,
       campaignProduct: row.product
         ? { id: row.product.id, name: row.product.productName }
         : null,
@@ -134,7 +136,9 @@ export class CollaborationConsumerService {
     return {
       collaborationId: row.id,
       campaign: row.campaign,
-      brief: { id: row.brief.id, title: row.brief.internalTitle },
+      brief: row.brief
+        ? { id: row.brief.id, title: row.brief.internalTitle }
+        : null,
       campaignProduct: row.product
         ? { id: row.product.id, name: row.product.productName }
         : null,

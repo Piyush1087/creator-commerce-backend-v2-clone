@@ -19,6 +19,7 @@ import { commandConflict } from "../errors/collaboration-command.error";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
+import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
 import { splitEscrowQuote } from "../../brand-uce/utils/uce-decimal.util";
 import type {
   AcceptCommercialsDto,
@@ -68,6 +69,7 @@ export class CollaborationService {
     private readonly prisma: PrismaService,
     private readonly access: CollaborationAccessService,
     private readonly realtime: CollaborationRealtimeService,
+    private readonly notifications: NotificationDispatchService,
   ) {}
 
   async listThreads(
@@ -624,7 +626,7 @@ export class CollaborationService {
     const autoApprovalDeadline = new Date(Date.now() + 72 * 60 * 60 * 1000);
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.collaborationMedia.create({
+      const mediaReview = await tx.collaborationMedia.create({
         data: {
           collaborationId,
           phase: dto.phase,
@@ -642,6 +644,20 @@ export class CollaborationService {
         `Media submitted (v${versionNumber}). 72-hour review clock started.`,
         { unreadBrand: true },
       );
+      await this.notifications.enqueueWithinTransaction(tx, {
+        workspaceId: thread.brandProfileId,
+        eventType: "collaborations.media_submitted_for_review",
+        source: {
+          sourceType: "collaboration_media_review",
+          sourceId: mediaReview.id,
+          transitionId: "submitted_for_review",
+        },
+        payload: {
+          collaboration_id: collaborationId,
+          media_review_id: mediaReview.id,
+        },
+        triggerUserId: null,
+      });
     });
 
     return this.broadcastAndReturnThread(user, collaborationId);

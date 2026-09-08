@@ -1,75 +1,117 @@
 import { Type } from "class-transformer";
 import {
-  ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
   IsUUID,
-  MaxLength,
   Min,
-  MinLength,
   ValidateNested,
 } from "class-validator";
+import {
+  UceBriefCreationSource,
+  UceBriefType,
+  UceMediaPlatform,
+} from "@prisma/client";
 
+/** Transport boundary for canonical and P0-compatibility Deliverable shapes. */
 export class CanonicalBriefDeliverableDto {
+  @IsOptional()
+  @IsUUID()
+  deliverable_id?: string;
+
   @IsString()
-  @MinLength(2)
-  @MaxLength(80)
   format!: string;
 
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  display_order?: number;
+
+  @IsOptional()
+  configuration?: unknown;
+
+  @IsOptional()
+  creative_guidance?: unknown;
+
+  @IsOptional()
+  @IsUUID()
+  amplify_target_deliverable_id?: string | null;
+
+  @IsOptional()
   @IsInt()
   @Min(1)
-  quantity!: number;
+  quantity?: number;
 
-  @IsString()
-  @MinLength(5)
-  @MaxLength(4000)
-  creative_requirements!: string;
-
-  @IsBoolean()
-  publishing_required!: boolean;
-}
-
-export class CreateCanonicalCampaignBriefDto {
-  @IsUUID()
-  campaign_asset_id!: string;
-
-  @IsString()
-  @MinLength(5)
-  @MaxLength(255)
-  title!: string;
-
-  @IsString()
-  @MinLength(10)
-  @MaxLength(8000)
-  creative_requirements!: string;
-
-  @IsArray()
-  @ArrayMinSize(1)
-  @ValidateNested({ each: true })
-  @Type(() => CanonicalBriefDeliverableDto)
-  deliverables!: CanonicalBriefDeliverableDto[];
-}
-
-export class UpdateCanonicalCampaignBriefDto {
   @IsOptional()
   @IsString()
-  @MinLength(5)
-  @MaxLength(255)
+  creative_requirements?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  publishing_required?: boolean;
+}
+
+class CanonicalCampaignBriefFieldsDto {
+  @IsOptional()
+  @IsString()
+  brief_name?: string | null;
+
+  @IsOptional()
+  @IsString()
+  creative_intent?: string | null;
+
+  @IsOptional()
+  @IsString()
+  creator_brief?: string | null;
+
+  @IsOptional()
+  @IsEnum(UceBriefType)
+  brief_type?: UceBriefType | null;
+
+  @IsOptional()
+  @IsEnum(UceMediaPlatform)
+  platform?: UceMediaPlatform | null;
+
+  @IsOptional()
+  brief_level_guidance?: unknown;
+
+  @IsOptional()
+  reference_content?: unknown;
+
+  @IsOptional()
+  usage_rights?: unknown;
+
+  @IsOptional()
+  @IsString()
+  creator_requirements?: string | null;
+
+  /** P0 compatibility only; never promoted into canonical rich content. */
+  @IsOptional()
+  @IsString()
   title?: string;
 
+  /** P0 compatibility only; never promoted into canonical rich content. */
   @IsOptional()
   @IsString()
-  @MinLength(10)
-  @MaxLength(8000)
   creative_requirements?: string;
 
   @IsOptional()
   @IsArray()
-  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => CanonicalBriefDeliverableDto)
   deliverables?: CanonicalBriefDeliverableDto[];
 }
+
+export class CreateCanonicalCampaignBriefDto extends CanonicalCampaignBriefFieldsDto {
+  @IsUUID()
+  campaign_asset_id!: string;
+
+  @IsOptional()
+  @IsEnum(UceBriefCreationSource)
+  creation_source?: UceBriefCreationSource;
+}
+
+export class UpdateCanonicalCampaignBriefDto extends CanonicalCampaignBriefFieldsDto {}

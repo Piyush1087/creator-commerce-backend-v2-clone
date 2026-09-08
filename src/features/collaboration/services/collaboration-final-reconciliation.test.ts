@@ -58,6 +58,10 @@ function legacyService(sourceApplicationId: string | null) {
     prisma,
     { assertThreadForUser: async () => row } as any,
     { broadcast: async () => undefined } as any,
+    {
+      enqueueWithinTransaction: async () => ({ job_id: "job-1" }),
+      dispatch: async () => ({ job_id: "job-1" }),
+    } as any,
   );
   (service as any).broadcastAndReturnThread = async () => row;
   return { service, getLegacyMutationCount: () => legacyMutationCount };

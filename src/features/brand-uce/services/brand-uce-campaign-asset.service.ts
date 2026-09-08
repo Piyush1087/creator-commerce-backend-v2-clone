@@ -17,6 +17,7 @@ import {
   type CreateCampaignAssetDto,
 } from "../dto/brand-uce-campaign-asset.dto";
 import { BrandUceAccessService } from "./brand-uce-access.service";
+import { CampaignLifecycleLockService } from "./campaign-lifecycle-lock.service";
 
 const TERMINAL = new Set<UceCampaignStatus>([
   UceCampaignStatus.COMPLETED,
@@ -28,6 +29,7 @@ export class BrandUceCampaignAssetService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: BrandUceAccessService,
+    private readonly campaignLock: CampaignLifecycleLockService,
   ) {}
 
   async listSelectable(brandProfileId: string) {
@@ -106,14 +108,25 @@ export class BrandUceCampaignAssetService {
 
     const data = await this.resolveSelection(brandProfileId, input);
     try {
-      const asset = await this.prisma.uceCampaignAsset.create({
-        data: {
-          campaignId,
-          kind: input.kind as UceCampaignAssetKind,
-          status: UceCampaignAssetStatus.ACTIVE,
-          ...data,
-        },
-        include: this.assetInclude,
+      const asset = await this.prisma.$transaction(async (tx) => {
+        await this.campaignLock.lockCampaign(tx, campaignId);
+        const lockedCampaign = await tx.uceCampaign.findFirst({
+          where: { id: campaignId, brandProfileId },
+          select: { status: true },
+        });
+        if (!lockedCampaign) throw new NotFoundException("Campaign not found.");
+        if (TERMINAL.has(lockedCampaign.status)) {
+          throw new ConflictException("This Campaign is read-only.");
+        }
+        return tx.uceCampaignAsset.create({
+          data: {
+            campaignId,
+            kind: input.kind as UceCampaignAssetKind,
+            status: UceCampaignAssetStatus.ACTIVE,
+            ...data,
+          },
+          include: this.assetInclude,
+        });
       });
       return this.toProjection(asset);
     } catch (error: unknown) {

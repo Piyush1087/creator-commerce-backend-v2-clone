@@ -1,0 +1,8 @@
+Environment variables loaded from .env
+Error: ERROR: current transaction is aborted, commands ignored until end of transaction block
+   0: schema_commands::commands::apply_migrations::Applying migration
+           with migration_name="20260910120000_c03_campaign_asset_brief_convergence"
+             at schema-engine\commands\src\commands\apply_migrations.rs:95
+   1: schema_core::state::ApplyMigrations
+             at schema-engine\core\src\state.rs:260
+

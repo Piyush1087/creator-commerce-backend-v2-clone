@@ -45,28 +45,20 @@ export class CanonicalCampaignReadinessService {
   async getReadiness(brandProfileId: string, campaignId: string) {
     const campaign = await this.prisma.uceCampaign.findFirst({
       where: { id: campaignId, brandProfileId },
-      select: { id: true, status: true },
+      select: { id: true, status: true, canonicalDefinition: true },
     });
     if (!campaign) throw new BadRequestException("Campaign draft not found.");
     if (campaign.status !== UceCampaignStatus.DRAFT) {
       throw new BadRequestException("Campaign is no longer a DRAFT.");
     }
 
-    const [rows, brand] = await Promise.all([
-      this.prisma.$queryRaw<Array<{ canonical_definition: unknown }>>`
-        SELECT "canonical_definition"
-        FROM "uce_campaigns"
-        WHERE "id" = ${campaignId}
-        LIMIT 1
-      `,
-      this.prisma.brandProfile.findUnique({
-        where: { id: brandProfileId },
-        select: { countryCode: true, industry: true },
-      }),
-    ]);
+    const brand = await this.prisma.brandProfile.findUnique({
+      where: { id: brandProfileId },
+      select: { countryCode: true, industry: true },
+    });
     if (!brand) throw new BadRequestException("Brand profile not found");
 
-    const objective = savedObjective(rows[0]?.canonical_definition);
+    const objective = savedObjective(campaign.canonicalDefinition);
     const readiness = resolveCanonicalCampaignReadiness(
       objective,
       brand.industry,

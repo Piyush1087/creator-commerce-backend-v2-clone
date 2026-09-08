@@ -105,6 +105,7 @@ export class NotificationWorkerService implements OnModuleInit {
       claimed.push({
         id: job.id,
         workspaceId: job.workspaceId,
+        creatorWorkspaceId: job.creatorWorkspaceId,
         eventType: job.eventType,
         semanticEventKey: job.semanticEventKey,
         claimToken,

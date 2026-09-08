@@ -34,11 +34,13 @@ handoff-audit/
 │   └── 02-phase2-product-intelligence-v1/
 └── creator/
     ├── README.md
-    ├── commands-to-run.md              ← run these locally; paste results back
-    ├── origin-run-log.md               ← filled from your command output
-    ├── origin-integration-ledger.yaml
+    ├── commands-to-run.md              ← C-01/C-05
+    ├── origin-run-log.md
+    ├── c03-commands-to-run.md          ← C-03
+    ├── c03-origin-run-log.md
     ├── 01-c01-creator-entry/
-    └── 02-c05-creator-settings-shell/
+    ├── 02-c05-creator-settings-shell/
+    └── 03-c03-campaign-participation/
 ```
 
 Each module folder keeps:

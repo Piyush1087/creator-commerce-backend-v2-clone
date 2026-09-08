@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { PrismaModule } from "../../prisma/prisma.module";
+import { CampaignApplicationsModule } from "../campaign-applications/campaign-applications.module";
 import { AuthModule } from "../auth/auth.module";
 import { BrandCentreModule } from "../brand-centre/brand-centre.module";
 import { CollaborationModule } from "../collaboration/collaboration.module";
@@ -16,15 +17,18 @@ import { BrandUceProductService } from "./services/brand-uce-product.service";
 import { BrandUceReportingService } from "./services/brand-uce-reporting.service";
 import { CampaignApplicationService } from "./services/campaign-application.service";
 import { CampaignCommandService } from "./services/campaign-command.service";
+import { CampaignLifecycleLockService } from "./services/campaign-lifecycle-lock.service";
 import { CampaignQueryService } from "./services/campaign-query.service";
 import { CanonicalCampaignCreateService } from "./services/canonical-campaign-create.service";
 import { CanonicalCampaignDraftReadService } from "./services/canonical-campaign-draft-read.service";
 import { CanonicalCampaignReadinessService } from "./services/canonical-campaign-readiness.service";
 import { CanonicalCampaignBriefService } from "./services/canonical-campaign-brief.service";
+import { CanonicalCampaignApplicationReadService } from "./services/canonical-campaign-application-read.service";
 
 @Module({
   imports: [
     PrismaModule,
+    CampaignApplicationsModule,
     AuthModule,
     BrandCentreModule,
     CollaborationModule,
@@ -43,9 +47,11 @@ import { CanonicalCampaignBriefService } from "./services/canonical-campaign-bri
     CampaignApplicationService,
     CampaignQueryService,
     CampaignCommandService,
+    CampaignLifecycleLockService,
     CanonicalCampaignCreateService,
     CanonicalCampaignDraftReadService,
     CanonicalCampaignReadinessService,
+    CanonicalCampaignApplicationReadService,
   ],
   exports: [
     BrandUceCampaignService,
@@ -54,7 +60,9 @@ import { CanonicalCampaignBriefService } from "./services/canonical-campaign-bri
     CampaignApplicationService,
     CampaignQueryService,
     CampaignCommandService,
+    CampaignLifecycleLockService,
     CanonicalCampaignCreateService,
+    CanonicalCampaignApplicationReadService,
   ],
 })
 export class BrandUceModule {}

@@ -33,7 +33,9 @@ suite("BS-05 P2B Team producer transaction", () => {
     ) {
       throw new Error("P2B requires a disposable loopback p2b_* database");
     }
-    await db.organization.create({ data: { id: organizationId, name: "P2B" } });
+    await db.organization.create({
+      data: { id: organizationId, name: "P2B", kind: "BRAND" },
+    });
     await db.brandProfile.create({
       data: {
         id: brandId,

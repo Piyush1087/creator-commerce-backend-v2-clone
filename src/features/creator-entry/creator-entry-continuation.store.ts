@@ -3,6 +3,7 @@ import { CreatorEntryContinuationIntent } from "@prisma/client";
 import { createHash, randomBytes } from "node:crypto";
 
 import { PrismaService } from "../../prisma/prisma.service";
+import type { CampaignContinuationSeed } from "./campaign-continuation-context.port";
 
 export const hashCreatorEntryContinuationToken = (token: string): string =>
   createHash("sha256").update(token).digest("hex");
@@ -35,6 +36,7 @@ export class CreatorEntryContinuationStore {
     campaignId: string;
     boundUserId?: string | null;
     expiresAt: Date;
+    context?: CampaignContinuationSeed;
   }): Promise<{ continuationId: string; opaqueToken: string }> {
     if (args.expiresAt.getTime() <= Date.now()) {
       throw new BadRequestException(
@@ -49,6 +51,22 @@ export class CreatorEntryContinuationStore {
         campaignId: args.campaignId,
         boundUserId: args.boundUserId ?? null,
         expiresAt: args.expiresAt,
+        ...(args.context
+          ? {
+              contextVersion: args.context.schemaVersion,
+              entrySurface: args.context.entrySurface,
+              entryAuthorityKind: args.context.entryAuthority.kind,
+              campaignShareId:
+                args.context.entryAuthority.kind === "SHARE"
+                  ? args.context.entryAuthority.campaignShareId
+                  : null,
+              campaignInvitationId:
+                args.context.entryAuthority.kind === "INVITATION"
+                  ? args.context.entryAuthority.campaignInvitationId
+                  : null,
+              firstQualifiedTouchId: args.context.firstQualifiedTouchId ?? null,
+            }
+          : {}),
       },
       select: { id: true },
     });

@@ -1,19 +1,25 @@
-# Creator module audit (C-01 + C-05)
+# Creator module audit (C-01 + C-05 + C-03)
 
-Origin integration of accepted clone C-01 (Creator Entry) and C-05 (Creator
-Settings + persistent Creator shell).
+Origin integration of accepted clone C-01 (Creator Entry), C-05 (Creator
+Settings + persistent Creator shell), and C-03 (Campaign Participation / Apply).
 
-C-05 cannot compile without C-01, so both modules share one origin branch.
-Verification commands are listed once in `commands-to-run.md`. Results are
-recorded in `origin-run-log.md`, then copied into each module's
-`automated-test-results.md`. Local click-through is `ui-verification.md`
-(C-01 and C-05 sections).
+C-05 cannot compile without C-01, so those two modules share one origin branch
+and the shared files below. **C-03** uses a separate integration branch and its
+own command/run-log files (do not overwrite C-01/C-05 evidence).
 
 **Reusable process for future modules:**  
 [`../MODULE-AUDIT-TESTING-PLAYBOOK.md`](../MODULE-AUDIT-TESTING-PLAYBOOK.md)  
 (file set, status vocabulary, no-skip DB rules, report/test-results templates).
 
-**Reconciliation**
+## Modules
+
+| Module | Folder | Commands / run log |
+|--------|--------|--------------------|
+| C-01 Creator Entry | `01-c01-creator-entry/` | `commands-to-run.md` · `origin-run-log.md` |
+| C-05 Settings + shell | `02-c05-creator-settings-shell/` | same shared files |
+| C-03 Campaign Participation / Apply | `03-c03-campaign-participation/` | `c03-commands-to-run.md` · `c03-origin-run-log.md` |
+
+**C-01 / C-05 reconciliation**
 
 | Pass | Report | Test results |
 |------|--------|--------------|
@@ -22,46 +28,41 @@ recorded in `origin-run-log.md`, then copied into each module's
 
 Do not overwrite earlier pass files; add `reconciliation-pass-N-*` for corrections.
 
-## Origin branch
+## Origin branches
+
+### C-01 / C-05 (historical)
 
 | Repo | Branch | Base (`origin/development`) | Port status |
 |------|--------|-----------------------------|-------------|
-| Backend | `feature/c01-c05-creator-integration` | `2f03819` (Settings MVP PR #23) | Uncommitted working tree |
-| Frontend | `feature/c01-c05-creator-integration` | `f4e6c49` (Settings MVP PR #21) | Uncommitted working tree |
+| Backend | `feature/c01-c05-creator-integration` | `2f03819` (Settings MVP PR #23) | See module packets |
+| Frontend | `feature/c01-c05-creator-integration` | `f4e6c49` (Settings MVP PR #21) | See module packets |
 
-Not pushed. No PR. No merge. Production migrate/deploy is **not** authorized.
+### C-03 (current)
 
-## Clone reference docs (do not treat as origin evidence)
+| Repo | Branch | Merge | Status |
+|------|--------|-------|--------|
+| Backend | `integration/c03-campaign-participation` | `9397a10` (parents `f274bad` + `aebeb85`) | BE scoped postgres green; uncommitted reconcile; no PR |
+| Frontend | `integration/c03-campaign-participation` | `26e1a0d` (parents `fac47f2` + `82ed3c9`) | FE tsc/vitest/build/lint VERIFIED; uncommitted; no PR |
 
-Copied onto origin backend `docs/ai-collaboration/`:
+Not pushed for C-03. No PR. Production migrate/deploy is **not** authorized.
 
-| Clone artifact | Local copy | Use |
-|----------------|------------|-----|
-| `c01-developer-code-integration-handoff-v1.md` | same path | Product behavior, routes, migrations, integration order |
-| `c01-aws-database-bootstrap-handoff-v1.md` | same path | AWS/DB discovery later; **do not execute** |
-| `c01-module-closeout-v1.md` | same path | Clone closeout SHAs and clone test counts |
-| `c05-developer-code-integration-handoff-v1.md` | same path | Settings/shell Product freeze, routes, actor contract |
-| `c05-module-closeout-v1.md` | same path | Clone closeout SHAs and clone test counts |
-| `c05-execution-ledger-v1.yaml` | same path | Clone checkpoint register |
+## Clone reference docs
 
-Origin intake notes:
+C-01/C-05 copies remain under `docs/ai-collaboration/c01-*` and `c05-*`.
 
-- Backend: `docs/ai-collaboration/2026-09-03-c01-c05-clone-reconcile.md`
-- Frontend: `docs/ai-collaboration/2026-09-03-c01-c05-clone-reconcile.md`
+C-03 accepted tips (mail authority):
 
-## Clone SHAs used for the port
+| Role | SHA |
+|------|-----|
+| Backend tip | `aebeb85fd6bba37f88c3805c213c61e7f63b2f5f` |
+| Frontend tip | `82ed3c9ef849be8353565a1901b6f5fb065c37e1` |
 
-File checkout used C-05 clone `development` heads because they already contain C-01.
-Do **not** use the older C-01 handoff checkpoint `3ec01751` as the file source.
-
-| Role | Backend | Frontend |
-|------|---------|----------|
-| Origin `development` base | `2f03819` | `f4e6c49` |
-| C-01 clone ancestor | `8f2a3b3` | `b50c36f` |
-| C-05 runtime acceptance | `156d583` | `323658d` |
-| File checkout source | `4c5f428` | `323658d` |
+Primary handoff (external):  
+https://github.com/Piyush1087/dummy_tcs/blob/5e23582318cd7bbf637d184d36412cc3f8fe70a4/docs/ai-collaboration/c03-developer-code-integration-handoff-v1.md
 
 ## Gate before merge
+
+### C-01 / C-05
 
 1. You run the commands in `commands-to-run.md`.
 2. Paste output into `origin-run-log.md` (or drop a log file under `../.logs/`).
@@ -69,3 +70,13 @@ Do **not** use the older C-01 handoff checkpoint `3ec01751` as the file source.
 4. Walk `ui-verification.md` (C-01 then C-05) on local UI.
 5. Product verification packet after tests + UI, then PR.
 6. AWS / production migrate remains a later, separately authorized step.
+
+### C-03
+
+1. Run [`c03-commands-to-run.md`](./c03-commands-to-run.md) (FE still outstanding).
+2. Paste into [`c03-origin-run-log.md`](./c03-origin-run-log.md) / `.logs/c03-*`.
+3. Update [`03-c03-campaign-participation/automated-test-results.md`](./03-c03-campaign-participation/automated-test-results.md).
+4. UI smoke only if Product asks.
+5. Commit + push + PR to **`origin/development`** when you ask — **not** deploy.
+6. AWS / production migrate remains separately authorized.
+

@@ -67,7 +67,7 @@ export type CanonicalCollaborationThreadRow = {
       type: string;
       imageUrl: string | null;
     } | null;
-    brief: { id: string; title: string };
+    brief: { id: string | null; title: string };
   };
   lifecycle: CollaborationLifecycle;
   workflow: CollaborationWorkflowProjection;
@@ -95,7 +95,7 @@ export type CollaborationThreadRow = {
   creator_user_id: string;
   campaign_id: string;
   campaign_name: string;
-  brief_id: string;
+  brief_id: string | null;
   brief_title: string;
   creator_display_name: string | null;
   creator_handle: string | null;

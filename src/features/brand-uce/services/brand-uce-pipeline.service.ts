@@ -37,6 +37,7 @@ import {
   splitEscrowQuote,
 } from "../utils/uce-decimal.util";
 import { CollaborationProvisionService } from "../../collaboration/services/collaboration-provision.service";
+import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
 import { BrandUceAccessService } from "./brand-uce-access.service";
 
 const PROSPECT_STATUSES: UceCollabStatus[] = [
@@ -61,6 +62,7 @@ export class BrandUcePipelineService {
     private readonly prisma: PrismaService,
     private readonly access: BrandUceAccessService,
     private readonly collaborationProvision: CollaborationProvisionService,
+    private readonly subscriptionCapabilities: SubscriptionCapabilityService,
   ) {}
 
   async listProspects(
@@ -302,6 +304,10 @@ export class BrandUcePipelineService {
     dto: ApproveApplicantDto,
     actorId: string,
   ) {
+    await this.subscriptionCapabilities.assertCapability(
+      brandProfileId,
+      "COLLABORATION_CREATE",
+    );
     const collab = await this.access.assertCollaborationOwned(
       brandProfileId,
       campaignId,
@@ -335,12 +341,6 @@ export class BrandUcePipelineService {
     );
 
     const productId = dto.product_id ?? collab.productId;
-
-    if (!productId) {
-      throw new BadRequestException(
-        "Approved Applications require an explicit Campaign Asset/Product",
-      );
-    }
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (productId) {
@@ -404,107 +404,19 @@ export class BrandUcePipelineService {
       collab.creatorEmail,
       collab.instagramHandle,
     );
-    const normalizedHandle = collab.instagramHandle
-      .trim()
-      .replace(/^@/, "")
-      .toLowerCase();
 
-    const sourceApplication = await this.prisma.$transaction(async (tx) => {
-      const campaignCreator = await tx.uceCampaignCreator.upsert({
-        where: {
-          campaignId_platform_normalizedSocialHandle: {
-            campaignId,
-            platform: UceMediaPlatform.INSTAGRAM,
-            normalizedSocialHandle: normalizedHandle,
-          },
-        },
-        update: {
-          creatorUserId,
-          email: collab.creatorEmail,
-          creatorProfileId: collab.creatorProfileId ?? undefined,
-        },
-        create: {
-          campaignId,
-          creatorUserId,
-          creatorProfileId: collab.creatorProfileId,
-          platform: UceMediaPlatform.INSTAGRAM,
-          socialHandle: collab.instagramHandle,
-          normalizedSocialHandle: normalizedHandle,
-          email: collab.creatorEmail,
-          source: UceCampaignCreatorSource.MANUAL,
-          ingestionMethod: UceCampaignCreatorIngestionMethod.MANUAL_SINGLE,
-        },
-      });
-
-      const application = await tx.uceApplication.upsert({
-        where: { legacyPipelineCollaborationId: collaborationId },
-        update: {
-          status: UceApplicationStatus.APPROVED,
-          approvedAt: new Date(),
-          proposedFee: totalQuote,
-        },
-        create: {
-          requestId: `legacy-pipeline:${collaborationId}`,
-          campaignId,
-          campaignCreatorId: campaignCreator.id,
-          campaignAssetId: productId,
-          briefId: collab.briefId,
-          legacyPipelineCollaborationId: collaborationId,
-          status: UceApplicationStatus.APPROVED,
-          source: UceApplicationSource.LEGACY_PIPELINE,
-          proposedFee: totalQuote,
-          approvedAt: new Date(),
-        },
-        include: { snapshot: true },
-      });
-      if (!application.snapshot) {
-        await tx.uceApplicationSnapshot.create({
-          data: {
-            applicationId: application.id,
-            campaignContext: { campaignId },
-            campaignAssetContext: { campaignAssetId: productId },
-            briefContext: { briefId: collab.briefId },
-            commercialContext: { proposedFee: totalQuote },
-            creatorIdentity: {
-              creatorUserId,
-              instagramHandle: collab.instagramHandle,
-            },
-          },
-        });
-      }
-
-      const existingDeliverables = await tx.uceBriefDeliverable.findMany({
-        where: { briefId: collab.briefId },
-        orderBy: { displayOrder: "asc" },
-      });
-      if (existingDeliverables.length === 0) {
-        const brief = await tx.uceCampaignBrief.findUnique({
-          where: { id: collab.briefId },
-          select: { deliverableFormatTags: true },
-        });
-        const tags = brief?.deliverableFormatTags ?? [];
-        const formats = tags.length > 0 ? tags : ["UNSPECIFIED"];
-        await tx.uceBriefDeliverable.createMany({
-          data: formats.map((format, index) => ({
-            briefId: collab.briefId,
-            format,
-            displayOrder: index,
-          })),
-        });
-      }
-
-      return application;
-    });
-
-    const workflow =
-      await this.collaborationProvision.provisionFromApprovedApplication({
-        sourceApplicationId: sourceApplication.id,
-        deliverablePublishingApplicability:
-          dto.deliverable_publishing_applicability.map((item) => ({
-            sourceBriefDeliverableId: item.source_brief_deliverable_id,
-            publishingRequired: item.publishing_required,
-          })),
-      });
+    const workflow = await this.collaborationProvision.provisionFromUceApproval(
+      {
+        brandProfileId,
+        campaignId,
+        briefId: collab.briefId,
+        creatorUserId,
+        productId: productId ?? collab.productId,
+        ucePipelineCollaborationId: collaborationId,
+        initialQuote: totalQuote,
+        welcomeMessage: `Congrats @${collab.instagramHandle}! You're approved. View your brief and secure your spot.`,
+      },
+    );
 
     const row = mapCollaborationRow(updated);
     row.workflow_collaboration_id = workflow.collaboration_id;

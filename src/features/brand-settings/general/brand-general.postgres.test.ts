@@ -9,6 +9,7 @@ import { ThrottlerModule } from "@nestjs/throttler";
 import { PrismaClient, type BrandRole } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaService } from "../../../prisma/prisma.service";
+import { AuthSessionService } from "../../auth/auth-session.service";
 import { JwtAuthGuard } from "../../auth/jwt-auth.guard";
 import { JwtStrategy } from "../../auth/jwt.strategy";
 import type { AuthUser } from "../../auth/types/auth-user";
@@ -89,7 +90,15 @@ describe.skipIf(process.env.BS01_DATABASE_TEST !== "true")(
       brandIds: string[] = [],
       userIds: string[] = [];
     const secret = randomBytes(32).toString("hex");
-    const jwt = new JwtService({ secret });
+    const authConfig = new ConfigService({
+      JWT_SECRET: secret,
+      JWT_ISSUER: "bs01-test-issuer",
+      JWT_AUDIENCE: "bs01-test-audience",
+      JWT_ACCESS_TTL: "15m",
+      AUTH_REFRESH_TTL: "30d",
+    });
+    const jwt = new JwtService();
+    const sessions = new AuthSessionService(db, jwt, authConfig);
     let app: INestApplication;
     let base: string;
 
@@ -117,9 +126,7 @@ describe.skipIf(process.env.BS01_DATABASE_TEST !== "true")(
           { provide: BrandSettingsIntegrationsService, useValue: {} },
           {
             provide: JwtStrategy,
-            useValue: new JwtStrategy(
-              new ConfigService({ JWT_SECRET: secret }),
-            ),
+            useValue: new JwtStrategy(authConfig, sessions),
           },
         ],
       })
@@ -173,6 +180,8 @@ describe.skipIf(process.env.BS01_DATABASE_TEST !== "true")(
           email: `${randomUUID()}@example.test`,
           role: "BRAND",
           organizationId: org.id,
+          authState: "ACTIVE",
+          emailVerifiedAt: new Date(),
         },
       });
       userIds.push(user.id);
@@ -191,8 +200,10 @@ describe.skipIf(process.env.BS01_DATABASE_TEST !== "true")(
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
       };
-      if (user)
-        headers.Authorization = `Bearer ${jwt.sign({ sub: user.id, email: user.email, name: user.name, role: user.role, organizationId: user.organizationId })}`;
+      if (user) {
+        const session = await sessions.create(user.id);
+        headers.Authorization = `Bearer ${session.accessToken}`;
+      }
       return fetch(base, {
         method: input === undefined ? "GET" : "PATCH",
         headers,
@@ -424,7 +435,7 @@ describe.skipIf(process.env.BS01_DATABASE_TEST !== "true")(
         ).toBe(w.org.name);
       },
     );
-    it("requires authentication and isolates another Brand even with a valid signed foreign organization scope", async () => {
+    it("requires authentication and ignores a forged foreign organization scope", async () => {
       const a = await workspace(),
         b = await workspace();
       expect((await request()).status).toBe(401);
@@ -432,11 +443,11 @@ describe.skipIf(process.env.BS01_DATABASE_TEST !== "true")(
         (await request(undefined, { organizationLegalName: "Denied" })).status,
       ).toBe(401);
       const foreignScope = { ...a.user, organizationId: b.org.id };
-      expect((await request(foreignScope)).status).toBe(403);
+      expect((await request(foreignScope)).status).toBe(200);
       expect(
         (await request(foreignScope, { organizationLegalName: "Denied" }))
           .status,
-      ).toBe(403);
+      ).toBe(200);
       expect(
         (await request(a.user, { organizationLegalName: "Only A" })).status,
       ).toBe(200);

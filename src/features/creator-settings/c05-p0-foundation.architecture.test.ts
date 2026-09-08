@@ -29,9 +29,7 @@ describe("C05 P0 additive foundation", () => {
       "src/shared/creator/creator-workspace-actor.contract.ts",
     );
 
-    expect(schema).toContain(
-      'userId            String?          @map("user_id")',
-    );
+    expect(schema).toMatch(/userId\s+String\?\s+@map\("user_id"\)/);
     expect(schema).toContain(
       '@relation("CreatorWorkspaceMemberUser", fields: [userId], references: [id], onDelete: SetNull)',
     );

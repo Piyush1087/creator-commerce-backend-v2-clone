@@ -135,9 +135,114 @@ Local C-01 UI is **done**. C-05 Creator shell stays blocked without Instagram.
 
 ---
 
-## Do not treat as this packet
+---
 
-- Wiring `CreatorPlatformAccessGuard` onto Centre / Co-Pilot / Payouts / UCE
-  (parked on origin)
-- Clone vitest `getByRole("dialog")` vs Aurora SideDrawer
-- Production migrate, AWS bootstrap, live payout/KYC
+## C-03 — Campaign Participation / Apply (local smoke)
+
+Branch: BE/FE `integration/c03-campaign-participation`.  
+Do **not** use production, AWS, live Meta, or KYC/payout execution.
+
+Mark each row **PASS / FAIL / BLOCKED / SKIPPED** in chat or below when you run it.
+
+### A. Local servers (exact)
+
+**Terminal 1 — backend** (`d:\Work\cursor-repos\creator-commerce-backend-v2`):
+
+1. Ensure disposable Postgres is up (`creatorshop-postgres-v2`) and your local `.env` `DATABASE_URL` points at a migrated local DB (not AWS).
+2. Run:
+
+```powershell
+npm run start:dev
+```
+
+3. Wait until Nest is listening (default **http://localhost:3000**).
+
+**Terminal 2 — frontend** (`d:\Work\cursor-repos\creator-commerce-frontend-v2`):
+
+1. `.env` / `.env.local` should resolve API to local BE (example from `.env.example`: `VITE_API_URL=http://localhost:3000`).
+2. Run:
+
+```powershell
+npm run dev
+```
+
+3. Open the Vite URL (usually **http://localhost:5173**).
+
+**Browser:** one desktop pass (~1440) and one **390px** pass on the screens you touch.
+
+### B. Accounts and data you need before C03 rows
+
+| Need | How |
+|------|-----|
+| Local C-03 smoke seed (recommended) | From BE root with localhost `DATABASE_URL`: `npm run db:seed:dev-c03-opportunity` → Creator `c03-smoke@creator.com`, Brand `c03-smoke@brand.com`, campaign id `22222222-2222-4222-8222-222222222203` |
+| Brand account that can create/publish UCE campaigns | Same as prior C-01 Brand smoke (`/login` as Brand), **or** use seeded Brand above |
+| At least one **LIVE** campaign with a **PUBLISHED** Brief visible to Creator | Seed creates `ELIGIBLE_ONLY` LIVE + Brief. Without seed: create via Brand UCE `/brand/uce/campaigns` |
+| Creator who can open Campaigns | Seed creates workspace Owner + usable Instagram stub. Login via OTP (`[OTP]` in BE log) |
+
+**Note:** Opportunities list only shows campaigns the Creator is entitled to (ELIGIBLE_ONLY / invited / prior ingress). A random LIVE EVERYONE campaign may stay empty until you visit `/campaigns/<id>` once while logged in.
+
+### C. Exact smoke rows
+
+#### Guest / public (no Creator platform required)
+
+| # | Exact steps | Expect |
+|---|-------------|--------|
+| C03-G1 | Logged out → open `/marketplace` | Guest marketplace loads (no crash) |
+| C03-G2 | From marketplace (or paste) open a real campaign: `/marketplace/<campaignId>` **or** `/campaigns/<campaignId>` | Public Campaign opportunity entry loads campaign name; guest sees Sign in / create Creator CTAs (not a Brand Apply form that creates an Application) |
+| C03-G3 | On that public page, click through toward Apply as guest → Sign in / create account | Lands on `/login` (or Entry) with return intent toward `/campaigns/<campaignId>`. **No** Application row is created while still a guest |
+| C03-G4 | 390px on `/campaigns/<campaignId>` | Stacks; primary CTAs usable; no page-level horizontal scroll |
+
+#### Authenticated Creator (needs platform-ready Creator)
+
+Use a **Creator** session that reaches `/creator/home` successfully (Instagram usable).
+
+| # | Exact steps | Expect |
+|---|-------------|--------|
+| C03-1 | Login as Creator → open `/creator/campaigns` | Redirects to `/creator/campaigns/opportunities` |
+| C03-2 | On Opportunities, click **Refresh** | List loads (may be empty). No auth error. If empty but Brand published a LIVE eligible campaign for this Creator, investigate entitlement — else empty is OK until data exists |
+| C03-3 | Open `/creator/campaigns/opportunities/<campaignId>` for a LIVE eligible campaign | Opportunity dossier: brand, briefs, **Apply to this Brief** / **Apply to Campaign** when `AVAILABLE` |
+| C03-4 | Click **Apply to this Brief** (or Apply to Campaign) → complete required fields in the Apply overlay → submit once | Success path: Application created; navigate/link to Application detail under `/creator/campaigns/applications/<applicationId>` with status **PENDING** |
+| C03-5 | Hard-refresh Application detail; confirm snapshot fields (campaign/brief/commercial) still present | Immutable snapshot copy remains; status still PENDING |
+| C03-6 | Click **Download Creator Brief Pack** (or equivalent Brief Pack control) | PDF downloads (`creator-shop-brief-pack-…pdf`); status text progresses then success |
+| C03-7 | Open `/creator/campaigns/applications` | List shows the Application; open it again from the list |
+| C03-8 | On PENDING Application, as Owner with withdraw permission: open **Withdraw** → confirm in drawer → submit | Status becomes **WITHDRAWN** (or terminal withdrawn); withdraw CTA no longer available |
+| C03-9 | 390px on Opportunities list + Application detail | Stacks; drawers/sheets usable; no page-level horizontal scroll |
+
+#### Brand / handoff (optional if you have Brand + remaining PENDING Application)
+
+| # | Exact steps | Expect |
+|---|-------------|--------|
+| C03-B1 | Brand login → open applicants / UCE campaign applicants for that campaign (Brand UCE detail `/brand/uce/campaigns/<id>`) | See Creator Application |
+| C03-B2 | Approve Application (Brand decision) | Creator side shows terminal **APPROVED**; Collaboration appears under `/creator/collaborations` (handoff). If Brand UI for decide is missing locally, mark **BLOCKED** with note |
+
+#### Explicitly out of this local packet
+
+| # | Item | Status |
+|---|------|--------|
+| C03-IG | Live Meta Instagram connect on localhost | **BLOCKED** (same as C01-IG) |
+| C03-INV | Invite-only token deep link `/marketplace/invite/<token>` | Only if you issued a real invitation; otherwise **SKIPPED** |
+| C03-AWS | Prod/AWS deploy smoke | **Not authorized** |
+
+### D. Session results (operator 2026-09-08)
+
+Local seed: `npm run db:seed:dev-c03-opportunity` (`c03-smoke@creator.com`, campaign `22222222-2222-4222-8222-222222222203`).
+
+| # | Result | Notes |
+|---|--------|-------|
+| C03-G1 | | not required this session |
+| C03-G2 | | not required this session |
+| C03-G3 | | not required this session |
+| C03-G4 | | not required this session |
+| C03-1 | PASS | Opportunities reachable |
+| C03-2 | PASS | Seeded campaign listed after Refresh |
+| C03-3 | PASS | Opportunity dossier |
+| C03-4 | PASS | Apply → PENDING Application |
+| C03-5 | PASS | Snapshot persists |
+| C03-6 | PASS | Brief Pack download |
+| C03-7 | PASS | Applications list |
+| C03-8 | PASS | Withdraw (or covered in flow) |
+| C03-9 | | not separately noted |
+| C03-B1 | | not run |
+| C03-B2 | | not run |
+
+Operator confirmation: **all ok** (2026-09-08).

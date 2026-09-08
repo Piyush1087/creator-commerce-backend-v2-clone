@@ -92,7 +92,11 @@ describe.skipIf(!databaseEnabled)("Gatekeeper recovery database", () => {
     const orgResult = result("ORG_CLAIMED");
     const reviewResult = result("UNSUPPORTED");
     await prisma.organization.create({
-      data: { id: organizationId, name: "Gatekeeper database test" },
+      data: {
+        id: organizationId,
+        name: "Gatekeeper database test",
+        kind: "BRAND",
+      },
     });
     await prisma.brandProfile.create({
       data: {

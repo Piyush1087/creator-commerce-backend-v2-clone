@@ -1,4 +1,4 @@
-import {
+﻿import {
   CollaborationActorClass,
   CollaborationDeliverableState,
   CollaborationFulfillmentState,
@@ -46,6 +46,35 @@ function projectionSource(
   row: CollaborationReadSource,
 ): CollaborationProjectionSource {
   return row.sourceApplicationId ? "CANONICAL" : "LEGACY_COMPATIBILITY";
+}
+
+function snapshotText(
+  value: Prisma.JsonValue | undefined,
+  key: string,
+): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, Prisma.JsonValue>;
+  return typeof record[key] === "string" ? (record[key] as string) : null;
+}
+
+/** C-03 handoff reads project Brief/campaign titles from the Application snapshot. */
+function historicalContext(row: CollaborationReadSource) {
+  const snapshot = row.sourceApplication?.snapshot;
+  if (row.sourceApplicationId && !snapshot) {
+    throw new Error("C03_COLLABORATION_SNAPSHOT_MISSING");
+  }
+  return {
+    campaignName: snapshot
+      ? (snapshotText(snapshot.campaignContext, "name") ?? "Campaign")
+      : row.campaign.name,
+    briefId: row.sourceApplication?.canonicalBriefId ?? row.briefId,
+    briefTitle: snapshot
+      ? (snapshotText(snapshot.briefContext, "briefName") ?? "Brief")
+      : (row.brief?.internalTitle ?? "Brief"),
+    creativeGuidelines: snapshot
+      ? snapshotText(snapshot.briefContext, "creatorBrief")
+      : (row.brief?.creativeGuidelines ?? null),
+  };
 }
 
 function legacyLifecycle(row: CollaborationReadSource): CollaborationLifecycle {
@@ -403,8 +432,9 @@ function brandSummary(row: CollaborationReadSource) {
 }
 
 function sourceContext(row: CollaborationReadSource) {
+  const historical = historicalContext(row);
   return {
-    campaign: { id: row.campaignId, name: row.campaign.name },
+    campaign: { id: row.campaignId, name: historical.campaignName },
     campaignAsset: row.product
       ? {
           id: row.product.id,
@@ -415,9 +445,9 @@ function sourceContext(row: CollaborationReadSource) {
         }
       : null,
     brief: {
-      id: row.briefId,
-      title: row.brief.internalTitle,
-      creativeGuidelines: row.brief.creativeGuidelines,
+      id: historical.briefId,
+      title: historical.briefTitle,
+      creativeGuidelines: historical.creativeGuidelines,
     },
   };
 }
@@ -474,8 +504,8 @@ export function projectCanonicalCollaborationThreadRow(
       campaign: sourceContext(row).campaign,
       campaignAsset: sourceContext(row).campaignAsset,
       brief: {
-        id: row.briefId,
-        title: row.brief.internalTitle,
+        id: sourceContext(row).brief.id,
+        title: sourceContext(row).brief.title,
       },
     },
     lifecycle: effectiveLifecycle(row),
@@ -877,14 +907,15 @@ export function mapCollaborationThreadRow(
   viewerRole: CollaborationViewerRole,
 ): CollaborationThreadRow {
   const creator = creatorSummary(row);
+  const historical = historicalContext(row);
   return {
     collaboration_id: row.id,
     brand_profile_id: row.brandProfileId,
     creator_user_id: row.creatorUserId,
     campaign_id: row.campaignId,
-    campaign_name: row.campaign.name,
-    brief_id: row.briefId,
-    brief_title: row.brief.internalTitle,
+    campaign_name: historical.campaignName,
+    brief_id: historical.briefId,
+    brief_title: historical.briefTitle,
     creator_display_name: creator.displayName,
     creator_handle: creator.handle,
     brand_name: row.brandProfile.name,
@@ -906,9 +937,12 @@ export function mapCollaborationThreadRow(
 export function mapCollaborationDetail(row: CollaborationReadSource) {
   const commercials = row.commercials;
   const creator = creatorSummary(row);
+  const historical = historicalContext(row);
   const finalQuote = decimalOrNull(commercials?.finalQuote);
   const brandCounter = decimalOrNull(commercials?.brandCounterOffer);
-  const initialQuote = decimalOrNull(commercials?.initialQuote) ?? 0;
+  const initialQuote = decimalOrNull(commercials?.initialQuote);
+  const initialQuoteResolved =
+    initialQuote ?? (row.sourceApplicationId ? null : 0);
 
   return {
     thread: {
@@ -917,14 +951,20 @@ export function mapCollaborationDetail(row: CollaborationReadSource) {
       payoutMode: row.payoutMode,
       industry: row.industry,
       negotiationRound: row.negotiationRound,
+      ...(row.sourceApplicationId
+        ? {
+            sourceApplicationId: row.sourceApplicationId,
+            handoffCommercialState: row.handoffCommercialState,
+          }
+        : {}),
       fulfillmentIssueCount: row.fulfillmentIssueCount,
       revisionCount: row.revisionCount,
       isTerminated: row.isTerminated,
       isPaused: row.isPaused,
-      campaign: { name: row.campaign.name },
+      campaign: { name: historical.campaignName },
       brief: {
-        internalTitle: row.brief.internalTitle,
-        creativeGuidelines: row.brief.creativeGuidelines,
+        internalTitle: historical.briefTitle,
+        creativeGuidelines: historical.creativeGuidelines,
       },
       brandProfile: { name: row.brandProfile.name },
       creatorUser: {
@@ -936,15 +976,19 @@ export function mapCollaborationDetail(row: CollaborationReadSource) {
     },
     commercials: commercials
       ? {
-          initial_quote: initialQuote,
+          initial_quote: initialQuoteResolved,
           brand_counter_offer: brandCounter,
-          final_quote: finalQuote ?? 0,
+          final_quote: finalQuote ?? (row.sourceApplicationId ? null : 0),
           product_retail_value:
             decimalOrNull(commercials.productRetailValue) ?? 0,
           is_final_offer: commercials.isFinalOffer,
           advance_30_amount: decimalOrNull(commercials.advance30Amount) ?? 0,
           balance_70_amount: decimalOrNull(commercials.balance70Amount) ?? 0,
-          total_quote: finalQuote ?? brandCounter ?? initialQuote,
+          total_quote:
+            finalQuote ??
+            brandCounter ??
+            initialQuoteResolved ??
+            (row.sourceApplicationId ? null : 0),
           escrow_status: commercials.escrowStatus,
           advance_receipt_url: commercials.advanceReceiptUrl,
           creator_bank_details_id: commercials.creatorBankDetailsId,
