@@ -1,12 +1,21 @@
 import { Module } from "@nestjs/common";
 
-import { CreatorPayoutsController } from "./creator-payouts.controller";
-import { CreatorPayoutsService } from "./services/creator-payouts.service";
 import { CreatorEntryModule } from "../creator-entry/creator-entry.module";
+import { CreatorTeamModule } from "../creator-settings/team/creator-team.module";
+import { CreatorPayoutsController } from "./creator-payouts.controller";
+import { CreatorPayoutsAuthorizationService } from "./services/creator-payouts-authorization.service";
+import { CreatorPayoutsQueryService } from "./services/creator-payouts-query.service";
+import { CreatorPayoutsReadEnvironmentService } from "./services/creator-payouts-read-environment.service";
+import { CreatorPayoutsCursorCodec } from "./utils/creator-payouts-cursor";
 
 @Module({
-  imports: [CreatorEntryModule],
+  imports: [CreatorEntryModule, CreatorTeamModule],
   controllers: [CreatorPayoutsController],
-  providers: [CreatorPayoutsService],
+  providers: [
+    CreatorPayoutsAuthorizationService,
+    CreatorPayoutsQueryService,
+    CreatorPayoutsReadEnvironmentService,
+    CreatorPayoutsCursorCodec,
+  ],
 })
 export class CreatorPayoutsModule {}

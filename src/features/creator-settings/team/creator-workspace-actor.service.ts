@@ -153,6 +153,7 @@ export class CreatorWorkspaceActorService {
       actorUserId: actor.id,
       actorMembershipId: membership.id,
       actorRole: membership.securityRole,
+      authorizationVersion: `membership:${membership.updatedAt.toISOString()}`,
       workspaceId: workspace.id,
       organizationId: workspace.organizationId,
       subjectCreatorProfileId: workspace.ownerProfileId,
