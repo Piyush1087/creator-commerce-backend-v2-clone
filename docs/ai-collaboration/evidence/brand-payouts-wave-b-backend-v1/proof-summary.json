@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "result": "COMPLETE",
+  "branch": "brand-payouts/wave-b-backend-v1",
+  "c04_base_sha": "ec395bf5760b295dddd9c3f7e9c2f05485b6b743",
+  "p4_base_reconverged_sha": "a49e24e150d679ced65adea5a8ffe9b5245fb4cc",
+  "p4_base_reconverged_tree": "271f59d099f31694c04f300c341a3b75654969d6",
+  "wave_b_source_checkpoint_sha": "e9af2a5a45dda68fa3ea3498855d1438d8c717aa",
+  "wave_b_source_checkpoint_tree": "c0fbf69a395eedfd27738590b567fdfed1634241",
+  "migration": {
+    "identity": "20260912100000_brand_payouts_wave_b_normal_path",
+    "sql_sha256": "887e5bb6bd262a4dd02e42a798db55bd136d97bf6a923df7e6466573f11d1f84",
+    "count": 86,
+    "prior_85_paths_changed": 0,
+    "fresh_0_to_86": "PASS",
+    "populated_85_to_86": "PASS"
+  },
+  "tests": {
+    "focused_postgresql": { "files_passed": 1, "tests_passed": 3, "failures": 0 },
+    "full_backend": { "files_passed": 207, "tests_passed": 6302, "files_skipped": 57, "tests_skipped": 779, "failures": 0 },
+    "prisma_format_validate_generate": "PASS",
+    "scoped_lint": "PASS",
+    "repository_lint_baseline": "FAIL_1065_INHERITED_PRETTIER_CRLF_OUTSIDE_WAVE_B",
+    "build": "PASS",
+    "startup_root_health_shutdown": "PASS"
+  },
+  "security": {
+    "owner": "PASS",
+    "finance_admin": "PASS_BY_SHARED_FULL_FINANCIAL_ROLE_CONTRACT",
+    "campaign_manager": "DENIED_MUTATION_READ_ONLY",
+    "unauthorized": "DENIED_BY_JWT_AND_ROLE_GUARDS",
+    "cross_brand": "NON_ENUMERATING_NOT_FOUND",
+    "provider_capability_reads": 1,
+    "provider_create_calls": 0,
+    "provider_read_calls": 0,
+    "provider_reversal_calls": 0,
+    "external_provider_attempts": 0,
+    "provider_actions": "NONE",
+    "non_disposable_database_mutation": "NONE"
+  },
+  "cleanup": "OWNED_APP_STOPPED_AND_DISPOSABLE_CONTAINER_VOLUME_REMOVED",
+  "blockers": []
+}

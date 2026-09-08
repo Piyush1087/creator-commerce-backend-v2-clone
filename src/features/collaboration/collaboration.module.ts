@@ -91,6 +91,7 @@ import { CollaborationHomeReadService } from "./services/collaboration-home-read
     CollaborationFeedbackService,
     CollaborationService,
     CollaborationHomeReadService,
+    CollaborationTrustedConfirmationService,
   ],
 })
 export class CollaborationModule {}

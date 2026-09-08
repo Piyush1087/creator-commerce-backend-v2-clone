@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Get,
   GoneException,
@@ -19,6 +20,10 @@ import type { RequestWithAuthUser } from "../auth/auth.controller";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { BrandCentreAuthService } from "../brand-centre/brand-centre-auth.service";
 import { BrandWorkspaceAuthorizationService } from "../brand-centre/brand-workspace-authorization.service";
+import {
+  BRAND_FINANCIAL_COMMAND_SURFACE_HEADER,
+  isBrandFinancialCommandSurfaceActive,
+} from "../../shared/config/brand-financial-command-surface";
 import {
   CalculateEscrowBreakdownDto,
   CreateBrandReturnDto,
@@ -87,10 +92,13 @@ export class BrandEscrowController {
   async createTopUpIntent(
     @Req() req: RequestWithAuthUser,
     @Body() body: TopUpIntentDto,
+    @Headers(BRAND_FINANCIAL_COMMAND_SURFACE_HEADER)
+    commandSurface?: string,
   ) {
     const { brandProfileId } = await this.workspaceAuth.assertFinancialMutation(
       req.user,
     );
+    assertActiveCommandSurface(commandSurface);
     return this.escrow.createCardTopUpIntent(
       brandProfileId,
       body.target_allocation,
@@ -149,10 +157,13 @@ export class BrandEscrowController {
   async requestBrandReturn(
     @Req() req: RequestWithAuthUser,
     @Body() body: CreateBrandReturnDto,
+    @Headers(BRAND_FINANCIAL_COMMAND_SURFACE_HEADER)
+    commandSurface?: string,
   ) {
     const { brandProfileId } = await this.workspaceAuth.assertFinancialMutation(
       req.user,
     );
+    assertActiveCommandSurface(commandSurface);
     return this.brandReturns.requestReturn({
       brandProfileId,
       requestedByUserId: req.user.id,
@@ -160,6 +171,15 @@ export class BrandEscrowController {
       requestIdentity: body.idempotency_identity,
     });
   }
+}
+
+function assertActiveCommandSurface(claimedSurface: string | undefined): void {
+  if (isBrandFinancialCommandSurfaceActive(claimedSurface)) return;
+  throw new ConflictException({
+    code: "BRAND_FINANCIAL_COMMAND_SURFACE_INACTIVE",
+    message:
+      "This financial command surface is inactive. Refresh and use the canonical Brand financial workspace.",
+  });
 }
 
 @Controller("api/v1/escrow-engine")
