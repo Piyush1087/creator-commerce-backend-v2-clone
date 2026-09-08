@@ -51,6 +51,6 @@ runs:
     validation_gate: PARTIAL
     pass_declared: false
     checkpoints:
-      frontend: PENDING_THIS_COMMIT
-      backend: PENDING_THIS_COMMIT
-      dummy_tcs: PENDING_THIS_COMMIT
+      frontend: ee16a590480ca185a083944fb1bf2e246ff66dc2
+      backend: 773fbaa8f121a523eb0950740da79596e00ff873
+      dummy_tcs: 70b644c2bb321fc220b7333afe1c9bc23a951604
