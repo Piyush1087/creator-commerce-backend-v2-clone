@@ -41,3 +41,16 @@ runs:
       frontend: da76da297ab9c32bbe128a233f5f4ff517794241
       backend: 8ce12656ec68e4709b8fe77b8ab91412c726d122
       dummy_tcs: 52842bb4c63808371f34237d4af37869d5c6d9cf
+  - id: RUN3_VALIDATION_BUILDS_MIGRATE_HEALTH
+    date: "2026-09-08"
+    intent: >
+      §18 builds, disposable DB 0→head migrate, boot/health, targeted freeze tests.
+      Not freeze PASS. Lint/full suites/browser smoke remain.
+    prisma_drop: NOT_THIS_CHECKPOINT
+    fresh_db_migrate: PASS_87
+    validation_gate: PARTIAL
+    pass_declared: false
+    checkpoints:
+      frontend: PENDING_THIS_COMMIT
+      backend: PENDING_THIS_COMMIT
+      dummy_tcs: PENDING_THIS_COMMIT

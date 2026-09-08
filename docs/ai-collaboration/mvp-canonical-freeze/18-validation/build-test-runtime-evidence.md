@@ -1,32 +1,32 @@
 # Build / test / runtime evidence (§18)
 
 **Date:** 2026-09-08  
-**Status:** NOT YET RUN for freeze PASS
+**Status:** RUN 3 IN PROGRESS — not freeze PASS
 
-Do not declare `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` until this table is evidence-backed.
+Do not declare `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` until remaining gates in `10-remaining-gates.md` are closed or Parent-accepted.
 
-| Gate | Status | Classification |
-| --- | --- | --- |
-| fresh checkout/reproducibility | NOT_RUN | |
-| package install / lockfile integrity | NOT_RUN | |
-| backend build | NOT_RUN | |
-| frontend typecheck | NOT_RUN | |
-| frontend build | NOT_RUN | |
-| lint | NOT_RUN | |
-| unit/contract tests | PARTIAL | RUN 1: FE shell tests 12/12 after Store import restore; guard-scope not fully re-run after vitest hang |
-| module acceptance suites | NOT_RE_RUN on freeze tip | PREEXISTING_ACCEPTED_DEBT until reconfirmed |
-| cross-module invariant suite | DEFINED not executed | see `../phase-d-invariants/` |
-| fresh disposable database migration | NOT_PROVEN | ENVIRONMENT_BLOCKED |
-| Prisma/schema validation | PASS `npx prisma validate` 2026-09-08 | see `../14-migration-schema/` |
-| backend boot + health | NOT_RUN | |
-| frontend ↔ backend smoke | NOT_RUN | |
-| auth/session regression | NOT_RUN | |
-| RBAC / actor-subject / cross-tenant | NOT_RUN | |
-| responsive shell/navigation smoke | NOT_RUN in browser this run | RUN 1 hide is code-complete |
-| provider-unavailable recovery | NOT_RUN | |
-| compiled/deployable artifact | NOT_RUN | |
-| clean worktrees | NOT_CLAIMED | BE has unrelated untracked `tmp-*` / logs — do not commit |
-| local/remote checkpoint equality | freeze branches local; not required to push unless Parent asks | |
+| Gate | Status | Classification | Evidence |
+| --- | --- | --- | --- |
+| fresh checkout/reproducibility | NOT_RUN | working copy | `01-branch-and-lockfile.md` |
+| package install / lockfile integrity | LOCKFILE_PRESENT | `npm ci` not re-run | `01-branch-and-lockfile.md` |
+| backend build | PASS | | `03-backend-build.md` |
+| frontend typecheck | PASS | | `04-frontend-typecheck.md` |
+| frontend build | PASS | chunk-size warning = preexisting debt | `05-frontend-build.md` |
+| lint | NOT_RUN | | `06-lint.md` |
+| unit/contract tests | PARTIAL | 35 FE freeze tests PASS; full suite not run | `07-targeted-tests.md` |
+| module acceptance suites | NOT_RE_RUN | PREEXISTING_ACCEPTED_DEBT | `10-remaining-gates.md` |
+| cross-module invariant suite | DEFINED + partial FE | | `../phase-d-invariants/` + `07-targeted-tests.md` |
+| fresh disposable database migration | PASS 87/87 | `thecreatorshop` not touched | `08-fresh-db-migrate.md` |
+| Prisma/schema validation | PASS | | `02-prisma-validate.md` |
+| backend boot + health | PASS on freeze DB | | `09-backend-boot-health.md` |
+| frontend ↔ backend smoke | NOT_RUN | | `10-remaining-gates.md` |
+| auth/session regression | PARTIAL | BS-12 static 4/4 PASS | `07-targeted-tests.md` |
+| RBAC / actor-subject / cross-tenant | NOT_RUN | | `10-remaining-gates.md` |
+| responsive shell/navigation smoke | unit only | | `07-targeted-tests.md` |
+| provider-unavailable recovery | NOT_RUN | | `10-remaining-gates.md` |
+| compiled/deployable artifact | PASS | FE `dist/`, BE `dist/main.js` | `03` + `05` |
+| clean worktrees | NOT_CLAIMED | do not commit `tmp-*` | |
+| local/remote checkpoint equality | local only | | |
 
 ## Failure classification vocabulary
 

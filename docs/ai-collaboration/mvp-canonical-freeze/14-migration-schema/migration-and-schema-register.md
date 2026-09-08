@@ -61,18 +61,15 @@ DATE   = 2026-09-08
 ## Fresh empty database `0 → head`
 
 ```text
-STATUS = NOT_PROVEN_ON_DISPOSABLE_DB
-CLASS  = ENVIRONMENT_BLOCKED until a disposable Postgres is migrated
+STATUS = PASS 2026-09-08
+DATABASE = freeze_mvp_canonical_v1 (disposable; thecreatorshop not migrated)
+MIGRATION_COUNT_APPLIED = 87
+HEAD = 20260910122000_c03_application_handoff_notifications
 ```
 
-Command the later validation run must use (local/disposable only):
+Evidence: `../18-validation/08-fresh-db-migrate.md`
 
-```text
-npx prisma migrate deploy
-npx prisma validate
-```
-
-Application boot against migrated DB is part of §18, not this register.
+Application boot against the same disposable DB is recorded in `../18-validation/09-backend-boot-health.md`.
 
 ## Production-data posture (no AWS inspection)
 
