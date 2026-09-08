@@ -1,18 +1,21 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { Decimal } from "@prisma/client/runtime/library";
+import {
+  CREATOR_PAYOUT_METHOD_SUMMARY_PORT,
+  type CreatorPayoutMethodSummaryPort,
+} from "../../creator-settings/payouts/creator-payout-method-summary.port";
 
 import {
   creatorPayoutsEnvelope,
   type CreatorPayoutsAuthorizationScope,
   type CreatorPayoutSummaryFamily,
-  unavailableSection,
 } from "../contracts/creator-payouts.contract";
-import { CreatorPayoutsCursorCodec } from "../utils/creator-payouts-cursor";
 import {
   classifySummary,
   CreatorPayoutsObligationProjectionService,
 } from "./creator-payouts-obligation-projection.service";
 import { CreatorPayoutsReadEnvironmentService } from "./creator-payouts-read-environment.service";
+import { CreatorPayoutsHistoryProjectionService } from "./creator-payouts-history-projection.service";
 
 type ReadInput = {
   readonly authorization: CreatorPayoutsAuthorizationScope;
@@ -27,8 +30,10 @@ type ListInput = ReadInput & {
 export class CreatorPayoutsQueryService {
   constructor(
     private readonly environment: CreatorPayoutsReadEnvironmentService,
-    private readonly cursors: CreatorPayoutsCursorCodec,
     private readonly obligations: CreatorPayoutsObligationProjectionService,
+    private readonly history: CreatorPayoutsHistoryProjectionService,
+    @Inject(CREATOR_PAYOUT_METHOD_SUMMARY_PORT)
+    private readonly payoutMethods: CreatorPayoutMethodSummaryPort,
   ) {}
 
   async readOverview(input: ReadInput) {
@@ -72,18 +77,23 @@ export class CreatorPayoutsQueryService {
 
   async listHistory(input: ListInput) {
     await this.environment.assertDatabaseUtc();
-    const boundary = this.cursors.decode({
-      cursor: input.cursor,
-      endpoint: "history",
-      filterKey: "{}",
-      authorization: input.authorization,
-      requestAsOf: input.asOf,
-    });
+    const result = await this.history.list(input);
     return {
-      ...creatorPayoutsEnvelope(input.authorization, boundary.asOf),
-      section: unavailableSection(),
-      items: [],
-      page: { limit: input.limit, next_cursor: null },
+      ...creatorPayoutsEnvelope(input.authorization, result.asOf),
+      section: {
+        coverage: "COMPLETE",
+        freshness: "CURRENT",
+        source_coverage: [
+          "PAYOUT_OBLIGATIONS",
+          "TRANSFER_ATTEMPTS",
+          "RECONCILED_RECEIPTS",
+          "PAYOUT_SETTLEMENT_LEDGER",
+          "PAYOUT_REVERSALS",
+        ],
+        available_actions: [],
+      },
+      items: result.items,
+      page: { limit: input.limit, next_cursor: result.nextCursor },
     };
   }
 
@@ -91,8 +101,16 @@ export class CreatorPayoutsQueryService {
     await this.environment.assertDatabaseUtc();
     return {
       ...creatorPayoutsEnvelope(input.authorization, input.asOf),
-      section: unavailableSection(),
-      payout_method: null,
+      section: {
+        coverage: "COMPLETE",
+        freshness: "CURRENT",
+        source_coverage: ["C05_PAYOUT_DESTINATION"],
+        available_actions: [],
+      },
+      payout_method: await this.payoutMethods.read(
+        input.authorization.subjectCreatorProfileId,
+        true,
+      ),
     };
   }
 
@@ -112,7 +130,16 @@ export class CreatorPayoutsQueryService {
 
   async readHistory(input: ReadInput & { readonly resourceId: string }) {
     await this.environment.assertDatabaseUtc();
-    throw nonEnumeratingNotFound();
+    return {
+      ...creatorPayoutsEnvelope(input.authorization, input.asOf),
+      section: {
+        coverage: "COMPLETE",
+        freshness: "CURRENT",
+        source_coverage: ["PAYOUT_HISTORY_PROJECTION"],
+        available_actions: [],
+      },
+      history: await this.history.detail(input),
+    };
   }
 }
 
@@ -153,11 +180,4 @@ export function summarizeCreatorPayouts(
       return { family, value: { amount: amount.toFixed(4), currency } };
     }),
   );
-}
-
-function nonEnumeratingNotFound(): NotFoundException {
-  return new NotFoundException({
-    code: "CREATOR_PAYOUT_RESOURCE_NOT_FOUND",
-    message: "The requested payout resource was not found.",
-  });
 }

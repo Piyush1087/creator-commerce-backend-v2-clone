@@ -51,6 +51,23 @@ export type CreatorPayoutObligationItem = {
   };
 };
 
+export type CreatorPayoutHistoryItem = {
+  readonly history_id: string;
+  readonly public_reference: string;
+  readonly resource_version: string;
+  readonly event_type:
+    | "OBLIGATION_RECORDED"
+    | "TRANSFER_PROCESSING"
+    | "TRANSFER_FAILED"
+    | "SETTLED"
+    | "REVERSAL_PROCESSED";
+  readonly obligation_reference: string;
+  readonly collaboration_reference: string;
+  readonly value: CreatorPayoutMoney | null;
+  readonly recorded_at: string;
+  readonly status: string;
+};
+
 export type CreatorPayoutsAuthorizationScope = {
   readonly workspaceId: string;
   readonly organizationId: string;
