@@ -151,7 +151,7 @@ describe.skipIf(process.env.C03_P11C_DATABASE_TEST !== "true")(
 
       await prisma.$executeRawUnsafe(
         `ALTER TABLE uce_applications
-         DISABLE TRIGGER c03_canonical_application_write_closed`,
+         DISABLE TRIGGER c03_canonical_application_evidence_guard`,
       );
       try {
         await prisma.$executeRawUnsafe(
@@ -195,7 +195,7 @@ describe.skipIf(process.env.C03_P11C_DATABASE_TEST !== "true")(
       } finally {
         await prisma.$executeRawUnsafe(
           `ALTER TABLE uce_applications
-           ENABLE TRIGGER c03_canonical_application_write_closed`,
+           ENABLE TRIGGER c03_canonical_application_evidence_guard`,
         );
       }
     });
@@ -210,7 +210,9 @@ describe.skipIf(process.env.C03_P11C_DATABASE_TEST !== "true")(
           `UPDATE uce_applications SET updated_at = NOW() WHERE id = $1`,
           applicationId,
         ),
-      ).rejects.toThrow(/C03_CANONICAL_APPLICATION_WRITE_CLOSED/);
+      ).rejects.toThrow(
+        /C03_CANONICAL_APPLICATION_REQUIRES_(ONE_SNAPSHOT|MATCHING_EVENT)/,
+      );
     });
 
     it("enforces invitation digest, lifetime, Owner binding, revocation, and append-only rules", async () => {
@@ -578,7 +580,7 @@ describe.skipIf(process.env.C03_P11C_DATABASE_TEST !== "true")(
         FROM pg_trigger
         WHERE NOT tgisinternal
           AND tgname IN (
-            'c03_canonical_application_write_closed',
+            'c03_canonical_application_evidence_guard',
             'c03_campaign_invitation_delete_guard',
             'c03_campaign_ingress_delete_guard',
             'c03_application_event_delete_guard',

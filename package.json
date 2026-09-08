@@ -20,6 +20,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:seed:dev-creator": "ts-node -r dotenv/config scripts/seed-dev-creator.ts",
+    "db:seed:dev-c03-opportunity": "ts-node -r dotenv/config scripts/seed-dev-c03-opportunity.ts",
     "c03:p11:preflight": "node scripts/c03-p11-preflight.mjs",
     "auth:reconcile": "ts-node -r dotenv/config scripts/bs12-auth-reconciliation.ts",
     "intelligence:contracts:generate": "ts-node src/features/brand-intelligence/contracts/bundle/contract-bundle.generator.ts",

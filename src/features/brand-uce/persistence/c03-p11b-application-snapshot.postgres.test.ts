@@ -37,15 +37,18 @@ describe.skipIf(process.env.C03_P11B_DATABASE_TEST !== "true")(
       status?: string;
     }) {
       const id = input.id ?? randomUUID();
+      const status = input.status ?? "PENDING";
+      const isTerminal = status !== "PENDING";
       await prisma.$executeRawUnsafe(
         `INSERT INTO uce_applications
           (id, authority_version, campaign_id, brand_profile_id,
            canonical_campaign_asset_id, canonical_brief_id,
            subject_creator_profile_id, subject_creator_workspace_id,
            actor_user_id, actor_membership_id, actor_role,
-           status, source, status_version, created_at, updated_at)
+           status, source, status_version, terminal_at, created_at, updated_at)
          VALUES ($1, 'C03_CANONICAL', $2, $3, $4, $5, $6, $7, $8, $9,
-           'OWNER', $10::"UceApplicationStatus", 'DIRECT', 1, NOW(), NOW())`,
+           'OWNER', $10::"UceApplicationStatus", 'DIRECT', $11,
+           $12::timestamptz, NOW(), NOW())`,
         id,
         input.campaignId ?? campaignIds[0],
         input.brandProfileId ?? brandIds[0],
@@ -55,16 +58,25 @@ describe.skipIf(process.env.C03_P11B_DATABASE_TEST !== "true")(
         subjectWorkspaceId,
         actorUserId,
         actorMembershipId,
-        input.status ?? "PENDING",
+        status,
+        isTerminal ? 2 : 1,
+        isTerminal ? new Date().toISOString() : null,
       );
       createdApplicationIds.add(id);
       return id;
     }
 
     async function disableWriteGuard() {
+      // Tip (post P1.1D): write_closed → deferred evidence_guard.
+      // Uniqueness seeding still needs insert_guard off so WITHDRAWN/EXPIRED
+      // rows can be inserted; REJECTED still fails the active-opportunity index.
       await prisma.$executeRawUnsafe(
         `ALTER TABLE uce_applications
-         DISABLE TRIGGER c03_canonical_application_write_closed`,
+         DISABLE TRIGGER c03_canonical_application_evidence_guard`,
+      );
+      await prisma.$executeRawUnsafe(
+        `ALTER TABLE uce_applications
+         DISABLE TRIGGER c03_canonical_application_insert_guard`,
       );
       writeGuardDisabled = true;
     }
@@ -73,9 +85,36 @@ describe.skipIf(process.env.C03_P11B_DATABASE_TEST !== "true")(
       if (!writeGuardDisabled) return;
       await prisma.$executeRawUnsafe(
         `ALTER TABLE uce_applications
-         ENABLE TRIGGER c03_canonical_application_write_closed`,
+         ENABLE TRIGGER c03_canonical_application_insert_guard`,
+      );
+      await prisma.$executeRawUnsafe(
+        `ALTER TABLE uce_applications
+         ENABLE TRIGGER c03_canonical_application_evidence_guard`,
       );
       writeGuardDisabled = false;
+    }
+
+    async function withCleanupGuardsDisabled(run: () => Promise<void>) {
+      await prisma.$executeRawUnsafe(
+        `ALTER TABLE uce_application_snapshots
+         DISABLE TRIGGER c03_application_snapshot_delete_guard`,
+      );
+      await prisma.$executeRawUnsafe(
+        `ALTER TABLE uce_applications
+         DISABLE TRIGGER c03_application_delete_guard`,
+      );
+      try {
+        await run();
+      } finally {
+        await prisma.$executeRawUnsafe(
+          `ALTER TABLE uce_applications
+           ENABLE TRIGGER c03_application_delete_guard`,
+        );
+        await prisma.$executeRawUnsafe(
+          `ALTER TABLE uce_application_snapshots
+           ENABLE TRIGGER c03_application_snapshot_delete_guard`,
+        );
+      }
     }
 
     beforeAll(async () => {
@@ -170,11 +209,13 @@ describe.skipIf(process.env.C03_P11B_DATABASE_TEST !== "true")(
     afterAll(async () => {
       try {
         await enableWriteGuard();
-        await prisma.uceApplicationSnapshot.deleteMany({
-          where: { applicationId: { in: [...createdApplicationIds] } },
-        });
-        await prisma.uceApplication.deleteMany({
-          where: { id: { in: [...createdApplicationIds] } },
+        await withCleanupGuardsDisabled(async () => {
+          await prisma.uceApplicationSnapshot.deleteMany({
+            where: { applicationId: { in: [...createdApplicationIds] } },
+          });
+          await prisma.uceApplication.deleteMany({
+            where: { id: { in: [...createdApplicationIds] } },
+          });
         });
         await prisma.canonicalCampaignBrief.deleteMany({
           where: { id: { in: briefIds } },
@@ -205,8 +246,9 @@ describe.skipIf(process.env.C03_P11B_DATABASE_TEST !== "true")(
     });
 
     it("keeps canonical Application writes closed until P1.1D", async () => {
+      // On the integrated tip, P1.1D replaces write_closed with deferred evidence.
       await expect(insertCanonical({})).rejects.toThrow(
-        /C03_CANONICAL_APPLICATION_WRITE_CLOSED/,
+        /C03_CANONICAL_APPLICATION_REQUIRES_(ONE_SNAPSHOT|MATCHING_EVENT)/,
       );
       expect(createdApplicationIds.size).toBe(0);
     });
@@ -329,7 +371,7 @@ describe.skipIf(process.env.C03_P11B_DATABASE_TEST !== "true")(
         SELECT tgname AS name, pg_get_triggerdef(oid) AS definition
         FROM pg_trigger
         WHERE NOT tgisinternal
-          AND tgname = 'c03_canonical_application_write_closed'
+          AND tgname = 'c03_canonical_application_evidence_guard'
       `;
       expect(new Set(catalog.map((row) => row.name)).size).toBe(2);
       const predicate = catalog.find((row) =>

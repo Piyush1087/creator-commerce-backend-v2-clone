@@ -267,6 +267,27 @@ describe.skipIf(process.env.C03_P11E_DATABASE_TEST !== "true")(
           where: { id: applicationId },
           data: { status, statusVersion: 2, terminalAt: new Date() },
         });
+        let approvedCollaborationId: string | undefined;
+        if (status === UceApplicationStatus.APPROVED) {
+          // Tip includes P1.4 approved-event↔Collaboration coupling.
+          const collab = await tx.collaboration.create({
+            data: {
+              sourceApplicationId: applicationId,
+              brandProfileId: application.brandProfileId!,
+              campaignId: application.campaignId,
+              creatorUserId: creatorUserId,
+              briefId: null,
+              productId: null,
+              ucePipelineCollaborationId: null,
+              industry: "D2C_ECOMMERCE",
+              handoffCommercialState: "FIXED_AGREED",
+              commercials: { create: {} },
+              logistics: { create: {} },
+              finalization: { create: {} },
+            },
+          });
+          approvedCollaborationId = collab.id;
+        }
         await tx.applicationDomainEvent.create({
           data: {
             transitionId,
@@ -293,6 +314,7 @@ describe.skipIf(process.env.C03_P11E_DATABASE_TEST !== "true")(
             campaignId: application.campaignId,
             canonicalCampaignAssetId: application.canonicalCampaignAssetId!,
             canonicalBriefId: application.canonicalBriefId!,
+            approvedCollaborationId,
           },
         });
       });

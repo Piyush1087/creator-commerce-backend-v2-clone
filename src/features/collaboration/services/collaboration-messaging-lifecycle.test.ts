@@ -192,7 +192,16 @@ function postMessageHarness(lifecycle: CollaborationLifecycle) {
     assertThreadForUser: async () => row,
   };
   const realtime: any = { broadcast: async () => undefined };
-  const service = new CollaborationService(prisma, access, realtime);
+  const notifications: any = {
+    enqueueWithinTransaction: async () => ({ job_id: "job-1" }),
+    dispatch: async () => ({ job_id: "job-1" }),
+  };
+  const service = new CollaborationService(
+    prisma,
+    access,
+    realtime,
+    notifications,
+  );
   return { service, row, messages };
 }
 

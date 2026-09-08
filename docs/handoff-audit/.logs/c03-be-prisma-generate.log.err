@@ -1,0 +1,29 @@
+Environment variables loaded from .env
+Error: Prisma schema validation - (get-dmmf wasm)
+Error code: P1012
+error: Error validating field `notificationJobs` in model `BrandProfile`: The relation field `notificationJobs` on model `BrandProfile` is missing an opposite relation field on the model `NotificationJob`. Either run `prisma format` or add it manually.
+  -->  prisma\schema.prisma:1645
+   | 
+1644 |   applicationDomainEvents   ApplicationDomainEvent[] @relation("ApplicationEventBrand")
+1645 |   notificationJobs          NotificationJob[]
+1646 | 
+   | 
+error: Error validating field `brief` in model `UceBriefDeliverable`: The relation field `brief` on model `UceBriefDeliverable` is missing an opposite relation field on the model `UceCampaignBrief`. Either run `prisma format` or add it manually.
+  -->  prisma\schema.prisma:2984
+   | 
+2983 |   briefId                    String               @map("brief_id")
+2984 |   brief                      UceCampaignBrief     @relation(fields: [briefId], references: [id], onDelete: Cascade)
+2985 |   format                     String               @db.VarChar(80)
+   | 
+error: Error validating field `legacyApplications` in model `UceCampaignCollaboration`: The relation field `legacyApplications` on model `UceCampaignCollaboration` is missing an opposite relation field on the model `UceApplication`. Either run `prisma format` or add it manually.
+  -->  prisma\schema.prisma:3095
+   | 
+3094 |   workflowCollaboration Collaboration?
+3095 |   legacyApplications UceApplication[]
+3096 |   logisticsRegistry UceCollaborationLogistics?
+   | 
+
+Validation Error Count: 3
+[Context: getDmmf]
+
+Prisma CLI Version : 6.19.3

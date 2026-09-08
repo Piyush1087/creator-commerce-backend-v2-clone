@@ -223,12 +223,28 @@ export class MailService {
     }
   }
 
-  private requiredTemplateId(name: string): number {
-    const value = Number(process.env[name]);
-    if (!Number.isSafeInteger(value) || value <= 0) {
-      throw new Error(`${name} is missing or invalid`);
+  async sendOtp(
+    to: string,
+    code: string,
+    displayName: string,
+    expiresInMinutes = 10,
+  ): Promise<string> {
+    return this.sendAuthenticationOtp({
+      to,
+      code,
+      displayName,
+      expiresInMinutes,
+    });
+  }
+
+  private requiredTemplateId(...names: string[]): number {
+    for (const name of names) {
+      const value = Number(process.env[name]);
+      if (Number.isSafeInteger(value) && value > 0) {
+        return value;
+      }
     }
-    return value;
+    throw new Error(`${names[0]} is missing or invalid`);
   }
 
   private async sendAuthenticationMessage(

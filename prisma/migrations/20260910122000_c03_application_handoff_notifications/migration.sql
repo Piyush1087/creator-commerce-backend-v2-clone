@@ -2,15 +2,16 @@ BEGIN;
 
 -- Preflight: accepted 78-migration fixture, explicit Brand scopes and preserved
 -- legacy Collaboration/Brief/Product/history rows. No lineage is inferred.
+-- Integration note: source_application_id (+ unique/FK/index) already landed in
+-- 20260811130000_collaboration_phase_1_foundation; only add C-03-specific pieces.
 CREATE TYPE "CollaborationHandoffCommercialState" AS ENUM ('FIXED_AGREED', 'AWAITING_CREATOR_PROPOSAL');
+
 ALTER TABLE collaborations
-  ADD COLUMN source_application_id TEXT,
   ADD COLUMN handoff_commercial_state "CollaborationHandoffCommercialState",
-  ALTER COLUMN brief_id DROP NOT NULL,
-  ADD CONSTRAINT collaborations_source_application_id_fkey FOREIGN KEY (source_application_id) REFERENCES uce_applications(id) ON DELETE RESTRICT ON UPDATE RESTRICT;
-CREATE UNIQUE INDEX collaborations_source_application_id_key ON collaborations(source_application_id);
-DROP INDEX collaborations_campaign_id_creator_id_key;
-CREATE INDEX collaborations_campaign_id_creator_id_idx ON collaborations(campaign_id, creator_id);
+  ALTER COLUMN brief_id DROP NOT NULL;
+
+DROP INDEX IF EXISTS collaborations_campaign_id_creator_id_key;
+CREATE INDEX IF NOT EXISTS collaborations_campaign_id_creator_id_idx ON collaborations(campaign_id, creator_id);
 CREATE UNIQUE INDEX collaborations_legacy_campaign_creator_key ON collaborations(campaign_id, creator_id) WHERE source_application_id IS NULL;
 ALTER TABLE application_domain_events ADD CONSTRAINT application_domain_events_approved_collaboration_id_fkey FOREIGN KEY (approved_collaboration_id) REFERENCES collaborations(id) ON DELETE RESTRICT ON UPDATE RESTRICT;
 

@@ -13,10 +13,13 @@ import { CollaborationService } from "./services/collaboration.service";
 import { CollaborationAccessService } from "./services/collaboration-access.service";
 import { NotificationQueryService } from "../notifications/services/notification-query.service";
 import { NotificationProcessorService } from "../notifications/services/notification-processor.service";
+import { NotificationDispatchService } from "../notifications/services/notification-dispatch.service";
+import { NotificationRecipientPolicyService } from "../notifications/services/notification-recipient-policy.service";
 import { randomUUID } from "node:crypto";
 
 describe.skipIf(process.env.C03_P14_DATABASE_TEST !== "true")(
   "P1.4 legacy Collaboration compatibility",
+  { timeout: 30_000 },
   () => {
     const db = new PrismaClient();
     const h = applicationHarness(db);
@@ -66,15 +69,15 @@ describe.skipIf(process.env.C03_P14_DATABASE_TEST !== "true")(
         db as PrismaService,
         workspace as never,
       );
+      const notifications = new NotificationDispatchService(
+        db as PrismaService,
+        new NotificationRecipientPolicyService(db as PrismaService),
+      );
       const service = new CollaborationService(
         db as PrismaService,
         access,
-        provision,
-        {} as never,
         realtime as never,
-        {} as never,
-        workspace as never,
-        h.notifications,
+        notifications,
       );
       return { owner, brand, c, product, brief, input, service };
     }

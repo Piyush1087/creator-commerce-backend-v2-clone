@@ -23,7 +23,6 @@ import type { RequestWithAuthUser } from "../auth/auth.controller";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { CreatorPlatformAccessGuard } from "../creator-entry/creator-platform-access.guard";
 import { CreatorSettingsAccessService } from "../creator-settings/services/creator-settings-access.service";
-import { CreatorPlatformAccessGuard } from "../creator-entry/creator-platform-access.guard";
 import { ZodValidationPipe } from "../creator-onboarding/pipes/zod-validation.pipe";
 import { CREATOR_COPILOT_WELCOME_NARRATIVE } from "./integrations/creator-copilot-system-prompt";
 import {

@@ -7,7 +7,7 @@ CREATE TYPE "UceBriefStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'PAUSED');
 CREATE TYPE "UceBriefCreationSource" AS ENUM ('MANUAL', 'AI_RECOMMENDED');
 CREATE TYPE "UceBriefType" AS ENUM ('CREATOR_LED', 'BRAND_LED');
 CREATE TYPE "UceDeliverableFormat" AS ENUM ('REEL_VIDEO', 'STORY', 'PHOTOSHOOT', 'BANNER_CAROUSEL');
-CREATE TYPE "UceBrandSupportType" AS ENUM ('PRODUCT', 'SERVICE', 'EXPERIENCE', 'ACCESS_SUBSCRIPTION', 'OTHER');
+-- UceBrandSupportType already created by 20260811130000_collaboration_phase_1_foundation.
 
 ALTER TABLE "uce_campaigns"
   ADD COLUMN "live_at" TIMESTAMP(3),
@@ -21,13 +21,28 @@ ALTER TABLE "uce_campaign_targeting"
   ADD COLUMN "targeting_version" INTEGER NOT NULL DEFAULT 1,
   ADD CONSTRAINT "uce_campaign_targeting_version_check" CHECK ("targeting_version" >= 1);
 
+-- C-03 adds canonical commercial fields. Collaboration Phase 1 already added
+-- currency / receives_brand_support / brand_support_* with NOT NULL defaults;
+-- align those to the nullable Char(3) C-03 shape before the canonical CHECK.
 ALTER TABLE "uce_campaign_commercials"
   ADD COLUMN "canonical_version" INTEGER,
-  ADD COLUMN "commercial_offer" DECIMAL(12,2),
-  ADD COLUMN "currency" CHAR(3),
-  ADD COLUMN "receives_brand_support" BOOLEAN,
-  ADD COLUMN "brand_support_type" "UceBrandSupportType",
-  ADD COLUMN "brand_support_estimated_value" DECIMAL(12,2);
+  ADD COLUMN "commercial_offer" DECIMAL(12,2);
+
+ALTER TABLE "uce_campaign_commercials"
+  ALTER COLUMN "currency" DROP DEFAULT,
+  ALTER COLUMN "currency" DROP NOT NULL,
+  ALTER COLUMN "currency" TYPE CHAR(3) USING "currency"::CHAR(3),
+  ALTER COLUMN "receives_brand_support" DROP DEFAULT,
+  ALTER COLUMN "receives_brand_support" DROP NOT NULL;
+
+UPDATE "uce_campaign_commercials"
+SET
+  "currency" = NULL,
+  "receives_brand_support" = NULL,
+  "brand_support_type" = NULL,
+  "brand_support_estimated_value" = NULL
+WHERE "canonical_version" IS NULL
+  AND "commercial_offer" IS NULL;
 
 -- Exact, provenance-safe projections from an accepted v1.2 definition.
 UPDATE "uce_campaign_strategy" AS strategy

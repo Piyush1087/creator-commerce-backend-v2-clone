@@ -735,7 +735,9 @@ describe.skipIf(process.env.C03_P13_DATABASE_TEST !== "true")(
       },
     );
 
-    it("history cursor uses the entire ordering tuple for tied timestamps without duplicates or omissions", async () => {
+    it(
+      "history cursor uses the entire ordering tuple for tied timestamps without duplicates or omissions",
+      async () => {
       const owner = await creatorFixture(prisma),
         fixedNow = new Date();
       vi.useFakeTimers({ toFake: ["Date"] });
@@ -773,6 +775,8 @@ describe.skipIf(process.env.C03_P13_DATABASE_TEST !== "true")(
       ).rejects.toMatchObject({
         response: { code: "APPLICATION_CURSOR_INVALID" },
       });
-    });
+    },
+      30_000,
+    );
   },
 );

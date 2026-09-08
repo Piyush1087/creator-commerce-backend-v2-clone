@@ -2972,6 +2972,7 @@ model UceCampaignBrief {
   collaborations         UceCampaignCollaboration[]
   applications           UceApplication[]
   workflowCollaborations Collaboration[]
+  deliverables           UceBriefDeliverable[]
 
   @@index([campaignId])
   @@index([productId])
@@ -3092,7 +3093,6 @@ model UceCampaignCollaboration {
   auditLogs             UceCollaborationAuditLog[]
   reportingAssets       UceCampaignReportingAssetGallery[]
   workflowCollaboration Collaboration?
-  legacyApplications UceApplication[]
   logisticsRegistry UceCollaborationLogistics?
   contentDrafts     UceCollaborationContentDraft[]
   liveTelemetry     UceCollaborationLiveTelemetry?
@@ -3677,8 +3677,8 @@ model Collaboration {
   creatorUser    User                @relation("CollaborationCreator", fields: [creatorUserId], references: [id], onDelete: Restrict)
   campaignId     String              @map("campaign_id")
   campaign       UceCampaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  briefId        String              @map("brief_id")
-  brief          UceCampaignBrief    @relation(fields: [briefId], references: [id], onDelete: Restrict)
+  briefId        String?             @map("brief_id")
+  brief          UceCampaignBrief?   @relation(fields: [briefId], references: [id], onDelete: Restrict)
   productId      String?             @map("product_id")
   product        UceCampaignProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
@@ -4574,8 +4574,8 @@ model CreatorCoPilotInteractionLog {
 
 model Notification {
   id               String                        @id @default(uuid())
-  workspaceId      String                        @map("workspace_id")
-  brandProfile     BrandProfile                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId      String?                       @map("workspace_id")
+  brandProfile     BrandProfile?                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   triggerUserId    String?                       @map("trigger_user_id")
   triggerUser      User?                         @relation("NotificationTriggerUser", fields: [triggerUserId], references: [id], onDelete: SetNull)
   eventType        String                        @map("event_type") @db.VarChar(100)
@@ -4596,8 +4596,10 @@ model Notification {
 
 
   @@unique([workspaceId, eventType, semanticEventKey])
+  @@unique([creatorWorkspaceId, eventType, semanticEventKey], map: "notifications_creator_scope_semantic_key")
   @@index([workspaceId])
   @@index([workspaceId, eventType, createdAt])
+  @@index([creatorWorkspaceId, createdAt])
   @@map("notifications")
 }
 
@@ -4619,7 +4621,8 @@ model NotificationRecipient {
 
 model NotificationJob {
   id                  String                   @id @default(uuid())
-  workspaceId         String                   @map("workspace_id")
+  workspaceId         String?                  @map("workspace_id")
+  brandProfile        BrandProfile?            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   eventType           String                   @map("event_type") @db.VarChar(100)
   urgencyLevel        NotificationUrgencyLevel @map("urgency_level")
   semanticEventKey    String                   @map("semantic_event_key") @db.VarChar(200)

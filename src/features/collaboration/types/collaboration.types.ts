@@ -67,7 +67,7 @@ export type CanonicalCollaborationThreadRow = {
       type: string;
       imageUrl: string | null;
     } | null;
-    brief: { id: string; title: string };
+    brief: { id: string | null; title: string };
   };
   lifecycle: CollaborationLifecycle;
   workflow: CollaborationWorkflowProjection;

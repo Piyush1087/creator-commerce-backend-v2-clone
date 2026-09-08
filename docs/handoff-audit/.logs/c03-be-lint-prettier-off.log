@@ -1,0 +1,5 @@
+# C-03 BE prettier-off ESLint (operator 2026-09-08)
+# Command:
+#   npx eslint "{src,test}/**/*.ts" --rule "prettier/prettier: off"
+# Result: exit 0, no rule findings printed (Tee produced no file when stdout empty).
+# Treat as code-rule VERIFIED. Do not confuse with `npm run lint` (includes Prettier debt).

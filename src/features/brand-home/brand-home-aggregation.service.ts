@@ -111,8 +111,13 @@ export class BrandHomeAggregationService {
 
     const candidates: BrandHomeCandidate[] = [];
     for (const collaboration of collaborations.data?.collaborations ?? []) {
+      const brief = collaboration.brief;
+      if (!brief) continue;
       candidates.push(
-        ...this.classifier.collaboration(collaboration, generatedAt),
+        ...this.classifier.collaboration(
+          { ...collaboration, brief },
+          generatedAt,
+        ),
       );
     }
     if (workspaceReadiness.data) {
