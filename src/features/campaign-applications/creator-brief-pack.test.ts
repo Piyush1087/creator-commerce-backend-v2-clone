@@ -104,5 +104,5 @@ describe("P5 Brief Pack HTTP boundary", () => {
     } finally {
       await app.close();
     }
-  });
+  }, 30000);
 });

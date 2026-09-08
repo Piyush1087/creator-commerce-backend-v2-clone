@@ -124,6 +124,8 @@ describe("C06 P1 contracts and authorization", () => {
     );
     expect(controller.match(/@Get\(/g)).toHaveLength(6);
     expect(controller).not.toMatch(/@(Post|Put|Patch|Delete)\(/);
+    expect(controller).toContain("@UseGuards(ThrottlerGuard, JwtAuthGuard)");
+    expect(controller).not.toContain("CreatorPlatformAccessGuard");
     expect(controller).toContain('"private, no-store"');
     expect(controller).toContain('@Get("obligations")');
     expect(controller).toContain('@Get("history")');

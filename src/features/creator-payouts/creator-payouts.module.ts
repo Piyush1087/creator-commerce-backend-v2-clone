@@ -1,6 +1,5 @@
 import { Module } from "@nestjs/common";
 
-import { CreatorEntryModule } from "../creator-entry/creator-entry.module";
 import { CreatorTeamModule } from "../creator-settings/team/creator-team.module";
 import { CreatorPayoutMethodSummaryModule } from "../creator-settings/payouts/creator-payout-method-summary.module";
 import { CreatorPayoutsController } from "./creator-payouts.controller";
@@ -12,11 +11,7 @@ import { CreatorPayoutsReadEnvironmentService } from "./services/creator-payouts
 import { CreatorPayoutsCursorCodec } from "./utils/creator-payouts-cursor";
 
 @Module({
-  imports: [
-    CreatorEntryModule,
-    CreatorTeamModule,
-    CreatorPayoutMethodSummaryModule,
-  ],
+  imports: [CreatorTeamModule, CreatorPayoutMethodSummaryModule],
   controllers: [CreatorPayoutsController],
   providers: [
     CreatorPayoutsAuthorizationService,

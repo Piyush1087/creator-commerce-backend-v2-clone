@@ -12,13 +12,12 @@ import type { Response } from "express";
 
 import type { RequestWithAuthUser } from "../auth/auth.controller";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
-import { CreatorPlatformAccessGuard } from "../creator-entry/creator-platform-access.guard";
 import { CreatorPayoutsPageQueryDto } from "./dto/creator-payouts-query.dto";
 import { CreatorPayoutsAuthorizationService } from "./services/creator-payouts-authorization.service";
 import { CreatorPayoutsQueryService } from "./services/creator-payouts-query.service";
 
 @Controller("api/v1/creator/payouts")
-@UseGuards(ThrottlerGuard, JwtAuthGuard, CreatorPlatformAccessGuard)
+@UseGuards(ThrottlerGuard, JwtAuthGuard)
 export class CreatorPayoutsController {
   constructor(
     private readonly authorization: CreatorPayoutsAuthorizationService,

@@ -35,6 +35,9 @@ describe("C06 P2 obligation and summary projection", () => {
     expect(resolveProviderDisabledGate("READY", due, due)).toBe(
       "PROVIDER_UNAVAILABLE",
     );
+    expect(resolveProviderDisabledGate("NOT_YET_DUE", due, due)).toBe(
+      "PROVIDER_UNAVAILABLE",
+    );
     expect(
       resolveProviderDisabledGate("READY", new Date(due.getTime() + 1), due),
     ).toBe("NOT_YET_DUE");

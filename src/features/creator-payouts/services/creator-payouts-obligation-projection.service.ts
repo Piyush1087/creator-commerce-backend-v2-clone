@@ -124,6 +124,7 @@ const obligationSelect =
             campaignId: true,
             creatorProfileId: true,
             currency: true,
+            reserveAmount: true,
             status: true,
           },
         },
@@ -590,7 +591,7 @@ function canonicalIntegrity(
     confirmation.campaignId !== row.collaboration.campaignId ||
     confirmation.creatorProfileId !== row.creatorProfileId ||
     confirmation.currency !== row.currency ||
-    confirmation.confirmedAmount !== row.entitlementAmount.toFixed(2)
+    confirmation.confirmedAmount !== reserve.reserveAmount.toFixed(2)
   )
     return { ok: false, reason: "FUNDING_CONFIRMATION_MISMATCH" };
   const allocationTotal = decimalSum(
@@ -712,7 +713,7 @@ export function resolveProviderDisabledGate(
   paymentDueAt: Date,
   asOf: Date,
 ): CreatorPayoutObligationItem["effective_gate"] {
-  if (storedGate !== "READY") return storedGate;
+  if (storedGate !== "READY" && storedGate !== "NOT_YET_DUE") return storedGate;
   return paymentDueAt.getTime() > asOf.getTime()
     ? "NOT_YET_DUE"
     : "PROVIDER_UNAVAILABLE";
