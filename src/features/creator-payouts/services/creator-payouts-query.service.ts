@@ -1,11 +1,17 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { Decimal } from "@prisma/client/runtime/library";
 
 import {
   creatorPayoutsEnvelope,
   type CreatorPayoutsAuthorizationScope,
+  type CreatorPayoutSummaryFamily,
   unavailableSection,
 } from "../contracts/creator-payouts.contract";
 import { CreatorPayoutsCursorCodec } from "../utils/creator-payouts-cursor";
+import {
+  classifySummary,
+  CreatorPayoutsObligationProjectionService,
+} from "./creator-payouts-obligation-projection.service";
 import { CreatorPayoutsReadEnvironmentService } from "./creator-payouts-read-environment.service";
 
 type ReadInput = {
@@ -22,31 +28,45 @@ export class CreatorPayoutsQueryService {
   constructor(
     private readonly environment: CreatorPayoutsReadEnvironmentService,
     private readonly cursors: CreatorPayoutsCursorCodec,
+    private readonly obligations: CreatorPayoutsObligationProjectionService,
   ) {}
 
   async readOverview(input: ReadInput) {
     await this.environment.assertDatabaseUtc();
+    const rows = await this.obligations.allCanonical(input);
+    const canonical = rows.filter((row) => row.canonical);
     return {
       ...creatorPayoutsEnvelope(input.authorization, input.asOf),
-      section: unavailableSection(),
-      summaries: [],
+      section: {
+        coverage: canonical.length === rows.length ? "COMPLETE" : "PARTIAL",
+        freshness: "CURRENT",
+        source_coverage: ["PAYOUT_OBLIGATIONS", "TRANSFER_SETTLEMENT_EVIDENCE"],
+        available_actions: [],
+      },
+      summaries: summarizeCreatorPayouts(
+        canonical.map((row) => row.item),
+        input.asOf,
+      ),
     };
   }
 
   async listObligations(input: ListInput) {
     await this.environment.assertDatabaseUtc();
-    const boundary = this.cursors.decode({
-      cursor: input.cursor,
-      endpoint: "obligations",
-      filterKey: "{}",
-      authorization: input.authorization,
-      requestAsOf: input.asOf,
-    });
+    const result = await this.obligations.list(input);
     return {
-      ...creatorPayoutsEnvelope(input.authorization, boundary.asOf),
-      section: unavailableSection(),
-      items: [],
-      page: { limit: input.limit, next_cursor: null },
+      ...creatorPayoutsEnvelope(input.authorization, result.asOf),
+      section: {
+        coverage: result.coverage,
+        freshness: "CURRENT",
+        source_coverage: [
+          "PAYOUT_OBLIGATIONS",
+          "C04_FINANCIAL_LINEAGE",
+          "TRANSFER_SETTLEMENT_EVIDENCE",
+        ],
+        available_actions: [],
+      },
+      items: result.items,
+      page: { limit: input.limit, next_cursor: result.nextCursor },
     };
   }
 
@@ -78,13 +98,61 @@ export class CreatorPayoutsQueryService {
 
   async readObligation(input: ReadInput & { readonly resourceId: string }) {
     await this.environment.assertDatabaseUtc();
-    throw nonEnumeratingNotFound();
+    return {
+      ...creatorPayoutsEnvelope(input.authorization, input.asOf),
+      section: {
+        coverage: "COMPLETE",
+        freshness: "CURRENT",
+        source_coverage: ["PAYOUT_OBLIGATIONS", "C04_FINANCIAL_LINEAGE"],
+        available_actions: [],
+      },
+      obligation: await this.obligations.detail(input),
+    };
   }
 
   async readHistory(input: ReadInput & { readonly resourceId: string }) {
     await this.environment.assertDatabaseUtc();
     throw nonEnumeratingNotFound();
   }
+}
+
+const SUMMARY_FAMILIES: readonly CreatorPayoutSummaryFamily[] = [
+  "UPCOMING",
+  "DUE_OR_ACTION_REQUIRED",
+  "PROCESSING",
+  "PAID_TO_DATE",
+];
+
+export function summarizeCreatorPayouts(
+  items: readonly import("../contracts/creator-payouts.contract").CreatorPayoutObligationItem[],
+  asOf: Date,
+) {
+  const currencies = [
+    ...new Set(
+      items.flatMap((item) =>
+        [item.outstanding_value?.currency, item.settled_value?.currency].filter(
+          (value): value is string => Boolean(value),
+        ),
+      ),
+    ),
+  ].sort();
+  return currencies.flatMap((currency) =>
+    SUMMARY_FAMILIES.map((family) => {
+      const amount = items.reduce((total, item) => {
+        const included =
+          family === "PAID_TO_DATE"
+            ? Boolean(item.settled_value && !item.legacy)
+            : classifySummary(item, asOf) === family;
+        if (!included) return total;
+        const money =
+          family === "PAID_TO_DATE"
+            ? item.settled_value
+            : item.outstanding_value;
+        return money?.currency === currency ? total.add(money.amount) : total;
+      }, new Decimal(0));
+      return { family, value: { amount: amount.toFixed(4), currency } };
+    }),
+  );
 }
 
 function nonEnumeratingNotFound(): NotFoundException {
