@@ -1,0 +1,43 @@
+freeze: MVP_CANONICAL_APPLICATION_FREEZE_V1
+charter: dummy_tcs/docs/organization/charters/canonical_application_freeze_ai_worker_charter.md
+development_untouched: true
+aws: NOT_STARTED
+pass_declared: false
+snapshot:
+  backend: cd446fb4bd356fe03faf16c6c7a282a55cebcf08
+  frontend: c83ab8bab02ace8872a53de81cc8ffe79ccda832
+branch: freeze/mvp-canonical-application-v1
+parent_locks:
+  defer:
+    - C-02A
+    - C-04
+    - Brand Payouts v1
+  out:
+    - C-06
+    - Marketplace
+    - Co-Pilot
+    - Creator Centre
+package_root: docs/organization/mvp-canonical-freeze/
+runs:
+  - id: RUN1_INVENTORY_AND_HIDE
+    date: "2026-09-08"
+    intent: Register accepted modules; hide deferred/out product from nav and routes
+    prisma_drop: NOT_THIS_CHECKPOINT
+    docs_layout: numbered files 00-04 at package root
+    checkpoints:
+      frontend: 71fe273e9a4d84b868dc7511d606e1109f2d566e
+      backend: 13a1dedc0ead8eef24a27c48067364258119b0fc
+      dummy_tcs: f6378bc1f26ed51a7cb797e3888cb1140bffbed9
+  - id: RUN2_COVERAGE_INVARIANTS_SCHEMA_SECURITY_ENV
+    date: "2026-09-08"
+    intent: >
+      Charter Phase C coverage map, Phase D invariant definition, Phase E no-pull
+      convergence plan, §14 Prisma register, §15 security scan, §16 provider
+      register, §17 env manifest. Restructure freeze docs into one folder per step.
+    prisma_drop: NOT_THIS_CHECKPOINT
+    fresh_db_migrate: NOT_PROVEN
+    validation_gate: NOT_RUN
+    checkpoints:
+      frontend: PENDING_THIS_COMMIT
+      backend: PENDING_THIS_COMMIT
+      dummy_tcs: PENDING_THIS_COMMIT

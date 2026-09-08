@@ -1,0 +1,13 @@
+# Backend security notes (§15)
+
+See also `security-release-check.md`.
+
+| Topic | Backend evidence |
+| --- | --- |
+| No fixed OTP in deployable config | `src/features/auth/auth-security.static.test.ts` |
+| Non-prod OTP log | `src/features/auth/email-otp.service.ts` (`!isProduction()`) |
+| QA apply bypass | `CREATOR_APPLY_BYPASS_EMAILS` — empty in production |
+| OUT APIs still mounted | `CoPilotModule` `CreatorCoPilotModule` `CreatorCentreModule` `BrandPayoutsModule` `CreatorPayoutsModule` in `src/app.module.ts` |
+| Prisma validate | PASS 2026-09-08 `npx prisma validate` |
+
+Do not commit `.env`, `tmp-ssm-params.json`, or `tmp-*` logs.

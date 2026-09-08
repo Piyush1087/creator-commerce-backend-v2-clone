@@ -2,9 +2,12 @@
 
 **Status:** ACTIVE  
 **Branch:** `freeze/mvp-canonical-application-v1`  
-**Does not update:** `development` or `main`
+**Does not update:** `development` or `main`  
+**Package index:** [README.md](./README.md)
 
 This branch is the Canonical Application Freeze workspace. `origin/development` remains the untouched snapshot after C-03 merge.
+
+Each charter step has its **own folder** under this directory. Do not commit `tmp-*`, `tmp-ssm-params.json`, or handoff-audit logs.
 
 ## Locked Parent decisions (2026-09-08)
 
@@ -19,7 +22,7 @@ Creator Centre / Media Kit        DEFERRED (C-02A deferral)
 Live Razorpay / Meta App Review   PROVIDER_DEFERRED
 ```
 
-Remaining mixed-folder debt (old payout hubs still in the tree, Co-Pilot schema, duplicate persistence) is classified in `03-legacy-disposition.md` and may be removed in a later freeze amendment. This checkpoint hides those products from the running app.
+Backend Co-Pilot / Centre / old payout modules remain imported (`src/app.module.ts`). Hide was frontend chrome. Schema drop is not this checkpoint.
 
 ## Snapshot SHAs (do not treat as freeze SHAs)
 
@@ -28,7 +31,7 @@ ORIGIN_DEVELOPMENT_FRONTEND = c83ab8bab02ace8872a53de81cc8ffe79ccda832
 ORIGIN_DEVELOPMENT_BACKEND  = cd446fb4bd356fe03faf16c6c7a282a55cebcf08
 ```
 
-Freeze SHAs are the tips of this branch after checkpoint commits.
+Freeze SHAs: `phase-f-execution/execution-ledger.yaml`.
 
 ## Charter
 
