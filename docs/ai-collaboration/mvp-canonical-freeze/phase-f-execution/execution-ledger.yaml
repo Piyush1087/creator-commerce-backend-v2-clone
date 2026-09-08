@@ -70,6 +70,6 @@ runs:
     pass_declared: false
     smoke: PARTIAL_PASS
     checkpoints:
-      frontend: PENDING_THIS_COMMIT
-      backend: PENDING_THIS_COMMIT
-      dummy_tcs: PENDING_THIS_COMMIT
+      frontend: 3e32b7421b37a743dcd10378e7aa9a465bc89774
+      backend: c055ca8335f639a5b9d0d3cc03cfdf9693139647
+      dummy_tcs: 3e4bc9a8068779fb7cb283ec7ed9c682ca968dbf

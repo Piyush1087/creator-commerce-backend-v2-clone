@@ -25,17 +25,19 @@ Freeze workspace (do not treat `development` / `main` as the freeze):
 ```text
 BACKEND_CANONICAL_REPOSITORY  = growth-verse/creator-commerce-backend-v2
 BACKEND_CANONICAL_BRANCH      = freeze/mvp-canonical-application-v1
-BACKEND_CANONICAL_SHA         = see phase-f-execution/execution-ledger.yaml (RUN4 checkpoints after record commit)
+BACKEND_CANONICAL_SHA         = c055ca8335f639a5b9d0d3cc03cfdf9693139647
 
 FRONTEND_CANONICAL_REPOSITORY = growth-verse/creator-commerce-frontend-v2
 FRONTEND_CANONICAL_BRANCH     = freeze/mvp-canonical-application-v1
-FRONTEND_CANONICAL_SHA        = see phase-f-execution/execution-ledger.yaml (RUN4 checkpoints after record commit)
+FRONTEND_CANONICAL_SHA        = 3e32b7421b37a743dcd10378e7aa9a465bc89774
 
 ARCHITECTURE_AUTHORITY_REPO   = Piyush1087/dummy_tcs
-ARCHITECTURE_AUTHORITY_SHA    = see phase-f-execution/execution-ledger.yaml (RUN4 checkpoints after record commit)
+ARCHITECTURE_AUTHORITY_SHA    = 3e4bc9a8068779fb7cb283ec7ed9c682ca968dbf
 ```
 
-Last recorded tips **before** this RUN 4 docs commit (ledger-record of RUN 3):
+These are the RUN 4 evidence commits (artifact + §18 results). A follow-up ledger-record commit may sit on top; it does not replace these freeze SHAs.
+
+RUN 3 ledger-record (parent of RUN 4 evidence):
 
 ```text
 FRONTEND  a91cb9aee6df5340819ee26e2cd92612aba846d5
