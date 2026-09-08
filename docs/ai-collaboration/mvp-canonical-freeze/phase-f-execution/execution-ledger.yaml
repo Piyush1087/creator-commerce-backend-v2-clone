@@ -54,3 +54,22 @@ runs:
       frontend: ee16a590480ca185a083944fb1bf2e246ff66dc2
       backend: 773fbaa8f121a523eb0950740da79596e00ff873
       dummy_tcs: 70b644c2bb321fc220b7333afe1c9bc23a951604
+    ledger_record:
+      frontend: a91cb9aee6df5340819ee26e2cd92612aba846d5
+      backend: 319691820bb4c0d1fa55a80398c686e40cb8cd93
+      dummy_tcs: 92aea72a32cbab473abe57c536c3f9bf8cb8cba4
+  - id: RUN4_LINT_INVARIANTS_SMOKE_ARTIFACT
+    date: "2026-09-08"
+    intent: >
+      FE lint PASS; BE lint FAIL classified prettier debt; named invariant proofs
+      (FE 70 / BE 51); seeded OTP browser smoke on freeze_mvp_canonical_v1;
+      write MVP_CANONICAL_APPLICATION_FREEZE_V1. Not freeze PASS.
+    prisma_drop: NOT_THIS_CHECKPOINT
+    fresh_db_migrate: PASS_87
+    validation_gate: PARTIAL
+    pass_declared: false
+    smoke: PARTIAL_PASS
+    checkpoints:
+      frontend: PENDING_THIS_COMMIT
+      backend: PENDING_THIS_COMMIT
+      dummy_tcs: PENDING_THIS_COMMIT

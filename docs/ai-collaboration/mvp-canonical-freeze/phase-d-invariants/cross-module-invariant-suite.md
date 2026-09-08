@@ -2,7 +2,7 @@
 
 Compact high-value invariants only. Not a restatement of every module test.
 
-**Status:** DEFINED. Execution belongs in `../18-validation/`.  
+**Status:** DEFINED. RUN 4 partial execution: `../18-validation/11-invariant-results.md`.  
 **Date:** 2026-09-08
 
 | ID | Invariant | Authority | Prove with |

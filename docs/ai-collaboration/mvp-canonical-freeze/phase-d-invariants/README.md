@@ -1,6 +1,6 @@
 # Phase D — Cross-module invariant preflight (§11)
 
-**Status:** DEFINED — not yet executed as a suite gate  
+**Status:** DEFINED + PARTIAL execution in §18  
 **Date:** 2026-09-08
 
 ## Files in this folder
@@ -9,4 +9,4 @@
 | --- | --- |
 | `cross-module-invariant-suite.md` | Compact high-value invariants with authority + proof files |
 
-This is a **definition** checkpoint. Execution results belong in `../18-validation/` after the suite is run.
+Definition stays here. Execution results: `../18-validation/11-invariant-results.md` (RUN 4).
