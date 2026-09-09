@@ -25,17 +25,17 @@ Freeze workspace (do not treat `development` / `main` as the freeze):
 ```text
 BACKEND_CANONICAL_REPOSITORY  = growth-verse/creator-commerce-backend-v2
 BACKEND_CANONICAL_BRANCH      = freeze/mvp-canonical-application-v1
-BACKEND_CANONICAL_SHA         = 9d56c03d9d92cd07f44c349b20b0c12b62d82f98
+BACKEND_CANONICAL_SHA         = c7440e7f643f8fd4c421024e5c0d196f9b5fde3f
 
 FRONTEND_CANONICAL_REPOSITORY = growth-verse/creator-commerce-frontend-v2
 FRONTEND_CANONICAL_BRANCH     = freeze/mvp-canonical-application-v1
-FRONTEND_CANONICAL_SHA        = b8b819161835fd8c5b15366dc2463e73fd3946b2
+FRONTEND_CANONICAL_SHA        = 8edc42f498125faf7a054f744206b889c838b1ef
 
 ARCHITECTURE_AUTHORITY_REPO   = Piyush1087/dummy_tcs
-ARCHITECTURE_AUTHORITY_SHA    = 615e064da5ce02a8f99490bb4b27df4cbfdf47e0
+ARCHITECTURE_AUTHORITY_SHA    = 2ff5d06c6c42404b9e33045bc18614b240eb8b1f
 ```
 
-These are the RUN 5 freeze-package commits (docs + unused FE withdrawal types). RUN 4 product-tree parents remain `3e32b74` / `c055ca8` / `3e4bc9a`. A follow-up ledger-record commit may sit on top.
+These are the leftover-retry freeze-package commits (viewport + INV-06/07 PASS + Parent leftover re-runs). RUN 5 parents remain `b8b8191` / `9d56c03` / `615e064`. A follow-up ledger-record commit may sit on top.
 
 RUN 3 ledger-record (parent of RUN 4 evidence):
 
