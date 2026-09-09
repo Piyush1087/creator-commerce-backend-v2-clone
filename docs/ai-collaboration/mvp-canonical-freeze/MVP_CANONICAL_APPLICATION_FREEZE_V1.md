@@ -25,17 +25,17 @@ Freeze workspace (do not treat `development` / `main` as the freeze):
 ```text
 BACKEND_CANONICAL_REPOSITORY  = growth-verse/creator-commerce-backend-v2
 BACKEND_CANONICAL_BRANCH      = freeze/mvp-canonical-application-v1
-BACKEND_CANONICAL_SHA         = c055ca8335f639a5b9d0d3cc03cfdf9693139647
+BACKEND_CANONICAL_SHA         = 9d56c03d9d92cd07f44c349b20b0c12b62d82f98
 
 FRONTEND_CANONICAL_REPOSITORY = growth-verse/creator-commerce-frontend-v2
 FRONTEND_CANONICAL_BRANCH     = freeze/mvp-canonical-application-v1
-FRONTEND_CANONICAL_SHA        = 3e32b7421b37a743dcd10378e7aa9a465bc89774
+FRONTEND_CANONICAL_SHA        = b8b819161835fd8c5b15366dc2463e73fd3946b2
 
 ARCHITECTURE_AUTHORITY_REPO   = Piyush1087/dummy_tcs
-ARCHITECTURE_AUTHORITY_SHA    = 3e4bc9a8068779fb7cb283ec7ed9c682ca968dbf
+ARCHITECTURE_AUTHORITY_SHA    = 615e064da5ce02a8f99490bb4b27df4cbfdf47e0
 ```
 
-These are the RUN 4 product-tree evidence commits. RUN 5 added named postgres proofs, clone `npm ci`, and full `npm test` farms; those results live in §18. A follow-up ledger-record commit may sit on top; it does not replace these freeze SHAs.
+These are the RUN 5 freeze-package commits (docs + unused FE withdrawal types). RUN 4 product-tree parents remain `3e32b74` / `c055ca8` / `3e4bc9a`. A follow-up ledger-record commit may sit on top.
 
 RUN 3 ledger-record (parent of RUN 4 evidence):
 
