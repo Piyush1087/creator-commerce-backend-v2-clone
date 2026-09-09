@@ -1,6 +1,6 @@
 # Phase F — Execution policy and ledger (§13)
 
-**Status:** ACTIVE — ledger current through RUN 6 working tree; **not** freeze PASS  
+**Status:** ACTIVE — ledger current through RUN 6 evidence SHAs; **not** freeze PASS  
 **Date:** 2026-09-08; ledger audit 2026-09-09
 
 ## Files in this folder
@@ -21,15 +21,14 @@ AWS is not started. `development`/`main` are not updated.
 | RUN 2 canonical convergence | **Skipped as a pull** — IN already in lineage; RUN 2 is docs |
 | RUN 3 whole-app acceptance | Split across RUN 3–5 (build/migrate; lint/invariants/smoke; postgres/npm ci/full test) |
 | RUN 4 freeze preparation | Artifact written in RUN 4; still not PASS |
-| Ledger + checkpoint SHA every material run | YES RUN 1–5. RUN 6 is **UNCOMMITTED_WORKING_TREE** until commit |
+| Ledger + checkpoint SHA every material run | YES RUN 1–6 evidence SHAs; ledger-record commit may sit on top |
 | Runner does not reconcile conflicting accepted sources | YES — C-02A / C-04 / Payouts stay deferred |
 
 ## RUN 6 (2026-09-09)
 
-Marketplace CTA retarget + `/help` mount. Targeted FE vitest **8 files / 97 passed**. No full farm, no browser E2E. Checkpoint SHAs pending commit.
+Marketplace CTA retarget + `/help` mount. Targeted FE vitest **8 files / 97 passed**. Evidence SHAs: FE `511d5e35…` / BE `4d4b350c…` / dummy_tcs `86d8e49e…`.
 
 ## Leftovers
 
-- `origin/freeze` lags at RUN 1.
-- RUN 6 has no git SHA until commit/push.
 - Do not start a charter-shaped RUN 2 pull to match the diagram.
+- Freeze PASS still forbidden (security sentence, classified test farms, deferred packs).
