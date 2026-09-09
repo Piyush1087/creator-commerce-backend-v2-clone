@@ -25,4 +25,4 @@ npm run build after generate  HUNG / killed after ~27 min with no nest output
   (CPU contended with full BE npm test)
 ```
 
-**Classification:** `ENVIRONMENT_BLOCKED` for clone `nest build` under load. Working-tree backend build already **PASS** in RUN 3. Fresh clone must run `npx prisma generate` before `npm run build` (`pretest` generates; `build` does not).
+**Classification:** `ENVIRONMENT_BLOCKED` for clone `nest build` under load. Working-tree backend `npx prisma generate` + `npm run build` **PASS** in RUN 3 and **Parent reconfirm 2026-09-09**. Fresh clone must run `npx prisma generate` before `npm run build` (`pretest` generates; `build` does not).

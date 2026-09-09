@@ -56,4 +56,6 @@ No Marketplace, Creator Centre, Co-Pilot, or old payout hub in authenticated nav
 
 ## Not claimed
 
-Responsive viewport matrix, provider-unavailable recovery, RBAC postgres isolation, full apply/handoff click-through.
+Provider-unavailable recovery, full apply/handoff click-through.
+
+Viewport matrix is in `16-viewport-smoke.md` (RUN 5 remainder). RBAC postgres isolation is in `13-postgres-invariants.md`.
