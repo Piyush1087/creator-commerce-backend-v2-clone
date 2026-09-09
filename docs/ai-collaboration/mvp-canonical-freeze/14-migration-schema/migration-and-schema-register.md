@@ -46,8 +46,8 @@ Classify, do not drop this run:
 | --- | --- |
 | `CoPilotThread` `CoPilotMessage` `CoPilotMessageFeedback` `CoPilotSlotSession` `CoPilotInteractionLog` | OUT_OF_MVP |
 | Marketplace-era tables from `20260624120000_creator_marketplace` | OUT_OF_MVP / C-03 mixed |
-| Duplicate collab: `UceCampaignCollaboration*` vs `Collaboration*` | UNKNOWN_REQUIRES_REVIEW |
-| Duplicate money identity: `CreatorBankDetails` vs `CreatorPayoutDestination` vs `CreatorSettlementProfile` | UNKNOWN_REQUIRES_REVIEW |
+| Duplicate collab: `UceCampaignCollaboration*` vs `Collaboration*` | PREEXISTING_ACCEPTED_DEBT (Parent 2026-09-09 later amendment; no drop) |
+| Duplicate money identity: `CreatorBankDetails` vs `CreatorPayoutDestination` vs `CreatorSettlementProfile` | PREEXISTING_ACCEPTED_DEBT (Parent 2026-09-09; C-06 / Brand Payouts v1 not pulled) |
 
 ## Prisma validate (this run)
 

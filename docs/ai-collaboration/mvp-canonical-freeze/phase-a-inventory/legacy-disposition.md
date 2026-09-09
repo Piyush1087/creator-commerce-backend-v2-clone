@@ -15,6 +15,6 @@ Canonical copy. Original RUN 1 file at `../03-legacy-disposition.md` is a pointe
 | Marketplace browse / guest marketplace | OUT_OF_MVP | keep C-03 redirects only |
 | `creator-marketplace` Apply helpers | CANONICAL_PENDING (C-03 mixed folder) | keep module wired |
 | C-02A / C-04 / Brand Payouts v1 | CANONICAL_PENDING_CONVERGENCE | not pulled |
-| Duplicate persistence (UCE collab vs Collaboration) | UNKNOWN_REQUIRES_REVIEW | later debt |
+| Duplicate persistence (UCE collab vs Collaboration) | PREEXISTING_ACCEPTED_DEBT | later schema amendment; no drop this freeze |
 
 Docs for OUT/DEFERRED modules are not deleted. Classification folders: `../deferred/` and `../out-of-mvp/`.

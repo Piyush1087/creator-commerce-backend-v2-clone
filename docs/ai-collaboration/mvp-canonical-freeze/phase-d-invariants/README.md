@@ -9,4 +9,4 @@
 | --- | --- |
 | `cross-module-invariant-suite.md` | Compact high-value invariants with authority + proof files |
 
-Definition stays here. Execution results: `../18-validation/11-invariant-results.md` (RUN 4).
+Definition stays here. Execution results: `../18-validation/11-invariant-results.md` (RUN 4 + RUN 5 postgres).

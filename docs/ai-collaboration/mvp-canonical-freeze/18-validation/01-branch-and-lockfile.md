@@ -10,8 +10,8 @@
 | `node_modules` | present (not a fresh checkout) | present (not a fresh checkout) |
 
 ```text
-fresh checkout/reproducibility = NOT_RUN (working copies, not a clean clone)
-package install / lockfile integrity = LOCKFILE_PRESENT; npm ci not re-run this gate
+fresh checkout/reproducibility = PARTIAL (RUN 5 local freeze-branch clones; 14-npm-ci-fresh-clone.md)
+package install / lockfile integrity = PASS npm ci on those clones
 ```
 
-Classification: `PREEXISTING_ACCEPTED_DEBT` for skipping `npm ci` on an already-installed freeze worktree. A later gate can still run `npm ci` if Parent wants a clean-machine proof.
+Working copies still have `node_modules` from earlier runs. Clone proof is RUN 5, not a second install in the working trees.

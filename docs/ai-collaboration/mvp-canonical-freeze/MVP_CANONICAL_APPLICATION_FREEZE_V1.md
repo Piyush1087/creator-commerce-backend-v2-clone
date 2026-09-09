@@ -35,7 +35,7 @@ ARCHITECTURE_AUTHORITY_REPO   = Piyush1087/dummy_tcs
 ARCHITECTURE_AUTHORITY_SHA    = 3e4bc9a8068779fb7cb283ec7ed9c682ca968dbf
 ```
 
-These are the RUN 4 evidence commits (artifact + §18 results). A follow-up ledger-record commit may sit on top; it does not replace these freeze SHAs.
+These are the RUN 4 product-tree evidence commits. RUN 5 added named postgres proofs, clone `npm ci`, and full `npm test` farms; those results live in §18. A follow-up ledger-record commit may sit on top; it does not replace these freeze SHAs.
 
 RUN 3 ledger-record (parent of RUN 4 evidence):
 
@@ -88,19 +88,19 @@ Definition: `phase-d-invariants/cross-module-invariant-suite.md`
 Results: `18-validation/11-invariant-results.md`
 
 ```text
-INV-01 PASS (static/unit)
-INV-02 PARTIAL (C-01 org trigger observed)
-INV-03 PASS (architecture + smoke)
-INV-04 PASS (architecture/unit)
-INV-05 PASS (unit + smoke)
-INV-06 NOT_RUN (postgres)
-INV-07 NOT_RUN (handoff postgres; collab seed STALE_TEST_PROVEN)
+INV-01 PASS (static/unit + postgres 10/10 on bs12_freeze_auth)
+INV-02 PARTIAL (C-01 org trigger; C-01 I2 postgres 26/29)
+INV-03 PASS architecture/smoke; postgres PARTIAL (26/29 STALE_TEST_PROVEN harness)
+INV-04 PASS (unit + postgres 5/5 on c05_freeze_team)
+INV-05 PASS (unit + smoke; Chat P6 git-diff test stale vs freeze hide)
+INV-06 PARTIAL postgres (c03_p14_handoff 27/30; 3 query timeouts ENVIRONMENT_BLOCKED)
+INV-07 PARTIAL postgres (same handoff file; collab seed still STALE_TEST_PROVEN)
 INV-08 PARTIAL (C-05 payout boundary unit)
-INV-09 NOT_RUN
+INV-09 PARTIAL (C-05 Settings contact proven; fulfillment does not consume that address)
 INV-10 PARTIAL (Postmark fail-closed locally; live IG/Razorpay NOT_RUN)
 INV-11 PARTIAL (Brand Home fail-closed for Creator session)
-INV-12 PARTIAL (unit + Brand↛Creator browser)
-INV-13 FAIL classified UNKNOWN_REQUIRES_REVIEW
+INV-12 PASS (unit + postgres 11/11 on bs07_freeze_auth + browser)
+INV-13 FAIL classified; Parent-accepted later schema amendment (same tables as last-accepted C-03 + origin Brand Collab; no drop this freeze)
 ```
 
 ---
@@ -140,15 +140,17 @@ Local smoke: Postmark send failed; OTP still issued because `STAGE` was not `pro
 Canonical: `15-security/security-release-check.md`
 
 ```text
-NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS  = NOT YET DECLARED
+NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS  = NOT DECLARED THIS FREEZE
 ```
 
-Blockers before PASS / prod:
+**Parent 2026-09-09:** residuals accepted as **AWS-dev / production gates**, not this-freeze unwind.
 
-1. Production `CREATOR_APPLY_BYPASS_EMAILS` empty (or security authority accepts a named list).
-2. OTP codes never logged when `STAGE=prod`.
-3. OUT APIs (Co-Pilot, Centre, old payout hubs, public marketplace) unwired or explicitly accepted as non-product with auth still required.
-4. Remaining §18 auth/RBAC/cross-tenant postgres proofs or Parent-accepted debt.
+1. Production `CREATOR_APPLY_BYPASS_EMAILS` empty (or security authority named list) — **AWS / prod worker**.
+2. OTP codes never logged when `STAGE=prod` — **AWS worker must prove**.
+3. OUT APIs remain in tree with auth required; hidden from product chrome. Explicitly accepted as non-product until a later amendment. **Do not unwire in this freeze.**
+4. §18 auth/RBAC/cross-tenant postgres INV-01/04/12 PASS.
+
+This freeze still does **not** declare `NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS` or `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1`.
 
 ---
 
@@ -161,14 +163,17 @@ FE typecheck PASS
 FE build PASS
 FE lint PASS
 BE prisma validate PASS
-BE build PASS
+BE build PASS (working tree; clone nest build hung under load)
 BE boot+health PASS on freeze_mvp_canonical_v1
 FE invariant vitest 70/70 PASS
 BE invariant vitest 51/51 PASS
 FE↔BE OTP smoke PARTIAL PASS
 BE lint FAIL 712 prettier  PREEXISTING_ACCEPTED_DEBT
-full npm test NOT_RUN
-npm ci fresh clone NOT_RUN
+postgres INV-01/04/12 PASS; INV-03/06/07 PARTIAL
+FE npm ci clone typecheck/lint/build PASS
+BE npm ci clone validate PASS; build requires prisma generate
+full FE npm test FAIL 3/1060 classified; 2 Parent-accepted + unused withdrawal types deleted
+full BE npm test FAIL 18/7170 classified; CORS/brief-pack/Gatekeeper isolated PASS (farm load)
 ```
 
 ---
@@ -177,14 +182,19 @@ npm ci fresh clone NOT_RUN
 
 - C-02A / C-04 / Brand Payouts v1 not pulled (Parent lock).
 - C-06, Marketplace, Co-Pilot, Creator Centre hidden, APIs/schema still in tree.
-- INV-13 duplicate persistence (`UceCampaignCollaboration` vs `Collaboration`; bank/payout models).
+- INV-13 duplicate persistence — **Parent-accepted 2026-09-09** later amendment (present on C-03 `aebeb85` and origin `development`). No Prisma drop this freeze.
 - `scripts/seed-dev-collaboration.ts` stale vs Prisma (`STALE_TEST_PROVEN`).
 - `db:seed:dev-creator` does not create an ACTIVE Creator organization (OTP ineligible).
 - Creator post-login can return to `/brand/*` if that was the unauthenticated `from` path.
-- BE prettier farm (712).
+- BE prettier farm (712) — Parent: do not `--fix`.
 - `/brand/intelligence/identity-test` still mounted (legacy test surface).
 - Chunk-size FE build warning.
-- Dedicated postgres invariant DBs not created this freeze.
+- C-01 I2 postgres harness drift (`issueTokenForUserId is not a function`).
+- FE `authAuthorizationHeader` still used by Brand Centre / UCE — Parent-accepted `PREEXISTING_ACCEPTED_DEBT`.
+- Chat architecture git-diff vs P6 `sidebar-items.ts` — Parent-accepted `STALE_TEST_PROVEN` (freeze hide).
+- Unused FE Brand withdrawal contract types deleted 2026-09-09; backend withdrawal-account API still present.
+- BE financial-producer / route-payout architecture greps vs deferred Brand Payouts v1 / C-04.
+- Clone `npm run build` does not run `prisma generate`; nest build under CPU contention was killed.
 
 ---
 

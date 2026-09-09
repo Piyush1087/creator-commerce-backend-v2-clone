@@ -73,3 +73,18 @@ runs:
       frontend: 3e32b7421b37a743dcd10378e7aa9a465bc89774
       backend: c055ca8335f639a5b9d0d3cc03cfdf9693139647
       dummy_tcs: 3e4bc9a8068779fb7cb283ec7ed9c682ca968dbf
+    ledger_record:
+      frontend: 58b26a26a7925bd12f2f2924757e3059710849fc
+      backend: 84b98fe18f1c6040335189ef2cfd59a5ed49b3fd
+      dummy_tcs: e71f4e6183ded766916721ee19175e23e17f1c8f
+  - id: RUN5_POSTGRES_NPMCI_FULLTEST
+    date: "2026-09-09"
+    intent: >
+      Named postgres invariant DBs; fresh local npm ci clones; full npm test farms;
+      Parent INV-13 later amendment; §15 residuals as AWS/prod gates. Not freeze PASS.
+    prisma_drop: NOT_THIS_CHECKPOINT
+    pass_declared: false
+    checkpoints:
+      frontend: PENDING_THIS_COMMIT
+      backend: PENDING_THIS_COMMIT
+      dummy_tcs: PENDING_THIS_COMMIT

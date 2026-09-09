@@ -1,7 +1,7 @@
 # §18 — Whole-application validation gate
 
-**Status:** RUN 4 COMPLETE (partial gates) — not freeze PASS  
-**Date:** 2026-09-08
+**Status:** RUN 5 COMPLETE (partial gates) — not freeze PASS  
+**Date:** 2026-09-09
 
 ## Files in this folder (one file per gate)
 
@@ -20,5 +20,8 @@
 | `10-remaining-gates.md` | still-open §18 gates |
 | `11-invariant-results.md` | INV-01…INV-13 execution results |
 | `12-frontend-backend-smoke.md` | seeded OTP browser smoke |
+| `13-postgres-invariants.md` | named disposable-DB invariant suites |
+| `14-npm-ci-fresh-clone.md` | local freeze-branch `npm ci` |
+| `15-full-npm-test.md` | full FE/BE `npm test` farms |
 
 `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` is forbidden until remaining gates are closed or Parent-accepted.

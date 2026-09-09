@@ -23,15 +23,15 @@
 ## Required posture
 
 ```text
-NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS  = NOT YET DECLARED
+NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS  = NOT DECLARED THIS FREEZE
 ```
 
-Blockers to clear before freeze PASS:
+**Parent 2026-09-09:** do not unwire OUT APIs or change prod env in this freeze. Residuals are **AWS_DEV_BLOCKER / PRODUCTION_BLOCKER**:
 
 1. Production `CREATOR_APPLY_BYPASS_EMAILS` empty (or security authority accepts a named list).
 2. OTP codes never logged when `STAGE=prod`.
-3. OUT APIs (Co-Pilot, Centre, old payout hubs, public marketplace) either unwired or explicitly accepted as non-deployable-in-product with auth still required.
-4. §18 auth/RBAC/cross-tenant suite run.
+3. OUT APIs (Co-Pilot, Centre, old payout hubs, public marketplace) stay in tree with auth required; accepted as non-product chrome until a later amendment.
+4. §18 auth/RBAC/cross-tenant postgres INV-01/04/12 already PASS.
 
 ## Known non-bypass debt
 

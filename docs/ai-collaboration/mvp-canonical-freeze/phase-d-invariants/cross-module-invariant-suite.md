@@ -2,7 +2,7 @@
 
 Compact high-value invariants only. Not a restatement of every module test.
 
-**Status:** DEFINED. RUN 4 partial execution: `../18-validation/11-invariant-results.md`.  
+**Status:** DEFINED. RUN 4 + RUN 5 execution: `../18-validation/11-invariant-results.md`.  
 **Date:** 2026-09-08
 
 | ID | Invariant | Authority | Prove with |
@@ -19,7 +19,7 @@ Compact high-value invariants only. Not a restatement of every module test.
 | INV-10 | Provider state fail-closed | Provider clients | Instagram/Razorpay/Postmark: missing secrets must not simulate production success |
 | INV-11 | Backend business state authoritative over frontend display | All accepted modules | No frontend-only authorization for mutations |
 | INV-12 | Cross-tenant and cross-role isolation | Auth + workspace guards | Brand cannot read Creator Settings; Creator cannot hit Brand Centre writes |
-| INV-13 | No duplicate competing persistence for the same canonical concept | Schema SOP | Known debt: `UceCampaignCollaboration` vs `Collaboration`; `CollaborationCommercial` vs `CollaborationCommercialAgreement`; `CreatorBankDetails` vs `CreatorPayoutDestination` vs `CreatorSettlementProfile`. Classified `UNKNOWN_REQUIRES_REVIEW` — later amendment, not extra scope this freeze |
+| INV-13 | No duplicate competing persistence for the same canonical concept | Schema SOP | Known debt: `UceCampaignCollaboration` vs `Collaboration`; `CollaborationCommercial` vs `CollaborationCommercialAgreement`; `CreatorBankDetails` vs `CreatorPayoutDestination` vs `CreatorSettlementProfile`. **Parent-accepted 2026-09-09** later amendment (same as last-accepted C-03 + origin Brand Collab). No Prisma drop this freeze. |
 
 ## Explicitly out of this suite
 

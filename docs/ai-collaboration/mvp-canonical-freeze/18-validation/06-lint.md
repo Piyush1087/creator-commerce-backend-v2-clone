@@ -27,8 +27,4 @@ result: 712 problems (712 errors, 0 warnings)
 rule: prettier/prettier (CRLF / wrapping), auto-fixable
 ```
 
-**Classification:** `PREEXISTING_ACCEPTED_DEBT`
-
-This is a formatter/line-ending farm across many accepted modules (including Brand Centre UCE bridge, pricing, S3). It is not a freeze-hide regression and was **not** `--fix`ed on this run (would be an unrelated 700-file churn).
-
-Freeze PASS still requires Parent to accept this classification or a later format-only amendment.
+**Classification:** `PREEXISTING_ACCEPTED_DEBT` — **Parent-accepted 2026-09-09** (do not `--fix`).
