@@ -2,28 +2,34 @@
 
 Compact high-value invariants only. Not a restatement of every module test.
 
-**Status:** DEFINED. RUN 4 + RUN 5 execution: `../18-validation/11-invariant-results.md`.  
-**Date:** 2026-09-08
+**Status:** DEFINED + audited 2026-09-09 against freeze tree and `../18-validation/11-invariant-results.md`  
+**Execution lives in §18.** This file is the preflight definition (authority + proof files + tests).
 
-| ID | Invariant | Authority | Prove with |
-| --- | --- | --- | --- |
-| INV-01 | One canonical auth/session model across Brand and Creator | Shared platform + BS-12 | `src/features/auth/*`; FE `src/shared/auth/*`; `auth-security.static.test.ts` |
-| INV-02 | Normalized identity/account ownership (User ↔ OrganizationKind) | Shared + C-01 + Brand Settings | Prisma `User` `Organization`; C-01 I1 org foundation migration |
-| INV-03 | Creator Entry gating and recovery | C-01 | FE `creator-platform-route-guard`; BE `creator-entry` |
-| INV-04 | C-05 Team actor vs canonical Creator business subject | C-05 | `creator-workspace-actor`; Settings action guards |
-| INV-05 | Creator shell route ownership; Marketplace hidden | C-05 + freeze hide | `sidebar-items.ts` `bottom-nav-items.ts` `app-routes.tsx` |
-| INV-06 | Campaign Application identity and Product/Brief relationship | C-03 | `UceApplication` `UceApplicationSnapshot` `CanonicalCampaignBrief` |
-| INV-07 | Accepted Application → Collaboration handoff | C-03 + Brand Collab | `application-handoff`; `Collaboration` |
-| INV-08 | Collaboration commercial agreement → payout/settlement boundary | Brand Collab + Settings escrow | `CollaborationCommercialAgreement` `CollaborationSettlement` `BrandEscrowVault`; Brand Payouts v1 **not** in this freeze; C-06 **out** |
-| INV-09 | Settings shipping/contact → Collaboration fulfillment consumption | C-05 + Brand Collab | `CreatorShippingAddress` `CreatorProfile` → fulfillment |
-| INV-10 | Provider state fail-closed | Provider clients | Instagram/Razorpay/Postmark: missing secrets must not simulate production success |
-| INV-11 | Backend business state authoritative over frontend display | All accepted modules | No frontend-only authorization for mutations |
-| INV-12 | Cross-tenant and cross-role isolation | Auth + workspace guards | Brand cannot read Creator Settings; Creator cannot hit Brand Centre writes |
-| INV-13 | No duplicate competing persistence for the same canonical concept | Schema SOP | Known debt: `UceCampaignCollaboration` vs `Collaboration`; `CollaborationCommercial` vs `CollaborationCommercialAgreement`; `CreatorBankDetails` vs `CreatorPayoutDestination` vs `CreatorSettlementProfile`. **Parent-accepted 2026-09-09** later amendment (same as last-accepted C-03 + origin Brand Collab). No Prisma drop this freeze. |
+Charter examples are all represented (INV-01 … INV-13). Deferred packs (C-02A, C-04, Brand Payouts v1) are **out of this suite**.
+
+| ID | Invariant | Authority | FE proof | BE proof | Tests | Execution |
+| --- | --- | --- | --- | --- | --- | --- |
+| INV-01 | One canonical auth/session model across Brand and Creator | Shared platform | `src/shared/auth/*`, `src/features/auth/*`, `require-auth.tsx` | `src/features/auth/*` | FE `auth-security-static.test.ts`; BE `auth-security.static/unit/postgres.test.ts` | **PASS** (postgres 10/10) |
+| INV-02 | Normalized identity/account ownership (User ↔ OrganizationKind) | Shared + C-01 + Brand Settings | C-01 entry clients / session role | Prisma `User` `Organization`; C-01 I1 persistence | BE `c01-persistence-security.postgres.test.ts`; C-01 I2 via `creator-entry.postgres.test.ts` | **PARTIAL** — 27/29 harness ctor (same as INV-03) |
+| INV-03 | Creator Entry gating and recovery | C-01 | `creator-platform-route-guard.tsx` | `src/features/creator-entry/*` | FE `creator-platform-route-guard.test.ts` `creator-entry-architecture.test.ts`; BE `creator-entry.postgres.test.ts` | Architecture/smoke PASS; postgres **27/29** `STALE_TEST_PROVEN` (ctor order) |
+| INV-04 | C-05 Team actor vs canonical Creator business subject | C-05 | `creator-settings-action-guard.tsx`, `creator-shell-capabilities.ts` | `creator-workspace-actor.controller.ts` `creator-team.policy.ts` | FE settings action-guard tests; BE `creator-team.postgres.test.ts` (5/5) | **PASS** |
+| INV-05 | Creator shell route ownership; Marketplace hidden | C-05 + freeze hide | `sidebar-items.ts` `bottom-nav-items.ts` `app-routes.tsx` | n/a (FE chrome) | `c05-frontend-convergence.architecture.test.ts` `creator-shell-capabilities.test.ts` `creator-shell-rendering.test.ts` | **PASS** unit+smoke. Chat git-diff vs P6 SHA is stale (not this invariant) |
+| INV-06 | Campaign Application identity and Product/Brief relationship | C-03 | C-03 campaign pages/clients | `UceApplication` `UceApplicationSnapshot` `CanonicalCampaignBrief`; `campaign-applications/*` `brand-uce/persistence/*` | BE C-03 P11/P14 postgres (`c03-p11*.postgres.test.ts`, applications postgres) | **PASS** 34/34 serial leftover retry |
+| INV-07 | Accepted Application → Collaboration handoff | C-03 + Brand Collab | `CollaborationRouteGuard.tsx`; Brand/Creator collab pages | `application-handoff`; `Collaboration` | BE `application-handoff.postgres.test.ts` `legacy-handoff-regression.postgres.test.ts` | **PASS** handoff; `seed-dev-collaboration.ts` still `STALE_TEST_PROVEN` |
+| INV-08 | Collaboration commercial agreement → payout/settlement boundary | Brand Collab + Settings escrow | Brand Settings billing/escrow UI | `CollaborationCommercialAgreement` `CollaborationSettlement` `BrandEscrowVault` | BE `brand-escrow` postgres; C-05 P2 architecture (fail-closed payout adapter) | **PARTIAL** — Brand Payouts v1 / C-06 not in freeze |
+| INV-09 | Settings shipping/contact → Collaboration fulfillment consumption | C-05 + Brand Collab | `creator-profile-contact-settings.tsx` `creator-settings.contracts.ts` (`CreatorShippingAddress`) | C-05 profile/contact APIs. Collab `POST creator/shipping-address` is a **second writer**; fulfillment stores Brand-entered evidence, does **not** read C-05 `CreatorShippingAddress` | FE `creator-profile-contact-settings.test.ts` `creator-profile-contact-client.test.ts`; BE contact-phone isolated | **PARTIAL** — Settings half proven; **consumption not in tree** (do not invent C-04 wiring) |
+| INV-10 | Provider state fail-closed | Provider clients | FE does not fake provider success | Instagram/Razorpay/Postmark clients | BE mail/notification tests; C-05 P2 fail-closed adapter; OTP postgres | **PARTIAL** — Postmark fail-closed locally; live IG/Razorpay **NOT_RUN** |
+| INV-11 | Backend business state authoritative over frontend display | All accepted IN modules | Feature `api/` clients; mutations go to BE | Controllers/services | FE `brand-home-architecture.test.ts` `chat-architecture.test.ts`; browser Brand Home vs Creator session | **PARTIAL** — Brand Home fail-closed for Creator proven; not every mutation path re-proven this freeze |
+| INV-12 | Cross-tenant and cross-role isolation | Auth + workspace guards | `require-auth.tsx` role home routes | Brand Centre authz; C-05 team | BE `brand-workspace-authorization.postgres.test.ts` (11/11); C-05 team postgres | **PASS** |
+| INV-13 | No duplicate competing persistence for the same canonical concept | Schema SOP | n/a | Prisma: `UceCampaignCollaboration` vs `Collaboration`; `CollaborationCommercial` vs `CollaborationCommercialAgreement`; `CreatorBankDetails` vs `CreatorPayoutDestination` vs `CreatorSettlementProfile` | Schema register `../14-migration-schema/` | **FAIL classified** — Parent-accepted `PREEXISTING_ACCEPTED_DEBT` 2026-09-09. No Prisma drop |
 
 ## Explicitly out of this suite
 
 - C-02A Home content
 - C-04 Creator Collaboration accepted pack
 - Brand Payouts v1 provider-disabled pack
-- C-06, Marketplace browse, Co-Pilot, Creator Centre
+- C-06, Marketplace browse, Co-Pilot, Creator Centre (except “must not be required for MVP journeys”)
+
+## Preflight verdict
+
+Suite is **defined**. Execution is PARTIAL overall (INV-03 harness, INV-08/09/10/11 PARTIAL, INV-13 accepted debt). That does **not** block Phase E’s **no-pull** plan. It does block freeze PASS.

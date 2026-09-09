@@ -94,3 +94,28 @@ runs:
       INV-03 27/29 STALE_TEST_PROVEN BrandVerificationService ctor order.
       INV-09 FE contact 6/6 + BE contact-phone 8/8.
       Working-tree prisma generate + nest build PASS.
+  - id: RUN6_MARKETPLACE_CTA_AND_HELP
+    date: "2026-09-09"
+    intent: >
+      Charter §10 leftover close: stop generating new Marketplace browse CTAs;
+      mount authenticated /help placeholder. Phase C docs mirrored. Not a
+      deferred-module pull. Not freeze PASS.
+    prisma_drop: NOT_THIS_CHECKPOINT
+    pass_declared: false
+    checkpoints:
+      frontend: UNCOMMITTED_WORKING_TREE
+      backend: UNCOMMITTED_WORKING_TREE
+      dummy_tcs: UNCOMMITTED_WORKING_TREE
+    base_checkpoints:
+      frontend: 8edc42f498125faf7a054f744206b889c838b1ef
+      backend: c7440e7f643f8fd4c421024e5c0d196f9b5fde3f
+      dummy_tcs: 2ff5d06c6c42404b9e33045bc18614b240eb8b1f
+    targeted_tests: |
+      FE vitest 8 files / 97 passed (creator-entry-view, campaign-detail-continuation,
+      public-invite-landing-page, safe-internal-path, creator-shell-rendering,
+      c05-frontend-convergence.architecture, post-login-redirect,
+      creator-shell-capabilities). No full npm test. No browser E2E (no local FE server).
+    notes: |
+      Inbound /marketplace* compat routes unchanged. Creator Help moved from
+      dead utility action to footer nav. origin/freeze still lags at RUN 1.
+      Checkpoint SHAs pending commit.
