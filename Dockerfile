@@ -6,6 +6,8 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-c
   && rm -rf /var/lib/apt/lists/*
 
 ENV HUSKY=0 CI=true
+# Browsers are installed in the chromium stage, not during npm ci.
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -16,11 +18,25 @@ RUN npx prisma generate
 # `npm run build` = nest build + copy-prompt-assets.mjs (prompt .md into dist/)
 RUN npm run build
 
-FROM node:20-bookworm-slim AS runner
+# Pin the Chromium layer to the lockfile Playwright version only.
+# App code and other dependency bumps must not re-download browsers.
+FROM node:20-bookworm-slim AS playwright-version
+COPY package-lock.json /package-lock.json
+RUN node -e "const v=require('/package-lock.json').packages['node_modules/playwright']?.version; if(!v) throw new Error('playwright missing from package-lock.json'); require('fs').writeFileSync('/playwright-version', v);"
+
+FROM node:20-bookworm-slim AS chromium
 WORKDIR /usr/src/app
 
 RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
+
+COPY --from=playwright-version /playwright-version /playwright-version
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN PW_VERSION="$(cat /playwright-version)" \
+  && npx --yes "playwright@${PW_VERSION}" install --with-deps chromium
+
+FROM chromium AS runner
+WORKDIR /usr/src/app
 
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/package*.json ./
@@ -31,11 +47,7 @@ COPY --from=builder /usr/src/app/scripts ./scripts
 COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Brand onboarding Stage 1A — Playwright Chromium for ECS (arm64 + amd64).
-# Browsers land under /ms-playwright so the slim image can find them at runtime.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN npx playwright install --with-deps chromium
-
 ENV PORT=80
 EXPOSE 80
 

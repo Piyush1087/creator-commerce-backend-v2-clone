@@ -12,6 +12,8 @@ Stop deploying the **old v1 backend** for the same stage before v2 cutover.
 
 **Cost optimization:** see [../aws-optimization/creator-dev.md](../aws-optimization/creator-dev.md) for dev audit, savings estimates, and scheduler notes.
 
+**Optional API image hotfix** (already-running ECS, no Chromium reinstall, Prisma auto-detect): [hotfix/README.md](./hotfix/README.md). Default release is still this SST path.
+
 ---
 
 ## Default dev release (current workflow)
@@ -40,7 +42,7 @@ curl -s https://api.dev.thecreatorshop.in/health/live
 
 ### What happens on deploy
 
-1. SST builds the Docker image (includes `prisma/migrations`).
+1. SST builds the Docker image (includes `prisma/migrations`). Playwright Chromium is a separate image layer keyed on the `playwright` version in `package-lock.json`. App-only deploys reuse the cached browsers; a Playwright version bump reinstalls Chromium.
 2. ECS rolls out new API task(s) in the VPC with `DATABASE_URL` = `DEV_DATABASE_URL` from `.env`.
 3. Container entrypoint (`scripts/docker-entrypoint.sh`) runs **`npx prisma migrate deploy`** when `RUN_MIGRATIONS_ON_START=true` (dev and prod).
 4. App starts (`node dist/main.js`).
@@ -78,6 +80,7 @@ Details: `docs/campaigns-creator-view/engineering/MARKETPLACE_BACKEND.md`.
 | Goal | Command |
 |------|---------|
 | **Routine dev deploy** (schema + code) | `prisma:generate` → `build` → `sst deploy --stage dev` |
+| **Optional API hotfix** (running ECS only) | [hotfix/README.md](./hotfix/README.md) — not `sst deploy`; prod blocked until LIVE |
 | **Local Docker DB only** | `npm run db:migrate:dev` or `db:migrate:deploy` against `localhost:5432` |
 | **Dev RDS manual migrate** (fallback) | Jumpbox tunnel → `DATABASE_URL=localhost:5435` → `db:migrate:deploy` |
 | **Prisma Studio on dev RDS** (fallback) | Jumpbox tunnel + `DATABASE_URL=localhost:5435` → `npm run db:studio` |
@@ -107,7 +110,7 @@ For Prisma through the tunnel, use **`localhost:5435`**, not the RDS hostname an
    For brand onboarding Stage 1A, ensure at least:
    - `ZYTE_API_KEY` (+ optional `ZYTE_API_URL`, `ZYTE_REQUEST_TIMEOUT_MS`)
    - `GEMINI_API_KEY`
-   - `PLAYWRIGHT_ENABLED` — leave unset (or `true`) so deployed ECS runs Zyte + Playwright; Docker image installs Chromium
+   - `PLAYWRIGHT_ENABLED` — leave unset (or `true`) so deployed ECS runs Zyte + Playwright; the image installs Chromium once per Playwright version (Docker layer cache)
    - OTP: random 6-digit codes via Postmark. Non-prod also logs `[OTP]` in the API process.
 2. AWS SSO:
 
