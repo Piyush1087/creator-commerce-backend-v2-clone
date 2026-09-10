@@ -28,6 +28,8 @@ export const UcePayoutTermsSchema = z.enum([
   "NET_7",
   "NET_15",
   "NET_30",
+  "NET_45",
+  "NET_60",
 ]);
 export const UceMediaPlatformSchema = z.enum([
   "INSTAGRAM",
@@ -80,7 +82,10 @@ export const Step1StrategySchema = z
         });
       }
     }
-    if (data.timeline_type === "DYNAMIC_MILESTONES" && !data.dynamic_days_limit) {
+    if (
+      data.timeline_type === "DYNAMIC_MILESTONES" &&
+      !data.dynamic_days_limit
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Dynamic milestones require dynamic_days_limit.",

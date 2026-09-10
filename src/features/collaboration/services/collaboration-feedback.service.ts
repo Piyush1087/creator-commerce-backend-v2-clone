@@ -45,7 +45,7 @@ export class CollaborationFeedbackService {
       ...(raw as object),
       collaborationId,
     });
-    await this.access.assertThreadForUser(user, collaborationId);
+    await this.access.assertThreadForUser(user, collaborationId, "COMMAND");
     const authorRole = this.authorRole(user);
     const actorClass =
       authorRole === CollaborationFeedbackAuthorRole.BRAND

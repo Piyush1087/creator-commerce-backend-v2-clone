@@ -23,6 +23,10 @@ import { CollaborationRealtimeService } from "./services/collaboration-realtime.
 import { CollaborationQueryService } from "./services/collaboration-query.service";
 import { CollaborationService } from "./services/collaboration.service";
 import { CollaborationSecurementService } from "./services/collaboration-securement.service";
+import { CollaborationDestinationService } from "./services/collaboration-destination.service";
+import { CollaborationWorkerService } from "./services/collaboration-worker.service";
+import { CollaborationTrustedConfirmationService } from "./services/collaboration-trusted-confirmation.service";
+import { CollaborationBriefPackService } from "./services/collaboration-brief-pack.service";
 import {
   CollaborationSettlementGateway,
   DeferredCollaborationSettlementGateway,
@@ -32,6 +36,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
 import { NotificationProcessorService } from "../notifications/services/notification-processor.service";
 import { BrandEscrowModule } from "../brand-escrow/brand-escrow.module";
 import { PricingModule } from "../pricing/pricing.module";
+import { CreatorTeamModule } from "../creator-settings/team/creator-team.module";
 
 @Module({
   imports: [
@@ -41,6 +46,7 @@ import { PricingModule } from "../pricing/pricing.module";
     NotificationsModule,
     BrandEscrowModule,
     PricingModule,
+    CreatorTeamModule,
   ],
   controllers: [CollaborationController],
   providers: [
@@ -51,8 +57,13 @@ import { PricingModule } from "../pricing/pricing.module";
     CollaborationNegotiationService,
     CollaborationPaymentCapabilityService,
     CollaborationSecurementService,
+    CollaborationDestinationService,
+    CollaborationWorkerService,
+    CollaborationTrustedConfirmationService,
+    CollaborationBriefPackService,
     CollaborationFulfillmentService,
     CollaborationFeedbackService,
+    CollaborationTrustedConfirmationService,
     CollaborationProductionService,
     CollaborationPublishingService,
     CollaborationSettlementService,
@@ -72,8 +83,6 @@ import { PricingModule } from "../pricing/pricing.module";
   exports: [
     CollaborationProvisionService,
     CollaborationExceptionService,
-    CollaborationNegotiationService,
-    CollaborationSecurementService,
     CollaborationProductionService,
     CollaborationPublishingService,
     CollaborationSettlementService,

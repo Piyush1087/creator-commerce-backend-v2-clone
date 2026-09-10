@@ -23,9 +23,11 @@ import {
 import {
   collaborationCommandEnvelopeSchema,
   counterCreatorProposalSchema,
+  submitCreatorProposalSchema,
   declineNegotiationSchema,
   type CollaborationCommandEnvelope,
   type CounterCreatorProposalInput,
+  type SubmitCreatorProposalInput,
   type DeclineNegotiationInput,
 } from "../schemas/collaboration-commercial-command.schema";
 import {
@@ -46,6 +48,10 @@ import { CollaborationPaymentCapabilityService } from "./collaboration-payment-c
 import { PlanCommercialPolicyService } from "../../pricing/services/plan-commercial-policy.service";
 import { BusinessGeographyFinancialPolicyService } from "../../pricing/services/business-geography-financial-policy.service";
 import { calculateCommercialReserve } from "../utils/collaboration-financial-calculation";
+import {
+  exactCampaignPaymentTerm,
+  financialAuthorityHash,
+} from "../utils/collaboration-financial-authority";
 
 @Injectable()
 export class CollaborationNegotiationService {
@@ -58,6 +64,91 @@ export class CollaborationNegotiationService {
     private readonly geographyPolicies: BusinessGeographyFinancialPolicyService,
   ) {}
 
+  async submitCreatorProposal(
+    user: AuthUser,
+    collaborationId: string,
+    raw: unknown,
+  ) {
+    this.assertRole(user, UserRole.CREATOR);
+    const input: SubmitCreatorProposalInput = parseCommand(
+      submitCreatorProposalSchema,
+      raw,
+    );
+    const fingerprint = requestFingerprint(input);
+    await this.access.assertThreadForUser(user, collaborationId, "COMMAND");
+    await this.prisma.$transaction(async (tx) => {
+      if (
+        await replayOrThrow(
+          tx,
+          collaborationId,
+          input.commandId,
+          "CREATOR_PROPOSAL_SUBMITTED",
+          fingerprint,
+        )
+      )
+        return;
+      const row = await this.load(tx, collaborationId);
+      this.assertNegotiation(row);
+      assertExpectedVersion(
+        row.aggregateVersion,
+        input.expectedAggregateVersion,
+      );
+      const agreement = row.commercialAgreement;
+      if (
+        !agreement ||
+        agreement.negotiationState !==
+          CollaborationNegotiationState.AWAITING_CREATOR_PROPOSAL ||
+        agreement.creatorProposedFee !== null
+      ) {
+        commandConflict(
+          "INVALID_STATE",
+          "The first Creator proposal is not available",
+          row.aggregateVersion,
+        );
+      }
+      if (input.currency !== agreement.currency) {
+        commandConflict(
+          "CURRENCY_MISMATCH",
+          "Proposal currency must match the Collaboration currency",
+          row.aggregateVersion,
+        );
+      }
+      const fee = new Prisma.Decimal(input.proposedFee);
+      if (
+        agreement.minimumCreatorFeeSnapshot !== null &&
+        fee.lessThan(agreement.minimumCreatorFeeSnapshot)
+      ) {
+        commandConflict(
+          "PROPOSAL_BELOW_MINIMUM",
+          "Creator proposal is below the snapshotted minimum",
+          row.aggregateVersion,
+        );
+      }
+      const now = new Date();
+      await tx.collaborationCommercialAgreement.update({
+        where: { collaborationId },
+        data: {
+          creatorProposedFee: fee,
+          creatorProposalSubmittedAt: now,
+          negotiationState:
+            CollaborationNegotiationState.AWAITING_BRAND_DECISION,
+        },
+      });
+      await this.bump(tx, collaborationId, row.aggregateVersion);
+      await appendCommandEvent(tx, {
+        collaborationId,
+        eventType: "CREATOR_PROPOSAL_SUBMITTED",
+        actorClass: CollaborationActorClass.CREATOR,
+        actorUserId: user.id,
+        commandId: input.commandId,
+        aggregateVersion: row.aggregateVersion + 1,
+        requestFingerprint: fingerprint,
+        payload: { proposedFee: fee.toString(), currency: input.currency },
+      });
+    });
+    return this.result(user, collaborationId);
+  }
+
   acceptProposedFee(user: AuthUser, collaborationId: string, raw: unknown) {
     const input = parseCommand(collaborationCommandEnvelopeSchema, raw);
     return this.lockTerms(
@@ -65,7 +156,7 @@ export class CollaborationNegotiationService {
       collaborationId,
       input,
       "CREATOR_PROPOSAL_ACCEPTED",
-      "APPLICATION_PROPOSAL",
+      "CREATOR_PROPOSAL",
     );
   }
 
@@ -73,7 +164,7 @@ export class CollaborationNegotiationService {
     this.assertRole(user, UserRole.BRAND);
     const input = parseCommand(counterCreatorProposalSchema, raw);
     const fingerprint = requestFingerprint(input);
-    await this.access.assertThreadForUser(user, collaborationId);
+    await this.access.assertThreadForUser(user, collaborationId, "COMMAND");
 
     await this.prisma.$transaction(async (tx) => {
       if (
@@ -153,7 +244,7 @@ export class CollaborationNegotiationService {
     const input = parseCommand(declineNegotiationSchema, raw);
     const reasonCode = "NEGOTIATION_DECLINED";
     const fingerprint = requestFingerprint(input);
-    await this.access.assertThreadForUser(user, collaborationId);
+    await this.access.assertThreadForUser(user, collaborationId, "COMMAND");
     const actorClass =
       user.role === UserRole.BRAND
         ? CollaborationActorClass.BRAND
@@ -255,13 +346,13 @@ export class CollaborationNegotiationService {
     collaborationId: string,
     input: CollaborationCommandEnvelope,
     eventType: string,
-    feeSource: "APPLICATION_PROPOSAL" | "BRAND_COUNTER",
+    feeSource: "CREATOR_PROPOSAL" | "BRAND_COUNTER",
   ) {
     const requiredRole =
-      feeSource === "APPLICATION_PROPOSAL" ? UserRole.BRAND : UserRole.CREATOR;
+      feeSource === "CREATOR_PROPOSAL" ? UserRole.BRAND : UserRole.CREATOR;
     this.assertRole(user, requiredRole);
     const fingerprint = requestFingerprint(input);
-    await this.access.assertThreadForUser(user, collaborationId);
+    await this.access.assertThreadForUser(user, collaborationId, "COMMAND");
     await this.prisma.$transaction(async (tx) => {
       if (
         await replayOrThrow(
@@ -299,7 +390,7 @@ export class CollaborationNegotiationService {
         );
       }
       const expectedState =
-        feeSource === "APPLICATION_PROPOSAL"
+        feeSource === "CREATOR_PROPOSAL"
           ? CollaborationNegotiationState.AWAITING_BRAND_DECISION
           : CollaborationNegotiationState.AWAITING_CREATOR_DECISION;
       if (agreement.negotiationState !== expectedState)
@@ -309,8 +400,8 @@ export class CollaborationNegotiationService {
           row.aggregateVersion,
         );
       const fee =
-        feeSource === "APPLICATION_PROPOSAL"
-          ? agreement.applicationProposedFee
+        feeSource === "CREATOR_PROPOSAL"
+          ? agreement.creatorProposedFee
           : agreement.brandCounterFee;
       if (fee === null)
         commandConflict(
@@ -334,35 +425,11 @@ export class CollaborationNegotiationService {
         planPolicy.platformCommissionRate,
         geographyPolicy.platformCommissionGstRate,
       );
-      if (
-        agreement.paymentRail === CollaborationPaymentRail.MANUAL &&
-        !this.paymentCapabilities.manualEnabledForNewObligations()
-      ) {
-        commandConflict(
-          "MANUAL_PAYMENT_DISABLED",
-          "Manual payment is disabled for new obligations",
-          row.aggregateVersion,
-        );
-      }
       let securementState: CollaborationSecurementState;
       if (fee.isZero())
         securementState = CollaborationSecurementState.NOT_REQUIRED;
-      else if (
-        agreement.paymentRail === CollaborationPaymentRail.PLATFORM_ESCROW
-      )
+      else
         securementState = CollaborationSecurementState.AWAITING_ESCROW_FUNDING;
-      else {
-        const profile = row.creatorUser.creatorProfile;
-        const payout = profile
-          ? await tx.creatorSettlementProfile.findUnique({
-              where: { creatorProfileId: profile.id },
-              select: { id: true },
-            })
-          : null;
-        securementState = payout
-          ? CollaborationSecurementState.AWAITING_BRAND_PAYMENT
-          : CollaborationSecurementState.AWAITING_PAYOUT_DETAILS;
-      }
       const progression =
         securementState === CollaborationSecurementState.NOT_REQUIRED
           ? afterSecurementProgression(row.fulfillment?.state ?? null)
@@ -374,6 +441,28 @@ export class CollaborationNegotiationService {
             };
       const version = row.aggregateVersion + 1;
       const now = new Date();
+      const campaignPaymentTerm = exactCampaignPaymentTerm(
+        agreement.campaignPaymentTermSnapshot,
+      );
+      const agreementHash = financialAuthorityHash({
+        agreementId: agreement.id,
+        agreementVersion: agreement.agreementVersion,
+        collaborationId,
+        campaignId: row.campaignId,
+        creatorProfileId: row.creatorProfileId,
+        creatorFee: fee.toFixed(2),
+        currency: agreement.currency,
+        campaignPaymentTerm,
+        advancePercentage: agreement.advancePercentageSnapshot,
+        advanceAmount: advanceAmount.toFixed(2),
+        balanceAmount: balanceAmount.toFixed(2),
+        platformCommissionAmount: reserve.platformCommissionAmount.toFixed(2),
+        platformCommissionGstAmount:
+          reserve.platformCommissionGstAmount.toFixed(2),
+        reserveAmount: reserve.requiredSecuredAmount.toFixed(2),
+        paymentRail: agreement.paymentRail,
+        lockedAt: now.toISOString(),
+      });
       await tx.collaborationCommercialAgreement.update({
         where: { collaborationId },
         data: {
@@ -393,6 +482,7 @@ export class CollaborationNegotiationService {
           negotiationState: CollaborationNegotiationState.LOCKED,
           securementState,
           termsLockedAt: now,
+          agreementHash,
           securementCompletedAt:
             securementState === CollaborationSecurementState.NOT_REQUIRED
               ? now
@@ -436,6 +526,10 @@ export class CollaborationNegotiationService {
           requiredSecuredAmount: reserve.requiredSecuredAmount.toString(),
           currency: agreement.currency,
           securementState,
+          commercialAgreementId: agreement.id,
+          commercialAgreementVersion: agreement.agreementVersion,
+          commercialAgreementHash: agreementHash,
+          campaignPaymentTerm,
         },
       });
     });

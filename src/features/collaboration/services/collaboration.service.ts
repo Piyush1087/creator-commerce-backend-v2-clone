@@ -4,7 +4,6 @@ import {
   Injectable,
 } from "@nestjs/common";
 import {
-  CollaborationEscrowStatus,
   CollaborationIndustryType,
   CollaborationMediaReviewStatus,
   CollaborationMessageKind,
@@ -15,12 +14,12 @@ import {
   UserRole,
 } from "@prisma/client";
 
-import { commandConflict } from "../errors/collaboration-command.error";
-
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
-import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
+import { BrandWorkspaceAuthorizationService } from "../../brand-centre/brand-workspace-authorization.service";
+import { BrandEscrowComputationService } from "../../brand-escrow/services/brand-escrow-computation.service";
 import { splitEscrowQuote } from "../../brand-uce/utils/uce-decimal.util";
+import { NotificationDispatchService } from "../../notifications/services/notification-dispatch.service";
 import type {
   AcceptCommercialsDto,
   BrandCounterOfferDto,
@@ -41,7 +40,6 @@ import {
   assertBrandCanCounter,
   assertComplianceNotVerified,
   assertCreatorCanSubmitQuote,
-  assertEscrowNotFunded,
   assertLivePostNotSubmitted,
   assertLogisticsNotDispatched,
   assertNoPendingMedia,
@@ -49,7 +47,6 @@ import {
   logisticsIsDispatched,
 } from "../utils/collaboration-action-guards";
 import {
-  deriveAvailableActions,
   mapCollaborationDetail,
   mapCollaborationThreadRow,
   mapMessageRow,
@@ -69,6 +66,8 @@ export class CollaborationService {
     private readonly prisma: PrismaService,
     private readonly access: CollaborationAccessService,
     private readonly realtime: CollaborationRealtimeService,
+    private readonly escrowReserve: BrandEscrowComputationService,
+    private readonly brandWorkspace: BrandWorkspaceAuthorizationService,
     private readonly notifications: NotificationDispatchService,
   ) {}
 
@@ -142,30 +141,25 @@ export class CollaborationService {
     collaborationId: string,
     dto: PostCollaborationMessageDto,
   ) {
-    const thread = await this.access.assertThreadForUser(user, collaborationId);
-    const viewerRole =
-      user.role === UserRole.BRAND
-        ? "BRAND"
-        : user.role === UserRole.CREATOR
-          ? "CREATOR"
-          : null;
-    if (
-      !viewerRole ||
-      !deriveAvailableActions(thread, viewerRole).includes(
-        "PostCollaborationMessage",
-      )
-    ) {
-      commandConflict(
-        "INVALID_STATE",
-        "Messaging is closed for this collaboration.",
-      );
-    }
+    const thread = await this.access.assertThreadForUser(
+      user,
+      collaborationId,
+      "CHAT",
+    );
+    const creatorActor =
+      user.role === UserRole.CREATOR && thread.creatorWorkspaceId
+        ? await this.access.resolveCreatorActor(user, thread.creatorWorkspaceId)
+        : null;
 
     const msg = await this.prisma.$transaction(async (tx) => {
       const created = await tx.collaborationMessage.create({
         data: {
           collaborationId,
           senderUserId: user.id,
+          senderMembershipId: creatorActor?.actorMembershipId,
+          senderRole: creatorActor?.actorRole,
+          senderWorkspaceId: creatorActor?.workspaceId,
+          subjectCreatorProfileId: creatorActor?.subjectCreatorProfileId,
           kind: CollaborationMessageKind.USER,
           body: dto.body.trim(),
         },
@@ -197,7 +191,11 @@ export class CollaborationService {
     if (user.role !== UserRole.CREATOR) {
       throw new ForbiddenException("Creator access required");
     }
-    const thread = await this.access.assertThreadForUser(user, collaborationId);
+    const thread = await this.access.assertThreadForUser(
+      user,
+      collaborationId,
+      "COMMAND",
+    );
     this.assertLegacyCommercialCompatibility(thread);
     this.assertStage(thread, UceMilestoneStage.STAGE_1_NEGOTIATION);
     if (
@@ -312,7 +310,11 @@ export class CollaborationService {
     collaborationId: string,
     dto: AcceptCommercialsDto,
   ) {
-    const thread = await this.access.assertThreadForUser(user, collaborationId);
+    const thread = await this.access.assertThreadForUser(
+      user,
+      collaborationId,
+      "COMMAND",
+    );
     this.assertLegacyCommercialCompatibility(thread);
     this.assertStage(thread, UceMilestoneStage.STAGE_1_NEGOTIATION);
 
@@ -364,29 +366,65 @@ export class CollaborationService {
   async fundEscrow(
     user: AuthUser,
     collaborationId: string,
-    dto: FundEscrowDto,
+    _dto: FundEscrowDto,
   ) {
     if (user.role !== UserRole.BRAND) {
       throw new ForbiddenException("Brand access required");
     }
+    const context = await this.brandWorkspace.resolveBrandContext(user);
     const thread = await this.access.assertThreadForUser(user, collaborationId);
     this.assertLegacyCommercialCompatibility(thread);
-    this.assertStage(thread, UceMilestoneStage.STAGE_2_SECUREMENT);
+    if (thread.brandProfileId !== context.brandProfileId) {
+      throw new ForbiddenException(
+        "Collaboration is outside this Brand workspace",
+      );
+    }
+    const alreadyAdvanced =
+      thread.currentStage === UceMilestoneStage.STAGE_3_LOGISTICS;
+    if (!alreadyAdvanced) {
+      this.assertStage(thread, UceMilestoneStage.STAGE_2_SECUREMENT);
+    }
     if (thread.payoutMode !== CollaborationPayoutMode.ESCROW) {
       throw new BadRequestException(
         "Escrow funding only applies to ESCROW mode",
       );
     }
-    assertEscrowNotFunded(thread.commercials);
+    const reserve = await this.escrowReserve.executeStage2Lock({
+      collaborationId,
+      brandProfileId: thread.brandProfileId,
+      grossCreatorQuote: 0,
+      expectedTdsPercentage: 0,
+    });
+    if (reserve.state !== "FUNDED") {
+      if (reserve.state === "AWAITING_FUNDS") {
+        const commercial =
+          await this.prisma.collaborationCommercial.findUniqueOrThrow({
+            where: { collaborationId },
+            select: { finalQuote: true },
+          });
+        const requiredReserve = String(reserve.required_reserve);
+        await this.notifications?.dispatch({
+          workspaceId: thread.brandProfileId,
+          eventType: "escrow.collaboration_awaiting_funds",
+          source: {
+            sourceType: "collaboration_escrow_requirement",
+            sourceId: collaborationId,
+            transitionId: `awaiting_funds:${commercial.finalQuote?.toString() ?? "unknown"}:${requiredReserve}`,
+          },
+          payload: {
+            collaboration_id: collaborationId,
+            required_reserve: reserve.required_reserve,
+          },
+          triggerUserId: user.id,
+        });
+      }
+      return this.broadcastAndReturnThread(user, collaborationId);
+    }
+    if (alreadyAdvanced) {
+      return this.broadcastAndReturnThread(user, collaborationId);
+    }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.collaborationCommercial.update({
-        where: { collaborationId },
-        data: {
-          escrowVaultId: dto.escrow_vault_id ?? `vault_${collaborationId}`,
-          escrowStatus: CollaborationEscrowStatus.FUNDED,
-        },
-      });
       await tx.collaboration.update({
         where: { id: collaborationId },
         data: { currentStage: UceMilestoneStage.STAGE_3_LOGISTICS },
@@ -432,7 +470,11 @@ export class CollaborationService {
     if (user.role !== UserRole.CREATOR) {
       throw new ForbiddenException("Creator access required");
     }
-    const thread = await this.access.assertThreadForUser(user, collaborationId);
+    const thread = await this.access.assertThreadForUser(
+      user,
+      collaborationId,
+      "COMMAND",
+    );
     this.assertLegacyCommercialCompatibility(thread);
     if (thread.payoutMode !== CollaborationPayoutMode.MANUAL) {
       throw new BadRequestException(
@@ -520,7 +562,11 @@ export class CollaborationService {
     if (user.role !== UserRole.CREATOR) {
       throw new ForbiddenException("Creator access required");
     }
-    const thread = await this.access.assertThreadForUser(user, collaborationId);
+    const thread = await this.access.assertThreadForUser(
+      user,
+      collaborationId,
+      "COMMAND",
+    );
     this.assertLegacyFulfillmentCompatibility(thread);
     this.assertStage(thread, UceMilestoneStage.STAGE_3_LOGISTICS);
     assertReceiptNotConfirmed(thread.logistics);
@@ -562,7 +608,11 @@ export class CollaborationService {
     if (user.role !== UserRole.CREATOR) {
       throw new ForbiddenException("Creator access required");
     }
-    const thread = await this.access.assertThreadForUser(user, collaborationId);
+    const thread = await this.access.assertThreadForUser(
+      user,
+      collaborationId,
+      "COMMAND",
+    );
     this.assertLegacyFulfillmentCompatibility(thread);
     this.assertStage(thread, UceMilestoneStage.STAGE_3_LOGISTICS);
     assertReceiptNotConfirmed(thread.logistics);
@@ -605,7 +655,11 @@ export class CollaborationService {
     if (user.role !== UserRole.CREATOR) {
       throw new ForbiddenException("Creator access required");
     }
-    const thread = await this.access.assertThreadForUser(user, collaborationId);
+    const thread = await this.access.assertThreadForUser(
+      user,
+      collaborationId,
+      "COMMAND",
+    );
     this.assertLegacyProductionCompatibility(thread);
     this.assertStage(thread, UceMilestoneStage.STAGE_4_CONTENT_REVIEW);
     if (!thread.logistics?.isReceivedConfirmed) {
@@ -644,7 +698,7 @@ export class CollaborationService {
         `Media submitted (v${versionNumber}). 72-hour review clock started.`,
         { unreadBrand: true },
       );
-      await this.notifications.enqueueWithinTransaction(tx, {
+      await this.notifications?.enqueueWithinTransaction(tx, {
         workspaceId: thread.brandProfileId,
         eventType: "collaborations.media_submitted_for_review",
         source: {
@@ -738,7 +792,11 @@ export class CollaborationService {
     if (user.role !== UserRole.CREATOR) {
       throw new ForbiddenException("Creator access required");
     }
-    const thread = await this.access.assertThreadForUser(user, collaborationId);
+    const thread = await this.access.assertThreadForUser(
+      user,
+      collaborationId,
+      "COMMAND",
+    );
     this.assertLegacyPublishingCompatibility(thread);
     this.assertStage(thread, UceMilestoneStage.STAGE_5_PUBLISHING);
     assertLivePostNotSubmitted(thread.finalization);
@@ -789,16 +847,8 @@ export class CollaborationService {
         where: { collaborationId },
         data: {
           isComplianceVerified: true,
-          isFinalPayoutReleased:
-            thread.payoutMode === CollaborationPayoutMode.ESCROW,
         },
       });
-      if (thread.payoutMode === CollaborationPayoutMode.ESCROW) {
-        await tx.collaborationCommercial.update({
-          where: { collaborationId },
-          data: { escrowStatus: CollaborationEscrowStatus.SETTLED },
-        });
-      }
       await tx.collaboration.update({
         where: { id: collaborationId },
         data: { currentStage: UceMilestoneStage.STAGE_6_FEEDBACK_SYNC },
@@ -820,7 +870,11 @@ export class CollaborationService {
     collaborationId: string,
     dto: SubmitCollaborationReviewDto,
   ) {
-    const thread = await this.access.assertThreadForUser(user, collaborationId);
+    const thread = await this.access.assertThreadForUser(
+      user,
+      collaborationId,
+      "COMMAND",
+    );
     this.assertStage(thread, UceMilestoneStage.STAGE_6_FEEDBACK_SYNC);
 
     const fin = await this.prisma.collaborationFinalization.findUniqueOrThrow({

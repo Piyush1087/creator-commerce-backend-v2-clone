@@ -1,4 +1,4 @@
-import { forwardRef, Module } from "@nestjs/common";
+import { Module } from "@nestjs/common";
 
 import { PrismaModule } from "../../prisma/prisma.module";
 import { AuthModule } from "../auth/auth.module";
@@ -15,18 +15,18 @@ import { PricingRazorpayClient } from "./services/pricing-razorpay.client";
 import { PricingWebhookService } from "./services/pricing-webhook.service";
 import { RazorpayPlanProvisioningService } from "./services/razorpay-plan-provisioning.service";
 import { SubscriptionLifecycleService } from "./services/subscription-lifecycle.service";
-import { PlanCommercialPolicyService } from "./services/plan-commercial-policy.service";
-import { BusinessGeographyFinancialPolicyService } from "./services/business-geography-financial-policy.service";
 import { SubscriptionAccessService } from "./services/subscription-access.service";
 import { SubscriptionCapabilityModule } from "./subscription-capability.module";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { BusinessGeographyFinancialPolicyService } from "./services/business-geography-financial-policy.service";
+import { PlanCommercialPolicyService } from "./services/plan-commercial-policy.service";
 
 @Module({
   imports: [
     PrismaModule,
     AuthModule,
     BrandCentreModule,
-    forwardRef(() => BrandSettingsModule),
+    BrandSettingsModule,
     SubscriptionCapabilityModule,
     NotificationsModule,
   ],
@@ -42,8 +42,8 @@ import { NotificationsModule } from "../notifications/notifications.module";
     PricingInvoiceService,
     PricingWebhookService,
     SubscriptionLifecycleReconciliationScheduler,
-    PlanCommercialPolicyService,
     BusinessGeographyFinancialPolicyService,
+    PlanCommercialPolicyService,
   ],
   exports: [
     SubscriptionCapabilityModule,
@@ -52,8 +52,8 @@ import { NotificationsModule } from "../notifications/notifications.module";
     SubscriptionLifecycleService,
     SubscriptionAccessService,
     GeoRoutingService,
-    PlanCommercialPolicyService,
     BusinessGeographyFinancialPolicyService,
+    PlanCommercialPolicyService,
   ],
 })
 export class PricingModule {}

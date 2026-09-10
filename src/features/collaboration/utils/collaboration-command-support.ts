@@ -66,13 +66,50 @@ export async function appendCommandEvent(
     payload?: Record<string, unknown>;
   },
 ) {
-  await tx.collaborationEvent.create({
+  const creatorAudit =
+    input.actorClass === CollaborationActorClass.CREATOR && input.actorUserId
+      ? await tx.collaboration
+          .findUnique({
+            where: { id: input.collaborationId },
+            select: {
+              creatorWorkspaceId: true,
+              creatorProfileId: true,
+              creatorWorkspace: { select: { organizationId: true } },
+            },
+          })
+          .then(async (collaboration) => {
+            if (
+              !collaboration?.creatorWorkspaceId ||
+              !collaboration.creatorProfileId
+            )
+              return null;
+            const membership = await tx.creatorWorkspaceMember.findFirst({
+              where: {
+                workspaceId: collaboration.creatorWorkspaceId,
+                userId: input.actorUserId,
+                isActive: true,
+              },
+              select: { id: true, securityRole: true },
+            });
+            if (!membership) return null;
+            return {
+              actorMembershipId: membership.id,
+              actorRole: membership.securityRole,
+              actorWorkspaceId: collaboration.creatorWorkspaceId,
+              actorOrganizationId:
+                collaboration.creatorWorkspace?.organizationId,
+              subjectCreatorProfileId: collaboration.creatorProfileId,
+            };
+          })
+      : null;
+  const event = await tx.collaborationEvent.create({
     data: {
       collaborationId: input.collaborationId,
       kind: CollaborationEventKind.DOMAIN,
       eventType: input.eventType,
       actorClass: input.actorClass,
       actorUserId: input.actorUserId,
+      ...(creatorAudit ?? {}),
       commandId: input.commandId,
       aggregateVersion: input.aggregateVersion,
       payload: {
@@ -80,5 +117,15 @@ export async function appendCommandEvent(
         ...input.payload,
       } as Prisma.InputJsonValue,
     },
+  });
+  await tx.collaborationProjectionOutbox.createMany({
+    data: ["SYSTEM_MESSAGE", "NOTIFICATION", "SOCKET_INVALIDATION"].map(
+      (projectionType) => ({
+        collaborationId: input.collaborationId,
+        eventId: event.id,
+        projectionType,
+      }),
+    ),
+    skipDuplicates: true,
   });
 }

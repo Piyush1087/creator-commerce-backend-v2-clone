@@ -60,6 +60,16 @@ export class CollaborationFulfillmentService {
           row,
           CollaborationFulfillmentState.AWAITING_BRAND_FULFILLMENT,
         );
+        if (
+          row.snapshot?.physicalDeliveryRequired &&
+          !row.deliveryDestination
+        ) {
+          commandConflict(
+            "DESTINATION_REQUIRED",
+            "A confirmed immutable destination is required before physical dispatch",
+            row.aggregateVersion,
+          );
+        }
         this.assertEvidence(
           row.snapshot!.brandSupportType!,
           input,
@@ -272,7 +282,7 @@ export class CollaborationFulfillmentService {
     }>,
   ) {
     const fingerprint = requestFingerprint(input);
-    await this.access.assertThreadForUser(user, collaborationId);
+    await this.access.assertThreadForUser(user, collaborationId, "COMMAND");
     await this.prisma.$transaction(async (tx) => {
       if (
         await replayOrThrow(

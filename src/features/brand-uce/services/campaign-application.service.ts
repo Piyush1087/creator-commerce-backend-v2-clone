@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  GoneException,
   Injectable,
   NotFoundException,
   Optional,
@@ -111,9 +112,12 @@ export class CampaignApplicationService {
         key,
       );
     }
-    return command === "APPROVE"
-      ? this.approve(brandProfileId, campaignId, applicationId, user.id)
-      : this.reject(brandProfileId, campaignId, applicationId, user.id, reason);
+    void reason;
+    throw new GoneException({
+      code: "C04_LEGACY_APPLICATION_WRITER_RETIRED",
+      message:
+        "Legacy application decisions are read-only compatibility history.",
+    });
   }
 
   /**

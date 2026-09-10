@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  GoneException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -20,6 +21,7 @@ import {
   ReviewCollaborationMediaDto,
   SubmitCollaborationMediaDto,
   SubmitLivePostDto,
+  UpsertCreatorBankDetailsDto,
   UpsertCreatorShippingAddressDto,
 } from "./dto/collaboration-actions.dto";
 import { ListCollaborationThreadsQueryDto } from "./dto/collaboration-query.dto";
@@ -32,6 +34,8 @@ import { CollaborationProductionService } from "./services/collaboration-product
 import { CollaborationPublishingService } from "./services/collaboration-publishing.service";
 import { CollaborationQueryService } from "./services/collaboration-query.service";
 import { CollaborationSecurementService } from "./services/collaboration-securement.service";
+import { CollaborationDestinationService } from "./services/collaboration-destination.service";
+import { CollaborationBriefPackService } from "./services/collaboration-brief-pack.service";
 import { CollaborationService } from "./services/collaboration.service";
 
 @Controller("api/v1/collaboration")
@@ -48,7 +52,35 @@ export class CollaborationController {
     private readonly production: CollaborationProductionService,
     private readonly publishing: CollaborationPublishingService,
     private readonly creatorProfile: CollaborationCreatorProfileService,
+    private readonly destination: CollaborationDestinationService,
+    private readonly briefPack: CollaborationBriefPackService,
   ) {}
+
+  @Get("threads/:collaborationId/brief")
+  getBriefPack(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+  ) {
+    return this.briefPack.get(req.user, collaborationId);
+  }
+
+  @Post("threads/:collaborationId/destination/confirm-default")
+  confirmDefaultDestination(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.destination.confirmDefault(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/destination/override")
+  overrideDestination(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.destination.override(req.user, collaborationId, body);
+  }
 
   @Get("threads")
   listThreads(
@@ -108,6 +140,19 @@ export class CollaborationController {
     @Body() body: unknown,
   ) {
     return this.negotiation.acceptProposedFee(req.user, collaborationId, body);
+  }
+
+  @Post("threads/:collaborationId/negotiation/creator-proposal")
+  submitCreatorProposal(
+    @Req() req: RequestWithAuthUser,
+    @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.negotiation.submitCreatorProposal(
+      req.user,
+      collaborationId,
+      body,
+    );
   }
 
   @Post("threads/:collaborationId/negotiation/counter-offer")
@@ -363,11 +408,23 @@ export class CollaborationController {
     return this.creatorProfile.getCreatorProfile(req.user);
   }
 
+  @Post("creator/bank-details")
+  upsertBankDetails(
+    @Req() req: RequestWithAuthUser,
+    @Body() body: UpsertCreatorBankDetailsDto,
+  ) {
+    void req;
+    void body;
+    throw new GoneException("Use Creator Settings payout destinations");
+  }
+
   @Post("creator/shipping-address")
   upsertShippingAddress(
     @Req() req: RequestWithAuthUser,
     @Body() body: UpsertCreatorShippingAddressDto,
   ) {
-    return this.creatorProfile.upsertShippingAddress(req.user, body);
+    void req;
+    void body;
+    throw new GoneException("Use Creator Settings contact destination");
   }
 }

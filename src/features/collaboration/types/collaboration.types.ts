@@ -16,14 +16,14 @@ export type CollaborationProjectionSource =
 
 export type CollaborationAvailableAction =
   | "PostCollaborationMessage"
+  | "SubmitCreatorProposal"
+  | "ConfirmDefaultDestination"
+  | "OverrideDestination"
   | "AcceptProposedFee"
   | "CounterOffer"
   | "AcceptCounterOffer"
   | "DeclineNegotiation"
   | "RequestEscrowFunding"
-  | "SubmitManualPaymentEvidence"
-  | "ConfirmManualPaymentReceipt"
-  | "DisputeManualPayment"
   | "ProvideFulfillment"
   | "ConfirmFulfillment"
   | "ReportFulfillmentIssue"
@@ -67,7 +67,7 @@ export type CanonicalCollaborationThreadRow = {
       type: string;
       imageUrl: string | null;
     } | null;
-    brief: { id: string | null; title: string };
+    brief: { id: string; title: string };
   };
   lifecycle: CollaborationLifecycle;
   workflow: CollaborationWorkflowProjection;
@@ -95,7 +95,7 @@ export type CollaborationThreadRow = {
   creator_user_id: string;
   campaign_id: string;
   campaign_name: string;
-  brief_id: string | null;
+  brief_id: string;
   brief_title: string;
   creator_display_name: string | null;
   creator_handle: string | null;

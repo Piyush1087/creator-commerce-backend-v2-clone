@@ -33,7 +33,8 @@ export class CollaborationQueryService {
     if (viewerRole === "BRAND") {
       where.brandProfileId = await this.access.resolveBrandProfileId(user);
     } else {
-      where.creatorUserId = user.id;
+      const actor = await this.access.resolveCreatorActor(user);
+      where.creatorWorkspaceId = actor.workspaceId;
     }
 
     if (query.campaign_id) where.campaignId = query.campaign_id;
@@ -79,9 +80,13 @@ export class CollaborationQueryService {
       take: query.limit ?? 50,
     });
 
+    const canMutate = await this.creatorCanMutate(user);
     return {
       rows: rows.map((row) =>
-        projectCanonicalCollaborationThreadRow(row, viewerRole),
+        this.applyCreatorCapability(
+          projectCanonicalCollaborationThreadRow(row, viewerRole),
+          canMutate,
+        ),
       ),
     };
   }
@@ -98,7 +103,7 @@ export class CollaborationQueryService {
           : { unreadCountCreator: 0 },
     });
 
-    return projectCanonicalCollaborationDetail(
+    const result = projectCanonicalCollaborationDetail(
       {
         ...row,
         ...(viewerRole === "BRAND"
@@ -107,6 +112,36 @@ export class CollaborationQueryService {
       },
       viewerRole,
     );
+    return this.applyCreatorCapability(
+      result,
+      await this.creatorCanMutate(user, row.creatorWorkspaceId ?? undefined),
+    );
+  }
+
+  private async creatorCanMutate(user: AuthUser, workspaceId?: string) {
+    if (user.role !== UserRole.CREATOR) return true;
+    const actor = await this.access.resolveCreatorActor(user, workspaceId);
+    return actor.actorRole !== "ASSISTANT";
+  }
+
+  private applyCreatorCapability<T>(value: T, canMutate: boolean): T {
+    if (canMutate || !value || typeof value !== "object") return value;
+    const visit = (node: unknown): void => {
+      if (!node || typeof node !== "object") return;
+      if (Array.isArray(node)) {
+        node.forEach(visit);
+        return;
+      }
+      const record = node as Record<string, unknown>;
+      if (Array.isArray(record.availableActions)) {
+        record.availableActions = record.availableActions.filter(
+          (action) => action === "PostCollaborationMessage",
+        );
+      }
+      Object.values(record).forEach(visit);
+    };
+    visit(value);
+    return value;
   }
 
   private viewerRole(user: AuthUser): "BRAND" | "CREATOR" {

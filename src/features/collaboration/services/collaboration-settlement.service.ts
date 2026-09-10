@@ -30,6 +30,7 @@ import {
   requestFingerprint,
 } from "../utils/collaboration-command-support";
 import { resolveFinancialOutcome } from "../utils/collaboration-financial-resolution.policy";
+import { appendFinancialAuthority } from "../utils/collaboration-financial-authority.persistence";
 import { COLLABORATION_THREAD_INCLUDE } from "./collaboration-access.service";
 import { CollaborationRealtimeService } from "./collaboration-realtime.service";
 import { CollaborationSettlementGateway } from "./collaboration-settlement.gateway";
@@ -84,16 +85,18 @@ export class CollaborationSettlementService {
         "NORMAL_SUCCESS",
       );
       const now = new Date();
-      await tx.collaborationFinancialResolution.upsert({
-        where: { collaborationId: row.id },
-        create: {
-          collaborationId: row.id,
-          ...resolution,
-          decidedAt: now,
-          resolvedAt: now,
+      const resolutionRecord = await tx.collaborationFinancialResolution.upsert(
+        {
+          where: { collaborationId: row.id },
+          create: {
+            collaborationId: row.id,
+            ...resolution,
+            decidedAt: now,
+            resolvedAt: now,
+          },
+          update: { ...resolution, decidedAt: now, resolvedAt: now },
         },
-        update: { ...resolution, decidedAt: now, resolvedAt: now },
-      });
+      );
       await tx.collaborationSettlement.upsert({
         where: { collaborationId: row.id },
         create: {
@@ -123,6 +126,18 @@ export class CollaborationSettlementService {
           currency: resolution.currency,
           eligibleAt: now,
         },
+      });
+      await appendFinancialAuthority(tx, {
+        collaborationId: row.id,
+        agreement: row.commercialAgreement!,
+        creatorEntitlement: resolution.creatorGrossEntitlementAmount,
+        brandRefundEntitlement:
+          resolution.brandCommercialRefundEntitlementAmount,
+        settlementEligibleAt: now,
+        resolutionType: "NORMAL_SUCCESS",
+        sourceFinancialRef: resolutionRecord.id,
+        effectiveAt: now,
+        ...(await this.requireExactProtectedFundingLineage(tx, row.id)),
       });
       await this.bump(tx, row);
       await appendCommandEvent(tx, {
@@ -555,6 +570,44 @@ export class CollaborationSettlementService {
         row.aggregateVersion,
       );
     return resolution;
+  }
+
+  private async requireExactProtectedFundingLineage(
+    tx: Prisma.TransactionClient,
+    collaborationId: string,
+  ) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`c04-reserve:${collaborationId}`}, 0))`;
+    const agreement = await tx.collaborationCommercialAgreement.findUniqueOrThrow({
+      where: { collaborationId },
+      select: { id: true },
+    });
+    const rows = await tx.collaborationTrustedConfirmation.findMany({
+      where: {
+        collaborationId,
+        confirmationType: "ESCROW_FUNDING",
+        lineageMode: "CANONICAL_PAYOUTS_V1",
+        applicationState: "APPLIED",
+        disposition: "COMPLETED_SUFFICIENT",
+        commercialAgreementId: agreement.id,
+        reserveInstruction: {
+          commercialAgreementId: agreement.id,
+          supersededBy: { none: {} },
+          status: "REQUESTED",
+        },
+      },
+      select: { id: true, reserveInstructionId: true },
+      take: 2,
+    });
+    if (rows.length !== 1 || !rows[0].reserveInstructionId) {
+      commandConflict(
+        "INVALID_STATE",
+        "Exactly one current protected-funding lineage is required",
+      );
+    }
+    return {
+      fundingConfirmationId: rows[0].id,
+      reserveInstructionId: rows[0].reserveInstructionId,
+    };
   }
 
   private async ensureEligibleSettlement(

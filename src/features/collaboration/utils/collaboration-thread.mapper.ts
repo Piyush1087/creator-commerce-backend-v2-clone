@@ -1,4 +1,4 @@
-﻿import {
+import {
   CollaborationActorClass,
   CollaborationDeliverableState,
   CollaborationFulfillmentState,
@@ -46,35 +46,6 @@ function projectionSource(
   row: CollaborationReadSource,
 ): CollaborationProjectionSource {
   return row.sourceApplicationId ? "CANONICAL" : "LEGACY_COMPATIBILITY";
-}
-
-function snapshotText(
-  value: Prisma.JsonValue | undefined,
-  key: string,
-): string | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const record = value as Record<string, Prisma.JsonValue>;
-  return typeof record[key] === "string" ? (record[key] as string) : null;
-}
-
-/** C-03 handoff reads project Brief/campaign titles from the Application snapshot. */
-function historicalContext(row: CollaborationReadSource) {
-  const snapshot = row.sourceApplication?.snapshot;
-  if (row.sourceApplicationId && !snapshot) {
-    throw new Error("C03_COLLABORATION_SNAPSHOT_MISSING");
-  }
-  return {
-    campaignName: snapshot
-      ? (snapshotText(snapshot.campaignContext, "name") ?? "Campaign")
-      : row.campaign.name,
-    briefId: row.sourceApplication?.canonicalBriefId ?? row.briefId,
-    briefTitle: snapshot
-      ? (snapshotText(snapshot.briefContext, "briefName") ?? "Brief")
-      : (row.brief?.internalTitle ?? "Brief"),
-    creativeGuidelines: snapshot
-      ? snapshotText(snapshot.briefContext, "creatorBrief")
-      : (row.brief?.creativeGuidelines ?? null),
-  };
 }
 
 function legacyLifecycle(row: CollaborationReadSource): CollaborationLifecycle {
@@ -259,14 +230,11 @@ export function deriveActionRequiredBy(
     case CollaborationStage.SECUREMENT:
       switch (row.commercialAgreement?.securementState) {
         case CollaborationSecurementState.AWAITING_ESCROW_FUNDING:
-        case CollaborationSecurementState.AWAITING_BRAND_PAYMENT:
           return CollaborationActorClass.BRAND;
         case CollaborationSecurementState.PROCESSING_FUNDING:
           return CollaborationActorClass.SYSTEM;
-        case CollaborationSecurementState.AWAITING_CREATOR_CONFIRMATION:
         case CollaborationSecurementState.AWAITING_PAYOUT_DETAILS:
           return CollaborationActorClass.CREATOR;
-        case CollaborationSecurementState.PAYMENT_DISPUTED:
         case CollaborationSecurementState.BLOCKED:
           return CollaborationActorClass.ADMIN;
         default:
@@ -311,10 +279,7 @@ export function deriveAvailableActions(
   row: CollaborationReadSource,
   viewerRole: CollaborationViewerRole,
 ): CollaborationAvailableAction[] {
-  const actions: CollaborationAvailableAction[] = [];
-  if (effectiveLifecycle(row) === CollaborationLifecycle.ACTIVE) {
-    actions.push("PostCollaborationMessage");
-  }
+  const actions: CollaborationAvailableAction[] = ["PostCollaborationMessage"];
   if (
     projectionSource(row) === "CANONICAL" &&
     row.lifecycle === CollaborationLifecycle.COMPLETED
@@ -339,6 +304,21 @@ export function deriveAvailableActions(
     return actions;
 
   if (
+    viewerRole === "CREATOR" &&
+    row.snapshot?.physicalDeliveryRequired &&
+    !row.deliveryDestination
+  ) {
+    actions.push("ConfirmDefaultDestination", "OverrideDestination");
+  }
+
+  if (
+    row.canonicalStage === CollaborationStage.NEGOTIATION &&
+    row.commercialAgreement?.negotiationState ===
+      CollaborationNegotiationState.AWAITING_CREATOR_PROPOSAL &&
+    viewerRole === "CREATOR"
+  ) {
+    actions.push("SubmitCreatorProposal");
+  } else if (
     row.canonicalStage === CollaborationStage.NEGOTIATION &&
     row.commercialAgreement?.negotiationState ===
       CollaborationNegotiationState.AWAITING_BRAND_DECISION &&
@@ -359,8 +339,6 @@ export function deriveAvailableActions(
       state === CollaborationSecurementState.AWAITING_ESCROW_FUNDING
     )
       actions.push("RequestEscrowFunding");
-    // MANUAL remains a supported internal capability but is deliberately not
-    // advertised to ordinary MVP Brand/Creator clients.
   } else if (row.canonicalStage === CollaborationStage.FULFILLMENT) {
     const state = row.fulfillment?.state;
     if (
@@ -431,10 +409,37 @@ function brandSummary(row: CollaborationReadSource) {
   return { id: row.brandProfileId, displayName: row.brandProfile.name };
 }
 
-function sourceContext(row: CollaborationReadSource) {
-  const historical = historicalContext(row);
+function jsonRecord(value: Prisma.JsonValue | null | undefined) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Prisma.JsonObject)
+    : null;
+}
+
+function briefSummary(row: CollaborationReadSource) {
+  const snapshotBrief = jsonRecord(row.snapshot?.briefContext);
+  const titleFromSnapshot =
+    snapshotBrief && typeof snapshotBrief.internalTitle === "string"
+      ? snapshotBrief.internalTitle
+      : snapshotBrief && typeof snapshotBrief.title === "string"
+        ? snapshotBrief.title
+        : null;
+  const guidelinesFromSnapshot =
+    snapshotBrief && typeof snapshotBrief.creativeGuidelines === "string"
+      ? snapshotBrief.creativeGuidelines
+      : null;
   return {
-    campaign: { id: row.campaignId, name: historical.campaignName },
+    id: row.briefId ?? `snapshot:${row.sourceApplicationId ?? row.id}`,
+    title:
+      row.brief?.internalTitle ?? titleFromSnapshot ?? "Collaboration brief",
+    creativeGuidelines:
+      row.brief?.creativeGuidelines ?? guidelinesFromSnapshot ?? "",
+  };
+}
+
+function sourceContext(row: CollaborationReadSource) {
+  const brief = briefSummary(row);
+  return {
+    campaign: { id: row.campaignId, name: row.campaign.name },
     campaignAsset: row.product
       ? {
           id: row.product.id,
@@ -444,11 +449,7 @@ function sourceContext(row: CollaborationReadSource) {
           imageUrl: row.product.imageUrl,
         }
       : null,
-    brief: {
-      id: historical.briefId,
-      title: historical.briefTitle,
-      creativeGuidelines: historical.creativeGuidelines,
-    },
+    brief,
   };
 }
 
@@ -465,11 +466,7 @@ function blockingProjection(row: CollaborationReadSource) {
   if (row.currentStageStatus === CollaborationStageStatus.BLOCKED) {
     return {
       category: "WORKFLOW_BLOCKED",
-      reason:
-        row.commercialAgreement?.securementState ===
-        CollaborationSecurementState.PAYMENT_DISPUTED
-          ? "PAYMENT_DISPUTED"
-          : null,
+      reason: null,
     };
   }
   return null;
@@ -503,10 +500,7 @@ export function projectCanonicalCollaborationThreadRow(
     sourceContext: {
       campaign: sourceContext(row).campaign,
       campaignAsset: sourceContext(row).campaignAsset,
-      brief: {
-        id: sourceContext(row).brief.id,
-        title: sourceContext(row).brief.title,
-      },
+      brief: briefSummary(row),
     },
     lifecycle: effectiveLifecycle(row),
     workflow: workflowProjection(row, viewerRole),
@@ -692,7 +686,7 @@ export function projectCanonicalCollaborationDetail(
       collaborationId: row.id,
       sourceApplicationId: row.sourceApplicationId,
       campaignId: row.campaignId,
-      campaignCreatorId: row.campaignCreatorId,
+      campaignCreatorId: row.ucePipelineCollaborationId,
       campaignAssetId: row.campaignAssetId,
       briefId: row.briefId,
       brand: brandSummary(row),
@@ -731,6 +725,10 @@ export function projectCanonicalCollaborationDetail(
           negotiationState: agreement.negotiationState,
           applicationProposedFee: decimalOrNull(
             agreement.applicationProposedFee,
+          ),
+          creatorProposedFee: decimalOrNull(agreement.creatorProposedFee),
+          minimumCreatorFeeSnapshot: decimalOrNull(
+            agreement.minimumCreatorFeeSnapshot,
           ),
           brandCounterFee: decimalOrNull(agreement.brandCounterFee),
           agreedCreatorFee: decimalOrNull(agreement.agreedCreatorFee),
@@ -771,6 +769,20 @@ export function projectCanonicalCollaborationDetail(
           escrowLockRef: agreement.escrowLockRef,
         }
       : null,
+    physicalDestination: snapshot?.physicalDeliveryRequired
+      ? {
+          required: true,
+          confirmed: row.deliveryDestination !== null,
+          sourceType: row.deliveryDestination?.sourceType ?? null,
+          confirmedAt:
+            row.deliveryDestination?.confirmedAt.toISOString() ?? null,
+        }
+      : {
+          required: false,
+          confirmed: false,
+          sourceType: null,
+          confirmedAt: null,
+        },
     fulfillment: row.fulfillment
       ? {
           applies: snapshot?.receivesBrandSupport ?? null,
@@ -907,15 +919,15 @@ export function mapCollaborationThreadRow(
   viewerRole: CollaborationViewerRole,
 ): CollaborationThreadRow {
   const creator = creatorSummary(row);
-  const historical = historicalContext(row);
+  const brief = briefSummary(row);
   return {
     collaboration_id: row.id,
     brand_profile_id: row.brandProfileId,
     creator_user_id: row.creatorUserId,
     campaign_id: row.campaignId,
-    campaign_name: historical.campaignName,
-    brief_id: historical.briefId,
-    brief_title: historical.briefTitle,
+    campaign_name: row.campaign.name,
+    brief_id: brief.id,
+    brief_title: brief.title,
     creator_display_name: creator.displayName,
     creator_handle: creator.handle,
     brand_name: row.brandProfile.name,
@@ -937,12 +949,10 @@ export function mapCollaborationThreadRow(
 export function mapCollaborationDetail(row: CollaborationReadSource) {
   const commercials = row.commercials;
   const creator = creatorSummary(row);
-  const historical = historicalContext(row);
+  const brief = briefSummary(row);
   const finalQuote = decimalOrNull(commercials?.finalQuote);
   const brandCounter = decimalOrNull(commercials?.brandCounterOffer);
-  const initialQuote = decimalOrNull(commercials?.initialQuote);
-  const initialQuoteResolved =
-    initialQuote ?? (row.sourceApplicationId ? null : 0);
+  const initialQuote = decimalOrNull(commercials?.initialQuote) ?? 0;
 
   return {
     thread: {
@@ -951,20 +961,14 @@ export function mapCollaborationDetail(row: CollaborationReadSource) {
       payoutMode: row.payoutMode,
       industry: row.industry,
       negotiationRound: row.negotiationRound,
-      ...(row.sourceApplicationId
-        ? {
-            sourceApplicationId: row.sourceApplicationId,
-            handoffCommercialState: row.handoffCommercialState,
-          }
-        : {}),
       fulfillmentIssueCount: row.fulfillmentIssueCount,
       revisionCount: row.revisionCount,
       isTerminated: row.isTerminated,
       isPaused: row.isPaused,
-      campaign: { name: historical.campaignName },
+      campaign: { name: row.campaign.name },
       brief: {
-        internalTitle: historical.briefTitle,
-        creativeGuidelines: historical.creativeGuidelines,
+        internalTitle: brief.title,
+        creativeGuidelines: brief.creativeGuidelines,
       },
       brandProfile: { name: row.brandProfile.name },
       creatorUser: {
@@ -976,19 +980,15 @@ export function mapCollaborationDetail(row: CollaborationReadSource) {
     },
     commercials: commercials
       ? {
-          initial_quote: initialQuoteResolved,
+          initial_quote: initialQuote,
           brand_counter_offer: brandCounter,
-          final_quote: finalQuote ?? (row.sourceApplicationId ? null : 0),
+          final_quote: finalQuote ?? 0,
           product_retail_value:
             decimalOrNull(commercials.productRetailValue) ?? 0,
           is_final_offer: commercials.isFinalOffer,
           advance_30_amount: decimalOrNull(commercials.advance30Amount) ?? 0,
           balance_70_amount: decimalOrNull(commercials.balance70Amount) ?? 0,
-          total_quote:
-            finalQuote ??
-            brandCounter ??
-            initialQuoteResolved ??
-            (row.sourceApplicationId ? null : 0),
+          total_quote: finalQuote ?? brandCounter ?? initialQuote,
           escrow_status: commercials.escrowStatus,
           advance_receipt_url: commercials.advanceReceiptUrl,
           creator_bank_details_id: commercials.creatorBankDetailsId,

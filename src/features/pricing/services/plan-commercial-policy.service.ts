@@ -2,10 +2,11 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import { Prisma, SubscriptionStatus, SubscriptionTier } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
-import { ESCROW_TAKE_RATES } from "../constants/subscription.constants";
+import { LEGACY_ESCROW_TAKE_RATES } from "../constants/subscription.constants";
 
 type PolicyClient =
-  Pick<PrismaService, "brandSubscription"> | Prisma.TransactionClient;
+  | Pick<PrismaService, "brandSubscription">
+  | Prisma.TransactionClient;
 
 export type BrandPlanCommercialPolicy = {
   tier: SubscriptionTier;
@@ -36,7 +37,7 @@ export class PlanCommercialPolicyService {
       tier: subscription.tier,
       policyVersion: `subscription-commercial-v1:${subscription.tier}`,
       platformCommissionRate: new Prisma.Decimal(
-        ESCROW_TAKE_RATES[subscription.tier],
+        LEGACY_ESCROW_TAKE_RATES[subscription.tier],
       ).mul(100),
     };
   }

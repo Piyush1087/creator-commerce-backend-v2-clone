@@ -451,7 +451,7 @@ export class CollaborationProductionService {
     }>,
   ) {
     const fingerprint = requestFingerprint(input);
-    await this.access.assertThreadForUser(user, collaborationId);
+    await this.access.assertThreadForUser(user, collaborationId, "COMMAND");
     await this.prisma.$transaction(async (tx) => {
       if (
         await replayOrThrow(

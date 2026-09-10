@@ -15,6 +15,17 @@ export const counterCreatorProposalSchema = z
     counterFee: z.coerce.number().finite().nonnegative(),
   })
   .strict();
+export const submitCreatorProposalSchema = z
+  .object({
+    ...commandEnvelope,
+    proposedFee: z.coerce.number().finite().nonnegative(),
+    currency: z
+      .string()
+      .trim()
+      .length(3)
+      .transform((value) => value.toUpperCase()),
+  })
+  .strict();
 export const declineNegotiationSchema = z
   .object({
     ...commandEnvelope,
@@ -26,7 +37,9 @@ export const confirmEscrowFundingSchema = z
     ...commandEnvelope,
     fundingConfirmationRef: evidenceRef,
     escrowLockRef: evidenceRef,
-    confirmedAmount: z.coerce.number().finite().nonnegative(),
+    confirmedAmount: z
+      .string()
+      .regex(/^(?:0|[1-9]\d{0,11})(?:\.\d{1,4})?$/),
     currency: z
       .string()
       .trim()
@@ -49,6 +62,9 @@ export type CollaborationCommandEnvelope = z.infer<
 >;
 export type CounterCreatorProposalInput = z.infer<
   typeof counterCreatorProposalSchema
+>;
+export type SubmitCreatorProposalInput = z.infer<
+  typeof submitCreatorProposalSchema
 >;
 export type DeclineNegotiationInput = z.infer<typeof declineNegotiationSchema>;
 export type ConfirmEscrowFundingInput = z.infer<
