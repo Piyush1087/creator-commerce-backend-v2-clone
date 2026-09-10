@@ -1,6 +1,6 @@
 # Phase F — Execution policy and ledger (§13)
 
-**Status:** ACTIVE — ledger current through RUN 10 AWS env/hotfix docs; **not** freeze PASS  
+**Status:** ACTIVE — ledger current through RUN 11 Postmark OTP live send; **not** freeze PASS  
 **Date:** 2026-09-08; ledger audit 2026-09-10
 
 ## Files in this folder
@@ -21,7 +21,7 @@ AWS deploy is not started. `docs/aws-environments/` and `docs/deployment/hotfix/
 | RUN 2 canonical convergence | **Skipped as a pull** — IN already in lineage; RUN 2 is docs |
 | RUN 3 whole-app acceptance | Split across RUN 3–5 (build/migrate; lint/invariants/smoke; postgres/npm ci/full test) |
 | RUN 4 freeze preparation | Artifact written in RUN 4; still not PASS |
-| Ledger + checkpoint SHA every material run | YES RUN 1–10; RUN 7–10 evidence SHAs recorded; ledger-record commit sits on top |
+| Ledger + checkpoint SHA every material run | YES RUN 1–11; RUN 7–11 evidence SHAs recorded; ledger-record commit sits on top |
 | Runner does not reconcile conflicting accepted sources | YES — C-02A / C-04 / Payouts stay deferred |
 
 ## RUN 6 (2026-09-09)
@@ -43,6 +43,10 @@ Local hygiene leftovers: identity-test inbound → Home; Creator post-login no l
 ## RUN 10 (2026-09-10)
 
 AWS environments + optional API hotfix docs; Dockerfile Chromium layer keyed to Playwright version. Evidence SHA BE `d5828f6f…`. Frontend unchanged (`a508e8ff…`). Not an SST deploy. Not freeze PASS.
+
+## RUN 11 (2026-09-10)
+
+Local Postmark OTP template live send **PASS** (Parent-confirmed inboxes). Prior fail was TemplateId placeholder `1`. INV-10 still PARTIAL (IG/Razorpay not run). Evidence FE `2bdf08b4…` / BE `0c683e41…`. Not freeze PASS.
 
 ## Leftovers
 
