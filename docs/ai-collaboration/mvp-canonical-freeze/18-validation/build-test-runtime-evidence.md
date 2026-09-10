@@ -14,7 +14,7 @@ Do not declare `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` until remaining ga
 | frontend build | PASS | chunk-size warning = preexisting debt | `05-frontend-build.md` |
 | frontend lint | PASS | | `06-lint.md` |
 | backend lint | FAIL | PREEXISTING_ACCEPTED_DEBT (712 prettier; Parent: do not `--fix`) | `06-lint.md` |
-| unit/contract tests | FAIL classified | FE: 2 Parent-accepted + withdrawal types deleted; BE 18 failed / 6370 passed | `15-full-npm-test.md` |
+| unit/contract tests | FAIL classified | FE named RUN 5 files closed (auth static isolated PASS RUN 12); full FE farm not re-run. BE 18 failed / 6370 passed | `15-full-npm-test.md` |
 | module acceptance suites | NOT_RE_RUN as named packs | farm classified in `15` | `10-remaining-gates.md` |
 | cross-module invariant suite | PARTIAL + postgres | INV-01/02/03/04/12/06/07 postgres PASS (INV-03 29/29 RUN 7); INV-08/09/10/11 PARTIAL; INV-13 FAIL classified | `11-invariant-results.md` `13-postgres-invariants.md` |
 | fresh disposable database migration | PASS 87/87 | `thecreatorshop` not touched | `08-fresh-db-migrate.md` |
@@ -27,7 +27,7 @@ Do not declare `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` until remaining ga
 | provider-unavailable recovery | PARTIAL | Postmark OTP live send PASS 2026-09-10; IG/Razorpay NOT_RUN | `12-frontend-backend-smoke.md` |
 | compiled/deployable artifact | PASS | FE `dist/`, BE `dist/main.js` | `03` + `05` |
 | clean worktrees | NOT_CLAIMED | do not commit `tmp-*` | |
-| local/remote checkpoint equality | Parent asked origin+piyush push of RUN 11 | freeze branch; not development/main |
+| local/remote checkpoint equality | Parent asked origin+piyush push of RUN 12 | freeze branch; not development/main |
 
 ## Failure classification vocabulary
 

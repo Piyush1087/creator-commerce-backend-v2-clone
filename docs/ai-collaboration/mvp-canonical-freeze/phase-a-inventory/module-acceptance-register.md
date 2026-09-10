@@ -135,7 +135,7 @@ frontend_runtime_acceptance_SHA: d89810cfcb70c780054357c6571e51f1f13e258c
 closeout/docs_SHA: UNKNOWN_REQUIRES_REVIEW (distinct closeout not named)
 current canonical branch/head: freeze/mvp-canonical-application-v1
 status: ACCEPTED
-remaining_debt: FE authAuthorizationHeader still used by Brand Centre client (Parent-accepted)
+remaining_debt: none for authAuthorizationHeader (authenticatedFetch cutover RUN 12)
 upstream: BRAND-PREVIEW, NOTIF-DE
 downstream: PI-V1, CHAT-HOME
 ```
@@ -207,7 +207,7 @@ lineage_named_merge: FE d39c5ee8d9763882359148dd77e34c72dd6a5061 / BE 29224609d1
 closeout/docs_SHA: UNKNOWN_REQUIRES_REVIEW
 current canonical branch/head: freeze/mvp-canonical-application-v1
 status: ACCEPTED on snapshot (no separate named runtime SHA in RUN 1)
-remaining_debt: UCE table→cards closed RUN 8; UceCampaignCollaboration leftover vs Collaboration (INV-13 Parent later amendment)
+remaining_debt: UCE table→cards closed RUN 8; canonical-draft client authenticatedFetch RUN 12; UceCampaignCollaboration leftover vs Collaboration (INV-13 Parent later amendment)
 upstream: BRAND-SETTINGS, PI-V1, C-03
 downstream: BRAND-COLLAB, C-03, CHAT-HOME
 ```

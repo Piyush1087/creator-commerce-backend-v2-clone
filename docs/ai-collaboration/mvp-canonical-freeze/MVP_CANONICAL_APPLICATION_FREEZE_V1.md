@@ -173,7 +173,7 @@ BE lint FAIL 712 prettier  PREEXISTING_ACCEPTED_DEBT
 postgres INV-01/02/03/04/12/06/07 PASS (INV-03 29/29 RUN 7)
 FE npm ci clone typecheck/lint/build PASS
 BE npm ci clone validate PASS; build requires prisma generate
-full FE npm test FAIL 3/1060 classified; 2 Parent-accepted + unused withdrawal types deleted
+full FE npm test RUN 5 FAIL 3/1060; named files closed (auth static RUN 12 isolated PASS; chat RUN 9; billing types amended). Full farm not re-run
 full BE npm test FAIL 18/7170 classified; CORS/brief-pack/Gatekeeper isolated PASS (farm load)
 ```
 
@@ -187,7 +187,7 @@ full BE npm test FAIL 18/7170 classified; CORS/brief-pack/Gatekeeper isolated PA
 - `db:seed:dev-creator` does not create an ACTIVE Creator organization (OTP ineligible).
 - BE prettier farm (712) — Parent: do not `--fix`.
 - Chunk-size FE build warning.
-- FE `authAuthorizationHeader` still used by Brand Centre / UCE — Parent-accepted `PREEXISTING_ACCEPTED_DEBT`.
+- FE `authAuthorizationHeader` helper — **closed RUN 12** (Brand Centre/UCE use `authenticatedFetch`; helper removed).
 - Unused FE Brand withdrawal contract types deleted 2026-09-09; backend withdrawal-account API still present.
 - BE financial-producer / route-payout architecture greps vs deferred Brand Payouts v1 / C-04.
 - Clone `npm run build` does not run `prisma generate`; nest build under CPU contention was killed.

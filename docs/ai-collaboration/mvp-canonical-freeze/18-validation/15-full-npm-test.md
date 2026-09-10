@@ -3,7 +3,7 @@
 **Date:** 2026-09-09  
 Working trees on `freeze/mvp-canonical-application-v1`. Postgres-gated files skipped unless flags set (correct).
 
-## Frontend — FAIL (3 tests)
+## Frontend — RUN 5 FAIL (3 tests); named files closed (full farm not re-run)
 
 ```text
 npm test
@@ -15,7 +15,7 @@ exit 1
 
 | File | Failure | Classification |
 | --- | --- | --- |
-| `src/features/auth/auth-security-static.test.ts` | runtime still contains `authAuthorizationHeader` (Brand Centre / UCE clients) | **Parent-accepted** `PREEXISTING_ACCEPTED_DEBT` (2026-09-09). Helper is in-memory Bearer for Brand Centre + UCE. Not a second session or bypass. Later amendment: switch those clients to `authenticatedFetch`. Test not weakened. |
+| `src/features/auth/auth-security-static.test.ts` | RUN 5: `authAuthorizationHeader` in Brand Centre / UCE clients | **Closed RUN 12.** Clients use `authenticatedFetch`; helper removed. Isolated vitest **4/4 PASS** plus related clients **24/24** 2026-09-10. Test not weakened. Full `npm test` farm not re-run. |
 | `src/features/chat/chat-architecture.test.ts` | git diff vs Chat P6 SHA includes `sidebar-items.ts` | **Closed RUN 9.** Test no longer git-diffs P6; asserts Brand Home still owns Chat, no Chat sidebar label, no `/brand/chat`. Full `npm test` farm not re-run. |
 | `src/pages/brand/settings/brand-settings-billing-page.test.ts` | `WithdrawalAccount` still in `brand-settings.contracts.ts` | **Amended 2026-09-09:** unused FE types `BrandWithdrawalAccountResponse` / `LinkBrandWithdrawalAccountPayload` deleted. UI/client already had no withdrawal surface. Backend `…/withdrawal-account` remains with other OUT/old-payout APIs (separate Parent call). Brand Payouts v1 still not pulled. |
 
