@@ -1,0 +1,71 @@
+{
+  "fixtureVersion": "1.0",
+  "capturedAt": "2026-09-10T12:00:00.000Z",
+  "accounts": [
+    {
+      "identity": "ACCOUNT_A",
+      "providerAccountId": "ig-preflight-account-a",
+      "username": "fixture_brand_a"
+    },
+    {
+      "identity": "ACCOUNT_B",
+      "providerAccountId": "ig-preflight-account-b",
+      "username": "fixture_brand_b"
+    }
+  ],
+  "media": [
+    {
+      "id": "ig-preflight-image",
+      "accountIdentity": "ACCOUNT_A",
+      "mediaType": "IMAGE",
+      "publishedAt": "2026-09-09T10:00:00.000Z",
+      "captionState": "AVAILABLE",
+      "children": []
+    },
+    {
+      "id": "ig-preflight-carousel",
+      "accountIdentity": "ACCOUNT_A",
+      "mediaType": "CAROUSEL_ALBUM",
+      "publishedAt": "2026-09-08T10:00:00.000Z",
+      "captionState": "AVAILABLE",
+      "children": ["ig-preflight-carousel-1", "ig-preflight-carousel-2"]
+    },
+    {
+      "id": "ig-preflight-reel",
+      "accountIdentity": "ACCOUNT_A",
+      "mediaType": "REELS",
+      "publishedAt": "2026-09-07T10:00:00.000Z",
+      "captionState": "UNAVAILABLE",
+      "children": []
+    }
+  ],
+  "audience": [
+    {
+      "fixture": "FULL",
+      "followers": "AVAILABLE",
+      "engaged": "AVAILABLE"
+    },
+    {
+      "fixture": "PARTIAL",
+      "followers": "AVAILABLE",
+      "engaged": "UNAVAILABLE"
+    },
+    {
+      "fixture": "UNAVAILABLE",
+      "followers": "UNAVAILABLE",
+      "engaged": "UNAVAILABLE"
+    }
+  ],
+  "providerErrors": [
+    {
+      "fixture": "AUTHORIZATION",
+      "classification": "AUTHORIZATION_REVALIDATION_REQUIRED",
+      "httpStatus": 401
+    },
+    {
+      "fixture": "TRANSIENT",
+      "classification": "TRANSIENT",
+      "httpStatus": 503
+    }
+  ]
+}
