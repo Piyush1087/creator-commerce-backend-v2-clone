@@ -1,0 +1,113 @@
+{
+  "contractVersion": "1.0",
+  "observationProfileVersion": "1.0",
+  "sourceScope": "INSTAGRAM_OWNED",
+  "brandProfileId": "22222222-2222-4222-8222-222222222222",
+  "providerAccountId": "ig-account-1",
+  "mediaId": "ig-media-1",
+  "resourceRef": "resource:instagram:ig-account-1:media:ig-media-1",
+  "captureRef": "capture:instagram:ig-media-1:2026-09-10",
+  "authorizationGeneration": 1,
+  "capturedAt": "2026-09-10T08:00:00.000Z",
+  "publishedAt": {
+    "state": "AVAILABLE",
+    "value": "2026-09-08T12:00:00.000Z"
+  },
+  "mediaType": "IMAGE",
+  "permalink": {
+    "state": "AVAILABLE",
+    "value": "https://www.instagram.com/p/example/"
+  },
+  "caption": {
+    "state": "AVAILABLE",
+    "value": "A calm morning routine with Serum A."
+  },
+  "captionContentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "hashtags": ["#morningroutine"],
+  "mentions": [],
+  "themes": [
+    {
+      "semanticId": "routine",
+      "label": "Daily routine",
+      "confidence": "MEDIUM",
+      "evidenceRefs": ["evidence:caption:1", "evidence:image:1"]
+    }
+  ],
+  "captionPatterns": [],
+  "creativeStructures": [
+    {
+      "semanticId": "product-in-use",
+      "label": "Product in use",
+      "confidence": "MEDIUM",
+      "evidenceRefs": ["evidence:image:1"]
+    }
+  ],
+  "visualExecutions": [],
+  "creatorRoleSignals": [],
+  "creatorPresence": {
+    "state": "NOT_OBSERVED",
+    "reasonCodes": [],
+    "evidenceRefs": ["evidence:image:1"]
+  },
+  "offeringPresence": {
+    "state": "PRESENT",
+    "canonicalOfferingId": "11111111-1111-4111-8111-111111111111",
+    "canonicalOfferingMatch": "EXACT_PREEXISTING",
+    "reasonCodes": [],
+    "evidenceRefs": ["evidence:caption:1", "evidence:image:1"]
+  },
+  "likelyCollab": {
+    "state": "NO_COLLAB_SIGNAL",
+    "confidence": "LOW",
+    "signalClasses": [],
+    "canonicalCreatorId": null,
+    "canonicalCreatorMatch": "NONE",
+    "canonicalCollaborationId": null,
+    "canonicalCollaborationMatch": "NONE",
+    "reasonCodes": [],
+    "evidenceRefs": ["evidence:caption:1", "evidence:image:1"],
+    "negativeEvidence": {
+      "captionInspected": true,
+      "requiredSelectedMediaInspected": true
+    }
+  },
+  "metrics": [
+    {
+      "availability": "OBSERVED_ZERO",
+      "metricId": "reach",
+      "value": 0,
+      "unit": "COUNT",
+      "denominator": {
+        "state": "INTENTIONALLY_ABSENT",
+        "reasonCode": "INTENTIONAL_ABSENCE"
+      },
+      "evidenceRefs": ["evidence:metric:reach:1"]
+    },
+    {
+      "availability": "UNAVAILABLE",
+      "metricId": "shares",
+      "reasonCode": "METRIC_NOT_RETURNED",
+      "evidenceRefs": []
+    }
+  ],
+  "inspection": {
+    "depth": "DEEP_SELECTED",
+    "selectedForDeepAnalysis": true,
+    "selectionReasons": ["RECENT_FORMAT_COVERAGE"],
+    "inspectedChildCount": 0,
+    "availableChildCount": 0,
+    "inspectedFrameCount": 0,
+    "reasonCodes": ["AUDIO_NOT_ANALYZED", "TRANSCRIPT_NOT_ACQUIRED"]
+  },
+  "evidenceRefs": [
+    "evidence:caption:1",
+    "evidence:image:1",
+    "evidence:metric:reach:1"
+  ],
+  "derivationVersions": {
+    "contract": "1.0",
+    "artifact": "instagram-media-observation-v1",
+    "model": "fixture-model-v1",
+    "promptOrProfile": "instagram-media-profile-v1"
+  }
+}

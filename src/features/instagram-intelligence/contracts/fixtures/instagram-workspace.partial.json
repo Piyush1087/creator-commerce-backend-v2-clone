@@ -1,0 +1,305 @@
+{
+  "contractVersion": "1.0",
+  "connection": {
+    "state": "REAUTH_REQUIRED",
+    "providerAccountId": "ig-account-1",
+    "handle": "creator_shop_test",
+    "reasonCodes": ["REAUTH_REQUIRED"]
+  },
+  "window": {
+    "start": "2026-08-11T08:00:00.000Z",
+    "end": "2026-09-10T08:00:00.000Z",
+    "days": 30
+  },
+  "accountFacts": [
+    {
+      "semanticId": "follower_count",
+      "value": {
+        "state": "UNKNOWN",
+        "reasonCode": "AUTHORIZATION_DEGRADED"
+      },
+      "observedAt": null,
+      "evidenceRefs": []
+    }
+  ],
+  "accountPerformance": [],
+  "objects": [
+    {
+      "semanticId": "instagram_content_behavior",
+      "objectContractVersion": "1.0",
+      "outputContractVersion": "1.0",
+      "sourceScope": "INSTAGRAM_OWNED",
+      "state": "PARTIAL_CURRENT",
+      "readiness": "PARTIAL",
+      "freshness": "STALE",
+      "currentPreserved": true,
+      "generatedAt": "2026-09-08T08:00:00.000Z",
+      "window": {
+        "start": "2026-08-09T08:00:00.000Z",
+        "end": "2026-09-08T08:00:00.000Z",
+        "days": 30
+      },
+      "results": [],
+      "signals": [],
+      "learnings": [],
+      "components": {
+        "window": {
+          "state": "AVAILABLE",
+          "value": "2026-08-09/2026-09-08"
+        },
+        "corpus_summary": {
+          "state": "AVAILABLE",
+          "value": { "eligible": 5, "observed": 3 }
+        },
+        "posting_cadence": {
+          "state": "UNKNOWN",
+          "reasonCode": "INSUFFICIENT_EVIDENCE"
+        },
+        "format_mix": {
+          "state": "UNKNOWN",
+          "reasonCode": "INSUFFICIENT_EVIDENCE"
+        },
+        "theme_patterns": {
+          "state": "UNKNOWN",
+          "reasonCode": "INSUFFICIENT_EVIDENCE"
+        },
+        "caption_patterns": {
+          "state": "UNKNOWN",
+          "reasonCode": "INSUFFICIENT_EVIDENCE"
+        },
+        "creative_structure_patterns": {
+          "state": "UNKNOWN",
+          "reasonCode": "INSUFFICIENT_EVIDENCE"
+        },
+        "offering_presence_patterns": {
+          "state": "UNKNOWN",
+          "reasonCode": "INSUFFICIENT_EVIDENCE"
+        },
+        "creator_presence_patterns": {
+          "state": "UNKNOWN",
+          "reasonCode": "INSUFFICIENT_EVIDENCE"
+        },
+        "representative_media_refs": {
+          "state": "AVAILABLE",
+          "value": []
+        },
+        "bounded_learnings": {
+          "state": "INTENTIONALLY_ABSENT",
+          "reasonCode": "INSUFFICIENT_SAMPLE"
+        },
+        "coverage": {
+          "state": "AVAILABLE",
+          "value": 60
+        }
+      },
+      "coverage": {
+        "state": "PARTIAL",
+        "eligibleCount": 5,
+        "observedCount": 3,
+        "coveragePercent": 60,
+        "reasonCodes": ["CURRENT_PRESERVED_AFTER_FAILURE"]
+      },
+      "evidenceRefs": ["evidence:prior:content:1"]
+    },
+    {
+      "semanticId": "instagram_audience_profile",
+      "objectContractVersion": "1.0",
+      "outputContractVersion": "1.0",
+      "sourceScope": "INSTAGRAM_OWNED",
+      "state": "NO_CURRENT",
+      "readiness": "NOT_READY",
+      "freshness": "UNKNOWN",
+      "currentPreserved": false,
+      "generatedAt": null,
+      "window": {
+        "start": "2026-08-11T08:00:00.000Z",
+        "end": "2026-09-10T08:00:00.000Z",
+        "days": 30
+      },
+      "results": [],
+      "signals": [],
+      "learnings": [],
+      "components": {
+        "window": {
+          "state": "AVAILABLE",
+          "value": "2026-08-11/2026-09-10"
+        },
+        "follower_audience": {
+          "state": "INTENTIONALLY_ABSENT",
+          "reasonCode": "AUDIENCE_PRIVACY_SUPPRESSED"
+        },
+        "engaged_audience": {
+          "state": "UNKNOWN",
+          "reasonCode": "AUDIENCE_ENGAGED_UNAVAILABLE"
+        },
+        "distribution_concentration": {
+          "state": "UNKNOWN",
+          "reasonCode": "AUDIENCE_PRIVACY_SUPPRESSED"
+        },
+        "material_differences": {
+          "state": "INTENTIONALLY_ABSENT",
+          "reasonCode": "INSUFFICIENT_EVIDENCE"
+        },
+        "limitations": {
+          "state": "AVAILABLE",
+          "value": ["AUDIENCE_PRIVACY_SUPPRESSED"]
+        },
+        "coverage": {
+          "state": "UNKNOWN",
+          "reasonCode": "AUDIENCE_PRIVACY_SUPPRESSED"
+        },
+        "summary": {
+          "state": "INTENTIONALLY_ABSENT",
+          "reasonCode": "INSUFFICIENT_EVIDENCE"
+        }
+      },
+      "coverage": {
+        "state": "UNAVAILABLE",
+        "eligibleCount": 0,
+        "observedCount": 0,
+        "coveragePercent": null,
+        "reasonCodes": ["AUDIENCE_PRIVACY_SUPPRESSED"]
+      },
+      "evidenceRefs": []
+    },
+    {
+      "semanticId": "instagram_organic_performance_profile",
+      "objectContractVersion": "1.0",
+      "outputContractVersion": "1.0",
+      "sourceScope": "INSTAGRAM_OWNED",
+      "state": "PARTIAL_CURRENT",
+      "readiness": "PARTIAL",
+      "freshness": "STALE",
+      "currentPreserved": true,
+      "generatedAt": "2026-09-08T08:00:00.000Z",
+      "window": {
+        "start": "2026-08-09T08:00:00.000Z",
+        "end": "2026-09-08T08:00:00.000Z",
+        "days": 30
+      },
+      "results": [
+        {
+          "kind": "RESULT",
+          "semanticId": "observed_reach",
+          "value": 310,
+          "unit": "COUNT",
+          "sampleSize": 3,
+          "evidenceRefs": ["evidence:prior:reach:1"]
+        }
+      ],
+      "signals": [],
+      "learnings": [],
+      "components": {
+        "window": {
+          "state": "AVAILABLE",
+          "value": "2026-08-09/2026-09-08"
+        },
+        "account_results": {
+          "state": "AVAILABLE",
+          "value": { "observed_reach": 310 }
+        },
+        "metric_coverage": {
+          "state": "AVAILABLE",
+          "value": 60
+        },
+        "format_baselines": {
+          "state": "UNKNOWN",
+          "reasonCode": "INSUFFICIENT_COMPARABLE_SAMPLE"
+        },
+        "response_distribution": {
+          "state": "UNKNOWN",
+          "reasonCode": "INSUFFICIENT_COMPARABLE_SAMPLE"
+        },
+        "high_response_cohorts": {
+          "state": "INTENTIONALLY_ABSENT",
+          "reasonCode": "INSUFFICIENT_COMPARABLE_SAMPLE"
+        },
+        "low_response_cohorts": {
+          "state": "INTENTIONALLY_ABSENT",
+          "reasonCode": "INSUFFICIENT_COMPARABLE_SAMPLE"
+        },
+        "content_performance_signals": {
+          "state": "INTENTIONALLY_ABSENT",
+          "reasonCode": "INSUFFICIENT_SAMPLE"
+        },
+        "snapshot_change": {
+          "state": "INTENTIONALLY_ABSENT",
+          "reasonCode": "INSUFFICIENT_EVIDENCE"
+        },
+        "representative_media_refs": {
+          "state": "AVAILABLE",
+          "value": []
+        },
+        "bounded_learnings": {
+          "state": "INTENTIONALLY_ABSENT",
+          "reasonCode": "INSUFFICIENT_SAMPLE"
+        },
+        "coverage": {
+          "state": "AVAILABLE",
+          "value": 60
+        }
+      },
+      "coverage": {
+        "state": "PARTIAL",
+        "eligibleCount": 5,
+        "observedCount": 3,
+        "coveragePercent": 60,
+        "reasonCodes": ["CURRENT_PRESERVED_AFTER_FAILURE"]
+      },
+      "evidenceRefs": ["evidence:prior:reach:1"]
+    }
+  ],
+  "representativeMedia": [],
+  "coverage": {
+    "inventory": {
+      "state": "PARTIAL",
+      "eligibleCount": 5,
+      "observedCount": 3,
+      "coveragePercent": 60,
+      "reasonCodes": ["AUTHORIZATION_DEGRADED"]
+    },
+    "metrics": {
+      "state": "PARTIAL",
+      "eligibleCount": 5,
+      "observedCount": 3,
+      "coveragePercent": 60,
+      "reasonCodes": ["AUTHORIZATION_DEGRADED"]
+    },
+    "lightSemantic": {
+      "state": "PARTIAL",
+      "eligibleCount": 5,
+      "observedCount": 3,
+      "coveragePercent": 60,
+      "reasonCodes": ["AUTHORIZATION_DEGRADED"]
+    },
+    "deepMultimodal": {
+      "state": "UNAVAILABLE",
+      "eligibleCount": 3,
+      "observedCount": 0,
+      "coveragePercent": 0,
+      "reasonCodes": ["AUTHORIZATION_DEGRADED"]
+    },
+    "audience": {
+      "state": "UNAVAILABLE",
+      "eligibleCount": 0,
+      "observedCount": 0,
+      "coveragePercent": null,
+      "reasonCodes": ["AUDIENCE_PRIVACY_SUPPRESSED"]
+    }
+  },
+  "sync": {
+    "state": "BLOCKED",
+    "lastAttemptAt": "2026-09-10T08:00:00.000Z",
+    "lastSuccessAt": "2026-09-08T08:00:00.000Z",
+    "nextDueAt": null,
+    "currentPreserved": true,
+    "reasonCodes": ["REAUTH_REQUIRED", "CURRENT_PRESERVED_AFTER_FAILURE"]
+  },
+  "actions": {
+    "manualRefresh": {
+      "state": "DENIED",
+      "reasonCode": "REFRESH_BACKOFF_ACTIVE"
+    },
+    "settingsRecoveryPath": "/brand/settings/integrations?tab=instagram"
+  }
+}

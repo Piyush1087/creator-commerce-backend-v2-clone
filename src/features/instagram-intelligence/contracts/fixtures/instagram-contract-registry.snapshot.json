@@ -1,0 +1,34 @@
+{
+  "registryVersion": "1.0",
+  "objectIds": [
+    "instagram_content_behavior",
+    "instagram_audience_profile",
+    "instagram_organic_performance_profile"
+  ],
+  "manualRefreshRoles": {
+    "BRAND_OWNER": "ALLOW",
+    "CAMPAIGN_MANAGER": "ALLOW",
+    "FINANCE_ADMIN": "DENY_READ_ONLY"
+  },
+  "brandSourceProfiles": [
+    ["brand_character", "1.0", "1.0", "1.0", "RUN"],
+    ["brand_communication", "1.0", "1.0", "1.0", "RUN"],
+    [
+      "audience_persona_synthesis",
+      "1.0",
+      "1.0",
+      "1.0",
+      "RUN_WHEN_EVIDENCE_THRESHOLD_MET"
+    ],
+    ["visual_style_synthesis", "1.0", "1.0", "1.0", "RUN"],
+    ["brand_meaning", "1.0", "1.1", "1.1", "RUN_WHEN_EVIDENCE_THRESHOLD_MET"],
+    [
+      "brand_differentiation",
+      "1.0",
+      "1.1",
+      "1.1",
+      "RUN_WHEN_EVIDENCE_THRESHOLD_MET"
+    ],
+    ["serviceability_synthesis", null, null, null, "EXCLUDED"]
+  ]
+}
