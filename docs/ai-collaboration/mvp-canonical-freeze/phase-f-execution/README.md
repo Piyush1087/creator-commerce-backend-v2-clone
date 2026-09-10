@@ -50,7 +50,7 @@ Local Postmark OTP template live send **PASS** (Parent-confirmed inboxes). Prior
 
 ## RUN 12 (2026-09-10)
 
-Brand Centre / UCE clients switched to `authenticatedFetch`; `authAuthorizationHeader` removed. Isolated FE vitest **5 files / 24 passed** including `auth-security-static.test.ts`. Named RUN 5 FE farm files now closed; full FE `npm test` farm not re-run. Not freeze PASS.
+Brand Centre / UCE clients switched to `authenticatedFetch`; `authAuthorizationHeader` removed. Isolated FE vitest **5 files / 24 passed** including `auth-security-static.test.ts`. Named RUN 5 FE farm files now closed; full FE `npm test` farm not re-run. Evidence FE `8c1362af…` / BE `eea4e716…`. Not freeze PASS.
 
 ## Leftovers
 

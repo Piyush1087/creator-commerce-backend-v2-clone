@@ -206,3 +206,21 @@ runs:
     notes: |
       Dummy delivery OTP only; codes not recorded. AWS-dev still needs the same
       token/templates on ECS. Invite/notification templates not re-proven.
+  - id: RUN12_AUTH_FETCH_CUTOVER
+    date: "2026-09-10"
+    intent: >
+      Switch Brand Centre and UCE clients off authAuthorizationHeader onto
+      authenticatedFetch; remove the helper. Close named RUN 5 FE auth-static
+      leftover. Not a full FE npm test farm re-run. Not freeze PASS.
+    prisma_drop: NOT_THIS_CHECKPOINT
+    pass_declared: false
+    targeted_tests: |
+      Isolated FE vitest 5 files / 24 passed (auth-security-static plus Brand
+      Centre / UCE client tests). Full npm test farm not re-run.
+    checkpoints:
+      frontend: 8c1362aff09501f59b04c411105ab64d100cd377
+      backend: eea4e71691721203ac70633a0f752cc6d54cc18a
+    notes: |
+      Chat architecture closed RUN 9; billing types amended 2026-09-09.
+      BE farm still classified (C-04 empty suites, ENVIRONMENT_BLOCKED,
+      payout greps).
