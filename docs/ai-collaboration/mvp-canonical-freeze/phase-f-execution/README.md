@@ -1,6 +1,6 @@
 # Phase F — Execution policy and ledger (§13)
 
-**Status:** ACTIVE — ledger current through RUN 9 local hygiene leftovers; **not** freeze PASS  
+**Status:** ACTIVE — ledger current through RUN 10 AWS env/hotfix docs; **not** freeze PASS  
 **Date:** 2026-09-08; ledger audit 2026-09-10
 
 ## Files in this folder
@@ -9,7 +9,7 @@
 | --- | --- |
 | `execution-ledger.yaml` | RUN ids, dates, checkpoint SHAs, STOP / Parent locks |
 
-AWS is not started. `development`/`main` are not updated.
+AWS deploy is not started. `docs/aws-environments/` and `docs/deployment/hotfix/` are documented (RUN 10). `development`/`main` are not updated.
 
 ## Charter checklist
 
@@ -21,7 +21,7 @@ AWS is not started. `development`/`main` are not updated.
 | RUN 2 canonical convergence | **Skipped as a pull** — IN already in lineage; RUN 2 is docs |
 | RUN 3 whole-app acceptance | Split across RUN 3–5 (build/migrate; lint/invariants/smoke; postgres/npm ci/full test) |
 | RUN 4 freeze preparation | Artifact written in RUN 4; still not PASS |
-| Ledger + checkpoint SHA every material run | YES RUN 1–9; RUN 7–9 evidence SHAs recorded; ledger-record commit sits on top |
+| Ledger + checkpoint SHA every material run | YES RUN 1–10; RUN 7–10 evidence SHAs recorded; ledger-record commit sits on top |
 | Runner does not reconcile conflicting accepted sources | YES — C-02A / C-04 / Payouts stay deferred |
 
 ## RUN 6 (2026-09-09)
@@ -39,6 +39,10 @@ UCE table→cards + Creator viewport. Parent Vitest **9/9**; UI confirmed. Viewp
 ## RUN 9 (2026-09-10)
 
 Local hygiene leftovers: identity-test inbound → Home; Creator post-login no longer resumes Brand app chrome; Chat architecture test no longer git-diffs P6; `db:seed:dev-collaboration` PASS on `freeze_mvp_canonical_v1` (legacy brief-linked fixture). Not freeze PASS.
+
+## RUN 10 (2026-09-10)
+
+AWS environments + optional API hotfix docs; Dockerfile Chromium layer keyed to Playwright version. Evidence SHA BE `d5828f6f…`. Frontend unchanged (`a508e8ff…`). Not an SST deploy. Not freeze PASS.
 
 ## Leftovers
 

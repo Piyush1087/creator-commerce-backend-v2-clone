@@ -1,7 +1,7 @@
 freeze: MVP_CANONICAL_APPLICATION_FREEZE_V1
 charter: dummy_tcs/docs/organization/charters/canonical_application_freeze_ai_worker_charter.md
 development_untouched: true
-aws: NOT_STARTED
+aws: DOCUMENTED_NOT_DEPLOYED
 pass_declared: false
 snapshot:
   backend: cd446fb4bd356fe03faf16c6c7a282a55cebcf08
@@ -175,3 +175,20 @@ runs:
       Seed creates a legacy brief-linked Collaboration (source_application_id
       null, brief_id set). C-03 canonical handoff proof stays on INV-07
       postgres. Page files for identity-test kept; inbound redirects to Home.
+  - id: RUN10_AWS_ENV_AND_HOTFIX_DOCS
+    date: "2026-09-10"
+    intent: >
+      Document creator-dev vs placeholder creator-prod, standing do-not-light-up-prod
+      recommendation, Auditor/Deploy/Hotfix workers, and optional API image hotfix
+      (Prisma auto-detect; Chromium FROM running image). Cache Playwright Chromium
+      in Dockerfile by lockfile version. Not an SST deploy. Not freeze PASS.
+    prisma_drop: NOT_THIS_CHECKPOINT
+    pass_declared: false
+    aws: DOCUMENTED_NOT_DEPLOYED
+    checkpoints:
+      frontend: a508e8ff23ed33ea92617cd28747f22f735932b7
+      backend: d5828f6fed547da8ce8c1adb362bd84531049114
+    notes: |
+      Evidence commit is Chromium layer + docs/aws-environments + docs/deployment/hotfix.
+      Prod hotfix remains BLOCKED until LIVE ECS/image/bastion exist.
+      Snapshot origin/development SHAs unchanged. Frontend unchanged this RUN.

@@ -17,6 +17,6 @@
 | frontend lint | PASS | RUN 4 + clone |
 | backend lint | FAIL | 712 prettier — **Parent-accepted** `PREEXISTING_ACCEPTED_DEBT` (do not `--fix`) |
 | clean worktrees | NOT_CLAIMED | do not commit `tmp-*` / OTP logs |
-| local/remote checkpoint equality | local only | commit this freeze-doc checkpoint; do not push unless Parent asks |
+| local/remote checkpoint equality | Parent asked origin+piyush push of RUN 10 AWS/hotfix docs | freeze branch only; not `development`/`main` |
 
 `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` is still forbidden.
