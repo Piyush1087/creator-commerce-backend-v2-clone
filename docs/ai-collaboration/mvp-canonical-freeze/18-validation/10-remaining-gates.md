@@ -17,7 +17,7 @@
 | frontend lint | PASS | RUN 4 + clone |
 | backend lint | FAIL | 712 prettier — **Parent-accepted** `PREEXISTING_ACCEPTED_DEBT` (do not `--fix`) |
 | clean worktrees | NOT_CLAIMED | do not commit `tmp-*` / OTP logs |
-| local/remote checkpoint equality | Parent asked origin+piyush push of RUN 12 authAuthorizationHeader cutover | freeze branch only; not `development`/`main` |
+| local/remote checkpoint equality | this amendment: origin push of ledger-record (not piyush) | freeze branch only; not `development`/`main` |
 
 `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` is still forbidden.
 
@@ -34,5 +34,5 @@ FE Brand Payouts P2 + Wave C                    PASS 40 tests across 5 files
 full npm test farms                             NOT_RE_RUN (do not greenwash)
 Brand Payouts Wave B postgres                   NOT_RUN (needs BRAND_PAYOUTS_WAVE_B_DATABASE_TEST + Parent freeze DB)
 NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS             NOT DECLARED
-immutable SHA pair                              NOT PUBLISHED (needs commit)
+immutable SHA pair                              EVIDENCE BE aaa0b83 / FE 12fa514 (ledger-record may sit on top)
 ```

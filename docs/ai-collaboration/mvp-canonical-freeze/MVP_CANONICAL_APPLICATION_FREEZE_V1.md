@@ -25,17 +25,17 @@ Freeze workspace (do not treat `development` / `main` as the freeze):
 ```text
 BACKEND_CANONICAL_REPOSITORY  = growth-verse/creator-commerce-backend-v2
 BACKEND_CANONICAL_BRANCH      = freeze/mvp-canonical-application-v1
-BACKEND_CANONICAL_SHA         = 4d4b350c9951afb1e7f110805904fec1c48766cf
+BACKEND_CANONICAL_SHA         = aaa0b834ee6fce6785c8c4bc9bcc33847910b825
 
 FRONTEND_CANONICAL_REPOSITORY = growth-verse/creator-commerce-frontend-v2
 FRONTEND_CANONICAL_BRANCH     = freeze/mvp-canonical-application-v1
-FRONTEND_CANONICAL_SHA        = 511d5e3546348fae9270751812cfde7ab45cc128
+FRONTEND_CANONICAL_SHA        = 12fa514d37dfe6ade1d2991aa86a0b8635cf34c7
 
 ARCHITECTURE_AUTHORITY_REPO   = Piyush1087/dummy_tcs
 ARCHITECTURE_AUTHORITY_SHA    = 86d8e49e6d1fc0c5ef68b1c89507339de5ca80c5
 ```
 
-These are the RUN 6 evidence commits (Marketplace CTA hide + `/help` + charter walk leftovers). RUN 5 leftover-retry parents remain `8edc42f` / `c7440e7` / `2ff5d06`. A follow-up ledger-record commit may sit on top.
+These are the 2026-09-10 amendment **evidence** commits (C-04 / C-02A / Brand Payouts pulls + INV-13 Pair 1 / OUT competing-transition retirements). A ledger-record commit may sit on top; use the pushed freeze-branch tips as the immutable pair for this amendment. RUN 6 evidence remains `4d4b350` / `511d5e3`.
 
 RUN 3 ledger-record (parent of RUN 4 evidence):
 
@@ -235,8 +235,8 @@ After any future deploy of these freeze SHAs (AWS worker):
 
 1. `/health/live` and `/health/ready` as applicable.
 2. Unauthenticated `/login`; `/marketplace` unavailable copy.
-3. Creator OTP or Google login → `/creator/home` deferred entry (not C-02A content); Campaigns opportunities; Settings; Centre redirects Home; `/creator/payouts` → Settings payouts.
-4. Brand login → Brand Home; Brand Centre; `/brand/uce/campaigns`; Collaborations; Settings.
+3. Creator OTP or Google login → `/creator/home` (C-02A); Campaigns opportunities; Settings; Centre redirects Home; `/creator/payouts` → Settings payouts.
+4. Brand login → Brand Home; Brand Centre; `/brand/uce/campaigns`; Collaborations; Settings; `/brand/payouts` Brand Payouts v1 (provider-disabled).
 5. Brand session cannot complete Creator setup.
 6. Nav must not advertise Marketplace, Co-Pilot, Creator Centre, or old payout hubs.
 7. Confirm `STAGE` matches env; Postmark delivers in that env or fail-closed without logging codes on prod.

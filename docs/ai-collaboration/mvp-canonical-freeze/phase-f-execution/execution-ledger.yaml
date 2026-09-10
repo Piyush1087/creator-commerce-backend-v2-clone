@@ -8,7 +8,7 @@ snapshot:
   frontend: c83ab8bab02ace8872a53de81cc8ffe79ccda832
 branch: freeze/mvp-canonical-application-v1
 parent_locks:
-  defer:
+  pulled_this_amendment:
     - C-02A
     - C-04
     - Brand Payouts v1
@@ -224,3 +224,25 @@ runs:
       Chat architecture closed RUN 9; billing types amended 2026-09-09.
       BE farm still classified (C-04 empty suites, ENVIRONMENT_BLOCKED,
       payout greps).
+  - id: RUN13_AMENDMENT_SUBSEQUENT_MODULES
+    date: "2026-09-10"
+    intent: >
+      Architecture-review amendment: converge C-04, C-02A, Brand Payouts v1;
+      retire competing UceCampaignCollaboration writes and OUT collab
+      transitions; record INV-13 / OUT API proofs. Not freeze PASS.
+    prisma_drop: NOT_THIS_CHECKPOINT
+    pass_declared: false
+    targeted_tests: |
+      BE prisma validate PASS. out-of-mvp-competing-transition-retired 4/4.
+      campaign-application.service 5/5. Brand Payouts unit PASS.
+      FE C-02A Home + Brand Payouts 5 files / 40 passed.
+      C-04 node:test still STALE_TEST_PROVEN under vitest. Full farms not re-run.
+    checkpoints:
+      frontend: 12fa514d37dfe6ade1d2991aa86a0b8635cf34c7
+      backend: aaa0b834ee6fce6785c8c4bc9bcc33847910b825
+    notes: |
+      Evidence commits are the amendment product/docs change. A ledger-record
+      commit may sit on top; pushed freeze-branch tips are the immutable pair
+      for this amendment. C-06 remains OUT. INV-13 Pair 1 closed; Pair 2
+      leftover commercial source writers remain. Security declaration withheld.
+
