@@ -25,12 +25,18 @@ created. It is not migration authority and does not reserve final column names.
 
 - source class: `INSTAGRAM_OWNED`;
 - resource types: `INSTAGRAM_ACCOUNT`, `INSTAGRAM_MEDIA`;
-- capabilities: the nine `instagram.*` IDs in
-  `evidence-vocabulary.ts`;
+- capabilities: the nine `instagram.*` IDs in the additive
+  `INSTAGRAM_DE_CONTRACT` registry;
 - stable resource identity excludes handle, token, ephemeral media URL and
   authorization generation;
 - authorization generation belongs on capture/execution fencing and request
   identity.
+
+A2 intentionally leaves the shared runnable DE vocabulary website-only so it
+does not claim Prisma can persist enum values that have not been migrated. B1
+must atomically add the Prisma enum values and widen the shared DE runtime union
+and adapters under migration review; it must derive those values from
+`INSTAGRAM_DE_CONTRACT` without renaming them.
 
 No raw Instagram image, video, frame, signed URL or token receives a durable
 column. Carousel children remain ordered artifacts/evidence below one media
