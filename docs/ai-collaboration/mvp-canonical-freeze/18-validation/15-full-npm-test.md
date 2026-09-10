@@ -16,7 +16,7 @@ exit 1
 | File | Failure | Classification |
 | --- | --- | --- |
 | `src/features/auth/auth-security-static.test.ts` | runtime still contains `authAuthorizationHeader` (Brand Centre / UCE clients) | **Parent-accepted** `PREEXISTING_ACCEPTED_DEBT` (2026-09-09). Helper is in-memory Bearer for Brand Centre + UCE. Not a second session or bypass. Later amendment: switch those clients to `authenticatedFetch`. Test not weakened. |
-| `src/features/chat/chat-architecture.test.ts` | git diff vs Chat P6 SHA includes `sidebar-items.ts` | **Parent-accepted** `STALE_TEST_PROVEN` (2026-09-09). Diff is RUN 1 freeze hide / Brand Home as Home. INV-05 names that file. Test not retargeted. |
+| `src/features/chat/chat-architecture.test.ts` | git diff vs Chat P6 SHA includes `sidebar-items.ts` | **Closed RUN 9.** Test no longer git-diffs P6; asserts Brand Home still owns Chat, no Chat sidebar label, no `/brand/chat`. Full `npm test` farm not re-run. |
 | `src/pages/brand/settings/brand-settings-billing-page.test.ts` | `WithdrawalAccount` still in `brand-settings.contracts.ts` | **Amended 2026-09-09:** unused FE types `BrandWithdrawalAccountResponse` / `LinkBrandWithdrawalAccountPayload` deleted. UI/client already had no withdrawal surface. Backend `…/withdrawal-account` remains with other OUT/old-payout APIs (separate Parent call). Brand Payouts v1 still not pulled. |
 
 Not a freeze-hide functional regression. Not greenwashed as pass.

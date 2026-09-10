@@ -89,12 +89,12 @@ Results: `18-validation/11-invariant-results.md`
 
 ```text
 INV-01 PASS (static/unit + postgres 10/10 on bs12_freeze_auth)
-INV-02 PARTIAL (C-01 org trigger; C-01 I2 postgres 27/29)
-INV-03 PASS architecture/smoke; postgres PARTIAL (27/29 STALE_TEST_PROVEN harness ctor)
+INV-02 PASS (I2 leftover closed; same 29/29 as INV-03)
+INV-03 PASS architecture/smoke + postgres 29/29 (harness ctor aligned)
 INV-04 PASS (unit + postgres 5/5 on c05_freeze_team)
-INV-05 PASS (unit + smoke; Chat P6 git-diff test stale vs freeze hide)
+INV-05 PASS (unit + smoke; Chat architecture test retargeted RUN 9)
 INV-06 PASS postgres (fresh c03_p14_handoff 34/34 serial, 2026-09-09)
-INV-07 PASS postgres handoff; collab seed still STALE_TEST_PROVEN
+INV-07 PASS postgres handoff; local collab seed leftover closed RUN 9 (legacy fixture)
 INV-08 PARTIAL (C-05 payout boundary unit)
 INV-09 PARTIAL (C-05 Settings contact proven; fulfillment does not consume that address)
 INV-10 PARTIAL (Postmark fail-closed locally; live IG/Razorpay NOT_RUN)
@@ -168,9 +168,9 @@ BE boot+health PASS on freeze_mvp_canonical_v1
 FE invariant vitest 70/70 PASS
 BE invariant vitest 51/51 PASS
 FE↔BE OTP smoke PARTIAL PASS
-responsive shell/nav viewport PARTIAL PASS (Brand 375/766/768; campaigns table→cards open)
+responsive shell/nav viewport PASS (RUN 8: UCE table→cards + Creator viewport)
 BE lint FAIL 712 prettier  PREEXISTING_ACCEPTED_DEBT
-postgres INV-01/04/12/06/07 PASS; INV-03 PARTIAL
+postgres INV-01/02/03/04/12/06/07 PASS (INV-03 29/29 RUN 7)
 FE npm ci clone typecheck/lint/build PASS
 BE npm ci clone validate PASS; build requires prisma generate
 full FE npm test FAIL 3/1060 classified; 2 Parent-accepted + unused withdrawal types deleted
@@ -184,19 +184,13 @@ full BE npm test FAIL 18/7170 classified; CORS/brief-pack/Gatekeeper isolated PA
 - C-02A / C-04 / Brand Payouts v1 not pulled (Parent lock).
 - C-06, Marketplace, Co-Pilot, Creator Centre hidden, APIs/schema still in tree.
 - INV-13 duplicate persistence — **Parent-accepted 2026-09-09** later amendment (present on C-03 `aebeb85` and origin `development`). No Prisma drop this freeze.
-- `scripts/seed-dev-collaboration.ts` stale vs Prisma (`STALE_TEST_PROVEN`).
 - `db:seed:dev-creator` does not create an ACTIVE Creator organization (OTP ineligible).
-- Creator post-login can return to `/brand/*` if that was the unauthenticated `from` path.
 - BE prettier farm (712) — Parent: do not `--fix`.
-- `/brand/intelligence/identity-test` still mounted (legacy test surface).
 - Chunk-size FE build warning.
-- C-01 I2 postgres harness drift: `creator-entry.postgres.test.ts` constructs `BrandVerificationService` with stale argument order (`issueTokenForUserId is not a function`).
 - FE `authAuthorizationHeader` still used by Brand Centre / UCE — Parent-accepted `PREEXISTING_ACCEPTED_DEBT`.
-- Chat architecture git-diff vs P6 `sidebar-items.ts` — Parent-accepted `STALE_TEST_PROVEN` (freeze hide).
 - Unused FE Brand withdrawal contract types deleted 2026-09-09; backend withdrawal-account API still present.
 - BE financial-producer / route-payout architecture greps vs deferred Brand Payouts v1 / C-04.
 - Clone `npm run build` does not run `prisma generate`; nest build under CPU contention was killed.
-- UCE campaigns `performance-matrix` stays a 900px table with scoped horizontal scroll below 768px (not card stacks).
 
 ---
 

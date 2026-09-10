@@ -189,7 +189,7 @@ closeout/docs_path: creator-commerce-frontend-v2 docs/ai-collaboration/chat-home
 closeout/docs_SHA: 18e8363ac40b30a9248e6b529b857d3aa20e1fc0
 current canonical branch/head: freeze/mvp-canonical-application-v1
 status: ACCEPTED
-remaining_debt: Chat architecture git-diff vs P6 sidebar-items STALE_TEST_PROVEN (freeze hide)
+remaining_debt: Chat architecture test retargeted RUN 9 (no P6 git-diff)
 upstream: BRAND-CENTRE-BI, PI-V1, BRAND-UCE
 downstream: Brand authenticated Home
 ```
@@ -207,7 +207,7 @@ lineage_named_merge: FE d39c5ee8d9763882359148dd77e34c72dd6a5061 / BE 29224609d1
 closeout/docs_SHA: UNKNOWN_REQUIRES_REVIEW
 current canonical branch/head: freeze/mvp-canonical-application-v1
 status: ACCEPTED on snapshot (no separate named runtime SHA in RUN 1)
-remaining_debt: UCE table→cards PARTIAL; UceCampaignCollaboration leftover vs Collaboration (INV-13 Parent later amendment)
+remaining_debt: UCE table→cards closed RUN 8; UceCampaignCollaboration leftover vs Collaboration (INV-13 Parent later amendment)
 upstream: BRAND-SETTINGS, PI-V1, C-03
 downstream: BRAND-COLLAB, C-03, CHAT-HOME
 ```
@@ -243,7 +243,7 @@ backend_runtime_acceptance_SHA: 3ec01751d28cfa60840ecf97d95c706f94c3dec9
 frontend_runtime_acceptance_SHA: b50c36fd4b99b6e0ec0718291d794d7a58353f4c
 current canonical branch/head: freeze/mvp-canonical-application-v1
 status: ACCEPTED
-remaining_debt: INV-03 postgres harness ctor order 27/29 STALE_TEST_PROVEN
+remaining_debt: INV-03 postgres harness closed 29/29 RUN 7
 upstream: PLAT-SHARED
 downstream: C-05, C-03
 ```
@@ -281,7 +281,7 @@ frontend_runtime_acceptance_SHA: 82ed3c9ef849be8353565a1901b6f5fb065c37e1
 closeout/docs_SHA: UNKNOWN_REQUIRES_REVIEW (distinct closeout not named)
 current canonical branch/head: freeze/mvp-canonical-application-v1
 status: ACCEPTED
-remaining_debt: seed-dev-collaboration STALE; marketplace folder mixed (Apply helpers kept)
+remaining_debt: seed-dev-collaboration leftover closed RUN 9 (legacy brief-linked fixture); marketplace folder mixed (Apply helpers kept)
 upstream: C-01, BRAND-UCE, PLAT-SHARED
 downstream: BRAND-COLLAB
 ```

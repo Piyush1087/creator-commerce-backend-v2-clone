@@ -11,7 +11,7 @@ A route merely existing in code does not make it part of the canonical product.
 | Journey | Classification | Canonical surfaces | Notes |
 | --- | --- | --- | --- |
 | public/guest entry | MIXED | `/login`, `/forgot-password`, `/reset-password`, `/` Gatekeeper landing, `/brand/:slug` public brand page, `/campaigns/:campaignId` C-03 public campaign | `/marketplace*` stays OUT_OF_MVP inbound (`CampaignUnavailable` / C-03 redirect). New CTAs no longer generate Marketplace browse URLs (C-01 recovery → Campaigns; guest campaign share/login-return → `/campaigns/:id`; missing brand slug → `/`). |
-| Brand onboarding | CANONICAL | `/`, `/brand/onboarding/{scan,core-identity,intelligence-scan,dna,catalogue,competitors,verification,pricing,social-sync,sync-verify,sync-complete}`, Gatekeeper discovery | `dna` is compatibility resume → scan page. `/brand/intelligence/identity-test` is LEGACY_ONLY (still mounted). |
+| Brand onboarding | CANONICAL | `/`, `/brand/onboarding/{scan,core-identity,intelligence-scan,dna,catalogue,competitors,verification,pricing,social-sync,sync-verify,sync-complete}`, Gatekeeper discovery | `dna` is compatibility resume → scan page. `/brand/intelligence/identity-test` inbound redirects to Home (RUN 9). |
 | Brand Preview / Brand Centre | CANONICAL | `/brand-centre`, `/brand-centre/offerings`, `/brand-centre/offerings/:offeringId` | Brand Centre + PI |
 | Brand Settings | CANONICAL | `/brand/settings/{general,integrations,billing,escrow}` | Settings MVP + escrow/billing (not Brand Payouts v1) |
 | Campaign creation and Brand Campaign workspaces | CANONICAL | `/brand/uce/campaigns`, `/create`, `/:id` | Brand UCE |
@@ -66,4 +66,4 @@ There is no separate product module named **C-02**. The accepted Home module is 
 
 ## Charter coverage verdict
 
-Intended MVP journeys are covered by accepted IN modules **on the freeze branch**, with named MIXED leftovers (Creator collab route, payouts hubs, identity-test, OUT APIs still imported). Marketplace browse CTAs were retargeted; inbound `/marketplace*` compat remains. That is classification, not freeze PASS. Phase C is **complete enough to move to Phase D**.
+Intended MVP journeys are covered by accepted IN modules **on the freeze branch**, with named MIXED leftovers (Creator collab route, payouts hubs, OUT APIs still imported). identity-test inbound redirects to Home (RUN 9). Marketplace browse CTAs were retargeted; inbound `/marketplace*` compat remains. That is classification, not freeze PASS. Phase C is **complete enough to move to Phase D**.

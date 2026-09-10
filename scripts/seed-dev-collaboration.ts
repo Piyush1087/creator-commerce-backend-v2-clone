@@ -4,10 +4,10 @@
  * Usage (from backend-v2 root, with a localhost DATABASE_URL):
  *   npm run db:seed:dev-collaboration
  *
- * This intentionally bypasses the unfinished Campaign pipeline UI. It creates
- * the minimum canonical Application graph required by Collaboration reads,
- * then creates one fresh ACTIVE Negotiation Collaboration for messaging and
- * interaction acceptance.
+ * This intentionally bypasses the C-03 canonical Application handoff write
+ * path (`C03_CANONICAL` applications are closed to this script). It creates
+ * the minimum Campaign graph plus one **legacy** brief-linked Collaboration
+ * (`source_application_id` null, `brief_id` set) for local messaging.
  *
  * Re-running the script resets only this fixture's Collaboration and children.
  * Login for both accounts uses password or email OTP (code is logged by the API in non-prod).
@@ -26,7 +26,9 @@ import {
   CollaborationPublishingState,
   CollaborationStage,
   CollaborationStageStatus,
+  CreatorTeamRole,
   IndustryVertical,
+  OrganizationKind,
   Prisma,
   PrismaClient,
   SubscriptionCurrency,
@@ -41,6 +43,7 @@ import {
   UceCompensationType,
   UceMediaPlatform,
   UceMilestoneStage,
+  UserAuthState,
   UserRole,
 } from "@prisma/client";
 
@@ -52,6 +55,9 @@ const APPLICATION_REQUEST_ID = "local-acceptance:test1-collaboration";
 
 const IDS = {
   organization: "11111111-1111-4111-8111-111111111101",
+  creatorOrg: "11111111-1111-4111-8111-111111111110",
+  workspace: "11111111-1111-4111-8111-111111111111",
+  membership: "11111111-1111-4111-8111-111111111112",
   campaign: "11111111-1111-4111-8111-111111111102",
   product: "11111111-1111-4111-8111-111111111103",
   brief: "11111111-1111-4111-8111-111111111104",
@@ -99,10 +105,11 @@ async function main() {
     const fixture = await prisma.$transaction(async (tx) => {
       const organization = await tx.organization.upsert({
         where: { id: IDS.organization },
-        update: { name: "Test One Brand" },
+        update: { name: "Test One Brand", kind: OrganizationKind.BRAND },
         create: {
           id: IDS.organization,
           name: "Test One Brand",
+          kind: OrganizationKind.BRAND,
         },
       });
 
@@ -111,12 +118,15 @@ async function main() {
         update: {
           name: "Test One Brand",
           organizationId: organization.id,
+          authState: UserAuthState.ACTIVE,
+          emailVerifiedAt: new Date(),
         },
         create: {
           email: BRAND_EMAIL,
           name: "Test One Brand",
           role: UserRole.BRAND,
           organizationId: organization.id,
+          authState: UserAuthState.ACTIVE,
           emailVerifiedAt: new Date(),
         },
       });
@@ -169,13 +179,49 @@ async function main() {
         },
       });
 
+      await tx.brandTeamMember.upsert({
+        where: {
+          brandProfileId_userId: {
+            brandProfileId: brandProfile.id,
+            userId: brandUser.id,
+          },
+        },
+        update: { role: "BRAND_OWNER", isActive: true },
+        create: {
+          brandProfileId: brandProfile.id,
+          userId: brandUser.id,
+          role: "BRAND_OWNER",
+          isActive: true,
+        },
+      });
+
+      const creatorOrg = await tx.organization.upsert({
+        where: { id: IDS.creatorOrg },
+        update: {
+          name: "Test One Creator Org",
+          kind: OrganizationKind.CREATOR,
+        },
+        create: {
+          id: IDS.creatorOrg,
+          name: "Test One Creator Org",
+          kind: OrganizationKind.CREATOR,
+        },
+      });
+
       const creatorUser = await tx.user.upsert({
         where: { email: CREATOR_EMAIL },
-        update: { name: "Test One Creator" },
+        update: {
+          name: "Test One Creator",
+          organizationId: creatorOrg.id,
+          authState: UserAuthState.ACTIVE,
+          emailVerifiedAt: new Date(),
+        },
         create: {
           email: CREATOR_EMAIL,
           name: "Test One Creator",
           role: UserRole.CREATOR,
+          organizationId: creatorOrg.id,
+          authState: UserAuthState.ACTIVE,
           emailVerifiedAt: new Date(),
         },
       });
@@ -202,6 +248,42 @@ async function main() {
             top_countries: { IN: 0.8 },
             age_distribution: { "18-24": 0.4, "25-34": 0.6 },
           }),
+        },
+      });
+
+      const workspace = await tx.creatorWorkspace.upsert({
+        where: { id: IDS.workspace },
+        update: {
+          ownerProfileId: creatorProfile.id,
+          organizationId: creatorOrg.id,
+        },
+        create: {
+          id: IDS.workspace,
+          ownerProfileId: creatorProfile.id,
+          organizationId: creatorOrg.id,
+        },
+      });
+
+      await tx.creatorWorkspaceMember.upsert({
+        where: { id: IDS.membership },
+        update: {
+          workspaceId: workspace.id,
+          userId: creatorUser.id,
+          assignedProfileId: creatorProfile.id,
+          associatedEmail: CREATOR_EMAIL,
+          securityRole: CreatorTeamRole.OWNER,
+          isActive: true,
+          joinedAt: new Date(),
+        },
+        create: {
+          id: IDS.membership,
+          workspaceId: workspace.id,
+          userId: creatorUser.id,
+          assignedProfileId: creatorProfile.id,
+          associatedEmail: CREATOR_EMAIL,
+          securityRole: CreatorTeamRole.OWNER,
+          isActive: true,
+          joinedAt: new Date(),
         },
       });
 
@@ -288,20 +370,26 @@ async function main() {
           compensationType: UceCompensationType.NEGOTIABLE,
           negotiableMinFee: 10_000,
           negotiableMaxFee: 20_000,
+          commercialOffer: 15_000,
           totalCampaignBudgetPool: 100_000,
           advancePaymentPercentage: 30,
           receivesBrandSupport: false,
+          brandSupportType: null,
+          brandSupportEstimatedValue: null,
           currency: "INR",
+          canonicalVersion: 1,
         },
         create: {
           campaignId: campaign.id,
           compensationType: UceCompensationType.NEGOTIABLE,
           negotiableMinFee: 10_000,
           negotiableMaxFee: 20_000,
+          commercialOffer: 15_000,
           totalCampaignBudgetPool: 100_000,
           advancePaymentPercentage: 30,
           receivesBrandSupport: false,
           currency: "INR",
+          canonicalVersion: 1,
         },
       });
 
@@ -334,84 +422,63 @@ async function main() {
       });
 
       const application = await tx.uceApplication.upsert({
-        where: { requestId: APPLICATION_REQUEST_ID },
-        update: {
-          campaignId: campaign.id,
-          campaignCreatorId: campaignCreator.id,
-          campaignAssetId: product.id,
-          briefId: brief.id,
-          status: UceApplicationStatus.APPROVED,
-          source: UceApplicationSource.DIRECT,
-          proposedFee: 15_000,
-          approvedAt: new Date(),
-        },
+        where: { legacyRequestId: APPLICATION_REQUEST_ID },
+        update: {},
         create: {
-          requestId: APPLICATION_REQUEST_ID,
+          legacyRequestId: APPLICATION_REQUEST_ID,
           campaignId: campaign.id,
           campaignCreatorId: campaignCreator.id,
-          campaignAssetId: product.id,
-          briefId: brief.id,
+          legacyCampaignProductId: product.id,
+          legacyBriefId: brief.id,
           status: UceApplicationStatus.APPROVED,
           source: UceApplicationSource.DIRECT,
-          proposedFee: 15_000,
-          approvedAt: new Date(),
+          legacyApprovedAt: new Date(),
         },
       });
 
-      await tx.uceApplicationSnapshot.upsert({
+      const snapshotPayload = {
+        campaignContext: json({ id: campaign.id, name: campaign.name }),
+        campaignAssetContext: json({
+          id: product.id,
+          productName: product.productName,
+        }),
+        briefContext: json({
+          id: brief.id,
+          internalTitle: brief.internalTitle,
+        }),
+        commercialContext: json({
+          proposedFee: 15_000,
+          currency: commercials.currency,
+        }),
+        creatorIdentity: json({
+          userId: creatorUser.id,
+          email: creatorUser.email,
+          instagramHandle: CREATOR_HANDLE,
+        }),
+      };
+      const existingSnapshot = await tx.uceApplicationSnapshot.findUnique({
         where: { applicationId: application.id },
-        update: {
-          campaignContext: json({ id: campaign.id, name: campaign.name }),
-          campaignAssetContext: json({
-            id: product.id,
-            productName: product.productName,
-          }),
-          briefContext: json({
-            id: brief.id,
-            internalTitle: brief.internalTitle,
-          }),
-          commercialContext: json({
-            proposedFee: 15_000,
-            currency: commercials.currency,
-          }),
-          creatorIdentity: json({
-            userId: creatorUser.id,
-            email: creatorUser.email,
-            instagramHandle: CREATOR_HANDLE,
-          }),
-        },
-        create: {
-          applicationId: application.id,
-          campaignContext: json({ id: campaign.id, name: campaign.name }),
-          campaignAssetContext: json({
-            id: product.id,
-            productName: product.productName,
-          }),
-          briefContext: json({
-            id: brief.id,
-            internalTitle: brief.internalTitle,
-          }),
-          commercialContext: json({
-            proposedFee: 15_000,
-            currency: commercials.currency,
-          }),
-          creatorIdentity: json({
-            userId: creatorUser.id,
-            email: creatorUser.email,
-            instagramHandle: CREATOR_HANDLE,
-          }),
-        },
       });
+      if (!existingSnapshot) {
+        await tx.uceApplicationSnapshot.create({
+          data: {
+            applicationId: application.id,
+            ...snapshotPayload,
+          },
+        });
+      }
 
       await tx.collaboration.deleteMany({
-        where: { sourceApplicationId: application.id },
+        where: {
+          campaignId: campaign.id,
+          creatorUserId: creatorUser.id,
+        },
       });
 
       const welcome =
         "Local acceptance fixture is active. Brand and Creator can message each other.";
       const collaboration = await tx.collaboration.create({
         data: {
-          sourceApplicationId: application.id,
           campaignCreatorId: campaignCreator.id,
           campaignAssetId: product.id,
           brandProfileId: brandProfile.id,
@@ -513,7 +580,6 @@ async function main() {
               commandId: "local-acceptance:provision",
               aggregateVersion: 1,
               payload: json({
-                sourceApplicationId: application.id,
                 fixture: true,
               }),
             },

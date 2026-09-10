@@ -84,7 +84,7 @@
 | `/brand/onboarding/social-sync` | CANONICAL | Preview |
 | `/brand/onboarding/sync-verify` | CANONICAL | Preview |
 | `/brand/onboarding/sync-complete` | CANONICAL | Preview |
-| `/brand/intelligence/identity-test` | LEGACY_ONLY | Still mounted; non-MVP test surface |
+| `/brand/intelligence/identity-test` | LEGACY_ONLY | Inbound redirects to Home (RUN 9). Page files kept |
 | `/creator/onboarding` | CANONICAL | C-01 landing |
 | `/creator/onboarding/{modules,signup,connect,sync}` | LEGACY_ONLY | Redirect to landing |
 | `/creator-marketplace/callback` | CANONICAL | C-01 Instagram OAuth (name is leftover) |

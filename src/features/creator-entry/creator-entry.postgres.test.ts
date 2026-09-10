@@ -80,10 +80,10 @@ database("C01-I2 account, auth and provisioning", () => {
   } as unknown as BrandCentreScanService;
   const brandVerification = new BrandVerificationService(
     db,
+    mail,
     scan,
     auth,
     googleAuth,
-    emailOtp,
   );
 
   vi.spyOn(googleAuth, "verifyIdTokenPayload").mockImplementation(

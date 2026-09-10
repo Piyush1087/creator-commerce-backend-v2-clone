@@ -4,7 +4,7 @@
 | --- | --- |
 | INV-01 | `src/features/auth/*`, `auth-security.static.test.ts`, `auth-security.unit.test.ts`, `auth-security.postgres.test.ts` |
 | INV-02 | Prisma `User` `Organization`; `src/features/c01-persistence/c01-persistence-security.postgres.test.ts` |
-| INV-03 | `src/features/creator-entry/*`, `creator-entry.postgres.test.ts` (27/29 harness ctor leftover) |
+| INV-03 | `src/features/creator-entry/*`, `creator-entry.postgres.test.ts` (29/29 harness ctor aligned RUN 7) |
 | INV-04 | `src/features/creator-settings/team/creator-workspace-actor.*`, `creator-team.postgres.test.ts` |
 | INV-05 | n/a (FE chrome). Marketplace HTTP still live: `public-marketplace.controller.ts` (OUT, classified Phase C) |
 | INV-06 | `src/features/campaign-applications/*`, `src/features/brand-uce/persistence/c03-p11*.postgres.test.ts` |

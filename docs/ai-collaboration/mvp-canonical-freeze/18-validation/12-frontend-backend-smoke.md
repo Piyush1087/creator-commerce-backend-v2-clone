@@ -13,7 +13,7 @@ OTP codes were read from the local Nest non-prod log and **must not** be committ
 | --- | --- | --- |
 | `npm run db:seed:dev-c03-opportunity` | PASS. Creator `c03-smoke@creator.com`, Brand `c03-smoke@brand.com`, LIVE campaign fixture | Used for login smoke |
 | `npm run db:seed:dev-creator` | User `test@creator.com` created earlier as `PROVISIONAL` without a Creator organization | Cannot receive LOGIN OTP (`eligible` requires `ACTIVE`). C-01 trigger `C01_ACTIVE_CREATOR_ORGANIZATION_REQUIRED` if activated without org. **Not** used for this smoke |
-| `npm run db:seed:dev-collaboration` | TypeScript compile fail vs current Prisma | `STALE_TEST_PROVEN` |
+| `npm run db:seed:dev-collaboration` | **RUN 9 PASS** on `freeze_mvp_canonical_v1` (legacy brief-linked Collaboration; re-run resets collab only) | Local messaging fixture. Not INV-07 canonical handoff proof |
 
 Local Postmark send failed; OTP issue still succeeded off-prod (code logged, then “Postmark send failed”).
 
@@ -30,7 +30,7 @@ Local Postmark send failed; OTP issue still succeeded off-prod (code logged, the
 | Path / action | Observed |
 | --- | --- |
 | Email-code login | PASS |
-| Immediate post-login | `/brand/dashboard` because an earlier unauthenticated visit left `from=/brand/dashboard`. `resolvePostLoginPath` preserves `/brand/` return values for Creator. Brand Home fail-closed: “Brand Centre is available to active brand users only” |
+| Immediate post-login | RUN 4 observed bounce to `/brand/dashboard` from preserved `from=`. **RUN 9:** Creator no longer resumes Brand app chrome (`/brand/dashboard`, settings, UCE, onboarding, intelligence, `/brand-centre`). Public `/brand/:slug` still allowed. |
 | `/creator/home` | Deferred C-05 entry: “Creator Home is deferred”. Signed in as `c03-smoke@creator.com`. Nav: Home, Campaigns, Collaborations, Settings |
 | `/creator/campaigns` | Redirects to `/creator/campaigns/opportunities`. Lists **C-03 Local Smoke Opportunity** |
 | `/creator/settings` | `/creator/settings/account`. Email code Active |

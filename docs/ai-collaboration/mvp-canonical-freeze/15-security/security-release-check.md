@@ -16,7 +16,7 @@
 | Permissive redirects | C-01 client must not send client-controlled `redirectUri` (architecture tests exist) | Keep in §18 |
 | Disabled auth/RBAC | FE `RequireAuth` + Creator platform guard + Settings action guards. BE still serves OUT modules if called | Residual: hidden UI ≠ disabled API |
 | Cross-tenant exposure | Not re-proven this run | §18 |
-| Debug / test routes | `/brand/intelligence/identity-test` still mounted in brand onboarding app | Classify LEGACY test surface |
+| Debug / test routes | `/brand/intelligence/identity-test` inbound redirects to Home (RUN 9). Page files kept | LEGACY test surface hidden |
 | Frontend-only authorization | Mutations must stay backend-enforced | §18 |
 | Provider success simulation | Razorpay route runtime comment: disabled until entitlement verified. Co-Pilot quota unlimited off-prod | Fail-closed required for money |
 

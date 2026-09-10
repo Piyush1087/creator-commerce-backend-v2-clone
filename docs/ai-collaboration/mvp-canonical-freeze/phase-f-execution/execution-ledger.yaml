@@ -94,6 +94,7 @@ runs:
       INV-03 27/29 STALE_TEST_PROVEN BrandVerificationService ctor order.
       INV-09 FE contact 6/6 + BE contact-phone 8/8.
       Working-tree prisma generate + nest build PASS.
+      INV-03 leftover closed later in RUN 7 (29/29).
   - id: RUN6_MARKETPLACE_CTA_AND_HELP
     date: "2026-09-09"
     intent: >
@@ -119,3 +120,58 @@ runs:
       Inbound /marketplace* compat routes unchanged. Creator Help moved from
       dead utility action to footer nav. Checkpoint SHAs are the RUN 6 evidence
       commits; a follow-up ledger-record commit may sit on top.
+  - id: RUN7_INV03_HARNESS_CTOR
+    date: "2026-09-09"
+    intent: >
+      Parent-asked INV-03 harness-only fix: BrandVerificationService ctor
+      matches production (prisma, mail, scan, auth, googleAuth). Not a product
+      pull. Not freeze PASS.
+    prisma_drop: NOT_THIS_CHECKPOINT
+    pass_declared: false
+    targeted_tests: |
+      Parent-run on c01_i2_freeze: Test Files 1 passed (1); Tests 29 passed (29).
+      npx vitest run src/features/creator-entry/creator-entry.postgres.test.ts
+      --testTimeout=30000 --fileParallelism=false --maxWorkers=1
+    checkpoints:
+      frontend: UNCOMMITTED_WORKING_TREE
+      backend: UNCOMMITTED_WORKING_TREE
+    notes: |
+      Closes INV-03 postgres leftover and the INV-02 I2 harness leftover that
+      shared the same file. INV-08/09/10/11/13 unchanged.
+  - id: RUN8_VIEWPORT_TABLE_CARDS
+    date: "2026-09-09"
+    intent: >
+      UCE campaigns table→cards below 768px; Creator viewport leftover close.
+      Not freeze PASS.
+    prisma_drop: NOT_THIS_CHECKPOINT
+    pass_declared: false
+    targeted_tests: |
+      Parent-run: Test Files 3 passed (3); Tests 9 passed (9).
+      campaign-list-tabs.responsive, creator-campaigns-viewport.architecture,
+      creator-shell-rendering. Parent: frontend UI works as expected.
+    checkpoints:
+      frontend: UNCOMMITTED_WORKING_TREE
+      backend: UNCOMMITTED_WORKING_TREE
+    notes: |
+      Viewport gate PASS. 900px performance-matrix min-width removed.
+      Creator .cc-mobile-rows padding 24px. Exact 767@DPR2 still ENVIRONMENT.
+  - id: RUN9_LOCAL_HYGIENE_LEFTOVERS
+    date: "2026-09-10"
+    intent: >
+      Parent-asked local leftovers: hide identity-test inbound, stop Creator
+      post-login Brand-app bounce, retarget Chat git-diff test, unstick
+      seed-dev-collaboration. Not a deferred-module pull. Not freeze PASS.
+    prisma_drop: NOT_THIS_CHECKPOINT
+    pass_declared: false
+    targeted_tests: |
+      FE Parent: 4 files / 73 passed (post-login-redirect, safe-internal-path,
+      chat-architecture, brand-onboarding-app.architecture).
+      BE: npm run db:seed:dev-collaboration on localhost freeze_mvp_canonical_v1
+      PASS twice (idempotent Collaboration reset).
+    checkpoints:
+      frontend: UNCOMMITTED_WORKING_TREE
+      backend: UNCOMMITTED_WORKING_TREE
+    notes: |
+      Seed creates a legacy brief-linked Collaboration (source_application_id
+      null, brief_id set). C-03 canonical handoff proof stays on INV-07
+      postgres. Page files for identity-test kept; inbound redirects to Home.
