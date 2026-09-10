@@ -21,7 +21,7 @@ AWS is not started. `development`/`main` are not updated.
 | RUN 2 canonical convergence | **Skipped as a pull** — IN already in lineage; RUN 2 is docs |
 | RUN 3 whole-app acceptance | Split across RUN 3–5 (build/migrate; lint/invariants/smoke; postgres/npm ci/full test) |
 | RUN 4 freeze preparation | Artifact written in RUN 4; still not PASS |
-| Ledger + checkpoint SHA every material run | YES RUN 1–9; RUN 7–9 still UNCOMMITTED_WORKING_TREE until Parent commits |
+| Ledger + checkpoint SHA every material run | YES RUN 1–9; RUN 7–9 evidence SHAs recorded; ledger-record commit sits on top |
 | Runner does not reconcile conflicting accepted sources | YES — C-02A / C-04 / Payouts stay deferred |
 
 ## RUN 6 (2026-09-09)

@@ -133,8 +133,8 @@ runs:
       npx vitest run src/features/creator-entry/creator-entry.postgres.test.ts
       --testTimeout=30000 --fileParallelism=false --maxWorkers=1
     checkpoints:
-      frontend: UNCOMMITTED_WORKING_TREE
-      backend: UNCOMMITTED_WORKING_TREE
+      frontend: a508e8ff23ed33ea92617cd28747f22f735932b7
+      backend: 0b655749a6874d0d2d7a1888ad5918b515b4df7e
     notes: |
       Closes INV-03 postgres leftover and the INV-02 I2 harness leftover that
       shared the same file. INV-08/09/10/11/13 unchanged.
@@ -150,8 +150,8 @@ runs:
       campaign-list-tabs.responsive, creator-campaigns-viewport.architecture,
       creator-shell-rendering. Parent: frontend UI works as expected.
     checkpoints:
-      frontend: UNCOMMITTED_WORKING_TREE
-      backend: UNCOMMITTED_WORKING_TREE
+      frontend: a508e8ff23ed33ea92617cd28747f22f735932b7
+      backend: 0b655749a6874d0d2d7a1888ad5918b515b4df7e
     notes: |
       Viewport gate PASS. 900px performance-matrix min-width removed.
       Creator .cc-mobile-rows padding 24px. Exact 767@DPR2 still ENVIRONMENT.
@@ -169,8 +169,8 @@ runs:
       BE: npm run db:seed:dev-collaboration on localhost freeze_mvp_canonical_v1
       PASS twice (idempotent Collaboration reset).
     checkpoints:
-      frontend: UNCOMMITTED_WORKING_TREE
-      backend: UNCOMMITTED_WORKING_TREE
+      frontend: a508e8ff23ed33ea92617cd28747f22f735932b7
+      backend: 0b655749a6874d0d2d7a1888ad5918b515b4df7e
     notes: |
       Seed creates a legacy brief-linked Collaboration (source_application_id
       null, brief_id set). C-03 canonical handoff proof stays on INV-07
