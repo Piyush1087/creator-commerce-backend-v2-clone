@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0",
+  "runner": "BRAND_PAYOUTS_WAVE_B_COHERENT_BACKEND_EXECUTION_RUNNER_V1",
+  "decisions": [
+    {
+      "classification": "UPSTREAM_DEPENDENCY_REQUIRED",
+      "issue": "Prior P4 Base and accepted C04 lineage diverged at their common parent.",
+      "chosen_correction": "Reapply the bounded P4 Base delta onto exact C04 final and preserve C04 as ancestry base.",
+      "source_sha": "a49e24e150d679ced65adea5a8ffe9b5245fb4cc",
+      "proof": "C04 ancestor check passed; first 85 migration paths have zero diff.",
+      "residual_risk": "none"
+    },
+    {
+      "classification": "FINANCIAL_SAFETY_REQUIRED",
+      "issue": "Reserve approval must not trust caller economics or duplicate an effect under contention.",
+      "chosen_correction": "Load exact C04 instruction server-side; preserve immutable membership audit tuples; serialize by Brand/idempotency/instruction; use unique constraints and bounded serialization retry.",
+      "source_sha": "e9af2a5a45dda68fa3ea3498855d1438d8c717aa",
+      "migration_sha256": "887e5bb6bd262a4dd02e42a798db55bd136d97bf6a923df7e6466573f11d1f84",
+      "proof": "Two concurrent calls produced one completed approval, one successful attempt, and one reserve ledger effect; changed payload, shortfall, RBAC, and cross-Brand cases failed closed.",
+      "residual_risk": "none within bounded normal path"
+    },
+    {
+      "classification": "MVP_LAUNCH_REQUIRED",
+      "issue": "Creator obligation and due authority require exact C04 lineage and finite term semantics.",
+      "chosen_correction": "Persist canonical C04 references and calculate the UTC due instant from settlementEligibleAt with the Asia/Kolkata NET_7/15/30/45/60 rule.",
+      "source_sha": "e9af2a5a45dda68fa3ea3498855d1438d8c717aa",
+      "proof": "PostgreSQL triggers and service tests reject incomplete/currentness mismatch and verify all five allowed terms; IMMEDIATE is excluded.",
+      "residual_risk": "none"
+    },
+    {
+      "classification": "FINANCIAL_SAFETY_REQUIRED",
+      "issue": "Provider-neutral execution must not infer destination authority or collapse create, observation, and settlement.",
+      "chosen_correction": "Fence exact current Creator-owned C05 destination/version/mapping at claim; keep distinct provider calls and settle only from observed evidence with exact funding consumption.",
+      "source_sha": "e9af2a5a45dda68fa3ea3498855d1438d8c717aa",
+      "proof": "C05 mutation is rejected, transfer replay calls create once, settlement replay writes one ledger effect, and immutable receipts reject deletion.",
+      "residual_risk": "A crash after remote acceptance but before local result persistence remains fail-closed for manual reconciliation; it cannot issue a duplicate with the same local active attempt. Provider-enabled recovery is outside P5A."
+    },
+    {
+      "classification": "DEFERRED_POST_MVP",
+      "issue": "Production provider capability is absent.",
+      "chosen_correction": "Select a no-SDK fail-closed provider by default and expose provider-unavailable state without creating an attempt.",
+      "source_sha": "e9af2a5a45dda68fa3ea3498855d1438d8c717aa",
+      "proof": "Migrated PostgreSQL acceptance recorded one capability read and zero create/read/reversal methods or transfer attempts.",
+      "residual_risk": "Provider-enabled P6 requires separate authority."
+    }
+  ]
+}

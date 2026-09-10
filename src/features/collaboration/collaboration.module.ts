@@ -64,7 +64,6 @@ import { CollaborationHomeReadService } from "./services/collaboration-home-read
     CollaborationBriefPackService,
     CollaborationFulfillmentService,
     CollaborationFeedbackService,
-    CollaborationTrustedConfirmationService,
     CollaborationProductionService,
     CollaborationPublishingService,
     CollaborationSettlementService,
@@ -91,6 +90,7 @@ import { CollaborationHomeReadService } from "./services/collaboration-home-read
     CollaborationFeedbackService,
     CollaborationService,
     CollaborationHomeReadService,
+    CollaborationTrustedConfirmationService,
   ],
 })
 export class CollaborationModule {}

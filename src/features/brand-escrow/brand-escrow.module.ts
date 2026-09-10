@@ -110,6 +110,8 @@ import { CollaborationEscrowReserveService } from "./services/collaboration-escr
     RouteReconciliationService,
     BrandReturnService,
     EscrowFundingSourceReconciliationService,
+    EscrowFundingAttributionService,
+    EscrowFinancialAllocationService,
     CollaborationEscrowReserveService,
   ],
 })
