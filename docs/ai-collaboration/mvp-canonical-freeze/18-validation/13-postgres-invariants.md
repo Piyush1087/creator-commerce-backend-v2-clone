@@ -10,7 +10,7 @@ OTP codes appeared in test logs and are **not** recorded here.
 
 | INV | DB | Flag | Result | Notes |
 | --- | --- | --- | --- | --- |
-| INV-01 | `bs12_freeze_auth` | `BS12_DATABASE_TEST=true` | **PASS** 10/10 | `auth-security.postgres.test.ts`. Postmark send failed; OTP still issued off-prod |
+| INV-01 | `bs12_freeze_auth` | `BS12_DATABASE_TEST=true` | **PASS** 10/10 | `auth-security.postgres.test.ts`. RUN 5: Postmark send failed; OTP still issued off-prod. RUN 11: live OTP template send PASS (invalid TemplateId `1` was the RUN 5 cause) |
 | INV-12 | `bs07_freeze_auth` | `BRAND_WORKSPACE_DATABASE_TEST=true` | **PASS** 11/11 | `brand-workspace-authorization.postgres.test.ts`. Hostname `127.0.0.1` accepted |
 | INV-04 | `c05_freeze_team` | `C05_TEAM_DATABASE_TEST=true` | **PASS** 5/5 | `creator-team.postgres.test.ts` |
 | INV-03 | `c01_i2_freeze` | `C01_I2_DATABASE_URL` | **PASS** 29/29 Parent-run 2026-09-09 | Harness ctor aligned to production `(prisma, mail, scan, auth, googleAuth)`. `--testTimeout=30000 --fileParallelism=false --maxWorkers=1`. `thecreatorshop` not touched. |

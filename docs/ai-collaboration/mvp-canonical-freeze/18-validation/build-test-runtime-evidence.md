@@ -24,10 +24,10 @@ Do not declare `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` until remaining ga
 | auth/session regression | PASS postgres INV-01 | plus static/unit | `13-postgres-invariants.md` |
 | RBAC / actor-subject / cross-tenant | PASS postgres INV-04 + INV-12 | | `13-postgres-invariants.md` |
 | responsive shell/navigation smoke | PASS | RUN 8 Parent confirm: UCE cards + Creator viewport | `16-viewport-smoke.md` |
-| provider-unavailable recovery | PARTIAL | Postmark fail observed locally | `12-frontend-backend-smoke.md` |
+| provider-unavailable recovery | PARTIAL | Postmark OTP live send PASS 2026-09-10; IG/Razorpay NOT_RUN | `12-frontend-backend-smoke.md` |
 | compiled/deployable artifact | PASS | FE `dist/`, BE `dist/main.js` | `03` + `05` |
 | clean worktrees | NOT_CLAIMED | do not commit `tmp-*` | |
-| local/remote checkpoint equality | local only | | |
+| local/remote checkpoint equality | Parent asked origin+piyush push of RUN 11 | freeze branch; not development/main |
 
 ## Failure classification vocabulary
 

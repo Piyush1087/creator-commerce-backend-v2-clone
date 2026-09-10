@@ -97,7 +97,7 @@ INV-06 PASS postgres (fresh c03_p14_handoff 34/34 serial, 2026-09-09)
 INV-07 PASS postgres handoff; local collab seed leftover closed RUN 9 (legacy fixture)
 INV-08 PARTIAL (C-05 payout boundary unit)
 INV-09 PARTIAL (C-05 Settings contact proven; fulfillment does not consume that address)
-INV-10 PARTIAL (Postmark fail-closed locally; live IG/Razorpay NOT_RUN)
+INV-10 PARTIAL (Postmark OTP live send PASS 2026-09-10; live IG/Razorpay NOT_RUN)
 INV-11 PARTIAL (Brand Home fail-closed for Creator session)
 INV-12 PASS (unit + postgres 11/11 on bs07_freeze_auth + browser)
 INV-13 FAIL classified; Parent-accepted later schema amendment (same tables as last-accepted C-03 + origin Brand Collab; no drop this freeze)
@@ -131,7 +131,7 @@ Names only. No secret values.
 
 Canonical: `16-external-providers/external-dependency-register.md`
 
-Local smoke: Postmark send failed; OTP still issued because `STAGE` was not `prod`. Production must not log OTP codes.
+Local smoke RUN 4: Postmark send failed (invalid TemplateId `1`); OTP still issued because `STAGE` was not `prod`. RUN 11: OTP template live send **PASS** to Parent-confirmed inboxes. Production must not log OTP codes.
 
 ---
 

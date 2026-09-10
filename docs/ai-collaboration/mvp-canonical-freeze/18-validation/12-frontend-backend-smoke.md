@@ -17,6 +17,8 @@ OTP codes were read from the local Nest non-prod log and **must not** be committ
 
 Local Postmark send failed; OTP issue still succeeded off-prod (code logged, then “Postmark send failed”).
 
+**RUN 11 (2026-09-10):** local Postmark OTP template send **PASS** to Parent-confirmed inboxes. RUN 4 failure was Postmark `422` / code `1101` (TemplateId placeholder `1` not found), not the smoke addresses. Dummy delivery code only; OTP values are not recorded.
+
 ## Unauthenticated (RUN 3 remainder + RUN 4)
 
 | Path | Observed |

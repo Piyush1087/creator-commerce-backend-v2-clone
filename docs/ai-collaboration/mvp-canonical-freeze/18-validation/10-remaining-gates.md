@@ -1,7 +1,7 @@
 # 10 — Remaining §18 gates
 
 **Date:** 2026-09-10  
-**Run:** RUN 5 + RUN 7 INV-03 harness + RUN 8 viewport + RUN 9 local hygiene
+**Run:** RUN 5 + RUN 7 INV-03 harness + RUN 8 viewport + RUN 9 local hygiene + RUN 11 Postmark live send
 
 | Gate | Status | Classification |
 | --- | --- | --- |
@@ -13,10 +13,10 @@
 | auth/session regression | PASS postgres INV-01 | plus RUN 4 static/unit |
 | RBAC / actor-subject / cross-tenant | PASS postgres INV-04 + INV-12 | |
 | responsive shell/navigation smoke | PASS | RUN 8 Parent confirm: UCE table→cards + Creator viewport (`16-viewport-smoke.md`) |
-| provider-unavailable recovery | PARTIAL | Postmark only |
+| provider-unavailable recovery | PARTIAL | Postmark OTP live send **PASS** 2026-09-10; IG/Razorpay **NOT_RUN**. RUN 4 fail was invalid TemplateId (`12-frontend-backend-smoke.md`) |
 | frontend lint | PASS | RUN 4 + clone |
 | backend lint | FAIL | 712 prettier — **Parent-accepted** `PREEXISTING_ACCEPTED_DEBT` (do not `--fix`) |
 | clean worktrees | NOT_CLAIMED | do not commit `tmp-*` / OTP logs |
-| local/remote checkpoint equality | Parent asked origin+piyush push of RUN 10 AWS/hotfix docs | freeze branch only; not `development`/`main` |
+| local/remote checkpoint equality | Parent asked origin+piyush push of RUN 11 Postmark live-send docs | freeze branch only; not `development`/`main` |
 
 `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` is still forbidden.

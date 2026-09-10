@@ -299,7 +299,7 @@ frontend_runtime_acceptance_SHA: c83ab8bab02ace8872a53de81cc8ffe79ccda832
 closeout/docs_SHA: N/A
 current canonical branch/head: freeze/mvp-canonical-application-v1
 status: INFRA retain
-remaining_debt: Postmark fail-closed locally; live DE providers AWS
+remaining_debt: Postmark OTP live send PASS 2026-09-10; live DE providers AWS
 upstream: PLAT-SHARED
 downstream: C-03, BRAND-PREVIEW, BRAND-CENTRE-BI, CHAT-HOME
 ```
