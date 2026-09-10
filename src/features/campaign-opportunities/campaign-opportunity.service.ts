@@ -337,4 +337,85 @@ export class CampaignOpportunityService {
       { timeout: 30_000 },
     );
   }
+
+  async readForHome(
+    user: AuthUser,
+    expected: CreatorWorkspaceActorContext,
+    previewLimit: number,
+  ) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const actor = await this.actors.resolveReadOnlyInTransaction(
+          tx,
+          user,
+          expected.workspaceId,
+        );
+        if (
+          actor.actorUserId !== expected.actorUserId ||
+          actor.actorMembershipId !== expected.actorMembershipId ||
+          actor.subjectCreatorProfileId !== expected.subjectCreatorProfileId
+        ) {
+          throw new Error(
+            "Creator Home actor context changed during opportunity read",
+          );
+        }
+        const now = new Date();
+        const candidates = await tx.uceCampaign.findMany({
+          where: {
+            OR: [
+              {
+                opportunityInvitations: {
+                  some: {
+                    boundCreatorProfileId: actor.subjectCreatorProfileId,
+                    boundCreatorWorkspaceId: actor.workspaceId,
+                    expiresAt: { gt: now },
+                    revokedAt: null,
+                  },
+                },
+              },
+              {
+                ingressTouches: {
+                  some: {
+                    boundCreatorProfileId: actor.subjectCreatorProfileId,
+                    boundCreatorWorkspaceId: actor.workspaceId,
+                    entryAuthorityKind: { in: ["DIRECT", "SHARE"] },
+                  },
+                },
+              },
+              { targeting: { visibilityScope: "ELIGIBLE_ONLY" } },
+            ],
+          },
+          select: { id: true },
+          orderBy: { id: "asc" },
+        });
+        const authorized = [];
+        for (const candidate of candidates) {
+          const projection = await this.project(
+            tx,
+            candidate.id,
+            user,
+            actor,
+            now,
+          );
+          if (projection.state === "AUTHORIZED") authorized.push(projection);
+        }
+        return {
+          exactAuthorizedCount: authorized.length,
+          preview: authorized.slice(0, previewLimit).map((item) => ({
+            id: item.campaign.id,
+            name: item.campaign.name,
+            brand: item.campaign.brand,
+            platforms: item.campaign.platforms,
+            applicationDeadline: item.applicationDeadline,
+            applicationsOpen: item.applicationsOpen,
+            canApply: item.canApply,
+            applyBlockedReason: item.applyBlockedReason,
+          })),
+          truncated: authorized.length > previewLimit,
+          observedAt: now.toISOString(),
+        };
+      },
+      { timeout: 30_000 },
+    );
+  }
 }

@@ -23,6 +23,7 @@ import { NotificationQueryService } from "./services/notification-query.service"
 import { NotificationWorkerService } from "./services/notification-worker.service";
 import { NotificationEmailWorkerService } from "./services/notification-email-worker.service";
 import { NotificationRecipientPolicyService } from "./services/notification-recipient-policy.service";
+import { CreatorHomeNotificationReadService } from "./services/creator-home-notification-read.service";
 
 @Module({
   imports: [
@@ -43,8 +44,13 @@ import { NotificationRecipientPolicyService } from "./services/notification-reci
     NotificationEmailWorkerService,
     NotificationRecipientPolicyService,
     NotificationQueryService,
+    CreatorHomeNotificationReadService,
   ],
-  exports: [NotificationDispatchService, NotificationProcessorService],
+  exports: [
+    NotificationDispatchService,
+    NotificationProcessorService,
+    CreatorHomeNotificationReadService,
+  ],
 })
 export class NotificationsModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

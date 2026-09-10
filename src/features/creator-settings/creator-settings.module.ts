@@ -22,6 +22,7 @@ import { CreatorProfileContactService } from "./services/creator-profile-contact
 import { CreatorSettingsAccessService } from "./services/creator-settings-access.service";
 import { CreatorTeamModule } from "./team/creator-team.module";
 import { CreatorWorkspaceActorService } from "./team/creator-workspace-actor.service";
+import { CreatorSettingsHomeReadService } from "./home/creator-settings-home-read.service";
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { CreatorWorkspaceActorService } from "./team/creator-workspace-actor.ser
     CreatorPayoutSettingsService,
     PrismaCreatorPayoutSettingsRepository,
     CreatorPayoutReadinessCompatibilityAdapter,
+    CreatorSettingsHomeReadService,
     {
       provide: CREATOR_INSTAGRAM_SETTINGS_ACTOR_PORT,
       useExisting: CreatorWorkspaceActorService,
@@ -65,6 +67,7 @@ import { CreatorWorkspaceActorService } from "./team/creator-workspace-actor.ser
     CreatorSettingsAccessService,
     CreatorProfileContactService,
     CreatorTeamModule,
+    CreatorSettingsHomeReadService,
   ],
 })
 export class CreatorSettingsModule {}

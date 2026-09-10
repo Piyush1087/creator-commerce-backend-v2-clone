@@ -24,6 +24,7 @@ import { CreatorBriefPackService } from "./creator-brief-pack.service";
 import { CampaignApplicationsController } from "./campaign-applications.controller";
 import { ApplicationHandoffModule } from "../collaboration/application-handoff.module";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { ApplicationHomeReadService } from "./application-home-read.service";
 
 export function privateApplicationResponse(
   _req: Request,
@@ -52,6 +53,7 @@ export function privateApplicationResponse(
     ApplicationSubmitService,
     ApplicationTerminalService,
     ApplicationHistoryService,
+    ApplicationHomeReadService,
     CreatorBriefPackService,
     CampaignOpportunityPolicyService,
     CanonicalCampaignApplicationReadService,
@@ -60,7 +62,7 @@ export function privateApplicationResponse(
       useClass: CanonicalCampaignOpportunityEligibility,
     },
   ],
-  exports: [ApplicationTerminalService],
+  exports: [ApplicationTerminalService, ApplicationHomeReadService],
 })
 export class CampaignApplicationsModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
