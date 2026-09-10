@@ -14,8 +14,8 @@ Canonical copy. Original RUN 1 file at `../03-legacy-disposition.md` is a pointe
 | Creator Centre / Media Kit / Analytics | DEFERRED | hide routes |
 | Marketplace browse / guest marketplace | OUT_OF_MVP | keep C-03 redirects only |
 | `creator-marketplace` Apply helpers | CANONICAL_PENDING (C-03 mixed folder) | keep module wired |
-| C-02A / C-04 / Brand Payouts v1 | CANONICAL_PENDING_CONVERGENCE | not pulled |
-| Duplicate persistence (UCE collab vs Collaboration) | PREEXISTING_ACCEPTED_DEBT | later schema amendment; no drop this freeze |
+| C-02A / C-04 / Brand Payouts v1 | CANONICAL_ACCEPTED (pulled this amendment) | in freeze lineage |
+| Duplicate persistence (UCE collab vs Collaboration) | COMPETING IN leftover proven | Brand UCE still writes `UceCampaignCollaboration`; no drop |
 | `/brand/intelligence/identity-test` | LEGACY_COMPATIBILITY_ONLY | inbound redirects to Home (RUN 9); page files kept |
 | BE `CoPilotModule` / `CreatorCoPilotModule` | OUT_OF_MVP | still imported; not in nav |
 

@@ -26,12 +26,12 @@
 NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS  = NOT DECLARED THIS FREEZE
 ```
 
-**Parent 2026-09-09:** do not unwire OUT APIs or change prod env in this freeze. Residuals are **AWS_DEV_BLOCKER / PRODUCTION_BLOCKER**:
+**Parent 2026-09-09:** do not delete OUT modules or change prod env in this freeze. Amendment 2026-09-10 fail-closes competing OUT *transitions* (`410`) while leaving modules mounted. Residuals remain **AWS_DEV_BLOCKER / PRODUCTION_BLOCKER**:
 
 1. Production `CREATOR_APPLY_BYPASS_EMAILS` empty (or security authority accepts a named list).
 2. OTP codes never logged when `STAGE=prod`.
-3. OUT APIs (Co-Pilot, Centre, old payout hubs, public marketplace) stay in tree with auth required; accepted as non-product chrome until a later amendment.
-4. §18 auth/RBAC/cross-tenant postgres INV-01/04/12 already PASS.
+3. Competing OUT collab/marketplace command writes are retired `410`. Remaining: Brand UCE second persistence engine (IN), Chat Home HITL campaign/planner intents, unauthenticated public marketplace GET (read-only), Centre media-kit PATCH (OUT writing OUT).
+4. §18 auth/RBAC/cross-tenant postgres INV-01/04/12 already PASS. AWS prod env is still unproven by this worker.
 
 ## Known non-bypass debt
 

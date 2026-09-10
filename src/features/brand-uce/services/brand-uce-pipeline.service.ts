@@ -38,6 +38,7 @@ import {
 } from "../utils/uce-decimal.util";
 import { CollaborationProvisionService } from "../../collaboration/services/collaboration-provision.service";
 import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
+import { retiredUceCampaignCollaborationWrite } from "../utils/uce-campaign-collaboration-write.retired";
 import { BrandUceAccessService } from "./brand-uce-access.service";
 
 const PROSPECT_STATUSES: UceCollabStatus[] = [
@@ -153,6 +154,7 @@ export class BrandUcePipelineService {
     dto: CreateProspectDto,
     actorId: string,
   ) {
+    retiredUceCampaignCollaborationWrite();
     const row = await this.createProspect(
       brandProfileId,
       campaignId,
@@ -183,6 +185,7 @@ export class BrandUcePipelineService {
     dto: CreateProspectDto,
     actorId: string,
   ) {
+    retiredUceCampaignCollaborationWrite();
     await this.access.assertCampaignOwned(brandProfileId, campaignId);
 
     const handle = normalizeInstagramHandle(dto.instagram_handle);
@@ -248,6 +251,7 @@ export class BrandUcePipelineService {
     actorId: string,
     outreachMessage?: string,
   ) {
+    retiredUceCampaignCollaborationWrite();
     const collab = await this.access.assertCollaborationOwned(
       brandProfileId,
       campaignId,
@@ -304,6 +308,7 @@ export class BrandUcePipelineService {
     dto: ApproveApplicantDto,
     actorId: string,
   ) {
+    retiredUceCampaignCollaborationWrite();
     await this.subscriptionCapabilities.assertCapability(
       brandProfileId,
       "COLLABORATION_CREATE",
@@ -430,6 +435,7 @@ export class BrandUcePipelineService {
     dto: RejectApplicantDto,
     actorId: string,
   ) {
+    retiredUceCampaignCollaborationWrite();
     const collab = await this.access.assertCollaborationOwned(
       brandProfileId,
       campaignId,
@@ -473,6 +479,7 @@ export class BrandUcePipelineService {
     dto: AddTrackingDto,
     actorId: string,
   ) {
+    retiredUceCampaignCollaborationWrite();
     const collab = await this.access.assertCollaborationOwned(
       brandProfileId,
       campaignId,
@@ -524,6 +531,7 @@ export class BrandUcePipelineService {
     dto: SubmitContentDraftDto,
     actorId: string,
   ) {
+    retiredUceCampaignCollaborationWrite();
     const collab = await this.access.assertCollaborationOwned(
       brandProfileId,
       campaignId,
@@ -573,6 +581,7 @@ export class BrandUcePipelineService {
     dto: ReviewContentDto,
     actorId: string,
   ) {
+    retiredUceCampaignCollaborationWrite();
     const collab = await this.access.assertCollaborationOwned(
       brandProfileId,
       campaignId,
@@ -648,6 +657,7 @@ export class BrandUcePipelineService {
     dto: PublishLivePostDto,
     actorId: string,
   ) {
+    retiredUceCampaignCollaborationWrite();
     const updated = await this.prisma.$transaction(async (tx) => {
       const row = await tx.uceCampaignCollaboration.update({
         where: { id: collaborationId },
@@ -683,6 +693,7 @@ export class BrandUcePipelineService {
     dto: RecordFulfillmentIssueDto,
     actorId: string,
   ) {
+    retiredUceCampaignCollaborationWrite();
     const collab = await this.access.assertCollaborationOwned(
       brandProfileId,
       campaignId,

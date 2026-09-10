@@ -15,31 +15,23 @@ import {
   UceCampaignStatus,
   UceCollabStatus,
   UceMediaPlatform,
-  UceMilestoneStage,
-  UceNegotiationSubState,
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
 import { ApplicationTerminalService } from "../../campaign-applications/application-terminal.service";
 import { projectApplication } from "../../campaign-applications/application-history.service";
-import { buildPhaseSyncPatch } from "../../../shared/uce/uce-production-phase.util";
 import { CollaborationProvisionService } from "../../collaboration/services/collaboration-provision.service";
 import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
-import { decimalToNumber, splitEscrowQuote } from "../utils/uce-decimal.util";
+import { decimalToNumber } from "../utils/uce-decimal.util";
 import {
   approveApplicationInputSchema,
   rejectApplicationInputSchema,
 } from "../validation/applicants/application.schema";
 import { BrandUceAccessService } from "./brand-uce-access.service";
-import { BrandUcePipelineService } from "./brand-uce-pipeline.service";
 
 function normalizeHandle(handle: string): string {
   return handle.trim().replace(/^@/, "").toLowerCase();
-}
-
-function defaultMilestoneDeadline(days = 14): Date {
-  return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 }
 
 const CANONICAL_HANDOFF_NOT_AVAILABLE =
@@ -79,7 +71,6 @@ export class CampaignApplicationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: BrandUceAccessService,
-    private readonly pipeline: BrandUcePipelineService,
     private readonly collaborationProvision: CollaborationProvisionService,
     private readonly subscriptionCapabilities: SubscriptionCapabilityService,
     @Optional()
@@ -452,60 +443,11 @@ export class CampaignApplicationService {
             ? decimalToNumber(commercials.fixedFeeAmount)
             : decimalToNumber(commercials.negotiableMaxFee);
       }
-      const { advance30Value, balance70Value } = splitEscrowQuote(
-        totalQuote,
-        advancePercent,
-      );
 
       if (product.inventoryCount > 0) {
         await tx.uceCampaignProduct.update({
           where: { id: product.id },
           data: { inventoryCount: { decrement: 1 } },
-        });
-      }
-
-      if (
-        legacyCollab &&
-        (legacyCollab.collabStatus === UceCollabStatus.APPLICANT_PENDING ||
-          legacyCollab.collabStatus === UceCollabStatus.APPLICANT_SHORTLISTED)
-      ) {
-        const milestoneDeadline = defaultMilestoneDeadline(14);
-        await tx.uceCampaignCollaboration.update({
-          where: { id: legacyCollab.id },
-          data: {
-            collabStatus: UceCollabStatus.ACTIVE_WORKFLOW,
-            currentMilestone: UceMilestoneStage.STAGE_1_NEGOTIATION,
-            productId: application.legacyCampaignProductId,
-            totalQuote,
-            advance30Value,
-            balance70Value,
-            negotiationState: UceNegotiationSubState.CREATOR_COUNTER,
-            currentMilestoneDeadline: milestoneDeadline,
-            ...buildPhaseSyncPatch({
-              ...legacyCollab,
-              collabStatus: UceCollabStatus.ACTIVE_WORKFLOW,
-              currentMilestone: UceMilestoneStage.STAGE_1_NEGOTIATION,
-              currentMilestoneDeadline: milestoneDeadline,
-            }),
-          },
-        });
-
-        await tx.uceCollaborationAuditLog.create({
-          data: {
-            collaborationId: legacyCollab.id,
-            stageContext: UceMilestoneStage.STAGE_1_NEGOTIATION,
-            systemEventTag: "APPLICANT_APPROVED",
-            messagePayload: `Creator ${legacyCollab.instagramHandle} approved and Collaboration created`,
-            actorIdentifier: actorId,
-          },
-        });
-
-        await tx.uceCampaignPerformanceAggregate.update({
-          where: { campaignId },
-          data: {
-            totalApplicantsCount: { decrement: 1 },
-            totalActiveCollabsCount: { increment: 1 },
-          },
         });
       }
 
@@ -587,29 +529,8 @@ export class CampaignApplicationService {
       },
     });
 
-    const collab = await this.prisma.uceCampaignCollaboration.findFirst({
-      where: {
-        campaignId,
-        instagramHandle: {
-          equals: application.campaignCreator.socialHandle,
-          mode: "insensitive",
-        },
-      },
-    });
-    if (
-      collab &&
-      (collab.collabStatus === UceCollabStatus.APPLICANT_PENDING ||
-        collab.collabStatus === UceCollabStatus.APPLICANT_SHORTLISTED)
-    ) {
-      await this.pipeline.rejectApplicant(
-        brandProfileId,
-        campaignId,
-        collab.id,
-        { rejection_reason: reason?.trim() || "Rejected" },
-        actorId,
-      );
-    }
-
+    void actorId;
+    void reason;
     return { ok: true, applicationId, status: "REJECTED" as const };
   }
 }

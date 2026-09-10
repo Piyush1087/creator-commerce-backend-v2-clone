@@ -62,7 +62,6 @@ function approvalHarness(claimCount = 1, capabilityError?: Error) {
   const access = {
     assertCampaignOwned: vi.fn().mockResolvedValue({ id: "campaign-1" }),
   };
-  const pipeline = { rejectApplicant: vi.fn() };
   const collaborationProvision = {
     ensureCreatorUserInTransaction: vi.fn().mockResolvedValue("user-1"),
     provisionFromUceApprovalInTransaction: vi.fn().mockResolvedValue({
@@ -82,7 +81,6 @@ function approvalHarness(claimCount = 1, capabilityError?: Error) {
     service: new CampaignApplicationService(
       prisma as never,
       access as never,
-      pipeline as never,
       collaborationProvision as never,
       subscriptionCapabilities as never,
     ),

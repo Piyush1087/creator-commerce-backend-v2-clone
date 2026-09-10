@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  GoneException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -1470,6 +1471,11 @@ export class CoPilotHitlService {
       creatorLabel?: string;
     }) => string;
   }): Promise<HitlConfirmResult> {
+    throw new GoneException({
+      code: "OUT_OF_MVP_COMPETING_TRANSITION_RETIRED",
+      message:
+        "Co-Pilot cannot mutate Collaboration; use canonical Collaboration APIs",
+    });
     const collaborationId = this.parseSelectId(args.staged.collaboration_id);
     const creatorLabel =
       typeof args.staged.creator_label === "string"

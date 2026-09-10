@@ -8,6 +8,7 @@
 | File | Purpose |
 | --- | --- |
 | `cross-module-invariant-suite.md` | Compact high-value invariants with authority + proof + tests + execution |
+| `inv-13-competing-writers.md` | Competing vs retained schema proof (no Prisma drop) |
 | `frontend-proof-files.md` | FE paths per INV |
 | `backend-proof-files.md` | BE paths per INV |
 
@@ -26,7 +27,7 @@ Definition stays here. Execution results: `../18-validation/11-invariant-results
 | Provider fail-closed | YES (INV-10 PARTIAL) |
 | BE authoritative over FE | YES (INV-11 PARTIAL) |
 | Cross-tenant / cross-role | YES (INV-12 PASS) |
-| No duplicate persistence | YES (INV-13 Parent-accepted debt) |
+| No duplicate persistence | YES (INV-13 FAIL classified — Brand UCE second engine remains; OUT collab writes retired) |
 | Each INV: authority + repos/files/tests | YES after 2026-09-09 audit |
 
 ## Verdict

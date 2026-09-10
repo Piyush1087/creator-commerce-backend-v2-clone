@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  GoneException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -35,6 +36,13 @@ export class CreatorCampaignsCommandService {
   ) {}
 
   async claimBrandInvitation(user: AuthUser, input: ClaimBrandInvitationInput) {
+    throw new GoneException({
+      code: "OUT_OF_MVP_COMPETING_TRANSITION_RETIRED",
+      message:
+        "Marketplace command center cannot mutate UceCampaignCollaboration; use canonical Collaboration APIs",
+    });
+    void user;
+    void input;
     const profile = await this.requireCreatorProfile(user);
     const collab = await this.assertOwnedCollaboration(
       input.collaborationId,
@@ -113,6 +121,13 @@ export class CreatorCampaignsCommandService {
     user: AuthUser,
     input: ConfirmLogisticsReceiptInput,
   ) {
+    throw new GoneException({
+      code: "OUT_OF_MVP_COMPETING_TRANSITION_RETIRED",
+      message:
+        "Marketplace command center cannot mutate UceCampaignCollaboration; use canonical Collaboration APIs",
+    });
+    void user;
+    void input;
     const profile = await this.requireCreatorProfile(user);
     const collab = await this.assertOwnedCollaboration(
       input.collaborationId,
@@ -161,6 +176,13 @@ export class CreatorCampaignsCommandService {
   }
 
   async submitContentDraft(user: AuthUser, input: SubmitContentDraftInput) {
+    throw new GoneException({
+      code: "OUT_OF_MVP_COMPETING_TRANSITION_RETIRED",
+      message:
+        "Marketplace command center cannot mutate UceCampaignCollaboration; use canonical Collaboration APIs",
+    });
+    void user;
+    void input;
     const profile = await this.requireCreatorProfile(user);
     const collab = await this.assertOwnedCollaboration(
       input.collaborationId,

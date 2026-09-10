@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  GoneException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -55,6 +56,13 @@ export class CreatorInvitationService {
   }
 
   async claimInvitation(user: AuthUser, token: string) {
+    throw new GoneException({
+      code: "OUT_OF_MVP_COMPETING_TRANSITION_RETIRED",
+      message:
+        "Marketplace invitation claim cannot mutate UceCampaignCollaboration; use canonical C-03 apply",
+    });
+    void user;
+    void token;
     if (user.role !== UserRole.CREATOR) {
       throw new ForbiddenException("Creator access required");
     }

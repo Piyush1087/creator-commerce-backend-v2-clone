@@ -1,7 +1,8 @@
 # Canonical convergence plan (§12)
 
-**Date:** 2026-09-08; audited 2026-09-09  
-**This freeze does not pull deferred accepted modules.**
+**Date:** 2026-09-08; audited 2026-09-09; amendment 2026-09-10  
+**Intermediate freeze did not pull subsequently accepted modules.**  
+**This amendment converges C-04, then C-02A, then Brand Payouts v1 if still missing.**
 
 This is **new-canonical-stack** work on `freeze/mvp-canonical-application-v1`, not legacy-production reconciliation.
 
@@ -116,11 +117,13 @@ Ledger: `../phase-f-execution/execution-ledger.yaml`.
 
 ---
 
-## Later amendment only (do **not** run now)
+## This amendment (run now)
 
-Finite plan if Parent later authorizes deferred pulls. Use **new bounded branches** off freeze (or off snapshot), not force-moving accepted refs.
+Finite plan reconstructed from dummy_tcs C-02A acceptance (Home consumes C-04; C-02A backend already contains C-04 as ancestor). Not copied from the historical email sequence.
 
-### Accepted source SHAs (DEFERRED)
+Use the freeze branch. Do not force-move accepted refs. Do not merge into `development` / `main`.
+
+### Accepted source SHAs (REQUIRES_CONVERGENCE)
 
 ```text
 C-04     BE ec395bf5760b295dddd9c3f7e9c2f05485b6b743
@@ -134,17 +137,18 @@ PAYOUTS  BE a38102fd9662f1654c9572b19913b9e228385b73
 
 Merge-bases vs snapshot: BE C-02A/C-04/Payouts → C-03 `aebeb85f…`; FE C-02A/C-04 → C-03 `82ed3c9e…`; FE Payouts → C-05 `323658d4…`.
 
-### Module ordering (later)
+### Module ordering (reconstructed)
 
 ```text
 C-04 Creator Collaboration (BE+FE)
         ↓
 C-02A Creator Home (replace C-05 /creator/home stub; BE GET /api/v1/creator/home)
         ↓
-Brand Payouts v1 last (do not confuse with old src/features/brand-payouts)
+Brand Payouts v1 if still not an ancestor after C-04
+        (do not confuse with old src/features/brand-payouts)
 ```
 
-C-02A Parent: Home aggregation consumes C-04 lifecycle. **Do not pull C-02A without C-04.** C-02A BE candidate already contains C-04; preserve that ancestry. C-02A adds **no** migration; C-04 adds `20260911125000_c04_brand_payouts_reserve_entitlement_lineage` after current freeze head `20260910…` — review chain before apply.
+C-02A Parent: Home aggregation consumes C-04 lifecycle. **Do not pull C-02A without C-04.** C-02A BE candidate already contains C-04; preserve that ancestry. C-02A adds **no** migration; C-04 adds `20260911125000_c04_brand_payouts_reserve_entitlement_lineage` after current freeze head `20260910…` — review chain before apply. C-06 stays OUT.
 
 ### Shared files likely to collide
 
@@ -157,16 +161,16 @@ C-02A Parent: Home aggregation consumes C-04 lifecycle. **Do not pull C-02A with
 | Prisma | `schema.prisma` + new C-04 migration vs 87-head; INV-13 duplicate tables stay until Parent drop amendment |
 | Notifications | C-02A `creator-home-notification-read.service.ts` |
 
-### Tests after each later block (when authorized)
+### Tests after each block
 
-1. C-04: collab architecture + postgres; empty freeze `node:test` collab suites must not stay the authority.
-2. C-02A: Home contract tests; single `GET /api/v1/creator/home`; joint Home smoke; do not mutate C-04 unread on read.
+1. C-04: `prisma validate` / generate first. Collab architecture + postgres; empty freeze `node:test` collab suites must not stay the authority.
+2. C-02A: Home contract tests; single `GET /api/v1/creator/home`; do not mutate C-04 unread on read.
 3. Payouts: provider-disabled contract; Settings billing/escrow still canonical until Parent says otherwise.
-4. After each: `prisma validate` + disposable migrate; INV-01/04/12; no Prisma drop.
+4. After each: no Prisma drop; Parent runs freeze-DB migrate when schema is valid.
 
-### STOP if a later pull is attempted without a new Parent decision
+### STOP during this amendment
 
-Same as this freeze STOPs, plus: pulling C-02A without C-04; treating Centre files as Home; applying C-04 migration without chain review.
+Same as charter §19, plus: pulling C-02A without C-04; treating Centre files as Home; concatenating Prisma `Collaboration` models; applying C-04 migration to `thecreatorshop`.
 
 ---
 

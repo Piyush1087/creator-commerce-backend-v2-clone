@@ -38,6 +38,14 @@ import { CollaborationDestinationService } from "./services/collaboration-destin
 import { CollaborationBriefPackService } from "./services/collaboration-brief-pack.service";
 import { CollaborationService } from "./services/collaboration.service";
 
+function retiredLegacyCollabTransition(): never {
+  throw new GoneException({
+    code: "OUT_OF_MVP_COMPETING_TRANSITION_RETIRED",
+    message:
+      "Use canonical C-04 fulfillment, production, or publishing APIs",
+  });
+}
+
 @Controller("api/v1/collaboration")
 @UseGuards(ThrottlerGuard, JwtAuthGuard)
 export class CollaborationController {
@@ -237,11 +245,10 @@ export class CollaborationController {
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
     @Body() body: DispatchLogisticsDto,
   ) {
-    return this.collaboration.dispatchLogistics(
-      req.user,
-      collaborationId,
-      body,
-    );
+    void req;
+    void collaborationId;
+    void body;
+    return retiredLegacyCollabTransition();
   }
 
   @Post("threads/:collaborationId/logistics/confirm-receipt")
@@ -249,7 +256,9 @@ export class CollaborationController {
     @Req() req: RequestWithAuthUser,
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
   ) {
-    return this.collaboration.confirmReceipt(req.user, collaborationId);
+    void req;
+    void collaborationId;
+    return retiredLegacyCollabTransition();
   }
 
   @Post("threads/:collaborationId/logistics/report-issue")
@@ -258,11 +267,10 @@ export class CollaborationController {
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
     @Body() body: ReportFulfillmentIssueDto,
   ) {
-    return this.collaboration.reportFulfillmentIssue(
-      req.user,
-      collaborationId,
-      body,
-    );
+    void req;
+    void collaborationId;
+    void body;
+    return retiredLegacyCollabTransition();
   }
 
   @Post("threads/:collaborationId/production/submit")
@@ -271,7 +279,10 @@ export class CollaborationController {
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
     @Body() body: SubmitCollaborationMediaDto,
   ) {
-    return this.collaboration.submitMedia(req.user, collaborationId, body);
+    void req;
+    void collaborationId;
+    void body;
+    return retiredLegacyCollabTransition();
   }
 
   @Post("threads/:collaborationId/production/submit-deliverable")
@@ -316,7 +327,10 @@ export class CollaborationController {
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
     @Body() body: ReviewCollaborationMediaDto,
   ) {
-    return this.collaboration.reviewMedia(req.user, collaborationId, body);
+    void req;
+    void collaborationId;
+    void body;
+    return retiredLegacyCollabTransition();
   }
 
   @Post("threads/:collaborationId/posting/live-url")
@@ -325,7 +339,10 @@ export class CollaborationController {
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
     @Body() body: SubmitLivePostDto,
   ) {
-    return this.collaboration.submitLivePost(req.user, collaborationId, body);
+    void req;
+    void collaborationId;
+    void body;
+    return retiredLegacyCollabTransition();
   }
 
   @Post("threads/:collaborationId/publishing/authorize")
@@ -391,7 +408,9 @@ export class CollaborationController {
     @Req() req: RequestWithAuthUser,
     @Param("collaborationId", ParseUUIDPipe) collaborationId: string,
   ) {
-    return this.collaboration.verifyCompliance(req.user, collaborationId);
+    void req;
+    void collaborationId;
+    return retiredLegacyCollabTransition();
   }
 
   @Post("threads/:collaborationId/feedback/review")

@@ -14,6 +14,6 @@
 | INV-10 | Instagram/Razorpay/Postmark clients; `mail.service.test.ts`; notification provider tests |
 | INV-11 | Controllers/services own mutations; Brand Home `brand-home.postgres.test.ts` |
 | INV-12 | `brand-workspace-authorization.postgres.test.ts`, C-05 team postgres |
-| INV-13 | Prisma duplicates classified in `../14-migration-schema/` |
+| INV-13 | `../phase-d-invariants/inv-13-competing-writers.md`; `src/features/collaboration/out-of-mvp-competing-transition-retired.test.ts` |
 
 OUT modules still imported in `src/app.module.ts` are not invariant targets except “must not be required for MVP journeys”.

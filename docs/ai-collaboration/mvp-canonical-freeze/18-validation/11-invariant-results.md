@@ -15,11 +15,11 @@ OTP codes and secrets are not recorded here.
 | INV-05 | PASS (unit + smoke) | Shell tests + browser hide | Chat architecture test retargeted RUN 9 (no P6 git-diff) |
 | INV-06 | **PASS** postgres (2026-09-09 retry) | Fresh `c03_p14_handoff` 34/34 serial `--testTimeout=30000` | Prior 5s timeouts + dirty-DB count drift were `ENVIRONMENT_BLOCKED`, not product red |
 | INV-07 | **PASS** postgres handoff; local seed leftover closed RUN 9 | Same suite: approval commits `Collaboration` | `scripts/seed-dev-collaboration.ts` now seeds a **legacy** brief-linked fixture (`source_application_id` null). Canonical handoff remains this suite |
-| INV-08 | PARTIAL | C-05 P2 architecture | Brand Payouts v1 / C-06 out |
-| INV-09 | PARTIAL | C-05 Settings contact/shipping unit+architecture PASS (BE 24/24 isolated; Parent reconfirm 2026-09-09 BE contact-phone 8/8 + FE 6/6). Brand Collab fulfillment does **not** read `CreatorShippingAddress`; it stores Brand-entered evidence. Collab `POST creator/shipping-address` is a second writer. C-05 P2 forbids Collaboration business deps. Cross-module *consumption* not proven; not a Brand Payouts pull. | Settings half proven; consumption not in tree |
+| INV-08 | PARTIAL | C-05 P2 architecture + Brand Payouts v1 pulled (provider-disabled). C-06 still OUT |
+| INV-09 | PARTIAL | C-05 Settings contact/shipping unit+architecture PASS (BE 24/24 isolated; Parent reconfirm 2026-09-09 BE contact-phone 8/8 + FE 6/6). Collab `POST creator/shipping-address` is already `410`. C-04 fulfillment still stores Brand-entered evidence, not `CreatorShippingAddress`. |
 | INV-10 | PARTIAL | Postmark OTP template live send **PASS** 2026-09-10 (Parent-confirmed inboxes). RUN 4/postgres “send failed” was invalid TemplateId `1` (422/1101); off-prod OTP still issued from log. | Live IG/Razorpay NOT_RUN |
 | INV-11 | PARTIAL | Browser Brand Home fail-closed for Creator | |
 | INV-12 | PASS (unit + postgres 11/11 + browser) | `brand-workspace-authorization.postgres.test.ts` on `bs07_freeze_auth` | |
-| INV-13 | FAIL classified; **Parent-accepted 2026-09-09** later amendment | Same duplicate tables on C-03 accepted `aebeb85`, origin `development` `cd446fb`, freeze. Canonical C-03 writes `Collaboration`; UCE pipeline leftover. Bank/payout models vs C-05 destinations + C-06/Payouts not pulled. **No Prisma drop this freeze.** | `PREEXISTING_ACCEPTED_DEBT` (was `UNKNOWN_REQUIRES_REVIEW`) |
+| INV-13 | FAIL classified (Pair 1 writers retired) | `UceCampaignCollaboration` writes fail-closed `410` (Brand UCE pipeline, creator-uce apply, marketplace, leftover approve update). Canonical C-03/C-04 still write `Collaboration`. Pair 2 escrow/legacy commercial source writers remain. **No Prisma drop.** Proof: `../phase-d-invariants/inv-13-competing-writers.md` | Pair 1 Parent decision applied; overall INV-13 not PASS |
 
 Postgres commands: `13-postgres-invariants.md`.

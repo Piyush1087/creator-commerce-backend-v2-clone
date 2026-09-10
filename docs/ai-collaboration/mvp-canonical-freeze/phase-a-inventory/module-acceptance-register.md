@@ -54,9 +54,9 @@ Original RUN 1 pointer: `../01-module-acceptance-register.md`.
 | C-05 | Creator Settings + shell | ACCEPTED |
 | C-03 | Campaign Apply | ACCEPTED |
 | NOTIF-DE | Notifications / Data Extraction | INFRA retain |
-| C-02A | Creator Home Foundation | DEFERRED (not pulled) |
-| C-04 | Creator Collaboration | DEFERRED (not pulled) |
-| BRAND-PAYOUTS-V1 | Brand Payouts v1 | DEFERRED (not pulled) |
+| C-02A | Creator Home Foundation | PULLED (IN this amendment) |
+| C-04 | Creator Collaboration | PULLED (IN this amendment) |
+| BRAND-PAYOUTS-V1 | Brand Payouts v1 | PULLED (IN this amendment) |
 | C-06 | Creator Payouts | OUT (not accepted) |
 | MKT | Marketplace | OUT_OF_MVP |
 | COPILOT | Co-Pilot / Creator Co-Pilot | OUT_OF_MVP |
@@ -306,9 +306,11 @@ downstream: C-03, BRAND-PREVIEW, BRAND-CENTRE-BI, CHAT-HOME
 
 ---
 
-## DEFERRED (accepted elsewhere, not pulled)
+## PULLED this amendment (were REQUIRES_CONVERGENCE on the intermediate freeze)
 
-See `../deferred/README.md`. Do not converge in this freeze.
+Amendment 2026-09-10. Intermediate freeze correctly left these unpulled. Architecture review required converging them. They are now ancestors of the freeze working tree. Order was reconstructed from dummy_tcs C-02A acceptance (Home consumes C-04), not copied from the review email.
+
+See `../deferred/README.md`.
 
 ### C-02A
 
@@ -321,9 +323,9 @@ architecture_authority_path: dummy_tcs docs/ai-collaboration/c02a-developer-code
 architecture_authority_SHA: 3ac9895901092e3de2e4e803501b3c0db0aa8c75
 backend_runtime_acceptance_SHA: 4e082f67953f0d6b55fa791f2cea03c8aef28119
 frontend_runtime_acceptance_SHA: 29e78397fc66676d0134c45aa0bb6af173fbe12b
-status: CANONICAL_PENDING_CONVERGENCE / DEFERRED
-remaining_debt: not an ancestor of snapshot; freeze has C-05 `/creator/home` stub only; Centre Home files unmounted (not C-02A); depends on C-04
-upstream: C-04 (Parent note)
+status: PULLED_IN_TREE
+remaining_debt: Centre/Analytics/MediaKit still redirect Home (not remounted as product)
+upstream: C-04
 downstream: Creator Home content
 ```
 
@@ -337,8 +339,8 @@ architecture_authority_path: dummy_tcs origin/c04/stage-b-authority-package-v1 (
 architecture_authority_SHA: 7790864dbd4764b9a4118856e3ca074fb374ce7e
 backend_runtime_acceptance_SHA: ec395bf5760b295dddd9c3f7e9c2f05485b6b743
 frontend_runtime_acceptance_SHA: 106de9988ea2d4bd534205b083f63ae7ecd1878c
-status: CANONICAL_PENDING_CONVERGENCE / DEFERRED
-remaining_debt: empty node:test collab suites on freeze BE; Creator collab route still mounted
+status: PULLED_IN_TREE
+remaining_debt: leftover Brand Collab HTTP retired 410; UceCampaignCollaboration writes retired 410
 upstream: C-03, BRAND-COLLAB
 downstream: C-02A
 ```
@@ -352,8 +354,8 @@ product_authority_path: UNKNOWN_REQUIRES_REVIEW
 architecture_authority_path: UNKNOWN_REQUIRES_REVIEW
 backend_runtime_acceptance_SHA: a38102fd9662f1654c9572b19913b9e228385b73
 frontend_runtime_acceptance_SHA: 25441dd4fd228bec4d6c9fe9f39c2297318b6167
-status: CANONICAL_PENDING_CONVERGENCE / DEFERRED
-remaining_debt: do not treat src/features/brand-payouts as this module
+status: PULLED_IN_TREE
+remaining_debt: provider-disabled; C-06 stays OUT; do not treat old hub as this module
 upstream: BRAND-SETTINGS escrow
 downstream: none in this freeze
 ```

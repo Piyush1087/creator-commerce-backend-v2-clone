@@ -51,7 +51,7 @@ IN: shared platform, Gatekeeper, Brand Preview/Onboarding, Brand Centre + BI P1,
     Brand Campaign/UCE, Brand Collaboration + Phase G, C-01, C-05, C-03,
     notifications/DE as infra
 
-DEFERRED (accepted, not pulled): C-02A, C-04, Brand Payouts v1
+REQUIRES_CONVERGENCE (amendment): C-04, C-02A, Brand Payouts v1
 OUT: C-06, Marketplace, Co-Pilot / Creator Co-Pilot, Creator Centre / Media Kit / Analytics
 PROVIDER_DEFERRED: live Razorpay, Meta App Review
 ```

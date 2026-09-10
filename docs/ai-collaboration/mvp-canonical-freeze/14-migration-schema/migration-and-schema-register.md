@@ -30,7 +30,16 @@ Folder names are unique (no duplicate migration identities). One early folder ha
 | C-03 | `20260910120000_c03_campaign_asset_brief_convergence` … `20260910122000_c03_application_handoff_notifications` |
 | Collaboration Brand | `20260811130000_collaboration_phase_1_foundation` through Phase 4.7 |
 
-Deferred C-02A / C-04 / Brand Payouts v1 migrations are **not** required on this freeze because those modules are not pulled.
+**Freeze branch after C-04 + Brand Payouts pulls (Parent migrate 2026-09-10):**
+
+```text
+MIGRATION_COUNT = 94
+HEAD  = 20260912100000_brand_payouts_wave_b_normal_path
+```
+
+C-04 six-migration chain (M1 overlay is idempotent for freeze DB that already had Brand Collab types) plus Brand Payouts Wave B. Folder names remain unique. **No DROP TABLE.**
+
+Deferred C-02A owns 0 migrations. C-06 migrations are not a pull requirement.
 
 ## Destructive operations
 
@@ -46,8 +55,8 @@ Classify, do not drop this run:
 | --- | --- |
 | `CoPilotThread` `CoPilotMessage` `CoPilotMessageFeedback` `CoPilotSlotSession` `CoPilotInteractionLog` | OUT_OF_MVP |
 | Marketplace-era tables from `20260624120000_creator_marketplace` | OUT_OF_MVP / C-03 mixed |
-| Duplicate collab: `UceCampaignCollaboration*` vs `Collaboration*` | PREEXISTING_ACCEPTED_DEBT (Parent 2026-09-09 later amendment; no drop) |
-| Duplicate money identity: `CreatorBankDetails` vs `CreatorPayoutDestination` vs `CreatorSettlementProfile` | PREEXISTING_ACCEPTED_DEBT (Parent 2026-09-09; C-06 / Brand Payouts v1 not pulled) |
+| Duplicate collab: `UceCampaignCollaboration*` vs `Collaboration*` | COMPETING IN leftover (Brand UCE pipeline). Proof: `../phase-d-invariants/inv-13-competing-writers.md`. No drop |
+| Duplicate money identity: `CreatorBankDetails` vs `CreatorPayoutDestination` vs `CreatorSettlementProfile` | Bank HTTP `410`; C-05 writes destinations. Settlement retained. No drop |
 
 ## Prisma validate (this run)
 

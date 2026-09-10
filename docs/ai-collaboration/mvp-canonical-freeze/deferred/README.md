@@ -1,11 +1,12 @@
-# Deferred (accepted elsewhere, not pulled)
+# Subsequently accepted modules
 
-Parent lock 2026-09-08. These modules are **accepted** but **not** part of this freeze lineage.
+Amendment 2026-09-10 pulled the review's subsequent set onto `freeze/mvp-canonical-application-v1`. This folder is no longer a pull queue.
 
-| Module | Bring-back SHAs | Notes |
+| Module | Freeze status | Notes |
 | --- | --- | --- |
-| C-02A Creator Home Foundation | BE `4e082f67953f0d6b55fa791f2cea03c8aef28119` / FE `29e78397fc66676d0134c45aa0bb6af173fbe12b` | **Not partly pulled.** Freeze has the `/creator/home` C-05 stub only. Accepted `src/features/creator-home` + `GET /api/v1/creator/home` are absent. Unmounted Creator Centre Home UI is **not** C-02A. Pull later requires C-04 ancestry. |
-| C-04 Creator Collaboration | dummy_tcs `origin/c04/stage-b-authority-package-v1`; BE `ec395bf5760b295dddd9c3f7e9c2f05485b6b743` / FE `106de9988ea2d4bd534205b083f63ae7ecd1878c` | Brand Collaboration stays on this freeze. C-02A depends on C-04 |
-| Brand Payouts v1 (provider-disabled) | BE `a38102fd9662f1654c9572b19913b9e228385b73` / FE `25441dd4fd228bec4d6c9fe9f39c2297318b6167` | Do not treat old `src/features/brand-payouts` as this module. Settings escrow/billing stay |
+| C-04 Creator Collaboration | PULLED | Parent freeze-DB applied C-04 migrations (idempotent M1 overlay) |
+| C-02A Creator Home Foundation | PULLED | `/creator/home` → `CreatorHomePage`; Centre/Analytics/MediaKit still redirect Home |
+| Brand Payouts v1 | PULLED | `/brand/payouts` accepted page + Wave B migration applied. Not old hub. Not C-06 |
+| C-06 Creator Payouts | OUT | Stays out until dummy_tcs accepted authority exists |
 
-Docs for these packs are not deleted from the product repos. Later freeze amendment may move copies here.
+Runtime acceptance SHAs used for the pulls remain in `../phase-a-inventory/module-acceptance-register.md`.

@@ -33,7 +33,7 @@ exit 1
 
 Clusters (not freeze-hide):
 
-- **14 collaboration `*.test.ts` files:** `Error: No test suite found`. Files use `node:test`, not Vitest, and C-04 is not pulled. **Parent-accepted 2026-09-09** `STALE_TEST_PROVEN`. Re-prove on the **future C-04 handoff / freeze amendment** — do not pull C-04 into this freeze.
+- **14 collaboration `*.test.ts` files:** `Error: No test suite found`. Files use `node:test`, not Vitest. **Still STALE_TEST_PROVEN after C-04 pull** (amendment 2026-09-10 re-ran fulfillment/production/publishing under vitest: TAP side-effects ran, vitest still reports 0 suites). Do not greenwash as C-04 product red. Convert-or-re-prove is a later test-infra decision.
 - **C-03 CORS** (`src/c03-idempotency-cors.test.ts`): farm `ECONNRESET`. Parent isolated 2026-09-09 **5/5 PASS** (~13s). Farm = `ENVIRONMENT_BLOCKED`.
 - **Brief Pack** (`creator-brief-pack.test.ts`): farm 5s timeout. Parent isolated 2026-09-09 **1/1 PASS** (~12s). Farm = `ENVIRONMENT_BLOCKED`.
 - **Brand Preview artifacts:** farm 5s timeout. Isolated earlier **4/4 PASS**. Farm = `ENVIRONMENT_BLOCKED`.

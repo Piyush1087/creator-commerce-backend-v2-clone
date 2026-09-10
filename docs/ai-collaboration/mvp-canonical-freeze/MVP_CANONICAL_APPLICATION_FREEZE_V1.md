@@ -59,7 +59,8 @@ IN: shared platform, Gatekeeper, Brand Preview/Onboarding, Brand Centre + BI P1,
     Brand Campaign/UCE, Brand Collaboration + Phase G, C-01, C-05, C-03,
     notifications/DE as infra
 
-DEFERRED (accepted, not pulled): C-02A, C-04, Brand Payouts v1
+DEFERRED: none remaining from the review subsequent set
+PULLED this amendment: C-02A, C-04, Brand Payouts v1
 OUT: C-06, Marketplace, Co-Pilot / Creator Co-Pilot, Creator Centre / Media Kit / Analytics
 PROVIDER_DEFERRED: live Razorpay, Meta App Review
 ```
@@ -70,7 +71,7 @@ PROVIDER_DEFERRED: live Razorpay, Meta App Review
 
 Canonical: `phase-b-lineage/canonical-source-register.md`
 
-Accepted modules are ancestors of the development snapshot. C-02A / C-04 / Brand Payouts v1 remain `REQUIRES_CONVERGENCE` later and were **not** pulled.
+Accepted modules are ancestors of the freeze working tree after this amendment's C-04 / C-02A / Brand Payouts v1 pulls. C-06 remains OUT.
 
 ---
 
@@ -100,7 +101,7 @@ INV-09 PARTIAL (C-05 Settings contact proven; fulfillment does not consume that 
 INV-10 PARTIAL (Postmark OTP live send PASS 2026-09-10; live IG/Razorpay NOT_RUN)
 INV-11 PARTIAL (Brand Home fail-closed for Creator session)
 INV-12 PASS (unit + postgres 11/11 on bs07_freeze_auth + browser)
-INV-13 FAIL classified; Parent-accepted later schema amendment (same tables as last-accepted C-03 + origin Brand Collab; no drop this freeze)
+INV-13 FAIL classified (Pair 1 UceCampaignCollaboration writes retired; leftover commercial-table source writers remain). No Prisma drop.
 ```
 
 ---
@@ -110,11 +111,11 @@ INV-13 FAIL classified; Parent-accepted later schema amendment (same tables as l
 Canonical: `14-migration-schema/migration-and-schema-register.md`
 
 ```text
-MIGRATION_COUNT = 87
-HEAD = 20260910122000_c03_application_handoff_notifications
-FRESH_DB = freeze_mvp_canonical_v1  0→head PASS 87/87
+MIGRATION_COUNT = 94
+HEAD = 20260912100000_brand_payouts_wave_b_normal_path
+FRESH_DB = freeze_mvp_canonical_v1  Parent applied C-04 overlay + Payouts Wave B (94 migrations)
 thecreatorshop = NOT MIGRATED
-PRISMA VALIDATE = PASS
+PRISMA VALIDATE = PASS (re-run this amendment)
 SCHEMA DROP / Prisma table drop for OUT models = NOT THIS FREEZE
 ```
 
@@ -147,7 +148,7 @@ NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS  = NOT DECLARED THIS FREEZE
 
 1. Production `CREATOR_APPLY_BYPASS_EMAILS` empty (or security authority named list) — **AWS / prod worker**.
 2. OTP codes never logged when `STAGE=prod` — **AWS worker must prove**.
-3. OUT APIs remain in tree with auth required; hidden from product chrome. Explicitly accepted as non-product until a later amendment. **Do not unwire in this freeze.**
+3. Competing OUT collab/marketplace command writes retired `410` this amendment. Modules stay mounted. Remaining: Brand UCE second engine, Chat Home HITL campaign/planner, public marketplace GET (read-only), Centre media-kit PATCH.
 4. §18 auth/RBAC/cross-tenant postgres INV-01/04/12 PASS.
 
 This freeze still does **not** declare `NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS` or `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1`.
@@ -181,15 +182,15 @@ full BE npm test FAIL 18/7170 classified; CORS/brief-pack/Gatekeeper isolated PA
 
 ## KNOWN_DEBT
 
-- C-02A / C-04 / Brand Payouts v1 not pulled (Parent lock).
-- C-06, Marketplace, Co-Pilot, Creator Centre hidden, APIs/schema still in tree.
-- INV-13 duplicate persistence — **Parent-accepted 2026-09-09** later amendment (present on C-03 `aebeb85` and origin `development`). No Prisma drop this freeze.
+- C-02A / C-04 / Brand Payouts v1 **pulled** this amendment (not freeze PASS).
+- C-06, Marketplace, Co-Pilot, Creator Centre hidden; competing OUT collab/marketplace command writes retired `410`; modules/schema still in tree.
+- INV-13 Pair 1 `UceCampaignCollaboration` writes retired `410`. Writer proof: `phase-d-invariants/inv-13-competing-writers.md`. No Prisma drop. Pair 2 leftover commercial source writers remain.
 - `db:seed:dev-creator` does not create an ACTIVE Creator organization (OTP ineligible).
 - BE prettier farm (712) — Parent: do not `--fix`.
 - Chunk-size FE build warning.
 - FE `authAuthorizationHeader` helper — **closed RUN 12** (Brand Centre/UCE use `authenticatedFetch`; helper removed).
 - Unused FE Brand withdrawal contract types deleted 2026-09-09; backend withdrawal-account API still present.
-- BE financial-producer / route-payout architecture greps vs deferred Brand Payouts v1 / C-04.
+- BE financial-producer / route-payout architecture greps — re-prove after Payouts pull (this amendment's targeted unit tests, not full farm).
 - Clone `npm run build` does not run `prisma generate`; nest build under CPU contention was killed.
 
 ---
@@ -209,7 +210,7 @@ This worker did **not** inspect AWS. From registers, AWS-dev cannot be treated a
 
 - Same as AWS-dev plus `STAGE=prod`, no OTP logging, empty apply-bypass, live Razorpay/Meta App Review still `PROVIDER_DEFERRED`.
 - Production data reconciliation unknown (`PRODUCTION_DB_STATE_UNKNOWN`).
-- OUT APIs still reachable if called.
+- Competing OUT collab/marketplace command writes retired `410`. Remaining callable: Brand UCE second engine, Chat Home HITL campaign/planner, public marketplace GET, Centre media-kit PATCH.
 - Parent has not authorized production release.
 
 ---

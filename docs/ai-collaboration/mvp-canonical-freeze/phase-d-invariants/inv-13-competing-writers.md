@@ -1,0 +1,40 @@
+# INV-13 — competing runtime writers vs retained schema
+
+**Date:** 2026-09-10  
+**Amendment:** prove duplicate models; silent Prisma drop is forbidden  
+**Result:** Pair 1 closed (UceCampaignCollaboration writes retired). Overall still **FAIL classified** for leftover commercial-table source writers. No Prisma drop.
+
+```text
+competing runtime writer     = live service still creates/updates the non-canonical model
+harmless retained schema     = table/model remains; no canonical journey writes it
+retired competing transition = HTTP/service throw before write; table may remain
+silent Prisma drop           = FORBIDDEN this amendment
+```
+
+## Pair 1 — Collaboration identity
+
+| Model | Disposition | Proof |
+| --- | --- | --- |
+| `Collaboration` | Canonical (C-03 handoff, C-04) | `approved-application-collaboration.service.ts` `collaboration-provision.service.ts` create |
+| `UceCampaignCollaboration` | Harmless retained schema | Parent 2026-09-10: stop writing. Brand UCE pipeline mutations, creator-uce apply, marketplace command/invite, and C-03 approve leftover update are `410` (`UCE_CAMPAIGN_COLLABORATION_WRITE_RETIRED` / `OUT_OF_MVP_COMPETING_TRANSITION_RETIRED`). Reads remain. Table not dropped |
+
+Canonical Brand application approve still provisions `Collaboration`. It may *read* a leftover UCE row id for compatibility linking (`ucePipelineCollaborationId`). It does not update/create `UceCampaignCollaboration`.
+
+## Pair 2 — Commercial / logistics / media aggregates
+
+| Model | Disposition | Proof |
+| --- | --- | --- |
+| `CollaborationCommercialAgreement` | Canonical C-04 | `collaboration-negotiation.service.ts` `collaboration-securement.service.ts` |
+| `CollaborationCommercial` `CollaborationLogistics` `CollaborationMedia` `CollaborationFinalization` | Retained schema; canonical rows DB-guarded; leftover HTTP retired | Trigger `c04_prevent_canonical_legacy_write` on `CANONICAL_V1` rows. Source writers remain in `collaboration.service.ts` and `brand-escrow-computation.service.ts`. HTTP leftovers now `410` |
+
+## Pair 3 — Creator money identity
+
+| Model | Disposition | Proof |
+| --- | --- | --- |
+| `CreatorPayoutDestination` | Canonical C-05 | `prisma-creator-payout-settings.repository.ts` |
+| `CreatorBankDetails` | Harmless retained schema | `POST /api/v1/collaboration/creator/bank-details` is already `410` |
+| `CreatorSettlementProfile` | Retained / mixed leftover | Not C-05 P1D writer. Do not drop |
+
+## What this amendment did not drop
+
+No `DROP TABLE`. Co-Pilot tables, marketplace-era tables, and the duplicate collab/money models remain.

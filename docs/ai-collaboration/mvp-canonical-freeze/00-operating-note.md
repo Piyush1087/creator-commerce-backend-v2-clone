@@ -12,17 +12,19 @@ Each charter step has its **own folder** under this directory. Do not commit `tm
 ## Locked Parent decisions (2026-09-08)
 
 ```text
-C-02A Creator Home Foundation     DEFERRED (accepted, not pulled)
-C-04 Creator Collaboration        DEFERRED (accepted, not pulled)
-Brand Payouts v1                  DEFERRED (accepted provider-disabled, not pulled)
+C-02A Creator Home Foundation     PULLED this amendment (accepted)
+C-04 Creator Collaboration        PULLED this amendment (accepted)
+Brand Payouts v1                  PULLED this amendment (provider-disabled)
 C-06 Creator Payouts              OUT of this freeze (still in progress)
 Marketplace                       OUT_OF_MVP
-Co-Pilot / Creator Co-Pilot       OUT_OF_MVP
-Creator Centre / Media Kit        DEFERRED (C-02A deferral)
+Co-Pilot / Creator Co-Pilot       OUT_OF_MVP (collab HITL mutations retired)
+Creator Centre / Media Kit        OUT / deferred product (routes redirect Home)
 Live Razorpay / Meta App Review   PROVIDER_DEFERRED
 ```
 
-Backend Co-Pilot / Centre / old payout modules remain imported (`src/app.module.ts`). Hide was frontend chrome. Schema drop is not this checkpoint.
+Parent 2026-09-08 correctly left C-02A / C-04 / Payouts unpulled on the intermediate freeze. Architecture review 2026-09-10 requires this amendment to converge them. C-06 stays OUT.
+
+Backend Co-Pilot / Centre / C-06 modules remain imported (`src/app.module.ts`). Competing OUT mutations are fail-closed `410`; chrome hide alone is not proof. Schema drop is not this checkpoint.
 
 ## Snapshot SHAs (do not treat as freeze SHAs)
 

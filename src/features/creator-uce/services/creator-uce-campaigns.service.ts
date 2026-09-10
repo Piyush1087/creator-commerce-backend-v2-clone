@@ -25,7 +25,7 @@ import { isInvitedCollaboration } from "../../creator-marketplace/utils/visibili
 import type { CreatorApplyToCampaignDto } from "../dto/creator-apply.dto";
 import { normalizeInstagramHandle } from "../../brand-uce/utils/instagram-handle.util";
 import { decimalToNumber } from "../../brand-uce/utils/uce-decimal.util";
-import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
+import { retiredUceCampaignCollaborationWrite } from "../../brand-uce/utils/uce-campaign-collaboration-write.retired";
 
 type AuthUser = { id: string; email: string; role: UserRole };
 
@@ -105,6 +105,7 @@ export class CreatorUceCampaignsService {
     campaignId: string,
     dto: CreatorApplyToCampaignDto,
   ) {
+    retiredUceCampaignCollaborationWrite();
     this.assertCreator(user);
 
     const profile = await this.prisma.creatorProfile.findUnique({
