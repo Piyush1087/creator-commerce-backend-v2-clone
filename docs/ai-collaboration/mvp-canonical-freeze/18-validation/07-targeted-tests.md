@@ -113,4 +113,54 @@ BE  npm run lint:eslint
     PASS classified (prettier plugin off; exit 0)
 ```
 
+### INV-09 reclassification — 2026-09-11 (later)
+
+C-04 destination `confirmDefault` already consumed `CreatorShippingAddress` (snapshot onto `CollaborationDeliveryDestination`; fulfillment gates on that snapshot). The earlier PARTIAL grepped `collaboration-fulfillment.service.ts` only. Static test rewritten to prove that path. **PASS classified.** Do not invent a live fulfillment join.
+
+```text
+BE  npx vitest run src/features/collaboration/inv-09-shipping-disposition.static.test.ts
+    PASS 3/3
+```
+
+### creator-dev security env — 2026-09-11
+
+Read-only `aws` profile `creator-dev`. No deploy. No creator-prod. OTP codes not recorded.
+
+```text
+sts account                         841162679642
+ecs service api                     desired=1 running=1  task :232
+STAGE                               dev
+CREATOR_APPLY_BYPASS_EMAILS         test@creator.com
+mock OTP flag names                 absent
+health/live                         HTTP 200
+CloudWatch [OTP]                    events present (codes not copied)
+NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS DECLARED (this bound only)
+```
+
+### Parent reconfirm — INV-09 / C-04 destination / auth security — 2026-09-11 16:50
+
+Parent-run after INV-09 static rewrite. Isolated vitest only. No postgres. No full farm.
+
+```text
+BE  npx vitest run --config vitest.config.ts
+      src/features/collaboration/inv-09-shipping-disposition.static.test.ts
+    PASS 1 file / 3 tests
+
+BE  npx vitest run --config vitest.config.ts
+      src/features/collaboration/c04-runtime.test.ts
+      src/features/collaboration/services/collaboration-fulfillment.test.ts
+    PASS 2 files / 15 tests
+
+BE  npx vitest run --config vitest.config.ts
+      src/features/auth/auth-security.static.test.ts
+      src/features/auth/auth-security.unit.test.ts
+    PASS 2 files / 14 tests
+
+FE  npx vitest run --config vitest.config.ts
+      src/features/collaboration/c04-frontend.test.ts
+    PASS 1 file / 6 tests
+```
+
+C-04 destination postgres (`C04_B2_DATABASE_TEST` / `c04_b2_runtime_20260906`) was **not** re-run. Wave B postgres and full `npm test` farms were **not** re-run.
+
 Per-INV mapping: `11-invariant-results.md`.

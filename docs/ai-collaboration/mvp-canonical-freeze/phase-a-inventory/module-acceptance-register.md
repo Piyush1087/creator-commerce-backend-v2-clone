@@ -224,7 +224,7 @@ frontend_runtime_acceptance_SHA: 591abd3ad51c7d763df9e4c71b1998e2bba52d09
 closeout/docs_SHA: UNKNOWN_REQUIRES_REVIEW
 current canonical branch/head: freeze/mvp-canonical-application-v1
 status: ACCEPTED WITH DEBT
-remaining_debt: INV-13 leftover journey writers retired 410 (tables retained); INV-09 fulfillment does not consume CreatorShippingAddress; C-04 PULLED this amendment
+remaining_debt: INV-13 leftover journey writers retired 410 (tables retained); INV-09 destination consumption PASS classified; C-04 PULLED this amendment
 upstream: BRAND-UCE, C-03, PLAT-SHARED
 downstream: Creator collab UI mounted via C-04
 ```
@@ -262,7 +262,7 @@ backend_runtime_acceptance_SHA: 156d5834266077be7e2b6a2d459bae5489edbbd6
 frontend_runtime_acceptance_SHA: 323658d4b147b95b5629ff8d91fa90b8fe9077e4
 current canonical branch/head: freeze/mvp-canonical-application-v1
 status: ACCEPTED
-remaining_debt: INV-09 C-04 fulfillment still does not consume CreatorShippingAddress; Home is C-02A (pulled)
+remaining_debt: INV-09 destination consumption PASS classified; Home is C-02A (pulled)
 upstream: C-01, PLAT-SHARED
 downstream: C-03 nav, Creator Settings
 ```

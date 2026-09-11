@@ -10,7 +10,7 @@
 | INV-06 | `src/features/campaign-applications/*`, `src/features/brand-uce/persistence/c03-p11*.postgres.test.ts` |
 | INV-07 | `src/features/campaign-applications/application-handoff.postgres.test.ts`, collaboration handoff services |
 | INV-08 | `src/features/brand-escrow/*`, collaboration settlement models — not Brand Payouts v1, not C-06 |
-| INV-09 | C-05 profile/contact controllers. Collaboration `collaboration-creator-profile.service.ts` writes its own shipping evidence (not C-05 `CreatorShippingAddress` consumption) |
+| INV-09 | C-05 profile/contact controllers. Leftover collab shipping writer `410`. C-04 `collaboration-destination.service.ts` reads `CreatorShippingAddress`; fulfillment gates on `CollaborationDeliveryDestination`. Proof: `inv-09-shipping-disposition.static.test.ts` |
 | INV-10 | Instagram/Razorpay/Postmark clients; `mail.service.test.ts`; notification provider tests |
 | INV-11 | Controllers/services own mutations; Brand Home `brand-home.postgres.test.ts` |
 | INV-12 | `brand-workspace-authorization.postgres.test.ts`, C-05 team postgres |

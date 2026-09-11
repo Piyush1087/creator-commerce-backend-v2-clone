@@ -80,7 +80,7 @@ When a later accepted module lands, reconstruct order from current dummy_tcs aut
 3 INV-13 leftover journey writers    = PASS classified (tables retained; no Prisma drop)
 4 OUT competing transitions          = retired 410 where canonical C-04/C-03 already owns the write
   leftover collab POST creator/shipping-address HTTP + service = 410 (Settings owns contact)
-5 NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS = NOT DECLARED (AWS creator-dev later; not creator-prod)
+5 NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS = DECLARED 2026-09-11 (freeze source + live creator-dev ECS; not freeze PASS; not creator-prod)
 6 affected gates                     = PARTIAL
   INV-11 PASS classified (accepted IN clients)
   local smoke PASS 2026-09-11
@@ -88,8 +88,9 @@ When a later accepted module lands, reconstruct order from current dummy_tcs aut
   npm run lint:eslint (prettier plugin off) = PASS classified 2026-09-11
   BE prettier/prettier 712 remains ACCEPTED (do not --fix)
   INV-08 left for C-06
-  INV-09 consumption of CreatorShippingAddress still PARTIAL (do not invent C-04 wiring)
-7 immutable SHA pair                 = checkpoint after this push; still not freeze PASS
+  INV-09 PASS classified (C-04 destination confirmDefault snapshots CreatorShippingAddress; leftover shipping 410)
+  Parent 2026-09-11 16:50: BE INV-09 3/3, c04-runtime+fulfillment 15/15, auth-security 14/14; FE c04-frontend 6/6
+7 immutable SHA pair                 = this freeze-branch dual-push; still not freeze PASS
 
 C-04 collab node:test STALE_TEST_PROVEN = CLOSED
   14 files / 106 tests PASS under Vitest (harnesses retargeted to current constructors)
@@ -693,13 +694,14 @@ Do not weaken tests merely to accommodate an unsafe destination implementation.
 
 ### Amendment — security declaration
 
-The intermediate artifact correctly left:
+The intermediate artifact correctly left the sentence undeclared until AWS-dev proof. Live creator-dev read 2026-09-11:
 
 ```text
-NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS = NOT DECLARED THIS FREEZE
+NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS = DECLARED 2026-09-11
+  bound = freeze source + live creator-dev ECS env
 ```
 
-This amendment may not declare PASS without that posture. Empty apply-bypass and no OTP logs on `STAGE=prod` remain production gates. AWS **dev** proof uses `creator-dev` / `STAGE=dev` (OTP `[OTP]` logs required for testers). Competing leftover collab shipping writes are retired `410`. Remaining: Brand UCE second persistence engine (IN), Chat Home HITL campaign/planner intents, unauthenticated public marketplace GET (read-only), Centre media-kit PATCH (OUT writing OUT).
+That is not freeze PASS and not creator-prod. Live ECS `STAGE=dev`; `[OTP]` CloudWatch events present (codes not recorded); `CREATOR_APPLY_BYPASS_EMAILS=test@creator.com` is the named AWS-dev targeting list (not login). Empty apply-bypass and no OTP logs on `STAGE=prod` remain **future prod-deploy** gates. Competing leftover collab shipping writes are retired `410`. Remaining callable leftovers that are not login bypasses: Brand UCE second persistence engine (IN), Chat Home HITL campaign/planner intents, unauthenticated public marketplace GET (read-only), Centre media-kit PATCH (OUT writing OUT).
 
 ---
 
@@ -816,7 +818,7 @@ BE `prettier/prettier` 712 is **accepted this freeze** (`PREEXISTING_ACCEPTED_DE
 
 C-04 collab files previously classified `STALE_TEST_PROVEN` (`node:test`, vitest 0 suites) are **re-proven** this amendment: Vitest **14 files / 106 tests PASS**. Harnesses were retargeted to the current C-04 / Brand Payouts constructors (projection outbox, advisory lock, payouts lineage, retired Manual rail). That classification does not automatically clear other STALE / ENVIRONMENT_BLOCKED farms.
 
-When a subsequent accepted module is pulled, apply the same rule: empty or stale suites owned by that module must be re-proven after it is in lineage. INV-08 stays PARTIAL until C-06. INV-09 leftover collab shipping HTTP/service is retired `410`; C-04 fulfillment still does not consume `CreatorShippingAddress` (do not invent that wiring). INV-11 accepted-IN clients are PASS classified. INV-13 leftover journey writers are PASS classified (tables retained).
+When a subsequent accepted module is pulled, apply the same rule: empty or stale suites owned by that module must be re-proven after it is in lineage. INV-08 stays PARTIAL until C-06. INV-09 leftover collab shipping HTTP/service is retired `410`; C-04 destination `confirmDefault` consumes `CreatorShippingAddress` (snapshot onto `CollaborationDeliveryDestination`; fulfillment gates on that snapshot). Do not invent a live fulfillment join. INV-11 accepted-IN clients are PASS classified. INV-13 leftover journey writers are PASS classified (tables retained).
 
 ---
 
@@ -1031,7 +1033,7 @@ If AWS later discovers a software inconsistency that changes the frozen applicat
 
 ### Amendment — completion vs PASS
 
-This amendment is **not** complete, and **not** PASS, until remaining review items 5–7 are closed with durable evidence (security declaration, affected smoke/farms as required, one origin-published SHA pair). Items 1–4 of the review remaining-work list are closed or classified as this amendment records. Classification of prettier/farm debt is not clearance. AWS remains a downstream worker.
+This amendment is **not** complete, and **not** PASS, until remaining review items 6–7 are closed with durable evidence (affected smoke/farms as required, one origin-published SHA pair). Item 5 (security sentence) is DECLARED 2026-09-11 for freeze source + live creator-dev ECS env. Items 1–4 of the review remaining-work list are closed or classified as this amendment records. Classification of prettier/farm debt is not clearance. AWS deploy of freeze SHAs remains a downstream worker.
 
 ---
 

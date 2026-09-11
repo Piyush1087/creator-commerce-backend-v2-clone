@@ -12,7 +12,7 @@ Freeze-branch FE files. Execution: `../18-validation/11-invariant-results.md`.
 | INV-06 | `src/pages/creator/campaigns/c03-pages.tsx`, `src/features/creator-campaigns/*` |
 | INV-07 | `src/features/collaboration/components/CollaborationRouteGuard.tsx`, `src/pages/brand/collaborations/*`, `src/pages/creator/collaborations/creator-collaborations-page.tsx` |
 | INV-08 | Brand Settings billing/escrow pages; not Brand Payouts hub |
-| INV-09 | `src/features/settings/components/creator/creator-profile-contact-settings.tsx`, `src/features/settings/contracts/creator-settings.contracts.ts` |
+| INV-09 | `src/features/settings/components/creator/creator-profile-contact-settings.tsx`, `src/features/collaboration/components/execution/PhysicalDestinationPanel.tsx`, `src/features/collaboration/c04-frontend.test.ts` |
 | INV-10 | No FE provider success simulation in auth/OTP clients |
 | INV-11 | Feature `src/features/*/api/` clients; `src/features/chat/chat-architecture.test.ts`; `src/features/brand-dashboard/brand-home-architecture.test.ts` |
 | INV-12 | `require-auth.tsx`, `getHomeRouteForRole` in `src/features/auth/constants.ts` |

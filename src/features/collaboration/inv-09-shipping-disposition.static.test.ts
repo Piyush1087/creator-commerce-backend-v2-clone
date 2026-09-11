@@ -47,11 +47,19 @@ describe("INV-09 leftover collab shipping vs C-05 contact", () => {
     ).rejects.toBeInstanceOf(GoneException);
   });
 
-  it("does not let C-04 fulfillment consume CreatorShippingAddress", () => {
+  it("C-04 destination confirmDefault snapshots CreatorShippingAddress; fulfillment gates on that snapshot", () => {
+    const destination = read(
+      "src/features/collaboration/services/collaboration-destination.service.ts",
+    );
+    expect(destination).toContain("tx.creatorShippingAddress.findFirst");
+    expect(destination).toContain("C05_DEFAULT");
+    expect(destination).toContain("collaborationDeliveryDestination.create");
+
     const fulfillment = read(
       "src/features/collaboration/services/collaboration-fulfillment.service.ts",
     );
-    expect(fulfillment).not.toContain("CreatorShippingAddress");
+    expect(fulfillment).toContain("DESTINATION_REQUIRED");
+    expect(fulfillment).toContain("deliveryDestination");
     expect(fulfillment).not.toContain("creatorShippingAddress");
   });
 });

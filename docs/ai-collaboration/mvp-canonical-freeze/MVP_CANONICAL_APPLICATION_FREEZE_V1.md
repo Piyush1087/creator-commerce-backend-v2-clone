@@ -97,7 +97,7 @@ INV-05 PASS (unit + smoke; Chat architecture test retargeted RUN 9)
 INV-06 PASS postgres (fresh c03_p14_handoff 34/34 serial, 2026-09-09)
 INV-07 PASS postgres handoff; local collab seed leftover closed RUN 9 (legacy fixture)
 INV-08 PARTIAL (Brand Payouts v1 + Wave B; C-06 OUT — next)
-INV-09 PARTIAL (leftover collab shipping 410; C-04 fulfillment does not consume CreatorShippingAddress)
+INV-09 PASS classified (leftover collab shipping 410; C-04 destination confirmDefault snapshots CreatorShippingAddress; fulfillment gates on that snapshot)
 INV-10 PARTIAL (Postmark live + fail-closed recovery PASS classified; live IG/Razorpay NOT_RUN)
 INV-11 PASS classified (accepted IN API clients → BE; Brand Home fail-closed for Creator)
 INV-12 PASS (unit + postgres 11/11 on bs07_freeze_auth + browser)
@@ -141,17 +141,21 @@ Local smoke RUN 4: Postmark send failed (invalid TemplateId `1`); OTP still issu
 Canonical: `15-security/security-release-check.md`
 
 ```text
-NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS  = NOT DECLARED THIS FREEZE
+NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS  = DECLARED 2026-09-11
+  bound = freeze source + live creator-dev ECS env
+  not freeze PASS
+  not creator-prod
 ```
 
-**Parent 2026-09-09:** residuals accepted as **AWS-dev / production gates**, not this-freeze unwind.
+Live creator-dev (profile `creator-dev`, 2026-09-11, no deploy):
 
-1. Production `CREATOR_APPLY_BYPASS_EMAILS` empty (or security authority named list) — **AWS / prod worker**.
-2. OTP codes never logged when `STAGE=prod` — **AWS worker must prove**.
-3. Competing OUT collab/marketplace command writes retired `410` this amendment. Modules stay mounted. Remaining: Brand UCE second engine, Chat Home HITL campaign/planner, public marketplace GET (read-only), Centre media-kit PATCH.
+1. ECS `STAGE=dev`; `[OTP]` CloudWatch events present (codes not recorded).
+2. `CREATOR_APPLY_BYPASS_EMAILS=test@creator.com` — named QA targeting list, not login. Accepted for AWS-dev. Empty apply-bypass remains a **future prod-deploy** gate.
+3. Competing OUT collab/marketplace command writes retired `410`. Remaining callable leftovers are not login bypasses: Brand UCE second engine, Chat Home HITL campaign/planner, public marketplace GET (read-only), Centre media-kit PATCH.
 4. §18 auth/RBAC/cross-tenant postgres INV-01/04/12 PASS.
+5. Live ECS revision `:232` (registered 2026-09-08) is **not** the freeze SHA pair.
 
-This freeze still does **not** declare `NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS` or `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1`.
+This freeze still does **not** declare `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1`.
 
 ---
 
@@ -199,12 +203,12 @@ Brand Payouts Wave B postgres PASS 3/3 on localhost/waveb_runtime (generate firs
 
 ## AWS_DEV_BLOCKERS
 
-This worker did **not** inspect AWS. From registers, AWS-dev cannot be treated as proven until the AWS worker supplies:
+Live creator-dev env read 2026-09-11 (no deploy, not creator-prod): `STAGE=dev`, named apply-bypass `test@creator.com`, `[OTP]` logs present. Security sentence declared for that bound.
 
-- RDS `DATABASE_URL` and migrate posture (greenfield vs existing).
-- SST/ECS secrets: JWT, OTP pepper, settings encryption, Postmark, Gemini/Zyte as required by Brand onboarding, S3, Instagram if C-01 connect is in that env.
-- `STAGE=dev` (not prod OTP logging rules), empty or reviewed `CREATOR_APPLY_BYPASS_EMAILS`.
-- Confirmation that freeze SHAs — not `development` — are what get deployed.
+Still not proven on AWS-dev:
+
+- RDS migrate posture (greenfield vs existing) and secret inventory beyond the env **names** listed in the security check.
+- Confirmation that freeze SHAs — not the 2026-09-08 ECS image — are what get deployed. Live task `creatorshop-be-dev-apiclusterCluster-api:232`.
 
 ---
 

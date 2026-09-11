@@ -90,7 +90,7 @@ C-02A owns **0** migrations. C-04’s accepted extra migration `20260911125000_c
 - AWS / IAM / VPC / RDS / ECS / secret injection
 - Force-push
 - Destructive production migrations / Prisma drop
-- Invent C-04 wiring to green INV-09
+- Invent a live C-04 fulfillment join to `CreatorShippingAddress` (destination snapshot is the accepted INV-09 consumption)
 
 ### Tests after this freeze’s blocks
 
