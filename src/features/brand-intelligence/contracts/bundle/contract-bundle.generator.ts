@@ -426,11 +426,10 @@ function buildBundle(
   const sourceBytes = {} as Record<ContractArtifactRole, Buffer>;
   const parsed = {} as Record<ContractArtifactRole, Record<string, unknown>>;
   for (const role of CONTRACT_ARTIFACT_ROLES) {
-    const bytes = readCommittedArtifact(
-      sourceRoot,
-      commitSha,
-      spec.artifactPaths[role],
-    );
+    const compiled = spec.compiledArtifactSources?.[role];
+    const bytes = compiled
+      ? Buffer.from(compiled, "utf8")
+      : readCommittedArtifact(sourceRoot, commitSha, spec.artifactPaths[role]);
     sourceBytes[role] = bytes;
     parsed[role] = record(parse(bytes.toString("utf8")), role);
   }
@@ -536,8 +535,18 @@ export function generateContractBundles(options: GenerateOptions): void {
     const commit = processorPins?.[spec.processorId] ?? options.commitSha;
     if (!COMMIT_SHA.test(commit))
       throw new Error("Invalid processor architecture pin");
-    // Every per-processor source must belong to the clean canonical history.
-    git(sourceRoot, ["merge-base", "--is-ancestor", commit, options.commitSha]);
+    // Legacy source files belong to the pinned architecture line. A compiled
+    // machine-registry snapshot may be pinned to its accepted authority line.
+    if (spec.compiledArtifactSources) {
+      git(sourceRoot, ["cat-file", "-e", `${commit}^{commit}`]);
+    } else {
+      git(sourceRoot, [
+        "merge-base",
+        "--is-ancestor",
+        commit,
+        options.commitSha,
+      ]);
+    }
     return buildBundle(sourceRoot, commit, architectureRepository, spec);
   });
   const registrations = bundleFiles.map((files) => {

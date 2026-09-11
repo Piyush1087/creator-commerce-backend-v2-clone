@@ -1,0 +1,33 @@
+id: instagram_content_behavior_output_contract
+version: "1.0"
+status: FROZEN
+processor: instagram_content_behavior
+objects: [instagram_content_behavior]
+processor_definition: intelligence/architecture/instagram_intelligence_v1_contract_registry.json
+reasoning_authority: intelligence/architecture/instagram_intelligence_v1_contract_registry.json
+object_authority: intelligence/architecture/instagram_intelligence_v1_contract_registry.json
+shared_metadata_authority: intelligence/architecture/instagram_intelligence_v1_contract_registry.json
+response:
+  type: object
+  required: [semanticId, objectContractVersion, outputContractVersion, sourceScope, state, readiness, freshness, currentPreserved, generatedAt, window, results, signals, learnings, components, coverage, evidenceRefs]
+  additional_properties: false
+  properties:
+    semanticId: {type: enum, values: [instagram_content_behavior]}
+    objectContractVersion: {type: enum, values: ["1.0"]}
+    outputContractVersion: {type: enum, values: ["1.0"]}
+    sourceScope: {type: enum, values: [INSTAGRAM_OWNED]}
+    state: {type: enum, values: [PARTIAL_CURRENT]}
+    readiness: {type: enum, values: [PARTIAL]}
+    freshness: {type: enum, values: [CURRENT]}
+    currentPreserved: {type: boolean}
+    generatedAt: {type: string, min_length: 1}
+    window: {type: object}
+    results: {type: array, item_type: object}
+    signals: {type: array, item_type: object}
+    learnings: {type: array, item_type: object}
+    components: {type: object}
+    coverage: {type: object}
+    evidenceRefs: {type: array, min_items: 1, unique_items: true, item_type: string}
+shared_generated_metadata:
+  fields:
+    authority: {type: enum, values: [CREATOR_SHOP_DERIVED]}

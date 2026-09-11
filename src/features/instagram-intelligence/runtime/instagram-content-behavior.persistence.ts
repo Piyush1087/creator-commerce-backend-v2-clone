@@ -11,6 +11,7 @@ import {
 } from "@prisma/client";
 
 import { canonicalJson } from "../../brand-intelligence/contracts/bundle/canonical-json";
+import { ContractRuntimeRegistry } from "../../brand-intelligence/contracts/registry/contract-runtime.registry";
 import { PersistenceTransitionValidator } from "../../brand-intelligence/contracts/validation/persistence-transition.validator";
 import type { ProcessorSuccessPersistenceHook } from "../../brand-intelligence/execution/processor-persistence.hook";
 import type {
@@ -23,9 +24,6 @@ import { IntelligenceGenerationRepository } from "../../brand-intelligence/persi
 import type { ComponentSemanticAddress } from "../../brand-intelligence/semantic-path/component-path.types";
 import { IntelligenceTransitionService } from "../../brand-intelligence/transitions/intelligence-transition.service";
 import {
-  INSTAGRAM_CONTENT_BEHAVIOR_BUNDLE_HASH,
-  INSTAGRAM_CONTENT_BEHAVIOR_BUNDLE_ID,
-  INSTAGRAM_CONTENT_BEHAVIOR_BUNDLE_VERSION,
   INSTAGRAM_CONTENT_BEHAVIOR_OBJECT_ID,
   INSTAGRAM_CONTENT_BEHAVIOR_PROCESSOR_ID,
   INSTAGRAM_CONTENT_BEHAVIOR_REGISTRY_KEY,
@@ -52,6 +50,7 @@ export class InstagramContentBehaviorPersistenceHook implements ProcessorSuccess
     private readonly current: IntelligenceCurrentStateRepository,
     private readonly transitions: IntelligenceTransitionService,
     private readonly validator: PersistenceTransitionValidator,
+    private readonly contracts: ContractRuntimeRegistry,
   ) {}
 
   async persistBeforeCompletion(
@@ -68,10 +67,13 @@ export class InstagramContentBehaviorPersistenceHook implements ProcessorSuccess
     );
     if (!parsed.success) this.fail("B4_INVALID_PERSISTENCE_PAYLOAD");
     const payload = parsed.data;
+    const verifiedManifest = this.contracts.getVerifiedBundle(
+      INSTAGRAM_CONTENT_BEHAVIOR_REGISTRY_KEY,
+    ).manifest;
     if (
-      execution.bundleId !== INSTAGRAM_CONTENT_BEHAVIOR_BUNDLE_ID ||
-      execution.bundleVersion !== INSTAGRAM_CONTENT_BEHAVIOR_BUNDLE_VERSION ||
-      execution.bundleHash !== INSTAGRAM_CONTENT_BEHAVIOR_BUNDLE_HASH ||
+      execution.bundleId !== verifiedManifest.bundleId ||
+      execution.bundleVersion !== verifiedManifest.bundleVersion ||
+      execution.bundleHash !== verifiedManifest.bundleContentHash ||
       payload.account.integrationId !==
         parseEvidenceManifest(execution.evidenceManifest).integrationId
     ) {

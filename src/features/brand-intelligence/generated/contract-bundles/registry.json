@@ -5,6 +5,30 @@
   "architectureCommitSha": "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
   "registrations": [
     {
+      "processorId": "instagram_content_behavior",
+      "processorVersion": "1.0",
+      "outputContractId": "instagram_content_behavior_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "instagram_intelligence.instagram_content_behavior",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "024699171c820e90706297935b7ba49c2b407d137776f66166c236a9b40d7bb3",
+      "ownedObjectSemanticIds": [
+        "instagram_content_behavior"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "instagram_content_behavior",
+          "componentPathPattern": "$"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "instagram_content_behavior",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
+    },
+    {
       "processorId": "brand_communication",
       "processorVersion": "1.0",
       "outputContractId": "brand_communication_output_contract",

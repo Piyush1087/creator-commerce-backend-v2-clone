@@ -79,6 +79,7 @@ export class InstagramB4ConsumerService {
       {
         where: {
           brandId: brandProfileId,
+          subjectId: object.subjectId,
           objectSemanticId: INSTAGRAM_CONTENT_BEHAVIOR_OBJECT_ID,
           componentSemanticPath: "$",
           lifecycle: "ACTIVE",
@@ -93,6 +94,7 @@ export class InstagramB4ConsumerService {
     const latest = await this.prisma.intelligenceProcessorExecution.findFirst({
       where: {
         brandId: brandProfileId,
+        subjectId: object.subjectId,
         processorId: INSTAGRAM_CONTENT_BEHAVIOR_PROCESSOR_ID,
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],

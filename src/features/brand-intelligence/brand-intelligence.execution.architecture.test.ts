@@ -53,7 +53,7 @@ describe("W1.0D architecture boundary", () => {
     expect(registry).not.toContain("brand_meaning");
   });
 
-  it("retains seven Brand processors and activates exactly one Product processor", () => {
+  it("retains Brand/Product processors and admits the verified Instagram processor", () => {
     const registry = JSON.parse(
       readFileSync(
         join(__dirname, "generated", "contract-bundles", "registry.json"),
@@ -75,6 +75,12 @@ describe("W1.0D architecture boundary", () => {
         executionEnabled: registration.executionEnabled,
       })),
     ).toEqual([
+      {
+        processorId: "instagram_content_behavior",
+        bundled: true,
+        registered: true,
+        executionEnabled: true,
+      },
       {
         processorId: "brand_communication",
         bundled: true,

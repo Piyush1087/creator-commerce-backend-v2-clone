@@ -12,6 +12,7 @@ import { BundlePathOwnershipRegistry } from "../../brand-intelligence/contracts/
 import { ContractRuntimeRegistry } from "../../brand-intelligence/contracts/registry/contract-runtime.registry";
 import { PersistenceTransitionValidator } from "../../brand-intelligence/contracts/validation/persistence-transition.validator";
 import { SemanticValidator } from "../../brand-intelligence/contracts/validation/semantic.validator";
+import { StructuralValidator } from "../../brand-intelligence/contracts/validation/structural.validator";
 import { ExecutionAggregationService } from "../../brand-intelligence/execution/execution-aggregation.service";
 import { ProcessorExecutorRegistry } from "../../brand-intelligence/execution/executor/processor-executor.registry";
 import { SyntheticProcessorExecutor } from "../../brand-intelligence/execution/executor/synthetic-processor.executor";
@@ -66,9 +67,10 @@ postgres("B4 database-backed vertical slice", () => {
     prisma = new PrismaService();
     await prisma.$connect();
     const codec = new ComponentPathCodec();
+    const semantic = new SemanticValidator();
     const contracts = new ContractRuntimeRegistry(
       new ContractBundleIntegrityVerifier(),
-      new SemanticValidator(),
+      semantic,
     );
     contracts.verifyAtRoot(
       join(
@@ -81,7 +83,12 @@ postgres("B4 database-backed vertical slice", () => {
       ),
     );
     const ownership = new BundlePathOwnershipRegistry(contracts, codec);
-    const processor = new InstagramContentBehaviorProcessor(prisma);
+    const processor = new InstagramContentBehaviorProcessor(
+      prisma,
+      contracts,
+      new StructuralValidator(),
+      semantic,
+    );
     const executors = new ProcessorExecutorRegistry(
       new SyntheticProcessorExecutor(),
       undefined,
@@ -129,6 +136,7 @@ postgres("B4 database-backed vertical slice", () => {
       current,
       transitions,
       new PersistenceTransitionValidator(contracts, ownership),
+      contracts,
     );
     const router = new ProcessorPersistenceRouter(
       undefined as never,
@@ -332,6 +340,86 @@ postgres("B4 database-backed vertical slice", () => {
       evidence: [evidenceRef],
     });
 
+    const conflictingOffering = await prisma.offering.create({
+      data: {
+        brandProfileId: brand.id,
+        type: "PRODUCT",
+        name: "Adversarial subject fixture",
+        url: "https://example.test/adversarial-subject",
+        locationIds: [],
+      },
+    });
+    const conflictingSubject = await prisma.intelligenceSubject.create({
+      data: {
+        brandId: brand.id,
+        subjectType: "OFFERING",
+        subjectRef: conflictingOffering.id,
+        offeringId: conflictingOffering.id,
+      },
+    });
+    const conflictingExecution = await prisma.intelligenceExecution.create({
+      data: {
+        brandId: brand.id,
+        subjectId: conflictingSubject.id,
+        triggerType: "ADVERSARIAL_SUBJECT_TEST",
+        triggerRef: "other-subject",
+        triggerIdempotencyKey: `other-subject-${randomUUID()}`,
+        correlationRef: "other-subject",
+        requestedImpact: {
+          objectSemanticId: "instagram_content_behavior",
+          componentSemanticPath: "$",
+        },
+        status: "COMPLETED",
+      },
+    });
+    await prisma.intelligenceProcessorExecution.create({
+      data: {
+        executionId: conflictingExecution.id,
+        brandId: brand.id,
+        subjectId: conflictingSubject.id,
+        processorId: "instagram_content_behavior",
+        processorVersion: "1.0",
+        bundleId:
+          currentAfter.currentComponentGeneration.objectGeneration.bundleId,
+        bundleVersion:
+          currentAfter.currentComponentGeneration.objectGeneration
+            .bundleVersion,
+        bundleHash:
+          currentAfter.currentComponentGeneration.objectGeneration.bundleHash,
+        outputContractId: "instagram_content_behavior_output_contract",
+        outputContractVersion: "1.0",
+        activeScope: [
+          {
+            brandId: brand.id,
+            subjectId: conflictingSubject.id,
+            objectSemanticId: "instagram_content_behavior",
+            pathSchemeVersion: 1,
+            componentSemanticPath: "$",
+          },
+        ],
+        activeScopeHash: createHash("sha256")
+          .update(`scope:${conflictingSubject.id}`)
+          .digest("hex"),
+        dependencyManifest: {},
+        dependencyManifestHash: createHash("sha256")
+          .update(`dependency:${conflictingSubject.id}`)
+          .digest("hex"),
+        evidenceManifest: {},
+        evidenceManifestHash: createHash("sha256")
+          .update(`evidence:${conflictingSubject.id}`)
+          .digest("hex"),
+        triggerIntentKey: "other-subject",
+        processorExecutionKey: createHash("sha256")
+          .update(`processor:${conflictingSubject.id}`)
+          .digest("hex"),
+        maxAttempts: 1,
+        status: "FAILED_TERMINAL",
+        lastErrorCategory: "VALIDATION_FAILURE",
+        lastErrorCode: "OTHER_SUBJECT_FAILURE_MUST_NOT_LEAK",
+        createdAt: new Date("2030-01-01T00:00:00.000Z"),
+      },
+    });
+
     const visible = await consumer.read(brand.id, new Date());
     expect(visible.contentBehavior).toMatchObject({
       currentPreserved: true,
@@ -341,6 +429,7 @@ postgres("B4 database-backed vertical slice", () => {
       limitation: "Not enough posts to identify patterns or learnings",
     });
     expect(visible.latestProcessing.state).toBe("DEGRADED");
+    expect(visible.latestProcessing.reasonCode).toBe("B4_EVIDENCE_UNAVAILABLE");
     expect((await consumer.read(otherBrand.id)).contentBehavior).toBeNull();
 
     await prisma.brandIntegration.update({

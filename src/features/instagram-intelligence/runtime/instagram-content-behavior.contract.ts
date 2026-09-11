@@ -1,10 +1,6 @@
-import { createHash } from "node:crypto";
 import { z } from "zod";
 
-import type {
-  ContractRegistryKey,
-  VerifiedContractBundle,
-} from "../../brand-intelligence/contracts/bundle/contract-bundle.types";
+import type { ContractRegistryKey } from "../../brand-intelligence/contracts/bundle/contract-bundle.types";
 import { InstagramIntelligenceObjectSchema } from "../contracts/instagram-intelligence.schemas";
 
 export const INSTAGRAM_CONTENT_BEHAVIOR_PROCESSOR_ID =
@@ -26,18 +22,6 @@ export const INSTAGRAM_CONTENT_BEHAVIOR_REGISTRY_KEY: ContractRegistryKey = {
   outputContractId: INSTAGRAM_CONTENT_BEHAVIOR_OUTPUT_CONTRACT_ID,
   outputContractVersion: INSTAGRAM_CONTENT_BEHAVIOR_OUTPUT_CONTRACT_VERSION,
 };
-
-const contractIdentity = JSON.stringify({
-  objectSemanticId: INSTAGRAM_CONTENT_BEHAVIOR_OBJECT_ID,
-  objectContractVersion: "1.0",
-  outputContractVersion: INSTAGRAM_CONTENT_BEHAVIOR_OUTPUT_CONTRACT_VERSION,
-  sourceScope: "INSTAGRAM_OWNED",
-  componentSemanticPath: "$",
-});
-
-export const INSTAGRAM_CONTENT_BEHAVIOR_BUNDLE_HASH = createHash("sha256")
-  .update(contractIdentity)
-  .digest("hex");
 
 export const InstagramContentBehaviorB4ValueSchema =
   InstagramIntelligenceObjectSchema.superRefine((value, context) => {
@@ -119,96 +103,3 @@ export const InstagramContentBehaviorPersistencePayloadSchema = z
 export type InstagramContentBehaviorPersistencePayload = z.infer<
   typeof InstagramContentBehaviorPersistencePayloadSchema
 >;
-
-export function isInstagramContentBehaviorRegistryKey(
-  key: ContractRegistryKey,
-): boolean {
-  return (
-    key.processorId === INSTAGRAM_CONTENT_BEHAVIOR_PROCESSOR_ID &&
-    key.processorVersion === INSTAGRAM_CONTENT_BEHAVIOR_PROCESSOR_VERSION &&
-    key.outputContractId === INSTAGRAM_CONTENT_BEHAVIOR_OUTPUT_CONTRACT_ID &&
-    key.outputContractVersion ===
-      INSTAGRAM_CONTENT_BEHAVIOR_OUTPUT_CONTRACT_VERSION
-  );
-}
-
-export const INSTAGRAM_CONTENT_BEHAVIOR_REGISTRATION = {
-  ...INSTAGRAM_CONTENT_BEHAVIOR_REGISTRY_KEY,
-  bundleId: INSTAGRAM_CONTENT_BEHAVIOR_BUNDLE_ID,
-  bundleVersion: INSTAGRAM_CONTENT_BEHAVIOR_BUNDLE_VERSION,
-  bundleContentHash: INSTAGRAM_CONTENT_BEHAVIOR_BUNDLE_HASH,
-  ownedObjectSemanticIds: [INSTAGRAM_CONTENT_BEHAVIOR_OBJECT_ID],
-  ownedPathPatterns: [
-    {
-      objectSemanticId: INSTAGRAM_CONTENT_BEHAVIOR_OBJECT_ID,
-      componentPathPattern: "$",
-    },
-  ],
-  structuralValidatorId: "instagram_content_behavior_b4_output_v1",
-  semanticValidatorId: "instagram_content_behavior_b4_semantics_v1",
-  persistenceValidatorId: "intelligence_persistence_transition_v1",
-  bundled: true,
-  registered: true,
-  executionEnabled: true,
-} as const;
-
-export const INSTAGRAM_CONTENT_BEHAVIOR_VERIFIED_BUNDLE: VerifiedContractBundle =
-  {
-    manifest: {
-      manifestSchemaVersion: 1,
-      bundleId: INSTAGRAM_CONTENT_BEHAVIOR_BUNDLE_ID,
-      bundleVersion: INSTAGRAM_CONTENT_BEHAVIOR_BUNDLE_VERSION,
-      ownerEngine: "instagram_intelligence",
-      owningBranch: "content_behavior",
-      architectureRepository: "Piyush1087/dummy_tcs",
-      architectureCommitSha: "70add5add8e600359b728d1cbb728c700f50acc2",
-      processorId: INSTAGRAM_CONTENT_BEHAVIOR_PROCESSOR_ID,
-      processorVersion: INSTAGRAM_CONTENT_BEHAVIOR_PROCESSOR_VERSION,
-      outputContractId: INSTAGRAM_CONTENT_BEHAVIOR_OUTPUT_CONTRACT_ID,
-      outputContractVersion: INSTAGRAM_CONTENT_BEHAVIOR_OUTPUT_CONTRACT_VERSION,
-      evidenceContractId: "instagram_content_behavior_evidence",
-      evidenceContractVersion: "1.0",
-      ownedObjectSemanticIds: [INSTAGRAM_CONTENT_BEHAVIOR_OBJECT_ID],
-      ownedPathPatterns: [
-        {
-          objectSemanticId: INSTAGRAM_CONTENT_BEHAVIOR_OBJECT_ID,
-          componentPathPattern: "$",
-        },
-      ],
-      generatedNotice: "GENERATED — DO NOT EDIT",
-      generatorVersion: "1.0.0",
-      artifacts: [],
-      bundleContentHash: INSTAGRAM_CONTENT_BEHAVIOR_BUNDLE_HASH,
-    },
-    artifacts: {
-      processorDefinition: {
-        id: INSTAGRAM_CONTENT_BEHAVIOR_PROCESSOR_ID,
-        version: INSTAGRAM_CONTENT_BEHAVIOR_PROCESSOR_VERSION,
-      },
-      reasoningContract: {
-        id: "instagram_content_behavior_reasoning",
-        version: "1.0",
-      },
-      outputContract: {
-        id: INSTAGRAM_CONTENT_BEHAVIOR_OUTPUT_CONTRACT_ID,
-        version: INSTAGRAM_CONTENT_BEHAVIOR_OUTPUT_CONTRACT_VERSION,
-        shared_generated_metadata: {
-          fields: {
-            authority: { values: ["CREATOR_SHOP_DERIVED"] },
-          },
-        },
-      },
-      evidenceContract: {
-        id: "instagram_content_behavior_evidence",
-        version: "1.0",
-        source_scope: "INSTAGRAM_OWNED",
-        capability_id: "instagram.media_visual_observations",
-      },
-      objectContract: {
-        engine: "instagram_intelligence",
-        object: INSTAGRAM_CONTENT_BEHAVIOR_OBJECT_ID,
-        component: "$",
-      },
-      sharedMetadataContract: { contract: "shared_intelligence_metadata" },
-    },
-  };

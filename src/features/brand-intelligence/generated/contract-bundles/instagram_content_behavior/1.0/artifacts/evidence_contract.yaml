@@ -1,0 +1,14 @@
+id: instagram_content_behavior_evidence
+version: "1.0"
+status: FROZEN
+processor: instagram_content_behavior
+owner_engine: instagram_intelligence
+owning_branch: content_behavior
+processor_definition: intelligence/architecture/instagram_intelligence_v1_contract_registry.json
+reasoning_authority: intelligence/architecture/instagram_intelligence_v1_contract_registry.json
+output_contract_authority: intelligence/architecture/instagram_intelligence_v1_contract_registry.json
+shared_metadata_authority: intelligence/architecture/instagram_intelligence_v1_contract_registry.json
+capabilities:
+  instagram.media_visual_observations:
+    source_scope: INSTAGRAM_OWNED
+    completed_capture_required: true

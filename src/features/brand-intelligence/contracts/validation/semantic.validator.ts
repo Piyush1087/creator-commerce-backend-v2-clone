@@ -9,6 +9,7 @@ import {
   OfferingActionabilitySemanticValidator,
   OfferingCreatorCommunicationSemanticValidator,
 } from "./offering-derived.semantic-validator";
+import { InstagramContentBehaviorSemanticValidator } from "../../../instagram-intelligence/runtime/instagram-content-behavior.semantic-validator";
 
 import type { VerifiedContractBundle } from "../bundle/contract-bundle.types";
 import { accepted, rejected } from "./validation-result";
@@ -342,6 +343,7 @@ export class SemanticValidator {
         new OfferingFactualSemanticValidator(),
         new OfferingCreatorCommunicationSemanticValidator(),
         new OfferingActionabilitySemanticValidator(),
+        new InstagramContentBehaviorSemanticValidator(),
       ].map((validator) => [validator.validatorId, validator]),
     );
 

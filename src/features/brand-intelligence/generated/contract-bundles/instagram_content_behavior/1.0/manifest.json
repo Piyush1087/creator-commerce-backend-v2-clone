@@ -1,0 +1,89 @@
+{
+  "manifestSchemaVersion": 1,
+  "bundleId": "instagram_intelligence.instagram_content_behavior",
+  "bundleVersion": "1.0",
+  "ownerEngine": "instagram_intelligence",
+  "owningBranch": "content_behavior",
+  "architectureRepository": "Piyush1087/dummy_tcs",
+  "architectureCommitSha": "a511aff15aafd3948bcdead8484c2cf49624f34c",
+  "processorId": "instagram_content_behavior",
+  "processorVersion": "1.0",
+  "outputContractId": "instagram_content_behavior_output_contract",
+  "outputContractVersion": "1.0",
+  "evidenceContractId": "instagram_content_behavior_evidence",
+  "evidenceContractVersion": "1.0",
+  "ownedObjectSemanticIds": [
+    "instagram_content_behavior"
+  ],
+  "ownedPathPatterns": [
+    {
+      "objectSemanticId": "instagram_content_behavior",
+      "componentPathPattern": "$"
+    }
+  ],
+  "generatedNotice": "GENERATED — DO NOT EDIT",
+  "generatorVersion": "1.0.0",
+  "artifacts": [
+    {
+      "role": "EVIDENCE_CONTRACT",
+      "path": "artifacts/evidence_contract.yaml",
+      "semanticId": "instagram_content_behavior_evidence",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 698,
+      "sha256": "6b93c7c6f1dc77d915145d0fc6863b71ccdb539ea2a425731e492e7c07a420a1"
+    },
+    {
+      "role": "OBJECT_CONTRACT",
+      "path": "artifacts/object_contract.yaml",
+      "semanticId": "instagram_intelligence_objects",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 485,
+      "sha256": "c3bc13c7f32e0b27803b062e06bbaeb4835f05952bbdfdf0d07265c9a4ff2537"
+    },
+    {
+      "role": "OUTPUT_CONTRACT",
+      "path": "artifacts/output_contract.yaml",
+      "semanticId": "instagram_content_behavior_output_contract",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 1705,
+      "sha256": "09a50baef70ebbebaa6bd5007ec33698fed257756cdfd727311f7cf1d5ac4ada"
+    },
+    {
+      "role": "PROCESSOR_DEFINITION",
+      "path": "artifacts/processor_definition.yaml",
+      "semanticId": "instagram_content_behavior",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 216,
+      "sha256": "b6fc5437e5b2d0c26e3740ae26eb34aff87e9380f71ad9764c02929d8b7f4610"
+    },
+    {
+      "role": "REASONING_CONTRACT",
+      "path": "artifacts/reasoning_contract.yaml",
+      "semanticId": "instagram_content_behavior_reasoning",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 568,
+      "sha256": "28e94beacccce06453e234fd81b8f515ac2531d5e5c2892db16a8ad171f63652"
+    },
+    {
+      "role": "SHARED_METADATA_CONTRACT",
+      "path": "artifacts/shared_metadata_contract.yaml",
+      "semanticId": "shared_intelligence_metadata",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 131,
+      "sha256": "c4440fd7762f871642e3a3ec1b5e8d7c46f31c3ad6fad7c97ac3cc27ff542d72"
+    }
+  ],
+  "bundleContentHash": "024699171c820e90706297935b7ba49c2b407d137776f66166c236a9b40d7bb3"
+}

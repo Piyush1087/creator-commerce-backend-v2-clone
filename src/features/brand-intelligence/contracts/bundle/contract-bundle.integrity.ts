@@ -190,6 +190,20 @@ export class ContractBundleIntegrityVerifier {
       );
     }
 
+    const ownedPaths = new Set<string>();
+    for (const registration of registry.registrations) {
+      for (const owned of registration.ownedPathPatterns) {
+        const identity = `${owned.objectSemanticId}\u0000${owned.componentPathPattern}`;
+        if (ownedPaths.has(identity)) {
+          configuration(
+            "CONFLICTING_PATH_OWNERSHIP",
+            "An Object/component path must have exactly one registered owner",
+          );
+        }
+        ownedPaths.add(identity);
+      }
+    }
+
     const bundles = new Map<string, VerifiedContractBundle>();
     const expectedFiles = new Set<string>(["registry.json"]);
     for (const registration of registry.registrations) {

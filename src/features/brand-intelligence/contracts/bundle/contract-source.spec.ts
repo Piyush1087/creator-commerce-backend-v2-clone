@@ -1,5 +1,98 @@
 import type { ContractSourceSpec } from "./contract-bundle.types";
 
+const INSTAGRAM_A2_REGISTRY =
+  "intelligence/architecture/instagram_intelligence_v1_contract_registry.json";
+
+const INSTAGRAM_CONTENT_BEHAVIOR_ARTIFACTS = {
+  PROCESSOR_DEFINITION: `id: instagram_content_behavior
+version: "1.0"
+status: FROZEN
+owner_engine: instagram_intelligence
+owning_branch: content_behavior
+authority: ${INSTAGRAM_A2_REGISTRY}
+`,
+  REASONING_CONTRACT: `id: instagram_content_behavior_reasoning
+version: "1.0"
+status: FROZEN
+processor: instagram_content_behavior
+owner_engine: instagram_intelligence
+owning_branch: content_behavior
+processor_definition: ${INSTAGRAM_A2_REGISTRY}
+object_authority: ${INSTAGRAM_A2_REGISTRY}
+shared_metadata_authority: ${INSTAGRAM_A2_REGISTRY}
+rules:
+  one_post_is_pattern: false
+  one_post_is_learning: false
+  partial_output_required: true
+`,
+  OUTPUT_CONTRACT: `id: instagram_content_behavior_output_contract
+version: "1.0"
+status: FROZEN
+processor: instagram_content_behavior
+objects: [instagram_content_behavior]
+processor_definition: ${INSTAGRAM_A2_REGISTRY}
+reasoning_authority: ${INSTAGRAM_A2_REGISTRY}
+object_authority: ${INSTAGRAM_A2_REGISTRY}
+shared_metadata_authority: ${INSTAGRAM_A2_REGISTRY}
+response:
+  type: object
+  required: [semanticId, objectContractVersion, outputContractVersion, sourceScope, state, readiness, freshness, currentPreserved, generatedAt, window, results, signals, learnings, components, coverage, evidenceRefs]
+  additional_properties: false
+  properties:
+    semanticId: {type: enum, values: [instagram_content_behavior]}
+    objectContractVersion: {type: enum, values: ["1.0"]}
+    outputContractVersion: {type: enum, values: ["1.0"]}
+    sourceScope: {type: enum, values: [INSTAGRAM_OWNED]}
+    state: {type: enum, values: [PARTIAL_CURRENT]}
+    readiness: {type: enum, values: [PARTIAL]}
+    freshness: {type: enum, values: [CURRENT]}
+    currentPreserved: {type: boolean}
+    generatedAt: {type: string, min_length: 1}
+    window: {type: object}
+    results: {type: array, item_type: object}
+    signals: {type: array, item_type: object}
+    learnings: {type: array, item_type: object}
+    components: {type: object}
+    coverage: {type: object}
+    evidenceRefs: {type: array, min_items: 1, unique_items: true, item_type: string}
+shared_generated_metadata:
+  fields:
+    authority: {type: enum, values: [CREATOR_SHOP_DERIVED]}
+`,
+  EVIDENCE_CONTRACT: `id: instagram_content_behavior_evidence
+version: "1.0"
+status: FROZEN
+processor: instagram_content_behavior
+owner_engine: instagram_intelligence
+owning_branch: content_behavior
+processor_definition: ${INSTAGRAM_A2_REGISTRY}
+reasoning_authority: ${INSTAGRAM_A2_REGISTRY}
+output_contract_authority: ${INSTAGRAM_A2_REGISTRY}
+shared_metadata_authority: ${INSTAGRAM_A2_REGISTRY}
+capabilities:
+  instagram.media_visual_observations:
+    source_scope: INSTAGRAM_OWNED
+    completed_capture_required: true
+`,
+  OBJECT_CONTRACT: `contract: instagram_intelligence_objects
+version: "1.0"
+status: FROZEN
+engine: instagram_intelligence
+branch: content_behavior
+objects:
+  - id: instagram_content_behavior
+    object_contract_version: "1.0"
+    output_contract_version: "1.0"
+    components: [window, corpus_summary, posting_cadence, format_mix, theme_patterns, caption_patterns, creative_structure_patterns, offering_presence_patterns, creator_presence_patterns, representative_media_refs, bounded_learnings, coverage]
+`,
+  SHARED_METADATA_CONTRACT: `contract: shared_intelligence_metadata
+version: "1.0"
+status: FROZEN
+source_scope: INSTAGRAM_OWNED
+authority: CREATOR_SHOP_DERIVED
+`,
+} as const;
+
 const ROOT =
   "intelligence/engines/brand_intelligence/branches/brand_expression";
 
@@ -22,6 +115,7 @@ export const PROCESSOR_ARCHITECTURE_COMMITS: Readonly<Record<string, string>> =
     offering_factual_synthesis: PINNED_ARCHITECTURE_COMMIT,
     offering_creator_communication: PINNED_ARCHITECTURE_COMMIT,
     offering_actionability_synthesis: PINNED_ARCHITECTURE_COMMIT,
+    instagram_content_behavior: "a511aff15aafd3948bcdead8484c2cf49624f34c",
   };
 
 export const EXECUTABLE_CONTRACT_PROCESSORS: ReadonlySet<string> = new Set([
@@ -35,9 +129,36 @@ export const EXECUTABLE_CONTRACT_PROCESSORS: ReadonlySet<string> = new Set([
   "offering_factual_synthesis",
   "offering_creator_communication",
   "offering_actionability_synthesis",
+  "instagram_content_behavior",
 ]);
 
 export const CONTRACT_SOURCE_SPECS: readonly ContractSourceSpec[] = [
+  {
+    processorId: "instagram_content_behavior",
+    processorVersion: "1.0",
+    outputContractId: "instagram_content_behavior_output_contract",
+    outputContractVersion: "1.0",
+    evidenceContractId: "instagram_content_behavior_evidence",
+    evidenceContractVersion: "1.0",
+    ownerEngine: "instagram_intelligence",
+    owningBranch: "content_behavior",
+    ownedObjectSemanticIds: ["instagram_content_behavior"],
+    ownedPathPatterns: [
+      {
+        objectSemanticId: "instagram_content_behavior",
+        componentPathPattern: "$",
+      },
+    ],
+    artifactPaths: {
+      PROCESSOR_DEFINITION: INSTAGRAM_A2_REGISTRY,
+      REASONING_CONTRACT: INSTAGRAM_A2_REGISTRY,
+      OUTPUT_CONTRACT: INSTAGRAM_A2_REGISTRY,
+      EVIDENCE_CONTRACT: INSTAGRAM_A2_REGISTRY,
+      OBJECT_CONTRACT: INSTAGRAM_A2_REGISTRY,
+      SHARED_METADATA_CONTRACT: INSTAGRAM_A2_REGISTRY,
+    },
+    compiledArtifactSources: INSTAGRAM_CONTENT_BEHAVIOR_ARTIFACTS,
+  },
   {
     processorId: "brand_communication",
     processorVersion: "1.0",

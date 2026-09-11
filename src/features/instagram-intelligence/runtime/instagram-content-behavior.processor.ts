@@ -12,6 +12,9 @@ import {
 import { z } from "zod";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import { ContractRuntimeRegistry } from "../../brand-intelligence/contracts/registry/contract-runtime.registry";
+import { SemanticValidator } from "../../brand-intelligence/contracts/validation/semantic.validator";
+import { StructuralValidator } from "../../brand-intelligence/contracts/validation/structural.validator";
 import type { ProcessorExecutionResult } from "../../brand-intelligence/execution/domain/intelligence-execution.types";
 import {
   ProcessorExecutorFailure,
@@ -21,6 +24,7 @@ import {
 import { instagramB3aVisualObservationSchema } from "../media/instagram-b3a-visual-observation";
 import {
   INSTAGRAM_CONTENT_BEHAVIOR_PROCESSOR_ID,
+  INSTAGRAM_CONTENT_BEHAVIOR_REGISTRY_KEY,
   InstagramContentBehaviorB4ValueSchema,
   InstagramContentBehaviorEvidenceManifestSchema,
   InstagramContentBehaviorPersistencePayloadSchema,
@@ -41,7 +45,12 @@ const b3aEvidencePayloadSchema = z
 export class InstagramContentBehaviorProcessor implements ProcessorExecutor {
   readonly processorId = INSTAGRAM_CONTENT_BEHAVIOR_PROCESSOR_ID;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly contracts: ContractRuntimeRegistry,
+    private readonly structural: StructuralValidator,
+    private readonly semantic: SemanticValidator,
+  ) {}
 
   async execute(
     context: ProcessorExecutorContext,
@@ -211,6 +220,30 @@ export class InstagramContentBehaviorProcessor implements ProcessorExecutor {
       },
       evidenceRefs: [evidence.evidenceRef],
     });
+
+    const bundle = this.contracts.getVerifiedBundle(
+      INSTAGRAM_CONTENT_BEHAVIOR_REGISTRY_KEY,
+    );
+    const structural = this.structural.validate(bundle, value);
+    if (!structural.valid) {
+      this.fail(`B4_${structural.issues[0]?.code ?? "STRUCTURAL_REJECTED"}`);
+    }
+    const semantic = this.semantic.validate(structural.value, {
+      bundle,
+      evidenceManifest: [
+        {
+          evidenceRef: evidence.evidenceRef,
+          capabilityId: evidence.capabilityId,
+          semanticId: "instagram.media_visual_observations",
+          revisionIdentity: `${evidence.captureRef}:1`,
+          sourceClass: "INSTAGRAM_OWNED",
+        },
+      ],
+      businessStateManifest: [],
+    });
+    if (!semantic.valid) {
+      this.fail(`B4_${semantic.issues[0]?.code ?? "SEMANTIC_REJECTED"}`);
+    }
 
     const payload = InstagramContentBehaviorPersistencePayloadSchema.parse({
       kind: "INSTAGRAM_CONTENT_BEHAVIOR_B4_PERSISTENCE_V1",

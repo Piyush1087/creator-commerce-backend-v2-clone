@@ -1,0 +1,6 @@
+id: instagram_content_behavior
+version: "1.0"
+status: FROZEN
+owner_engine: instagram_intelligence
+owning_branch: content_behavior
+authority: intelligence/architecture/instagram_intelligence_v1_contract_registry.json
