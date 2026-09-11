@@ -110,19 +110,59 @@ export const INSTAGRAM_SYNC_CAPABILITY_CLASSES = [
 ] as const;
 
 /**
- * A2 pins the allowlist represented by the installed v26 client. B2 must
- * provider-verify each format/metric pair before runtime acquisition; it may
- * remove unsupported pairs but must never zero-fill them.
+ * B2 provider-verified Instagram Login v26 read allowlist. Missing provider
+ * rows remain unavailable and unsupported pairs are never requested.
  */
 export const INSTAGRAM_GRAPH_METRIC_CONTRACT = {
   graphVersion: "v26.0",
-  verificationState:
-    "INSTALLED_CLIENT_ALLOWLIST_PENDING_B2_PROVIDER_VERIFICATION",
+  verificationState: "B2_PROVIDER_VERIFIED_2026_09_11",
   media: {
-    IMAGE: ["reach", "saved", "shares"],
-    CAROUSEL_ALBUM: ["reach", "saved", "shares", "likes"],
-    REELS: ["reach", "saved", "shares", "views"],
-    VIDEO: ["reach", "saved", "shares", "views"],
+    IMAGE: [
+      "comments",
+      "likes",
+      "reach",
+      "saved",
+      "shares",
+      "total_interactions",
+      "views",
+    ],
+    CAROUSEL_ALBUM: [
+      "comments",
+      "likes",
+      "reach",
+      "saved",
+      "shares",
+      "total_interactions",
+      "views",
+    ],
+    VIDEO: [
+      "comments",
+      "likes",
+      "reach",
+      "saved",
+      "shares",
+      "total_interactions",
+      "views",
+    ],
+    REEL: [
+      "comments",
+      "likes",
+      "reach",
+      "saved",
+      "shares",
+      "total_interactions",
+      "views",
+    ],
+    STORY: ["reach", "shares", "total_interactions", "views"],
+  },
+  audience: {
+    metrics: ["follower_demographics", "engaged_audience_demographics"],
+    period: "lifetime",
+    metricType: "total_value",
+    timeframes: ["this_month", "this_week"],
+    breakdowns: ["age", "city", "country", "gender"],
+    providerTopCategoryLimit: 45,
+    privacyThreshold: 100,
   },
 } as const;
 

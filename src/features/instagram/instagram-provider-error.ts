@@ -1,4 +1,5 @@
 export type InstagramProviderErrorClass =
+  | "RATE_LIMIT"
   | "TRANSIENT"
   | "AUTHORIZATION_REVALIDATION_REQUIRED"
   | "PERMISSION_LOSS"
@@ -34,7 +35,9 @@ export function classifyInstagramProviderError(
     typeof error.is_transient === "boolean" ? error.is_transient : null;
 
   let classification: InstagramProviderErrorClass = "UNKNOWN";
-  if (isTransient || httpStatus === 429 || httpStatus >= 500) {
+  if (httpStatus === 429 || providerCode === 4 || providerCode === 17) {
+    classification = "RATE_LIMIT";
+  } else if (isTransient || httpStatus >= 500) {
     classification = "TRANSIENT";
   } else if ([190, 102].includes(providerCode ?? -1)) {
     classification = "AUTHORIZATION_REVALIDATION_REQUIRED";

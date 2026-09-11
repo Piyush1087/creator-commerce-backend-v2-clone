@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import {
   renderSafeInstagramError,
   safeInstagramErrorMetadata,
+  type InstagramProviderErrorClass,
 } from "./instagram-provider-error";
 
 export type InstagramTokenExchangeResult = {
@@ -167,28 +168,14 @@ export class InstagramOAuthClient {
 export class InstagramOAuthExchangeError extends BadRequestException {
   constructor(
     message: string,
-    readonly classification:
-      | "TRANSIENT"
-      | "AUTHORIZATION_REVALIDATION_REQUIRED"
-      | "PERMISSION_LOSS"
-      | "PROVIDER_ACCESS_BLOCKED"
-      | "CONTENT_OR_METRIC_UNAVAILABLE"
-      | "UNKNOWN",
+    readonly classification: InstagramProviderErrorClass,
   ) {
     super(message);
   }
 }
 
 export class InstagramTokenRefreshError extends Error {
-  constructor(
-    readonly classification:
-      | "TRANSIENT"
-      | "AUTHORIZATION_REVALIDATION_REQUIRED"
-      | "PERMISSION_LOSS"
-      | "PROVIDER_ACCESS_BLOCKED"
-      | "CONTENT_OR_METRIC_UNAVAILABLE"
-      | "UNKNOWN",
-  ) {
+  constructor(readonly classification: InstagramProviderErrorClass) {
     super("Instagram token refresh failed");
   }
 }

@@ -95,12 +95,12 @@ describe("Instagram provider reconciliation primitives", () => {
     expect(rendered).not.toContain("provider payload");
   });
 
-  it("keeps server errors and rate limits transient", () => {
+  it("keeps server errors transient and rate limits distinct", () => {
     expect(classifyInstagramProviderError(503, null).classification).toBe(
       "TRANSIENT",
     );
     expect(classifyInstagramProviderError(429, null).classification).toBe(
-      "TRANSIENT",
+      "RATE_LIMIT",
     );
   });
 
@@ -119,6 +119,7 @@ describe("Instagram provider reconciliation primitives", () => {
 
   it.each([
     [503, null, "TRANSIENT"],
+    [429, null, "RATE_LIMIT"],
     [401, { error: { code: 190 } }, "AUTHORIZATION_REVALIDATION_REQUIRED"],
     [403, { error: { code: 10 } }, "PERMISSION_LOSS"],
     [

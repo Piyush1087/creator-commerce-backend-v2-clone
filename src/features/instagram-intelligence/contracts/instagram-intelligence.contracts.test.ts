@@ -109,16 +109,57 @@ describe("Instagram Intelligence V1 contract registry", () => {
     });
   });
 
-  it("pins the installed v26 metric allowlist for B2 provider verification", () => {
+  it("pins the B2 provider-verified v26 metric and audience allowlists", () => {
     expect(INSTAGRAM_GRAPH_METRIC_CONTRACT).toEqual({
       graphVersion: "v26.0",
-      verificationState:
-        "INSTALLED_CLIENT_ALLOWLIST_PENDING_B2_PROVIDER_VERIFICATION",
+      verificationState: "B2_PROVIDER_VERIFIED_2026_09_11",
       media: {
-        IMAGE: ["reach", "saved", "shares"],
-        CAROUSEL_ALBUM: ["reach", "saved", "shares", "likes"],
-        REELS: ["reach", "saved", "shares", "views"],
-        VIDEO: ["reach", "saved", "shares", "views"],
+        IMAGE: [
+          "comments",
+          "likes",
+          "reach",
+          "saved",
+          "shares",
+          "total_interactions",
+          "views",
+        ],
+        CAROUSEL_ALBUM: [
+          "comments",
+          "likes",
+          "reach",
+          "saved",
+          "shares",
+          "total_interactions",
+          "views",
+        ],
+        VIDEO: [
+          "comments",
+          "likes",
+          "reach",
+          "saved",
+          "shares",
+          "total_interactions",
+          "views",
+        ],
+        REEL: [
+          "comments",
+          "likes",
+          "reach",
+          "saved",
+          "shares",
+          "total_interactions",
+          "views",
+        ],
+        STORY: ["reach", "shares", "total_interactions", "views"],
+      },
+      audience: {
+        metrics: ["follower_demographics", "engaged_audience_demographics"],
+        period: "lifetime",
+        metricType: "total_value",
+        timeframes: ["this_month", "this_week"],
+        breakdowns: ["age", "city", "country", "gender"],
+        providerTopCategoryLimit: 45,
+        privacyThreshold: 100,
       },
     });
   });
