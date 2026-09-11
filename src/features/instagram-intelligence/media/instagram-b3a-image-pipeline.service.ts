@@ -8,6 +8,7 @@ import {
   type InstagramTemporaryImageArtifact,
 } from "../../instagram/media/instagram-image-acquisition.types";
 import { InstagramImageTemporaryStore } from "../../instagram/media/instagram-image-temporary-store";
+import type { InstagramLocatorKind } from "../../instagram/media/instagram-contained-image-acquisition.service";
 import {
   INSTAGRAM_B3A_NORMALIZATION_CONTRACT_VERSION,
   INSTAGRAM_B3A_OBSERVATION_CONTRACT_VERSION,
@@ -53,6 +54,14 @@ export class InstagramB3aImagePipelineService {
     providerAccountId: string;
     authorizationGeneration: number;
     mediaId: string;
+    acquisitionMediaId?: string;
+    locatorKind?: InstagramLocatorKind;
+    inspectionDepth?:
+      | "IMAGE_ONLY"
+      | "CAROUSEL_REPRESENTATIVE_ONLY"
+      | "COVER_ONLY";
+    executionProfile?: "b3a-v1" | "b3b-carousel-v1" | "b3b-cover-v1";
+    visualContext?: Readonly<Record<string, unknown>>;
     selection: "SELECTED" | "NOT_SELECTED";
     now?: () => Date;
     signal?: AbortSignal;
@@ -75,7 +84,8 @@ export class InstagramB3aImagePipelineService {
         integrationId: input.integrationId,
         expectedProviderAccountId: input.providerAccountId,
         expectedAuthorizationGeneration: input.authorizationGeneration,
-        mediaId: input.mediaId,
+        mediaId: input.acquisitionMediaId ?? input.mediaId,
+        ...(input.locatorKind ? { locatorKind: input.locatorKind } : {}),
         now,
         ...(input.signal ? { signal: input.signal } : {}),
       });
@@ -133,14 +143,14 @@ export class InstagramB3aImagePipelineService {
           technicalArtifact(artifact),
           {
             artifactKey: "visual-observation",
-            payload: observationPayload(this.visualModel, parsed.data),
+            payload: observationPayload(this.visualModel, parsed.data, input),
           },
         ],
         evidence: [
           {
             evidenceKey: "visual-observation",
             artifactKey: "visual-observation",
-            payload: observationPayload(this.visualModel, parsed.data),
+            payload: observationPayload(this.visualModel, parsed.data, input),
             freshness: "CURRENT",
             representativeness: "CONTEXT_SPECIFIC",
             semanticObservationKey: `instagram:image-visual:${digest(
@@ -248,7 +258,11 @@ function writerIdentity(input: {
   authorizationGeneration: number;
   mediaId: string;
 }) {
-  const identity = `${input.providerAccountId}:${input.authorizationGeneration}:${input.mediaId}:b3a-v1`;
+  const profile =
+    "executionProfile" in input && typeof input.executionProfile === "string"
+      ? input.executionProfile
+      : "b3a-v1";
+  const identity = `${input.providerAccountId}:${input.authorizationGeneration}:${input.mediaId}:${profile}`;
   return {
     brandId: input.brandProfileId,
     providerAccountId: input.providerAccountId,
@@ -284,6 +298,13 @@ function observationPayload(
     dominantColors: string[];
     composition: string;
   },
+  input?: {
+    inspectionDepth?:
+      | "IMAGE_ONLY"
+      | "CAROUSEL_REPRESENTATIVE_ONLY"
+      | "COVER_ONLY";
+    visualContext?: Readonly<Record<string, unknown>>;
+  },
 ) {
   return {
     observationContractVersion: INSTAGRAM_B3A_OBSERVATION_CONTRACT_VERSION,
@@ -291,6 +312,10 @@ function observationPayload(
     modelProvider: model.providerIdentity,
     modelIdentity: model.modelIdentity,
     modelProfileVersion: model.modelProfileVersion,
+    ...(input?.inspectionDepth
+      ? { inspectionDepth: input.inspectionDepth }
+      : {}),
+    ...(input?.visualContext ? { visualContext: input.visualContext } : {}),
     observation,
   };
 }
@@ -318,6 +343,7 @@ function validateIdentity(input: {
   providerAccountId: string;
   authorizationGeneration: number;
   mediaId: string;
+  acquisitionMediaId?: string;
 }): void {
   if (
     !input.brandProfileId.trim() ||
@@ -325,7 +351,9 @@ function validateIdentity(input: {
     !input.providerAccountId.trim() ||
     !Number.isSafeInteger(input.authorizationGeneration) ||
     input.authorizationGeneration < 0 ||
-    !/^[A-Za-z0-9_-]{1,128}$/.test(input.mediaId)
+    !/^[A-Za-z0-9_-]{1,128}$/.test(input.mediaId) ||
+    (input.acquisitionMediaId !== undefined &&
+      !/^[A-Za-z0-9_-]{1,128}$/.test(input.acquisitionMediaId))
   ) {
     throw new Error("Invalid Instagram B3A media identity");
   }

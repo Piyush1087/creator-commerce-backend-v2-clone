@@ -10,6 +10,7 @@ import {
 import { PrismaService } from "../../../prisma/prisma.service";
 import { decryptField } from "../../../shared/crypto/field-encryption.util";
 import { InstagramContainedImageAcquisitionService } from "../../instagram/media/instagram-contained-image-acquisition.service";
+import type { InstagramLocatorKind } from "../../instagram/media/instagram-contained-image-acquisition.service";
 import type { InstagramContainedImageAcquisitionResult } from "../../instagram/media/instagram-image-acquisition.types";
 import { InstagramIntelligenceReadFenceError } from "./instagram-intelligence-provider-read.service";
 
@@ -28,6 +29,7 @@ export class InstagramIntelligenceAuthorizedImageAcquisitionService {
     mediaId: string;
     now?: () => Date;
     signal?: AbortSignal;
+    locatorKind?: InstagramLocatorKind;
   }): Promise<InstagramContainedImageAcquisitionResult> {
     const integration = await this.prisma.brandIntegration.findUnique({
       where: { id: input.integrationId },
@@ -101,6 +103,7 @@ export class InstagramIntelligenceAuthorizedImageAcquisitionService {
       },
       mediaId: input.mediaId,
       isolationScope: input.brandProfileId,
+      ...(input.locatorKind ? { locatorKind: input.locatorKind } : {}),
       ...(input.now ? { now: input.now } : {}),
       ...(input.signal ? { signal: input.signal } : {}),
     });

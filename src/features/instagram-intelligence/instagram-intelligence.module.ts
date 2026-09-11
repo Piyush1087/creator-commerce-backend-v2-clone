@@ -6,6 +6,7 @@ import { BrandIntelligenceModule } from "../brand-intelligence/brand-intelligenc
 import { DataExtractionModule } from "../data-extraction/data-extraction.module";
 import { InstagramProviderClientModule } from "../instagram/instagram-provider-client.module";
 import { InstagramB3aImagePipelineService } from "./media/instagram-b3a-image-pipeline.service";
+import { InstagramB3bMediaCompletionService } from "./media/instagram-b3b-media-completion.service";
 import {
   InstagramB3aVisualModelPort,
   UnavailableInstagramB3aVisualModelAdapter,
@@ -25,6 +26,7 @@ import { InstagramContentBehaviorRuntimeService } from "./runtime/instagram-cont
   controllers: [InstagramB4ConsumerController],
   providers: [
     InstagramB3aImagePipelineService,
+    InstagramB3bMediaCompletionService,
     InstagramB4ConsumerService,
     InstagramContentBehaviorRuntimeService,
     {
@@ -34,6 +36,7 @@ import { InstagramContentBehaviorRuntimeService } from "./runtime/instagram-cont
   ],
   exports: [
     InstagramB3aImagePipelineService,
+    InstagramB3bMediaCompletionService,
     InstagramB4ConsumerService,
     InstagramContentBehaviorRuntimeService,
   ],

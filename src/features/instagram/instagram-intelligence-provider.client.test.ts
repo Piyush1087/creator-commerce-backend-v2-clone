@@ -108,6 +108,10 @@ describe("Instagram intelligence provider truth client", () => {
       state: "UNAVAILABLE",
       reason: "MISSING_OR_INVALID_TIMESTAMP",
     });
+    expect(result.items[1].caption).toEqual({
+      state: "UNAVAILABLE",
+      reason: "FIELD_ABSENT",
+    });
     expect(result.coverage).toMatchObject({
       pagesAttempted: 2,
       pagesCompleted: 2,

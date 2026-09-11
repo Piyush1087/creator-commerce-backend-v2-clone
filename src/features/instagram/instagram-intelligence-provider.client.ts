@@ -515,7 +515,7 @@ function mapMedia(
     permalink: stringField(row.permalink),
     caption:
       typeof row.caption === "undefined"
-        ? { state: "EXPLICIT_EMPTY", value: "" }
+        ? { state: "UNAVAILABLE", reason: "FIELD_ABSENT" }
         : stringField(row.caption),
     timestamp: timestamp
       ? { state: "OBSERVED", value: timestamp }
