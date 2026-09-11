@@ -9,6 +9,7 @@ import {
 } from "./services/instagram-intelligence-provider-read.service";
 import { BrandProviderReadinessService } from "./services/brand-provider-readiness.service";
 import { BrandSettingsAccessService } from "./services/brand-settings-access.service";
+import { InstagramIntelligenceAuthorizedImageAcquisitionService } from "./services/instagram-intelligence-image-acquisition.service";
 
 @Module({
   imports: [PrismaModule, BrandCentreModule, InstagramProviderClientModule],
@@ -17,11 +18,13 @@ import { BrandSettingsAccessService } from "./services/brand-settings-access.ser
     BrandProviderReadinessService,
     InstagramIntelligenceConnectionReadService,
     InstagramIntelligenceAuthorizedReadService,
+    InstagramIntelligenceAuthorizedImageAcquisitionService,
   ],
   exports: [
     BrandProviderReadinessService,
     InstagramIntelligenceConnectionReadService,
     InstagramIntelligenceAuthorizedReadService,
+    InstagramIntelligenceAuthorizedImageAcquisitionService,
   ],
 })
 export class BrandSettingsConsumerModule {}

@@ -10,6 +10,8 @@ import {
 import { OwnedWebsiteWave1NormalizationService } from "./evidence/normalization/owned-website-wave1-normalization.service";
 import { DataExtractionIntelligenceEvidenceAdapter } from "./evidence/intelligence/data-extraction-intelligence-evidence.adapter";
 import { InstagramCaptureWriterService } from "./evidence/instagram/instagram-capture-writer.service";
+import { InstagramDerivedDataPurgeService } from "./evidence/instagram/instagram-derived-data-purge.service";
+import { InstagramProviderClientModule } from "../instagram/instagram-provider-client.module";
 import { DataExtractionPersistenceService } from "./evidence/persistence/prisma-evidence-repositories";
 import { DATA_EXTRACTION_EVIDENCE_QUERY_PORT_V1 } from "./evidence/ports/evidence-runtime.ports";
 import { DataExtractionEvidenceQueryService } from "./evidence/query/data-extraction-evidence-query.service";
@@ -20,6 +22,7 @@ import { ParallelCompanyResearchProvider } from "./providers/parallel-company-re
 import { StructuredEvidenceExecutionService } from "./services/structured-evidence-execution.service";
 
 @Module({
+  imports: [InstagramProviderClientModule],
   providers: [
     ParallelSearchClient,
     GeminiGatekeeperProvider,
@@ -40,6 +43,7 @@ import { StructuredEvidenceExecutionService } from "./services/structured-eviden
     },
     DataExtractionIntelligenceEvidenceAdapter,
     InstagramCaptureWriterService,
+    InstagramDerivedDataPurgeService,
   ],
   exports: [
     GeminiGatekeeperProvider,
@@ -53,6 +57,7 @@ import { StructuredEvidenceExecutionService } from "./services/structured-eviden
     DATA_EXTRACTION_EVIDENCE_QUERY_PORT_V1,
     DataExtractionIntelligenceEvidenceAdapter,
     InstagramCaptureWriterService,
+    InstagramDerivedDataPurgeService,
   ],
 })
 export class DataExtractionModule {}
