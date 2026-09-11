@@ -16,6 +16,7 @@ import {
   OfferingActionabilityProcessorExecutor,
   OfferingCreatorCommunicationProcessorExecutor,
 } from "../../processors/offering-derived/offering-derived-processor.executor";
+import { InstagramContentBehaviorProcessor } from "../../../instagram-intelligence/runtime/instagram-content-behavior.processor";
 
 @Injectable()
 export class ProcessorExecutorRegistry {
@@ -43,6 +44,8 @@ export class ProcessorExecutorRegistry {
     offeringCreatorExecutor?: OfferingCreatorCommunicationProcessorExecutor,
     @Optional()
     offeringActionabilityExecutor?: OfferingActionabilityProcessorExecutor,
+    @Optional()
+    instagramContentBehaviorExecutor?: InstagramContentBehaviorProcessor,
   ) {
     const executors: [string, ProcessorExecutor][] = [
       [SYNTHETIC_PROCESSOR_ID, syntheticExecutor],
@@ -91,6 +94,11 @@ export class ProcessorExecutorRegistry {
       executors.push([
         offeringActionabilityExecutor.processorId,
         offeringActionabilityExecutor,
+      ]);
+    if (instagramContentBehaviorExecutor)
+      executors.push([
+        instagramContentBehaviorExecutor.processorId,
+        instagramContentBehaviorExecutor,
       ]);
     this.executors = new Map(executors);
   }

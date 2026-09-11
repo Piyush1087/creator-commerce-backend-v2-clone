@@ -84,7 +84,7 @@ describe("contract runtime registry and startup integrity", () => {
     const runtime = registry();
     runtime.verifyAtRoot(GENERATED_ROOT);
     expect(runtime.isReady()).toBe(true);
-    expect(runtime.registrations()).toHaveLength(10);
+    expect(runtime.registrations()).toHaveLength(11);
     expect(
       runtime
         .registrations()
@@ -100,6 +100,7 @@ describe("contract runtime registry and startup integrity", () => {
       ["offering_factual_synthesis", true],
       ["offering_creator_communication", true],
       ["offering_actionability_synthesis", true],
+      ["instagram_content_behavior", true],
     ]);
     expect(
       runtime.getVerifiedBundle({
@@ -109,6 +110,19 @@ describe("contract runtime registry and startup integrity", () => {
         outputContractVersion: "1.0",
       }).manifest.bundleId,
     ).toBe("brand_intelligence.brand_communication");
+    expect(
+      runtime.getVerifiedBundle({
+        processorId: "instagram_content_behavior",
+        processorVersion: "1.0",
+        outputContractId: "instagram_content_behavior_output_contract",
+        outputContractVersion: "1.0",
+      }).manifest.ownedPathPatterns,
+    ).toEqual([
+      {
+        objectSemanticId: "instagram_content_behavior",
+        componentPathPattern: "$",
+      },
+    ]);
   });
 
   it.each([

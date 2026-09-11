@@ -97,6 +97,8 @@ import {
   OfferingActionabilityProcessorExecutor,
   OfferingCreatorCommunicationProcessorExecutor,
 } from "./processors/offering-derived/offering-derived-processor.executor";
+import { InstagramContentBehaviorProcessor } from "../instagram-intelligence/runtime/instagram-content-behavior.processor";
+import { InstagramContentBehaviorPersistenceHook } from "../instagram-intelligence/runtime/instagram-content-behavior.persistence";
 import {
   OFFERING_ACTIONABILITY_MODEL_PROVIDER,
   OFFERING_CREATOR_MODEL_PROVIDER,
@@ -152,6 +154,8 @@ const internalProviders = [
   OfferingFactualPersistenceHook,
   OfferingCreatorCommunicationProcessorExecutor,
   OfferingActionabilityProcessorExecutor,
+  InstagramContentBehaviorProcessor,
+  InstagramContentBehaviorPersistenceHook,
   {
     provide: OFFERING_FACTUAL_MODEL_PROVIDER,
     useClass: StructuredOfferingFactualModelProvider,

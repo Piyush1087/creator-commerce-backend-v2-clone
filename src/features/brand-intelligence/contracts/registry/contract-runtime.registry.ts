@@ -12,6 +12,11 @@ import type {
 } from "../bundle/contract-bundle.types";
 import { ContractRuntimeError } from "../bundle/contract-runtime.error";
 import { SemanticValidator } from "../validation/semantic.validator";
+import {
+  INSTAGRAM_CONTENT_BEHAVIOR_REGISTRATION,
+  INSTAGRAM_CONTENT_BEHAVIOR_VERIFIED_BUNDLE,
+  isInstagramContentBehaviorRegistryKey,
+} from "../../../instagram-intelligence/runtime/instagram-content-behavior.contract";
 
 function keyOf(key: ContractRegistryKey): string {
   return [
@@ -84,6 +89,9 @@ export class ContractRuntimeRegistry implements OnModuleInit {
         "Brand Intelligence contract runtime is NOT_READY",
       );
     }
+    if (isInstagramContentBehaviorRegistryKey(key)) {
+      return INSTAGRAM_CONTENT_BEHAVIOR_VERIFIED_BUNDLE;
+    }
     const bundle = this.runtime.bundles.get(keyOf(key));
     if (!bundle) {
       throw new ContractRuntimeError(
@@ -96,6 +104,9 @@ export class ContractRuntimeRegistry implements OnModuleInit {
 
   registrations(): readonly GeneratedContractRegistration[] {
     if (!this.runtime) return [];
-    return this.runtime.registry.registrations;
+    return [
+      ...this.runtime.registry.registrations,
+      INSTAGRAM_CONTENT_BEHAVIOR_REGISTRATION,
+    ];
   }
 }
