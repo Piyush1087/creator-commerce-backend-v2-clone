@@ -81,7 +81,8 @@ export interface EvidenceProvenanceSummary {
     | "PROVIDER_MEDIATED_FETCH"
     | "CONNECTED_API"
     | "USER_ACTION_CAPTURE"
-    | "DETERMINISTIC_DERIVATION";
+    | "DETERMINISTIC_DERIVATION"
+    | "MODEL_DERIVATION";
   readonly normalizationContractVersion: string;
   readonly parentEvidenceRefs: readonly string[];
   readonly parentCaptureRefs: readonly string[];

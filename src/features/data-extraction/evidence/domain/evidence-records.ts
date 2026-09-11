@@ -88,7 +88,8 @@ export interface EvidenceProvenanceRecord {
     | "DIRECT_FETCH"
     | "RENDERED_FETCH"
     | "PROVIDER_MEDIATED_FETCH"
-    | "DETERMINISTIC_DERIVATION";
+    | "DETERMINISTIC_DERIVATION"
+    | "MODEL_DERIVATION";
   readonly normalizationContractVersion: string;
   readonly parentEvidenceRefs: readonly EvidenceRef[];
   readonly parentCaptureRefs: readonly CaptureRef[];

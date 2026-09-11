@@ -38,6 +38,7 @@ import type {
   DataExtractionProviderExecutionLink,
   DataExtractionResourceRecord,
   DataExtractionSemanticObservationRecord,
+  EvidenceProvenanceRecord,
   SemanticObservationRelationType,
 } from "../domain/evidence-records";
 import type {
@@ -117,6 +118,26 @@ function canonicalJson(value: unknown): string {
 
 function sameStrings(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+function canonicalEvidenceRefs(refs: readonly EvidenceRef[]): EvidenceRef[] {
+  return [...new Set(refs)].sort().map(asEvidenceRef);
+}
+
+function legacyCaptureMethodClass(
+  capabilityId: string,
+  normalizationContractVersion: string,
+  hasProviderLink: boolean,
+): EvidenceProvenanceRecord["captureMethodClass"] {
+  if (
+    normalizationContractVersion === "instagram-c2-deterministic-foundations-v1"
+  ) {
+    return "DETERMINISTIC_DERIVATION";
+  }
+  if (capabilityId.startsWith("derived_")) {
+    return "DETERMINISTIC_DERIVATION";
+  }
+  return hasProviderLink ? "PROVIDER_MEDIATED_FETCH" : "DIRECT_FETCH";
 }
 
 function sameQuality(
@@ -443,20 +464,50 @@ function parentEvidenceRefsFromPayload(
   if (!payload || Array.isArray(payload) || typeof payload !== "object") {
     return [];
   }
-  const refs = payload.supporting_evidence_refs;
+  const refs =
+    payload.supporting_evidence_refs ?? payload.supportingEvidenceRefs;
   if (!Array.isArray(refs)) return [];
-  return [
-    ...new Set(refs.filter((ref): ref is string => typeof ref === "string")),
-  ]
-    .sort()
-    .map(asEvidenceRef);
+  return canonicalEvidenceRefs(
+    refs.filter((ref): ref is EvidenceRef => typeof ref === "string"),
+  );
+}
+
+async function validatedParentProvenance(
+  db: DataExtractionDb,
+  brandId: BrandId,
+  evidenceRef: EvidenceRef,
+  refs: readonly EvidenceRef[],
+): Promise<
+  Readonly<{ evidenceRefs: EvidenceRef[]; captureRefs: CaptureRef[] }>
+> {
+  const evidenceRefs = canonicalEvidenceRefs(refs);
+  if (evidenceRefs.includes(evidenceRef)) {
+    throw persistenceError("PERSISTENCE_INVARIANT");
+  }
+  const captureRefs = new Set<CaptureRef>();
+  for (const parentRef of evidenceRefs) {
+    const parent = await ownedEvidence(db, brandId, parentRef);
+    const capture = await ownedCapture(
+      db,
+      brandId,
+      asCaptureRef(parent.captureRef),
+    );
+    if (capture.status !== "COMPLETED" || !capture.capturedAt) {
+      throw persistenceError("PERSISTENCE_INVARIANT");
+    }
+    captureRefs.add(asCaptureRef(capture.captureRef));
+  }
+  return {
+    evidenceRefs,
+    captureRefs: [...captureRefs].sort().map(asCaptureRef),
+  };
 }
 
 async function toEvidence(
   db: DataExtractionDb,
   row: EvidenceRow,
 ): Promise<DataExtractionEvidenceItemRecord> {
-  if (!row.capture.capturedAt) {
+  if (row.capture.status !== "COMPLETED" || !row.capture.capturedAt) {
     throw persistenceError("PERSISTENCE_INVARIANT");
   }
 
@@ -501,12 +552,25 @@ async function toEvidence(
   const providerLink = row.capture.providerExecutionLinks[0];
   const capabilityExecutionRef =
     row.capabilityMemberships[0]?.capabilityExecutionRef;
-  const captureMethodClass = row.capabilityId.startsWith("derived_")
-    ? "DETERMINISTIC_DERIVATION"
-    : providerLink
-      ? "PROVIDER_MEDIATED_FETCH"
-      : "DIRECT_FETCH";
-  const parentEvidenceRefs = parentEvidenceRefsFromPayload(row.boundedPayload);
+  const captureMethodClass =
+    row.captureMethodClass ??
+    legacyCaptureMethodClass(
+      row.capabilityId,
+      row.normalizationContractVersion,
+      Boolean(providerLink),
+    );
+  const persistedParentEvidenceRefs = row.parentEvidenceRefs.map(asEvidenceRef);
+  const parentEvidenceRefs = row.captureMethodClass
+    ? persistedParentEvidenceRefs
+    : persistedParentEvidenceRefs.length > 0
+      ? persistedParentEvidenceRefs
+      : parentEvidenceRefsFromPayload(row.boundedPayload);
+  const parentProvenance = await validatedParentProvenance(
+    db,
+    asBrandId(row.brandId),
+    asEvidenceRef(row.evidenceRef),
+    parentEvidenceRefs,
+  );
 
   return {
     brandId: asBrandId(row.brandId),
@@ -545,8 +609,11 @@ async function toEvidence(
         capabilityExecutionRef ?? row.captureRef,
       captureMethodClass,
       normalizationContractVersion: row.normalizationContractVersion,
-      parentEvidenceRefs,
-      parentCaptureRefs: [asCaptureRef(row.captureRef)],
+      parentEvidenceRefs: parentProvenance.evidenceRefs,
+      parentCaptureRefs:
+        parentProvenance.evidenceRefs.length > 0
+          ? parentProvenance.captureRefs
+          : [asCaptureRef(row.captureRef)],
       ...(providerLink
         ? {
             providerExecutionRef: asProviderExecutionRef(
@@ -1308,8 +1375,9 @@ export class PrismaEvidenceItemRepository implements EvidenceItemRepository {
 
   private async hydrate(
     row: PrismaEvidenceItem,
+    db: DataExtractionDb = this.db,
   ): Promise<DataExtractionEvidenceItemRecord> {
-    const full = await this.db.dataExtractionEvidenceItem.findUnique({
+    const full = await db.dataExtractionEvidenceItem.findUnique({
       where: { evidenceRef: row.evidenceRef },
       include: {
         resource: true,
@@ -1318,127 +1386,159 @@ export class PrismaEvidenceItemRepository implements EvidenceItemRepository {
       },
     });
     if (!full) throw persistenceError("EVIDENCE_NOT_FOUND");
-    return toEvidence(this.db, full);
+    return toEvidence(db, full);
   }
 
   async insertOrGetExact(
     record: DataExtractionEvidenceItemRecord,
   ): Promise<DataExtractionEvidenceItemRecord> {
-    return withPersistenceErrorMapping(async () => {
-      const resource = await ownedResource(
-        this.db,
-        record.brandId,
-        record.resourceRef,
-      );
-      const capture = await ownedCapture(
-        this.db,
-        record.brandId,
-        record.captureRef,
-      );
-      if (capture.resourceRef !== record.resourceRef || !capture.capturedAt) {
-        throw persistenceError("PERSISTENCE_INVARIANT");
-      }
-      if (
-        evidenceSourceClass(record.capabilityId, resource.sourceClass) !==
-          record.sourceClass ||
-        resource.resourceType !== record.resourceType ||
-        resource.pageRole !== (record.pageRole ?? null)
-      ) {
-        throw persistenceError("PERSISTENCE_INVARIANT");
-      }
-      if (record.normalizedContentRef) {
-        const artifact = await this.db.dataExtractionContentArtifact.findUnique(
-          {
-            where: { contentArtifactRef: record.normalizedContentRef },
-          },
+    return withPersistenceErrorMapping(async () =>
+      runAtomic(this.db, async (db) => {
+        const resource = await ownedResource(
+          db,
+          record.brandId,
+          record.resourceRef,
         );
-        if (!artifact) throw persistenceError("PERSISTENCE_INVARIANT");
-        if (artifact.brandId !== record.brandId) {
-          throw persistenceError("TENANCY_VIOLATION");
-        }
-        if (artifact.captureRef !== record.captureRef) {
+        const capture = await ownedCapture(
+          db,
+          record.brandId,
+          record.captureRef,
+        );
+        if (
+          capture.resourceRef !== record.resourceRef ||
+          capture.status !== "COMPLETED" ||
+          !capture.capturedAt
+        ) {
           throw persistenceError("PERSISTENCE_INVARIANT");
         }
-      }
+        if (
+          evidenceSourceClass(record.capabilityId, resource.sourceClass) !==
+            record.sourceClass ||
+          resource.resourceType !== record.resourceType ||
+          resource.pageRole !== (record.pageRole ?? null)
+        ) {
+          throw persistenceError("PERSISTENCE_INVARIANT");
+        }
+        if (record.normalizedContentRef) {
+          const artifact = await db.dataExtractionContentArtifact.findUnique({
+            where: { contentArtifactRef: record.normalizedContentRef },
+          });
+          if (!artifact) throw persistenceError("PERSISTENCE_INVARIANT");
+          if (artifact.brandId !== record.brandId) {
+            throw persistenceError("TENANCY_VIOLATION");
+          }
+          if (artifact.captureRef !== record.captureRef) {
+            throw persistenceError("PERSISTENCE_INVARIANT");
+          }
+        }
 
-      const existing = await this.db.dataExtractionEvidenceItem.findFirst({
-        where: {
-          brandId: record.brandId,
-          captureRef: record.captureRef,
-          capabilityId: record.capabilityId,
-          normalizationContractVersion: record.normalizationContractVersion,
-          itemFingerprint: record.deduplication.itemFingerprint,
-        },
-      });
-      if (existing) {
-        const exact =
-          existing.resourceRef === record.resourceRef &&
-          existing.contentArtifactRef ===
-            (record.normalizedContentRef ?? null) &&
-          canonicalJson(existing.boundedPayload) ===
-            canonicalJson(record.boundedNormalizedPayload ?? null) &&
-          existing.contentHash === record.contentHash &&
-          existing.polarity === (record.polarity ?? null) &&
-          existing.representativeness === record.representativeness &&
-          existing.coverageSnapshot === record.coverageSnapshot &&
-          existing.freshnessAtEmission === record.freshnessAtEmission.state &&
-          existing.freshnessBasis === record.freshnessAtEmission.basis &&
-          existing.freshnessEvaluatedAt.toISOString() ===
-            record.freshnessAtEmission.evaluatedAt &&
-          existing.freshnessPriorCaptureRef ===
-            (record.freshnessAtEmission.priorCaptureRef ?? null) &&
-          existing.freshnessSourceRevisionRef ===
-            (record.freshnessAtEmission.sourceRevisionRef ?? null) &&
-          existing.qualitySnapshot === record.qualitySnapshot.state &&
-          sameStrings(
-            existing.qualityFailureCategories,
-            record.qualitySnapshot.failureCategories,
-          ) &&
-          sameStrings(
-            existing.qualityDetailCodes,
-            record.qualitySnapshot.detailCodes,
-          ) &&
-          existing.semanticObservationKey ===
-            (record.semanticObservationKey ?? null);
-        if (!exact) throw persistenceError("IDEMPOTENCY_CONFLICT");
-        return this.hydrate(existing);
-      }
+        const parentProvenance = await validatedParentProvenance(
+          db,
+          record.brandId,
+          record.evidenceRef,
+          record.provenance.parentEvidenceRefs,
+        );
 
-      const row = await this.db.dataExtractionEvidenceItem.create({
-        data: {
-          evidenceRef: record.evidenceRef,
-          brandId: record.brandId,
-          capabilityId: record.capabilityId,
-          normalizationContractVersion: record.normalizationContractVersion,
-          resourceRef: record.resourceRef,
-          captureRef: record.captureRef,
-          contentArtifactRef: record.normalizedContentRef,
-          boundedPayload: record.boundedNormalizedPayload
-            ? (record.boundedNormalizedPayload as Prisma.InputJsonValue)
-            : Prisma.JsonNull,
-          contentHash: record.contentHash,
-          polarity: record.polarity,
-          representativeness: record.representativeness,
-          coverageSnapshot: record.coverageSnapshot,
-          freshnessAtEmission: record.freshnessAtEmission.state,
-          freshnessBasis: record.freshnessAtEmission.basis,
-          freshnessEvaluatedAt: new Date(
-            record.freshnessAtEmission.evaluatedAt,
-          ),
-          freshnessPriorCaptureRef: record.freshnessAtEmission.priorCaptureRef,
-          freshnessSourceRevisionRef:
-            record.freshnessAtEmission.sourceRevisionRef,
-          qualitySnapshot: record.qualitySnapshot.state,
-          qualityFailureCategories: [
-            ...record.qualitySnapshot.failureCategories,
-          ],
-          qualityDetailCodes: [...record.qualitySnapshot.detailCodes],
-          itemFingerprint: record.deduplication.itemFingerprint,
-          semanticObservationKey: record.semanticObservationKey,
-        },
-      });
-      return this.hydrate(row);
-    });
+        const existing = await db.dataExtractionEvidenceItem.findFirst({
+          where: {
+            brandId: record.brandId,
+            captureRef: record.captureRef,
+            capabilityId: record.capabilityId,
+            normalizationContractVersion: record.normalizationContractVersion,
+            itemFingerprint: record.deduplication.itemFingerprint,
+          },
+        });
+        if (existing) {
+          const existingCaptureMethodClass =
+            existing.captureMethodClass ??
+            legacyCaptureMethodClass(
+              existing.capabilityId,
+              existing.normalizationContractVersion,
+              capture.providerExecutionLinks.length > 0,
+            );
+          const existingParentEvidenceRefs = existing.captureMethodClass
+            ? existing.parentEvidenceRefs.map(asEvidenceRef)
+            : existing.parentEvidenceRefs.length > 0
+              ? existing.parentEvidenceRefs.map(asEvidenceRef)
+              : parentEvidenceRefsFromPayload(existing.boundedPayload);
+          const exact =
+            existing.resourceRef === record.resourceRef &&
+            existing.contentArtifactRef ===
+              (record.normalizedContentRef ?? null) &&
+            canonicalJson(existing.boundedPayload) ===
+              canonicalJson(record.boundedNormalizedPayload ?? null) &&
+            existing.contentHash === record.contentHash &&
+            existing.polarity === (record.polarity ?? null) &&
+            existing.representativeness === record.representativeness &&
+            existing.coverageSnapshot === record.coverageSnapshot &&
+            existing.freshnessAtEmission === record.freshnessAtEmission.state &&
+            existing.freshnessBasis === record.freshnessAtEmission.basis &&
+            existing.freshnessEvaluatedAt.toISOString() ===
+              record.freshnessAtEmission.evaluatedAt &&
+            existing.freshnessPriorCaptureRef ===
+              (record.freshnessAtEmission.priorCaptureRef ?? null) &&
+            existing.freshnessSourceRevisionRef ===
+              (record.freshnessAtEmission.sourceRevisionRef ?? null) &&
+            existing.qualitySnapshot === record.qualitySnapshot.state &&
+            existingCaptureMethodClass ===
+              record.provenance.captureMethodClass &&
+            sameStrings(
+              canonicalEvidenceRefs(existingParentEvidenceRefs),
+              parentProvenance.evidenceRefs,
+            ) &&
+            sameStrings(
+              existing.qualityFailureCategories,
+              record.qualitySnapshot.failureCategories,
+            ) &&
+            sameStrings(
+              existing.qualityDetailCodes,
+              record.qualitySnapshot.detailCodes,
+            ) &&
+            existing.semanticObservationKey ===
+              (record.semanticObservationKey ?? null);
+          if (!exact) throw persistenceError("IDEMPOTENCY_CONFLICT");
+          return this.hydrate(existing, db);
+        }
+
+        const row = await db.dataExtractionEvidenceItem.create({
+          data: {
+            evidenceRef: record.evidenceRef,
+            brandId: record.brandId,
+            capabilityId: record.capabilityId,
+            normalizationContractVersion: record.normalizationContractVersion,
+            resourceRef: record.resourceRef,
+            captureRef: record.captureRef,
+            contentArtifactRef: record.normalizedContentRef,
+            boundedPayload: record.boundedNormalizedPayload
+              ? (record.boundedNormalizedPayload as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
+            contentHash: record.contentHash,
+            polarity: record.polarity,
+            representativeness: record.representativeness,
+            coverageSnapshot: record.coverageSnapshot,
+            freshnessAtEmission: record.freshnessAtEmission.state,
+            freshnessBasis: record.freshnessAtEmission.basis,
+            freshnessEvaluatedAt: new Date(
+              record.freshnessAtEmission.evaluatedAt,
+            ),
+            freshnessPriorCaptureRef:
+              record.freshnessAtEmission.priorCaptureRef,
+            freshnessSourceRevisionRef:
+              record.freshnessAtEmission.sourceRevisionRef,
+            qualitySnapshot: record.qualitySnapshot.state,
+            qualityFailureCategories: [
+              ...record.qualitySnapshot.failureCategories,
+            ],
+            qualityDetailCodes: [...record.qualitySnapshot.detailCodes],
+            captureMethodClass: record.provenance.captureMethodClass,
+            parentEvidenceRefs: parentProvenance.evidenceRefs,
+            itemFingerprint: record.deduplication.itemFingerprint,
+            semanticObservationKey: record.semanticObservationKey,
+          },
+        });
+        return this.hydrate(row, db);
+      }),
+    );
   }
 
   async findByRef(

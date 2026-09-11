@@ -1200,6 +1200,14 @@ enum DataExtractionFreshnessIntent {
   FORCE_RECAPTURE
 }
 
+enum DataExtractionCaptureMethodClass {
+  DIRECT_FETCH
+  RENDERED_FETCH
+  PROVIDER_MEDIATED_FETCH
+  DETERMINISTIC_DERIVATION
+  MODEL_DERIVATION
+}
+
 enum DataExtractionFreshnessTargetType {
   RESOURCE
   CAPTURE
@@ -5289,6 +5297,8 @@ model DataExtractionEvidenceItem {
   qualitySnapshot              DataExtractionAcquisitionQuality @map("quality_snapshot")
   qualityFailureCategories     String[]                         @default([]) @map("quality_failure_categories")
   qualityDetailCodes           String[]                         @default([]) @map("quality_detail_codes")
+  captureMethodClass           DataExtractionCaptureMethodClass? @map("capture_method_class")
+  parentEvidenceRefs           String[]                         @default([]) @map("parent_evidence_refs")
   itemFingerprint              String                           @map("item_fingerprint") @db.VarChar(128)
   semanticObservationKey       String?                          @map("semantic_observation_key") @db.VarChar(255)
   createdAt                    DateTime                         @default(now()) @map("created_at")
