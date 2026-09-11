@@ -15,6 +15,11 @@ import { InstagramB4ConsumerController } from "./consumer/instagram-b4-consumer.
 import { InstagramB4ConsumerService } from "./consumer/instagram-b4-consumer.service";
 import { InstagramContentBehaviorRuntimeService } from "./runtime/instagram-content-behavior.runtime.service";
 import { InstagramC2FoundationsService } from "./foundations/instagram-c2-foundations.service";
+import {
+  InstagramC3SemanticModelPort,
+  StructuredInstagramC3SemanticModelAdapter,
+} from "./semantics/instagram-c3-semantic-model";
+import { InstagramC3SemanticsService } from "./semantics/instagram-c3-semantics.service";
 
 @Module({
   imports: [
@@ -31,9 +36,14 @@ import { InstagramC2FoundationsService } from "./foundations/instagram-c2-founda
     InstagramB4ConsumerService,
     InstagramContentBehaviorRuntimeService,
     InstagramC2FoundationsService,
+    InstagramC3SemanticsService,
     {
       provide: InstagramB3aVisualModelPort,
       useClass: UnavailableInstagramB3aVisualModelAdapter,
+    },
+    {
+      provide: InstagramC3SemanticModelPort,
+      useClass: StructuredInstagramC3SemanticModelAdapter,
     },
   ],
   exports: [
@@ -42,6 +52,7 @@ import { InstagramC2FoundationsService } from "./foundations/instagram-c2-founda
     InstagramB4ConsumerService,
     InstagramContentBehaviorRuntimeService,
     InstagramC2FoundationsService,
+    InstagramC3SemanticsService,
   ],
 })
 export class InstagramIntelligenceModule {}
