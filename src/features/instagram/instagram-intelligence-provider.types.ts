@@ -32,7 +32,6 @@ export type InstagramProfileTruth = {
   appScopedUserId: InstagramField<string>;
   username: InstagramField<string>;
   name: InstagramField<string>;
-  profilePictureUrl: InstagramField<string>;
   accountType: InstagramField<string>;
   followersCount: InstagramField<number>;
   followsCount: InstagramField<number>;

@@ -49,7 +49,7 @@ export class InstagramIntelligenceProviderClient implements InstagramIntelligenc
     const url = instagramGraphUrl("me");
     url.searchParams.set(
       "fields",
-      "id,user_id,username,name,account_type,profile_picture_url,followers_count,follows_count,media_count",
+      "id,user_id,username,name,account_type,followers_count,follows_count,media_count",
     );
     const result = await this.request<Record<string, unknown>>(
       "intelligence_profile",
@@ -63,7 +63,6 @@ export class InstagramIntelligenceProviderClient implements InstagramIntelligenc
         appScopedUserId: failure(result.classification),
         username: failure(result.classification),
         name: failure(result.classification),
-        profilePictureUrl: failure(result.classification),
         accountType: failure(result.classification),
         followersCount: failure(result.classification),
         followsCount: failure(result.classification),
@@ -80,7 +79,6 @@ export class InstagramIntelligenceProviderClient implements InstagramIntelligenc
       appScopedUserId: stringField(row.id),
       username: stringField(row.username),
       name: stringField(row.name),
-      profilePictureUrl: stringField(row.profile_picture_url),
       accountType: stringField(row.account_type),
       followersCount: numberField(row.followers_count),
       followsCount: numberField(row.follows_count),
@@ -116,7 +114,7 @@ export class InstagramIntelligenceProviderClient implements InstagramIntelligenc
     const seenCursors = new Set<string>();
     let after: string | null = null;
 
-    while (items.length < INSTAGRAM_MEDIA_MAX_ITEMS) {
+    while (true) {
       const url = instagramGraphUrl("me/media");
       url.searchParams.set(
         "fields",
@@ -160,6 +158,7 @@ export class InstagramIntelligenceProviderClient implements InstagramIntelligenc
       }
       coverage.pagesCompleted += 1;
       coverage.rowsReturned += result.body.data.length;
+      let retainedBeyondCap = false;
       for (const row of result.body.data) {
         const id = nonEmptyString(row.id);
         if (!id) continue;
@@ -171,17 +170,20 @@ export class InstagramIntelligenceProviderClient implements InstagramIntelligenc
         const timestamp = parseTimestamp(row.timestamp);
         if (!timestamp) {
           coverage.rowsMissingTimestamp += 1;
-          items.push(mapMedia(row, id, null));
+          if (items.length < INSTAGRAM_MEDIA_MAX_ITEMS) {
+            items.push(mapMedia(row, id, null));
+          } else {
+            retainedBeyondCap = true;
+          }
         } else if (timestamp >= windowStart && timestamp <= windowEnd) {
           coverage.rowsEligible += 1;
           updateTimestampCoverage(coverage, timestamp.toISOString());
-          items.push(mapMedia(row, id, timestamp.toISOString()));
+          if (items.length < INSTAGRAM_MEDIA_MAX_ITEMS) {
+            items.push(mapMedia(row, id, timestamp.toISOString()));
+          } else {
+            retainedBeyondCap = true;
+          }
         }
-        if (items.length === INSTAGRAM_MEDIA_MAX_ITEMS) break;
-      }
-      if (items.length === INSTAGRAM_MEDIA_MAX_ITEMS) {
-        coverage.stopReason = "CAP_REACHED";
-        return { availability: "PARTIAL", items, coverage };
       }
       const next = safeNextCursor(result.body.paging, url);
       if (
@@ -196,6 +198,14 @@ export class InstagramIntelligenceProviderClient implements InstagramIntelligenc
           failureClassification: "UNKNOWN",
         };
       }
+      if (items.length === INSTAGRAM_MEDIA_MAX_ITEMS) {
+        if (retainedBeyondCap || next.kind === "cursor") {
+          coverage.stopReason = "CAP_REACHED";
+          return { availability: "PARTIAL", items, coverage };
+        }
+        coverage.stopReason = "EXHAUSTED";
+        return { availability: "AVAILABLE", items, coverage };
+      }
       if (next.kind === "none") {
         coverage.stopReason =
           coverage.pagesCompleted === 1 && result.body.data.length === 0
@@ -206,8 +216,6 @@ export class InstagramIntelligenceProviderClient implements InstagramIntelligenc
       seenCursors.add(next.value);
       after = next.value;
     }
-    coverage.stopReason = "CAP_REACHED";
-    return { availability: "PARTIAL", items, coverage };
   }
 
   async readMediaInsights(
@@ -363,7 +371,8 @@ export class InstagramIntelligenceProviderClient implements InstagramIntelligenc
     let after: string | null = null;
     let completed = 0;
     const seenCursors = new Set<string>();
-    while (children.length < INSTAGRAM_CAROUSEL_MAX_CHILDREN) {
+    const seenChildren = new Set<string>();
+    while (true) {
       const url = instagramGraphUrl(`${encodeURIComponent(mediaId)}/children`);
       url.searchParams.set("fields", "id,media_type,media_product_type");
       url.searchParams.set("limit", String(INSTAGRAM_CAROUSEL_MAX_CHILDREN));
@@ -390,20 +399,21 @@ export class InstagramIntelligenceProviderClient implements InstagramIntelligenc
         };
       }
       completed += 1;
+      let retainedBeyondCap = false;
       for (const row of result.body.data) {
         const id = nonEmptyString(row.id);
-        if (!id || children.some((child) => child.providerMediaId === id))
-          continue;
-        children.push({
-          providerMediaId: id,
-          ordinal: children.length,
-          mediaType: stringField(row.media_type),
-          mediaProductType: stringField(row.media_product_type),
-        });
-        if (children.length === INSTAGRAM_CAROUSEL_MAX_CHILDREN) break;
-      }
-      if (children.length === INSTAGRAM_CAROUSEL_MAX_CHILDREN) {
-        return { availability: "PARTIAL", children, stopReason: "CAP_REACHED" };
+        if (!id || seenChildren.has(id)) continue;
+        seenChildren.add(id);
+        if (children.length < INSTAGRAM_CAROUSEL_MAX_CHILDREN) {
+          children.push({
+            providerMediaId: id,
+            ordinal: children.length,
+            mediaType: stringField(row.media_type),
+            mediaProductType: stringField(row.media_product_type),
+          });
+        } else {
+          retainedBeyondCap = true;
+        }
       }
       const next = safeNextCursor(result.body.paging, url);
       if (
@@ -416,6 +426,16 @@ export class InstagramIntelligenceProviderClient implements InstagramIntelligenc
           stopReason: "PROVIDER_FAILURE",
           failureClassification: "UNKNOWN",
         };
+      }
+      if (children.length === INSTAGRAM_CAROUSEL_MAX_CHILDREN) {
+        if (retainedBeyondCap || next.kind === "cursor") {
+          return {
+            availability: "PARTIAL",
+            children,
+            stopReason: "CAP_REACHED",
+          };
+        }
+        return { availability: "AVAILABLE", children, stopReason: "EXHAUSTED" };
       }
       if (next.kind === "none") {
         return {
@@ -430,7 +450,6 @@ export class InstagramIntelligenceProviderClient implements InstagramIntelligenc
       seenCursors.add(next.value);
       after = next.value;
     }
-    return { availability: "PARTIAL", children, stopReason: "CAP_REACHED" };
   }
 
   private async request<T>(

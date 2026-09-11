@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Logger } from "@nestjs/common";
 
 import { InstagramIntelligenceProviderClient } from "./instagram-intelligence-provider.client";
 
@@ -10,22 +11,23 @@ const credential = {
 describe("Instagram intelligence provider truth client", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("keeps observed zero distinct from missing profile fields", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            id: "app-1",
-            username: "brand",
-            followers_count: 0,
-          }),
-          { status: 200 },
-        ),
+    const warn = vi.spyOn(Logger.prototype, "warn");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "app-1",
+          username: "brand",
+          followers_count: 0,
+          profile_picture_url: "https://provider.example/profile-image",
+        }),
+        { status: 200 },
       ),
     );
+    vi.stubGlobal("fetch", fetchMock);
     const result = await new InstagramIntelligenceProviderClient().readProfile(
       credential,
     );
@@ -34,6 +36,13 @@ describe("Instagram intelligence provider truth client", () => {
       state: "UNAVAILABLE",
       reason: "FIELD_ABSENT_OR_INVALID",
     });
+    const requestUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(requestUrl.searchParams.get("fields")).not.toContain(
+      "profile_picture_url",
+    );
+    expect(result).not.toHaveProperty("profilePictureUrl");
+    expect(JSON.stringify(result)).not.toContain("provider.example");
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it("rejects a malformed required profile identity without fabricating it", async () => {
@@ -338,6 +347,42 @@ describe("Instagram intelligence provider truth client", () => {
     });
     expect(first.items).toHaveLength(500);
     expect(JSON.stringify(first)).toBe(JSON.stringify(second));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("treats exactly 500 retained rows without continuation as exhausted", async () => {
+    const rows = inventoryRows(500);
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ data: rows }));
+    vi.stubGlobal("fetch", fetchMock);
+    const result =
+      await new InstagramIntelligenceProviderClient().readMediaInventory(
+        credential,
+        new Date("2026-09-11T00:00:00.000Z"),
+      );
+    expect(result).toMatchObject({
+      availability: "AVAILABLE",
+      coverage: { rowsEligible: 500, stopReason: "EXHAUSTED" },
+    });
+    expect(result.items).toHaveLength(500);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats retained current-page overflow without continuation as cap reached", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ data: inventoryRows(501) }));
+    vi.stubGlobal("fetch", fetchMock);
+    const result =
+      await new InstagramIntelligenceProviderClient().readMediaInventory(
+        credential,
+        new Date("2026-09-11T00:00:00.000Z"),
+      );
+    expect(result).toMatchObject({
+      availability: "PARTIAL",
+      coverage: { rowsEligible: 501, stopReason: "CAP_REACHED" },
+    });
+    expect(result.items).toHaveLength(500);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("does not coerce absent insight metrics to zero", async () => {
@@ -581,10 +626,36 @@ describe("Instagram intelligence provider truth client", () => {
       stopReason: "PROVIDER_FAILURE",
     });
 
-    const cappedRows = Array.from({ length: 11 }, (_, index) => ({
-      id: `child-${index}`,
-      media_type: index === 0 ? undefined : "IMAGE",
-    }));
+    const exactChildren = carouselRows(10);
+    const exactFetch = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ data: exactChildren }));
+    vi.stubGlobal("fetch", exactFetch);
+    await expect(
+      client.readCarouselChildren(credential, "carousel-exhausted"),
+    ).resolves.toMatchObject({
+      availability: "AVAILABLE",
+      stopReason: "EXHAUSTED",
+    });
+    expect(exactFetch).toHaveBeenCalledTimes(1);
+
+    const continuedFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        data: exactChildren,
+        paging: { cursors: { after: "more-children" } },
+      }),
+    );
+    vi.stubGlobal("fetch", continuedFetch);
+    await expect(
+      client.readCarouselChildren(credential, "carousel-continued"),
+    ).resolves.toMatchObject({
+      availability: "PARTIAL",
+      stopReason: "CAP_REACHED",
+    });
+    expect(continuedFetch).toHaveBeenCalledTimes(1);
+
+    const cappedRows = carouselRows(11);
+    cappedRows[0].media_type = undefined;
     const capFetch = vi
       .fn()
       .mockResolvedValue(jsonResponse({ data: cappedRows }));
@@ -602,6 +673,7 @@ describe("Instagram intelligence provider truth client", () => {
       state: "UNAVAILABLE",
       reason: "FIELD_ABSENT",
     });
+    expect(capFetch).toHaveBeenCalledTimes(1);
     for (const [rawUrl] of [
       ...partialFetch.mock.calls,
       ...capFetch.mock.calls,
@@ -613,4 +685,19 @@ describe("Instagram intelligence provider truth client", () => {
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status });
+}
+
+function inventoryRows(count: number) {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `media-${index}`,
+    media_type: "IMAGE",
+    timestamp: "2026-09-01T00:00:00.000Z",
+  }));
+}
+
+function carouselRows(count: number) {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `child-${index}`,
+    media_type: "IMAGE" as string | undefined,
+  }));
 }
