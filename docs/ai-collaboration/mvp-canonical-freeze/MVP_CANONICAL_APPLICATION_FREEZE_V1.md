@@ -25,17 +25,17 @@ Freeze workspace (do not treat `development` / `main` as the freeze):
 ```text
 BACKEND_CANONICAL_REPOSITORY  = growth-verse/creator-commerce-backend-v2
 BACKEND_CANONICAL_BRANCH      = freeze/mvp-canonical-application-v1
-BACKEND_CANONICAL_SHA         = 23d315ad55360a6cd591f0155785c29447200987
+BACKEND_CANONICAL_SHA         = bae19de915cb2235ab21cb7cd8afb908bdee1f10
 
 FRONTEND_CANONICAL_REPOSITORY = growth-verse/creator-commerce-frontend-v2
 FRONTEND_CANONICAL_BRANCH     = freeze/mvp-canonical-application-v1
-FRONTEND_CANONICAL_SHA        = 5e6cfe53786c599a92abe55aa209c62dfa0e275b
+FRONTEND_CANONICAL_SHA        = 628eb6da3fdac4add93a3188fee1764fd9c06c74
 
 ARCHITECTURE_AUTHORITY_REPO   = Piyush1087/dummy_tcs
 ARCHITECTURE_AUTHORITY_SHA    = 86d8e49e6d1fc0c5ef68b1c89507339de5ca80c5
 ```
 
-These are the local amendment tips after Pair 2 leftover-writer retirement, C-04 Vitest conversion, and Wave B postgres PASS. Origin BE is still one commit behind `23d315a` until Parent asks push. Not a freeze PASS pair. RUN 6 evidence remains `4d4b350` / `511d5e3`.
+These are the 2026-09-11 freeze-branch **product** commits (INV-09 destination consumption + creator-dev security declaration). A ledger-record commit may sit on top; use the pushed freeze-branch tips as the deploy refs. Not a freeze PASS pair.
 
 RUN 3 ledger-record (parent of RUN 4 evidence):
 

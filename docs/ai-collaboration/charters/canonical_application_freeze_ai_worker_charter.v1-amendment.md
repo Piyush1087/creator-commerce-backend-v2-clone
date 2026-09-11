@@ -90,7 +90,8 @@ When a later accepted module lands, reconstruct order from current dummy_tcs aut
   INV-08 left for C-06
   INV-09 PASS classified (C-04 destination confirmDefault snapshots CreatorShippingAddress; leftover shipping 410)
   Parent 2026-09-11 16:50: BE INV-09 3/3, c04-runtime+fulfillment 15/15, auth-security 14/14; FE c04-frontend 6/6
-7 immutable SHA pair                 = this freeze-branch dual-push; still not freeze PASS
+7 immutable SHA pair                 = BE bae19de915cb2235ab21cb7cd8afb908bdee1f10 / FE 628eb6da3fdac4add93a3188fee1764fd9c06c74
+  freeze branch dual-push; still not freeze PASS
 
 C-04 collab node:test STALE_TEST_PROVEN = CLOSED
   14 files / 106 tests PASS under Vitest (harnesses retargeted to current constructors)

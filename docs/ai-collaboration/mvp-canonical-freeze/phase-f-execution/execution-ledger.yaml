@@ -250,4 +250,23 @@ runs:
       and Pair 2 leftover journey writers retired. Wave B used disposable
       waveb_runtime (94 migrations), not thecreatorshop. Security declaration
       withheld.
+  - id: RUN14_INV09_SECURITY_CHECKPOINT
+    date: "2026-09-11"
+    intent: >
+      Reclassify INV-09 C-04 destination consumption; declare
+      NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS for freeze source + live creator-dev.
+      Not freeze PASS.
+    prisma_drop: NOT_THIS_CHECKPOINT
+    pass_declared: false
+    targeted_tests: |
+      Parent 16:50: BE INV-09 static 3/3; c04-runtime+fulfillment 15/15;
+      auth-security static+unit 14/14. FE c04-frontend 6/6.
+      Destination postgres and full farms not re-run.
+    checkpoints:
+      frontend: 628eb6da3fdac4add93a3188fee1764fd9c06c74
+      backend: bae19de915cb2235ab21cb7cd8afb908bdee1f10
+    notes: |
+      Product pair named above. Ledger-record may sit on top. C-06 remains OUT.
+      INV-10 live IG/Razorpay later. Security bound is creator-dev, not prod.
+      creator-dev ECS :232 is not this pair.
 

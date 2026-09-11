@@ -17,7 +17,7 @@
 | frontend lint | PASS | RUN 4 + clone |
 | backend lint | PASS classified | `npm run lint:eslint` clean 2026-09-11 (prettier plugin off). `npm run lint` prettier 712 remains **accepted** `PREEXISTING_ACCEPTED_DEBT` (do not `--fix`) |
 | clean worktrees | NOT_CLAIMED | do not commit `tmp-*` / OTP logs |
-| local/remote checkpoint equality | freeze branch dual-push this amendment; not `development`/`main`. SHAs named after this push. Not freeze PASS |
+| local/remote checkpoint equality | dual-push product pair BE `bae19de` / FE `628eb6d`; freeze branch only; not `development`/`main` |
 
 `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` is still forbidden.
 
@@ -44,5 +44,5 @@ provider fail-closed recovery                   PASS classified (live IG/Razorpa
 BE lint:eslint (prettier plugin off)            PASS classified 2026-09-11
 BE prettier/prettier 712                            ACCEPTED this freeze (do not --fix)
 NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS             DECLARED 2026-09-11 (creator-dev bound; not freeze PASS)
-immutable SHA pair                              checkpoint this push; not freeze PASS
+immutable SHA pair                              BE bae19de / FE 628eb6d; not freeze PASS
 ```
