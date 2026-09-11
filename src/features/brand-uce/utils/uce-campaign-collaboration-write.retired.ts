@@ -3,7 +3,7 @@ import { GoneException } from "@nestjs/common";
 export const UCE_CAMPAIGN_COLLABORATION_WRITE_RETIRED =
   "UCE_CAMPAIGN_COLLABORATION_WRITE_RETIRED" as const;
 
-export function retiredUceCampaignCollaborationWrite(): never {
+export function retiredUceCampaignCollaborationWrite(): void {
   throw new GoneException({
     code: UCE_CAMPAIGN_COLLABORATION_WRITE_RETIRED,
     message:

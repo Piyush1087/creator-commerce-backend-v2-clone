@@ -1,6 +1,4 @@
 import {
-  BadRequestException,
-  ForbiddenException,
   GoneException,
   Injectable,
   NotFoundException,
@@ -13,7 +11,6 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
-import { normalizeInstagramHandle } from "../../brand-uce/utils/instagram-handle.util";
 import { generateInvitationToken } from "../utils/invitation-token.util";
 
 type AuthUser = { id: string; email: string; role: UserRole };
@@ -56,58 +53,13 @@ export class CreatorInvitationService {
   }
 
   async claimInvitation(user: AuthUser, token: string) {
+    void user;
+    void token;
     throw new GoneException({
       code: "OUT_OF_MVP_COMPETING_TRANSITION_RETIRED",
       message:
         "Marketplace invitation claim cannot mutate UceCampaignCollaboration; use canonical C-03 apply",
     });
-    void user;
-    void token;
-    if (user.role !== UserRole.CREATOR) {
-      throw new ForbiddenException("Creator access required");
-    }
-
-    const profile = await this.prisma.creatorProfile.findUnique({
-      where: { userId: user.id },
-    });
-    if (!profile?.instagramHandle) {
-      throw new BadRequestException(
-        "Complete your creator profile with an Instagram handle before claiming an invitation.",
-      );
-    }
-
-    const handle = normalizeInstagramHandle(profile.instagramHandle);
-    const collab = await this.prisma.uceCampaignCollaboration.findFirst({
-      where: { invitationToken: token },
-    });
-
-    if (!collab) {
-      throw new NotFoundException("Invitation not found");
-    }
-
-    if (collab.instagramHandle !== handle) {
-      throw new ForbiddenException(
-        "This invitation was issued to a different creator profile.",
-      );
-    }
-
-    if (
-      collab.collabStatus !== UceCollabStatus.PROSPECT_INVITED &&
-      collab.collabStatus !== UceCollabStatus.PROSPECT_CURATED
-    ) {
-      throw new BadRequestException("Invitation has already been claimed or is no longer valid.");
-    }
-
-    await this.prisma.uceCampaignCollaboration.update({
-      where: { id: collab.id },
-      data: { collabStatus: UceCollabStatus.PROSPECT_INVITED },
-    });
-
-    return {
-      collaboration_id: collab.id,
-      campaign_id: collab.campaignId,
-      claimed: true,
-    };
   }
 
   bypassesEligibility(applicationScope: UceApplicationScope | null | undefined): boolean {

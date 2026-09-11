@@ -15,10 +15,10 @@ OTP codes and secrets are not recorded here.
 | INV-05 | PASS (unit + smoke) | Shell tests + browser hide | Chat architecture test retargeted RUN 9 (no P6 git-diff) |
 | INV-06 | **PASS** postgres (2026-09-09 retry) | Fresh `c03_p14_handoff` 34/34 serial `--testTimeout=30000` | Prior 5s timeouts + dirty-DB count drift were `ENVIRONMENT_BLOCKED`, not product red |
 | INV-07 | **PASS** postgres handoff; local seed leftover closed RUN 9 | Same suite: approval commits `Collaboration` | `scripts/seed-dev-collaboration.ts` now seeds a **legacy** brief-linked fixture (`source_application_id` null). Canonical handoff remains this suite |
-| INV-08 | PARTIAL | C-05 P2 architecture + Brand Payouts v1 pulled (provider-disabled). C-06 still OUT |
-| INV-09 | PARTIAL | C-05 Settings contact/shipping unit+architecture PASS (BE 24/24 isolated; Parent reconfirm 2026-09-09 BE contact-phone 8/8 + FE 6/6). Collab `POST creator/shipping-address` is already `410`. C-04 fulfillment still stores Brand-entered evidence, not `CreatorShippingAddress`. |
-| INV-10 | PARTIAL | Postmark OTP template live send **PASS** 2026-09-10 (Parent-confirmed inboxes). RUN 4/postgres “send failed” was invalid TemplateId `1` (422/1101); off-prod OTP still issued from log. | Live IG/Razorpay NOT_RUN |
-| INV-11 | PARTIAL | Browser Brand Home fail-closed for Creator | |
+| INV-08 | PARTIAL | C-05 P2 architecture + Brand Payouts v1 pulled (provider-disabled). Wave B postgres **PASS 3/3**. C-06 still OUT — left for next |
+| INV-09 | PARTIAL | Settings contact proven. Leftover collab `POST creator/shipping-address` HTTP **and** service writer retired `410` (Parent OUT-API check: not a competing transition). C-04 fulfillment still does not consume `CreatorShippingAddress` (do not invent wiring) |
+| INV-10 | PARTIAL | Postmark OTP template live send **PASS** 2026-09-10. Fail-closed payouts/C-05 recovery **PASS classified** 2026-09-11. Live IG/Razorpay **NOT_RUN** |
+| INV-11 | PASS classified | Accepted IN feature API clients use `authenticatedFetch` → `/api/v1`. Brand Home / Creator Home aggregators only. Brand Home fail-closed for Creator (smoke). OUT Co-Pilot/Centre/C-06 hub excluded | |
 | INV-12 | PASS (unit + postgres 11/11 + browser) | `brand-workspace-authorization.postgres.test.ts` on `bs07_freeze_auth` | |
 | INV-13 | PASS classified (pairs 1–2 leftover journey writers retired) | Pair 1 `UceCampaignCollaboration` writes `410`. Pair 2 leftover commercial/logistics/media/finalization service writes `410 LEGACY_COLLABORATION_AGGREGATE_WRITE_RETIRED`; escrow reserve no longer writes `CollaborationCommercial`. Canonical C-03/C-04 still write `Collaboration` + `CollaborationCommercialAgreement`. Tables retained. **No Prisma drop.** Proof: `../phase-d-invariants/inv-13-competing-writers.md` | Writer proof closed; freeze itself is still not PASS |
 

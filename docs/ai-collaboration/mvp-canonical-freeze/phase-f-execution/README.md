@@ -1,6 +1,6 @@
 # Phase F — Execution policy and ledger (§13)
 
-**Status:** ACTIVE — ledger current through RUN 12 authAuthorizationHeader cutover; **not** freeze PASS  
+**Status:** ACTIVE — ledger current through RUN 13 amendment (C-04 / C-02A / Payouts + INV-13 + Wave B postgres); **not** freeze PASS  
 **Date:** 2026-09-08; ledger audit 2026-09-10
 
 ## Files in this folder
@@ -21,8 +21,8 @@ AWS deploy is not started. `docs/aws-environments/` and `docs/deployment/hotfix/
 | RUN 2 canonical convergence | **Skipped as a pull** — IN already in lineage; RUN 2 is docs |
 | RUN 3 whole-app acceptance | Split across RUN 3–5 (build/migrate; lint/invariants/smoke; postgres/npm ci/full test) |
 | RUN 4 freeze preparation | Artifact written in RUN 4; still not PASS |
-| Ledger + checkpoint SHA every material run | YES RUN 1–12; RUN 7–12 evidence SHAs recorded; ledger-record commit sits on top |
-| Runner does not reconcile conflicting accepted sources | YES — C-02A / C-04 / Payouts stay deferred |
+| Ledger + checkpoint SHA every material run | YES RUN 1–13; RUN 13 local BE `23d315a` / FE `5e6cfe5`; origin BE one commit behind until Parent asks push |
+| Runner does not reconcile conflicting accepted sources | YES — C-06 stays OUT; C-02A / C-04 / Payouts pulled this amendment |
 
 ## RUN 6 (2026-09-09)
 
@@ -52,7 +52,11 @@ Local Postmark OTP template live send **PASS** (Parent-confirmed inboxes). Prior
 
 Brand Centre / UCE clients switched to `authenticatedFetch`; `authAuthorizationHeader` removed. Isolated FE vitest **5 files / 24 passed** including `auth-security-static.test.ts`. Named RUN 5 FE farm files now closed; full FE `npm test` farm not re-run. Evidence FE `8c1362af…` / BE `eea4e716…`. Not freeze PASS.
 
+## RUN 13 (2026-09-10 / 2026-09-11)
+
+Converge C-04 / C-02A / Brand Payouts v1. INV-13 Pair 1–2 leftover journey writers retired `410`. C-04 collab Vitest **106/106**. Wave B postgres **PASS 3/3** on disposable `waveb_runtime` (Parent reconfirm). Local tips BE `23d315ad…` / FE `5e6cfe53…`. Origin BE still one commit behind. Security declaration withheld. Not freeze PASS.
+
 ## Leftovers
 
 - Do not start a charter-shaped RUN 2 pull to match the diagram.
-- Freeze PASS still forbidden (security sentence, classified test farms, deferred packs).
+- Freeze PASS still forbidden (security sentence, classified test farms, C-06 OUT, smoke after this amendment).

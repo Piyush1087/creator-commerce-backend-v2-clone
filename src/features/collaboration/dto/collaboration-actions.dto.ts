@@ -138,6 +138,13 @@ export class SubmitCollaborationReviewDto {
   review_text?: string;
 }
 
+export class UpsertCreatorBankDetailsDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  account_holder_name?: string;
+}
+
 export class UpsertCreatorShippingAddressDto {
   @IsString()
   @MinLength(2)

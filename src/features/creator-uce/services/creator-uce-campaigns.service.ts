@@ -15,6 +15,7 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import { SubscriptionCapabilityService } from "../../pricing/services/subscription-capability.service";
 import {
   buildPhaseSyncPatch,
   mapContentFormatFromTags,
@@ -111,7 +112,7 @@ export class CreatorUceCampaignsService {
     const profile = await this.prisma.creatorProfile.findUnique({
       where: { userId: user.id },
     });
-    if (!profile?.instagramHandle) {
+    if (!profile || !profile.instagramHandle) {
       throw new BadRequestException(
         "Complete your creator profile with an Instagram handle before applying.",
       );
@@ -126,6 +127,7 @@ export class CreatorUceCampaignsService {
         "Campaign not found or not open for applications",
       );
     }
+    const targeting = campaign.targeting;
     await this.subscriptionCapabilities.assertCapability(
       campaign.brandProfileId,
       "APPLICATION_CREATE",
@@ -151,11 +153,11 @@ export class CreatorUceCampaignsService {
       pipelineRow !== null && isInvitedCollaboration(pipelineRow.collabStatus);
     const eligibility = this.eligibility.evaluateTargeting(
       creatorContext,
-      campaign.targeting,
+      targeting,
       { creatorEmail: user.email },
     );
     const inviteBypass =
-      campaign.targeting.applicationScope === UceApplicationScope.DIRECT_BYPASS;
+      targeting.applicationScope === UceApplicationScope.DIRECT_BYPASS;
 
     if (!eligibility.is_eligible && !(isInvited && inviteBypass)) {
       throw new BadRequestException(

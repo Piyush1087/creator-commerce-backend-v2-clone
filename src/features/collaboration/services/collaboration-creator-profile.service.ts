@@ -1,5 +1,6 @@
 import {
   ForbiddenException,
+  GoneException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -35,35 +36,9 @@ export class CollaborationCreatorProfileService {
     user: AuthUser,
     dto: UpsertCreatorShippingAddressDto,
   ) {
-    this.assertCreator(user);
-    const profile = await this.ensureProfile(user.id);
-
-    await this.prisma.creatorShippingAddress.updateMany({
-      where: { creatorProfileId: profile.id },
-      data: { isDefault: false },
-    });
-
-    const row = await this.prisma.creatorShippingAddress.create({
-      data: {
-        creatorProfileId: profile.id,
-        recipientName: dto.recipient_name,
-        addressLine1: dto.address_line_1,
-        addressLine2: dto.address_line_2,
-        city: dto.city,
-        stateRegion: dto.state_region,
-        postalCode: dto.postal_code,
-        countryCode: dto.country_code ?? "IN",
-        phone: dto.phone,
-        isDefault: true,
-      },
-    });
-
-    return {
-      shipping_address_id: row.id,
-      recipient_name: row.recipientName,
-      city: row.city,
-      is_default: row.isDefault,
-    };
+    void user;
+    void dto;
+    throw new GoneException("Use Creator Settings contact destination");
   }
 
   async getCreatorProfile(user: AuthUser) {

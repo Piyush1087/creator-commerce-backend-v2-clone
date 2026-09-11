@@ -207,7 +207,7 @@ lineage_named_merge: FE d39c5ee8d9763882359148dd77e34c72dd6a5061 / BE 29224609d1
 closeout/docs_SHA: UNKNOWN_REQUIRES_REVIEW
 current canonical branch/head: freeze/mvp-canonical-application-v1
 status: ACCEPTED on snapshot (no separate named runtime SHA in RUN 1)
-remaining_debt: UCE table→cards closed RUN 8; canonical-draft client authenticatedFetch RUN 12; UceCampaignCollaboration leftover vs Collaboration (INV-13 Parent later amendment)
+remaining_debt: UCE table→cards closed RUN 8; canonical-draft client authenticatedFetch RUN 12; UceCampaignCollaboration writes retired 410 (INV-13 Pair 1)
 upstream: BRAND-SETTINGS, PI-V1, C-03
 downstream: BRAND-COLLAB, C-03, CHAT-HOME
 ```
@@ -224,9 +224,9 @@ frontend_runtime_acceptance_SHA: 591abd3ad51c7d763df9e4c71b1998e2bba52d09
 closeout/docs_SHA: UNKNOWN_REQUIRES_REVIEW
 current canonical branch/head: freeze/mvp-canonical-application-v1
 status: ACCEPTED WITH DEBT
-remaining_debt: INV-13 duplicate persistence; INV-09 fulfillment does not consume CreatorShippingAddress; C-04 not pulled
+remaining_debt: INV-13 leftover journey writers retired 410 (tables retained); INV-09 fulfillment does not consume CreatorShippingAddress; C-04 PULLED this amendment
 upstream: BRAND-UCE, C-03, PLAT-SHARED
-downstream: Creator collab UI still mounted (C-04 deferred)
+downstream: Creator collab UI mounted via C-04
 ```
 
 ### C-01 — Creator Entry
@@ -262,7 +262,7 @@ backend_runtime_acceptance_SHA: 156d5834266077be7e2b6a2d459bae5489edbbd6
 frontend_runtime_acceptance_SHA: 323658d4b147b95b5629ff8d91fa90b8fe9077e4
 current canonical branch/head: freeze/mvp-canonical-application-v1
 status: ACCEPTED
-remaining_debt: INV-09 consumption not in tree; Home is C-05 entry not C-02A
+remaining_debt: INV-09 C-04 fulfillment still does not consume CreatorShippingAddress; Home is C-02A (pulled)
 upstream: C-01, PLAT-SHARED
 downstream: C-03 nav, Creator Settings
 ```
@@ -340,7 +340,7 @@ architecture_authority_SHA: 7790864dbd4764b9a4118856e3ca074fb374ce7e
 backend_runtime_acceptance_SHA: ec395bf5760b295dddd9c3f7e9c2f05485b6b743
 frontend_runtime_acceptance_SHA: 106de9988ea2d4bd534205b083f63ae7ecd1878c
 status: PULLED_IN_TREE
-remaining_debt: leftover Brand Collab HTTP retired 410; UceCampaignCollaboration writes retired 410
+remaining_debt: leftover Brand Collab HTTP retired 410; Pair 1/2 leftover journey writers retired 410; tables retained
 upstream: C-03, BRAND-COLLAB
 downstream: C-02A
 ```
@@ -355,7 +355,7 @@ architecture_authority_path: UNKNOWN_REQUIRES_REVIEW
 backend_runtime_acceptance_SHA: a38102fd9662f1654c9572b19913b9e228385b73
 frontend_runtime_acceptance_SHA: 25441dd4fd228bec4d6c9fe9f39c2297318b6167
 status: PULLED_IN_TREE
-remaining_debt: provider-disabled; C-06 stays OUT; do not treat old hub as this module
+remaining_debt: provider-disabled; Wave B postgres PASS 3/3 on waveb_runtime; C-06 stays OUT; do not treat old hub as this module
 upstream: BRAND-SETTINGS escrow
 downstream: none in this freeze
 ```

@@ -9,7 +9,6 @@ import {
   IndustryVertical,
   PlannerWorkflowStatus,
   UserRole,
-  type UceMilestoneStage,
 } from "@prisma/client";
 
 import { BrandCentreDnaService } from "../../brand-centre/services/brand-centre-dna.service";
@@ -19,8 +18,6 @@ import { BrandCentreUceBridgeService } from "../../brand-centre-uce-bridge/servi
 import { BrandSettingsService } from "../../brand-settings/services/brand-settings.service";
 import { BrandUceCampaignService } from "../../brand-uce/services/brand-uce-campaign.service";
 import { CollaborationService } from "../../collaboration/services/collaboration.service";
-import { CollaborationNegotiationService } from "../../collaboration/services/collaboration-negotiation.service";
-import { CollaborationSecurementService } from "../../collaboration/services/collaboration-securement.service";
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
 import {
@@ -41,12 +38,7 @@ import {
   validationChecklistToPayloadFields,
   type CampaignListValidationAction,
 } from "../modules/uce-campaign-list/campaign-list-validation";
-import {
-  mapCollaborationValidationError,
-  validationChecklistToPayloadFields as collabValidationChecklistToPayloadFields,
-  type CollaborationValidationAction,
-} from "../modules/collaboration/collaboration-validation";
-import { isBrandWriteAllowedAtStage } from "../modules/collaboration/collaboration.stages";
+import { type CollaborationValidationAction } from "../modules/collaboration/collaboration-validation";
 import {
   mapBrandSettingsValidationError,
   validationChecklistToPayloadFields as settingsValidationChecklistToPayloadFields,
@@ -102,8 +94,6 @@ export class CoPilotHitlService {
     private readonly planner: BrandCentrePlannerService,
     private readonly bridge: BrandCentreUceBridgeService,
     private readonly collaboration: CollaborationService,
-    private readonly collaborationNegotiation: CollaborationNegotiationService,
-    private readonly collaborationSecurement: CollaborationSecurementService,
     private readonly brandSettings: BrandSettingsService,
     private readonly conversationMemory: CoPilotConversationMemoryService,
   ) {}
@@ -1476,123 +1466,12 @@ export class CoPilotHitlService {
       message:
         "Co-Pilot cannot mutate Collaboration; use canonical Collaboration APIs",
     });
-    const collaborationId = this.parseSelectId(args.staged.collaboration_id);
-    const creatorLabel =
-      typeof args.staged.creator_label === "string"
-        ? args.staged.creator_label
-        : undefined;
-    const campaignName =
-      typeof args.staged.campaign_name === "string"
-        ? args.staged.campaign_name
-        : undefined;
-
-    if (!collaborationId) {
-      throw new BadRequestException("Collaboration id is required.");
-    }
-
-    try {
-      const authUser = await this.resolveAuthUser(args.userId);
-      if (authUser.role !== UserRole.BRAND) {
-        throw new BadRequestException("Brand access required.");
-      }
-
-      // Defense in depth: re-check stage before mutating (stage can change
-      // between HITL staging and confirm).
-      const detail = await this.collaboration.getThread(
-        authUser,
-        collaborationId,
-      );
-      const currentStage = detail.thread.currentStage as UceMilestoneStage;
-      if (!isBrandWriteAllowedAtStage(args.intent, currentStage)) {
-        throw new BadRequestException(
-          `Cannot complete this action at the current stage ${currentStage}.`,
-        );
-      }
-
-      const meta = await args.run(authUser, collaborationId);
-      await this.slotSessions.clearSession(args.threadId);
-      const resolvedAt = new Date().toISOString();
-      const summary = args.successSummary({
-        stage: meta.stage,
-        campaignName: meta.campaignName ?? campaignName,
-        creatorLabel: meta.creatorLabel ?? creatorLabel,
-      });
-      this.conversationMemory.rememberSelectedCollaboration(args.threadId, {
-        id: collaborationId,
-        name: `${meta.creatorLabel ?? creatorLabel ?? "Creator"} · ${meta.campaignName ?? campaignName ?? ""}`,
-        stage: meta.stage,
-        campaignName: meta.campaignName ?? campaignName,
-      });
-      await this.threads.persistHitlResolution(
-        this.ownerScope(args),
-        args.threadId,
-        String(args.staged.idempotencyKey),
-        {
-          status: "CONFIRMED",
-          resolvedAt,
-          summary,
-        },
-      );
-      return {
-        intent: args.intent,
-        message: summary,
-        hitlResolution: {
-          status: "CONFIRMED",
-          resolvedAt,
-          summary,
-        },
-      };
-    } catch (err) {
-      if (
-        err instanceof BadRequestException &&
-        String(err.message).includes("Collaboration id is required")
-      ) {
-        throw err;
-      }
-      const mapped = mapCollaborationValidationError({
-        err,
-        action: args.action,
-        collaborationId,
-        creatorLabel,
-        campaignName,
-      });
-      const fields = collabValidationChecklistToPayloadFields(mapped);
-      return {
-        intent: args.intent,
-        message: fields.narrativeText,
-        validationBlocked: true,
-        validationChecklist: {
-          ...fields.validationChecklistData,
-          idempotencyKey:
-            typeof args.staged.idempotencyKey === "string"
-              ? args.staged.idempotencyKey
-              : undefined,
-        },
-      };
-    }
   }
 
   private stageFromDetail(
     detail: Awaited<ReturnType<CollaborationService["getThread"]>>,
   ): string {
     return detail.thread.currentStage;
-  }
-
-  private async canonicalInvocationContext(
-    collaborationId: string,
-    staged: Record<string, unknown>,
-  ) {
-    const row = await this.prisma.collaboration.findUniqueOrThrow({
-      where: { id: collaborationId },
-      select: { sourceApplicationId: true, aggregateVersion: true },
-    });
-    return {
-      row,
-      command: {
-        commandId: String(staged.idempotencyKey),
-        expectedAggregateVersion: row.aggregateVersion,
-      },
-    };
   }
 
   private async collaborationMeta(collaborationId: string) {
@@ -1641,21 +1520,9 @@ export class CoPilotHitlService {
       action: "COUNTER_OFFER",
       staged,
       run: async (authUser, collaborationId) => {
-        const context = await this.canonicalInvocationContext(
-          collaborationId,
-          staged,
-        );
-        if (context.row.sourceApplicationId) {
-          await this.collaborationNegotiation.counterOffer(
-            authUser,
-            collaborationId,
-            { ...context.command, counterFee: amount },
-          );
-        } else {
-          await this.collaboration.brandCounterOffer(authUser, collaborationId, {
-            counter_offer: amount,
-          });
-        }
+        await this.collaboration.brandCounterOffer(authUser, collaborationId, {
+          counter_offer: amount,
+        });
         return this.collaborationMeta(collaborationId);
       },
       successSummary: (meta) =>
@@ -1673,19 +1540,11 @@ export class CoPilotHitlService {
       action: "ACCEPT_TERMS",
       staged,
       run: async (authUser, collaborationId) => {
-        const context = await this.canonicalInvocationContext(
+        await this.collaboration.acceptCommercials(
+          authUser,
           collaborationId,
-          staged,
+          {},
         );
-        if (context.row.sourceApplicationId) {
-          await this.collaborationNegotiation.acceptProposedFee(
-            authUser,
-            collaborationId,
-            context.command,
-          );
-        } else {
-          await this.collaboration.acceptCommercials(authUser, collaborationId, {});
-        }
         return this.collaborationMeta(collaborationId);
       },
       successSummary: (meta) =>
@@ -1703,19 +1562,7 @@ export class CoPilotHitlService {
       action: "FUND_ESCROW",
       staged,
       run: async (authUser, collaborationId) => {
-        const context = await this.canonicalInvocationContext(
-          collaborationId,
-          staged,
-        );
-        if (context.row.sourceApplicationId) {
-          await this.collaborationSecurement.requestEscrowFunding(
-            authUser,
-            collaborationId,
-            context.command,
-          );
-        } else {
-          await this.collaboration.fundEscrow(authUser, collaborationId, {});
-        }
+        await this.collaboration.fundEscrow(authUser, collaborationId, {});
         return this.collaborationMeta(collaborationId);
       },
       successSummary: (meta) =>

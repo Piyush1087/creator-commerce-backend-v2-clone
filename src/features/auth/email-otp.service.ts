@@ -22,6 +22,7 @@ import {
 import { AuthMailDeliveryError, MailService } from "../../mail/mail.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { normalizeEmail } from "../../shared/identity/normalize-email";
+import { isProductionStage, shouldLogOtpCodes } from "./auth-otp-log";
 import {
   AUTH_OTP_TTL,
   durationToMs,
@@ -47,10 +48,10 @@ export class EmailOtpService {
   ) {}
 
   private isProduction(): boolean {
-    return (
+    return isProductionStage(
       (this.config.get<string>("STAGE") ?? process.env.STAGE ?? "")
         .trim()
-        .toLowerCase() === "prod"
+        .toLowerCase(),
     );
   }
 
@@ -121,7 +122,7 @@ export class EmailOtpService {
     });
     if (!challenge) return;
 
-    if (!this.isProduction()) {
+    if (shouldLogOtpCodes(this.config)) {
       this.logger.warn(
         `[OTP] purpose=${input.purpose} email=${normalizedEmail} code=${code} expiresAt=${expiresAt.toISOString()}`,
       );

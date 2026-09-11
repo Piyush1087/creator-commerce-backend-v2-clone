@@ -79,17 +79,30 @@ When a later accepted module lands, reconstruct order from current dummy_tcs aut
 2 converge C-04 / C-02A / Payouts v1 = DONE (C-06 remains OUT)
 3 INV-13 leftover journey writers    = PASS classified (tables retained; no Prisma drop)
 4 OUT competing transitions          = retired 410 where canonical C-04/C-03 already owns the write
-5 NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS = NOT DECLARED (AWS)
-6 affected gates                     = PARTIAL (C-04 collab vitest closed; farms / Wave B / smoke remain)
-7 immutable SHA pair                 = NOT THIS TREE until Parent asks commit
+  leftover collab POST creator/shipping-address HTTP + service = 410 (Settings owns contact)
+5 NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS = NOT DECLARED (AWS creator-dev later; not creator-prod)
+6 affected gates                     = PARTIAL
+  INV-11 PASS classified (accepted IN clients)
+  local smoke PASS 2026-09-11
+  provider fail-closed recovery PASS classified (live IG/Razorpay later)
+  npm run lint:eslint (prettier plugin off) = PASS classified 2026-09-11
+  BE prettier/prettier 712 remains ACCEPTED (do not --fix)
+  INV-08 left for C-06
+  INV-09 consumption of CreatorShippingAddress still PARTIAL (do not invent C-04 wiring)
+7 immutable SHA pair                 = checkpoint after this push; still not freeze PASS
 
 C-04 collab node:test STALE_TEST_PROVEN = CLOSED
   14 files / 106 tests PASS under Vitest (harnesses retargeted to current constructors)
 
 BE prettier/prettier 712                 = ACCEPTED this freeze
   do not --fix
-  later eslint without prettier: if the only remaining findings are the same prettier farm, accept as PASS classified
+  npm run lint:eslint = ESLint without eslint-plugin-prettier
+  if that run is clean, BE lint = PASS classified
   new non-prettier eslint findings       = not auto-accepted
+
+Brand Payouts Wave B postgres            = PASS 3/3
+  disposable localhost/waveb_runtime; 94 migrations; prisma generate required
+  npx vitest does not run pretest generate — first fail was stale client, not Pair 2
 ```
 
 Do not declare `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` from this progress block.
@@ -634,6 +647,21 @@ PRODUCTION_DB_STATE_UNKNOWN
 
 If historical production data may matter, the freeze must identify that as an AWS/release gate. Do not silently assume a destructive fresh start.
 
+### Amendment — AWS test account is creator-dev
+
+The freeze worker still does not deploy. When an AWS worker (or Parent) runs env/DB proof, the test account is **`creator-dev`** (`--stage dev`, profile `creator-dev`), **not** `creator-prod`.
+
+```text
+AWS test / AWS DB              = creator-dev
+jumpbox                        = temp-dev-db-ssm-jump (scripts/start-dev-tunnel.ps1 / npm run db:tunnel:dev)
+creator-dev data               = disposable for freeze/dev proof; may be cleaned and migrated fresh
+creator-prod                   = DO NOT TOUCH until real go-live
+sst deploy --stage prod        = NOT THIS WORKER
+OTP codes in logs              = required on STAGE=dev; forbidden on STAGE=prod
+```
+
+Do not use `creator-prod` as a test bed. Do not treat a clean of creator-dev as a production-data decision. Live IG / Razorpay remain `PROVIDER_DEFERRED` on that account until Product runs them.
+
 ---
 
 ## 15. Security and release hygiene SOP
@@ -671,7 +699,7 @@ The intermediate artifact correctly left:
 NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS = NOT DECLARED THIS FREEZE
 ```
 
-This amendment may not declare PASS without that posture. Prod apply-bypass empty and no OTP logs on `STAGE=prod` remain AWS/prod gates. Competing OUT mutations also block the declaration.
+This amendment may not declare PASS without that posture. Empty apply-bypass and no OTP logs on `STAGE=prod` remain production gates. AWS **dev** proof uses `creator-dev` / `STAGE=dev` (OTP `[OTP]` logs required for testers). Competing leftover collab shipping writes are retired `410`. Remaining: Brand UCE second persistence engine (IN), Chat Home HITL campaign/planner intents, unauthenticated public marketplace GET (read-only), Centre media-kit PATCH (OUT writing OUT).
 
 ---
 
@@ -784,11 +812,11 @@ RELEASE_BLOCKER
 
 After each convergence block, rerun gates the pull can change. Do not re-open classified prettier 712 or environment-blocked farms as a PASS claim unless the pull actually changes that surface.
 
-BE `prettier/prettier` 712 is **accepted this freeze** (`PREEXISTING_ACCEPTED_DEBT`). Do not `--fix`. A later `eslint` run with prettier disabled is allowed. If that run shows only the same prettier farm, keep **PASS classified**. New non-prettier eslint findings are not auto-accepted.
+BE `prettier/prettier` 712 is **accepted this freeze** (`PREEXISTING_ACCEPTED_DEBT`). Do not `--fix`. Run `npm run lint:eslint` (ESLint with `eslint-plugin-prettier` disabled). If that run is clean, backend lint is **PASS classified**. `npm run lint` still reports the prettier farm. New non-prettier eslint findings are not auto-accepted. Full `npm test` farms stay classified / not greened.
 
 C-04 collab files previously classified `STALE_TEST_PROVEN` (`node:test`, vitest 0 suites) are **re-proven** this amendment: Vitest **14 files / 106 tests PASS**. Harnesses were retargeted to the current C-04 / Brand Payouts constructors (projection outbox, advisory lock, payouts lineage, retired Manual rail). That classification does not automatically clear other STALE / ENVIRONMENT_BLOCKED farms.
 
-When a subsequent accepted module is pulled, apply the same rule: empty or stale suites owned by that module must be re-proven after it is in lineage. INV-08 / INV-09 stay PARTIAL until their remaining product boundaries close. INV-13 leftover journey writers are PASS classified (tables retained).
+When a subsequent accepted module is pulled, apply the same rule: empty or stale suites owned by that module must be re-proven after it is in lineage. INV-08 stays PARTIAL until C-06. INV-09 leftover collab shipping HTTP/service is retired `410`; C-04 fulfillment still does not consume `CreatorShippingAddress` (do not invent that wiring). INV-11 accepted-IN clients are PASS classified. INV-13 leftover journey writers are PASS classified (tables retained).
 
 ---
 
@@ -935,6 +963,15 @@ Provide:
 The AWS worker then independently owns:
 
 ```text
+AWS test account                 = creator-dev / --stage dev
+jumpbox                          = npm run db:tunnel:dev (temp-dev-db-ssm-jump)
+creator-dev DB                   = may be cleaned and migrated fresh
+creator-prod                     = DO NOT TOUCH until real go-live
+```
+
+Plus the usual AWS audit / IAM / VPC / RDS / ECS / secret injection / `--stage dev` deploy / production release gates. This freeze worker still does not deploy.
+
+```text
 AWS account / region confirmation
 IAM and permission model
 network/VPC/subnet/security-group audit
@@ -994,7 +1031,7 @@ If AWS later discovers a software inconsistency that changes the frozen applicat
 
 ### Amendment — completion vs PASS
 
-This amendment is **not** complete, and **not** PASS, until the seven remaining review items are closed with durable evidence. Classification of prettier/farm debt is not clearance. AWS remains a downstream worker.
+This amendment is **not** complete, and **not** PASS, until remaining review items 5–7 are closed with durable evidence (security declaration, affected smoke/farms as required, one origin-published SHA pair). Items 1–4 of the review remaining-work list are closed or classified as this amendment records. Classification of prettier/farm debt is not clearance. AWS remains a downstream worker.
 
 ---
 

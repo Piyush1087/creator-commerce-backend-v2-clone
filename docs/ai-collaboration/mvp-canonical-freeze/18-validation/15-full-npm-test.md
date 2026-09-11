@@ -17,7 +17,7 @@ exit 1
 | --- | --- | --- |
 | `src/features/auth/auth-security-static.test.ts` | RUN 5: `authAuthorizationHeader` in Brand Centre / UCE clients | **Closed RUN 12.** Clients use `authenticatedFetch`; helper removed. Isolated vitest **4/4 PASS** plus related clients **24/24** 2026-09-10. Test not weakened. Full `npm test` farm not re-run. |
 | `src/features/chat/chat-architecture.test.ts` | git diff vs Chat P6 SHA includes `sidebar-items.ts` | **Closed RUN 9.** Test no longer git-diffs P6; asserts Brand Home still owns Chat, no Chat sidebar label, no `/brand/chat`. Full `npm test` farm not re-run. |
-| `src/pages/brand/settings/brand-settings-billing-page.test.ts` | `WithdrawalAccount` still in `brand-settings.contracts.ts` | **Amended 2026-09-09:** unused FE types `BrandWithdrawalAccountResponse` / `LinkBrandWithdrawalAccountPayload` deleted. UI/client already had no withdrawal surface. Backend `…/withdrawal-account` remains with other OUT/old-payout APIs (separate Parent call). Brand Payouts v1 still not pulled. |
+| `src/pages/brand/settings/brand-settings-billing-page.test.ts` | `WithdrawalAccount` still in `brand-settings.contracts.ts` | **Amended 2026-09-09:** unused FE types `BrandWithdrawalAccountResponse` / `LinkBrandWithdrawalAccountPayload` deleted. UI/client already had no withdrawal surface. Backend `…/withdrawal-account` remains with other OUT/old-payout APIs. Brand Payouts v1 is pulled this amendment (provider-disabled). |
 
 Not a freeze-hide functional regression. Not greenwashed as pass.
 
@@ -38,7 +38,7 @@ Clusters (not freeze-hide):
 - **Brief Pack** (`creator-brief-pack.test.ts`): farm 5s timeout. Parent isolated 2026-09-09 **1/1 PASS** (~12s). Farm = `ENVIRONMENT_BLOCKED`.
 - **Brand Preview artifacts:** farm 5s timeout. Isolated earlier **4/4 PASS**. Farm = `ENVIRONMENT_BLOCKED`.
 - **Gatekeeper orchestrator** (`gatekeeper-runtime-orchestrator.test.ts`): farm 5s timeouts + one LOW-spy assert. Parent isolated 2026-09-09 **7/7 PASS** (~3s). Farm = `ENVIRONMENT_BLOCKED`. Product contract holds.
-- **Financial producer / route-payout architecture greps:** still open vs deferred Brand Payouts v1 / C-04 (not a charter requirement for this freeze).
-- **Postgres files in this farm:** skipped (no opt-in flags) — expected
+- **Financial producer / route-payout architecture greps:** C-04 / Brand Payouts v1 are now in lineage. Targeted Payouts unit + Wave B postgres **PASS 3/3**. Full farm not re-run.
+- **Postgres files in this farm:** skipped (no opt-in flags) — expected. Wave B postgres is opt-in (`BRAND_PAYOUTS_WAVE_B_DATABASE_TEST`) on disposable `waveb_runtime` only.
 
 Do not treat full `npm test` as freeze PASS.

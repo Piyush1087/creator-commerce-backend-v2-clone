@@ -12,6 +12,16 @@ Software freeze (`docs/ai-collaboration/mvp-canonical-freeze/`) is a separate pr
 
 **Keep the current two-account layout. Keep using `creator-dev` for all application testing. Do not touch `creator-prod` until a real production go-live.**
 
+Freeze / AWS-dev proof uses:
+
+- profile `creator-dev`, SST `--stage dev`
+- jumpbox `temp-dev-db-ssm-jump` (`npm run db:tunnel:dev`) when a tunnel to the AWS DB is required
+- creator-dev data may be **cleaned and migrated fresh** for freeze/dev testing (it is not production data)
+- `STAGE=dev` (OTP `[OTP]` logs required for testers)
+- `creator-prod` stays placeholder
+
+This freeze worker still does not `sst deploy`. The AWS deploy worker default remains `--stage dev` only.
+
 Do not introduce a third SST stage, a TEST_MINI stack in the prod account, or mode-switch automation now. Those ideas are written down so they are not reinvented; they are **not** the next action. Reasons (complexity, usefulness, redundancy, cost) are in [`modes-and-recommendation.md`](./modes-and-recommendation.md).
 
 ## How to read

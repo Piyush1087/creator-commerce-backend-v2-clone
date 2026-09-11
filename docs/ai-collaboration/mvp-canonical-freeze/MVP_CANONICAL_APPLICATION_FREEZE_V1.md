@@ -25,17 +25,17 @@ Freeze workspace (do not treat `development` / `main` as the freeze):
 ```text
 BACKEND_CANONICAL_REPOSITORY  = growth-verse/creator-commerce-backend-v2
 BACKEND_CANONICAL_BRANCH      = freeze/mvp-canonical-application-v1
-BACKEND_CANONICAL_SHA         = aaa0b834ee6fce6785c8c4bc9bcc33847910b825
+BACKEND_CANONICAL_SHA         = 23d315ad55360a6cd591f0155785c29447200987
 
 FRONTEND_CANONICAL_REPOSITORY = growth-verse/creator-commerce-frontend-v2
 FRONTEND_CANONICAL_BRANCH     = freeze/mvp-canonical-application-v1
-FRONTEND_CANONICAL_SHA        = 12fa514d37dfe6ade1d2991aa86a0b8635cf34c7
+FRONTEND_CANONICAL_SHA        = 5e6cfe53786c599a92abe55aa209c62dfa0e275b
 
 ARCHITECTURE_AUTHORITY_REPO   = Piyush1087/dummy_tcs
 ARCHITECTURE_AUTHORITY_SHA    = 86d8e49e6d1fc0c5ef68b1c89507339de5ca80c5
 ```
 
-These are the 2026-09-10 amendment **evidence** commits (C-04 / C-02A / Brand Payouts pulls + INV-13 Pair 1 / OUT competing-transition retirements). A ledger-record commit may sit on top; use the pushed freeze-branch tips as the immutable pair for this amendment. RUN 6 evidence remains `4d4b350` / `511d5e3`.
+These are the local amendment tips after Pair 2 leftover-writer retirement, C-04 Vitest conversion, and Wave B postgres PASS. Origin BE is still one commit behind `23d315a` until Parent asks push. Not a freeze PASS pair. RUN 6 evidence remains `4d4b350` / `511d5e3`.
 
 RUN 3 ledger-record (parent of RUN 4 evidence):
 
@@ -96,10 +96,10 @@ INV-04 PASS (unit + postgres 5/5 on c05_freeze_team)
 INV-05 PASS (unit + smoke; Chat architecture test retargeted RUN 9)
 INV-06 PASS postgres (fresh c03_p14_handoff 34/34 serial, 2026-09-09)
 INV-07 PASS postgres handoff; local collab seed leftover closed RUN 9 (legacy fixture)
-INV-08 PARTIAL (C-05 payout boundary unit)
-INV-09 PARTIAL (C-05 Settings contact proven; fulfillment does not consume that address)
-INV-10 PARTIAL (Postmark OTP live send PASS 2026-09-10; live IG/Razorpay NOT_RUN)
-INV-11 PARTIAL (Brand Home fail-closed for Creator session)
+INV-08 PARTIAL (Brand Payouts v1 + Wave B; C-06 OUT — next)
+INV-09 PARTIAL (leftover collab shipping 410; C-04 fulfillment does not consume CreatorShippingAddress)
+INV-10 PARTIAL (Postmark live + fail-closed recovery PASS classified; live IG/Razorpay NOT_RUN)
+INV-11 PASS classified (accepted IN API clients → BE; Brand Home fail-closed for Creator)
 INV-12 PASS (unit + postgres 11/11 on bs07_freeze_auth + browser)
 INV-13 PASS classified (Pair 1 and Pair 2 leftover journey writers retired; tables retained). No Prisma drop.
 ```
@@ -168,7 +168,7 @@ BE build PASS (working tree; Parent reconfirm generate+build 2026-09-09; clone n
 BE boot+health PASS on freeze_mvp_canonical_v1
 FE invariant vitest 70/70 PASS
 BE invariant vitest 51/51 PASS
-FE↔BE OTP smoke PARTIAL PASS
+FE↔BE OTP smoke PASS (Parent 2026-09-11; C-02A Home)
 responsive shell/nav viewport PASS (RUN 8: UCE table→cards + Creator viewport)
 BE lint PASS classified 712 prettier  accepted this freeze (do not --fix)
 postgres INV-01/02/03/04/12/06/07 PASS (INV-03 29/29 RUN 7)
@@ -176,6 +176,7 @@ FE npm ci clone typecheck/lint/build PASS
 BE npm ci clone validate PASS; build requires prisma generate
 full FE npm test RUN 5 FAIL 3/1060; named files closed (auth static RUN 12 isolated PASS; chat RUN 9; billing types amended). Full farm not re-run
 full BE npm test FAIL 18/7170 classified; CORS/brief-pack/Gatekeeper isolated PASS (farm load)
+Brand Payouts Wave B postgres PASS 3/3 on localhost/waveb_runtime (generate first; Parent reconfirm 2026-09-11)
 ```
 
 ---

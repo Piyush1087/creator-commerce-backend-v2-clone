@@ -115,67 +115,23 @@ test("Co-Pilot commercial intents are retired and do not dispatch leftover or ca
   let acceptCalls = 0;
   let securementCalls = 0;
   let legacyCalls = 0;
-  let currentStage: UceMilestoneStage = UceMilestoneStage.STAGE_1_NEGOTIATION;
-  const prisma: any = {
-    user: { findUnique: async () => brand },
-    collaboration: {
-      findUniqueOrThrow: async ({ select }: any) =>
-        "aggregateVersion" in select
-          ? { sourceApplicationId: "application-1", aggregateVersion: 7 }
-          : {
-              sourceApplicationId: "application-1",
-              canonicalStage: "NEGOTIATION",
-              currentStage: UceMilestoneStage.STAGE_1_NEGOTIATION,
-              campaign: { name: "Campaign" },
-              creatorUser: {
-                name: "Creator",
-                email: "creator@example.com",
-                creatorProfile: null,
-              },
-            },
-    },
-  };
   const collaboration: any = {
-    getThread: async () => ({
-      thread: { currentStage },
-    }),
     brandCounterOffer: async () => {
       legacyCalls += 1;
     },
   };
-  const negotiation: any = {
-    counterOffer: async (_user: any, id: string, command: any) => {
-      canonicalCalls += 1;
-      assert.equal(id, collaborationId);
-      assert.deepEqual(command, {
-        commandId: "copilot-command-1",
-        expectedAggregateVersion: 7,
-        counterFee: 900,
-      });
-    },
-    acceptProposedFee: async () => {
-      acceptCalls += 1;
-    },
-  };
-  const securement: any = {
-    requestEscrowFunding: async () => {
-      securementCalls += 1;
-    },
-  };
   const hitl = new CoPilotHitlService(
-    prisma,
-    { clearSession: async () => undefined } as any,
-    { persistHitlResolution: async () => undefined } as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
+    {} as never,
+    { clearSession: async () => undefined } as never,
+    { persistHitlResolution: async () => undefined } as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
     collaboration,
-    negotiation,
-    securement,
-    {} as any,
-    { rememberSelectedCollaboration: () => undefined } as any,
+    {} as never,
+    { rememberSelectedCollaboration: () => undefined } as never,
   );
 
   await assert.rejects(

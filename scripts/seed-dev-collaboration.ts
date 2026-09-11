@@ -36,6 +36,9 @@ import {
   SubscriptionTier,
   UceApplicationSource,
   UceApplicationStatus,
+  UceBriefStatus,
+  UceCampaignAssetKind,
+  UceCampaignAssetStatus,
   UceCampaignCreatorIngestionMethod,
   UceCampaignCreatorReviewState,
   UceCampaignCreatorSource,
@@ -62,6 +65,9 @@ const IDS = {
   product: "11111111-1111-4111-8111-111111111103",
   brief: "11111111-1111-4111-8111-111111111104",
   briefDeliverable: "11111111-1111-4111-8111-111111111105",
+  asset: "11111111-1111-4111-8111-111111111106",
+  canonicalBrief: "11111111-1111-4111-8111-111111111107",
+  canonicalDeliverable: "11111111-1111-4111-8111-111111111108",
 } as const;
 
 const json = (value: unknown): Prisma.InputJsonValue =>
@@ -347,7 +353,7 @@ async function main() {
         },
       });
 
-      const briefDeliverable = await tx.uceBriefDeliverable.upsert({
+      await tx.uceBriefDeliverable.upsert({
         where: { id: IDS.briefDeliverable },
         update: {
           briefId: brief.id,
@@ -361,6 +367,55 @@ async function main() {
           format: "SHORT_FORM_VIDEO",
           displayOrder: 0,
           configuration: json({ fixture: true }),
+        },
+      });
+
+      const asset = await tx.uceCampaignAsset.upsert({
+        where: { id: IDS.asset },
+        update: {
+          campaignId: campaign.id,
+          kind: UceCampaignAssetKind.BRAND,
+          brandProfileId: brandProfile.id,
+          status: UceCampaignAssetStatus.ACTIVE,
+        },
+        create: {
+          id: IDS.asset,
+          campaignId: campaign.id,
+          kind: UceCampaignAssetKind.BRAND,
+          brandProfileId: brandProfile.id,
+          status: UceCampaignAssetStatus.ACTIVE,
+        },
+      });
+
+      const canonicalBrief = await tx.canonicalCampaignBrief.upsert({
+        where: { id: IDS.canonicalBrief },
+        update: {
+          campaignAssetId: asset.id,
+          status: UceBriefStatus.PUBLISHED,
+          briefName: "Local acceptance short-form video",
+          platform: UceMediaPlatform.INSTAGRAM,
+        },
+        create: {
+          id: IDS.canonicalBrief,
+          campaignAssetId: asset.id,
+          status: UceBriefStatus.PUBLISHED,
+          briefName: "Local acceptance short-form video",
+          platform: UceMediaPlatform.INSTAGRAM,
+        },
+      });
+
+      const canonicalDeliverable = await tx.canonicalBriefDeliverable.upsert({
+        where: { id: IDS.canonicalDeliverable },
+        update: {
+          briefId: canonicalBrief.id,
+          format: "REEL_VIDEO",
+          displayOrder: 0,
+        },
+        create: {
+          id: IDS.canonicalDeliverable,
+          briefId: canonicalBrief.id,
+          format: "REEL_VIDEO",
+          displayOrder: 0,
         },
       });
 
@@ -403,14 +458,12 @@ async function main() {
         },
         update: {
           creatorProfileId: creatorProfile.id,
-          creatorUserId: creatorUser.id,
           email: CREATOR_EMAIL,
           reviewState: UceCampaignCreatorReviewState.REVIEWED,
         },
         create: {
           campaignId: campaign.id,
           creatorProfileId: creatorProfile.id,
-          creatorUserId: creatorUser.id,
           platform: UceMediaPlatform.INSTAGRAM,
           socialHandle: CREATOR_HANDLE,
           normalizedSocialHandle: CREATOR_HANDLE,
@@ -479,10 +532,10 @@ async function main() {
         "Local acceptance fixture is active. Brand and Creator can message each other.";
       const collaboration = await tx.collaboration.create({
         data: {
-          campaignCreatorId: campaignCreator.id,
           campaignAssetId: product.id,
           brandProfileId: brandProfile.id,
           creatorUserId: creatorUser.id,
+          creatorProfileId: creatorProfile.id,
           campaignId: campaign.id,
           briefId: brief.id,
           productId: product.id,
@@ -546,11 +599,11 @@ async function main() {
           },
           deliverables: {
             create: {
-              sourceBriefDeliverableId: briefDeliverable.id,
+              sourceBriefDeliverableId: canonicalDeliverable.id,
               displayOrder: 0,
               definitionSnapshot: json({
-                id: briefDeliverable.id,
-                format: briefDeliverable.format,
+                id: canonicalDeliverable.id,
+                format: canonicalDeliverable.format,
               }),
               publishingRequired: false,
               publishing: {

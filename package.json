@@ -7,6 +7,7 @@
     "build": "nest build && node scripts/copy-prompt-assets.mjs",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "lint": "eslint \"{src,test}/**/*.ts\"",
+    "lint:eslint": "node scripts/eslint-without-prettier.mjs",
     "pretest": "npm run prisma:generate",
     "test": "vitest run --config vitest.config.ts",
     "pretest:campaign-readiness": "npm run prisma:generate",

@@ -81,4 +81,36 @@ Test Files  14 passed (14)
 Tests       106 passed (106)
 ```
 
+## Brand Payouts Wave B postgres (PASS) — this amendment
+
+First `npx vitest` fail was a stale Prisma client (`payoutReserveApproval` / `financialReserveApproval` missing). `npx vitest` does not run `pretest` generate. After `npx prisma generate` against disposable `localhost/waveb_runtime` (94 migrations; not `thecreatorshop`):
+
+```text
+npx prisma generate
+$env:DATABASE_URL="postgresql://postgres:password@localhost:5432/waveb_runtime?schema=public"
+$env:BRAND_PAYOUTS_WAVE_B_DATABASE_TEST="true"
+npx vitest run src/features/brand-payouts/brand-payouts-wave-b.postgres.test.ts
+Test Files  1 passed (1)
+Tests       3 passed (3)
+```
+
+Post-Wave-B targeted C-04 collab + Payouts unit (no postgres): **23 files / 167 passed / 5 skipped**. Pair 2 leftover-writer retirement did not break Wave B. Parent reconfirm 2026-09-11: same suite **3/3 PASS**.
+
+## INV-11 / INV-09 / fail-closed / lint:eslint — 2026-09-11
+
+```text
+FE  npx vitest run src/routes/inv-11-backend-authority.architecture.test.ts
+    (+ creator-home / brand-home / chat architecture)
+    PASS 3/3 on INV-11 file
+
+BE  npx vitest run src/features/collaboration/inv-09-shipping-disposition.static.test.ts
+    src/features/brand-payouts/brand-payouts-wave-b.test.ts
+    src/features/brand-payouts/brand-payouts-p0.architecture.test.ts
+    src/features/creator-settings/c05-p2-convergence.architecture.test.ts
+    PASS
+
+BE  npm run lint:eslint
+    PASS classified (prettier plugin off; exit 0)
+```
+
 Per-INV mapping: `11-invariant-results.md`.

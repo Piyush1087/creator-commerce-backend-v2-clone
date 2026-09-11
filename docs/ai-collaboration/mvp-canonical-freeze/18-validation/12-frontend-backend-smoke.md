@@ -1,11 +1,11 @@
 # 12 — Frontend ↔ backend smoke
 
-**Date:** 2026-09-08  
-**Run:** RUN 4  
+**Date:** 2026-09-11  
+**Run:** RUN 4 remainder + Parent confirm 2026-09-11  
 **App:** Vite `http://localhost:5173/` proxying `/api` to Nest `http://127.0.0.1:3000`  
-**Database:** disposable `freeze_mvp_canonical_v1` (87/87). `thecreatorshop` not migrated.
+**Database:** disposable `freeze_mvp_canonical_v1` (migrated). `thecreatorshop` not migrated.
 
-OTP codes were read from the local Nest non-prod log and **must not** be committed.
+OTP codes were read from the local Nest non-prod log (`[OTP]`) and **must not** be committed. The same `[OTP]` line is required on AWS `--stage dev` (`STAGE=dev`). `STAGE=prod` must stay silent.
 
 ## Seed
 
@@ -33,7 +33,7 @@ Local Postmark send failed; OTP issue still succeeded off-prod (code logged, the
 | --- | --- |
 | Email-code login | PASS |
 | Immediate post-login | RUN 4 observed bounce to `/brand/dashboard` from preserved `from=`. **RUN 9:** Creator no longer resumes Brand app chrome (`/brand/dashboard`, settings, UCE, onboarding, intelligence, `/brand-centre`). Public `/brand/:slug` still allowed. |
-| `/creator/home` | Deferred C-05 entry: “Creator Home is deferred”. Signed in as `c03-smoke@creator.com`. Nav: Home, Campaigns, Collaborations, Settings |
+| `/creator/home` | **PASS 2026-09-11.** C-02A Creator Home loaded for `c03-smoke@creator.com` (not the old “Home is deferred” surface). Nav: Home, Campaigns, Collaborations, Settings |
 | `/creator/campaigns` | Redirects to `/creator/campaigns/opportunities`. Lists **C-03 Local Smoke Opportunity** |
 | `/creator/settings` | `/creator/settings/account`. Email code Active |
 | `/creator/centre` | Redirects to `/creator/home` |
@@ -55,6 +55,8 @@ Local Postmark send failed; OTP issue still succeeded off-prod (code logged, the
 ## Shell hide
 
 No Marketplace, Creator Centre, Co-Pilot, or old payout hub in authenticated nav for either role.
+
+**2026-09-11 Parent confirm:** remaining smoke paths PASS (unauth + Creator OTP + Brand OTP + nav hide). Creator Home left/right flush padding is a follow-up UI fix, not a smoke fail.
 
 ## Not claimed
 

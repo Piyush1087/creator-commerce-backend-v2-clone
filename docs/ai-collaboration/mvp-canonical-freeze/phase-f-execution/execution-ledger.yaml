@@ -237,13 +237,17 @@ runs:
       campaign-application.service 5/5. Brand Payouts unit PASS.
       FE C-02A Home + Brand Payouts 5 files / 40 passed.
       C-04 collab vitest 14/14 files, 106/106 PASS (former node:test STALE closed).
+      Wave B postgres PASS 3/3 on localhost/waveb_runtime after prisma generate
+      (Parent reconfirm 2026-09-11). Post-Wave-B C-04+Payouts unit 23/167.
       Full farms not re-run.
     checkpoints:
-      frontend: 12fa514d37dfe6ade1d2991aa86a0b8635cf34c7
-      backend: aaa0b834ee6fce6785c8c4bc9bcc33847910b825
+      frontend: 5e6cfe53786c599a92abe55aa209c62dfa0e275b
+      backend: 23d315ad55360a6cd591f0155785c29447200987
     notes: |
-      Evidence commits are the amendment product/docs change. A ledger-record
-      commit may sit on top; pushed freeze-branch tips are the immutable pair
-      for this amendment. C-06 remains OUT. INV-13 Pair 1 and Pair 2 leftover
-      journey writers retired. Security declaration withheld.
+      Evidence product/docs sit at BE 23d315a (Pair 2 leftover writers + C-04
+      Vitest + prettier accepted). FE ledger-record 5e6cfe5. Origin BE is still
+      one commit behind until Parent asks push. C-06 remains OUT. INV-13 Pair 1
+      and Pair 2 leftover journey writers retired. Wave B used disposable
+      waveb_runtime (94 migrations), not thecreatorshop. Security declaration
+      withheld.
 

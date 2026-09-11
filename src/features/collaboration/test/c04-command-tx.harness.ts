@@ -24,17 +24,21 @@ export function patchC04CommandTx(
   const events = tx.collaborationEvent as
     | { create?: (args: unknown) => Promise<unknown> | unknown }
     | undefined;
-  if (events?.create) {
+    if (events?.create) {
     const original = events.create.bind(events);
-    events.create = async (args: { data?: Record<string, unknown> }) => {
+    events.create = async (args: unknown) => {
       const created = await original(args);
       if (created && typeof created === "object" && "id" in created) {
         return created;
       }
+      const payload =
+        args && typeof args === "object" && "data" in args
+          ? (args as { data?: Record<string, unknown> }).data
+          : undefined;
       const data =
         created && typeof created === "object"
           ? created
-          : (args?.data ?? {});
+          : (payload ?? {});
       return { id: "event-1", ...(data as Record<string, unknown>) };
     };
   }

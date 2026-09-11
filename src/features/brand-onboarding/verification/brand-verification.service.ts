@@ -19,6 +19,7 @@ import { MailService } from "../../../mail/mail.service";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { hashPasswordAsync } from "../../../shared/crypto/password.util";
 import { AuthService } from "../../auth/auth.service";
+import { shouldLogOtpCodes } from "../../auth/auth-otp-log";
 import { GoogleAuthService } from "../../auth/google-auth.service";
 import { establishInitialBrandOwner } from "../../brand-settings/team/initial-brand-owner";
 import {
@@ -363,7 +364,7 @@ export class BrandVerificationService {
       },
     });
 
-    if ((process.env.STAGE ?? "").trim().toLowerCase() !== "prod") {
+    if (shouldLogOtpCodes()) {
       this.logger.warn(
         `[OTP] purpose=BRAND_VERIFICATION email=${email} brandProfileId=${brandProfileId} code=${otpCode} expiresAt=${expiresAt.toISOString()}`,
       );

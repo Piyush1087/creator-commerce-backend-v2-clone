@@ -16,6 +16,7 @@ import {
   resolveJwtSecret,
   resolveOtpPepper,
 } from "./auth-jwt.config";
+import { shouldLogOtpCodes } from "./auth-otp-log";
 
 describe("BS-12 authentication security contracts", () => {
   afterEach(() => vi.unstubAllEnvs());
@@ -182,5 +183,13 @@ describe("BS-12 authentication security contracts", () => {
     await expect(ambiguous.sendPasswordReset(request)).rejects.toMatchObject({
       classification: "DELIVERY_UNKNOWN",
     });
+  });
+
+  it("logs OTP codes on local and AWS-dev, never on STAGE=prod", () => {
+    expect(shouldLogOtpCodes(new ConfigService({ STAGE: "local" }))).toBe(true);
+    expect(shouldLogOtpCodes(new ConfigService({ STAGE: "dev" }))).toBe(true);
+    expect(shouldLogOtpCodes(new ConfigService({ STAGE: "prod" }))).toBe(false);
+    vi.stubEnv("STAGE", "");
+    expect(shouldLogOtpCodes()).toBe(true);
   });
 });

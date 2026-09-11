@@ -751,13 +751,14 @@ export class CollaborationService {
     if (!pending) {
       throw new BadRequestException("No pending media to review");
     }
+    const pendingId = pending.id;
 
     const rejectTermination =
       dto.decision === "REJECTED" && thread.revisionCount >= 1;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.collaborationMedia.update({
-        where: { id: pending.id },
+        where: { id: pendingId },
         data: {
           status:
             dto.decision === "APPROVED"
@@ -849,10 +850,11 @@ export class CollaborationService {
     this.assertStage(thread, UceMilestoneStage.STAGE_5_PUBLISHING);
     assertComplianceNotVerified(thread.finalization);
     const fin = thread.finalization;
-    if (!fin?.livePostUrl) {
+    const livePostUrl = fin?.livePostUrl;
+    if (!fin || !livePostUrl) {
       throw new BadRequestException("Live post URL missing");
     }
-    if (!LIVE_URL_DOMAINS.some((re) => re.test(fin.livePostUrl!))) {
+    if (!LIVE_URL_DOMAINS.some((re) => re.test(livePostUrl))) {
       throw new BadRequestException("Live URL domain verification failed");
     }
 

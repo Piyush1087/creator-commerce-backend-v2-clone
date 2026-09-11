@@ -62,4 +62,19 @@ describe("BS-12 runtime backdoor reconciliation", () => {
       "this.sessions.validate(payload.sub, payload.sid)",
     );
   });
+
+  it("prints OTP codes on local and STAGE=dev, never on STAGE=prod", () => {
+    const otpLog = readFileSync(
+      join(project, "src/features/auth/auth-otp-log.ts"),
+      "utf8",
+    );
+    const emailOtp = readFileSync(
+      join(project, "src/features/auth/email-otp.service.ts"),
+      "utf8",
+    );
+    expect(otpLog).toContain('stage === "prod"');
+    expect(otpLog).toContain("AWS `--stage dev`");
+    expect(emailOtp).toContain("shouldLogOtpCodes(this.config)");
+    expect(emailOtp).toContain("[OTP]");
+  });
 });

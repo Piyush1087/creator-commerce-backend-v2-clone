@@ -262,8 +262,9 @@ export class BrandUcePipelineService {
       throw new BadRequestException("Collaboration is not in prospect state");
     }
 
-    if (outreachMessage) {
-      const wordCount = outreachMessage.trim().split(/\s+/).filter(Boolean).length;
+    const outreach = outreachMessage ?? "";
+    if (outreach.length > 0) {
+      const wordCount = outreach.trim().split(/\s+/).filter(Boolean).length;
       if (wordCount > 20) {
         throw new BadRequestException(
           "Outreach templates must stay under 20 words (PIC-03)",
@@ -348,7 +349,7 @@ export class BrandUcePipelineService {
     const productId = dto.product_id ?? collab.productId;
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      if (productId) {
+      if (typeof productId === "string") {
         const product = await tx.uceCampaignProduct.findFirst({
           where: { id: productId, campaignId },
         });

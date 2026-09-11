@@ -27,5 +27,7 @@ export default [
       "@typescript-eslint/no-explicit-any": "off"
     },
   },
-  eslintPluginPrettierRecommended,
+  ...(process.env.ESLINT_WITHOUT_PRETTIER === "1"
+    ? []
+    : [eslintPluginPrettierRecommended]),
 ];

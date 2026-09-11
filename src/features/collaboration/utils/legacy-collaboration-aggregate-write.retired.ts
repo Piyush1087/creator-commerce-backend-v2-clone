@@ -3,7 +3,7 @@ import { GoneException } from "@nestjs/common";
 export const LEGACY_COLLABORATION_AGGREGATE_WRITE_RETIRED =
   "LEGACY_COLLABORATION_AGGREGATE_WRITE_RETIRED" as const;
 
-export function retiredLegacyCollaborationAggregateWrite(): never {
+export function retiredLegacyCollaborationAggregateWrite(): void {
   throw new GoneException({
     code: LEGACY_COLLABORATION_AGGREGATE_WRITE_RETIRED,
     message:

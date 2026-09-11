@@ -55,7 +55,7 @@ Classify, do not drop this run:
 | --- | --- |
 | `CoPilotThread` `CoPilotMessage` `CoPilotMessageFeedback` `CoPilotSlotSession` `CoPilotInteractionLog` | OUT_OF_MVP |
 | Marketplace-era tables from `20260624120000_creator_marketplace` | OUT_OF_MVP / C-03 mixed |
-| Duplicate collab: `UceCampaignCollaboration*` vs `Collaboration*` | COMPETING IN leftover (Brand UCE pipeline). Proof: `../phase-d-invariants/inv-13-competing-writers.md`. No drop |
+| Duplicate collab: `UceCampaignCollaboration*` vs `Collaboration*` | Harmless retained schema after INV-13 Pair 1–2 writer retirement. Proof: `../phase-d-invariants/inv-13-competing-writers.md`. No drop |
 | Duplicate money identity: `CreatorBankDetails` vs `CreatorPayoutDestination` vs `CreatorSettlementProfile` | Bank HTTP `410`; C-05 writes destinations. Settlement retained. No drop |
 
 ## Prisma validate (this run)
@@ -79,6 +79,16 @@ HEAD = 20260910122000_c03_application_handoff_notifications
 Evidence: `../18-validation/08-fresh-db-migrate.md`
 
 Application boot against the same disposable DB is recorded in `../18-validation/09-backend-boot-health.md`.
+
+Amendment 2026-09-11 Wave B disposable DB (not freeze DB, not `thecreatorshop`):
+
+```text
+DATABASE = waveb_runtime (localhost loopback; docker compose engine only)
+MIGRATION_COUNT_APPLIED = 94
+HEAD = 20260912100000_brand_payouts_wave_b_normal_path
+STATUS = Database schema is up to date
+SUITE = brand-payouts-wave-b.postgres.test.ts PASS 3/3 after prisma generate
+```
 
 ## Production-data posture (no AWS inspection)
 
