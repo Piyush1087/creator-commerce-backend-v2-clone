@@ -20,6 +20,6 @@ OTP codes and secrets are not recorded here.
 | INV-10 | PARTIAL | Postmark OTP template live send **PASS** 2026-09-10 (Parent-confirmed inboxes). RUN 4/postgres “send failed” was invalid TemplateId `1` (422/1101); off-prod OTP still issued from log. | Live IG/Razorpay NOT_RUN |
 | INV-11 | PARTIAL | Browser Brand Home fail-closed for Creator | |
 | INV-12 | PASS (unit + postgres 11/11 + browser) | `brand-workspace-authorization.postgres.test.ts` on `bs07_freeze_auth` | |
-| INV-13 | FAIL classified (Pair 1 writers retired) | `UceCampaignCollaboration` writes fail-closed `410` (Brand UCE pipeline, creator-uce apply, marketplace, leftover approve update). Canonical C-03/C-04 still write `Collaboration`. Pair 2 escrow/legacy commercial source writers remain. **No Prisma drop.** Proof: `../phase-d-invariants/inv-13-competing-writers.md` | Pair 1 Parent decision applied; overall INV-13 not PASS |
+| INV-13 | PASS classified (pairs 1–2 leftover journey writers retired) | Pair 1 `UceCampaignCollaboration` writes `410`. Pair 2 leftover commercial/logistics/media/finalization service writes `410 LEGACY_COLLABORATION_AGGREGATE_WRITE_RETIRED`; escrow reserve no longer writes `CollaborationCommercial`. Canonical C-03/C-04 still write `Collaboration` + `CollaborationCommercialAgreement`. Tables retained. **No Prisma drop.** Proof: `../phase-d-invariants/inv-13-competing-writers.md` | Writer proof closed; freeze itself is still not PASS |
 
 Postgres commands: `13-postgres-invariants.md`.

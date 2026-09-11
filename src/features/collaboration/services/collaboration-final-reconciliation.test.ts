@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 
 import {
   CollaborationPayoutMode,
@@ -67,10 +67,10 @@ function legacyService(sourceApplicationId: string | null) {
   return { service, getLegacyMutationCount: () => legacyMutationCount };
 }
 
-test("all retained legacy commercial mutations reject canonical Application-origin rows", async () => {
+test("leftover commercial mutations fail-close before Prisma", async () => {
   const h = legacyService("application-1");
   const expected = (error: any) =>
-    error?.response?.code === "LEGACY_ROUTE_CANONICAL_ROW";
+    error?.response?.code === "LEGACY_COLLABORATION_AGGREGATE_WRITE_RETIRED";
 
   await assert.rejects(
     () =>
@@ -97,15 +97,20 @@ test("all retained legacy commercial mutations reject canonical Application-orig
   assert.equal(h.getLegacyMutationCount(), 0);
 });
 
-test("retained legacy compatibility rows can still use the legacy counter flow", async () => {
+test("leftover compatibility rows also fail-close leftover commercial writes", async () => {
   const h = legacyService(null);
-  await h.service.brandCounterOffer(brand, collaborationId, {
-    counter_offer: 900,
-  });
-  assert.equal(h.getLegacyMutationCount(), 1);
+  await assert.rejects(
+    () =>
+      h.service.brandCounterOffer(brand, collaborationId, {
+        counter_offer: 900,
+      }),
+    (error: any) =>
+      error?.response?.code === "LEGACY_COLLABORATION_AGGREGATE_WRITE_RETIRED",
+  );
+  assert.equal(h.getLegacyMutationCount(), 0);
 });
 
-test("Co-Pilot commercial intents dispatch canonical rows through canonical services", async () => {
+test("Co-Pilot commercial intents are retired and do not dispatch leftover or canonical collab writes", async () => {
   let canonicalCalls = 0;
   let acceptCalls = 0;
   let securementCalls = 0;
@@ -173,34 +178,21 @@ test("Co-Pilot commercial intents dispatch canonical rows through canonical serv
     { rememberSelectedCollaboration: () => undefined } as any,
   );
 
-  const result = await (hitl as any).confirmCollabCounterOffer(
-    { userId: brand.id, threadId: "thread-1" },
-    {
-      collaboration_id: collaborationId,
-      counter_offer: 900,
-      idempotencyKey: "copilot-command-1",
-    },
+  await assert.rejects(
+    () =>
+      (hitl as any).confirmCollabCounterOffer(
+        { userId: brand.id, threadId: "thread-1" },
+        {
+          collaboration_id: collaborationId,
+          counter_offer: 900,
+          idempotencyKey: "copilot-command-1",
+        },
+      ),
+    (error: any) =>
+      error?.response?.code === "OUT_OF_MVP_COMPETING_TRANSITION_RETIRED",
   );
-  assert.equal(result.validationBlocked, undefined);
-  assert.equal(canonicalCalls, 1);
-  assert.equal(legacyCalls, 0);
-
-  await (hitl as any).confirmCollabAcceptTerms(
-    { userId: brand.id, threadId: "thread-1" },
-    {
-      collaboration_id: collaborationId,
-      idempotencyKey: "copilot-command-2",
-    },
-  );
-  currentStage = UceMilestoneStage.STAGE_2_SECUREMENT;
-  await (hitl as any).confirmCollabFundEscrow(
-    { userId: brand.id, threadId: "thread-1" },
-    {
-      collaboration_id: collaborationId,
-      idempotencyKey: "copilot-command-3",
-    },
-  );
-  assert.equal(acceptCalls, 1);
-  assert.equal(securementCalls, 1);
+  assert.equal(canonicalCalls, 0);
+  assert.equal(acceptCalls, 0);
+  assert.equal(securementCalls, 0);
   assert.equal(legacyCalls, 0);
 });

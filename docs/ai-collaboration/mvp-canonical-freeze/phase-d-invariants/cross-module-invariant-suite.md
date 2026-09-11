@@ -21,7 +21,7 @@ Charter examples are all represented (INV-01 … INV-13). C-02A, C-04, and Brand
 | INV-10 | Provider state fail-closed | Provider clients | FE does not fake provider success | Instagram/Razorpay/Postmark clients | BE mail/notification tests; C-05 P2 fail-closed adapter; OTP postgres | **PARTIAL** — Postmark OTP live send **PASS** 2026-09-10; live IG/Razorpay **NOT_RUN** |
 | INV-11 | Backend business state authoritative over frontend display | All accepted IN modules | Feature `api/` clients; mutations go to BE | Controllers/services | FE `brand-home-architecture.test.ts` `chat-architecture.test.ts`; browser Brand Home vs Creator session | **PARTIAL** — Brand Home fail-closed for Creator proven; not every mutation path re-proven this freeze |
 | INV-12 | Cross-tenant and cross-role isolation | Auth + workspace guards | `require-auth.tsx` role home routes | Brand Centre authz; C-05 team | BE `brand-workspace-authorization.postgres.test.ts` (11/11); C-05 team postgres | **PASS** |
-| INV-13 | No duplicate competing persistence for the same canonical concept | Schema SOP | n/a | Prisma pairs + runtime writers in `inv-13-competing-writers.md` | Schema register; `out-of-mvp-competing-transition-retired.test.ts` | **FAIL classified** — Pair 1 `UceCampaignCollaboration` writes retired `410`. Pair 2 leftover commercial source writers remain. No Prisma drop |
+| INV-13 | No duplicate competing persistence for the same canonical concept | Schema SOP | n/a | Prisma pairs + runtime writers in `inv-13-competing-writers.md` | Schema register; `out-of-mvp-competing-transition-retired.test.ts` | **PASS classified** — Pair 1 and Pair 2 leftover journey writers retired `410`. Canonical C-04 agreement path remains. No Prisma drop |
 
 ## Explicitly out of this suite
 
@@ -31,4 +31,4 @@ Charter examples are all represented (INV-01 … INV-13). C-02A, C-04, and Brand
 
 ## Preflight verdict
 
-Suite is **defined**. Execution is PARTIAL overall (INV-08/09/10/11 PARTIAL, INV-13 FAIL classified with writer proof). C-02A / C-04 / Brand Payouts v1 are now in lineage. That still blocks freeze PASS.
+Suite is **defined**. Execution is PARTIAL overall (INV-08/09/10/11 PARTIAL). INV-13 leftover journey writers are PASS classified (tables retained). C-02A / C-04 / Brand Payouts v1 are now in lineage. That still blocks freeze PASS.

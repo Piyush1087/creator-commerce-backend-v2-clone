@@ -4,10 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import {
-  CollaborationEscrowStatus,
-  CollaborationPayoutMode,
-} from "@prisma/client";
+import { CollaborationPayoutMode } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import { randomUUID } from "crypto";
 
@@ -162,19 +159,6 @@ export class BrandEscrowComputationService {
         },
       });
 
-      if (collaboration.commercials) {
-        await tx.collaborationCommercial.update({
-          where: { collaborationId: input.collaborationId },
-          data: {
-            escrowVaultId: vault.id,
-            escrowStatus: CollaborationEscrowStatus.FUNDED,
-            finalQuote: metrics.grossCreatorQuote,
-            advance30Amount: metrics.netCreatorPayoutPool.mul(0.3),
-            balance70Amount: metrics.netCreatorPayoutPool.mul(0.7),
-          },
-        });
-      }
-
       return {
         lock_id: lock.id,
         collaboration_id: lock.collaborationId,
@@ -266,10 +250,6 @@ export class BrandEscrowComputationService {
           "INR aggregate reserve cap of 500000 exceeded",
         );
       if (available.lessThan(metrics.totalEscrowLockedAmount)) {
-        await tx.collaborationCommercial.update({
-          where: { collaborationId: input.collaborationId },
-          data: { escrowStatus: CollaborationEscrowStatus.AWAITING_FUNDS },
-        });
         return {
           state: "AWAITING_FUNDS",
           collaboration_id: input.collaborationId,
@@ -315,13 +295,6 @@ export class BrandEscrowComputationService {
           currency,
           idempotencyKey: `reserve:${input.collaborationId}`,
           transactionStatus: "CLEARED",
-        },
-      });
-      await tx.collaborationCommercial.update({
-        where: { collaborationId: input.collaborationId },
-        data: {
-          escrowVaultId: vaultId,
-          escrowStatus: CollaborationEscrowStatus.FUNDED,
         },
       });
       return this.mapReserve(
@@ -497,13 +470,6 @@ export class BrandEscrowComputationService {
           transactionStatus: "CLEARED",
         },
       });
-
-      if (lock.collaborationId) {
-        await tx.collaborationCommercial.updateMany({
-          where: { collaborationId: lock.collaborationId },
-          data: { escrowStatus: CollaborationEscrowStatus.SETTLED },
-        });
-      }
 
       return {
         transaction_id: tdsLedger.id,

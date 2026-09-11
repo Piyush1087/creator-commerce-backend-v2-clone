@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 
 import {
   CollaborationActorClass,
@@ -12,11 +12,13 @@ import {
   CollaborationStageStatus,
   Prisma,
   UceMilestoneStage,
+  UcePayoutTerms,
   UserRole,
 } from "@prisma/client";
 
 import { CollaborationNegotiationService } from "./collaboration-negotiation.service";
 import { CollaborationSecurementService } from "./collaboration-securement.service";
+import { patchC04CommandTx } from "../test/c04-command-tx.harness";
 
 const brandUser = {
   id: "brand-user",
@@ -46,6 +48,7 @@ function makeRow(): any {
     ucePipelineCollaborationId: null,
     campaignCreatorId: "campaign-creator-1",
     campaignAssetId: "asset-1",
+    creatorProfileId: "creator-profile-1",
     lifecycle: CollaborationLifecycle.ACTIVE,
     canonicalStage: CollaborationStage.NEGOTIATION,
     currentStageStatus: CollaborationStageStatus.IN_PROGRESS,
@@ -100,8 +103,11 @@ function makeRow(): any {
     commercialAgreement: {
       id: "agreement-1",
       collaborationId: "collaboration-1",
+      agreementVersion: 1,
+      agreementHash: "a".repeat(64),
       negotiationState: CollaborationNegotiationState.AWAITING_BRAND_DECISION,
       applicationProposedFee: new Prisma.Decimal(1000),
+      creatorProposedFee: new Prisma.Decimal(1000),
       brandCounterFee: null,
       agreedCreatorFee: null,
       currency: "USD",
@@ -115,9 +121,7 @@ function makeRow(): any {
       confirmedSecuredAmount: null,
       fundingInstructionRef: null,
       fundingConfirmationRef: null,
-      manualPaymentEvidenceRef: null,
-      manualCreatorConfirmedAt: null,
-      paymentDisputeRef: null,
+      campaignPaymentTermSnapshot: UcePayoutTerms.NET_30,
       termsLockedAt: null,
       securementCompletedAt: null,
     },
@@ -204,6 +208,7 @@ function harness(
       }),
     },
   };
+  patchC04CommandTx(tx, row);
   const prisma: any = {
     ...tx,
     $transaction: async (callback: any) => callback(tx),
@@ -266,6 +271,13 @@ function harness(
       access,
       realtime,
       funding,
+      {
+        resolveBrandContext: async () => ({
+          brandProfileId: row.brandProfileId,
+          membership: { role: "OWNER" },
+        }),
+        isFinancialReadOnly: () => false,
+      } as never,
     ),
   };
 }
@@ -380,35 +392,36 @@ test("Negotiation decline cancels without inventing Creator entitlement", async 
   );
 });
 
-test("Manual-disabled capability prevents a new Manual obligation but existing Manual Securement remains operable", async () => {
+test("Manual payment commands are retired for canonical Collaborations", async () => {
   const h = harness({ manualEnabled: false });
-  h.row.commercialAgreement.paymentRail = CollaborationPaymentRail.MANUAL;
   await assert.rejects(
     () =>
-      h.negotiation.acceptProposedFee(brandUser, h.row.id, {
-        commandId: "manual-lock",
+      h.securement.reportManualPayment(brandUser, h.row.id, {
+        commandId: "manual-evidence",
         expectedAggregateVersion: 1,
+        paymentEvidenceRef: "evidence-1",
+      }),
+    (error: any) => error.response?.code === "MANUAL_PAYMENT_DISABLED",
+  );
+  await assert.rejects(
+    () =>
+      h.securement.confirmManualPayment(creatorUser, h.row.id, {
+        commandId: "manual-confirm",
+        expectedAggregateVersion: 1,
+      }),
+    (error: any) => error.response?.code === "MANUAL_PAYMENT_DISABLED",
+  );
+  await assert.rejects(
+    () =>
+      h.securement.disputeManualPayment(creatorUser, h.row.id, {
+        commandId: "manual-dispute",
+        expectedAggregateVersion: 1,
+        reasonText: "Not received",
       }),
     (error: any) => error.response?.code === "MANUAL_PAYMENT_DISABLED",
   );
   assert.equal(h.row.aggregateVersion, 1);
   assert.equal(h.events.length, 0);
-
-  h.row.canonicalStage = CollaborationStage.SECUREMENT;
-  h.row.commercialAgreement.negotiationState =
-    CollaborationNegotiationState.LOCKED;
-  h.row.commercialAgreement.securementState =
-    CollaborationSecurementState.AWAITING_BRAND_PAYMENT;
-  h.row.commercialAgreement.requiredSecuredAmount = new Prisma.Decimal(1000);
-  await h.securement.reportManualPayment(brandUser, h.row.id, {
-    commandId: "manual-evidence",
-    expectedAggregateVersion: 1,
-    paymentEvidenceRef: "evidence-1",
-  });
-  assert.equal(
-    h.row.commercialAgreement.securementState,
-    "AWAITING_CREATOR_CONFIRMATION",
-  );
 });
 
 test("Escrow request is not confirmation; only trusted confirmation can complete 100% Securement", async () => {
@@ -422,6 +435,7 @@ test("Escrow request is not confirmation; only trusted confirmation can complete
     12.6,
   );
   h.row.commercialAgreement.requiredSecuredAmount = new Prisma.Decimal(1082.6);
+  h.row.commercialAgreement.agreementHash = "a".repeat(64);
   h.row.commercialAgreement.confirmedSecuredAmount = new Prisma.Decimal(0);
   h.row.commercialAgreement.securementState =
     CollaborationSecurementState.AWAITING_ESCROW_FUNDING;
@@ -446,7 +460,7 @@ test("Escrow request is not confirmation; only trusted confirmation can complete
           expectedAggregateVersion: 2,
           fundingConfirmationRef: "confirmation-brand",
           escrowLockRef: "lock-full",
-          confirmedAmount: 1082.6,
+          confirmedAmount: "1082.6",
           currency: "USD",
         },
       ),
@@ -457,7 +471,7 @@ test("Escrow request is not confirmation; only trusted confirmation can complete
     expectedAggregateVersion: 2,
     fundingConfirmationRef: "confirmation-500",
     escrowLockRef: "lock-partial",
-    confirmedAmount: 500,
+    confirmedAmount: "500",
     currency: "USD",
   });
   assert.equal(h.row.commercialAgreement.securementState, "PROCESSING_FUNDING");
@@ -466,7 +480,7 @@ test("Escrow request is not confirmation; only trusted confirmation can complete
     expectedAggregateVersion: 3,
     fundingConfirmationRef: "confirmation-1000",
     escrowLockRef: "lock-full",
-    confirmedAmount: 1082.6,
+    confirmedAmount: "1082.6",
     currency: "USD",
   });
   assert.equal(h.row.commercialAgreement.securementState, "COMPLETED");
@@ -487,6 +501,7 @@ test("stale Escrow command is rejected before reserve and successful reserve sha
   stale.row.commercialAgreement.requiredSecuredAmount = new Prisma.Decimal(
     1082.6,
   );
+  stale.row.commercialAgreement.agreementHash = "a".repeat(64);
   stale.row.commercialAgreement.securementState =
     CollaborationSecurementState.AWAITING_ESCROW_FUNDING;
   await assert.rejects(
@@ -511,54 +526,4 @@ test("stale Escrow command is rejected before reserve and successful reserve sha
   assert.equal(stale.row.canonicalStage, CollaborationStage.PRODUCTION);
   assert.equal(stale.row.aggregateVersion, 2);
   assert.equal(stale.events.length, 1);
-});
-
-test("Manual evidence requires Creator confirmation and dispute blocks Securement", async () => {
-  const confirmed = harness();
-  confirmed.row.canonicalStage = CollaborationStage.SECUREMENT;
-  confirmed.row.commercialAgreement.paymentRail =
-    CollaborationPaymentRail.MANUAL;
-  confirmed.row.commercialAgreement.securementState =
-    CollaborationSecurementState.AWAITING_BRAND_PAYMENT;
-  confirmed.row.commercialAgreement.requiredSecuredAmount = new Prisma.Decimal(
-    1000,
-  );
-  await confirmed.securement.reportManualPayment(brandUser, confirmed.row.id, {
-    commandId: "manual-report",
-    expectedAggregateVersion: 1,
-    paymentEvidenceRef: "manual-evidence",
-  });
-  assert.notEqual(
-    confirmed.row.commercialAgreement.securementState,
-    "COMPLETED",
-  );
-  await confirmed.securement.confirmManualPayment(
-    creatorUser,
-    confirmed.row.id,
-    {
-      commandId: "manual-confirm",
-      expectedAggregateVersion: 2,
-    },
-  );
-  assert.equal(confirmed.row.commercialAgreement.securementState, "COMPLETED");
-
-  const disputed = harness();
-  disputed.row.canonicalStage = CollaborationStage.SECUREMENT;
-  disputed.row.commercialAgreement.paymentRail =
-    CollaborationPaymentRail.MANUAL;
-  disputed.row.commercialAgreement.securementState =
-    CollaborationSecurementState.AWAITING_CREATOR_CONFIRMATION;
-  await disputed.securement.disputeManualPayment(creatorUser, disputed.row.id, {
-    commandId: "manual-dispute",
-    expectedAggregateVersion: 1,
-    reasonText: "Not received",
-  });
-  assert.equal(
-    disputed.row.commercialAgreement.securementState,
-    "PAYMENT_DISPUTED",
-  );
-  assert.equal(
-    disputed.row.currentStageStatus,
-    CollaborationStageStatus.BLOCKED,
-  );
 });

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 
 import {
   CollaborationLifecycle,
@@ -112,7 +112,7 @@ function canonicalRow(
   } as CollaborationReadSource;
 }
 
-test("ACTIVE projects PostCollaborationMessage; non-ACTIVE lifecycles do not", () => {
+test("ACTIVE and non-ACTIVE lifecycles still project PostCollaborationMessage", () => {
   assert.ok(
     deriveAvailableActions(
       canonicalRow(CollaborationLifecycle.ACTIVE),
@@ -132,16 +132,10 @@ test("ACTIVE projects PostCollaborationMessage; non-ACTIVE lifecycles do not", (
     CollaborationLifecycle.TERMINATED,
   ] as const) {
     assert.ok(
-      !deriveAvailableActions(canonicalRow(lifecycle), "BRAND").includes(
+      deriveAvailableActions(canonicalRow(lifecycle), "BRAND").includes(
         "PostCollaborationMessage",
       ),
-      `${lifecycle} must not project PostCollaborationMessage for Brand`,
-    );
-    assert.ok(
-      !deriveAvailableActions(canonicalRow(lifecycle), "CREATOR").includes(
-        "PostCollaborationMessage",
-      ),
-      `${lifecycle} must not project PostCollaborationMessage for Creator`,
+      `${lifecycle} still projects PostCollaborationMessage for Brand`,
     );
   }
 });
@@ -200,6 +194,8 @@ function postMessageHarness(lifecycle: CollaborationLifecycle) {
     prisma,
     access,
     realtime,
+    {} as never,
+    {} as never,
     notifications,
   );
   return { service, row, messages };
@@ -222,7 +218,7 @@ test("ACTIVE message POST succeeds", async () => {
   assert.equal(h.messages.length, 2);
 });
 
-test("direct POST message in non-ACTIVE lifecycle is rejected", async () => {
+test("direct POST message remains available in non-ACTIVE lifecycle", async () => {
   for (const lifecycle of [
     CollaborationLifecycle.PAUSED,
     CollaborationLifecycle.COMPLETED,
@@ -230,14 +226,11 @@ test("direct POST message in non-ACTIVE lifecycle is rejected", async () => {
     CollaborationLifecycle.TERMINATED,
   ] as const) {
     const h = postMessageHarness(lifecycle);
-    await assert.rejects(
-      () =>
-        h.service.postMessage(brandUser, collaborationId, {
-          body: "Should fail",
-        }),
-      (error: any) => error?.response?.code === "INVALID_STATE",
-    );
-    assert.equal(h.messages.length, 1);
+    const result = await h.service.postMessage(brandUser, collaborationId, {
+      body: "Should remain available",
+    });
+    assert.equal(result.body, "Should remain available");
+    assert.equal(h.messages.length, 2);
   }
 });
 

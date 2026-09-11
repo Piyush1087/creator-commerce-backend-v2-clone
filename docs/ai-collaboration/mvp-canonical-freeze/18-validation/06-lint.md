@@ -27,4 +27,6 @@ result: 712 problems (712 errors, 0 warnings)
 rule: prettier/prettier (CRLF / wrapping), auto-fixable
 ```
 
-**Classification:** `PREEXISTING_ACCEPTED_DEBT` — **Parent-accepted 2026-09-09** (do not `--fix`).
+**Classification:** `PREEXISTING_ACCEPTED_DEBT` — **accepted this freeze** (Parent 2026-09-09; amendment restated). Do not `--fix`.
+
+A later eslint run with prettier disabled is allowed. If findings are still only this prettier farm, keep **PASS classified**. New non-prettier eslint findings are not auto-accepted.

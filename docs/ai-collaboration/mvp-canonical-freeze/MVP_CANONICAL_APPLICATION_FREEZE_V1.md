@@ -101,7 +101,7 @@ INV-09 PARTIAL (C-05 Settings contact proven; fulfillment does not consume that 
 INV-10 PARTIAL (Postmark OTP live send PASS 2026-09-10; live IG/Razorpay NOT_RUN)
 INV-11 PARTIAL (Brand Home fail-closed for Creator session)
 INV-12 PASS (unit + postgres 11/11 on bs07_freeze_auth + browser)
-INV-13 FAIL classified (Pair 1 UceCampaignCollaboration writes retired; leftover commercial-table source writers remain). No Prisma drop.
+INV-13 PASS classified (Pair 1 and Pair 2 leftover journey writers retired; tables retained). No Prisma drop.
 ```
 
 ---
@@ -170,7 +170,7 @@ FE invariant vitest 70/70 PASS
 BE invariant vitest 51/51 PASS
 FE↔BE OTP smoke PARTIAL PASS
 responsive shell/nav viewport PASS (RUN 8: UCE table→cards + Creator viewport)
-BE lint FAIL 712 prettier  PREEXISTING_ACCEPTED_DEBT
+BE lint PASS classified 712 prettier  accepted this freeze (do not --fix)
 postgres INV-01/02/03/04/12/06/07 PASS (INV-03 29/29 RUN 7)
 FE npm ci clone typecheck/lint/build PASS
 BE npm ci clone validate PASS; build requires prisma generate
@@ -184,13 +184,14 @@ full BE npm test FAIL 18/7170 classified; CORS/brief-pack/Gatekeeper isolated PA
 
 - C-02A / C-04 / Brand Payouts v1 **pulled** this amendment (not freeze PASS).
 - C-06, Marketplace, Co-Pilot, Creator Centre hidden; competing OUT collab/marketplace command writes retired `410`; modules/schema still in tree.
-- INV-13 Pair 1 `UceCampaignCollaboration` writes retired `410`. Writer proof: `phase-d-invariants/inv-13-competing-writers.md`. No Prisma drop. Pair 2 leftover commercial source writers remain.
+- INV-13 Pair 1 `UceCampaignCollaboration` writes retired `410`. Pair 2 leftover commercial/logistics/media/finalization service writes retired `410 LEGACY_COLLABORATION_AGGREGATE_WRITE_RETIRED`; escrow reserve no longer writes `CollaborationCommercial`. Writer proof: `phase-d-invariants/inv-13-competing-writers.md`. No Prisma drop.
 - `db:seed:dev-creator` does not create an ACTIVE Creator organization (OTP ineligible).
-- BE prettier farm (712) — Parent: do not `--fix`.
+- BE prettier farm (712) — **accepted this freeze**. Do not `--fix`. Later eslint without prettier: same prettier-only farm stays accepted.
 - Chunk-size FE build warning.
 - FE `authAuthorizationHeader` helper — **closed RUN 12** (Brand Centre/UCE use `authenticatedFetch`; helper removed).
 - Unused FE Brand withdrawal contract types deleted 2026-09-09; backend withdrawal-account API still present.
 - BE financial-producer / route-payout architecture greps — re-prove after Payouts pull (this amendment's targeted unit tests, not full farm).
+- C-04 collab `node:test` empty suites — **closed** this amendment (Vitest 14/14 files, 106/106).
 - Clone `npm run build` does not run `prisma generate`; nest build under CPU contention was killed.
 
 ---
@@ -210,7 +211,7 @@ This worker did **not** inspect AWS. From registers, AWS-dev cannot be treated a
 
 - Same as AWS-dev plus `STAGE=prod`, no OTP logging, empty apply-bypass, live Razorpay/Meta App Review still `PROVIDER_DEFERRED`.
 - Production data reconciliation unknown (`PRODUCTION_DB_STATE_UNKNOWN`).
-- Competing OUT collab/marketplace command writes retired `410`. Remaining callable: Brand UCE second engine, Chat Home HITL campaign/planner, public marketplace GET, Centre media-kit PATCH.
+- Competing OUT collab/marketplace command writes retired `410`. Remaining callable: Chat Home HITL campaign/planner, public marketplace GET, Centre media-kit PATCH.
 - Parent has not authorized production release.
 
 ---

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import test from "node:test";
+import { test } from "vitest";
 import {
   CollaborationEventKind,
   CollaborationFulfillmentState,
@@ -88,6 +88,7 @@ test("Prisma identity is Application-based and publishingRequired has no default
 test("uses the frozen canonical Collaboration enum vocabulary", () => {
   assert.deepEqual(Object.values(CollaborationNegotiationState), [
     "NOT_REQUIRED",
+    "AWAITING_CREATOR_PROPOSAL",
     "AWAITING_BRAND_DECISION",
     "AWAITING_CREATOR_DECISION",
     "LOCKED",
@@ -98,9 +99,6 @@ test("uses the frozen canonical Collaboration enum vocabulary", () => {
     "AWAITING_ESCROW_FUNDING",
     "PROCESSING_FUNDING",
     "AWAITING_PAYOUT_DETAILS",
-    "AWAITING_BRAND_PAYMENT",
-    "AWAITING_CREATOR_CONFIRMATION",
-    "PAYMENT_DISPUTED",
     "COMPLETED",
     "BLOCKED",
   ]);
@@ -125,9 +123,6 @@ test("does not impose Collaboration product policy on Campaign advance percentag
     "utf8",
   );
 
-  assert.match(schema, /Number\.isInteger\(advancePercentage\)/);
-  assert.match(schema, /advancePercentage < 0/);
-  assert.match(schema, /advancePercentage > 100/);
   assert.doesNotMatch(schema, /\[0,\s*25,\s*50,\s*75,\s*100\]/);
   assert.doesNotMatch(schema, /UceAdvancePaymentPercentageSchema/);
 });

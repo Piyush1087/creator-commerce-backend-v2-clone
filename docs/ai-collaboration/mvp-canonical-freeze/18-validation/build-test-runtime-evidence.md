@@ -13,10 +13,10 @@ Do not declare `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` until remaining ga
 | frontend typecheck | PASS | | `04-frontend-typecheck.md` |
 | frontend build | PASS | chunk-size warning = preexisting debt | `05-frontend-build.md` |
 | frontend lint | PASS | | `06-lint.md` |
-| backend lint | FAIL | PREEXISTING_ACCEPTED_DEBT (712 prettier; Parent: do not `--fix`) | `06-lint.md` |
+| backend lint | PASS classified | prettier 712 accepted this freeze (do not `--fix`). Later eslint-without-prettier: same prettier-only farm stays accepted | `06-lint.md` |
 | unit/contract tests | FAIL classified | FE named RUN 5 files closed (auth static isolated PASS RUN 12); full FE farm not re-run. BE 18 failed / 6370 passed | `15-full-npm-test.md` |
 | module acceptance suites | NOT_RE_RUN as named packs | farm classified in `15` | `10-remaining-gates.md` |
-| cross-module invariant suite | PARTIAL + postgres | INV-01/02/03/04/12/06/07 postgres PASS (INV-03 29/29 RUN 7); INV-08/09/10/11 PARTIAL; INV-13 FAIL classified | `11-invariant-results.md` `13-postgres-invariants.md` |
+| cross-module invariant suite | PARTIAL + postgres | INV-01/02/03/04/12/06/07 postgres PASS (INV-03 29/29 RUN 7); INV-08/09/10/11 PARTIAL; INV-13 PASS classified (leftover journey writers retired) | `11-invariant-results.md` `13-postgres-invariants.md` |
 | fresh disposable database migration | PASS 87/87 | `thecreatorshop` not touched | `08-fresh-db-migrate.md` |
 | Prisma/schema validation | PASS | | `02-prisma-validate.md` |
 | backend boot + health | PASS on freeze DB | | `09-backend-boot-health.md` |

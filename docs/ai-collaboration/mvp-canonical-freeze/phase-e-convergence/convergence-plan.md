@@ -163,7 +163,7 @@ C-02A Parent: Home aggregation consumes C-04 lifecycle. **Do not pull C-02A with
 
 ### Tests after each block
 
-1. C-04: `prisma validate` / generate first. Collab architecture + postgres; empty freeze `node:test` collab suites must not stay the authority.
+1. C-04: `prisma validate` / generate first. Collab architecture + postgres. Formerly empty freeze `node:test` collab suites are now Vitest **14/14 files, 106/106 PASS** and are the unit authority for that surface.
 2. C-02A: Home contract tests; single `GET /api/v1/creator/home`; do not mutate C-04 unread on read.
 3. Payouts: provider-disabled contract; Settings billing/escrow still canonical until Parent says otherwise.
 4. After each: no Prisma drop; Parent runs freeze-DB migrate when schema is valid.

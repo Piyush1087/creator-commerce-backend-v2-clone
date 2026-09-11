@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 
 import {
   CollaborationDeliverableState,
@@ -43,6 +43,7 @@ function canonicalRow(
     sourceApplicationId: "application-1",
     campaignCreatorId: "campaign-creator-1",
     campaignAssetId: "asset-1",
+    creatorWorkspaceId: "workspace-1",
     lifecycle: CollaborationLifecycle.ACTIVE,
     canonicalStage: CollaborationStage.NEGOTIATION,
     currentStageStatus: CollaborationStageStatus.IN_PROGRESS,
@@ -599,7 +600,9 @@ test("list query applies effective legacy filters while canonical rows use canon
         rows.filter((row) => matchesPrismaFilter(row, where)),
     },
   };
-  const service = new CollaborationQueryService(prisma as never, {} as never);
+  const service = new CollaborationQueryService(prisma as never, {
+    resolveCreatorActor: async () => ({ workspaceId: "workspace-1" }),
+  } as never);
   const user = {
     id: "creator-1",
     role: UserRole.CREATOR,
@@ -661,18 +664,7 @@ test("AWAITING_PAYOUT_DETAILS is Creator-owned while other Securement actors rem
     actorFor(CollaborationSecurementState.PROCESSING_FUNDING),
     "SYSTEM",
   );
-  assert.equal(
-    actorFor(CollaborationSecurementState.AWAITING_BRAND_PAYMENT),
-    "BRAND",
-  );
-  assert.equal(
-    actorFor(CollaborationSecurementState.AWAITING_CREATOR_CONFIRMATION),
-    "CREATOR",
-  );
-  assert.equal(
-    actorFor(CollaborationSecurementState.PAYMENT_DISPUTED),
-    "ADMIN",
-  );
+  assert.equal(actorFor(CollaborationSecurementState.COMPLETED), "NONE");
   assert.equal(actorFor(CollaborationSecurementState.BLOCKED), "ADMIN");
 });
 

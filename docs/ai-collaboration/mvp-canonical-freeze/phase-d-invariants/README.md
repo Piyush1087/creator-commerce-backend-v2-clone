@@ -27,7 +27,7 @@ Definition stays here. Execution results: `../18-validation/11-invariant-results
 | Provider fail-closed | YES (INV-10 PARTIAL) |
 | BE authoritative over FE | YES (INV-11 PARTIAL) |
 | Cross-tenant / cross-role | YES (INV-12 PASS) |
-| No duplicate persistence | YES (INV-13 FAIL classified — Brand UCE second engine remains; OUT collab writes retired) |
+| No duplicate persistence | YES (INV-13 PASS classified — leftover journey writers retired; tables retained; no Prisma drop) |
 | Each INV: authority + repos/files/tests | YES after 2026-09-09 audit |
 
 ## Verdict

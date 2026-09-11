@@ -57,4 +57,28 @@ Tests       51 passed (51)
 
 Full `npm test` suites were not re-run (prior vitest hang risk). Module acceptance suites: `NOT_RE_RUN` on freeze tip.
 
+## Backend C-04 collab conversion (PASS) — this amendment
+
+Former `node:test` collab files now collect under Vitest. Harnesses retargeted to current C-04 / Payouts constructors. Isolated:
+
+```text
+npx vitest run --config vitest.config.ts
+  src/features/collaboration/services/collaboration-fulfillment.test.ts
+  src/features/collaboration/services/collaboration-publishing.test.ts
+  src/features/collaboration/utils/collaboration-read-model.mapper.test.ts
+  src/features/collaboration/services/collaboration-feedback.test.ts
+  src/features/collaboration/services/collaboration-commercial-command.test.ts
+  src/features/collaboration/services/collaboration-exception.test.ts
+  src/features/collaboration/schemas/provision-collaboration.schema.test.ts
+  src/features/collaboration/services/collaboration-auto-approval.test.ts
+  src/features/collaboration/services/collaboration-production.test.ts
+  src/features/collaboration/services/collaboration-settlement.test.ts
+  src/features/collaboration/services/collaboration-financial-boundary.test.ts
+  src/features/collaboration/services/collaboration-bank-ownership.test.ts
+  src/features/collaboration/services/collaboration-messaging-lifecycle.test.ts
+  src/features/collaboration/services/collaboration-final-reconciliation.test.ts
+Test Files  14 passed (14)
+Tests       106 passed (106)
+```
+
 Per-INV mapping: `11-invariant-results.md`.

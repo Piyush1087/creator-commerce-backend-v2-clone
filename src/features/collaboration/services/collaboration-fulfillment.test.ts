@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import test from "node:test";
+import { join } from "node:path";
+import { test } from "vitest";
 
 import {
   CollaborationFulfillmentState,
@@ -136,7 +137,7 @@ test("Fulfillment hard-stop refunds the full commercial reserve but excludes cha
 
 test("second issue keeps Creator reporting evidence but attributes the automatic hard-stop to SYSTEM", () => {
   const serviceSource = readFileSync(
-    require.resolve("./collaboration-fulfillment.service"),
+    join(__dirname, "collaboration-fulfillment.service.ts"),
     "utf8",
   );
   assert.match(serviceSource, /reportedByUserId:\s*user\.id/);

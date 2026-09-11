@@ -1,11 +1,11 @@
 # INV-13 — competing runtime writers vs retained schema
 
-**Date:** 2026-09-10  
+**Date:** 2026-09-11  
 **Amendment:** prove duplicate models; silent Prisma drop is forbidden  
-**Result:** Pair 1 closed (UceCampaignCollaboration writes retired). Overall still **FAIL classified** for leftover commercial-table source writers. No Prisma drop.
+**Result:** Pair 1 and Pair 2 leftover *journey* writers retired `410`. Overall **PASS classified** for competing writers (tables retained). No Prisma drop. Freeze itself is still not PASS.
 
 ```text
-competing runtime writer     = live service still creates/updates the non-canonical model
+competing runtime writer     = live service still creates/updates the non-canonical model on the canonical journey
 harmless retained schema     = table/model remains; no canonical journey writes it
 retired competing transition = HTTP/service throw before write; table may remain
 silent Prisma drop           = FORBIDDEN this amendment
@@ -25,7 +25,13 @@ Canonical Brand application approve still provisions `Collaboration`. It may *re
 | Model | Disposition | Proof |
 | --- | --- | --- |
 | `CollaborationCommercialAgreement` | Canonical C-04 | `collaboration-negotiation.service.ts` `collaboration-securement.service.ts` |
-| `CollaborationCommercial` `CollaborationLogistics` `CollaborationMedia` `CollaborationFinalization` | Retained schema; canonical rows DB-guarded; leftover HTTP retired | Trigger `c04_prevent_canonical_legacy_write` on `CANONICAL_V1` rows. Source writers remain in `collaboration.service.ts` and `brand-escrow-computation.service.ts`. HTTP leftovers now `410` |
+| `CollaborationCommercial` `CollaborationLogistics` `CollaborationMedia` `CollaborationFinalization` | Harmless retained schema | Trigger `c04_prevent_canonical_legacy_write` on `CANONICAL_V1` rows. Leftover Brand Collab HTTP already `410`. Leftover `CollaborationService` mutating methods now throw `410 LEGACY_COLLABORATION_AGGREGATE_WRITE_RETIRED` before Prisma. Canonical escrow reserve (`executeCanonicalReserve`) no longer writes `CollaborationCommercial`; vault / lock / ledger remain. Tables not dropped |
+
+Canonical C-03 handoff (`approved-application-collaboration.service.ts`) creates `CollaborationCommercialAgreement`, not the leftover aggregates.
+
+Leftover-origin seed: `collaboration-provision.service.ts` `provisionFromUceApproval` may still create leftover child rows for leftover-origin Collaboration (`sourceApplicationId` null). That is leftover-origin fixture/seed, not a C-04 agreement writer on `CANONICAL_V1`. Canonical rows remain DB-guarded.
+
+Escrow may still *read* leftover `commercials.finalQuote` when a leftover-origin row has one. That is a read of retained schema, not a competing write.
 
 ## Pair 3 — Creator money identity
 

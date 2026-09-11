@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import { GoneException } from "@nestjs/common";
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
@@ -11,8 +12,6 @@ import type { PrismaService } from "../../prisma/prisma.service";
 import { CollaborationProvisionService } from "./services/collaboration-provision.service";
 import { CollaborationService } from "./services/collaboration.service";
 import { CollaborationAccessService } from "./services/collaboration-access.service";
-import { NotificationQueryService } from "../notifications/services/notification-query.service";
-import { NotificationProcessorService } from "../notifications/services/notification-processor.service";
 import { NotificationDispatchService } from "../notifications/services/notification-dispatch.service";
 import { NotificationRecipientPolicyService } from "../notifications/services/notification-recipient-policy.service";
 import { randomUUID } from "node:crypto";
@@ -138,7 +137,7 @@ describe.skipIf(process.env.C03_P14_DATABASE_TEST !== "true")(
         }),
       ).toBe(1);
     });
-    it("legacy messages and commercial commands remain usable", async () => {
+    it("legacy messages remain usable; leftover commercial writes are 410", async () => {
       const f = await fixture();
       const { collaboration_id: id } = await provision.provisionFromUceApproval(
         f.input,
@@ -151,76 +150,62 @@ describe.skipIf(process.env.C03_P14_DATABASE_TEST !== "true")(
       expect(
         (await f.service.listMessages(f.owner.user, id)).messages,
       ).toHaveLength(2);
-      await f.service.submitCreatorQuote(f.owner.user, id, {
-        total_quote: 150,
-      });
-      await f.service.brandCounterOffer(f.brand.user, id, {
-        counter_offer: 125,
-      });
-      await f.service.acceptCommercials(f.owner.user, id, {});
+      await expect(
+        f.service.submitCreatorQuote(f.owner.user, id, {
+          total_quote: 150,
+        }),
+      ).rejects.toBeInstanceOf(GoneException);
+      await expect(
+        f.service.brandCounterOffer(f.brand.user, id, {
+          counter_offer: 125,
+        }),
+      ).rejects.toBeInstanceOf(GoneException);
+      await expect(
+        f.service.acceptCommercials(f.owner.user, id, {}),
+      ).rejects.toBeInstanceOf(GoneException);
       const row = await db.collaboration.findUniqueOrThrow({
         where: { id },
         include: { commercials: true },
       });
-      expect(row.currentStage).toBe("STAGE_2_SECUREMENT");
-      expect(row.commercials?.finalQuote?.toString()).toBe("125");
       expect(row.sourceApplicationId).toBeNull();
+      expect(row.commercials?.finalQuote?.toString()).not.toBe("125");
     });
-    it("legacy logistics, content, finalization and Brand notification query remain usable", async () => {
+    it("leftover logistics, content, and finalization writes are 410", async () => {
       const f = await fixture();
       const { collaboration_id: id } = await provision.provisionFromUceApproval(
         { ...f.input, payoutMode: "BARTER", initialQuote: 0 },
       );
-      await f.service.acceptCommercials(f.owner.user, id, { final_quote: 0 });
-      await f.service.dispatchLogistics(f.brand.user, id, {
-        tracking_id: "fixture-tracking",
-      });
-      await f.service.confirmReceipt(f.owner.user, id);
-      await f.service.submitMedia(f.owner.user, id, {
-        phase: "MEDIA",
-        media_url: "https://example.test/fixture.mp4",
-      });
-      const job = await db.notificationJob.findFirstOrThrow({
-        where: {
-          workspaceId: f.brand.brand.id,
-          eventType: "collaborations.media_submitted_for_review",
-        },
-      });
-      await new NotificationProcessorService(db as PrismaService).processJob({
-        ...job,
-        claimToken: "fixture",
-        payload: job.payload as Record<string, unknown>,
-      });
-      const query = new NotificationQueryService(
-        db as PrismaService,
-        {
-          resolveBrandWorkspace: async () => ({
-            brandProfileId: f.brand.brand.id,
-            userId: f.brand.user.id,
-          }),
-        } as never,
-      );
-      expect(await query.unreadCount(f.brand.user)).toEqual({
-        unread_count: 1,
-      });
-      const rows = await query.listForUser(f.brand.user, {});
-      expect(rows.notifications).toHaveLength(1);
-      await query.markRead(f.brand.user, rows.notifications[0].id);
-      expect(await query.markAllRead(f.brand.user)).toEqual({
-        updated_count: 0,
-      });
-      await f.service.reviewMedia(f.brand.user, id, { decision: "APPROVED" });
-      await f.service.submitLivePost(f.owner.user, id, {
-        live_post_url: "https://instagram.com/p/fixture",
-      });
-      await f.service.verifyCompliance(f.brand.user, id);
-      await f.service.submitReview(f.owner.user, id, { rating: 5 });
-      await f.service.submitReview(f.brand.user, id, { rating: 4 });
-      expect(
-        await db.collaborationFinalization.findUnique({
-          where: { collaborationId: id },
+      await expect(
+        f.service.acceptCommercials(f.owner.user, id, { final_quote: 0 }),
+      ).rejects.toBeInstanceOf(GoneException);
+      await expect(
+        f.service.dispatchLogistics(f.brand.user, id, {
+          tracking_id: "fixture-tracking",
         }),
-      ).toMatchObject({ reviewsVisible: true, isComplianceVerified: true });
+      ).rejects.toBeInstanceOf(GoneException);
+      await expect(
+        f.service.confirmReceipt(f.owner.user, id),
+      ).rejects.toBeInstanceOf(GoneException);
+      await expect(
+        f.service.submitMedia(f.owner.user, id, {
+          phase: "MEDIA",
+          media_url: "https://example.test/fixture.mp4",
+        }),
+      ).rejects.toBeInstanceOf(GoneException);
+      await expect(
+        f.service.reviewMedia(f.brand.user, id, { decision: "APPROVED" }),
+      ).rejects.toBeInstanceOf(GoneException);
+      await expect(
+        f.service.submitLivePost(f.owner.user, id, {
+          live_post_url: "https://instagram.com/p/fixture",
+        }),
+      ).rejects.toBeInstanceOf(GoneException);
+      await expect(
+        f.service.verifyCompliance(f.brand.user, id),
+      ).rejects.toBeInstanceOf(GoneException);
+      await expect(
+        f.service.submitReview(f.owner.user, id, { rating: 5 }),
+      ).rejects.toBeInstanceOf(GoneException);
     });
   },
 );

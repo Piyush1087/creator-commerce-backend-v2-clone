@@ -57,6 +57,7 @@ import {
   CollaborationAccessService,
 } from "./collaboration-access.service";
 import { CollaborationRealtimeService } from "./collaboration-realtime.service";
+import { retiredLegacyCollaborationAggregateWrite } from "../utils/legacy-collaboration-aggregate-write.retired";
 
 const LIVE_URL_DOMAINS = [/instagram\.com/i, /tiktok\.com/i, /youtube\.com/i];
 
@@ -188,6 +189,7 @@ export class CollaborationService {
     collaborationId: string,
     dto: SubmitCreatorQuoteDto,
   ) {
+    retiredLegacyCollaborationAggregateWrite();
     if (user.role !== UserRole.CREATOR) {
       throw new ForbiddenException("Creator access required");
     }
@@ -259,6 +261,7 @@ export class CollaborationService {
     collaborationId: string,
     dto: BrandCounterOfferDto,
   ) {
+    retiredLegacyCollaborationAggregateWrite();
     if (user.role !== UserRole.BRAND) {
       throw new ForbiddenException("Brand access required");
     }
@@ -310,6 +313,7 @@ export class CollaborationService {
     collaborationId: string,
     dto: AcceptCommercialsDto,
   ) {
+    retiredLegacyCollaborationAggregateWrite();
     const thread = await this.access.assertThreadForUser(
       user,
       collaborationId,
@@ -368,6 +372,7 @@ export class CollaborationService {
     collaborationId: string,
     _dto: FundEscrowDto,
   ) {
+    retiredLegacyCollaborationAggregateWrite();
     if (user.role !== UserRole.BRAND) {
       throw new ForbiddenException("Brand access required");
     }
@@ -446,6 +451,7 @@ export class CollaborationService {
     collaborationId: string,
     dto: UploadReceiptDto,
   ) {
+    retiredLegacyCollaborationAggregateWrite();
     if (user.role !== UserRole.BRAND) {
       throw new ForbiddenException("Brand access required");
     }
@@ -467,6 +473,7 @@ export class CollaborationService {
   }
 
   async confirmManualAdvanceReceived(user: AuthUser, collaborationId: string) {
+    retiredLegacyCollaborationAggregateWrite();
     if (user.role !== UserRole.CREATOR) {
       throw new ForbiddenException("Creator access required");
     }
@@ -509,6 +516,7 @@ export class CollaborationService {
     collaborationId: string,
     dto: DispatchLogisticsDto,
   ) {
+    retiredLegacyCollaborationAggregateWrite();
     if (user.role !== UserRole.BRAND) {
       throw new ForbiddenException("Brand access required");
     }
@@ -559,6 +567,7 @@ export class CollaborationService {
   }
 
   async confirmReceipt(user: AuthUser, collaborationId: string) {
+    retiredLegacyCollaborationAggregateWrite();
     if (user.role !== UserRole.CREATOR) {
       throw new ForbiddenException("Creator access required");
     }
@@ -605,6 +614,7 @@ export class CollaborationService {
     collaborationId: string,
     dto: ReportFulfillmentIssueDto,
   ) {
+    retiredLegacyCollaborationAggregateWrite();
     if (user.role !== UserRole.CREATOR) {
       throw new ForbiddenException("Creator access required");
     }
@@ -652,6 +662,7 @@ export class CollaborationService {
     collaborationId: string,
     dto: SubmitCollaborationMediaDto,
   ) {
+    retiredLegacyCollaborationAggregateWrite();
     if (user.role !== UserRole.CREATOR) {
       throw new ForbiddenException("Creator access required");
     }
@@ -722,6 +733,7 @@ export class CollaborationService {
     collaborationId: string,
     dto: ReviewCollaborationMediaDto,
   ) {
+    retiredLegacyCollaborationAggregateWrite();
     if (user.role !== UserRole.BRAND) {
       throw new ForbiddenException("Brand access required");
     }
@@ -789,6 +801,7 @@ export class CollaborationService {
     collaborationId: string,
     dto: SubmitLivePostDto,
   ) {
+    retiredLegacyCollaborationAggregateWrite();
     if (user.role !== UserRole.CREATOR) {
       throw new ForbiddenException("Creator access required");
     }
@@ -827,6 +840,7 @@ export class CollaborationService {
   }
 
   async verifyCompliance(user: AuthUser, collaborationId: string) {
+    retiredLegacyCollaborationAggregateWrite();
     if (user.role !== UserRole.BRAND) {
       throw new ForbiddenException("Brand access required");
     }
@@ -870,6 +884,7 @@ export class CollaborationService {
     collaborationId: string,
     dto: SubmitCollaborationReviewDto,
   ) {
+    retiredLegacyCollaborationAggregateWrite();
     const thread = await this.access.assertThreadForUser(
       user,
       collaborationId,

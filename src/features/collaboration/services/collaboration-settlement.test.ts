@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 
 import {
   CollaborationActorClass,
@@ -29,6 +29,7 @@ import {
   projectCanonicalCollaborationDetail,
 } from "../utils/collaboration-thread.mapper";
 import { CollaborationSettlementService } from "./collaboration-settlement.service";
+import { patchC04CommandTx } from "../test/c04-command-tx.harness";
 
 const d = (value: number) => new Prisma.Decimal(value);
 const command = {
@@ -203,6 +204,9 @@ function harness(
       : CollaborationStageStatus.IN_PROGRESS,
     aggregateVersion: 8,
     commercialAgreement: {
+      id: "agreement-1",
+      agreementVersion: 1,
+      agreementHash: "a".repeat(64),
       agreedCreatorFee: d(100000),
       currency: "INR",
       platformCommissionRateSnapshot: d(7),
@@ -273,6 +277,7 @@ function harness(
       },
     },
   };
+  patchC04CommandTx(tx, row);
   const prisma: any = {
     $transaction: async (fn: any) => {
       const before = clone(row);

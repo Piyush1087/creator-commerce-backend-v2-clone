@@ -92,12 +92,7 @@ describe("BS09 P2 canonical reserve economics", () => {
     });
     expect(result.total_reserve).toBe(108260);
     expect(ledgerCreate.mock.calls[0][0].data.transactionType).toBe("RESERVE");
-    expect(commercialUpdate.mock.calls[0][0].data).not.toHaveProperty(
-      "finalQuote",
-    );
-    expect(commercialUpdate.mock.calls[0][0].data.escrowVaultId).toBe(
-      "vault-1",
-    );
+    expect(commercialUpdate).not.toHaveBeenCalled();
   });
 
   it("returns AWAITING_FUNDS without lock, balance mutation, or ledger", async () => {
@@ -148,6 +143,7 @@ describe("BS09 P2 canonical reserve economics", () => {
     expect(tx.brandEscrowVault.update).not.toHaveBeenCalled();
     expect(tx.collaborationEscrowLock.create).not.toHaveBeenCalled();
     expect(tx.escrowTransactionLedger.create).not.toHaveBeenCalled();
+    expect(tx.collaborationCommercial.update).not.toHaveBeenCalled();
   });
 
   describe.each([

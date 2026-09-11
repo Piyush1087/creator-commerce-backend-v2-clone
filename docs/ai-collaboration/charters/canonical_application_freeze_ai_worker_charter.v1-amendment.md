@@ -70,6 +70,32 @@ hotfix procedure                   optional overlay ≠ canonical application de
 
 §18 still forbids greenwashing. Classified PREEXISTING_ACCEPTED_DEBT / ENVIRONMENT_BLOCKED / STALE_TEST_PROVEN from the intermediate package stay classified unless a pull actually changes that surface.
 
+When a later accepted module lands, reconstruct order from current dummy_tcs authorities. Do not copy this amendment's C-04 / C-02A / Payouts ladder as a permanent sequence. Re-prove only the gates that module can change. Leave classified debt classified until the owning module is in lineage.
+
+### Amendment progress (not freeze PASS)
+
+```text
+1 inventory                          = DONE this amendment
+2 converge C-04 / C-02A / Payouts v1 = DONE (C-06 remains OUT)
+3 INV-13 leftover journey writers    = PASS classified (tables retained; no Prisma drop)
+4 OUT competing transitions          = retired 410 where canonical C-04/C-03 already owns the write
+5 NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS = NOT DECLARED (AWS)
+6 affected gates                     = PARTIAL (C-04 collab vitest closed; farms / Wave B / smoke remain)
+7 immutable SHA pair                 = NOT THIS TREE until Parent asks commit
+
+C-04 collab node:test STALE_TEST_PROVEN = CLOSED
+  14 files / 106 tests PASS under Vitest (harnesses retargeted to current constructors)
+
+BE prettier/prettier 712                 = ACCEPTED this freeze
+  do not --fix
+  later eslint without prettier: if the only remaining findings are the same prettier farm, accept as PASS classified
+  new non-prettier eslint findings       = not auto-accepted
+```
+
+Do not declare `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` from this progress block.
+
+When a later accepted module lands, reconstruct order from current dummy_tcs authorities. Do not copy this amendment's C-04 / C-02A / Payouts ladder as a permanent sequence. Re-prove only the gates that module can change. Leave classified debt classified until the owning module is in lineage.
+
 ---
 
 ## 1. Mission
@@ -470,7 +496,7 @@ Every invariant must identify its authority source and the repositories/files/te
 
 ### Amendment Phase D — INV-13
 
-`INV-13 FAIL classified` on the intermediate package is acceptable as an intermediate result. Final PASS requires proving whether duplicate models are **competing runtime writers** or **harmless retained schema**.
+`INV-13` leftover journey writers are now **PASS classified** (tables retained, no Prisma drop). Final freeze PASS still requires remaining §18 gates and security/release proof.
 
 ```text
 competing runtime writer     = live service still creates/updates the non-canonical model
@@ -758,7 +784,11 @@ RELEASE_BLOCKER
 
 After each convergence block, rerun gates the pull can change. Do not re-open classified prettier 712 or environment-blocked farms as a PASS claim unless the pull actually changes that surface.
 
-C-04 empty `node:test` collab files classified `STALE_TEST_PROVEN` must be re-proven after C-04 is in lineage. INV-08 / INV-09 / INV-13 must be re-run after the modules that own those boundaries are pulled.
+BE `prettier/prettier` 712 is **accepted this freeze** (`PREEXISTING_ACCEPTED_DEBT`). Do not `--fix`. A later `eslint` run with prettier disabled is allowed. If that run shows only the same prettier farm, keep **PASS classified**. New non-prettier eslint findings are not auto-accepted.
+
+C-04 collab files previously classified `STALE_TEST_PROVEN` (`node:test`, vitest 0 suites) are **re-proven** this amendment: Vitest **14 files / 106 tests PASS**. Harnesses were retargeted to the current C-04 / Brand Payouts constructors (projection outbox, advisory lock, payouts lineage, retired Manual rail). That classification does not automatically clear other STALE / ENVIRONMENT_BLOCKED farms.
+
+When a subsequent accepted module is pulled, apply the same rule: empty or stale suites owned by that module must be re-proven after it is in lineage. INV-08 / INV-09 stay PARTIAL until their remaining product boundaries close. INV-13 leftover journey writers are PASS classified (tables retained).
 
 ---
 

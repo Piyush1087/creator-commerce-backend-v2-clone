@@ -9,6 +9,11 @@ import { UCE_CAMPAIGN_COLLABORATION_WRITE_RETIRED } from "../brand-uce/utils/uce
 import { CreatorUceCampaignsService } from "../creator-uce/services/creator-uce-campaigns.service";
 import { CreatorCampaignsCommandService } from "../creator-marketplace/services/creator-campaigns-command.service";
 import { CreatorInvitationService } from "../creator-marketplace/services/creator-invitation.service";
+import { CollaborationService } from "./services/collaboration.service";
+import {
+  LEGACY_COLLABORATION_AGGREGATE_WRITE_RETIRED,
+  retiredLegacyCollaborationAggregateWrite,
+} from "./utils/legacy-collaboration-aggregate-write.retired";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { CreatorCampaignsPanicService } from "../creator-marketplace/services/creator-campaigns-panic.service";
 
@@ -128,5 +133,63 @@ describe("OUT competing canonical transitions retired", () => {
     expect(helperSource).toContain(UCE_CAMPAIGN_COLLABORATION_WRITE_RETIRED);
     expect(approveSource).not.toContain("uceCampaignCollaboration.update");
     expect(approveSource).not.toContain("uceCampaignCollaboration.create");
+  });
+
+  it("fail-closes leftover CollaborationCommercial/Logistics/Media/Finalization writers", async () => {
+    const leftover = new CollaborationService(
+      {} as PrismaService,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    const collabId = "00000000-0000-0000-0000-000000000001";
+
+    await expect(
+      leftover.submitCreatorQuote(creator, collabId, { total_quote: 100 }),
+    ).rejects.toBeInstanceOf(GoneException);
+    await expect(
+      leftover.brandCounterOffer(creator, collabId, { counter_offer: 90 }),
+    ).rejects.toBeInstanceOf(GoneException);
+    await expect(
+      leftover.acceptCommercials(creator, collabId, {}),
+    ).rejects.toBeInstanceOf(GoneException);
+    await expect(
+      leftover.fundEscrow(creator, collabId, {}),
+    ).rejects.toBeInstanceOf(GoneException);
+    await expect(
+      leftover.dispatchLogistics(creator, collabId, {
+        tracking_id: "x",
+      } as never),
+    ).rejects.toBeInstanceOf(GoneException);
+    await expect(
+      leftover.submitMedia(creator, collabId, {
+        phase: "MEDIA",
+        media_url: "https://example.com/a.mp4",
+      } as never),
+    ).rejects.toBeInstanceOf(GoneException);
+    await expect(
+      leftover.submitReview(creator, collabId, { rating: 5 } as never),
+    ).rejects.toBeInstanceOf(GoneException);
+
+    expect(retiredLegacyCollaborationAggregateWrite).toThrow(GoneException);
+    try {
+      retiredLegacyCollaborationAggregateWrite();
+    } catch (error) {
+      expect((error as GoneException).getResponse()).toMatchObject({
+        code: LEGACY_COLLABORATION_AGGREGATE_WRITE_RETIRED,
+      });
+    }
+
+    const leftoverSource = read(
+      "src/features/collaboration/services/collaboration.service.ts",
+    );
+    const escrowSource = read(
+      "src/features/brand-escrow/services/brand-escrow-computation.service.ts",
+    );
+    expect(leftoverSource).toContain("retiredLegacyCollaborationAggregateWrite");
+    expect(escrowSource).not.toContain("collaborationCommercial.update");
+    expect(escrowSource).not.toContain("collaborationCommercial.updateMany");
   });
 });

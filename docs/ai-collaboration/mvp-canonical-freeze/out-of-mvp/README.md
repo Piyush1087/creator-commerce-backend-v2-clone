@@ -31,6 +31,7 @@ Chain: exists → authenticated? → mutate canonical state? → another canonic
 | `GET /api/v1/creator/payouts` | JWT + Creator platform | No | C-05 Settings payouts (canonical write) | OUT read hub; C-06 stays OUT |
 | `POST /api/v1/collaboration/threads/:id/logistics/*` `production/submit` `production/review` `posting/*` | JWT | Leftover Brand Collab aggregates | C-04 fulfillment / production / publishing | **Retired** `410` |
 | Brand UCE pipeline `UceCampaignCollaboration` writes | JWT (IN module) | Would mutate leftover collab identity | C-03/C-04 `Collaboration` | **Retired** `410 UCE_CAMPAIGN_COLLABORATION_WRITE_RETIRED`. Reads remain. Table not dropped |
+| Leftover `CollaborationService` commercial/logistics/media/finalization mutations | In-process (HTTP leftovers already `410`) | Would mutate leftover aggregates | C-04 negotiation / fulfillment / production / publishing | **Retired** `410 LEGACY_COLLABORATION_AGGREGATE_WRITE_RETIRED`. Canonical escrow reserve no longer writes `CollaborationCommercial` |
 
 Proof tests: `src/features/collaboration/out-of-mvp-competing-transition-retired.test.ts`  
 INV-13 writer register: `../phase-d-invariants/inv-13-competing-writers.md`

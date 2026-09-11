@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 
 import {
   CollaborationFeedbackAuthorRole,
@@ -13,6 +13,7 @@ import {
   submitCollaborationFeedbackSchema,
 } from "../schemas/collaboration-feedback-command.schema";
 import { CollaborationFeedbackService } from "./collaboration-feedback.service";
+import { patchC04CommandTx } from "../test/c04-command-tx.harness";
 
 const collaborationId = "10000000-0000-4000-8000-000000000001";
 const command = {
@@ -94,6 +95,7 @@ function harness(
       },
     },
   };
+  patchC04CommandTx(tx, row);
   const prisma: any = {
     $transaction: async (fn: any) => {
       const before = clone(row);

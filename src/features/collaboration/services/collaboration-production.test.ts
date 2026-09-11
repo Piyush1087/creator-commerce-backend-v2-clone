@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 
 import {
   CollaborationDeliverableState,
@@ -19,6 +19,7 @@ import {
   deriveAvailableActions,
 } from "../utils/collaboration-thread.mapper";
 import { CollaborationProductionService } from "./collaboration-production.service";
+import { patchC04CommandTx } from "../test/c04-command-tx.harness";
 
 const collaborationId = "10000000-0000-4000-8000-000000000001";
 const deliverableAId = "20000000-0000-4000-8000-000000000001";
@@ -156,6 +157,7 @@ function harness(options: { failEvent?: boolean; assetOnly?: boolean } = {}) {
       },
     },
   };
+  patchC04CommandTx(tx, row);
   const prisma: any = {
     $transaction: async (callback: any) => {
       const snapshot = {
