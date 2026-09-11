@@ -14,6 +14,7 @@ import {
 import { InstagramB4ConsumerController } from "./consumer/instagram-b4-consumer.controller";
 import { InstagramB4ConsumerService } from "./consumer/instagram-b4-consumer.service";
 import { InstagramContentBehaviorRuntimeService } from "./runtime/instagram-content-behavior.runtime.service";
+import { InstagramC2FoundationsService } from "./foundations/instagram-c2-foundations.service";
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { InstagramContentBehaviorRuntimeService } from "./runtime/instagram-cont
     InstagramB3bMediaCompletionService,
     InstagramB4ConsumerService,
     InstagramContentBehaviorRuntimeService,
+    InstagramC2FoundationsService,
     {
       provide: InstagramB3aVisualModelPort,
       useClass: UnavailableInstagramB3aVisualModelAdapter,
@@ -39,6 +41,7 @@ import { InstagramContentBehaviorRuntimeService } from "./runtime/instagram-cont
     InstagramB3bMediaCompletionService,
     InstagramB4ConsumerService,
     InstagramContentBehaviorRuntimeService,
+    InstagramC2FoundationsService,
   ],
 })
 export class InstagramIntelligenceModule {}
