@@ -121,7 +121,11 @@ export class DataExtractionIntelligenceEvidenceAdapter implements IntelligenceEv
       evidenceRef: item.evidenceRef,
       capabilityId: item.capabilityId,
       resourceRef: item.resourceRef,
-      resourceType: item.resourceType,
+      resourceType:
+        item.resourceType === "INSTAGRAM_ACCOUNT" ||
+        item.resourceType === "INSTAGRAM_MEDIA"
+          ? "CONNECTED_SOCIAL_RESOURCE"
+          : item.resourceType,
       captureRef: item.captureRef,
       captureVersion: item.captureRef,
       sourceClass: item.sourceClass,

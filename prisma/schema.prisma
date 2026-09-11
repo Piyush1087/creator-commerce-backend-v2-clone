@@ -1101,11 +1101,14 @@ enum IntelligenceSubjectType {
 
 enum DataExtractionSourceClass {
   OWNED_WEBSITE
+  INSTAGRAM_OWNED
 }
 
 enum DataExtractionResourceType {
   OWNED_WEB_PAGE
   OWNED_WEB_FRAGMENT
+  INSTAGRAM_ACCOUNT
+  INSTAGRAM_MEDIA
 }
 
 enum DataExtractionPageRole {
@@ -5130,6 +5133,7 @@ model DataExtractionResource {
   brandProfile             BrandProfile               @relation(fields: [brandId], references: [id], onDelete: Cascade)
   sourceClass              DataExtractionSourceClass  @default(OWNED_WEBSITE) @map("source_class")
   resourceType             DataExtractionResourceType @map("resource_type")
+  providerAccountId        String?                    @map("provider_account_id") @db.VarChar(100)
   pageRole                 DataExtractionPageRole?    @map("page_role")
   canonicalResourceKey     String                     @map("canonical_resource_key") @db.Text
   canonicalResourceKeyHash String                     @map("canonical_resource_key_hash") @db.VarChar(64)
@@ -5143,6 +5147,7 @@ model DataExtractionResource {
   @@unique([brandId, resourceRef], map: "uq_de_resource_brand_ref")
   @@unique([brandId, sourceClass, canonicalResourceKeyHash], map: "uq_de_resource_identity")
   @@index([brandId, resourceRef], map: "idx_de_resource_brand_ref")
+  @@index([brandId, providerAccountId], map: "idx_de_resource_brand_provider_account")
   @@map("data_extraction_resources")
 }
 
@@ -5155,6 +5160,9 @@ model DataExtractionCapture {
   resource                 DataExtractionResource             @relation(fields: [brandId, resourceRef], references: [brandId, resourceRef], onDelete: Cascade)
   capabilityExecutionRef   String?                            @map("capability_execution_ref")
   capabilityExecution      DataExtractionCapabilityExecution? @relation(fields: [brandId, capabilityExecutionRef], references: [brandId, capabilityExecutionRef], onDelete: Restrict)
+  providerIntegrationId    String?                            @map("provider_integration_id")
+  providerAccountId        String?                            @map("provider_account_id") @db.VarChar(100)
+  authorizationGeneration  Int?                               @map("authorization_generation")
   acquisitionRequestKey    String                             @map("acquisition_request_key") @db.VarChar(255)
   status                   DataExtractionCaptureStatus        @default(RUNNING)
   startedAt                DateTime                           @map("started_at")
@@ -5177,6 +5185,7 @@ model DataExtractionCapture {
   @@unique([brandId, acquisitionRequestKey], map: "uq_de_capture_request")
   @@index([resourceRef, capturedAt], map: "idx_de_capture_resource_time")
   @@index([brandId, captureRef], map: "idx_de_capture_brand_ref")
+  @@index([brandId, providerAccountId, authorizationGeneration], map: "idx_de_capture_instagram_fence")
   @@map("data_extraction_captures")
 }
 
@@ -5208,6 +5217,9 @@ model DataExtractionCapabilityExecution {
   capabilityExecutionRef       String                               @unique @map("capability_execution_ref")
   brandId                      String                               @map("brand_id")
   brandProfile                 BrandProfile                         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  providerIntegrationId        String?                              @map("provider_integration_id")
+  providerAccountId            String?                              @map("provider_account_id") @db.VarChar(100)
+  authorizationGeneration      Int?                                 @map("authorization_generation")
   capabilityId                 String                               @map("capability_id") @db.VarChar(100)
   normalizationContractVersion String                               @map("normalization_contract_version") @db.VarChar(100)
   resourceScopeHash            String                               @map("resource_scope_hash") @db.VarChar(128)
@@ -5233,6 +5245,7 @@ model DataExtractionCapabilityExecution {
   @@unique([brandId, capabilityExecutionRef, capabilityId], map: "uq_de_capexec_brand_ref_capability")
   @@unique([brandId, requestKey], map: "uq_de_capexec_request")
   @@index([brandId, capabilityId], map: "idx_de_capexec_brand_capability")
+  @@index([brandId, providerAccountId, authorizationGeneration], map: "idx_de_capexec_instagram_fence")
   @@map("data_extraction_capability_executions")
 }
 

@@ -36,6 +36,7 @@ export interface CreateOrGetResourceInput {
   readonly resourceRef: ResourceRef;
   readonly sourceClass: EvidenceObservedSourceClass;
   readonly resourceType: EvidenceResourceType;
+  readonly providerAccountId?: string;
   readonly canonicalResourceKey: string;
   readonly canonicalUrl: string;
   readonly pageRole?: EvidencePageRole;
@@ -46,6 +47,9 @@ export interface CreateCaptureInput {
   readonly captureRef: CaptureRef;
   readonly resourceRef: ResourceRef;
   readonly capabilityExecutionRef?: CapabilityExecutionRef;
+  readonly providerIntegrationId?: string;
+  readonly providerAccountId?: string;
+  readonly authorizationGeneration?: number;
   readonly acquisitionRequestKey: string;
   readonly startedAt: string;
   readonly acquisitionQuality: EvidenceAcquisitionQuality;
@@ -71,6 +75,9 @@ export interface CreateCapabilityExecutionInput {
   readonly brandId: BrandId;
   readonly capabilityExecutionRef: CapabilityExecutionRef;
   readonly capabilityId: EvidenceCapabilityId;
+  readonly providerIntegrationId?: string;
+  readonly providerAccountId?: string;
+  readonly authorizationGeneration?: number;
   readonly normalizationContractVersion: string;
   readonly resourceScopeHash: string;
   readonly freshnessIntent: EvidenceFreshnessIntent;

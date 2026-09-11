@@ -140,6 +140,9 @@ function toResource(row: PrismaResource): DataExtractionResourceRecord {
     resourceRef: asResourceRef(row.resourceRef),
     sourceClass: row.sourceClass,
     resourceType: row.resourceType,
+    ...(row.providerAccountId
+      ? { providerAccountId: row.providerAccountId }
+      : {}),
     canonicalResourceKey: row.canonicalResourceKey,
     canonicalUrl: row.canonicalUrl,
     aliases: [],
@@ -168,6 +171,15 @@ function toCapture(row: CaptureRow): DataExtractionCaptureRecord {
             row.capabilityExecutionRef,
           ),
         }
+      : {}),
+    ...(row.providerIntegrationId
+      ? { providerIntegrationId: row.providerIntegrationId }
+      : {}),
+    ...(row.providerAccountId
+      ? { providerAccountId: row.providerAccountId }
+      : {}),
+    ...(row.authorizationGeneration !== null
+      ? { authorizationGeneration: row.authorizationGeneration }
       : {}),
     acquisitionRequestKey: row.acquisitionRequestKey,
     startedAt: row.startedAt.toISOString(),
@@ -221,6 +233,15 @@ function toCapabilityExecution(
       row.capabilityExecutionRef,
     ),
     capabilityId: row.capabilityId as EvidenceCapabilityId,
+    ...(row.providerIntegrationId
+      ? { providerIntegrationId: row.providerIntegrationId }
+      : {}),
+    ...(row.providerAccountId
+      ? { providerAccountId: row.providerAccountId }
+      : {}),
+    ...(row.authorizationGeneration !== null
+      ? { authorizationGeneration: row.authorizationGeneration }
+      : {}),
     resourceScope: row.resourceScope.map((membership) =>
       asResourceRef(membership.resourceRef),
     ),
@@ -580,6 +601,7 @@ export class PrismaResourceRepository implements ResourceRepository {
       if (existing) {
         if (
           existing.resourceType !== input.resourceType ||
+          existing.providerAccountId !== (input.providerAccountId ?? null) ||
           existing.pageRole !== (input.pageRole ?? null) ||
           existing.canonicalResourceKey !== input.canonicalResourceKey ||
           existing.canonicalUrl !== input.canonicalUrl
@@ -595,6 +617,7 @@ export class PrismaResourceRepository implements ResourceRepository {
           brandId: input.brandId,
           sourceClass: input.sourceClass,
           resourceType: input.resourceType,
+          providerAccountId: input.providerAccountId,
           pageRole: input.pageRole,
           canonicalResourceKey: input.canonicalResourceKey,
           canonicalResourceKeyHash: hash,
@@ -667,6 +690,9 @@ export class PrismaResourceRepository implements ResourceRepository {
       resourceRef: record.resourceRef,
       sourceClass: record.sourceClass,
       resourceType: record.resourceType,
+      ...(record.providerAccountId
+        ? { providerAccountId: record.providerAccountId }
+        : {}),
       canonicalResourceKey: record.canonicalResourceKey,
       canonicalUrl: record.canonicalUrl,
       ...(record.pageRole ? { pageRole: record.pageRole } : {}),
@@ -701,7 +727,12 @@ export class PrismaCaptureRepository implements CaptureRepository {
         if (
           existing.resourceRef !== input.resourceRef ||
           existing.capabilityExecutionRef !==
-            (input.capabilityExecutionRef ?? null)
+            (input.capabilityExecutionRef ?? null) ||
+          existing.providerIntegrationId !==
+            (input.providerIntegrationId ?? null) ||
+          existing.providerAccountId !== (input.providerAccountId ?? null) ||
+          existing.authorizationGeneration !==
+            (input.authorizationGeneration ?? null)
         ) {
           throw persistenceError("IDEMPOTENCY_CONFLICT");
         }
@@ -714,6 +745,9 @@ export class PrismaCaptureRepository implements CaptureRepository {
           brandId: input.brandId,
           resourceRef: input.resourceRef,
           capabilityExecutionRef: input.capabilityExecutionRef,
+          providerIntegrationId: input.providerIntegrationId,
+          providerAccountId: input.providerAccountId,
+          authorizationGeneration: input.authorizationGeneration,
           acquisitionRequestKey: input.acquisitionRequestKey,
           status: "RUNNING",
           startedAt: new Date(input.startedAt),
@@ -842,6 +876,15 @@ export class PrismaCaptureRepository implements CaptureRepository {
       ...(record.capabilityExecutionRef
         ? { capabilityExecutionRef: record.capabilityExecutionRef }
         : {}),
+      ...(record.providerIntegrationId
+        ? { providerIntegrationId: record.providerIntegrationId }
+        : {}),
+      ...(record.providerAccountId
+        ? { providerAccountId: record.providerAccountId }
+        : {}),
+      ...(record.authorizationGeneration !== undefined
+        ? { authorizationGeneration: record.authorizationGeneration }
+        : {}),
       acquisitionRequestKey: record.acquisitionRequestKey,
       startedAt: record.startedAt,
       acquisitionQuality: record.acquisitionQuality,
@@ -947,6 +990,11 @@ export class PrismaCapabilityExecutionRepository implements CapabilityExecutionR
       const validateExisting = (existing: CapabilityExecutionRow) => {
         if (
           existing.capabilityId !== input.capabilityId ||
+          existing.providerIntegrationId !==
+            (input.providerIntegrationId ?? null) ||
+          existing.providerAccountId !== (input.providerAccountId ?? null) ||
+          existing.authorizationGeneration !==
+            (input.authorizationGeneration ?? null) ||
           existing.normalizationContractVersion !==
             input.normalizationContractVersion ||
           existing.resourceScopeHash !== input.resourceScopeHash ||
@@ -974,6 +1022,9 @@ export class PrismaCapabilityExecutionRepository implements CapabilityExecutionR
             capabilityExecutionRef: input.capabilityExecutionRef,
             brandId: input.brandId,
             capabilityId: input.capabilityId,
+            providerIntegrationId: input.providerIntegrationId,
+            providerAccountId: input.providerAccountId,
+            authorizationGeneration: input.authorizationGeneration,
             normalizationContractVersion: input.normalizationContractVersion,
             resourceScopeHash: input.resourceScopeHash,
             freshnessIntent: input.freshnessIntent,
@@ -1153,6 +1204,15 @@ export class PrismaCapabilityExecutionRepository implements CapabilityExecutionR
       brandId: record.brandId,
       capabilityExecutionRef: record.capabilityExecutionRef,
       capabilityId: record.capabilityId,
+      ...(record.providerIntegrationId
+        ? { providerIntegrationId: record.providerIntegrationId }
+        : {}),
+      ...(record.providerAccountId
+        ? { providerAccountId: record.providerAccountId }
+        : {}),
+      ...(record.authorizationGeneration !== undefined
+        ? { authorizationGeneration: record.authorizationGeneration }
+        : {}),
       normalizationContractVersion: record.normalizationContractVersion,
       resourceScopeHash,
       freshnessIntent: record.freshnessIntent,

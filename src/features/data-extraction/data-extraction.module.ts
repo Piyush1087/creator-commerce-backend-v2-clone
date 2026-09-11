@@ -9,6 +9,7 @@ import {
 } from "./evidence/acquisition/owned-website-wave1-acquisition.service";
 import { OwnedWebsiteWave1NormalizationService } from "./evidence/normalization/owned-website-wave1-normalization.service";
 import { DataExtractionIntelligenceEvidenceAdapter } from "./evidence/intelligence/data-extraction-intelligence-evidence.adapter";
+import { InstagramCaptureWriterService } from "./evidence/instagram/instagram-capture-writer.service";
 import { DataExtractionPersistenceService } from "./evidence/persistence/prisma-evidence-repositories";
 import { DATA_EXTRACTION_EVIDENCE_QUERY_PORT_V1 } from "./evidence/ports/evidence-runtime.ports";
 import { DataExtractionEvidenceQueryService } from "./evidence/query/data-extraction-evidence-query.service";
@@ -38,6 +39,7 @@ import { StructuredEvidenceExecutionService } from "./services/structured-eviden
       useExisting: DataExtractionEvidenceQueryService,
     },
     DataExtractionIntelligenceEvidenceAdapter,
+    InstagramCaptureWriterService,
   ],
   exports: [
     GeminiGatekeeperProvider,
@@ -50,6 +52,7 @@ import { StructuredEvidenceExecutionService } from "./services/structured-eviden
     DataExtractionPersistenceService,
     DATA_EXTRACTION_EVIDENCE_QUERY_PORT_V1,
     DataExtractionIntelligenceEvidenceAdapter,
+    InstagramCaptureWriterService,
   ],
 })
 export class DataExtractionModule {}

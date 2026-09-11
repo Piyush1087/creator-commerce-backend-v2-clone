@@ -29,6 +29,7 @@ export interface DataExtractionResourceRecord {
   readonly resourceRef: ResourceRef;
   readonly sourceClass: EvidenceObservedSourceClass;
   readonly resourceType: EvidenceResourceType;
+  readonly providerAccountId?: string;
   readonly canonicalResourceKey: string;
   readonly canonicalUrl: string;
   readonly aliases: readonly string[];
@@ -41,6 +42,9 @@ export interface DataExtractionCaptureRecord {
   readonly captureRef: CaptureRef;
   readonly resourceRef: ResourceRef;
   readonly capabilityExecutionRef?: CapabilityExecutionRef;
+  readonly providerIntegrationId?: string;
+  readonly providerAccountId?: string;
+  readonly authorizationGeneration?: number;
   readonly acquisitionRequestKey: string;
   readonly startedAt: string;
   readonly capturedAt?: string;
@@ -146,6 +150,9 @@ export interface DataExtractionCapabilityExecutionRecord {
   readonly brandId: BrandId;
   readonly capabilityExecutionRef: CapabilityExecutionRef;
   readonly capabilityId: EvidenceCapabilityId;
+  readonly providerIntegrationId?: string;
+  readonly providerAccountId?: string;
+  readonly authorizationGeneration?: number;
   readonly resourceScope: readonly ResourceRef[];
   readonly freshnessIntent: EvidenceFreshnessIntent;
   readonly normalizationContractVersion: string;
