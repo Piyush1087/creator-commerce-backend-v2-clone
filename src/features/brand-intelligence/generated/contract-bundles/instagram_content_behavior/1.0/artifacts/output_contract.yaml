@@ -3,10 +3,10 @@ version: "1.0"
 status: FROZEN
 processor: instagram_content_behavior
 objects: [instagram_content_behavior]
-processor_definition: intelligence/architecture/instagram_intelligence_v1_contract_registry.json
-reasoning_authority: intelligence/architecture/instagram_intelligence_v1_contract_registry.json
-object_authority: intelligence/architecture/instagram_intelligence_v1_contract_registry.json
-shared_metadata_authority: intelligence/architecture/instagram_intelligence_v1_contract_registry.json
+processor_definition: intelligence/engines/instagram_intelligence/branches/content_behavior/processors/instagram_content_behavior.yaml
+reasoning_authority: intelligence/engines/instagram_intelligence/branches/content_behavior/artifacts/instagram_content_behavior/reasoning.yaml
+object_authority: intelligence/engines/instagram_intelligence/branches/content_behavior/objects.yaml
+shared_metadata_authority: intelligence/engines/instagram_intelligence/branches/content_behavior/shared_metadata_contract.yaml
 response:
   type: object
   required: [semanticId, objectContractVersion, outputContractVersion, sourceScope, state, readiness, freshness, currentPreserved, generatedAt, window, results, signals, learnings, components, coverage, evidenceRefs]

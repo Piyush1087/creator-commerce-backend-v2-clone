@@ -88,12 +88,8 @@ export interface ContractSourceSpec {
   readonly ownedObjectSemanticIds: readonly string[];
   readonly ownedPathPatterns: readonly OwnedPathPattern[];
   readonly artifactPaths: Readonly<Record<ContractArtifactRole, string>>;
-  /**
-   * A frozen compiled snapshot is permitted only when the owning authority is
-   * a single machine registry rather than six legacy YAML documents. The
-   * normal generator and integrity verifier still own every emitted byte.
-   */
-  readonly compiledArtifactSources?: Readonly<
-    Record<ContractArtifactRole, string>
-  >;
+  /** Allows only this explicitly registered processor to use an exact commit
+   * outside the legacy architecture commit's ancestry. Artifacts are still
+   * read exclusively from that commit through Git. */
+  readonly independentAuthorityCommit?: true;
 }

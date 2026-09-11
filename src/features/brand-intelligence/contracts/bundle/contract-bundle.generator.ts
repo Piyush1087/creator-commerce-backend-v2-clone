@@ -426,10 +426,11 @@ function buildBundle(
   const sourceBytes = {} as Record<ContractArtifactRole, Buffer>;
   const parsed = {} as Record<ContractArtifactRole, Record<string, unknown>>;
   for (const role of CONTRACT_ARTIFACT_ROLES) {
-    const compiled = spec.compiledArtifactSources?.[role];
-    const bytes = compiled
-      ? Buffer.from(compiled, "utf8")
-      : readCommittedArtifact(sourceRoot, commitSha, spec.artifactPaths[role]);
+    const bytes = readCommittedArtifact(
+      sourceRoot,
+      commitSha,
+      spec.artifactPaths[role],
+    );
     sourceBytes[role] = bytes;
     parsed[role] = record(parse(bytes.toString("utf8")), role);
   }
@@ -535,10 +536,17 @@ export function generateContractBundles(options: GenerateOptions): void {
     const commit = processorPins?.[spec.processorId] ?? options.commitSha;
     if (!COMMIT_SHA.test(commit))
       throw new Error("Invalid processor architecture pin");
-    // Legacy source files belong to the pinned architecture line. A compiled
-    // machine-registry snapshot may be pinned to its accepted authority line.
-    if (spec.compiledArtifactSources) {
-      git(sourceRoot, ["cat-file", "-e", `${commit}^{commit}`]);
+    // Existing bundles retain their ancestor requirement. A processor may opt
+    // into a distinct authority line only through its compiled source spec;
+    // every byte is still read from the exact commit by readCommittedArtifact.
+    if (spec.independentAuthorityCommit) {
+      try {
+        git(sourceRoot, ["cat-file", "-e", `${commit}^{commit}`]);
+      } catch {
+        throw new Error(
+          `Independent authority commit does not exist for '${spec.processorId}'`,
+        );
+      }
     } else {
       git(sourceRoot, [
         "merge-base",

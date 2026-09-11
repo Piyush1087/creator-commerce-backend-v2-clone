@@ -4,9 +4,9 @@ status: FROZEN
 processor: instagram_content_behavior
 owner_engine: instagram_intelligence
 owning_branch: content_behavior
-processor_definition: intelligence/architecture/instagram_intelligence_v1_contract_registry.json
-object_authority: intelligence/architecture/instagram_intelligence_v1_contract_registry.json
-shared_metadata_authority: intelligence/architecture/instagram_intelligence_v1_contract_registry.json
+processor_definition: intelligence/engines/instagram_intelligence/branches/content_behavior/processors/instagram_content_behavior.yaml
+object_authority: intelligence/engines/instagram_intelligence/branches/content_behavior/objects.yaml
+shared_metadata_authority: intelligence/engines/instagram_intelligence/branches/content_behavior/shared_metadata_contract.yaml
 rules:
   one_post_is_pattern: false
   one_post_is_learning: false
