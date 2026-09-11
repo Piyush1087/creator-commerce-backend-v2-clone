@@ -161,6 +161,94 @@ describe("Instagram intelligence provider truth client", () => {
     });
   });
 
+  it("includes both exact window boundaries and excludes rows just outside", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          data: [
+            {
+              id: "start",
+              media_type: "IMAGE",
+              timestamp: "2026-08-12T00:00:00.000Z",
+            },
+            {
+              id: "end",
+              media_type: "VIDEO",
+              timestamp: "2026-09-11T00:00:00.000Z",
+            },
+            { id: "before", timestamp: "2026-08-11T23:59:59.999Z" },
+            { id: "after", timestamp: "2026-09-11T00:00:00.001Z" },
+            { id: "invalid", timestamp: "not-a-date" },
+          ],
+        }),
+      ),
+    );
+    const result =
+      await new InstagramIntelligenceProviderClient().readMediaInventory(
+        credential,
+        new Date("2026-09-11T00:00:00.000Z"),
+      );
+    expect(result.items.map((item) => item.providerMediaId)).toEqual([
+      "start",
+      "end",
+      "invalid",
+    ]);
+    expect(result.coverage).toMatchObject({
+      rowsEligible: 2,
+      rowsMissingTimestamp: 1,
+      oldestObservedTimestamp: "2026-08-12T00:00:00.000Z",
+      newestObservedTimestamp: "2026-09-11T00:00:00.000Z",
+    });
+  });
+
+  it.each([
+    [401, { error: { code: 190 } }, "AUTHORIZATION_REVALIDATION_REQUIRED"],
+    [403, { error: { code: 10 } }, "PERMISSION_LOSS"],
+    [429, { error: {} }, "RATE_LIMIT"],
+    [503, { error: { is_transient: true } }, "TRANSIENT"],
+    [418, { error: { code: 999 } }, "UNKNOWN"],
+  ] as const)(
+    "keeps first-page inventory failure %s explicit",
+    async (status, body, classification) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(jsonResponse(body, status)),
+      );
+      await expect(
+        new InstagramIntelligenceProviderClient().readMediaInventory(
+          credential,
+          new Date("2026-09-11T00:00:00.000Z"),
+        ),
+      ).resolves.toMatchObject({
+        availability: "UNAVAILABLE",
+        failureClassification: classification,
+        coverage: {
+          pagesAttempted: 1,
+          pagesCompleted: 0,
+          stopReason: "PROVIDER_FAILURE",
+        },
+      });
+    },
+  );
+
+  it("treats a malformed successful inventory envelope as provider failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse({ data: null })),
+    );
+    await expect(
+      new InstagramIntelligenceProviderClient().readMediaInventory(
+        credential,
+        new Date("2026-09-11T00:00:00.000Z"),
+      ),
+    ).resolves.toMatchObject({
+      availability: "UNAVAILABLE",
+      failureClassification: "UNKNOWN",
+      coverage: { stopReason: "PROVIDER_FAILURE" },
+    });
+  });
+
   it("distinguishes first-page failure, later partial failure, and explicit empty success", async () => {
     vi.stubGlobal(
       "fetch",
@@ -295,6 +383,36 @@ describe("Instagram intelligence provider truth client", () => {
   });
 
   it.each([
+    ["IMAGE", "comments,likes,reach,saved,shares,total_interactions,views"],
+    [
+      "CAROUSEL_ALBUM",
+      "comments,likes,reach,saved,shares,total_interactions,views",
+    ],
+    ["VIDEO", "comments,likes,reach,saved,shares,total_interactions,views"],
+    ["REEL", "comments,likes,reach,saved,shares,total_interactions,views"],
+    ["STORY", "reach,shares,total_interactions,views"],
+  ] as const)(
+    "requests only the verified %s metric matrix",
+    async (format, expected) => {
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ data: [] }));
+      vi.stubGlobal("fetch", fetchMock);
+      const result =
+        await new InstagramIntelligenceProviderClient().readMediaInsights(
+          credential,
+          "media-1",
+          format,
+        );
+      const url = new URL(String(fetchMock.mock.calls[0][0]));
+      expect(url.searchParams.get("metric")).toBe(expected);
+      expect(result).toMatchObject({
+        availability: "UNAVAILABLE",
+        unavailableReason: "EMPTY_DATA",
+        providerLagLimitHours: 48,
+      });
+    },
+  );
+
+  it.each([
     [401, { error: { code: 190 } }, "AUTHORIZATION_REVALIDATION_REQUIRED"],
     [403, { error: { code: 10 } }, "PERMISSION_LOSS"],
     [
@@ -397,6 +515,99 @@ describe("Instagram intelligence provider truth client", () => {
       { providerMediaId: "child-a", ordinal: 1 },
     ]);
     expect(JSON.stringify(children)).not.toMatch(/url|token/i);
+  });
+
+  it("preserves partial audience dimensions without inferring missing categories", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          data: [
+            {
+              total_value: {
+                breakdowns: [
+                  { results: [{ dimension_values: ["IN"], value: 12 }] },
+                ],
+              },
+            },
+          ],
+        }),
+      ),
+    );
+    const result =
+      await new InstagramIntelligenceProviderClient().readAudienceInsights(
+        credential,
+        "ENGAGED_AUDIENCE",
+        "COUNTRY",
+        "THIS_WEEK",
+      );
+    expect(result).toMatchObject({
+      availability: "AVAILABLE",
+      values: [{ dimension: "IN", value: 12 }],
+      limitation: null,
+    });
+  });
+
+  it("distinguishes empty, partial-failure, and safety-capped child coverage without insights", async () => {
+    const client = new InstagramIntelligenceProviderClient();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse({ data: [] })),
+    );
+    await expect(
+      client.readCarouselChildren(credential, "carousel-empty"),
+    ).resolves.toMatchObject({
+      availability: "AVAILABLE",
+      children: [],
+      stopReason: "EMPTY_SUCCESS",
+    });
+
+    const partialFetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: [{ id: "child-1" }],
+          paging: { cursors: { after: "next" } },
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ error: { code: 10 } }, 403));
+    vi.stubGlobal("fetch", partialFetch);
+    await expect(
+      client.readCarouselChildren(credential, "carousel-partial"),
+    ).resolves.toMatchObject({
+      availability: "PARTIAL",
+      children: [{ providerMediaId: "child-1", ordinal: 0 }],
+      failureClassification: "PERMISSION_LOSS",
+      stopReason: "PROVIDER_FAILURE",
+    });
+
+    const cappedRows = Array.from({ length: 11 }, (_, index) => ({
+      id: `child-${index}`,
+      media_type: index === 0 ? undefined : "IMAGE",
+    }));
+    const capFetch = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ data: cappedRows }));
+    vi.stubGlobal("fetch", capFetch);
+    const capped = await client.readCarouselChildren(
+      credential,
+      "carousel-cap",
+    );
+    expect(capped).toMatchObject({
+      availability: "PARTIAL",
+      stopReason: "CAP_REACHED",
+    });
+    expect(capped.children).toHaveLength(10);
+    expect(capped.children[0].mediaType).toEqual({
+      state: "UNAVAILABLE",
+      reason: "FIELD_ABSENT",
+    });
+    for (const [rawUrl] of [
+      ...partialFetch.mock.calls,
+      ...capFetch.mock.calls,
+    ]) {
+      expect(new URL(String(rawUrl)).pathname).toMatch(/\/children$/);
+    }
   });
 });
 
