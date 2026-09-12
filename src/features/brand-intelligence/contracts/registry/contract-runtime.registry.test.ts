@@ -89,13 +89,16 @@ describe("contract runtime registry and startup integrity", () => {
     const runtime = registry();
     runtime.verifyAtRoot(GENERATED_ROOT);
     expect(runtime.isReady()).toBe(true);
-    expect(runtime.registrations()).toHaveLength(11);
+    expect(runtime.registrations()).toHaveLength(14);
     expect(
       runtime
         .registrations()
         .map((entry) => [entry.processorId, entry.executionEnabled]),
     ).toEqual([
+      ["instagram_content_behavior", false],
       ["instagram_content_behavior", true],
+      ["instagram_audience_profile", true],
+      ["instagram_organic_performance_profile", true],
       ["brand_communication", true],
       ["brand_meaning", true],
       ["brand_character", true],

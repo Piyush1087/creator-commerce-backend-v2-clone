@@ -1,4 +1,4 @@
-import { Controller, Get, Req, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, Req, UseGuards } from "@nestjs/common";
 import { ThrottlerGuard } from "@nestjs/throttler";
 
 import type { RequestWithAuthUser } from "../../auth/auth.controller";
@@ -17,6 +17,15 @@ export class InstagramB4ConsumerController {
   @Get()
   async read(@Req() request: RequestWithAuthUser) {
     const brandProfileId = await this.auth.resolveBrandProfileId(request.user);
-    return this.consumer.read(brandProfileId);
+    return this.consumer.read(brandProfileId, request.user.id);
+  }
+
+  @Get("media/:mediaId")
+  async readMedia(
+    @Req() request: RequestWithAuthUser,
+    @Param("mediaId") mediaId: string,
+  ) {
+    const brandProfileId = await this.auth.resolveBrandProfileId(request.user);
+    return this.consumer.readMedia(brandProfileId, mediaId);
   }
 }

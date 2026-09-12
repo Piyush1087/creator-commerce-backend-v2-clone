@@ -45,6 +45,10 @@ describe("brand_character architecture", () => {
           r.executionEnabled,
         ]),
     ).toEqual([
+      ["instagram_content_behavior", true, true, false],
+      ["instagram_content_behavior", true, true, true],
+      ["instagram_audience_profile", true, true, true],
+      ["instagram_organic_performance_profile", true, true, true],
       ["brand_communication", true, true, true],
       ["brand_meaning", true, true, true],
       ["brand_character", true, true, true],
@@ -69,6 +73,7 @@ describe("brand_character architecture", () => {
         "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
       offering_actionability_synthesis:
         "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
+      instagram_content_behavior: "c98b4edfa64b6711d290947ea61236573e029dd2",
     });
     expect(bundle.manifest.architectureCommitSha).toBe(
       PROCESSOR_ARCHITECTURE_COMMITS.brand_character,

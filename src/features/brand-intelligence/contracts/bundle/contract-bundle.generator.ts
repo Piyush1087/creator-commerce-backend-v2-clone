@@ -532,8 +532,15 @@ export function generateContractBundles(options: GenerateOptions): void {
     (options.commitSha === PINNED_ARCHITECTURE_COMMIT
       ? PROCESSOR_ARCHITECTURE_COMMITS
       : undefined);
+  const useCompiledAuthorityPins =
+    options.processorCommitShas === PROCESSOR_ARCHITECTURE_COMMITS ||
+    (options.processorCommitShas === undefined &&
+      options.commitSha === PINNED_ARCHITECTURE_COMMIT);
   const bundleFiles = specs.map((spec) => {
-    const commit = processorPins?.[spec.processorId] ?? options.commitSha;
+    const commit =
+      (useCompiledAuthorityPins ? spec.architectureCommitSha : undefined) ??
+      processorPins?.[spec.processorId] ??
+      options.commitSha;
     if (!COMMIT_SHA.test(commit))
       throw new Error("Invalid processor architecture pin");
     // Existing bundles retain their ancestor requirement. A processor may opt
@@ -565,6 +572,13 @@ export function generateContractBundles(options: GenerateOptions): void {
     const manifest = JSON.parse(
       manifestFile.bytes.toString("utf8"),
     ) as ContractBundleManifest;
+    const sourceSpec = specs.find(
+      (candidate) =>
+        candidate.processorId === manifest.processorId &&
+        candidate.processorVersion === manifest.processorVersion &&
+        candidate.outputContractId === manifest.outputContractId &&
+        candidate.outputContractVersion === manifest.outputContractVersion,
+    );
     return {
       processorId: manifest.processorId,
       processorVersion: manifest.processorVersion,
@@ -580,9 +594,9 @@ export function generateContractBundles(options: GenerateOptions): void {
       persistenceValidatorId: "intelligence_persistence_transition_v1",
       bundled: true,
       registered: true,
-      executionEnabled: EXECUTABLE_CONTRACT_PROCESSORS.has(
-        manifest.processorId,
-      ),
+      executionEnabled:
+        sourceSpec?.executionEnabled ??
+        EXECUTABLE_CONTRACT_PROCESSORS.has(manifest.processorId),
     };
   });
   const registry = {

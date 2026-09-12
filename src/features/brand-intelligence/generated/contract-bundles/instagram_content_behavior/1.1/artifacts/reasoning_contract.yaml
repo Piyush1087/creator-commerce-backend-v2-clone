@@ -1,0 +1,23 @@
+id: instagram_content_behavior_reasoning
+version: "1.1"
+status: FROZEN
+processor: instagram_content_behavior
+owner_engine: instagram_intelligence
+owning_branch: content_behavior_complete
+source_scope: INSTAGRAM_OWNED
+authority: CREATOR_SHOP_DERIVED
+processor_definition: intelligence/engines/instagram_intelligence/branches/content_behavior_complete/processors/instagram_content_behavior.yaml
+object_authority: intelligence/engines/instagram_intelligence/branches/content_behavior_complete/objects.yaml
+shared_metadata_authority: intelligence/engines/instagram_intelligence/branches/content_behavior_complete/shared_metadata_contract.yaml
+rules:
+  deterministic_from_accepted_c2_c3: true
+  one_post_is_pattern: false
+  one_post_is_signal: false
+  one_post_is_learning: false
+  non_selected_visual_state: UNKNOWN
+  unavailable_modality_is_negative: false
+  likely_collab_is_canonical_collaboration: false
+  creator_presence_is_canonical_creator_identity: false
+  unverified_offering_presence_is_canonical_offering_link: false
+  facts_and_coverage_below_threshold_allowed: true
+  below_threshold_inference: INTENTIONALLY_ABSENT_OR_INCONCLUSIVE

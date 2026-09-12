@@ -11,7 +11,7 @@ import { ProcessorDependencyProfileRegistry } from "./input/dependency/processor
 import { PROCESSOR_ARCHITECTURE_COMMITS } from "./contracts/bundle/contract-source.spec";
 
 describe("brand_differentiation architecture boundaries", () => {
-  it("retains seven Brand processors, three Product processors, and six differentiation paths", () => {
+  it("retains Brand, Product, and active Instagram processors with six differentiation paths", () => {
     const runtime = contracts(),
       bundle = runtime.getVerifiedBundle(registryKey);
     expect(
@@ -26,6 +26,9 @@ describe("brand_differentiation architecture boundaries", () => {
       "brand_communication",
       "brand_differentiation",
       "brand_meaning",
+      "instagram_audience_profile",
+      "instagram_content_behavior",
+      "instagram_organic_performance_profile",
       "offering_actionability_synthesis",
       "offering_creator_communication",
       "offering_factual_synthesis",
@@ -45,6 +48,7 @@ describe("brand_differentiation architecture boundaries", () => {
         "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
       offering_actionability_synthesis:
         "bbb0be3345c36e9cc7c4f06ca68fb491b742b83f",
+      instagram_content_behavior: "c98b4edfa64b6711d290947ea61236573e029dd2",
     });
     expect(bundle.manifest.ownedObjectSemanticIds).toEqual([
       "differentiation_and_proof",

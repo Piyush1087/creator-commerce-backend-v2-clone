@@ -15,7 +15,7 @@ import { SYNTHETIC_PROCESSOR_ID } from "./domain/intelligence-execution.types";
 import { ProcessorExecutorFailure } from "./executor/processor-executor";
 import type { ProcessorSuccessPersistenceHook } from "./processor-persistence.hook";
 import { OfferingFactualPersistenceHook } from "../processors/offering-factual/offering-factual-persistence.hook";
-import { InstagramContentBehaviorPersistenceHook } from "../../instagram-intelligence/runtime/instagram-content-behavior.persistence";
+import { InstagramC4PersistenceHook } from "../../instagram-intelligence/runtime/instagram-c4.persistence";
 
 /** Bounded dispatch only; finalization still owns the transaction and live lease. */
 @Injectable()
@@ -33,7 +33,7 @@ export class ProcessorPersistenceRouter implements ProcessorSuccessPersistenceHo
     @Optional()
     private readonly offeringFactual?: OfferingFactualPersistenceHook,
     @Optional()
-    private readonly instagramContentBehavior?: InstagramContentBehaviorPersistenceHook,
+    private readonly instagramC4?: InstagramC4PersistenceHook,
   ) {}
   async persistBeforeCompletion(
     tx: Prisma.TransactionClient,
@@ -42,16 +42,14 @@ export class ProcessorPersistenceRouter implements ProcessorSuccessPersistenceHo
   ): Promise<void> {
     switch (claim.processorExecution.processorId) {
       case "instagram_content_behavior":
-        if (!this.instagramContentBehavior)
+      case "instagram_audience_profile":
+      case "instagram_organic_performance_profile":
+        if (!this.instagramC4)
           throw new ProcessorExecutorFailure({
             category: "CONFIGURATION_DRIFT",
             code: "PERSISTENCE_HOOK_REGISTRATION_MISSING",
           });
-        return this.instagramContentBehavior.persistBeforeCompletion(
-          tx,
-          claim,
-          result,
-        );
+        return this.instagramC4.persistBeforeCompletion(tx, claim, result);
       case "offering_factual_synthesis":
       case "offering_creator_communication":
       case "offering_actionability_synthesis":

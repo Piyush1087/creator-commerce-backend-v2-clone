@@ -10,7 +10,16 @@ export type InstagramDerivedPurgeCounts = Readonly<{
   contentArtifacts: number;
   evidenceItems: number;
   semanticObservations: number;
+  intelligenceObjectGenerations: number;
+  intelligenceComponentGenerations: number;
+  intelligenceProcessorExecutions: number;
 }>;
+
+const C4_OBJECT_IDS = [
+  "instagram_content_behavior",
+  "instagram_audience_profile",
+  "instagram_organic_performance_profile",
+] as const;
 
 @Injectable()
 export class InstagramDerivedDataPurgeService {
@@ -24,6 +33,90 @@ export class InstagramDerivedDataPurgeService {
     tx: Prisma.TransactionClient,
     brandProfileId: string,
   ): Promise<InstagramDerivedPurgeCounts> {
+    // Intelligence references normalized DE Evidence with restrictive FKs, so
+    // Settings removes the target Brand's derived current/history first.
+    const c4Generations = await tx.intelligenceObjectGeneration.findMany({
+      where: {
+        brandId: brandProfileId,
+        objectSemanticId: { in: [...C4_OBJECT_IDS] },
+      },
+      select: { id: true },
+    });
+    const c4GenerationIds = c4Generations.map((row) => row.id);
+    const c4Executions = await tx.intelligenceProcessorExecution.findMany({
+      where: {
+        brandId: brandProfileId,
+        processorId: { in: [...C4_OBJECT_IDS] },
+      },
+      select: { id: true },
+    });
+    const c4ExecutionIds = c4Executions.map((row) => row.id);
+    const c4ComponentCount = c4GenerationIds.length
+      ? await tx.intelligenceComponentGeneration.count({
+          where: {
+            brandId: brandProfileId,
+            objectGenerationId: { in: c4GenerationIds },
+          },
+        })
+      : 0;
+    await tx.intelligenceComponentTransition.deleteMany({
+      where: {
+        brandId: brandProfileId,
+        objectSemanticId: { in: [...C4_OBJECT_IDS] },
+      },
+    });
+    await tx.intelligenceComponentCandidate.deleteMany({
+      where: {
+        brandId: brandProfileId,
+        objectSemanticId: { in: [...C4_OBJECT_IDS] },
+      },
+    });
+    await tx.intelligenceCurrentComponent.deleteMany({
+      where: {
+        brandId: brandProfileId,
+        objectSemanticId: { in: [...C4_OBJECT_IDS] },
+      },
+    });
+    if (c4GenerationIds.length) {
+      await tx.intelligenceEvidenceReference.deleteMany({
+        where: {
+          brandId: brandProfileId,
+          objectGenerationId: { in: c4GenerationIds },
+        },
+      });
+      await tx.intelligenceBusinessStateReference.deleteMany({
+        where: {
+          brandId: brandProfileId,
+          objectGenerationId: { in: c4GenerationIds },
+        },
+      });
+      await tx.intelligenceComponentGeneration.deleteMany({
+        where: {
+          brandId: brandProfileId,
+          objectGenerationId: { in: c4GenerationIds },
+        },
+      });
+      await tx.intelligenceObjectGeneration.deleteMany({
+        where: { brandId: brandProfileId, id: { in: c4GenerationIds } },
+      });
+    }
+    if (c4ExecutionIds.length) {
+      await tx.intelligenceAction.deleteMany({
+        where: {
+          brandId: brandProfileId,
+          processorExecutionId: { in: c4ExecutionIds },
+        },
+      });
+      await tx.intelligenceProcessorAttempt.deleteMany({
+        where: {
+          brandId: brandProfileId,
+          processorExecutionId: { in: c4ExecutionIds },
+        },
+      });
+      await tx.intelligenceProcessorExecution.deleteMany({
+        where: { brandId: brandProfileId, id: { in: c4ExecutionIds } },
+      });
+    }
     const resources = await tx.dataExtractionResource.findMany({
       where: {
         brandId: brandProfileId,
@@ -161,6 +254,9 @@ export class InstagramDerivedDataPurgeService {
       contentArtifacts: artifactCount,
       evidenceItems: deletedEvidence.count,
       semanticObservations: deletedObservations.count || observationCount,
+      intelligenceObjectGenerations: c4GenerationIds.length,
+      intelligenceComponentGenerations: c4ComponentCount,
+      intelligenceProcessorExecutions: c4ExecutionIds.length,
     };
   }
 }

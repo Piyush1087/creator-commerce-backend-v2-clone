@@ -1,0 +1,22 @@
+id: instagram_audience_profile_reasoning
+version: "1.0"
+status: FROZEN
+processor: instagram_audience_profile
+owner_engine: instagram_intelligence
+owning_branch: audience_profile
+source_scope: INSTAGRAM_OWNED
+authority: CREATOR_SHOP_DERIVED
+processor_definition: intelligence/engines/instagram_intelligence/branches/audience_profile/processors/instagram_audience_profile.yaml
+object_authority: intelligence/engines/instagram_intelligence/branches/audience_profile/objects.yaml
+shared_metadata_authority: intelligence/engines/instagram_intelligence/branches/audience_profile/shared_metadata_contract.yaml
+rules:
+  suppressed_is_zero: false
+  unavailable_is_zero: false
+  unsupported_is_empty_audience: false
+  provider_failure_is_observed_absence: false
+  partial_population_coverage_remains_partial: true
+  unavailable_dimensions_are_inferred: false
+  difference_percentage_points:
+    material_minimum: 10
+    notable_minimum: 5
+    below_notable: NOT_HIGHLIGHTED

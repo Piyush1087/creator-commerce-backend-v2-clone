@@ -91,6 +91,7 @@ export class BundlePathOwnershipRegistry implements ComponentPathOwnershipRegist
     registration: ReturnType<ContractRuntimeRegistry["registrations"]>[number],
     address: ComponentSemanticAddress,
   ): boolean {
+    if (!registration.executionEnabled) return false;
     return registration.ownedPathPatterns.some(
       (pattern) =>
         pattern.objectSemanticId === address.objectSemanticId &&

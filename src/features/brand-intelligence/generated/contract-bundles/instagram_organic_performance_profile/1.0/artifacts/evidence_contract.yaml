@@ -1,0 +1,23 @@
+id: instagram_organic_performance_profile_evidence
+version: "1.0"
+status: FROZEN
+processor: instagram_organic_performance_profile
+owner_engine: instagram_intelligence
+owning_branch: performance
+source_scope: INSTAGRAM_OWNED
+authority: CREATOR_SHOP_DERIVED
+processor_definition: intelligence/engines/instagram_intelligence/branches/performance/processors/instagram_organic_performance_profile.yaml
+reasoning_authority: intelligence/engines/instagram_intelligence/branches/performance/artifacts/instagram_organic_performance_profile/reasoning.yaml
+output_contract_authority: intelligence/engines/instagram_intelligence/branches/performance/artifacts/instagram_organic_performance_profile/output_contract.yaml
+shared_metadata_authority: intelligence/engines/instagram_intelligence/branches/performance/shared_metadata_contract.yaml
+capabilities:
+  instagram.account_profile: {source_scope: INSTAGRAM_OWNED, completed_capture_required: true}
+  instagram.media_inventory: {source_scope: INSTAGRAM_OWNED, completed_capture_required: true}
+  instagram.media_insights: {source_scope: INSTAGRAM_OWNED, completed_capture_required: true}
+  instagram.caption_context: {source_scope: INSTAGRAM_OWNED, completed_capture_required: true, grouping_only: true}
+  instagram.media_visual_observations: {source_scope: INSTAGRAM_OWNED, completed_capture_required: true, grouping_only: true}
+  instagram.media_creator_signals: {source_scope: INSTAGRAM_OWNED, completed_capture_required: true, grouping_only: true}
+  instagram.media_offering_signals: {source_scope: INSTAGRAM_OWNED, completed_capture_required: true, grouping_only: true}
+derived_inputs: [accepted_c2_deterministic_derivations, accepted_c3_semantic_observations]
+lineage_required: [brand_subject, integration, provider_account, authorization_generation, window, media_identity, capture_or_execution, evidence_identity, c2_or_c3_identity_and_hash]
+provenance_classes: [PROVIDER_MEDIATED_FETCH, DETERMINISTIC_DERIVATION, MODEL_DERIVATION]

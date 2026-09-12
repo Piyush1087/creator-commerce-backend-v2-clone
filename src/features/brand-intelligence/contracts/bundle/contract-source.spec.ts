@@ -2,6 +2,7 @@ import type { ContractSourceSpec } from "./contract-bundle.types";
 
 const INSTAGRAM_ROOT =
   "intelligence/engines/instagram_intelligence/branches/content_behavior";
+const C4_AUTHORITY_COMMIT = "a7c691047ab6802098d3c4a84e73cc3fe95d753a";
 
 const ROOT =
   "intelligence/engines/brand_intelligence/branches/brand_expression";
@@ -40,6 +41,8 @@ export const EXECUTABLE_CONTRACT_PROCESSORS: ReadonlySet<string> = new Set([
   "offering_creator_communication",
   "offering_actionability_synthesis",
   "instagram_content_behavior",
+  "instagram_audience_profile",
+  "instagram_organic_performance_profile",
 ]);
 
 export const CONTRACT_SOURCE_SPECS: readonly ContractSourceSpec[] = [
@@ -60,6 +63,8 @@ export const CONTRACT_SOURCE_SPECS: readonly ContractSourceSpec[] = [
       },
     ],
     independentAuthorityCommit: true,
+    architectureCommitSha: "c98b4edfa64b6711d290947ea61236573e029dd2",
+    executionEnabled: false,
     artifactPaths: {
       PROCESSOR_DEFINITION: `${INSTAGRAM_ROOT}/processors/instagram_content_behavior.yaml`,
       REASONING_CONTRACT: `${INSTAGRAM_ROOT}/artifacts/instagram_content_behavior/reasoning.yaml`,
@@ -69,6 +74,107 @@ export const CONTRACT_SOURCE_SPECS: readonly ContractSourceSpec[] = [
       SHARED_METADATA_CONTRACT: `${INSTAGRAM_ROOT}/shared_metadata_contract.yaml`,
     },
   },
+  ...[
+    {
+      processorId: "instagram_content_behavior",
+      processorVersion: "1.1",
+      outputContractId: "instagram_content_behavior_output_contract",
+      outputContractVersion: "1.1",
+      evidenceContractId: "instagram_content_behavior_evidence",
+      evidenceContractVersion: "1.1",
+      owningBranch: "content_behavior_complete",
+      objectId: "instagram_content_behavior",
+      components: [
+        "window",
+        "corpus_summary",
+        "posting_cadence",
+        "format_mix",
+        "theme_patterns",
+        "caption_patterns",
+        "creative_structure_patterns",
+        "offering_presence_patterns",
+        "creator_presence_patterns",
+        "representative_media_refs",
+        "bounded_learnings",
+        "coverage",
+      ],
+    },
+    {
+      processorId: "instagram_audience_profile",
+      processorVersion: "1.0",
+      outputContractId: "instagram_audience_profile_output_contract",
+      outputContractVersion: "1.0",
+      evidenceContractId: "instagram_audience_profile_evidence",
+      evidenceContractVersion: "1.0",
+      owningBranch: "audience_profile",
+      objectId: "instagram_audience_profile",
+      components: [
+        "window",
+        "follower_audience",
+        "engaged_audience",
+        "distribution_concentration",
+        "material_differences",
+        "limitations",
+        "coverage",
+        "summary",
+      ],
+    },
+    {
+      processorId: "instagram_organic_performance_profile",
+      processorVersion: "1.0",
+      outputContractId: "instagram_organic_performance_profile_output_contract",
+      outputContractVersion: "1.0",
+      evidenceContractId: "instagram_organic_performance_profile_evidence",
+      evidenceContractVersion: "1.0",
+      owningBranch: "performance",
+      objectId: "instagram_organic_performance_profile",
+      components: [
+        "window",
+        "account_results",
+        "metric_coverage",
+        "format_baselines",
+        "response_distribution",
+        "high_response_cohorts",
+        "low_response_cohorts",
+        "content_performance_signals",
+        "snapshot_change",
+        "representative_media_refs",
+        "bounded_learnings",
+        "coverage",
+      ],
+    },
+  ].map((definition) => {
+    const root = `intelligence/engines/instagram_intelligence/branches/${definition.owningBranch}`;
+    return {
+      processorId: definition.processorId,
+      processorVersion: definition.processorVersion,
+      outputContractId: definition.outputContractId,
+      outputContractVersion: definition.outputContractVersion,
+      evidenceContractId: definition.evidenceContractId,
+      evidenceContractVersion: definition.evidenceContractVersion,
+      ownerEngine: "instagram_intelligence",
+      owningBranch: definition.owningBranch,
+      ownedObjectSemanticIds: [definition.objectId],
+      ownedPathPatterns: [
+        { objectSemanticId: definition.objectId, componentPathPattern: "$" },
+        ...definition.components.map((component) => ({
+          objectSemanticId: definition.objectId,
+          componentPathPattern: `$/f/components/f/${component}`,
+        })),
+      ],
+      independentAuthorityCommit: true,
+      architectureCommitSha: C4_AUTHORITY_COMMIT,
+      executionEnabled: true,
+      artifactPaths: {
+        PROCESSOR_DEFINITION: `${root}/processors/${definition.processorId}.yaml`,
+        REASONING_CONTRACT: `${root}/artifacts/${definition.processorId}/reasoning.yaml`,
+        OUTPUT_CONTRACT: `${root}/artifacts/${definition.processorId}/output_contract.yaml`,
+        EVIDENCE_CONTRACT: `${root}/evidence/${definition.processorId}_evidence.yaml`,
+        OBJECT_CONTRACT: `${root}/objects.yaml`,
+        SHARED_METADATA_CONTRACT: `${root}/shared_metadata_contract.yaml`,
+      },
+    } satisfies ContractSourceSpec;
+  }),
   {
     processorId: "brand_communication",
     processorVersion: "1.0",

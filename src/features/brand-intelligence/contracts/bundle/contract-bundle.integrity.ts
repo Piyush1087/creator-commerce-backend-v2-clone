@@ -192,6 +192,10 @@ export class ContractBundleIntegrityVerifier {
 
     const ownedPaths = new Set<string>();
     for (const registration of registry.registrations) {
+      // Historical bundles remain byte-verifiable but do not participate in
+      // active ownership. This permits the accepted B4 1.0 -> C4 1.1 handoff
+      // without creating simultaneous active owners.
+      if (!registration.executionEnabled) continue;
       for (const owned of registration.ownedPathPatterns) {
         const identity = `${owned.objectSemanticId}\u0000${owned.componentPathPattern}`;
         if (ownedPaths.has(identity)) {
@@ -219,9 +223,16 @@ export class ContractBundleIntegrityVerifier {
           );
         }
       }
-      const expectedExecutionEnabled = EXECUTABLE_CONTRACT_PROCESSORS.has(
-        registration.processorId,
+      const sourceSpec = CONTRACT_SOURCE_SPECS.find(
+        (spec) =>
+          spec.processorId === registration.processorId &&
+          spec.processorVersion === registration.processorVersion &&
+          spec.outputContractId === registration.outputContractId &&
+          spec.outputContractVersion === registration.outputContractVersion,
       );
+      const expectedExecutionEnabled =
+        sourceSpec?.executionEnabled ??
+        EXECUTABLE_CONTRACT_PROCESSORS.has(registration.processorId);
       if (
         registration.bundled !== true ||
         registration.registered !== true ||
@@ -402,7 +413,8 @@ export class ContractBundleIntegrityVerifier {
       manifest.generatorVersion !== CONTRACT_BUNDLE_GENERATOR_VERSION ||
       manifest.architectureRepository !== ARCHITECTURE_REPOSITORY ||
       manifest.architectureCommitSha !==
-        PROCESSOR_ARCHITECTURE_COMMITS[registration.processorId] ||
+        (spec?.architectureCommitSha ??
+          PROCESSOR_ARCHITECTURE_COMMITS[registration.processorId]) ||
       manifest.ownerEngine !== spec.ownerEngine ||
       manifest.owningBranch !== spec.owningBranch ||
       manifest.processorId !== registration.processorId ||

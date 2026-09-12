@@ -14,6 +14,7 @@ import {
 import { InstagramB4ConsumerController } from "./consumer/instagram-b4-consumer.controller";
 import { InstagramB4ConsumerService } from "./consumer/instagram-b4-consumer.service";
 import { InstagramContentBehaviorRuntimeService } from "./runtime/instagram-content-behavior.runtime.service";
+import { InstagramC4RuntimeService } from "./runtime/instagram-c4.runtime.service";
 import { InstagramC2FoundationsService } from "./foundations/instagram-c2-foundations.service";
 import {
   InstagramC3SemanticModelPort,
@@ -35,6 +36,7 @@ import { InstagramC3SemanticsService } from "./semantics/instagram-c3-semantics.
     InstagramB3bMediaCompletionService,
     InstagramB4ConsumerService,
     InstagramContentBehaviorRuntimeService,
+    InstagramC4RuntimeService,
     InstagramC2FoundationsService,
     InstagramC3SemanticsService,
     {
@@ -51,6 +53,7 @@ import { InstagramC3SemanticsService } from "./semantics/instagram-c3-semantics.
     InstagramB3bMediaCompletionService,
     InstagramB4ConsumerService,
     InstagramContentBehaviorRuntimeService,
+    InstagramC4RuntimeService,
     InstagramC2FoundationsService,
     InstagramC3SemanticsService,
   ],

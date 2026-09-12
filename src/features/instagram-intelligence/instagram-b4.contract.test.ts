@@ -52,11 +52,15 @@ describe("Instagram Intelligence B4 admission and consumer controller", () => {
         },
       ],
     });
+    const content = registry
+      .registrations()
+      .filter((entry) => entry.processorId === "instagram_content_behavior");
+    expect(content).toHaveLength(2);
+    expect(content.filter((entry) => entry.executionEnabled)).toHaveLength(1);
     expect(
-      registry
-        .registrations()
-        .filter((entry) => entry.processorId === "instagram_content_behavior"),
-    ).toHaveLength(1);
+      content.find((entry) => entry.processorVersion === "1.0")
+        ?.executionEnabled,
+    ).toBe(false);
   });
 
   it("resolves the active Brand server-side and never accepts a Brand selector", async () => {
@@ -64,7 +68,7 @@ describe("Instagram Intelligence B4 admission and consumer controller", () => {
       resolveBrandProfileId: vi.fn().mockResolvedValue("server-brand"),
     };
     const consumer = {
-      read: vi.fn().mockResolvedValue({ contractVersion: "b4-proof-1.0" }),
+      read: vi.fn().mockResolvedValue({ contractVersion: "1.0" }),
     };
     const controller = new InstagramB4ConsumerController(
       auth as never,
@@ -72,10 +76,10 @@ describe("Instagram Intelligence B4 admission and consumer controller", () => {
     );
     const user = { id: "user", role: "BRAND", sessionId: "session" };
     await expect(controller.read({ user } as never)).resolves.toEqual({
-      contractVersion: "b4-proof-1.0",
+      contractVersion: "1.0",
     });
     expect(auth.resolveBrandProfileId).toHaveBeenCalledWith(user);
-    expect(consumer.read).toHaveBeenCalledWith("server-brand");
+    expect(consumer.read).toHaveBeenCalledWith("server-brand", "user");
     expect(controller.read.length).toBe(1);
     const guards = Reflect.getMetadata(
       GUARDS_METADATA,

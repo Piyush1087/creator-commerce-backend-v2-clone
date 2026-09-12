@@ -26,6 +26,206 @@
       "persistenceValidatorId": "intelligence_persistence_transition_v1",
       "bundled": true,
       "registered": true,
+      "executionEnabled": false
+    },
+    {
+      "processorId": "instagram_content_behavior",
+      "processorVersion": "1.1",
+      "outputContractId": "instagram_content_behavior_output_contract",
+      "outputContractVersion": "1.1",
+      "bundleId": "instagram_intelligence.instagram_content_behavior",
+      "bundleVersion": "1.1",
+      "bundleContentHash": "0b0e77c2d3031f3655964364f4c0ae4fa1b0fb27c8dff21d6eb4a951bbcf57a2",
+      "ownedObjectSemanticIds": [
+        "instagram_content_behavior"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "instagram_content_behavior",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "instagram_content_behavior",
+          "componentPathPattern": "$/f/components/f/window"
+        },
+        {
+          "objectSemanticId": "instagram_content_behavior",
+          "componentPathPattern": "$/f/components/f/corpus_summary"
+        },
+        {
+          "objectSemanticId": "instagram_content_behavior",
+          "componentPathPattern": "$/f/components/f/posting_cadence"
+        },
+        {
+          "objectSemanticId": "instagram_content_behavior",
+          "componentPathPattern": "$/f/components/f/format_mix"
+        },
+        {
+          "objectSemanticId": "instagram_content_behavior",
+          "componentPathPattern": "$/f/components/f/theme_patterns"
+        },
+        {
+          "objectSemanticId": "instagram_content_behavior",
+          "componentPathPattern": "$/f/components/f/caption_patterns"
+        },
+        {
+          "objectSemanticId": "instagram_content_behavior",
+          "componentPathPattern": "$/f/components/f/creative_structure_patterns"
+        },
+        {
+          "objectSemanticId": "instagram_content_behavior",
+          "componentPathPattern": "$/f/components/f/offering_presence_patterns"
+        },
+        {
+          "objectSemanticId": "instagram_content_behavior",
+          "componentPathPattern": "$/f/components/f/creator_presence_patterns"
+        },
+        {
+          "objectSemanticId": "instagram_content_behavior",
+          "componentPathPattern": "$/f/components/f/representative_media_refs"
+        },
+        {
+          "objectSemanticId": "instagram_content_behavior",
+          "componentPathPattern": "$/f/components/f/bounded_learnings"
+        },
+        {
+          "objectSemanticId": "instagram_content_behavior",
+          "componentPathPattern": "$/f/components/f/coverage"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "instagram_content_behavior",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
+    },
+    {
+      "processorId": "instagram_audience_profile",
+      "processorVersion": "1.0",
+      "outputContractId": "instagram_audience_profile_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "instagram_intelligence.instagram_audience_profile",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "5a84da93416b9f0075ebf676922fbab2128693abea5b35c990a7449fe70ceb47",
+      "ownedObjectSemanticIds": [
+        "instagram_audience_profile"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "instagram_audience_profile",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "instagram_audience_profile",
+          "componentPathPattern": "$/f/components/f/window"
+        },
+        {
+          "objectSemanticId": "instagram_audience_profile",
+          "componentPathPattern": "$/f/components/f/follower_audience"
+        },
+        {
+          "objectSemanticId": "instagram_audience_profile",
+          "componentPathPattern": "$/f/components/f/engaged_audience"
+        },
+        {
+          "objectSemanticId": "instagram_audience_profile",
+          "componentPathPattern": "$/f/components/f/distribution_concentration"
+        },
+        {
+          "objectSemanticId": "instagram_audience_profile",
+          "componentPathPattern": "$/f/components/f/material_differences"
+        },
+        {
+          "objectSemanticId": "instagram_audience_profile",
+          "componentPathPattern": "$/f/components/f/limitations"
+        },
+        {
+          "objectSemanticId": "instagram_audience_profile",
+          "componentPathPattern": "$/f/components/f/coverage"
+        },
+        {
+          "objectSemanticId": "instagram_audience_profile",
+          "componentPathPattern": "$/f/components/f/summary"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "instagram_audience_profile",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
+      "executionEnabled": true
+    },
+    {
+      "processorId": "instagram_organic_performance_profile",
+      "processorVersion": "1.0",
+      "outputContractId": "instagram_organic_performance_profile_output_contract",
+      "outputContractVersion": "1.0",
+      "bundleId": "instagram_intelligence.instagram_organic_performance_profile",
+      "bundleVersion": "1.0",
+      "bundleContentHash": "e16f8b5c24a2541b0efc0603cc32c424183415a3dac19ee58e3337e133a8b486",
+      "ownedObjectSemanticIds": [
+        "instagram_organic_performance_profile"
+      ],
+      "ownedPathPatterns": [
+        {
+          "objectSemanticId": "instagram_organic_performance_profile",
+          "componentPathPattern": "$"
+        },
+        {
+          "objectSemanticId": "instagram_organic_performance_profile",
+          "componentPathPattern": "$/f/components/f/window"
+        },
+        {
+          "objectSemanticId": "instagram_organic_performance_profile",
+          "componentPathPattern": "$/f/components/f/account_results"
+        },
+        {
+          "objectSemanticId": "instagram_organic_performance_profile",
+          "componentPathPattern": "$/f/components/f/metric_coverage"
+        },
+        {
+          "objectSemanticId": "instagram_organic_performance_profile",
+          "componentPathPattern": "$/f/components/f/format_baselines"
+        },
+        {
+          "objectSemanticId": "instagram_organic_performance_profile",
+          "componentPathPattern": "$/f/components/f/response_distribution"
+        },
+        {
+          "objectSemanticId": "instagram_organic_performance_profile",
+          "componentPathPattern": "$/f/components/f/high_response_cohorts"
+        },
+        {
+          "objectSemanticId": "instagram_organic_performance_profile",
+          "componentPathPattern": "$/f/components/f/low_response_cohorts"
+        },
+        {
+          "objectSemanticId": "instagram_organic_performance_profile",
+          "componentPathPattern": "$/f/components/f/content_performance_signals"
+        },
+        {
+          "objectSemanticId": "instagram_organic_performance_profile",
+          "componentPathPattern": "$/f/components/f/snapshot_change"
+        },
+        {
+          "objectSemanticId": "instagram_organic_performance_profile",
+          "componentPathPattern": "$/f/components/f/representative_media_refs"
+        },
+        {
+          "objectSemanticId": "instagram_organic_performance_profile",
+          "componentPathPattern": "$/f/components/f/bounded_learnings"
+        },
+        {
+          "objectSemanticId": "instagram_organic_performance_profile",
+          "componentPathPattern": "$/f/components/f/coverage"
+        }
+      ],
+      "structuralValidatorId": "contract_output_schema_v1",
+      "semanticValidatorId": "instagram_organic_performance_profile",
+      "persistenceValidatorId": "intelligence_persistence_transition_v1",
+      "bundled": true,
+      "registered": true,
       "executionEnabled": true
     },
     {

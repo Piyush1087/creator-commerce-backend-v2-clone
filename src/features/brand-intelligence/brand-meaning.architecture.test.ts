@@ -73,6 +73,10 @@ describe("brand_meaning activation boundaries", () => {
     expect(
       registry.registrations().map((r) => [r.processorId, r.executionEnabled]),
     ).toEqual([
+      ["instagram_content_behavior", false],
+      ["instagram_content_behavior", true],
+      ["instagram_audience_profile", true],
+      ["instagram_organic_performance_profile", true],
       ["brand_communication", true],
       ["brand_meaning", true],
       ["brand_character", true],

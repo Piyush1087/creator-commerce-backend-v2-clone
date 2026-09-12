@@ -34,7 +34,7 @@ describe("W1.0E input-port architecture", () => {
     }
   });
 
-  it("keeps input ports bounded with seven Brand and three Product executables", () => {
+  it("keeps input ports bounded across registered Brand, Product, and Instagram contracts", () => {
     expect(
       registry.registrations.map((registration) => ({
         processorId: registration.processorId,
@@ -43,6 +43,30 @@ describe("W1.0E input-port architecture", () => {
         executionEnabled: registration.executionEnabled,
       })),
     ).toEqual([
+      {
+        processorId: "instagram_content_behavior",
+        bundled: true,
+        registered: true,
+        executionEnabled: false,
+      },
+      {
+        processorId: "instagram_content_behavior",
+        bundled: true,
+        registered: true,
+        executionEnabled: true,
+      },
+      {
+        processorId: "instagram_audience_profile",
+        bundled: true,
+        registered: true,
+        executionEnabled: true,
+      },
+      {
+        processorId: "instagram_organic_performance_profile",
+        bundled: true,
+        registered: true,
+        executionEnabled: true,
+      },
       {
         processorId: "brand_communication",
         bundled: true,
