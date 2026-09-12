@@ -168,7 +168,7 @@ FE typecheck PASS
 FE build PASS
 FE lint PASS
 BE prisma validate PASS
-BE build PASS (working tree; Parent reconfirm generate+build 2026-09-09; clone nest hung under load)
+BE build PASS (working tree + isolated clone generate+nest 2026-09-12)
 BE boot+health PASS on freeze_mvp_canonical_v1
 FE invariant vitest 70/70 PASS
 BE invariant vitest 51/51 PASS
@@ -177,7 +177,7 @@ responsive shell/nav viewport PASS (RUN 8: UCE table→cards + Creator viewport)
 BE lint PASS classified 712 prettier  accepted this freeze (do not --fix)
 postgres INV-01/02/03/04/12/06/07 PASS (INV-03 29/29 RUN 7)
 FE npm ci clone typecheck/lint/build PASS
-BE npm ci clone validate PASS; build requires prisma generate
+BE npm ci clone generate + nest build PASS isolated 2026-09-12
 Brand Payouts Wave B postgres PASS 3/3 on localhost/waveb_runtime (generate first; Parent reconfirm 2026-09-11)
 ```
 

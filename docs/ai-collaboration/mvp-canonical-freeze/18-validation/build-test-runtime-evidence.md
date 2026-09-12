@@ -7,9 +7,9 @@ Do not declare `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` until remaining ga
 
 | Gate | Status | Classification | Evidence |
 | --- | --- | --- | --- |
-| fresh checkout/reproducibility | PARTIAL | FE clone PASS; BE clone generate required | `14-npm-ci-fresh-clone.md` |
+| fresh checkout/reproducibility | PASS | FE clone PASS; BE clone generate + nest **PASS** isolated 2026-09-12 | `14-npm-ci-fresh-clone.md` |
 | package install / lockfile integrity | PASS `npm ci` on freeze clones | | `14-npm-ci-fresh-clone.md` |
-| backend build | PASS | working-tree generate+build Parent reconfirm 2026-09-09; clone nest hung under load | `03-backend-build.md` `14-npm-ci-fresh-clone.md` |
+| backend build | PASS | working-tree generate+build; isolated clone nest PASS 2026-09-12 (prior hang `ENVIRONMENT_BLOCKED`) | `03-backend-build.md` `14-npm-ci-fresh-clone.md` |
 | frontend typecheck | PASS | | `04-frontend-typecheck.md` |
 | frontend build | PASS | chunk-size warning = preexisting debt | `05-frontend-build.md` |
 | frontend lint | PASS | | `06-lint.md` |
@@ -25,7 +25,7 @@ Do not declare `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` until remaining ga
 | responsive shell/navigation smoke | PASS | RUN 8 Parent confirm: UCE cards + Creator viewport | `16-viewport-smoke.md` |
 | provider-unavailable recovery | PASS classified | Fail-closed Brand Payouts + C-05 P2; Postmark live send; IG/Razorpay later | `10-remaining-gates.md` |
 | compiled/deployable artifact | PASS | FE `dist/`, BE `dist/main.js` | `03` + `05` |
-| clean worktrees | NOT_CLAIMED | do not commit `tmp-*` | |
+| clean worktrees | PASS classified | Freeze SHAs clean. Local `tmp-*` / OTP logs / brand-home copies not committed. | |
 | local/remote checkpoint equality | dual-push product pair BE `bae19de` / FE `628eb6d`; package BE `47011cad` / FE `bc3f251` | freeze branch; not development/main |
 
 ## Failure classification vocabulary

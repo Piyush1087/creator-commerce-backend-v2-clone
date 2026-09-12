@@ -5,7 +5,7 @@
 
 | Gate | Status | Classification |
 | --- | --- | --- |
-| fresh checkout / `npm ci` | PARTIAL | FE clone typecheck/lint/build PASS. BE clone validate PASS; clone nest hung under load. **Working-tree** `npx prisma generate` + `npm run build` Parent reconfirm PASS 2026-09-09 (`14-npm-ci-fresh-clone.md`) |
+| fresh checkout / `npm ci` | PASS | FE clone typecheck/lint/build PASS. BE clone `npm ci` + `prisma validate` + **`prisma generate` then `npm run build`** PASS isolated 2026-09-12. Local generate after reset also PASS. Prior nest hang was `ENVIRONMENT_BLOCKED` under a concurrent farm. Evidence: `14-npm-ci-fresh-clone.md` |
 | module acceptance suites (this amendment) | PASS | Targeted C-04/C-02A/Payouts unit. Wave B postgres **PASS 3/3** on disposable `waveb_runtime` after `npx prisma generate` (not `thecreatorshop`, not freeze DB). C-04 collab Vitest 14/14 files, 106/106. INV-09 Parent 16:50 isolated C-04/auth. Evidence: `07-targeted-tests.md` |
 | cross-module invariant suite execution | PASS classified this amendment / PARTIAL leftover | postgres INV-01/02/03/04/12/06/07 PASS (prior). INV-11 **PASS classified**. INV-09 **PASS classified** (C-04 destination snapshot). INV-13 PASS classified. **INV-08 PARTIAL until C-06 pull.** **INV-10 PARTIAL** live IG/Razorpay `PROVIDER_DEFERRED` |
 | frontend ↔ backend smoke | PASS | Parent confirm 2026-09-11 `12-frontend-backend-smoke.md` (C-02A Home, not deferred) |
@@ -15,7 +15,7 @@
 | provider-unavailable recovery | PASS classified / deferred live | Fail-closed Brand Payouts provider + C-05 P2 adapter 2026-09-11. Postmark OTP live send PASS 2026-09-10. Live IG/Razorpay **NOT_RUN** / `PROVIDER_DEFERRED` |
 | frontend lint | PASS | RUN 4 + clone |
 | backend lint | PASS classified | `npm run lint:eslint` clean 2026-09-11 (prettier plugin off). `npm run lint` prettier 712 remains **accepted** `PREEXISTING_ACCEPTED_DEBT` (do not `--fix`) |
-| clean worktrees | NOT_CLAIMED | do not commit `tmp-*` / OTP logs |
+| clean worktrees | PASS classified | Freeze SHAs do not contain `tmp-*`, OTP logs, or `tmp-ssm-params.json`. Local untracked junk deleted 2026-09-12 (not committed). |
 | local/remote checkpoint equality | dual-push product pair BE `bae19de` / FE `628eb6d`; amendment package BE `47011cad` / FE `bc3f251`; freeze branch only; not `development`/`main` |
 
 `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` is still forbidden.
@@ -45,6 +45,8 @@ INV-09 leftover shipping HTTP+service           410; C-04 destination consumptio
 provider fail-closed recovery                   PASS classified (live IG/Razorpay later)
 BE lint:eslint (prettier plugin off)            PASS classified 2026-09-11
 BE prettier/prettier 712                            ACCEPTED this freeze (do not --fix)
-NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS             DECLARED 2026-09-11 (creator-dev bound; not freeze PASS)
+BE clone generate-then-nest                        PASS isolated 2026-09-12
+  local prisma generate after reset                PASS (same tip)
+clean worktrees                                 PASS classified (freeze SHAs; local junk not committed)
 immutable SHA pair                              BE bae19de / FE 628eb6d; not freeze PASS
 ```
