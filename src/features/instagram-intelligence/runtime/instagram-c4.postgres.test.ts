@@ -1,8 +1,8 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import { ContractBundleIntegrityVerifier } from "../../brand-intelligence/contracts/bundle/contract-bundle.integrity";
@@ -13,6 +13,7 @@ import { SemanticValidator } from "../../brand-intelligence/contracts/validation
 import { StructuralValidator } from "../../brand-intelligence/contracts/validation/structural.validator";
 import { ExecutionAggregationService } from "../../brand-intelligence/execution/execution-aggregation.service";
 import { ProcessorExecutorRegistry } from "../../brand-intelligence/execution/executor/processor-executor.registry";
+import { ProcessorExecutorFailure } from "../../brand-intelligence/execution/executor/processor-executor";
 import { SyntheticProcessorExecutor } from "../../brand-intelligence/execution/executor/synthetic-processor.executor";
 import { IntelligenceExecutionService } from "../../brand-intelligence/execution/intelligence-execution.service";
 import { RetryBackoffPolicy } from "../../brand-intelligence/execution/policy/retry-backoff.policy";
@@ -56,6 +57,8 @@ postgres("Instagram C4 shared-current round trip", () => {
   let prisma: PrismaService;
   let runtime: InstagramC4RuntimeService;
   let projection: IntelligenceCurrentProjectionService;
+  let currentState: IntelligenceCurrentStateRepository;
+  let audienceProcessor: InstagramC4AudienceProfileProcessor;
   let tempRoot: string;
 
   beforeAll(async () => {
@@ -92,6 +95,7 @@ postgres("Instagram C4 shared-current round trip", () => {
       structural,
       semantic,
     );
+    audienceProcessor = audience;
     const performance = new InstagramC4OrganicPerformanceProcessor(
       prisma,
       contracts,
@@ -128,6 +132,7 @@ postgres("Instagram C4 shared-current round trip", () => {
       retry,
     );
     const current = new IntelligenceCurrentStateRepository(prisma);
+    currentState = current;
     const transitions = new IntelligenceTransitionService(
       prisma,
       current,
@@ -267,6 +272,21 @@ postgres("Instagram C4 shared-current round trip", () => {
       c2EvidenceRef: c2.observations[0]!.derivedEvidenceRef,
     });
 
+    const legacy = await seedLegacyB4Current(prisma, currentState, brand.id);
+    const legacyProjection = await projection.readObject({
+      brandId: brand.id,
+      subject: { type: "BRAND" },
+      objectSemanticId: "instagram_content_behavior",
+    });
+    expect(legacyProjection.objectState).toBe("CURRENT");
+    expect(
+      InstagramIntelligenceObjectSchema.safeParse(
+        legacyProjection.assembledValue.state === "VALUE"
+          ? legacyProjection.assembledValue.value
+          : null,
+      ).success,
+    ).toBe(true);
+
     const input = {
       kind: "INSTAGRAM_C4_INPUT_V1" as const,
       brandProfileId: brand.id,
@@ -277,6 +297,31 @@ postgres("Instagram C4 shared-current round trip", () => {
       triggerIdempotencyKey: `c4-${brand.id}`,
       correlationRef: `c4-${brand.id}`,
     };
+    await prisma.brandIntegration.update({
+      where: { id: integration.id },
+      data: { authorizationGeneration: 8 },
+    });
+    const failedFirst = await runtime.execute({
+      ...input,
+      triggerIdempotencyKey: `${input.triggerIdempotencyKey}:failed-first`,
+      correlationRef: `${input.correlationRef}:failed-first`,
+    });
+    expect(failedFirst.every((item) => item.status === "FAILED_TERMINAL")).toBe(
+      true,
+    );
+    expect(
+      await prisma.intelligenceCurrentComponent.findUniqueOrThrow({
+        where: { id: legacy.currentId },
+        select: { currentComponentGenerationId: true, revision: true },
+      }),
+    ).toEqual({
+      currentComponentGenerationId: legacy.generationId,
+      revision: 1n,
+    });
+    await prisma.brandIntegration.update({
+      where: { id: integration.id },
+      data: { authorizationGeneration: 7 },
+    });
     const first = await runtime.execute(input);
     expect(first.map((item) => item.status)).toEqual([
       "COMPLETED",
@@ -285,12 +330,15 @@ postgres("Instagram C4 shared-current round trip", () => {
     ]);
     expect(
       await prisma.intelligenceObjectGeneration.count({
-        where: { brandId: brand.id },
+        where: { brandId: brand.id, processorExecutionId: { not: null } },
       }),
     ).toBe(3);
     expect(
       await prisma.intelligenceComponentGeneration.count({
-        where: { brandId: brand.id },
+        where: {
+          brandId: brand.id,
+          objectGeneration: { processorExecutionId: { not: null } },
+        },
       }),
     ).toBe(35);
     expect(
@@ -298,7 +346,36 @@ postgres("Instagram C4 shared-current round trip", () => {
         where: { brandId: brand.id },
       }),
     ).toBe(35);
-    const generationIds = (
+    const contentRootAfter =
+      await prisma.intelligenceCurrentComponent.findFirstOrThrow({
+        where: {
+          brandId: brand.id,
+          objectSemanticId: "instagram_content_behavior",
+          componentSemanticPath: "$",
+        },
+        include: { currentComponentGeneration: true },
+      });
+    expect(contentRootAfter).toMatchObject({
+      id: legacy.currentId,
+      revision: 2n,
+      currentComponentGeneration: {
+        supersedesComponentGenerationId: legacy.generationId,
+      },
+    });
+    expect(contentRootAfter.currentComponentGenerationId).not.toBe(
+      legacy.generationId,
+    );
+    expect(
+      await prisma.intelligenceCurrentComponent.count({
+        where: {
+          brandId: brand.id,
+          objectSemanticId: "instagram_content_behavior",
+          componentSemanticPath: "$",
+          lifecycle: "ACTIVE",
+        },
+      }),
+    ).toBe(1);
+    let generationIds = (
       await prisma.intelligenceCurrentComponent.findMany({
         where: { brandId: brand.id },
         select: { currentComponentGenerationId: true },
@@ -308,13 +385,25 @@ postgres("Instagram C4 shared-current round trip", () => {
         ],
       })
     ).map((item) => item.currentComponentGenerationId);
+    const transitionsBeforeReplay =
+      await prisma.intelligenceComponentTransition.count({
+        where: { brandId: brand.id },
+      });
     const replay = await runtime.execute(input);
     expect(replay.every((item) => item.replayed)).toBe(true);
     expect(
       await prisma.intelligenceComponentGeneration.count({
-        where: { brandId: brand.id },
+        where: {
+          brandId: brand.id,
+          objectGeneration: { processorExecutionId: { not: null } },
+        },
       }),
     ).toBe(35);
+    expect(
+      await prisma.intelligenceComponentTransition.count({
+        where: { brandId: brand.id },
+      }),
+    ).toBe(transitionsBeforeReplay);
     for (const definition of INSTAGRAM_C4_PROCESSORS) {
       const object = await projection.readObject({
         brandId: brand.id,
@@ -348,6 +437,70 @@ postgres("Instagram C4 shared-current round trip", () => {
     await expect(consumer.readMedia(other.id, mediaId)).rejects.toThrow(
       "Instagram media not found",
     );
+    const audienceBeforePartial = (
+      await prisma.intelligenceCurrentComponent.findMany({
+        where: {
+          brandId: brand.id,
+          objectSemanticId: "instagram_audience_profile",
+        },
+        select: { currentComponentGenerationId: true },
+        orderBy: { componentSemanticPath: "asc" },
+      })
+    ).map((item) => item.currentComponentGenerationId);
+    const contentBeforePartial = contentRootAfter.currentComponentGenerationId;
+    const audienceFailure = vi
+      .spyOn(audienceProcessor, "execute")
+      .mockRejectedValue(
+        new ProcessorExecutorFailure({
+          category: "VALIDATION_FAILURE",
+          code: "C4_REQUIRED_EVIDENCE_UNAVAILABLE",
+        }),
+      );
+    const partial = await runtime.execute({
+      ...input,
+      triggerIdempotencyKey: `${input.triggerIdempotencyKey}:partial`,
+      correlationRef: `${input.correlationRef}:partial`,
+    });
+    audienceFailure.mockRestore();
+    expect(partial.map((item) => item.status)).toEqual([
+      "COMPLETED",
+      "FAILED_TERMINAL",
+      "COMPLETED",
+    ]);
+    expect(
+      (
+        await prisma.intelligenceCurrentComponent.findMany({
+          where: {
+            brandId: brand.id,
+            objectSemanticId: "instagram_audience_profile",
+          },
+          select: { currentComponentGenerationId: true },
+          orderBy: { componentSemanticPath: "asc" },
+        })
+      ).map((item) => item.currentComponentGenerationId),
+    ).toEqual(audienceBeforePartial);
+    expect(
+      (
+        await prisma.intelligenceCurrentComponent.findFirstOrThrow({
+          where: {
+            brandId: brand.id,
+            objectSemanticId: "instagram_content_behavior",
+            componentSemanticPath: "$",
+          },
+          select: { currentComponentGenerationId: true },
+        })
+      ).currentComponentGenerationId,
+    ).not.toBe(contentBeforePartial);
+    generationIds = (
+      await prisma.intelligenceCurrentComponent.findMany({
+        where: { brandId: brand.id },
+        select: { currentComponentGenerationId: true },
+        orderBy: [
+          { objectSemanticId: "asc" },
+          { componentSemanticPath: "asc" },
+        ],
+      })
+    ).map((item) => item.currentComponentGenerationId);
     await prisma.brandIntegration.update({
       where: { id: integration.id },
       data: { authorizationGeneration: 8 },
@@ -397,9 +550,9 @@ postgres("Instagram C4 shared-current round trip", () => {
       purge.purgePersistentInTransaction(tx, brand.id),
     );
     expect(counts).toMatchObject({
-      intelligenceObjectGenerations: 3,
-      intelligenceComponentGenerations: 35,
-      intelligenceProcessorExecutions: 6,
+      intelligenceObjectGenerations: 6,
+      intelligenceComponentGenerations: 62,
+      intelligenceProcessorExecutions: 12,
     });
     expect(
       await prisma.intelligenceCurrentComponent.count({
@@ -418,6 +571,185 @@ postgres("Instagram C4 shared-current round trip", () => {
     ).toBe(1);
   }, 60_000);
 });
+
+async function seedLegacyB4Current(
+  prisma: PrismaService,
+  current: IntelligenceCurrentStateRepository,
+  brandId: string,
+) {
+  const subject = await prisma.intelligenceSubject.create({
+    data: {
+      brandId,
+      subjectType: "BRAND",
+      subjectRef: brandId,
+    },
+  });
+  const action = await prisma.intelligenceAction.create({
+    data: {
+      brandId,
+      subjectId: subject.id,
+      actionType: "C4_B4_COMPATIBILITY_FIXTURE",
+      actorType: "SYSTEM",
+      actorRef: "c4-postgres-test",
+      requestIdempotencyKey: randomUUID(),
+      correlationRef: randomUUID(),
+      reasonCode: "ACCEPTED_B4_CURRENT",
+      requestedAtomicity: "GENERATION_AND_CURRENT",
+      outcome: "PERSISTED",
+    },
+  });
+  const value = legacyB4Value();
+  const valueHash = createHash("sha256")
+    .update(JSON.stringify(value))
+    .digest("hex");
+  const object = await prisma.intelligenceObjectGeneration.create({
+    data: {
+      brandId,
+      subjectId: subject.id,
+      objectSemanticId: "instagram_content_behavior",
+      objectContractId: "instagram_content_behavior",
+      objectContractVersion: "1.0",
+      outputContractId: "instagram_content_behavior_output_contract",
+      outputContractVersion: "1.0",
+      producerKind: "AUTHORIZED_APPLICATION_ACTION",
+      producerId: "instagram_content_behavior",
+      producerVersion: "1.0",
+      bundleId: "instagram_content_behavior",
+      bundleVersion: "1.0",
+      bundleHash: createHash("sha256").update("accepted-b4-1.0").digest("hex"),
+      actionId: action.id,
+      valueState: "VALUE",
+      valuePayload: value as never,
+      valueHash,
+      objectMetadataPayload: { sourceScope: "INSTAGRAM_OWNED" },
+      readiness: "PARTIAL",
+      freshnessAtGeneration: "CURRENT",
+      activeScope: ["$"],
+      activeScopeHash: createHash("sha256").update("$").digest("hex"),
+    },
+  });
+  const generation = await prisma.intelligenceComponentGeneration.create({
+    data: {
+      brandId,
+      subjectId: subject.id,
+      objectGenerationId: object.id,
+      objectSemanticId: "instagram_content_behavior",
+      pathSchemeVersion: 1,
+      componentSemanticPath: "$",
+      nodeKind: "OBJECT_FIELD",
+      componentContractId: "instagram_content_behavior",
+      componentContractVersion: "1.0",
+      valueState: "VALUE",
+      valuePayload: value as never,
+      valueHash,
+      authority: "CREATOR_SHOP_DERIVED",
+      sourceClass: "INSTAGRAM_OWNED",
+      readiness: "PARTIAL",
+      freshnessAtGeneration: "CURRENT",
+      metadataPayload: { sourceScope: "INSTAGRAM_OWNED" },
+    },
+  });
+  const created = await prisma.$transaction((tx) =>
+    current.createExpectedAbsent(
+      tx,
+      {
+        brandId,
+        subjectId: subject.id,
+        objectSemanticId: "instagram_content_behavior",
+        pathSchemeVersion: 1,
+        componentSemanticPath: "$",
+      },
+      generation,
+    ),
+  );
+  if (!created) throw new Error("Legacy B4 current fixture was not created");
+  return { currentId: created.id, generationId: generation.id };
+}
+
+function legacyB4Value() {
+  const window = {
+    start: "2026-08-13T09:00:00.000Z",
+    end: "2026-09-12T09:00:00.000Z",
+    days: 30,
+  };
+  return {
+    semanticId: "instagram_content_behavior",
+    objectContractVersion: "1.0",
+    outputContractVersion: "1.0",
+    sourceScope: "INSTAGRAM_OWNED",
+    state: "PARTIAL_CURRENT",
+    readiness: "PARTIAL",
+    freshness: "CURRENT",
+    currentPreserved: false,
+    generatedAt: "2026-09-12T09:00:00.000Z",
+    window,
+    results: [],
+    signals: [],
+    learnings: [],
+    components: {
+      window: { state: "AVAILABLE", value: window },
+      corpus_summary: {
+        state: "AVAILABLE",
+        value: {
+          eligiblePostCount: 1,
+          observedPostCount: 1,
+          deepInspectedImageCount: 0,
+        },
+      },
+      posting_cadence: {
+        state: "UNKNOWN",
+        reasonCode: "INSUFFICIENT_EVIDENCE",
+      },
+      format_mix: {
+        state: "AVAILABLE",
+        value: {
+          observedCounts: { IMAGE: 1 },
+          broaderMix: { state: "UNKNOWN", reasonCode: "INSUFFICIENT_EVIDENCE" },
+        },
+      },
+      theme_patterns: { state: "UNKNOWN", reasonCode: "INSUFFICIENT_EVIDENCE" },
+      caption_patterns: {
+        state: "UNKNOWN",
+        reasonCode: "INSUFFICIENT_EVIDENCE",
+      },
+      creative_structure_patterns: {
+        state: "UNKNOWN",
+        reasonCode: "INSUFFICIENT_EVIDENCE",
+      },
+      offering_presence_patterns: {
+        state: "UNKNOWN",
+        reasonCode: "INSUFFICIENT_EVIDENCE",
+      },
+      creator_presence_patterns: {
+        state: "UNKNOWN",
+        reasonCode: "INSUFFICIENT_EVIDENCE",
+      },
+      representative_media_refs: { state: "AVAILABLE", value: [] },
+      bounded_learnings: {
+        state: "INTENTIONALLY_ABSENT",
+        reasonCode: "INSUFFICIENT_SAMPLE",
+      },
+      coverage: {
+        state: "AVAILABLE",
+        value: {
+          eligibleCount: 1,
+          observedCount: 1,
+          deepInspectedCount: 0,
+          unavailableCount: 0,
+          notInspectedCount: 1,
+        },
+      },
+    },
+    coverage: {
+      state: "PARTIAL",
+      eligibleCount: 1,
+      observedCount: 1,
+      coveragePercent: 100,
+      reasonCodes: ["MEDIA_NOT_SELECTED_FOR_DEEP_ANALYSIS"],
+    },
+    evidenceRefs: ["evidence:accepted-b4-current"],
+  };
+}
 
 async function createBrand(prisma: PrismaService, label: string) {
   return prisma.brandProfile.create({
