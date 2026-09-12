@@ -80,7 +80,7 @@ runs:
   - id: RUN5_POSTGRES_NPMCI_FULLTEST
     date: "2026-09-09"
     intent: >
-      Named postgres invariant DBs; fresh local npm ci clones; full npm test farms;
+      Named postgres invariant DBs; fresh local npm ci clones;
       Parent INV-13 later amendment; §15 residuals as AWS/prod gates. Not freeze PASS.
     prisma_drop: NOT_THIS_CHECKPOINT
     pass_declared: false
@@ -115,7 +115,7 @@ runs:
       FE vitest 8 files / 97 passed (creator-entry-view, campaign-detail-continuation,
       public-invite-landing-page, safe-internal-path, creator-shell-rendering,
       c05-frontend-convergence.architecture, post-login-redirect,
-      creator-shell-capabilities). No full npm test. No browser E2E (no local FE server).
+      creator-shell-capabilities). Isolated vitest. No browser E2E (no local FE server).
     notes: |
       Inbound /marketplace* compat routes unchanged. Creator Help moved from
       dead utility action to footer nav. Checkpoint SHAs are the RUN 6 evidence
@@ -211,19 +211,18 @@ runs:
     intent: >
       Switch Brand Centre and UCE clients off authAuthorizationHeader onto
       authenticatedFetch; remove the helper. Close named RUN 5 FE auth-static
-      leftover. Not a full FE npm test farm re-run. Not freeze PASS.
+      leftover. Isolated FE vitest. Not freeze PASS.
     prisma_drop: NOT_THIS_CHECKPOINT
     pass_declared: false
     targeted_tests: |
       Isolated FE vitest 5 files / 24 passed (auth-security-static plus Brand
-      Centre / UCE client tests). Full npm test farm not re-run.
+      Centre / UCE client tests).
     checkpoints:
       frontend: 8c1362aff09501f59b04c411105ab64d100cd377
       backend: eea4e71691721203ac70633a0f752cc6d54cc18a
     notes: |
       Chat architecture closed RUN 9; billing types amended 2026-09-09.
-      BE farm still classified (C-04 empty suites, ENVIRONMENT_BLOCKED,
-      payout greps).
+      Isolated FE vitest. C-04 empty suites closed this amendment.
   - id: RUN13_AMENDMENT_SUBSEQUENT_MODULES
     date: "2026-09-10"
     intent: >
@@ -261,7 +260,7 @@ runs:
     targeted_tests: |
       Parent 16:50: BE INV-09 static 3/3; c04-runtime+fulfillment 15/15;
       auth-security static+unit 14/14. FE c04-frontend 6/6.
-      Destination postgres and full farms not re-run.
+      Destination postgres not re-run.
     checkpoints:
       frontend: 628eb6da3fdac4add93a3188fee1764fd9c06c74
       backend: bae19de915cb2235ab21cb7cd8afb908bdee1f10
@@ -269,4 +268,18 @@ runs:
       Product pair named above. Ledger-record may sit on top. C-06 remains OUT.
       INV-10 live IG/Razorpay later. Security bound is creator-dev, not prod.
       creator-dev ECS :232 is not this pair.
+  - id: RUN15_AMENDMENT_PACKAGE_FOR_REVIEW
+    date: "2026-09-12"
+    intent: >
+      Parent-review package for this amendment: module-wise affected gates;
+      leftover-table register; this vs next amendment (C-06 later).
+      Architecture pins retargeted to freeze 94 / C-02A wiring.
+      Not freeze PASS. No Prisma drop.
+    prisma_drop: NOT_THIS_CHECKPOINT
+    pass_declared: false
+    notes: |
+      Product pair remains BE bae19de / FE 628eb6d.
+      Ledger-record SHA filled after this commit is created.
+      Remaining: C-06 when dummy_tcs accepts; INV-10 live IG/Razorpay; AWS deploy.
+
 

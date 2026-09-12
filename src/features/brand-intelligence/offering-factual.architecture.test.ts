@@ -93,12 +93,12 @@ describe("Product Intelligence P4 architecture", () => {
     );
   });
 
-  it("keeps the Product schema unchanged in the converged migration history", () => {
+  it("keeps the Product schema unchanged in the freeze migration history", () => {
     expect(
       readdirSync(join(process.cwd(), "prisma", "migrations"), {
         withFileTypes: true,
       }).filter((entry) => entry.isDirectory()),
-    ).toHaveLength(66);
+    ).toHaveLength(94);
     expect(
       readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8"),
     ).not.toContain("offering_factual_profile");

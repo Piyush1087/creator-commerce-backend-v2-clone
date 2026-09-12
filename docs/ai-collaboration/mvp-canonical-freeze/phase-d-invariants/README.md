@@ -9,6 +9,7 @@
 | --- | --- |
 | `cross-module-invariant-suite.md` | Compact high-value invariants with authority + proof + tests + execution |
 | `inv-13-competing-writers.md` | Competing vs retained schema proof (no Prisma drop) |
+| `../14-migration-schema/retained-schema-register.md` | Living leftover-table list; re-mark every amendment |
 | `frontend-proof-files.md` | FE paths per INV |
 | `backend-proof-files.md` | BE paths per INV |
 

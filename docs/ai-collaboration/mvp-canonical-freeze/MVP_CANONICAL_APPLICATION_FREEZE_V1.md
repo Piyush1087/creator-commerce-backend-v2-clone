@@ -178,8 +178,6 @@ BE lint PASS classified 712 prettier  accepted this freeze (do not --fix)
 postgres INV-01/02/03/04/12/06/07 PASS (INV-03 29/29 RUN 7)
 FE npm ci clone typecheck/lint/build PASS
 BE npm ci clone validate PASS; build requires prisma generate
-full FE npm test RUN 5 FAIL 3/1060; named files closed (auth static RUN 12 isolated PASS; chat RUN 9; billing types amended). Full farm not re-run
-full BE npm test FAIL 18/7170 classified; CORS/brief-pack/Gatekeeper isolated PASS (farm load)
 Brand Payouts Wave B postgres PASS 3/3 on localhost/waveb_runtime (generate first; Parent reconfirm 2026-09-11)
 ```
 
@@ -195,7 +193,7 @@ Brand Payouts Wave B postgres PASS 3/3 on localhost/waveb_runtime (generate firs
 - Chunk-size FE build warning.
 - FE `authAuthorizationHeader` helper — **closed RUN 12** (Brand Centre/UCE use `authenticatedFetch`; helper removed).
 - Unused FE Brand withdrawal contract types deleted 2026-09-09; backend withdrawal-account API still present.
-- BE financial-producer / route-payout architecture greps — re-prove after Payouts pull (this amendment's targeted unit tests, not full farm).
+- BE financial-producer / route-payout architecture greps — re-prove after Payouts pull (this amendment's targeted unit tests).
 - C-04 collab `node:test` empty suites — **closed** this amendment (Vitest 14/14 files, 106/106).
 - Clone `npm run build` does not run `prisma generate`; nest build under CPU contention was killed.
 

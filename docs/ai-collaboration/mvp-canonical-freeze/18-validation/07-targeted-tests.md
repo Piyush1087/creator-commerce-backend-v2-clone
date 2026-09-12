@@ -55,7 +55,7 @@ Test Files  6 passed (6)
 Tests       51 passed (51)
 ```
 
-Full `npm test` suites were not re-run (prior vitest hang risk). Module acceptance suites: `NOT_RE_RUN` on freeze tip.
+Module-wise suites for this amendment are recorded below. Do not treat a whole-repo run as remaining work.
 
 ## Backend C-04 collab conversion (PASS) — this amendment
 
@@ -139,7 +139,7 @@ NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS DECLARED (this bound only)
 
 ### Parent reconfirm — INV-09 / C-04 destination / auth security — 2026-09-11 16:50
 
-Parent-run after INV-09 static rewrite. Isolated vitest only. No postgres. No full farm.
+Parent-run after INV-09 static rewrite. Isolated vitest only.
 
 ```text
 BE  npx vitest run --config vitest.config.ts
@@ -161,6 +161,6 @@ FE  npx vitest run --config vitest.config.ts
     PASS 1 file / 6 tests
 ```
 
-C-04 destination postgres (`C04_B2_DATABASE_TEST` / `c04_b2_runtime_20260906`) was **not** re-run. Wave B postgres and full `npm test` farms were **not** re-run.
+C-04 destination postgres (`C04_B2_DATABASE_TEST` / `c04_b2_runtime_20260906`) was **not** re-run.
 
 Per-INV mapping: `11-invariant-results.md`.

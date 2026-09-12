@@ -49,7 +49,7 @@ Co-Pilot tables remain. Schema drop is **not** this checkpoint.
 
 ## Unused / OUT models (still in schema)
 
-Classify, do not drop this run:
+Classify, do not drop this run. **Living list (re-mark every amendment):** `retained-schema-register.md`.
 
 | Models | Disposition |
 | --- | --- |

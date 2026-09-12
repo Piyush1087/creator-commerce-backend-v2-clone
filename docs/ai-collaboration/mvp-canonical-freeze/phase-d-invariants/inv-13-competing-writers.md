@@ -43,4 +43,4 @@ Escrow may still *read* leftover `commercials.finalQuote` when a leftover-origin
 
 ## What this amendment did not drop
 
-No `DROP TABLE`. Co-Pilot tables, marketplace-era tables, and the duplicate collab/money models remain.
+No `DROP TABLE`. Living leftover list (re-mark every later run): `../14-migration-schema/retained-schema-register.md`.

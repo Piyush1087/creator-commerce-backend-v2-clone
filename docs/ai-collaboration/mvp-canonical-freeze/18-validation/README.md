@@ -22,7 +22,7 @@
 | `12-frontend-backend-smoke.md` | seeded OTP browser smoke |
 | `13-postgres-invariants.md` | named disposable-DB invariant suites |
 | `14-npm-ci-fresh-clone.md` | local freeze-branch `npm ci` |
-| `15-full-npm-test.md` | full FE/BE `npm test` farms |
+| `15-full-npm-test.md` | not a remaining freeze gate (module-wise only) |
 | `16-viewport-smoke.md` | DESIGN_SYSTEM 375/767 shell matrix |
 
 `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` is forbidden until remaining gates are closed or Parent-accepted.

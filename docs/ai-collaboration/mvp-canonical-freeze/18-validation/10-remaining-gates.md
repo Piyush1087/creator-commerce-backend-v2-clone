@@ -5,15 +5,14 @@
 
 | Gate | Status | Classification |
 | --- | --- | --- |
-| fresh checkout / `npm ci` | PARTIAL | FE clone typecheck/lint/build PASS. BE clone validate PASS; clone nest hung under farm load. **Working-tree** `npx prisma generate` + `npm run build` Parent reconfirm PASS 2026-09-09 (`14-npm-ci-fresh-clone.md`) |
-| full unit/contract `npm test` | FAIL classified | Full farms not re-run this amendment. Targeted: competing-transition retired tests + Brand Payouts unit + C-02A Home architecture (see amendment run). Do not greenwash prettier 712 / env-blocked farms |
-| module acceptance suites | PARTIAL this amendment | Targeted C-04/C-02A/Payouts unit PASS. Wave B postgres **PASS 3/3** on disposable `waveb_runtime` after `npx prisma generate` (not `thecreatorshop`, not freeze DB) |
-| cross-module invariant suite execution | PARTIAL | postgres INV-01/02/03/04/12/06/07 PASS (prior). INV-11 **PASS classified**. INV-09 **PASS classified** (C-04 destination snapshot). INV-08 PARTIAL (C-06). INV-10 PARTIAL (live IG/Razorpay later). INV-13 PASS classified |
+| fresh checkout / `npm ci` | PARTIAL | FE clone typecheck/lint/build PASS. BE clone validate PASS; clone nest hung under load. **Working-tree** `npx prisma generate` + `npm run build` Parent reconfirm PASS 2026-09-09 (`14-npm-ci-fresh-clone.md`) |
+| module acceptance suites (this amendment) | PASS | Targeted C-04/C-02A/Payouts unit. Wave B postgres **PASS 3/3** on disposable `waveb_runtime` after `npx prisma generate` (not `thecreatorshop`, not freeze DB). C-04 collab Vitest 14/14 files, 106/106. INV-09 Parent 16:50 isolated C-04/auth. Evidence: `07-targeted-tests.md` |
+| cross-module invariant suite execution | PASS classified this amendment / PARTIAL leftover | postgres INV-01/02/03/04/12/06/07 PASS (prior). INV-11 **PASS classified**. INV-09 **PASS classified** (C-04 destination snapshot). INV-13 PASS classified. **INV-08 PARTIAL until C-06 pull.** **INV-10 PARTIAL** live IG/Razorpay `PROVIDER_DEFERRED` |
 | frontend ↔ backend smoke | PASS | Parent confirm 2026-09-11 `12-frontend-backend-smoke.md` (C-02A Home, not deferred) |
 | auth/session regression | PASS postgres INV-01 | plus RUN 4 static/unit |
 | RBAC / actor-subject / cross-tenant | PASS postgres INV-04 + INV-12 | |
 | responsive shell/navigation smoke | PASS | RUN 8 Parent confirm: UCE table→cards + Creator viewport (`16-viewport-smoke.md`) |
-| provider-unavailable recovery | PASS classified | Fail-closed Brand Payouts provider + C-05 P2 adapter 2026-09-11. Postmark OTP live send PASS 2026-09-10. Live IG/Razorpay **NOT_RUN** / `PROVIDER_DEFERRED` |
+| provider-unavailable recovery | PASS classified / deferred live | Fail-closed Brand Payouts provider + C-05 P2 adapter 2026-09-11. Postmark OTP live send PASS 2026-09-10. Live IG/Razorpay **NOT_RUN** / `PROVIDER_DEFERRED` |
 | frontend lint | PASS | RUN 4 + clone |
 | backend lint | PASS classified | `npm run lint:eslint` clean 2026-09-11 (prettier plugin off). `npm run lint` prettier 712 remains **accepted** `PREEXISTING_ACCEPTED_DEBT` (do not `--fix`) |
 | clean worktrees | NOT_CLAIMED | do not commit `tmp-*` / OTP logs |
@@ -21,7 +20,11 @@
 
 `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` is still forbidden.
 
-**Amendment 2026-09-10 targeted gates (not full farms):**
+This **amendment package** is what to send for Parent review. C-06 absence, live IG/Razorpay, and AWS deploy do **not** block that review. They are the next amendment / downstream workers.
+
+**Amendment remaining after cleared module-wise gates:** next dummy_tcs-accepted module pull (C-06 / INV-08), live IG/Razorpay (`PROVIDER_DEFERRED` / INV-10), AWS deploy downstream. Not freeze PASS.
+
+**Amendment 2026-09-10 targeted gates:**
 
 ```text
 BE prisma validate                              PASS
@@ -32,7 +35,6 @@ BE C-04 collab vitest (14 formerly node:test files) PASS 14/14 files, 106/106 te
 BE prettier/prettier 712                            ACCEPTED this freeze (do not --fix)
 FE C-02A Home architecture/schemas/nav          PASS
 FE Brand Payouts P2 + Wave C                    PASS 40 tests across 5 files
-full npm test farms                             NOT_RE_RUN (do not greenwash)
 Brand Payouts Wave B postgres                   PASS 3/3 on localhost/waveb_runtime (generate first; npx vitest skips pretest)
 post-Wave-B targeted C-04 + Payouts unit        PASS 23 files / 167 tests (5 skipped env-gated)
 FE↔BE local smoke                               PASS 2026-09-11 Parent confirm

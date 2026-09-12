@@ -81,15 +81,18 @@ When a later accepted module lands, reconstruct order from current dummy_tcs aut
 4 OUT competing transitions          = retired 410 where canonical C-04/C-03 already owns the write
   leftover collab POST creator/shipping-address HTTP + service = 410 (Settings owns contact)
 5 NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS = DECLARED 2026-09-11 (freeze source + live creator-dev ECS; not freeze PASS; not creator-prod)
-6 affected gates                     = PARTIAL
+6 affected module-wise gates         = DONE this amendment
   INV-11 PASS classified (accepted IN clients)
   local smoke PASS 2026-09-11
   provider fail-closed recovery PASS classified (live IG/Razorpay later)
   npm run lint:eslint (prettier plugin off) = PASS classified 2026-09-11
   BE prettier/prettier 712 remains ACCEPTED (do not --fix)
-  INV-08 left for C-06
   INV-09 PASS classified (C-04 destination confirmDefault snapshots CreatorShippingAddress; leftover shipping 410)
   Parent 2026-09-11 16:50: BE INV-09 3/3, c04-runtime+fulfillment 15/15, auth-security 14/14; FE c04-frontend 6/6
+  remaining after this amendment     = next accepted-module pull (C-06 when dummy_tcs accepts)
+                                     + INV-08 until that pull
+                                     + PROVIDER_DEFERRED (live IG/Razorpay)
+                                     + AWS deploy downstream
 7 immutable SHA pair                 = BE bae19de915cb2235ab21cb7cd8afb908bdee1f10 / FE 628eb6da3fdac4add93a3188fee1764fd9c06c74
   freeze branch dual-push; still not freeze PASS
 
@@ -108,6 +111,48 @@ Brand Payouts Wave B postgres            = PASS 3/3
 ```
 
 Do not declare `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` from this progress block.
+
+Parent remaining-work items 1–7 for **this** amendment (C-04 / C-02A / Brand Payouts v1) are recorded DONE or classified above. They are **not** a reason to withhold sending this amendment for review. They are also **not** freeze PASS.
+
+### This amendment vs the next amendment
+
+This working amendment is the rule-set and evidence for the **C-04 / C-02A / Brand Payouts v1** pull. Send it for Parent / architecture review as an amendment package. Accepting it does not complete the original charter. Rejecting it does not require restarting RUN 1–12.
+
+```text
+THIS AMENDMENT (send for review)
+  inventory of subsequently accepted modules     DONE
+  converge C-04 / C-02A / Brand Payouts v1       DONE
+  INV-13 competing writers                       PASS classified (tables retained)
+  OUT competing writes                           410 where canonical owns the transition
+  security sentence                              DECLARED (freeze source + creator-dev; not prod)
+  affected module-wise gates                     DONE this amendment
+  one immutable product SHA pair                 BE bae19de915cb2235ab21cb7cd8afb908bdee1f10
+                                                 FE 628eb6da3fdac4add93a3188fee1764fd9c06c74
+  freeze PASS                                    NOT DECLARED
+
+DOES NOT BLOCK THIS REVIEW
+  C-06 Creator Payouts                           still OUT until dummy_tcs accepts it
+  INV-08 remainder                               waits on that C-06 pull
+  live Instagram / Razorpay                      PROVIDER_DEFERRED (INV-10)
+  AWS deploy of freeze SHAs                      downstream AWS worker
+  creator-prod                                   not this worker; no live prod API
+  prettier/prettier 712                          ACCEPTED; do not --fix
+  optional hotfix overlay                        ≠ canonical application definition
+
+NEXT AMENDMENT (future; new bounded pass)
+  trigger = dummy_tcs accepted authority for a module not yet in this lineage
+            (expected: C-06 when accepted; any later accepted module the same way)
+  reconstruct pull order from then-current dummy_tcs authorities
+  do not copy this amendment's C-04 → C-02A → Payouts ladder
+  re-prove only gates the new module can change
+  do not reopen this amendment's closed INV-09 / INV-11 / INV-13 / 410 retirements
+    unless the new module actually changes that surface
+  re-mark 14-migration-schema/retained-schema-register.md (KEEP / DROP_CANDIDATE)
+  drop leftover tables only with dummy_tcs or Parent authority + a named migration
+  do not treat C-06 absence as a defect of THIS amendment
+```
+
+The original v1.0 charter file stays frozen. This file stays a **working amendment** until Parent accepts it. A later accepted module starts a **new** amendment overlay; it does not rewrite RUN 1–12 or this amendment's closed items.
 
 When a later accepted module lands, reconstruct order from current dummy_tcs authorities. Do not copy this amendment's C-04 / C-02A / Payouts ladder as a permanent sequence. Re-prove only the gates that module can change. Leave classified debt classified until the owning module is in lineage.
 
@@ -511,13 +556,22 @@ Every invariant must identify its authority source and the repositories/files/te
 
 ### Amendment Phase D — INV-13
 
-`INV-13` leftover journey writers are now **PASS classified** (tables retained, no Prisma drop). Final freeze PASS still requires remaining §18 gates and security/release proof.
+`INV-13` leftover journey writers are now **PASS classified**. Tables stay. Silent Prisma drop remains **forbidden**.
+
+Living register (re-mark every later amendment / AI run):
+
+`docs/ai-collaboration/mvp-canonical-freeze/14-migration-schema/retained-schema-register.md`
 
 ```text
 competing runtime writer     = live service still creates/updates the non-canonical model
 harmless retained schema     = table/model remains; no canonical journey writes it
 silent Prisma drop           = FORBIDDEN this amendment
+later drop                   = only DROPPED_WITH_AUTHORITY on that register
+                               (dummy_tcs / Parent + named migration)
+                               never a silent cleanup
 ```
+
+Each later amendment must re-stamp that register even if every row stays `KEEP`. That is how unused tables become removable at the end — by accumulated marks, not by dropping now.
 
 ---
 
@@ -815,7 +869,7 @@ RELEASE_BLOCKER
 
 After each convergence block, rerun gates the pull can change. Do not re-open classified prettier 712 or environment-blocked farms as a PASS claim unless the pull actually changes that surface.
 
-BE `prettier/prettier` 712 is **accepted this freeze** (`PREEXISTING_ACCEPTED_DEBT`). Do not `--fix`. Run `npm run lint:eslint` (ESLint with `eslint-plugin-prettier` disabled). If that run is clean, backend lint is **PASS classified**. `npm run lint` still reports the prettier farm. New non-prettier eslint findings are not auto-accepted. Full `npm test` farms stay classified / not greened.
+BE `prettier/prettier` 712 is **accepted this freeze** (`PREEXISTING_ACCEPTED_DEBT`). Do not `--fix`. Run `npm run lint:eslint` (ESLint with `eslint-plugin-prettier` disabled). If that run is clean, backend lint is **PASS classified**. `npm run lint` still reports the prettier farm. New non-prettier eslint findings are not auto-accepted. Re-prove only the module-wise suites the pull can change.
 
 C-04 collab files previously classified `STALE_TEST_PROVEN` (`node:test`, vitest 0 suites) are **re-proven** this amendment: Vitest **14 files / 106 tests PASS**. Harnesses were retargeted to the current C-04 / Brand Payouts constructors (projection outbox, advisory lock, payouts lineage, retired Manual rail). That classification does not automatically clear other STALE / ENVIRONMENT_BLOCKED farms.
 
@@ -903,15 +957,17 @@ The freeze is also invalid if a major module is represented only by a chat state
 
 ### Amendment — one SHA pair
 
-While status is ACTIVE, later ledger checkpoints may sit above older §20 SHAs. That is tolerable only until this amendment publishes:
+This amendment publishes one **product** pair (INV-09 destination consumption + creator-dev security declaration). A later ledger-record commit may sit on top of that pair. Use the product pair as the review identity. Use the freeze-branch tips as the deploy refs. Do not publish the branch name as the canonical identity.
 
 ```text
-BACKEND_CANONICAL_SHA    = <one immutable commit>
-FRONTEND_CANONICAL_SHA   = <one immutable commit>
-status                   = still not PASS until remaining gates close
+BACKEND_PRODUCT_SHA      = bae19de915cb2235ab21cb7cd8afb908bdee1f10
+FRONTEND_PRODUCT_SHA     = 628eb6da3fdac4add93a3188fee1764fd9c06c74
+BACKEND_LEDGER_TIP       = 9270d9e52493ebe612d7b68cba1a345de1cb5a78
+FRONTEND_LEDGER_TIP      = 46fad5351f710654259f3b9e717db185444b16fb
+status                   = ACTIVE — not PASS
 ```
 
-Do not publish the freeze branch name as the canonical identity.
+Working-tree docs after those tips are not a new SHA pair until committed and dual-pushed. Do not treat an uncommitted working tree as the freeze identity.
 
 ---
 
@@ -1034,7 +1090,15 @@ If AWS later discovers a software inconsistency that changes the frozen applicat
 
 ### Amendment — completion vs PASS
 
-This amendment is **not** complete, and **not** PASS, until remaining review items 6–7 are closed with durable evidence (affected smoke/farms as required, one origin-published SHA pair). Item 5 (security sentence) is DECLARED 2026-09-11 for freeze source + live creator-dev ECS env. Items 1–4 of the review remaining-work list are closed or classified as this amendment records. Classification of prettier/farm debt is not clearance. AWS deploy of freeze SHAs remains a downstream worker.
+```text
+THIS AMENDMENT PACKAGE     = ready to send for Parent review
+THIS AMENDMENT AS CHARTER  = working copy; not principal until Parent accepts it
+PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1 = NOT DECLARED
+NEXT SOFTWARE AMENDMENT    = C-06 (or later) when dummy_tcs accepts it
+DOWNSTREAM                 = live IG/Razorpay; AWS deploy; creator-prod
+```
+
+Review items 1–7 for the C-04 / C-02A / Payouts v1 pull are recorded (affected module-wise gates + published SHA pair). Item 5 (security sentence) is DECLARED 2026-09-11 for freeze source + live creator-dev ECS env. Classification of prettier 712 is not clearance. Absence of C-06 does not block this review. Absence of freeze PASS does not mean this amendment failed.
 
 ---
 

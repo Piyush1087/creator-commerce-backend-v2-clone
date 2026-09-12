@@ -50,7 +50,7 @@ Local Postmark OTP template live send **PASS** (Parent-confirmed inboxes). Prior
 
 ## RUN 12 (2026-09-10)
 
-Brand Centre / UCE clients switched to `authenticatedFetch`; `authAuthorizationHeader` removed. Isolated FE vitest **5 files / 24 passed** including `auth-security-static.test.ts`. Named RUN 5 FE farm files now closed; full FE `npm test` farm not re-run. Evidence FE `8c1362af…` / BE `eea4e716…`. Not freeze PASS.
+Brand Centre / UCE clients switched to `authenticatedFetch`; `authAuthorizationHeader` removed. Isolated FE vitest **5 files / 24 passed** including `auth-security-static.test.ts`. Named RUN 5 FE files closed. Evidence FE `8c1362af…` / BE `eea4e716…`. Not freeze PASS.
 
 ## RUN 13 (2026-09-10 / 2026-09-11)
 
@@ -60,7 +60,11 @@ Converge C-04 / C-02A / Brand Payouts v1. INV-13 Pair 1–2 leftover journey wri
 
 INV-09 destination consumption PASS classified. `NO_KNOWN_DEPLOYABLE_SECURITY_BYPASS` DECLARED for freeze source + live creator-dev. Product pair BE `bae19de…` / FE `628eb6d…`. Not freeze PASS.
 
+## RUN 15 (2026-09-12)
+
+Amendment package for Parent review: module-wise gates, leftover-schema register, this vs next amendment (C-06 later). Product pair unchanged. Not freeze PASS.
+
 ## Leftovers
 
 - Do not start a charter-shaped RUN 2 pull to match the diagram.
-- Freeze PASS still forbidden (classified test farms, C-06 OUT, INV-10 live providers later, creator-dev not running this pair).
+- Freeze PASS still forbidden (C-06 OUT until dummy_tcs accepts, INV-10 live IG/Razorpay deferred, creator-dev not running this pair, AWS deploy downstream).

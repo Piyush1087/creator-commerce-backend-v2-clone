@@ -98,8 +98,8 @@ C-02A owns **0** migrations. C-04’s accepted extra migration `20260911125000_c
 | --- | --- | --- |
 | Hide chrome | FE shell/route architecture tests; viewport smoke | RUN 1 + RUN 5 PARTIAL |
 | Schema | `prisma validate`; 0→87 migrate on disposable DB | PASS_87 |
-| Invariants | INV-01…13 as defined in Phase D | PARTIAL overall (see `../18-validation/11-invariant-results.md`) |
-| Full `npm test` | Classified farms | Not greened; Parent-accepted debt named |
+| Invariants | INV-01…13 as defined in Phase D | PARTIAL leftover INV-08/10 (see `../18-validation/11-invariant-results.md`) |
+| Module-wise suites | Affected gates for pulled modules | `../18-validation/07-targeted-tests.md` `../18-validation/10-remaining-gates.md` |
 
 No new convergence block this freeze.
 
