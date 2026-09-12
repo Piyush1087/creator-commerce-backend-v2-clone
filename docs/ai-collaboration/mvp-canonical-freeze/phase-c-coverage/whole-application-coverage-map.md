@@ -4,6 +4,8 @@
 **Audited:** 2026-09-09 (freeze working tree). Route hide unchanged since RUN 1.  
 **Classification key:** `CANONICAL` | `DEFERRED` | `OUT_OF_MVP` | `LEGACY_ONLY` | `INFRA` | `PROVIDER_DEFERRED`
 
+**Amendment 2026-09-12:** C-02A / C-04 / Brand Payouts v1 are **pulled**. Rows below that still describe the 2026-09-09 intermediate snapshot as DEFERRED/not pulled. Current product: Creator Home (`src/features/creator-home`), C-04 collab, Brand Payouts v1. C-06 remains OUT.
+
 A route merely existing in code does not make it part of the canonical product.
 
 ## Charter journeys
@@ -16,12 +18,12 @@ A route merely existing in code does not make it part of the canonical product.
 | Brand Settings | CANONICAL | `/brand/settings/{general,integrations,billing,escrow}` | Settings MVP + escrow/billing (not Brand Payouts v1) |
 | Campaign creation and Brand Campaign workspaces | CANONICAL | `/brand/uce/campaigns`, `/create`, `/:id` | Brand UCE |
 | Creator Entry | CANONICAL | `/creator/onboarding`, Instagram callbacks `/creator-marketplace/callback` and `/integrate-instagram` | C-01. Callback paths keep marketplace naming; they are Instagram OAuth, not browse. |
-| Creator persistent shell | CANONICAL (C-05) / DEFERRED (C-02A Home product) | Sidebar + bottom nav: Home · Campaigns · Collaborations · Settings | `/creator/home` is the C-05 **slot** (`CreatorWorkspaceEntryPage`). Accepted C-02A `src/features/creator-home` + `GET /api/v1/creator/home` are **not** in this tree. Do not confuse with leftover Creator Centre Home files (unmounted). Brand bottom “Chat” is `/brand/collaborations`. Chat Home is `/brand/dashboard`. |
+| Creator persistent shell | CANONICAL (C-05 shell + C-02A Home) | Sidebar + bottom nav: Home · Campaigns · Collaborations · Settings | `/creator/home` is C-02A (`src/features/creator-home`). Centre routes redirect Home. Brand bottom “Chat” is `/brand/collaborations`. Chat Home is `/brand/dashboard`. |
 | Creator Settings | CANONICAL | `/creator/settings/{account,profile,team,instagram,payouts}` | C-05; `/social` redirects to Instagram |
 | Creator Campaign participation | CANONICAL | `/creator/campaigns/opportunities`, `opportunities/:campaignId`, `applications`, `applications/:applicationId` | C-03; marketplace URLs redirect here |
 | Collaboration — Brand | CANONICAL | `/brand/collaborations`, `/brand/collaboration-page` | Brand Collab + Phase G |
-| Collaboration — Creator | MIXED | `/creator/collaborations` still mounted (`CollaborationRouteGuard` + shared workspace) | C-04 accepted pack **not pulled**. Brand-side collab remains. |
-| Payouts / earnings / KYC | MIXED | Brand: Settings billing + escrow. Creator: Settings payouts + legal | Brand Payouts v1 deferred. C-06 OUT. Old hubs redirect. |
+| Collaboration — Creator | CANONICAL (C-04 pulled) | `/creator/collaborations` (`CollaborationRouteGuard` + shared workspace) | C-04 pack in lineage. Leftover Brand Collab HTTP retired `410` on BE. |
+| Payouts / earnings / KYC | MIXED | Brand: Settings billing + escrow + Brand Payouts v1 (provider-disabled). Creator: Settings payouts + legal | Brand Payouts v1 pulled. C-06 OUT. Old hubs redirect. |
 | shared authentication/session/security | CANONICAL | `/api/v1/auth`, JWT session, OTP, Google | |
 | Intelligence / Data Extraction consumers | CANONICAL as infra | Brand onboarding + Centre + PI consumers | `IntelligenceConsumerModule` has **no HTTP controller** (in-process). DE is not a user-facing product. |
 | notifications required by MVP | CANONICAL as infra | Brand + Creator notification APIs, Postmark | |
@@ -35,11 +37,13 @@ A route merely existing in code does not make it part of the canonical product.
 | Co-Pilot | No shell nav | Backend `CoPilotModule` + `CreatorCoPilotModule` still imported; HTTP still live |
 | Creator Centre / analytics / media-kit | FE routes redirect to `/creator/home` | Page files remain. **BE** `GET api/v1/public/creators/:slug/media-kit` and `api/v1/creator-centre` still imported |
 | Brand/Creator payout hubs | FE redirect to Settings billing / Settings payouts | Old feature folders and BE controllers still wired |
-| C-02A Home | Placeholder C-05 entry only; accepted pack not an ancestor | See **C-02A vs freeze** below |
+| C-02A Home | **PULLED this amendment.** `/creator/home` is C-02A Creator Home. | 2026-09-09 snapshot below is historical |
 | Creator Centre Home UI | Unmounted page files; FE routes redirect Home | Not C-02A (C-02A handoff: Centre is separately deferred) |
 | `/help` | Brand Support + Creator Help footer | Mounted placeholder `HelpPage` under authenticated shell. Not a product journey. |
 
-## C-02A vs freeze (Phase C — 2026-09-09)
+## C-02A vs freeze (Phase C — 2026-09-09 historical)
+
+**Superseded 2026-09-12:** C-02A is **pulled**. `/creator/home` is the accepted Creator Home. The table below is the intermediate snapshot only.
 
 There is no separate product module named **C-02**. The accepted Home module is **C-02A — Creator Home Foundation** (dummy_tcs parent acceptance `3ac98959`).
 

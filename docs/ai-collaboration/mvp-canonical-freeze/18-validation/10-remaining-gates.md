@@ -16,7 +16,7 @@
 | frontend lint | PASS | RUN 4 + clone |
 | backend lint | PASS classified | `npm run lint:eslint` clean 2026-09-11 (prettier plugin off). `npm run lint` prettier 712 remains **accepted** `PREEXISTING_ACCEPTED_DEBT` (do not `--fix`) |
 | clean worktrees | NOT_CLAIMED | do not commit `tmp-*` / OTP logs |
-| local/remote checkpoint equality | dual-push product pair BE `bae19de` / FE `628eb6d`; freeze branch only; not `development`/`main` |
+| local/remote checkpoint equality | dual-push product pair BE `bae19de` / FE `628eb6d`; amendment package BE `47011cad` / FE `bc3f251`; freeze branch only; not `development`/`main` |
 
 `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` is still forbidden.
 

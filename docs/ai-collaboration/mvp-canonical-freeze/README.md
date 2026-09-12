@@ -18,7 +18,7 @@ This folder is the program-level freeze package. Each charter phase has its own 
 | `phase-b-lineage/` | §9 | Canonical source register (repos, SHAs, ancestry) |
 | `phase-c-coverage/` | §10 | Whole-application coverage map |
 | `phase-d-invariants/` | §11 | Compact cross-module invariant suite |
-| `phase-e-convergence/` | §12 | Convergence plan (this freeze: no deferred pull) |
+| `phase-e-convergence/` | §12 | Convergence plan (amendment pulled C-02A / C-04 / Brand Payouts v1) |
 | `phase-f-execution/` | §13 | Execution ledger and checkpoint SHAs |
 | `14-migration-schema/` | §14 | Prisma/schema + migration register |
 | `15-security/` | §15 | Security / release hygiene |

@@ -18,7 +18,7 @@
 | Exact accepted module SHAs | YES — from Phase A register |
 | Ancestry + merge bases | YES — `git merge-base --is-ancestor` vs snapshot and local freeze HEAD |
 | Already ancestors of prospective head | YES — all IN modules |
-| Require convergence | YES — C-02A, C-04, Brand Payouts v1 named, **not pulled** |
+| Require convergence | YES — C-02A, C-04, Brand Payouts v1 **pulled this amendment**; C-06 still OUT |
 | Docs-only commits | YES — C-01 BE I7 ledger; Chat Home ledgers; C-01/C-05 closeout last-touch |
 | Developer integration branches | YES — evidence only |
 | Branch divergence | YES — origin/freeze is ancestor of local freeze HEAD (unpushed docs) |

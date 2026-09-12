@@ -1,6 +1,6 @@
 # Phase F — Execution policy and ledger (§13)
 
-**Status:** ACTIVE — ledger current through RUN 14 (INV-09 + creator-dev security); **not** freeze PASS  
+**Status:** ACTIVE — ledger current through RUN 15 (amendment package for Parent review); **not** freeze PASS  
 **Date:** 2026-09-08; ledger audit 2026-09-10
 
 ## Files in this folder
@@ -21,7 +21,7 @@ AWS deploy is not started. `docs/aws-environments/` and `docs/deployment/hotfix/
 | RUN 2 canonical convergence | **Skipped as a pull** — IN already in lineage; RUN 2 is docs |
 | RUN 3 whole-app acceptance | Split across RUN 3–5 (build/migrate; lint/invariants/smoke; postgres/npm ci/full test) |
 | RUN 4 freeze preparation | Artifact written in RUN 4; still not PASS |
-| Ledger + checkpoint SHA every material run | YES RUN 1–14; product pair BE `bae19de` / FE `628eb6d` |
+| Ledger + checkpoint SHA every material run | YES RUN 1–15; product pair BE `bae19de` / FE `628eb6d`; package BE `47011cad` / FE `bc3f251` |
 | Runner does not reconcile conflicting accepted sources | YES — C-06 stays OUT; C-02A / C-04 / Payouts pulled this amendment |
 
 ## RUN 6 (2026-09-09)

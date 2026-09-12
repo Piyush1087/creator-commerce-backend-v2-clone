@@ -13,7 +13,7 @@
 | `03-backend-build.md` | backend `npm run build` |
 | `04-frontend-typecheck.md` | frontend `npm run typecheck` |
 | `05-frontend-build.md` | frontend `npm run build` |
-| `06-lint.md` | FE lint PASS; BE lint FAIL classified |
+| `06-lint.md` | FE lint PASS; BE lint PASS classified (prettier 712 accepted) |
 | `07-targeted-tests.md` | freeze-relevant unit/contract tests |
 | `08-fresh-db-migrate.md` | disposable DB `0 → head` |
 | `09-backend-boot-health.md` | boot + `/health` |

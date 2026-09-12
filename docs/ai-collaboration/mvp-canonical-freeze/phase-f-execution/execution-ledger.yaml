@@ -277,9 +277,13 @@ runs:
       Not freeze PASS. No Prisma drop.
     prisma_drop: NOT_THIS_CHECKPOINT
     pass_declared: false
+    checkpoints:
+      frontend: bc3f25194523f8a6ed974da0fb4a5f2d89454c29
+      backend: 47011cad2e1e04bd0482e4fe8630af6cb7a5f4b7
     notes: |
       Product pair remains BE bae19de / FE 628eb6d.
-      Ledger-record SHA filled after this commit is created.
+      This package: BE 47011cad2e1e04bd0482e4fe8630af6cb7a5f4b7 /
+      FE bc3f25194523f8a6ed974da0fb4a5f2d89454c29.
       Remaining: C-06 when dummy_tcs accepts; INV-10 live IG/Razorpay; AWS deploy.
 
 

@@ -962,8 +962,8 @@ This amendment publishes one **product** pair (INV-09 destination consumption + 
 ```text
 BACKEND_PRODUCT_SHA      = bae19de915cb2235ab21cb7cd8afb908bdee1f10
 FRONTEND_PRODUCT_SHA     = 628eb6da3fdac4add93a3188fee1764fd9c06c74
-BACKEND_LEDGER_TIP       = 9270d9e52493ebe612d7b68cba1a345de1cb5a78
-FRONTEND_LEDGER_TIP      = 46fad5351f710654259f3b9e717db185444b16fb
+BACKEND_LEDGER_TIP       = 47011cad2e1e04bd0482e4fe8630af6cb7a5f4b7
+FRONTEND_LEDGER_TIP      = bc3f25194523f8a6ed974da0fb4a5f2d89454c29
 status                   = ACTIVE — not PASS
 ```
 

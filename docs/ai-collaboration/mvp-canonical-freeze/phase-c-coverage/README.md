@@ -24,7 +24,7 @@ A route or controller existing in code does **not** make it part of the canonica
 - Every `AUTH_ROUTES` / `PUBLIC_ROUTES` / onboarding path in those route files is classified.
 - `src/temp/aurora-playground` is **not** routed.
 - Co-Pilot has **no FE route**. Brand Home (`/brand/dashboard`) uses Chat (`useBrandChat`), not `useBrandCoPilot`. Leftover `brand-home-assistant-panel.tsx` / `BrandCoPilotWorkspace` remain in tree unused by that page.
-- **C-02A** is not partly pulled: freeze has `/creator/home` C-05 stub only; `src/features/creator-home` and `GET /api/v1/creator/home` are absent. Unmounted Creator Centre Home UI is not C-02A.
+- **C-02A** is **pulled this amendment**: `/creator/home` is Creator Home (`src/features/creator-home` + `GET /api/v1/creator/home`). Unmounted Creator Centre Home UI is still not C-02A.
 - Creator Centre **page files** remain; routes redirect Home. Brand dashboard still imports `creator-centre.css` (styling leftover, not a route).
 
 ## 2026-09-09 audit vs charter §10

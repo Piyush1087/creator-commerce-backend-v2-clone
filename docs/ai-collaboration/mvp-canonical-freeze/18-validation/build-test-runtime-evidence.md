@@ -26,7 +26,7 @@ Do not declare `PASS — MVP_CANONICAL_APPLICATION_FREEZE_V1` until remaining ga
 | provider-unavailable recovery | PASS classified | Fail-closed Brand Payouts + C-05 P2; Postmark live send; IG/Razorpay later | `10-remaining-gates.md` |
 | compiled/deployable artifact | PASS | FE `dist/`, BE `dist/main.js` | `03` + `05` |
 | clean worktrees | NOT_CLAIMED | do not commit `tmp-*` | |
-| local/remote checkpoint equality | Parent asked origin+piyush push of RUN 12 | freeze branch; not development/main |
+| local/remote checkpoint equality | dual-push product pair BE `bae19de` / FE `628eb6d`; package BE `47011cad` / FE `bc3f251` | freeze branch; not development/main |
 
 ## Failure classification vocabulary
 
