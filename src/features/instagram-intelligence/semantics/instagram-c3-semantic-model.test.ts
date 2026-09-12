@@ -10,8 +10,8 @@ const valid = {
   creativeStructures: [],
   visualExecutions: [],
   creatorRoleSignals: [],
-  creatorPresence: "UNKNOWN" as const,
-  offeringPresence: "UNKNOWN" as const,
+  creatorPresence: { state: "UNKNOWN" as const, supportModalities: [] },
+  offeringPresence: { state: "UNKNOWN" as const, supportModalities: [] },
   offeringName: null,
   collaborationCues: [],
 };

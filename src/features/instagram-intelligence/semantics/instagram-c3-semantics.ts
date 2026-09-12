@@ -40,6 +40,37 @@ const candidateValueSchema = z
   })
   .strict();
 
+const presenceCandidateSchema = z
+  .object({
+    state: z.enum(["PRESENT", "POSSIBLE", "NOT_OBSERVED", "UNKNOWN"]),
+    supportModalities: z
+      .array(modalitySchema)
+      .max(2)
+      .refine((values) => new Set(values).size === values.length, {
+        message: "Support modalities must be deduplicated",
+      }),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      ["PRESENT", "POSSIBLE", "NOT_OBSERVED"].includes(value.state) &&
+      value.supportModalities.length === 0
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Observed presence requires supporting modalities",
+        path: ["supportModalities"],
+      });
+    }
+    if (value.state === "UNKNOWN" && value.supportModalities.length > 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Unknown presence cannot claim supporting modalities",
+        path: ["supportModalities"],
+      });
+    }
+  });
+
 const candidateCueSchema = z
   .object({
     signalClass: z.enum([
@@ -47,7 +78,6 @@ const candidateCueSchema = z
       "EXPLICIT_PARTNERSHIP_DISCLOSURE",
       "JOINT_BRAND_CREATOR_APPEARANCE",
       "CREATOR_PRODUCT_DEMO_OR_TESTIMONIAL",
-      "MENTION_ONLY",
     ]),
     sourceModality: modalitySchema,
     support: boundedCandidateString(MAX_SUPPORT),
@@ -63,13 +93,8 @@ export const InstagramC3SemanticCandidateSchema = z
     creativeStructures: z.array(candidateValueSchema).max(MAX_VALUES),
     visualExecutions: z.array(candidateValueSchema).max(MAX_VALUES),
     creatorRoleSignals: z.array(candidateValueSchema).max(MAX_VALUES),
-    creatorPresence: z.enum(["PRESENT", "POSSIBLE", "NOT_OBSERVED", "UNKNOWN"]),
-    offeringPresence: z.enum([
-      "PRESENT",
-      "POSSIBLE",
-      "NOT_OBSERVED",
-      "UNKNOWN",
-    ]),
+    creatorPresence: presenceCandidateSchema,
+    offeringPresence: presenceCandidateSchema,
     offeringName: z.string().trim().min(1).max(MAX_LABEL).nullable(),
     collaborationCues: z.array(candidateCueSchema).max(MAX_VALUES),
   })
@@ -219,7 +244,7 @@ export function finalizeInstagramC3(
     input.offerings,
     input.context,
   );
-  const creatorEvidence = supportingRefsForState(
+  const creatorEvidence = supportingRefsForPresence(
     candidate.creatorPresence,
     input.context,
   );
@@ -254,7 +279,7 @@ export function finalizeInstagramC3(
     creatorPresence: {
       state: safeNegativePresence(candidate.creatorPresence, input.context),
       reasonCodes:
-        candidate.creatorPresence === "UNKNOWN"
+        candidate.creatorPresence.state === "UNKNOWN"
           ? ["INSUFFICIENT_EVIDENCE"]
           : [],
       evidenceRefs: creatorEvidence,
@@ -322,7 +347,13 @@ function finalizeField(
 }
 
 function finalizeCues(
-  values: InstagramC3SemanticCandidate["collaborationCues"],
+  values: readonly Readonly<{
+    signalClass:
+      | InstagramC3SemanticCandidate["collaborationCues"][number]["signalClass"]
+      | "MENTION_ONLY";
+    sourceModality: "CAPTION" | "VISUAL";
+    support: string;
+  }>[],
   context: InstagramC3AdmittedContext,
 ) {
   const unique = new Map<string, ReturnType<typeof cueRecord>>();
@@ -336,16 +367,26 @@ function finalizeCues(
 }
 
 function cueRecord(
-  cue: InstagramC3SemanticCandidate["collaborationCues"][number],
+  cue: Readonly<{
+    signalClass:
+      | InstagramC3SemanticCandidate["collaborationCues"][number]["signalClass"]
+      | "MENTION_ONLY";
+    sourceModality: "CAPTION" | "VISUAL";
+    support: string;
+  }>,
   context: InstagramC3AdmittedContext,
 ) {
   const support = normalizeLabel(cue.support);
+  assertCueGrounding(cue.signalClass, cue.sourceModality, support, context);
   const supportHash = digest(support.toLocaleLowerCase("en-US"));
+  const evidenceRefs = modalityRefs([cue.sourceModality], context);
+  if (evidenceRefs.length === 0)
+    throw new InstagramC3SemanticError("UNGROUNDED_CUE_SUPPORT");
   return {
     cueId: `instagram-c3-cue:${digest(`${cue.sourceModality}:${cue.signalClass}:${supportHash}`)}`,
     signalClass: cue.signalClass,
     sourceModality: cue.sourceModality,
-    evidenceRefs: modalityRefs([cue.sourceModality], context),
+    evidenceRefs,
     supportHash,
   } as const;
 }
@@ -446,7 +487,15 @@ function finalizeOffering(
   const matches = normalized
     ? offerings.filter((item) => item.normalizedName === normalized)
     : [];
-  const exact = state === "PRESENT" && matches.length === 1 ? matches[0] : null;
+  const sourceGrounded =
+    normalized !== null &&
+    candidate.offeringPresence.supportModalities.some((modality) =>
+      modalityContains(modality, normalized, context),
+    );
+  const exact =
+    state === "PRESENT" && matches.length === 1 && sourceGrounded
+      ? matches[0]
+      : null;
   return {
     state,
     canonicalOfferingId: exact?.id ?? null,
@@ -459,7 +508,10 @@ function finalizeOffering(
         : candidate.offeringName && !exact
           ? ["OFFERING_MATCH_UNVERIFIED" as const]
           : [],
-    evidenceRefs: supportingRefsForState(state, context),
+    evidenceRefs: supportingRefsForPresence(
+      candidate.offeringPresence,
+      context,
+    ),
   };
 }
 
@@ -484,21 +536,32 @@ function assertCandidateModalities(
   ) {
     throw new InstagramC3SemanticError("UNSUPPORTED_MODALITY_CLAIM");
   }
-  if (
-    !context.inspection.selectedForDeepAnalysis &&
-    (candidate.creatorPresence === "NOT_OBSERVED" ||
-      candidate.offeringPresence === "NOT_OBSERVED")
-  ) {
-    throw new InstagramC3SemanticError("INCOMPLETE_NEGATIVE_EVIDENCE");
-  }
-  if (
-    ["COVER_ONLY", "PARTIAL_DEEP", "LIGHT_ONLY", "NOT_INSPECTED"].includes(
-      context.inspection.depth,
-    ) &&
-    (candidate.creatorPresence === "NOT_OBSERVED" ||
-      candidate.offeringPresence === "NOT_OBSERVED")
-  ) {
-    throw new InstagramC3SemanticError("INCOMPLETE_NEGATIVE_EVIDENCE");
+  for (const presence of [
+    candidate.creatorPresence,
+    candidate.offeringPresence,
+  ]) {
+    if (
+      presence.supportModalities.includes("CAPTION") &&
+      (presence.state === "PRESENT" || presence.state === "POSSIBLE") &&
+      context.caption.state !== "AVAILABLE"
+    )
+      throw new InstagramC3SemanticError("UNSUPPORTED_MODALITY_CLAIM");
+    if (
+      presence.supportModalities.includes("VISUAL") &&
+      context.visual.state !== "AVAILABLE"
+    )
+      throw new InstagramC3SemanticError("UNSUPPORTED_MODALITY_CLAIM");
+    if (
+      presence.state === "NOT_OBSERVED" &&
+      (!context.inspection.selectedForDeepAnalysis ||
+        context.visual.state !== "AVAILABLE" ||
+        context.caption.state === "UNKNOWN" ||
+        context.inspection.depth !== "DEEP_SELECTED" ||
+        presence.supportModalities.length !== 2 ||
+        !presence.supportModalities.includes("CAPTION") ||
+        !presence.supportModalities.includes("VISUAL"))
+    )
+      throw new InstagramC3SemanticError("INCOMPLETE_NEGATIVE_EVIDENCE");
   }
 }
 
@@ -517,31 +580,72 @@ function modalityRefs(
   );
 }
 
-function supportingRefsForState(
-  state: "PRESENT" | "POSSIBLE" | "NOT_OBSERVED" | "UNKNOWN",
+function supportingRefsForPresence(
+  candidate: z.infer<typeof presenceCandidateSchema>,
   context: InstagramC3AdmittedContext,
 ) {
-  if (state === "UNKNOWN") return [];
-  return sortedUnique([
-    ...(context.caption.state !== "UNKNOWN"
-      ? [context.caption.evidenceRef]
-      : []),
-    ...(context.visual.state === "AVAILABLE" && context.visual.evidenceRef
-      ? [context.visual.evidenceRef]
-      : []),
-  ]);
+  if (candidate.state === "UNKNOWN") return [];
+  const refs = modalityRefs(candidate.supportModalities, context);
+  if (refs.length === 0)
+    throw new InstagramC3SemanticError("UNSUPPORTED_MODALITY_CLAIM");
+  return refs;
 }
 
 function safeNegativePresence(
-  state: "PRESENT" | "POSSIBLE" | "NOT_OBSERVED" | "UNKNOWN",
+  candidate: z.infer<typeof presenceCandidateSchema>,
   context: InstagramC3AdmittedContext,
 ) {
-  return state === "NOT_OBSERVED" &&
+  return candidate.state === "NOT_OBSERVED" &&
     (!context.inspection.selectedForDeepAnalysis ||
       context.visual.state !== "AVAILABLE" ||
+      context.caption.state === "UNKNOWN" ||
       context.inspection.depth !== "DEEP_SELECTED")
     ? ("UNKNOWN" as const)
-    : state;
+    : candidate.state;
+}
+
+function assertCueGrounding(
+  signalClass: string,
+  modality: "CAPTION" | "VISUAL",
+  support: string,
+  context: InstagramC3AdmittedContext,
+) {
+  if (
+    (signalClass === "EXPLICIT_CAPTION_COLLAB_LANGUAGE" &&
+      modality !== "CAPTION") ||
+    (signalClass === "JOINT_BRAND_CREATOR_APPEARANCE" &&
+      modality !== "VISUAL") ||
+    (signalClass === "MENTION_ONLY" && modality !== "CAPTION")
+  )
+    throw new InstagramC3SemanticError("CUE_MODALITY_MISMATCH");
+  if (!modalityContains(modality, normalizeName(support), context))
+    throw new InstagramC3SemanticError("UNGROUNDED_CUE_SUPPORT");
+}
+
+function modalityContains(
+  modality: "CAPTION" | "VISUAL",
+  normalizedNeedle: string,
+  context: InstagramC3AdmittedContext,
+) {
+  if (modality === "CAPTION")
+    return (
+      context.caption.state === "AVAILABLE" &&
+      normalizeName(context.caption.text ?? "").includes(normalizedNeedle)
+    );
+  return (
+    context.visual.state === "AVAILABLE" &&
+    visualStrings(context.visual.observation).some((value) =>
+      normalizeName(value).includes(normalizedNeedle),
+    )
+  );
+}
+
+function visualStrings(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(visualStrings);
+  if (value && typeof value === "object")
+    return Object.values(value).flatMap(visualStrings);
+  return [];
 }
 
 export function normalizeName(value: string) {

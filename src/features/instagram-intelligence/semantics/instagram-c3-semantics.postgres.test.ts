@@ -22,9 +22,10 @@ const capturedAt = "2026-09-12T00:00:00.000Z";
 class FixtureC3Model extends InstagramC3SemanticModelPort {
   readonly modelIdentity = "deterministic-c3-fixture";
   readonly modelProfileVersion = "fixture-profile-v1";
+  readonly failingMediaIds = new Set(["media-video"]);
   readonly analyze = vi.fn(
     async ({ context }: { context: InstagramC3ModelContext }) => {
-      if (context.media.id === "media-video")
+      if (this.failingMediaIds.has(context.media.id))
         throw new Error("PROVIDER_FAILURE");
       const caption = context.caption.state === "AVAILABLE";
       const visual = context.visual.state === "AVAILABLE";
@@ -58,8 +59,18 @@ class FixtureC3Model extends InstagramC3SemanticModelPort {
               },
             ]
           : [],
-        creatorPresence: visual ? ("PRESENT" as const) : ("UNKNOWN" as const),
-        offeringPresence: caption ? ("PRESENT" as const) : ("UNKNOWN" as const),
+        creatorPresence: visual
+          ? {
+              state: "PRESENT" as const,
+              supportModalities: ["VISUAL" as const],
+            }
+          : { state: "UNKNOWN" as const, supportModalities: [] },
+        offeringPresence: caption
+          ? {
+              state: "PRESENT" as const,
+              supportModalities: ["CAPTION" as const],
+            }
+          : { state: "UNKNOWN" as const, supportModalities: [] },
         offeringName: caption ? "Launch Kit" : null,
         collaborationCues:
           context.media.id === "media-image"
@@ -170,8 +181,9 @@ describePostgres("C3 per-media semantics PostgreSQL", () => {
                   ? "CAROUSEL_REPRESENTATIVE_ONLY"
                   : "COVER_ONLY",
             observation: {
-              description: "A bounded still observation",
-              visibleElements: ["person", "product"],
+              description:
+                "A bounded still observation with brand and creator in still",
+              visibleElements: ["person", "product", "Launch Kit"],
               dominantColors: ["blue"],
               composition: "centered",
             },
@@ -302,6 +314,27 @@ describePostgres("C3 per-media semantics PostgreSQL", () => {
           row.observationSupports[0]?.evidenceRef === row.evidenceRef,
       ),
     ).toBe(true);
+    expect(
+      derived.every((row) => {
+        const semanticPayload = asRecord(
+          asRecord(row.boundedPayload).semanticPayload,
+        );
+        return evidenceRefsFrom(semanticPayload).every((ref) =>
+          row.parentEvidenceRefs.includes(ref),
+        );
+      }),
+    ).toBe(true);
+    expect(
+      derived
+        .filter(
+          (row) => row.capabilityId === "instagram.media_offering_signals",
+        )
+        .every(
+          (row) =>
+            row.parentEvidenceRefs.length === 1 &&
+            !row.parentEvidenceRefs.includes(c2EvidenceRef),
+        ),
+    ).toBe(true);
     const counts = await rowCounts();
     const calls = model.analyze.mock.calls.length;
     const replay = await c3.execute({
@@ -312,12 +345,74 @@ describePostgres("C3 per-media semantics PostgreSQL", () => {
     expect(replay.media.filter((item) => item.replayed)).toHaveLength(3);
     expect(model.analyze.mock.calls.length).toBe(calls + 1);
     expect(await rowCounts()).toEqual(counts);
+
+    const imageResult = first.media.find(
+      (item) => item.mediaId === "media-image",
+    )!;
+    const peerRefs = first.media
+      .filter(
+        (item) => item.state === "AVAILABLE" && item.mediaId !== "media-image",
+      )
+      .flatMap((item) => item.derivedEvidenceRefs)
+      .sort();
+    const priorRows = await c3RowsForMedia("media-image");
+    const priorC3Count = await c3RowCounts();
+    await write(
+      brandId,
+      "account-c3",
+      7,
+      "instagram.media_visual_observations",
+      "media-image-visual-changed",
+      {
+        inspectionDepth: "IMAGE_ONLY",
+        observation: {
+          description: "Changed bounded still with Launch Kit",
+          visibleElements: ["product"],
+        },
+      },
+      "media-image",
+      INSTAGRAM_B3A_NORMALIZATION_CONTRACT_VERSION,
+      "2026-09-12T00:00:00.500Z",
+    );
+    model.failingMediaIds.add("media-image");
+    const failedReplacement = await c3.execute({
+      ...requestBase(),
+      brandProfileId: brandId,
+      c2EvidenceRef,
+    });
+    expect(
+      failedReplacement.media.find((item) => item.mediaId === "media-image"),
+    ).toMatchObject({
+      state: "UNAVAILABLE",
+      derivedEvidenceRefs: [],
+      reasonCode: "PROVIDER_FAILURE",
+      replayed: false,
+    });
+    expect(
+      failedReplacement.media
+        .filter(
+          (item) =>
+            item.state === "AVAILABLE" && item.mediaId !== "media-image",
+        )
+        .flatMap((item) => item.derivedEvidenceRefs)
+        .sort(),
+    ).toEqual(peerRefs);
+    expect(await c3RowCounts()).toEqual(priorC3Count);
+    expect(await c3RowsForMedia("media-image")).toEqual(priorRows);
+    await expect(
+      c3.replayCompleted({
+        brandProfileId: brandId,
+        mediaId: "media-image",
+        executionIdentity: imageResult.executionIdentity,
+      }),
+    ).resolves.toMatchObject({ refs: [...imageResult.derivedEvidenceRefs] });
+    expect(await c3RowsForMedia("media-image")).toEqual(priorRows);
     expect(
       await prisma.intelligenceCurrentComponent.count({
         where: { brandId },
       }),
     ).toBe(beforeCurrent);
-  });
+  }, 15_000);
 
   it("rejects tenant/account/generation/C2 substitution without mutating prior output", async () => {
     const before = await rowCounts();
@@ -427,6 +522,7 @@ describePostgres("C3 per-media semantics PostgreSQL", () => {
     payload: Record<string, unknown>,
     mediaId: string,
     normalizationContractVersion: string,
+    eventAt = capturedAt,
   ) {
     await writer.write({
       brandId: id,
@@ -438,9 +534,9 @@ describePostgres("C3 per-media semantics PostgreSQL", () => {
       requestKey: `c3:${key}:${id}`,
       providerExecutionRef: `provider-execution:c3:${key}:${id}`,
       normalizationContractVersion,
-      startedAt: capturedAt,
-      completedAt: capturedAt,
-      capturedAt,
+      startedAt: eventAt,
+      completedAt: eventAt,
+      capturedAt: eventAt,
       availability: "AVAILABLE",
       retryability: "NOT_APPLICABLE",
       reasonCodes: ["C3_FIXTURE"],
@@ -480,5 +576,74 @@ describePostgres("C3 per-media semantics PostgreSQL", () => {
         where: { brandProfileId: brandId },
       }),
     };
+  }
+
+  async function c3RowCounts() {
+    const where = {
+      brandId,
+      normalizationContractVersion: "instagram.per-media-semantics.c3.v1",
+    };
+    return {
+      evidence: await prisma.dataExtractionEvidenceItem.count({ where }),
+      observations: await prisma.dataExtractionSemanticObservation.count({
+        where: {
+          brandId,
+          semanticObservationKey: { startsWith: "instagram-c3:" },
+        },
+      }),
+      supports: await prisma.dataExtractionObservationSupport.count({
+        where: {
+          brandId,
+          evidence: {
+            normalizationContractVersion: "instagram.per-media-semantics.c3.v1",
+          },
+        },
+      }),
+    };
+  }
+
+  async function c3RowsForMedia(mediaId: string) {
+    const rows = await prisma.dataExtractionEvidenceItem.findMany({
+      where: {
+        brandId,
+        normalizationContractVersion: "instagram.per-media-semantics.c3.v1",
+        boundedPayload: { path: ["mediaId"], equals: mediaId },
+      },
+      include: { observationSupports: true },
+      orderBy: { evidenceRef: "asc" },
+    });
+    return rows.map((row) => ({
+      evidenceRef: row.evidenceRef,
+      contentHash: row.contentHash,
+      observationKey: row.semanticObservationKey,
+      parentEvidenceRefs: row.parentEvidenceRefs,
+      provenance: row.provenance,
+      supports: row.observationSupports.map((support) => ({
+        observationKey: support.semanticObservationKey,
+        evidenceRef: support.evidenceRef,
+        capabilityId: support.capabilityId,
+      })),
+    }));
+  }
+
+  function evidenceRefsFrom(value: unknown): string[] {
+    if (Array.isArray(value)) return value.flatMap(evidenceRefsFrom);
+    if (!value || typeof value !== "object") return [];
+    const row = value as Record<string, unknown>;
+    const own = Array.isArray(row.evidenceRefs)
+      ? row.evidenceRefs.filter((ref): ref is string => typeof ref === "string")
+      : [];
+    return [
+      ...own,
+      ...Object.entries(row)
+        .filter(([key]) => key !== "evidenceRefs")
+        .flatMap(([, child]) => evidenceRefsFrom(child)),
+    ];
+  }
+
+  function asRecord(value: unknown): Record<string, unknown> {
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
   }
 });

@@ -19,14 +19,17 @@ function context(
   return {
     caption: {
       state: "AVAILABLE",
-      text: "A launch",
+      text: "A launch featuring Launch Kit paid partnership collaboration",
       contentHash: "a".repeat(64),
       evidenceRef: captionRef,
     },
     visual: selected
       ? {
           state: "AVAILABLE",
-          observation: { description: "still" },
+          observation: {
+            description:
+              "joint brand creator appearance product demo testimonial Launch Kit",
+          },
           evidenceRef: visualRef,
         }
       : { state: "UNKNOWN" },
@@ -61,8 +64,8 @@ function candidate(overrides: Record<string, unknown> = {}) {
     creativeStructures: [],
     visualExecutions: [],
     creatorRoleSignals: [],
-    creatorPresence: "UNKNOWN",
-    offeringPresence: "UNKNOWN",
+    creatorPresence: { state: "UNKNOWN", supportModalities: [] },
+    offeringPresence: { state: "UNKNOWN", supportModalities: [] },
     offeringName: null,
     collaborationCues: [],
     ...overrides,
@@ -103,7 +106,15 @@ function cue(
     | "CREATOR_PRODUCT_DEMO_OR_TESTIMONIAL"
     | "MENTION_ONLY",
   sourceModality: "CAPTION" | "VISUAL",
-  support = signalClass,
+  support = signalClass === "JOINT_BRAND_CREATOR_APPEARANCE"
+    ? "joint brand creator appearance"
+    : signalClass === "CREATOR_PRODUCT_DEMO_OR_TESTIMONIAL"
+      ? "product demo testimonial"
+      : signalClass === "MENTION_ONLY"
+        ? "@maker"
+        : signalClass === "EXPLICIT_CAPTION_COLLAB_LANGUAGE"
+          ? "collaboration"
+          : "paid partnership",
 ) {
   return { signalClass, sourceModality, support };
 }
@@ -235,17 +246,117 @@ describe("Instagram C3 strict candidate and finalizer", () => {
     ).toThrowError("UNSUPPORTED_MODALITY_CLAIM");
     expect(() =>
       finalize(
-        candidate({ creatorPresence: "NOT_OBSERVED" }),
+        candidate({
+          creatorPresence: {
+            state: "NOT_OBSERVED",
+            supportModalities: ["CAPTION", "VISUAL"],
+          },
+        }),
         context("COVER_ONLY"),
       ),
     ).toThrowError("INCOMPLETE_NEGATIVE_EVIDENCE");
+  });
+
+  it("requires explicitly admitted evidence for positive and unknown presence states", () => {
+    expect(() =>
+      finalize(
+        candidate({
+          creatorPresence: { state: "PRESENT", supportModalities: [] },
+        }),
+      ),
+    ).toThrow();
+    expect(() =>
+      finalize(
+        candidate({
+          offeringPresence: { state: "POSSIBLE", supportModalities: [] },
+        }),
+      ),
+    ).toThrow();
+    expect(() =>
+      finalize(
+        candidate({
+          creatorPresence: {
+            state: "UNKNOWN",
+            supportModalities: ["CAPTION"],
+          },
+        }),
+      ),
+    ).toThrow();
+    const admitted = context();
+    expect(() =>
+      finalize(
+        candidate({
+          creatorPresence: {
+            state: "PRESENT",
+            supportModalities: ["CAPTION"],
+          },
+        }),
+        {
+          ...admitted,
+          caption: {
+            state: "EXPLICIT_EMPTY",
+            contentHash: null,
+            evidenceRef: captionRef,
+          },
+        },
+      ),
+    ).toThrowError("UNSUPPORTED_MODALITY_CLAIM");
+  });
+
+  it("derives positive and complete-negative refs only from declared modalities", () => {
+    expect(
+      finalize(
+        candidate({
+          creatorPresence: {
+            state: "PRESENT",
+            supportModalities: ["CAPTION"],
+          },
+        }),
+      ).observation.creatorPresence.evidenceRefs,
+    ).toEqual([captionRef]);
+    expect(
+      finalize(
+        candidate({
+          creatorPresence: {
+            state: "POSSIBLE",
+            supportModalities: ["VISUAL"],
+          },
+        }),
+      ).observation.creatorPresence.evidenceRefs,
+    ).toEqual([visualRef]);
+    expect(
+      finalize(
+        candidate({
+          creatorPresence: {
+            state: "PRESENT",
+            supportModalities: ["VISUAL", "CAPTION"],
+          },
+        }),
+      ).observation.creatorPresence.evidenceRefs,
+    ).toEqual([captionRef, visualRef]);
+    expect(
+      finalize(
+        candidate({
+          creatorPresence: {
+            state: "NOT_OBSERVED",
+            supportModalities: ["CAPTION", "VISUAL"],
+          },
+        }),
+      ).observation.creatorPresence,
+    ).toMatchObject({
+      state: "NOT_OBSERVED",
+      evidenceRefs: [captionRef, visualRef],
+    });
   });
 
   it("attaches only a unique exact pre-existing Offering name match", () => {
     const offeringId = randomUUID();
     const exact = finalize(
       candidate({
-        offeringPresence: "PRESENT",
+        offeringPresence: {
+          state: "PRESENT",
+          supportModalities: ["CAPTION"],
+        },
         offeringName: "  Launch   Kit ",
       }),
       context(),
@@ -257,7 +368,13 @@ describe("Instagram C3 strict candidate and finalizer", () => {
       canonicalOfferingMatch: "EXACT_PREEXISTING",
     });
     const ambiguous = finalize(
-      candidate({ offeringPresence: "PRESENT", offeringName: "Launch Kit" }),
+      candidate({
+        offeringPresence: {
+          state: "PRESENT",
+          supportModalities: ["CAPTION"],
+        },
+        offeringName: "Launch Kit",
+      }),
       context(),
       "IMAGE",
       [
@@ -270,6 +387,66 @@ describe("Instagram C3 strict candidate and finalizer", () => {
       canonicalOfferingMatch: "NONE",
       reasonCodes: ["OFFERING_MATCH_UNVERIFIED"],
     });
+    const missingFromSource = finalize(
+      candidate({
+        offeringPresence: {
+          state: "PRESENT",
+          supportModalities: ["CAPTION"],
+        },
+        offeringName: "Hidden Product",
+      }),
+      context(),
+      "IMAGE",
+      [{ id: randomUUID(), normalizedName: "hidden product" }],
+    );
+    expect(missingFromSource.observation.offeringPresence).toMatchObject({
+      canonicalOfferingId: null,
+      canonicalOfferingMatch: "NONE",
+      reasonCodes: ["OFFERING_MATCH_UNVERIFIED"],
+      evidenceRefs: [captionRef],
+    });
+  });
+
+  it("rejects model mention ownership, incompatible cue modalities, and ungrounded support", () => {
+    expect(() =>
+      InstagramC3SemanticCandidateSchema.parse(
+        candidate({ collaborationCues: [cue("MENTION_ONLY", "CAPTION")] }),
+      ),
+    ).toThrow();
+    expect(() =>
+      finalize(
+        candidate({
+          collaborationCues: [
+            cue("EXPLICIT_CAPTION_COLLAB_LANGUAGE", "VISUAL"),
+          ],
+        }),
+      ),
+    ).toThrowError("CUE_MODALITY_MISMATCH");
+    expect(() =>
+      finalize(
+        candidate({
+          collaborationCues: [cue("JOINT_BRAND_CREATOR_APPEARANCE", "CAPTION")],
+        }),
+      ),
+    ).toThrowError("CUE_MODALITY_MISMATCH");
+    expect(() =>
+      finalize(
+        candidate({
+          collaborationCues: [
+            cue("EXPLICIT_PARTNERSHIP_DISCLOSURE", "CAPTION", "not present"),
+          ],
+        }),
+      ),
+    ).toThrowError("UNGROUNDED_CUE_SUPPORT");
+    expect(() =>
+      finalize(
+        candidate({
+          collaborationCues: [
+            cue("CREATOR_PRODUCT_DEMO_OR_TESTIMONIAL", "VISUAL", "not visible"),
+          ],
+        }),
+      ),
+    ).toThrowError("UNGROUNDED_CUE_SUPPORT");
   });
 });
 
@@ -279,7 +456,6 @@ describe("Instagram C3 deterministic likely-collab matrix", () => {
       .likelyCollab;
 
   it.each([
-    [[cue("MENTION_ONLY", "CAPTION")], "POSSIBLE_COLLAB", "LOW"],
     [
       [cue("JOINT_BRAND_CREATOR_APPEARANCE", "VISUAL")],
       "POSSIBLE_COLLAB",
@@ -287,11 +463,11 @@ describe("Instagram C3 deterministic likely-collab matrix", () => {
     ],
     [
       [
-        cue("MENTION_ONLY", "CAPTION"),
+        cue("EXPLICIT_PARTNERSHIP_DISCLOSURE", "CAPTION"),
         cue("JOINT_BRAND_CREATOR_APPEARANCE", "VISUAL"),
       ],
-      "POSSIBLE_COLLAB",
-      "LOW",
+      "LIKELY_COLLAB",
+      "MEDIUM",
     ],
     [
       [cue("EXPLICIT_PARTNERSHIP_DISCLOSURE", "CAPTION")],
@@ -316,10 +492,24 @@ describe("Instagram C3 deterministic likely-collab matrix", () => {
   it("does not double-count one source span as independent classes", () => {
     expect(
       classify([
-        cue("EXPLICIT_PARTNERSHIP_DISCLOSURE", "CAPTION", "same span"),
-        cue("MENTION_ONLY", "CAPTION", "same span"),
+        cue("EXPLICIT_PARTNERSHIP_DISCLOSURE", "CAPTION", "paid partnership"),
+        cue("EXPLICIT_CAPTION_COLLAB_LANGUAGE", "CAPTION", "paid partnership"),
       ]),
     ).toMatchObject({ state: "POSSIBLE_COLLAB", confidence: "LOW" });
+  });
+
+  it("derives MENTION_ONLY only from an actual normalized caption token", () => {
+    const admitted = context();
+    const result = classify([], {
+      ...admitted,
+      caption: { ...admitted.caption, text: "Launch with @Maker" },
+    });
+    expect(result).toMatchObject({
+      state: "POSSIBLE_COLLAB",
+      confidence: "LOW",
+      signalClasses: ["MENTION_ONLY"],
+      evidenceRefs: [captionRef],
+    });
   });
 
   it("permits a complete image negative but not unselected, cover-only, or unavailable evidence", () => {

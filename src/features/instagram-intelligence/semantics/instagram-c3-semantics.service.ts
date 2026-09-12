@@ -79,6 +79,20 @@ export class InstagramC3SemanticsService {
     private readonly model: InstagramC3SemanticModelPort,
   ) {}
 
+  async replayCompleted(input: {
+    brandProfileId: string;
+    mediaId: string;
+    executionIdentity: string;
+  }) {
+    if (!input.brandProfileId || !input.mediaId || !input.executionIdentity)
+      throw new InstagramC3SemanticError("INVALID_REPLAY_IDENTITY");
+    return this.loadReplay(
+      input.brandProfileId,
+      input.mediaId,
+      input.executionIdentity,
+    );
+  }
+
   async execute(
     request: InstagramC3ExecutionRequest,
   ): Promise<InstagramC3ExecutionResult> {
@@ -416,10 +430,16 @@ export class InstagramC3SemanticsService {
       for (const capabilityId of OWNER_CAPABILITIES) {
         const parentRefs = relevantParents(
           capabilityId,
+          payloads[capabilityId],
           light.evidenceRef,
           visual?.evidenceRef,
           c2.evidenceRef,
         );
+        const captureByEvidenceRef = new Map([
+          [light.evidenceRef, light.captureRef],
+          [c2.evidenceRef, c2.captureRef],
+          ...(visual ? [[visual.evidenceRef, visual.captureRef] as const] : []),
+        ]);
         const normalizedPayload = {
           resultClass: "MODEL_DERIVED_RESULT",
           contractVersion: INSTAGRAM_C3_CONTRACT_VERSION,
@@ -469,11 +489,10 @@ export class InstagramC3SemanticsService {
             captureMethodClass: "MODEL_DERIVATION",
             normalizationContractVersion: INSTAGRAM_C3_NORMALIZATION_VERSION,
             parentEvidenceRefs: parentRefs.map(asEvidenceRef),
-            parentCaptureRefs: relevantParentCaptures(
-              capabilityId,
-              light.captureRef,
-              visual?.captureRef,
-              c2.captureRef,
+            parentCaptureRefs: sortedUnique(
+              parentRefs
+                .map((ref) => captureByEvidenceRef.get(ref))
+                .filter((ref): ref is string => Boolean(ref)),
             ) as never,
           },
           deduplication: {
@@ -554,24 +573,51 @@ function ownerPayloads(finalized: ReturnType<typeof finalizeInstagramC3>) {
 
 function relevantParents(
   capabilityId: (typeof OWNER_CAPABILITIES)[number],
+  semanticPayload: unknown,
   lightRef: string,
   visualRef: string | undefined,
   c2Ref: string,
 ) {
   if (capabilityId === "instagram.caption_context")
-    return [lightRef, c2Ref].sort();
-  return [lightRef, ...(visualRef ? [visualRef] : [])].sort();
+    return sortedUnique([
+      lightRef,
+      c2Ref,
+      ...collectEvidenceRefs(semanticPayload).filter((ref) =>
+        [lightRef, visualRef, c2Ref].includes(ref),
+      ),
+    ]);
+  if (capabilityId === "instagram.media_visual_observations")
+    return [lightRef, ...(visualRef ? [visualRef] : [])].sort();
+  const admitted = new Set([lightRef, ...(visualRef ? [visualRef] : [])]);
+  const grounded = collectEvidenceRefs(semanticPayload).filter((ref) =>
+    admitted.has(ref),
+  );
+  // UNKNOWN still records the admitted context that was inspected to reach a
+  // deliberately non-assertive result; asserted fields use only their refs.
+  return sortedUnique(
+    grounded.length > 0
+      ? grounded
+      : [lightRef, ...(visualRef ? [visualRef] : [])],
+  );
 }
 
-function relevantParentCaptures(
-  capabilityId: (typeof OWNER_CAPABILITIES)[number],
-  lightRef: string,
-  visualRef: string | undefined,
-  c2Ref: string,
-) {
-  if (capabilityId === "instagram.caption_context")
-    return [...new Set([lightRef, c2Ref])].sort();
-  return [...new Set([lightRef, ...(visualRef ? [visualRef] : [])])].sort();
+function collectEvidenceRefs(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(collectEvidenceRefs);
+  if (!value || typeof value !== "object") return [];
+  const row = value as Record<string, unknown>;
+  const own = Array.isArray(row.evidenceRefs)
+    ? row.evidenceRefs.filter((ref): ref is string => typeof ref === "string")
+    : [];
+  return [
+    ...own,
+    ...Object.entries(row)
+      .filter(([key]) => key !== "evidenceRefs")
+      .flatMap(([, child]) => collectEvidenceRefs(child)),
+  ];
+}
+
+function sortedUnique(values: readonly string[]) {
+  return [...new Set(values)].sort((a, b) => a.localeCompare(b));
 }
 
 function buildContext(
@@ -746,9 +792,9 @@ function assertC2SupportsMedia(c2: C3EvidenceRow, light: C3EvidenceRow) {
   const evidence = Array.isArray(inputManifest.evidence)
     ? inputManifest.evidence
     : [];
-  const support = evidence.map(record).find(
-    (item) => item.evidenceRef === light.evidenceRef,
-  );
+  const support = evidence
+    .map(record)
+    .find((item) => item.evidenceRef === light.evidenceRef);
   if (
     !support ||
     support.payloadHash !== digestCanonical(record(light.boundedPayload))
