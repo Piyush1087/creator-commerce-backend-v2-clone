@@ -21,6 +21,10 @@ import {
   StructuredInstagramC3SemanticModelAdapter,
 } from "./semantics/instagram-c3-semantic-model";
 import { InstagramC3SemanticsService } from "./semantics/instagram-c3-semantics.service";
+import { InstagramSyncController } from "./sync/instagram-sync.controller";
+import { InstagramSyncDispatcherService } from "./sync/instagram-sync-dispatcher.service";
+import { InstagramSyncPipelineAdapter } from "./sync/instagram-sync-pipeline.adapter";
+import { InstagramSyncPipelinePort } from "./sync/instagram-sync-pipeline.port";
 
 @Module({
   imports: [
@@ -30,7 +34,7 @@ import { InstagramC3SemanticsService } from "./semantics/instagram-c3-semantics.
     DataExtractionModule,
     InstagramProviderClientModule,
   ],
-  controllers: [InstagramB4ConsumerController],
+  controllers: [InstagramB4ConsumerController, InstagramSyncController],
   providers: [
     InstagramB3aImagePipelineService,
     InstagramB3bMediaCompletionService,
@@ -39,6 +43,11 @@ import { InstagramC3SemanticsService } from "./semantics/instagram-c3-semantics.
     InstagramC4RuntimeService,
     InstagramC2FoundationsService,
     InstagramC3SemanticsService,
+    InstagramSyncDispatcherService,
+    {
+      provide: InstagramSyncPipelinePort,
+      useClass: InstagramSyncPipelineAdapter,
+    },
     {
       provide: InstagramB3aVisualModelPort,
       useClass: UnavailableInstagramB3aVisualModelAdapter,

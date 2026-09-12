@@ -15,6 +15,7 @@ describe("Brand Settings Instagram role matrix", () => {
       "LEGACY_IDENTITY_RECONCILIATION",
       "DISCONNECT",
       "DELETE_MY_DATA",
+      "MANUAL_REFRESH",
     ] as const) {
       expect(() =>
         service.assertInstagramAction(BrandRole.BRAND_OWNER, action),
@@ -22,9 +23,15 @@ describe("Brand Settings Instagram role matrix", () => {
     }
   });
 
-  it("limits Campaign Manager to read and same-ID reconnect", () => {
+  it("allows Campaign Manager read, same-ID reconnect, and manual refresh", () => {
     expect(() =>
       service.assertInstagramAction(BrandRole.CAMPAIGN_MANAGER, "READ"),
+    ).not.toThrow();
+    expect(() =>
+      service.assertInstagramAction(
+        BrandRole.CAMPAIGN_MANAGER,
+        "MANUAL_REFRESH",
+      ),
     ).not.toThrow();
     expect(() =>
       service.assertInstagramAction(
@@ -56,6 +63,7 @@ describe("Brand Settings Instagram role matrix", () => {
       "LEGACY_IDENTITY_RECONCILIATION",
       "DISCONNECT",
       "DELETE_MY_DATA",
+      "MANUAL_REFRESH",
     ] as const) {
       expect(() =>
         service.assertInstagramAction(BrandRole.FINANCE_ADMIN, action),

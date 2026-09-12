@@ -19,6 +19,7 @@ import {
 } from "./instagram-b4-consumer.schema";
 
 const DAY_MS = 86_400_000;
+const MANUAL_COOLDOWN_MS = 15 * 60_000;
 type Connection = Awaited<
   ReturnType<InstagramIntelligenceConnectionReadService["read"]>
 >;
@@ -43,7 +44,7 @@ export class InstagramB4ConsumerService {
       end: now.toISOString(),
       days: 30 as const,
     };
-    const [role, projections, latestExecutions, observations] =
+    const [role, projections, latestExecutions, observations, syncJobs] =
       await Promise.all([
         this.role(brandProfileId, userId),
         Promise.all(
@@ -65,6 +66,10 @@ export class InstagramB4ConsumerService {
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         }),
         this.mediaObservations(brandProfileId, connection),
+        this.prisma.instagramIntelligenceSyncJob.findMany({
+          where: { brandProfileId },
+          orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        }),
       ]);
 
     const objects = projections.map((projection, index) => {
@@ -109,6 +114,29 @@ export class InstagramB4ConsumerService {
       ["FAILED_TERMINAL", "CANCELLED"].includes(item.status),
     );
     const successes = latest.filter((item) => item.status === "COMPLETED");
+    const currentSync = syncJobs.filter(
+      (job) =>
+        !connection ||
+        (job.integrationId === connection.integrationId &&
+          job.authorizationGeneration === connection.authorizationGeneration),
+    );
+    const syncRunning = currentSync.some((job) => job.status === "RUNNING");
+    const syncBackoff = currentSync.some((job) => job.status === "BACKOFF");
+    const syncBlocked = currentSync.some(
+      (job) => job.status === "BLOCKED_AUTHORIZATION",
+    );
+    const latestSync = currentSync[0];
+    const latestManualRequest = currentSync
+      .flatMap((job) =>
+        job.lastManualRequestedAt ? [job.lastManualRequestedAt] : [],
+      )
+      .sort((a, b) => b.getTime() - a.getTime())[0];
+    const nextDue = currentSync
+      .flatMap((job) => (job.nextDueAt ? [job.nextDueAt] : []))
+      .sort((a, b) => a.getTime() - b.getTime())[0];
+    const cooldownEndsAt = latestManualRequest
+      ? new Date(latestManualRequest.getTime() + MANUAL_COOLDOWN_MS)
+      : null;
 
     return InstagramWorkspaceConsumerSchema.parse({
       contractVersion: "1.0",
@@ -129,20 +157,50 @@ export class InstagramB4ConsumerService {
         audience: coverage(0, 0, "AUDIENCE_NOT_SUPPORTED"),
       },
       sync: {
-        state: hasRunning ? "REFRESHING" : failed.length ? "BLOCKED" : "IDLE",
-        lastAttemptAt: latest[0]?.createdAt.toISOString() ?? null,
-        lastSuccessAt: successes[0]?.completedAt?.toISOString() ?? null,
-        nextDueAt: null,
+        state: syncBlocked
+          ? "BLOCKED"
+          : syncBackoff
+            ? "BACKOFF"
+            : syncRunning || hasRunning
+              ? "REFRESHING"
+              : currentSync.some(
+                    (job) =>
+                      job.capabilityClass === "INITIAL_30_DAY" &&
+                      !job.lastSuccessAt,
+                  )
+                ? "INITIALIZING"
+                : failed.length
+                  ? "BLOCKED"
+                  : "IDLE",
+        lastAttemptAt:
+          latestSync?.lastAttemptAt?.toISOString() ??
+          latest[0]?.createdAt.toISOString() ??
+          null,
+        lastSuccessAt:
+          latestSync?.lastSuccessAt?.toISOString() ??
+          successes[0]?.completedAt?.toISOString() ??
+          null,
+        nextDueAt: nextDue?.toISOString() ?? null,
         currentPreserved:
           failed.length > 0 &&
           objects.some((item) => item.state !== "NO_CURRENT"),
-        reasonCodes: failed.length ? ["CURRENT_PRESERVED_AFTER_FAILURE"] : [],
+        reasonCodes: latestSync?.reasonCodes.length
+          ? latestSync.reasonCodes
+          : failed.length
+            ? ["CURRENT_PRESERVED_AFTER_FAILURE"]
+            : [],
       },
       actions: {
         manualRefresh:
           role === BrandRole.FINANCE_ADMIN
             ? { state: "DENIED", reasonCode: "REFRESH_NOT_AUTHORIZED" }
-            : { state: "ALLOWED", cooldownEndsAt: null },
+            : {
+                state: "ALLOWED",
+                cooldownEndsAt:
+                  cooldownEndsAt && cooldownEndsAt > now
+                    ? cooldownEndsAt.toISOString()
+                    : null,
+              },
         settingsRecoveryPath: "/brand/settings/integrations?tab=instagram",
       },
     });

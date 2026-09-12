@@ -13,6 +13,7 @@ export type InstagramDerivedPurgeCounts = Readonly<{
   intelligenceObjectGenerations: number;
   intelligenceComponentGenerations: number;
   intelligenceProcessorExecutions: number;
+  syncCoordinatorJobs: number;
 }>;
 
 const C4_OBJECT_IDS = [
@@ -33,6 +34,10 @@ export class InstagramDerivedDataPurgeService {
     tx: Prisma.TransactionClient,
     brandProfileId: string,
   ): Promise<InstagramDerivedPurgeCounts> {
+    const deletedCoordinatorJobs =
+      await tx.instagramIntelligenceSyncJob.deleteMany({
+        where: { brandProfileId },
+      });
     // Intelligence references normalized DE Evidence with restrictive FKs, so
     // Settings removes the target Brand's derived current/history first.
     const c4Generations = await tx.intelligenceObjectGeneration.findMany({
@@ -257,6 +262,7 @@ export class InstagramDerivedDataPurgeService {
       intelligenceObjectGenerations: c4GenerationIds.length,
       intelligenceComponentGenerations: c4ComponentCount,
       intelligenceProcessorExecutions: c4ExecutionIds.length,
+      syncCoordinatorJobs: deletedCoordinatorJobs.count,
     };
   }
 }

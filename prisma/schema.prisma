@@ -185,7 +185,6 @@ enum OfferingPriceFreshness {
   UNKNOWN
 }
 
-
 enum PerformanceColor {
   GREEN
   YELLOW
@@ -1239,55 +1238,54 @@ model Organization {
 }
 
 model User {
-  id                            String                            @id @default(uuid())
-  email                         String                            @unique
+  id                                 String                            @id @default(uuid())
+  email                              String                            @unique
   /// Database trigger derives this canonical authority from email on every write.
-  normalizedEmail               String?                           @unique @map("normalized_email")
+  normalizedEmail                    String?                           @unique @map("normalized_email")
   /// Display name; brand onboarding sets local-part of work email.
-  name                          String?
+  name                               String?
   /// Scrypt hash for creator email/password signup.
-  hashedPassword                String?                           @map("hashed_password")
+  hashedPassword                     String?                           @map("hashed_password")
   /// Google OAuth subject (`sub` claim) for creator Google signup/sign-in.
-  googleSubjectId               String?                           @unique @map("google_subject_id")
-  emailVerifiedAt               DateTime?                         @map("email_verified_at")
-  authState                     UserAuthState                     @default(PROVISIONAL) @map("auth_state")
-  role                          UserRole
-  organizationId                String?                           @map("organization_id")
-  organization                  Organization?                     @relation(fields: [organizationId], references: [id])
-  createdAt                     DateTime                          @default(now()) @map("created_at")
-  updatedAt                     DateTime                          @updatedAt @map("updated_at")
-  discoveryLeads                DiscoveryLead[]
-  creatorProfile                CreatorProfile?
-  creatorOnboardingTrack        CreatorOnboardingTrack?
-  userProfile                   UserProfile?
-  historicChatThreads           HistoricChatThread[]
-  metricPostPulses              MetricPostPulse[]
-  collaborationsAsCreator       Collaboration[]                   @relation("CollaborationCreator")
-  uceCampaignCreators           UceCampaignCreator[]              @relation("UceCampaignCreatorUser")
-  coPilotThreads                CoPilotThread[]
-  coPilotMessageFeedback        CoPilotMessageFeedback[]
-  creatorCoPilotThreadsAuthored CreatorCoPilotThread[]            @relation("CreatorCoPilotThreadAuthor")
-  creatorCoPilotMessageFeedback CreatorCoPilotMessageFeedback[]
+  googleSubjectId                    String?                           @unique @map("google_subject_id")
+  emailVerifiedAt                    DateTime?                         @map("email_verified_at")
+  authState                          UserAuthState                     @default(PROVISIONAL) @map("auth_state")
+  role                               UserRole
+  organizationId                     String?                           @map("organization_id")
+  organization                       Organization?                     @relation(fields: [organizationId], references: [id])
+  createdAt                          DateTime                          @default(now()) @map("created_at")
+  updatedAt                          DateTime                          @updatedAt @map("updated_at")
+  discoveryLeads                     DiscoveryLead[]
+  creatorProfile                     CreatorProfile?
+  creatorOnboardingTrack             CreatorOnboardingTrack?
+  userProfile                        UserProfile?
+  historicChatThreads                HistoricChatThread[]
+  metricPostPulses                   MetricPostPulse[]
+  collaborationsAsCreator            Collaboration[]                   @relation("CollaborationCreator")
+  uceCampaignCreators                UceCampaignCreator[]              @relation("UceCampaignCreatorUser")
+  coPilotThreads                     CoPilotThread[]
+  coPilotMessageFeedback             CoPilotMessageFeedback[]
+  creatorCoPilotThreadsAuthored      CreatorCoPilotThread[]            @relation("CreatorCoPilotThreadAuthor")
+  creatorCoPilotMessageFeedback      CreatorCoPilotMessageFeedback[]
   brandTeamMemberships               BrandTeamMember[]
   initiatedProviderOAuthTransactions ProviderOAuthTransaction[]
   creatorWorkspaceMemberships        CreatorWorkspaceMember[]          @relation("CreatorWorkspaceMemberUser")
   creatorEntryContinuations          CreatorEntryContinuation[]
   triggeredNotifications             Notification[]                    @relation("NotificationTriggerUser")
-  notificationRecipients        NotificationRecipient[]
-  notificationPreferences       UserBrandNotificationPreference[]
-  notificationEmailDeliveries   NotificationEmailDelivery[]
-  notificationJobRecipients     NotificationJobRecipient[]
-  gatekeeperRecoveryRequests    GatekeeperRecoveryRequest[]
-  authMethods                   UserAuthMethod[]
-  authSessions                  AuthSession[]
-  passwordResetChallenges       PasswordResetChallenge[]
-  securityEvents                SecurityEvent[]                   @relation("SecurityEventSubject")
-  applicationActorEvidence      UceApplication[]                  @relation("ApplicationActorUser")
-  campaignInvitationsIssued     CampaignOpportunityInvitation[]   @relation("CampaignInvitationIssuer")
-  campaignInvitationsRevoked    CampaignOpportunityInvitation[]   @relation("CampaignInvitationRevoker")
-  applicationCommandReceipts    ApplicationCommandReceipt[]       @relation("ApplicationCommandActor")
-  applicationDomainEvents       ApplicationDomainEvent[]          @relation("ApplicationEventActorUser")
-
+  notificationRecipients             NotificationRecipient[]
+  notificationPreferences            UserBrandNotificationPreference[]
+  notificationEmailDeliveries        NotificationEmailDelivery[]
+  notificationJobRecipients          NotificationJobRecipient[]
+  gatekeeperRecoveryRequests         GatekeeperRecoveryRequest[]
+  authMethods                        UserAuthMethod[]
+  authSessions                       AuthSession[]
+  passwordResetChallenges            PasswordResetChallenge[]
+  securityEvents                     SecurityEvent[]                   @relation("SecurityEventSubject")
+  applicationActorEvidence           UceApplication[]                  @relation("ApplicationActorUser")
+  campaignInvitationsIssued          CampaignOpportunityInvitation[]   @relation("CampaignInvitationIssuer")
+  campaignInvitationsRevoked         CampaignOpportunityInvitation[]   @relation("CampaignInvitationRevoker")
+  applicationCommandReceipts         ApplicationCommandReceipt[]       @relation("ApplicationCommandActor")
+  applicationDomainEvents            ApplicationDomainEvent[]          @relation("ApplicationEventActorUser")
 
   @@index([organizationId])
   @@index([role])
@@ -1641,64 +1639,65 @@ model BrandProfile {
   coPilotInteractionLogs CoPilotInteractionLog[]
   coPilotMessageFeedback CoPilotMessageFeedback[]
 
-  teamMembers               BrandTeamMember[]
-  billingProfile            BrandBillingProfile?
-  billingProfileVersions    BrandBillingProfileVersion[]
-  withdrawalAccounts        BrandWithdrawalAccount[]
-  notificationSettings      BrandNotificationSetting[]
-  notifications             Notification[]
-  notificationPreferences   UserBrandNotificationPreference[]
-  integrations              BrandIntegration[]
-  providerOAuthTransactions ProviderOAuthTransaction[]
-  instagramSyncInvitations  InstagramSyncInvitation[]
-  instagramDeletionRequests BrandInstagramDeletionRequest[]
-  applicationDomainEvents   ApplicationDomainEvent[] @relation("ApplicationEventBrand")
-  notificationJobs          NotificationJob[]
-
+  teamMembers                   BrandTeamMember[]
+  billingProfile                BrandBillingProfile?
+  billingProfileVersions        BrandBillingProfileVersion[]
+  withdrawalAccounts            BrandWithdrawalAccount[]
+  notificationSettings          BrandNotificationSetting[]
+  notifications                 Notification[]
+  notificationPreferences       UserBrandNotificationPreference[]
+  integrations                  BrandIntegration[]
+  providerOAuthTransactions     ProviderOAuthTransaction[]
+  instagramSyncInvitations      InstagramSyncInvitation[]
+  instagramDeletionRequests     BrandInstagramDeletionRequest[]
+  instagramIntelligenceSyncJobs InstagramIntelligenceSyncJob[]
+  applicationDomainEvents       ApplicationDomainEvent[]          @relation("ApplicationEventBrand")
+  notificationJobs              NotificationJob[]
 
   @@map("brand_profiles")
 }
 
 /// Brand OAuth connections (Instagram Login + optional Meta Business Suite in Settings).
 model BrandIntegration {
-  id                             String                        @id @default(uuid()) @map("integration_id")
-  brandProfileId                 String                        @map("brand_id")
-  brandProfile                   BrandProfile                  @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  id                             String                         @id @default(uuid()) @map("integration_id")
+  brandProfileId                 String                         @map("brand_id")
+  brandProfile                   BrandProfile                   @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
   provider                       BrandIntegrationProvider
-  status                         BrandIntegrationStatus        @default(DISCONNECTED)
-  currentPlatformHandle          String?                       @map("current_platform_handle") @db.VarChar(255)
-  inboundOauthHandle             String?                       @map("inbound_oauth_handle") @db.VarChar(255)
-  accessTokenEncrypted           String?                       @map("access_token_encrypted") @db.Text
-  refreshTokenEncrypted          String?                       @map("refresh_token_encrypted") @db.Text
-  pendingAccessTokenEncrypted    String?                       @map("pending_access_token_encrypted") @db.Text
-  pendingGrantedScopes           BrandIntegrationScope[]       @default([]) @map("pending_granted_scopes")
-  pendingTokenExpiresAt          DateTime?                     @map("pending_token_expires_at")
-  grantedScopes                  BrandIntegrationScope[]       @default([]) @map("granted_scopes")
-  tokenExpiresAt                 DateTime?                     @map("token_expires_at")
-  isActive                       Boolean                       @default(true) @map("is_active")
-  providerAccountId              String?                       @map("provider_account_id") @db.VarChar(100)
-  providerAppScopedUserId        String?                       @map("provider_app_scoped_user_id") @db.VarChar(100)
-  identityVerification           InstagramIdentityVerification @default(UNVERIFIED) @map("identity_verification")
-  authorizationHealth            InstagramAuthorizationHealth  @default(NEEDS_REVALIDATION) @map("authorization_health")
-  firstPartyProfileCapability    InstagramCapabilityState      @default(UNKNOWN) @map("first_party_profile_capability")
-  firstPartyInsightsCapability   InstagramCapabilityState      @default(UNKNOWN) @map("first_party_insights_capability")
-  businessDiscoveryCapability    InstagramCapabilityState      @default(DEFERRED) @map("business_discovery_capability")
-  creatorMarketplaceCapability   InstagramCapabilityState      @default(DEFERRED) @map("creator_marketplace_capability")
-  humanActionRequired            Boolean                       @default(false) @map("human_action_required")
-  syncHealth                     InstagramSyncHealth           @default(NOT_CONFIGURED) @map("sync_health")
-  authorizationGeneration        Int                           @default(0) @map("authorization_generation")
-  credentialVersion              Int                           @default(0) @map("credential_version")
-  tokenIssuedAt                  DateTime?                     @map("token_issued_at")
-  tokenLastRefreshedAt           DateTime?                     @map("token_last_refreshed_at")
-  tokenRefreshAttemptedAt        DateTime?                     @map("token_refresh_attempted_at")
-  pendingProviderAccountId       String?                       @map("pending_provider_account_id") @db.VarChar(100)
-  pendingProviderAppScopedUserId String?                       @map("pending_provider_app_scoped_user_id") @db.VarChar(100)
-  pendingOauthIntent             InstagramOAuthIntent?         @map("pending_oauth_intent")
-  pendingExpectedGeneration      Int?                          @map("pending_expected_generation")
-  authorizationLossTransitionId  String?                       @map("authorization_loss_transition_id") @db.Uuid
-  authorizationLossOpenedAt      DateTime?                     @map("authorization_loss_opened_at")
-  createdAt                      DateTime                      @default(now()) @map("created_at")
-  updatedAt                      DateTime                      @updatedAt @map("updated_at")
+  status                         BrandIntegrationStatus         @default(DISCONNECTED)
+  currentPlatformHandle          String?                        @map("current_platform_handle") @db.VarChar(255)
+  inboundOauthHandle             String?                        @map("inbound_oauth_handle") @db.VarChar(255)
+  accessTokenEncrypted           String?                        @map("access_token_encrypted") @db.Text
+  refreshTokenEncrypted          String?                        @map("refresh_token_encrypted") @db.Text
+  pendingAccessTokenEncrypted    String?                        @map("pending_access_token_encrypted") @db.Text
+  pendingGrantedScopes           BrandIntegrationScope[]        @default([]) @map("pending_granted_scopes")
+  pendingTokenExpiresAt          DateTime?                      @map("pending_token_expires_at")
+  grantedScopes                  BrandIntegrationScope[]        @default([]) @map("granted_scopes")
+  tokenExpiresAt                 DateTime?                      @map("token_expires_at")
+  isActive                       Boolean                        @default(true) @map("is_active")
+  providerAccountId              String?                        @map("provider_account_id") @db.VarChar(100)
+  providerAppScopedUserId        String?                        @map("provider_app_scoped_user_id") @db.VarChar(100)
+  identityVerification           InstagramIdentityVerification  @default(UNVERIFIED) @map("identity_verification")
+  authorizationHealth            InstagramAuthorizationHealth   @default(NEEDS_REVALIDATION) @map("authorization_health")
+  firstPartyProfileCapability    InstagramCapabilityState       @default(UNKNOWN) @map("first_party_profile_capability")
+  firstPartyInsightsCapability   InstagramCapabilityState       @default(UNKNOWN) @map("first_party_insights_capability")
+  businessDiscoveryCapability    InstagramCapabilityState       @default(DEFERRED) @map("business_discovery_capability")
+  creatorMarketplaceCapability   InstagramCapabilityState       @default(DEFERRED) @map("creator_marketplace_capability")
+  humanActionRequired            Boolean                        @default(false) @map("human_action_required")
+  syncHealth                     InstagramSyncHealth            @default(NOT_CONFIGURED) @map("sync_health")
+  authorizationGeneration        Int                            @default(0) @map("authorization_generation")
+  credentialVersion              Int                            @default(0) @map("credential_version")
+  tokenIssuedAt                  DateTime?                      @map("token_issued_at")
+  tokenLastRefreshedAt           DateTime?                      @map("token_last_refreshed_at")
+  tokenRefreshAttemptedAt        DateTime?                      @map("token_refresh_attempted_at")
+  pendingProviderAccountId       String?                        @map("pending_provider_account_id") @db.VarChar(100)
+  pendingProviderAppScopedUserId String?                        @map("pending_provider_app_scoped_user_id") @db.VarChar(100)
+  pendingOauthIntent             InstagramOAuthIntent?          @map("pending_oauth_intent")
+  pendingExpectedGeneration      Int?                           @map("pending_expected_generation")
+  authorizationLossTransitionId  String?                        @map("authorization_loss_transition_id") @db.Uuid
+  authorizationLossOpenedAt      DateTime?                      @map("authorization_loss_opened_at")
+  createdAt                      DateTime                       @default(now()) @map("created_at")
+  updatedAt                      DateTime                       @updatedAt @map("updated_at")
+  instagramIntelligenceSyncJobs  InstagramIntelligenceSyncJob[]
 
   @@unique([brandProfileId, provider], map: "uq_brand_provider_pair")
   @@index([brandProfileId, provider, status], map: "idx_brand_integrations_lookup")
@@ -1706,6 +1705,44 @@ model BrandIntegration {
   @@index([provider, providerAppScopedUserId], map: "idx_integrations_callback_subject")
   @@index([provider, authorizationHealth, tokenExpiresAt], map: "idx_instagram_refresh_candidates")
   @@map("brand_integrations")
+}
+
+model InstagramIntelligenceSyncJob {
+  id                         String                         @id @default(uuid()) @map("sync_job_id")
+  brandProfileId             String                         @map("brand_id")
+  brandProfile               BrandProfile                   @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  integrationId              String                         @map("integration_id")
+  integration                BrandIntegration               @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  providerAccountId          String                         @map("provider_account_id") @db.VarChar(100)
+  authorizationGeneration    Int                            @map("authorization_generation")
+  capabilityClass            InstagramSyncCapabilityClass   @map("capability_class")
+  status                     InstagramSyncCoordinatorStatus @default(PENDING)
+  trigger                    InstagramSyncTrigger
+  executionWindowStart       DateTime?                      @map("execution_window_start")
+  executionWindowEnd         DateTime?                      @map("execution_window_end")
+  requestIdentity            String                         @map("request_identity") @db.VarChar(255)
+  cursor                     Json?
+  leaseToken                 String?                        @unique @map("lease_token") @db.Uuid
+  leaseOwnerRef              String?                        @map("lease_owner_ref") @db.VarChar(255)
+  leaseExpiresAt             DateTime?                      @map("lease_expires_at")
+  lastHeartbeatAt            DateTime?                      @map("last_heartbeat_at")
+  lastAttemptAt              DateTime?                      @map("last_attempt_at")
+  lastSuccessAt              DateTime?                      @map("last_success_at")
+  lastManualRequestedAt      DateTime?                      @map("last_manual_requested_at")
+  manualPending              Boolean                        @default(false) @map("manual_pending")
+  nextDueAt                  DateTime?                      @map("next_due_at")
+  backoffUntil               DateTime?                      @map("backoff_until")
+  attemptCount               Int                            @default(0) @map("attempt_count")
+  consecutiveFailureCount    Int                            @default(0) @map("consecutive_failure_count")
+  lastCompletedGenerationIds String[]                       @default([]) @map("last_completed_generation_ids")
+  reasonCodes                String[]                       @default([]) @map("reason_codes")
+  createdAt                  DateTime                       @default(now()) @map("created_at")
+  updatedAt                  DateTime                       @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, integrationId, providerAccountId, authorizationGeneration, capabilityClass], map: "uq_instagram_sync_generation_class")
+  @@index([status, nextDueAt, backoffUntil, leaseExpiresAt], map: "idx_instagram_sync_due")
+  @@index([brandProfileId, integrationId, authorizationGeneration], map: "idx_instagram_sync_fence")
+  @@map("instagram_intelligence_sync_jobs")
 }
 
 /// Temporary agent invites for onboarding Instagram sync (no permanent User).
@@ -1939,28 +1976,28 @@ model OfferingLocationAvailability {
 }
 
 model Location {
-  id                   String                       @id @default(uuid())
-  brandProfileId       String                       @map("brand_profile_id")
-  brandProfile         BrandProfile                 @relation(fields: [brandProfileId], references: [id])
+  id                   String                         @id @default(uuid())
+  brandProfileId       String                         @map("brand_profile_id")
+  brandProfile         BrandProfile                   @relation(fields: [brandProfileId], references: [id])
   name                 String?
   address              String
   city                 String?
   zip                  String?
   lat                  Float?
   lng                  Float?
-  contactDetails       Json?                        @map("contact_details")
-  lifecycle            CanonicalLocationLifecycle   @default(ACTIVE)
-  authority            CanonicalLocationAuthority   @default(LEGACY_UNVERIFIED)
-  observationFreshness LocationObservationFreshness @default(UNKNOWN) @map("observation_freshness")
-  reconciliationState  LocationReconciliationState  @default(UNVERIFIED) @map("reconciliation_state")
-  lastObservedAt       DateTime?                    @map("last_observed_at")
-  revision             Int                          @default(1)
+  contactDetails       Json?                          @map("contact_details")
+  lifecycle            CanonicalLocationLifecycle     @default(ACTIVE)
+  authority            CanonicalLocationAuthority     @default(LEGACY_UNVERIFIED)
+  observationFreshness LocationObservationFreshness   @default(UNKNOWN) @map("observation_freshness")
+  reconciliationState  LocationReconciliationState    @default(UNVERIFIED) @map("reconciliation_state")
+  lastObservedAt       DateTime?                      @map("last_observed_at")
+  revision             Int                            @default(1)
   provenance           Json?
-  lastObservation      Json?                        @map("last_observation")
+  lastObservation      Json?                          @map("last_observation")
   aliases              BrandLocationAlias[]
   offeringAvailability OfferingLocationAvailability[] @relation("OfferingLocationAvailability")
-  createdAt            DateTime                     @default(now()) @map("created_at")
-  updatedAt            DateTime                     @updatedAt @map("updated_at")
+  createdAt            DateTime                       @default(now()) @map("created_at")
+  updatedAt            DateTime                       @updatedAt @map("updated_at")
 
   @@unique([brandProfileId, id])
   @@index([brandProfileId, lifecycle])
@@ -2521,9 +2558,9 @@ model UceCampaignCreator {
   email                  String?
   source                 UceCampaignCreatorSource          @default(MANUAL)
   ingestionMethod        UceCampaignCreatorIngestionMethod @default(MANUAL_SINGLE) @map("ingestion_method")
-  reviewState            UceCampaignCreatorReviewState    @default(PENDING_REVIEW) @map("review_state")
-  creatorUserId          String?                          @map("creator_user_id")
-  creatorUser            User?                            @relation("UceCampaignCreatorUser", fields: [creatorUserId], references: [id], onDelete: Restrict)
+  reviewState            UceCampaignCreatorReviewState     @default(PENDING_REVIEW) @map("review_state")
+  creatorUserId          String?                           @map("creator_user_id")
+  creatorUser            User?                             @relation("UceCampaignCreatorUser", fields: [creatorUserId], references: [id], onDelete: Restrict)
   applications           UceApplication[]
   archivedAt             DateTime?                         @map("archived_at")
   createdAt              DateTime                          @default(now()) @map("created_at")
@@ -2991,19 +3028,19 @@ model UceCampaignBrief {
 }
 
 model UceBriefDeliverable {
-  id                         String               @id @default(uuid())
-  briefId                    String               @map("brief_id")
-  brief                      UceCampaignBrief     @relation(fields: [briefId], references: [id], onDelete: Cascade)
-  format                     String               @db.VarChar(80)
-  displayOrder               Int                  @map("display_order")
+  id                         String                              @id @default(uuid())
+  briefId                    String                              @map("brief_id")
+  brief                      UceCampaignBrief                    @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  format                     String                              @db.VarChar(80)
+  displayOrder               Int                                 @map("display_order")
   configuration              Json?
-  creativeGuidance           Json?                @map("creative_guidance")
-  amplifyTargetDeliverableId String?              @map("amplify_target_deliverable_id")
-  amplifyTargetDeliverable   UceBriefDeliverable? @relation("BriefDeliverableAmplifyTarget", fields: [amplifyTargetDeliverableId], references: [id], onDelete: Restrict)
-  amplifiedBy                UceBriefDeliverable[] @relation("BriefDeliverableAmplifyTarget")
+  creativeGuidance           Json?                               @map("creative_guidance")
+  amplifyTargetDeliverableId String?                             @map("amplify_target_deliverable_id")
+  amplifyTargetDeliverable   UceBriefDeliverable?                @relation("BriefDeliverableAmplifyTarget", fields: [amplifyTargetDeliverableId], references: [id], onDelete: Restrict)
+  amplifiedBy                UceBriefDeliverable[]               @relation("BriefDeliverableAmplifyTarget")
   collaborationExecutions    CollaborationDeliverableExecution[]
-  createdAt                  DateTime             @default(now()) @map("created_at")
-  updatedAt                  DateTime             @updatedAt @map("updated_at")
+  createdAt                  DateTime                            @default(now()) @map("created_at")
+  updatedAt                  DateTime                            @updatedAt @map("updated_at")
 
   @@index([briefId, displayOrder])
   @@index([amplifyTargetDeliverableId])
@@ -3104,9 +3141,9 @@ model UceCampaignCollaboration {
   auditLogs             UceCollaborationAuditLog[]
   reportingAssets       UceCampaignReportingAssetGallery[]
   workflowCollaboration Collaboration?
-  logisticsRegistry UceCollaborationLogistics?
-  contentDrafts     UceCollaborationContentDraft[]
-  liveTelemetry     UceCollaborationLiveTelemetry?
+  logisticsRegistry     UceCollaborationLogistics?
+  contentDrafts         UceCollaborationContentDraft[]
+  liveTelemetry         UceCollaborationLiveTelemetry?
 
   @@unique([campaignId, instagramHandle])
   @@index([campaignId, collabStatus, currentMilestone])
@@ -3263,24 +3300,23 @@ model CreatorProfile {
   createdAt                  DateTime @default(now()) @map("created_at")
   updatedAt                  DateTime @updatedAt @map("updated_at")
 
-  bankDetails               CreatorBankDetails[]
-  shippingAddresses         CreatorShippingAddress[]
-  legalProfile              CreatorLegalProfile?
-  payoutDestinations        CreatorPayoutDestination[]
-  settlementProfile         CreatorSettlementProfile?
-  payoutProfile             CreatorPayoutProfile?
-  payoutObligations         CreatorPayoutObligation[]
-  ownedWorkspaces           CreatorWorkspace[]              @relation("CreatorWorkspaceOwner")
-  workspaceSeats            CreatorWorkspaceMember[]        @relation("CreatorWorkspaceMemberProfile")
-  socialIntegrations        CreatorSocialIntegration[]
-  providerOAuthTransactions ProviderOAuthTransaction[]
-  coPilotThreads            CreatorCoPilotThread[]
-  coPilotMessageFeedback CreatorCoPilotMessageFeedback[]
-  coPilotInteractionLogs CreatorCoPilotInteractionLog[]
-  uceCollaborations      UceCampaignCollaboration[]
-  campaignCreators              UceCampaignCreator[]
-  intendedCampaignInvitations   CampaignOpportunityInvitation[] @relation("CampaignInvitationIntendedProfile")
-
+  bankDetails                 CreatorBankDetails[]
+  shippingAddresses           CreatorShippingAddress[]
+  legalProfile                CreatorLegalProfile?
+  payoutDestinations          CreatorPayoutDestination[]
+  settlementProfile           CreatorSettlementProfile?
+  payoutProfile               CreatorPayoutProfile?
+  payoutObligations           CreatorPayoutObligation[]
+  ownedWorkspaces             CreatorWorkspace[]              @relation("CreatorWorkspaceOwner")
+  workspaceSeats              CreatorWorkspaceMember[]        @relation("CreatorWorkspaceMemberProfile")
+  socialIntegrations          CreatorSocialIntegration[]
+  providerOAuthTransactions   ProviderOAuthTransaction[]
+  coPilotThreads              CreatorCoPilotThread[]
+  coPilotMessageFeedback      CreatorCoPilotMessageFeedback[]
+  coPilotInteractionLogs      CreatorCoPilotInteractionLog[]
+  uceCollaborations           UceCampaignCollaboration[]
+  campaignCreators            UceCampaignCreator[]
+  intendedCampaignInvitations CampaignOpportunityInvitation[] @relation("CampaignInvitationIntendedProfile")
 
   @@map("creator_profiles")
 }
@@ -3696,24 +3732,24 @@ model Collaboration {
   ucePipelineCollaborationId String?                   @unique @map("uce_pipeline_collaboration_id")
   ucePipelineCollaboration   UceCampaignCollaboration? @relation(fields: [ucePipelineCollaborationId], references: [id], onDelete: SetNull)
 
-  sourceApplicationId String? @unique @map("source_application_id")
-  sourceApplication   UceApplication? @relation(fields: [sourceApplicationId], references: [id], onDelete: Restrict)
-  campaignCreatorId   String? @map("campaign_creator_id")
-  campaignAssetId     String? @map("campaign_asset_id")
-  lifecycle           CollaborationLifecycle @default(ACTIVE)
-  canonicalStage      CollaborationStage @default(NEGOTIATION) @map("canonical_stage")
+  sourceApplicationId String?                  @unique @map("source_application_id")
+  sourceApplication   UceApplication?          @relation(fields: [sourceApplicationId], references: [id], onDelete: Restrict)
+  campaignCreatorId   String?                  @map("campaign_creator_id")
+  campaignAssetId     String?                  @map("campaign_asset_id")
+  lifecycle           CollaborationLifecycle   @default(ACTIVE)
+  canonicalStage      CollaborationStage       @default(NEGOTIATION) @map("canonical_stage")
   currentStageStatus  CollaborationStageStatus @default(IN_PROGRESS) @map("current_stage_status")
-  aggregateVersion    Int @default(1) @map("aggregate_version")
-  endedFromStage      CollaborationStage? @map("ended_from_stage")
-  endedReasonCode     String? @map("ended_reason_code")
-  endedReasonText     String? @map("ended_reason_text")
+  aggregateVersion    Int                      @default(1) @map("aggregate_version")
+  endedFromStage      CollaborationStage?      @map("ended_from_stage")
+  endedReasonCode     String?                  @map("ended_reason_code")
+  endedReasonText     String?                  @map("ended_reason_text")
   endedByActorClass   CollaborationActorClass? @map("ended_by_actor_class")
-  endedByUserId       String? @map("ended_by_user_id")
-  endedAt             DateTime? @map("ended_at")
-  completedAt         DateTime? @map("completed_at")
+  endedByUserId       String?                  @map("ended_by_user_id")
+  endedAt             DateTime?                @map("ended_at")
+  completedAt         DateTime?                @map("completed_at")
 
-  currentStage UceMilestoneStage       @default(STAGE_1_NEGOTIATION) @map("current_stage")
-  payoutMode   CollaborationPayoutMode @default(ESCROW) @map("payout_mode")
+  currentStage UceMilestoneStage         @default(STAGE_1_NEGOTIATION) @map("current_stage")
+  payoutMode   CollaborationPayoutMode   @default(ESCROW) @map("payout_mode")
   industry     CollaborationIndustryType
 
   negotiationRound      Int @default(0) @map("negotiation_round")
@@ -3731,27 +3767,26 @@ model Collaboration {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  commercials    CollaborationCommercial?
-  logistics      CollaborationLogistics?
-  media          CollaborationMedia[]
-  finalization   CollaborationFinalization?
-  messages       CollaborationMessage[]
-  escrowLock     CollaborationEscrowLock?
-  snapshot       CollaborationExecutionSnapshot?
-  commercialAgreement CollaborationCommercialAgreement?
-  fulfillment    CollaborationFulfillment?
-  deliverables   CollaborationDeliverableExecution[]
-  events         CollaborationEvent[]
-  financialResolution CollaborationFinancialResolution?
-  settlement     CollaborationSettlement?
-  feedbackWindow CollaborationFeedbackWindow?
-  feedback       CollaborationFeedback[]
+  commercials                     CollaborationCommercial?
+  logistics                       CollaborationLogistics?
+  media                           CollaborationMedia[]
+  finalization                    CollaborationFinalization?
+  messages                        CollaborationMessage[]
+  escrowLock                      CollaborationEscrowLock?
+  snapshot                        CollaborationExecutionSnapshot?
+  commercialAgreement             CollaborationCommercialAgreement?
+  fulfillment                     CollaborationFulfillment?
+  deliverables                    CollaborationDeliverableExecution[]
+  events                          CollaborationEvent[]
+  financialResolution             CollaborationFinancialResolution?
+  settlement                      CollaborationSettlement?
+  feedbackWindow                  CollaborationFeedbackWindow?
+  feedback                        CollaborationFeedback[]
   creatorPayoutObligations        CreatorPayoutObligation[]
   collaborationRefundInstructions CollaborationRefundInstruction[]
   fundingLotAllocations           CollaborationFundingLotAllocation[]
   approvalEvents                  ApplicationDomainEvent[]             @relation("ApplicationApprovedCollaboration")
   handoffCommercialState          CollaborationHandoffCommercialState? @map("handoff_commercial_state")
-
 
   @@index([campaignId, creatorUserId])
   @@index([brandProfileId, currentStage])
@@ -3761,60 +3796,60 @@ model Collaboration {
 }
 
 model CollaborationExecutionSnapshot {
-  id String @id @default(uuid())
-  collaborationId String @unique @map("collaboration_id")
-  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
-  campaignContext Json @map("campaign_context")
-  campaignAssetContext Json @map("campaign_asset_context")
-  briefContext Json @map("brief_context")
-  applicationContext Json? @map("application_context")
-  creatorContext Json? @map("creator_context")
-  brandContext Json? @map("brand_context")
-  usageRights Json? @map("usage_rights")
-  creatorRequirements String? @map("creator_requirements")
-  receivesBrandSupport Boolean @default(false) @map("receives_brand_support")
-  brandSupportType UceBrandSupportType? @map("brand_support_type")
-  brandSupportEstimatedValue Decimal? @map("brand_support_estimated_value") @db.Decimal(12, 2)
-  campaignCommercialContext Json? @map("campaign_commercial_context")
-  advancePercentageSnapshot Int @map("advance_percentage_snapshot")
-  commercialCurrency String @db.VarChar(3) @map("commercial_currency")
-  lockedAt DateTime @default(now()) @map("locked_at")
+  id                         String               @id @default(uuid())
+  collaborationId            String               @unique @map("collaboration_id")
+  collaboration              Collaboration        @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  campaignContext            Json                 @map("campaign_context")
+  campaignAssetContext       Json                 @map("campaign_asset_context")
+  briefContext               Json                 @map("brief_context")
+  applicationContext         Json?                @map("application_context")
+  creatorContext             Json?                @map("creator_context")
+  brandContext               Json?                @map("brand_context")
+  usageRights                Json?                @map("usage_rights")
+  creatorRequirements        String?              @map("creator_requirements")
+  receivesBrandSupport       Boolean              @default(false) @map("receives_brand_support")
+  brandSupportType           UceBrandSupportType? @map("brand_support_type")
+  brandSupportEstimatedValue Decimal?             @map("brand_support_estimated_value") @db.Decimal(12, 2)
+  campaignCommercialContext  Json?                @map("campaign_commercial_context")
+  advancePercentageSnapshot  Int                  @map("advance_percentage_snapshot")
+  commercialCurrency         String               @map("commercial_currency") @db.VarChar(3)
+  lockedAt                   DateTime             @default(now()) @map("locked_at")
 
   @@map("collaboration_execution_snapshots")
 }
 
 model CollaborationCommercialAgreement {
-  id String @id @default(uuid())
-  collaborationId String @unique @map("collaboration_id")
-  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
-  negotiationState CollaborationNegotiationState @map("negotiation_state")
-  applicationProposedFee Decimal? @map("application_proposed_fee") @db.Decimal(14, 2)
-  brandCounterFee Decimal? @map("brand_counter_fee") @db.Decimal(14, 2)
-  agreedCreatorFee Decimal? @map("agreed_creator_fee") @db.Decimal(14, 2)
-  currency String @db.VarChar(3)
-  advancePercentageSnapshot Int @map("advance_percentage_snapshot")
-  advanceAmount Decimal? @map("advance_amount") @db.Decimal(14, 2)
-  balanceAmount Decimal? @map("balance_amount") @db.Decimal(14, 2)
-  pricingTierSnapshot String? @map("pricing_tier_snapshot") @db.VarChar(80)
-  businessCountryCodeSnapshot String? @map("business_country_code_snapshot") @db.VarChar(2)
-  financialPolicyVersionSnapshot String? @map("financial_policy_version_snapshot") @db.VarChar(80)
-  platformCommissionRateSnapshot Decimal? @map("platform_commission_rate_snapshot") @db.Decimal(7, 4)
-  platformCommissionAmount Decimal? @map("platform_commission_amount") @db.Decimal(14, 2)
-  platformCommissionGstRateSnapshot Decimal? @map("platform_commission_gst_rate_snapshot") @db.Decimal(7, 4)
-  platformCommissionGstAmount Decimal? @map("platform_commission_gst_amount") @db.Decimal(14, 2)
-  nonCashConsideration Json? @map("non_cash_consideration")
-  paymentRail CollaborationPaymentRail @default(PLATFORM_ESCROW) @map("payment_rail")
-  securementState CollaborationSecurementState? @map("securement_state")
-  requiredSecuredAmount Decimal? @map("required_secured_amount") @db.Decimal(14, 2)
-  confirmedSecuredAmount Decimal? @map("confirmed_secured_amount") @db.Decimal(14, 2)
-  fundingInstructionRef String? @map("funding_instruction_ref")
-  fundingConfirmationRef String? @map("funding_confirmation_ref")
-  escrowLockRef String? @map("escrow_lock_ref")
-  manualPaymentEvidenceRef String? @map("manual_payment_evidence_ref")
-  manualCreatorConfirmedAt DateTime? @map("manual_creator_confirmed_at")
-  paymentDisputeRef String? @map("payment_dispute_ref")
-  termsLockedAt DateTime? @map("terms_locked_at")
-  securementCompletedAt DateTime? @map("securement_completed_at")
+  id                                String                        @id @default(uuid())
+  collaborationId                   String                        @unique @map("collaboration_id")
+  collaboration                     Collaboration                 @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  negotiationState                  CollaborationNegotiationState @map("negotiation_state")
+  applicationProposedFee            Decimal?                      @map("application_proposed_fee") @db.Decimal(14, 2)
+  brandCounterFee                   Decimal?                      @map("brand_counter_fee") @db.Decimal(14, 2)
+  agreedCreatorFee                  Decimal?                      @map("agreed_creator_fee") @db.Decimal(14, 2)
+  currency                          String                        @db.VarChar(3)
+  advancePercentageSnapshot         Int                           @map("advance_percentage_snapshot")
+  advanceAmount                     Decimal?                      @map("advance_amount") @db.Decimal(14, 2)
+  balanceAmount                     Decimal?                      @map("balance_amount") @db.Decimal(14, 2)
+  pricingTierSnapshot               String?                       @map("pricing_tier_snapshot") @db.VarChar(80)
+  businessCountryCodeSnapshot       String?                       @map("business_country_code_snapshot") @db.VarChar(2)
+  financialPolicyVersionSnapshot    String?                       @map("financial_policy_version_snapshot") @db.VarChar(80)
+  platformCommissionRateSnapshot    Decimal?                      @map("platform_commission_rate_snapshot") @db.Decimal(7, 4)
+  platformCommissionAmount          Decimal?                      @map("platform_commission_amount") @db.Decimal(14, 2)
+  platformCommissionGstRateSnapshot Decimal?                      @map("platform_commission_gst_rate_snapshot") @db.Decimal(7, 4)
+  platformCommissionGstAmount       Decimal?                      @map("platform_commission_gst_amount") @db.Decimal(14, 2)
+  nonCashConsideration              Json?                         @map("non_cash_consideration")
+  paymentRail                       CollaborationPaymentRail      @default(PLATFORM_ESCROW) @map("payment_rail")
+  securementState                   CollaborationSecurementState? @map("securement_state")
+  requiredSecuredAmount             Decimal?                      @map("required_secured_amount") @db.Decimal(14, 2)
+  confirmedSecuredAmount            Decimal?                      @map("confirmed_secured_amount") @db.Decimal(14, 2)
+  fundingInstructionRef             String?                       @map("funding_instruction_ref")
+  fundingConfirmationRef            String?                       @map("funding_confirmation_ref")
+  escrowLockRef                     String?                       @map("escrow_lock_ref")
+  manualPaymentEvidenceRef          String?                       @map("manual_payment_evidence_ref")
+  manualCreatorConfirmedAt          DateTime?                     @map("manual_creator_confirmed_at")
+  paymentDisputeRef                 String?                       @map("payment_dispute_ref")
+  termsLockedAt                     DateTime?                     @map("terms_locked_at")
+  securementCompletedAt             DateTime?                     @map("securement_completed_at")
 
   @@index([negotiationState])
   @@index([securementState])
@@ -3823,41 +3858,41 @@ model CollaborationCommercialAgreement {
 }
 
 model CollaborationFulfillment {
-  id String @id @default(uuid())
-  collaborationId String @unique @map("collaboration_id")
-  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
-  state CollaborationFulfillmentState @default(NOT_STARTED)
-  issueCount Int @default(0) @map("issue_count")
-  shipmentTrackingRef String? @map("shipment_tracking_ref")
-  courierName String? @map("courier_name")
-  accessEvidenceRef String? @map("access_evidence_ref")
-  redemptionCode String? @map("redemption_code")
-  serviceEvidenceRef String? @map("service_evidence_ref")
-  genericFulfillmentEvidence Json? @map("generic_fulfillment_evidence")
-  brandFulfilledAt DateTime? @map("brand_fulfilled_at")
-  creatorConfirmedAt DateTime? @map("creator_confirmed_at")
-  completedAt DateTime? @map("completed_at")
-  hardStoppedAt DateTime? @map("hard_stopped_at")
-  issues CollaborationFulfillmentIssue[]
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                         String                          @id @default(uuid())
+  collaborationId            String                          @unique @map("collaboration_id")
+  collaboration              Collaboration                   @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  state                      CollaborationFulfillmentState   @default(NOT_STARTED)
+  issueCount                 Int                             @default(0) @map("issue_count")
+  shipmentTrackingRef        String?                         @map("shipment_tracking_ref")
+  courierName                String?                         @map("courier_name")
+  accessEvidenceRef          String?                         @map("access_evidence_ref")
+  redemptionCode             String?                         @map("redemption_code")
+  serviceEvidenceRef         String?                         @map("service_evidence_ref")
+  genericFulfillmentEvidence Json?                           @map("generic_fulfillment_evidence")
+  brandFulfilledAt           DateTime?                       @map("brand_fulfilled_at")
+  creatorConfirmedAt         DateTime?                       @map("creator_confirmed_at")
+  completedAt                DateTime?                       @map("completed_at")
+  hardStoppedAt              DateTime?                       @map("hard_stopped_at")
+  issues                     CollaborationFulfillmentIssue[]
+  createdAt                  DateTime                        @default(now()) @map("created_at")
+  updatedAt                  DateTime                        @updatedAt @map("updated_at")
 
   @@index([state])
   @@map("collaboration_fulfillments")
 }
 
 model CollaborationFulfillmentIssue {
-  id String @id @default(uuid())
-  fulfillmentId String @map("fulfillment_id")
-  fulfillment CollaborationFulfillment @relation(fields: [fulfillmentId], references: [id], onDelete: Cascade)
-  sequence Int
-  issueCode String @map("issue_code")
-  description String
-  evidenceRef String? @map("evidence_ref")
-  reportedByUserId String? @map("reported_by_user_id")
-  reportedAt DateTime @default(now()) @map("reported_at")
-  remediationEvidenceRef String? @map("remediation_evidence_ref")
-  remediationAt DateTime? @map("remediation_at")
+  id                     String                   @id @default(uuid())
+  fulfillmentId          String                   @map("fulfillment_id")
+  fulfillment            CollaborationFulfillment @relation(fields: [fulfillmentId], references: [id], onDelete: Cascade)
+  sequence               Int
+  issueCode              String                   @map("issue_code")
+  description            String
+  evidenceRef            String?                  @map("evidence_ref")
+  reportedByUserId       String?                  @map("reported_by_user_id")
+  reportedAt             DateTime                 @default(now()) @map("reported_at")
+  remediationEvidenceRef String?                  @map("remediation_evidence_ref")
+  remediationAt          DateTime?                @map("remediation_at")
 
   @@unique([fulfillmentId, sequence])
   @@index([fulfillmentId, reportedAt])
@@ -3865,23 +3900,23 @@ model CollaborationFulfillmentIssue {
 }
 
 model CollaborationDeliverableExecution {
-  id String @id @default(uuid())
-  collaborationId String @map("collaboration_id")
-  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
-  sourceBriefDeliverableId String @map("source_brief_deliverable_id")
-  sourceBriefDeliverable UceBriefDeliverable @relation(fields: [sourceBriefDeliverableId], references: [id], onDelete: Restrict)
-  displayOrder Int @map("display_order")
-  definitionSnapshot Json @map("definition_snapshot")
-  state CollaborationDeliverableState @default(AWAITING_SUBMISSION)
-  revisionRequestCount Int @default(0) @map("revision_request_count")
-  publishingRequired Boolean @map("publishing_required")
-  submissions CollaborationSubmissionVersion[]
-  publishing CollaborationPublishingExecution?
-  approvedAt DateTime? @map("approved_at")
-  autoApprovedAt DateTime? @map("auto_approved_at")
-  hardStoppedAt DateTime? @map("hard_stopped_at")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                       String                            @id @default(uuid())
+  collaborationId          String                            @map("collaboration_id")
+  collaboration            Collaboration                     @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  sourceBriefDeliverableId String                            @map("source_brief_deliverable_id")
+  sourceBriefDeliverable   UceBriefDeliverable               @relation(fields: [sourceBriefDeliverableId], references: [id], onDelete: Restrict)
+  displayOrder             Int                               @map("display_order")
+  definitionSnapshot       Json                              @map("definition_snapshot")
+  state                    CollaborationDeliverableState     @default(AWAITING_SUBMISSION)
+  revisionRequestCount     Int                               @default(0) @map("revision_request_count")
+  publishingRequired       Boolean                           @map("publishing_required")
+  submissions              CollaborationSubmissionVersion[]
+  publishing               CollaborationPublishingExecution?
+  approvedAt               DateTime?                         @map("approved_at")
+  autoApprovedAt           DateTime?                         @map("auto_approved_at")
+  hardStoppedAt            DateTime?                         @map("hard_stopped_at")
+  createdAt                DateTime                          @default(now()) @map("created_at")
+  updatedAt                DateTime                          @updatedAt @map("updated_at")
 
   @@unique([collaborationId, sourceBriefDeliverableId])
   @@index([collaborationId, state])
@@ -3890,24 +3925,24 @@ model CollaborationDeliverableExecution {
 }
 
 model CollaborationSubmissionVersion {
-  id String @id @default(uuid())
-  deliverableExecutionId String @map("deliverable_execution_id")
-  deliverableExecution CollaborationDeliverableExecution @relation(fields: [deliverableExecutionId], references: [id], onDelete: Cascade)
-  versionNumber Int @map("version_number")
-  assetRef String @map("asset_ref")
-  creatorNote String? @map("creator_note")
-  submissionMetadata Json? @map("submission_metadata")
-  submittedByUserId String @map("submitted_by_user_id")
-  submittedAt DateTime @default(now()) @map("submitted_at")
-  reviewDeadlineAt DateTime @map("review_deadline_at")
-  reviewState CollaborationSubmissionReviewState @default(UNDER_REVIEW) @map("review_state")
-  brandFeedback String? @map("brand_feedback")
-  reviewedByUserId String? @map("reviewed_by_user_id")
-  reviewedAt DateTime? @map("reviewed_at")
-  supersededAt DateTime? @map("superseded_at")
-  autoApprovedAt DateTime? @map("auto_approved_at")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                     String                             @id @default(uuid())
+  deliverableExecutionId String                             @map("deliverable_execution_id")
+  deliverableExecution   CollaborationDeliverableExecution  @relation(fields: [deliverableExecutionId], references: [id], onDelete: Cascade)
+  versionNumber          Int                                @map("version_number")
+  assetRef               String                             @map("asset_ref")
+  creatorNote            String?                            @map("creator_note")
+  submissionMetadata     Json?                              @map("submission_metadata")
+  submittedByUserId      String                             @map("submitted_by_user_id")
+  submittedAt            DateTime                           @default(now()) @map("submitted_at")
+  reviewDeadlineAt       DateTime                           @map("review_deadline_at")
+  reviewState            CollaborationSubmissionReviewState @default(UNDER_REVIEW) @map("review_state")
+  brandFeedback          String?                            @map("brand_feedback")
+  reviewedByUserId       String?                            @map("reviewed_by_user_id")
+  reviewedAt             DateTime?                          @map("reviewed_at")
+  supersededAt           DateTime?                          @map("superseded_at")
+  autoApprovedAt         DateTime?                          @map("auto_approved_at")
+  createdAt              DateTime                           @default(now()) @map("created_at")
+  updatedAt              DateTime                           @updatedAt @map("updated_at")
 
   @@unique([deliverableExecutionId, versionNumber])
   @@index([reviewState, reviewDeadlineAt])
@@ -3916,41 +3951,41 @@ model CollaborationSubmissionVersion {
 }
 
 model CollaborationPublishingExecution {
-  id String @id @default(uuid())
-  deliverableExecutionId String @unique @map("deliverable_execution_id")
-  deliverableExecution CollaborationDeliverableExecution @relation(fields: [deliverableExecutionId], references: [id], onDelete: Cascade)
-  state CollaborationPublishingState
-  authorizationState CollaborationPublicationAuthorizationState @map("authorization_state")
-  authorizedAt DateTime? @map("authorized_at")
-  authorizedByUserId String? @map("authorized_by_user_id")
-  evidenceHistory CollaborationPublishingEvidence[]
-  complianceVerifiedAt DateTime? @map("compliance_verified_at")
-  blockedReason String? @map("blocked_reason") @db.Text
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                     String                                     @id @default(uuid())
+  deliverableExecutionId String                                     @unique @map("deliverable_execution_id")
+  deliverableExecution   CollaborationDeliverableExecution          @relation(fields: [deliverableExecutionId], references: [id], onDelete: Cascade)
+  state                  CollaborationPublishingState
+  authorizationState     CollaborationPublicationAuthorizationState @map("authorization_state")
+  authorizedAt           DateTime?                                  @map("authorized_at")
+  authorizedByUserId     String?                                    @map("authorized_by_user_id")
+  evidenceHistory        CollaborationPublishingEvidence[]
+  complianceVerifiedAt   DateTime?                                  @map("compliance_verified_at")
+  blockedReason          String?                                    @map("blocked_reason") @db.Text
+  createdAt              DateTime                                   @default(now()) @map("created_at")
+  updatedAt              DateTime                                   @updatedAt @map("updated_at")
 
   @@index([state])
   @@map("collaboration_publishing_executions")
 }
 
 model CollaborationPublishingEvidence {
-  id String @id @default(uuid())
-  publishingExecutionId String @map("publishing_execution_id")
-  publishingExecution CollaborationPublishingExecution @relation(fields: [publishingExecutionId], references: [id], onDelete: Cascade)
-  sequence Int
-  evidenceRef String @map("evidence_ref") @db.Text
-  platform String? @db.VarChar(100)
-  creatorNote String? @map("creator_note") @db.Text
-  evidenceMetadata Json? @map("evidence_metadata")
-  submittedByUserId String @map("submitted_by_user_id")
-  submittedAt DateTime @default(now()) @map("submitted_at")
-  correctionReason String? @map("correction_reason") @db.Text
-  reviewedByUserId String? @map("reviewed_by_user_id")
-  reviewedAt DateTime? @map("reviewed_at")
-  complianceEvidenceRef String? @map("compliance_evidence_ref") @db.Text
-  verifiedAt DateTime? @map("verified_at")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                    String                           @id @default(uuid())
+  publishingExecutionId String                           @map("publishing_execution_id")
+  publishingExecution   CollaborationPublishingExecution @relation(fields: [publishingExecutionId], references: [id], onDelete: Cascade)
+  sequence              Int
+  evidenceRef           String                           @map("evidence_ref") @db.Text
+  platform              String?                          @db.VarChar(100)
+  creatorNote           String?                          @map("creator_note") @db.Text
+  evidenceMetadata      Json?                            @map("evidence_metadata")
+  submittedByUserId     String                           @map("submitted_by_user_id")
+  submittedAt           DateTime                         @default(now()) @map("submitted_at")
+  correctionReason      String?                          @map("correction_reason") @db.Text
+  reviewedByUserId      String?                          @map("reviewed_by_user_id")
+  reviewedAt            DateTime?                        @map("reviewed_at")
+  complianceEvidenceRef String?                          @map("compliance_evidence_ref") @db.Text
+  verifiedAt            DateTime?                        @map("verified_at")
+  createdAt             DateTime                         @default(now()) @map("created_at")
+  updatedAt             DateTime                         @updatedAt @map("updated_at")
 
   @@unique([publishingExecutionId, sequence])
   @@index([publishingExecutionId, submittedAt])
@@ -3958,18 +3993,18 @@ model CollaborationPublishingEvidence {
 }
 
 model CollaborationEvent {
-  id String @id @default(uuid())
-  collaborationId String @map("collaboration_id")
-  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
-  kind CollaborationEventKind
-  eventType String @map("event_type")
-  actorClass CollaborationActorClass @map("actor_class")
-  actorUserId String? @map("actor_user_id")
-  commandId String? @map("command_id")
-  correlationId String? @map("correlation_id")
-  aggregateVersion Int @map("aggregate_version")
-  payload Json?
-  occurredAt DateTime @default(now()) @map("occurred_at")
+  id               String                  @id @default(uuid())
+  collaborationId  String                  @map("collaboration_id")
+  collaboration    Collaboration           @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  kind             CollaborationEventKind
+  eventType        String                  @map("event_type")
+  actorClass       CollaborationActorClass @map("actor_class")
+  actorUserId      String?                 @map("actor_user_id")
+  commandId        String?                 @map("command_id")
+  correlationId    String?                 @map("correlation_id")
+  aggregateVersion Int                     @map("aggregate_version")
+  payload          Json?
+  occurredAt       DateTime                @default(now()) @map("occurred_at")
 
   @@unique([collaborationId, commandId])
   @@unique([collaborationId, aggregateVersion])
@@ -3979,29 +4014,29 @@ model CollaborationEvent {
 }
 
 model CollaborationFinancialResolution {
-  id String @id @default(uuid())
-  collaborationId String @unique @map("collaboration_id")
-  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
-  status CollaborationResolutionStatus @default(NOT_REQUIRED)
-  outcome CollaborationFinancialOutcome?
-  creatorEntitlementAmount Decimal? @map("creator_entitlement_amount") @db.Decimal(14, 2)
-  brandRefundEntitlementAmount Decimal? @map("brand_refund_entitlement_amount") @db.Decimal(14, 2)
-  creatorGrossEntitlementAmount Decimal? @map("creator_gross_entitlement_amount") @db.Decimal(14, 2)
-  creatorCommercialRefundAmount Decimal? @map("creator_commercial_refund_amount") @db.Decimal(14, 2)
-  platformCommissionRetainedAmount Decimal? @map("platform_commission_retained_amount") @db.Decimal(14, 2)
-  platformCommissionRefundAmount Decimal? @map("platform_commission_refund_amount") @db.Decimal(14, 2)
-  platformCommissionGstRetainedAmount Decimal? @map("platform_commission_gst_retained_amount") @db.Decimal(14, 2)
-  platformCommissionGstRefundAmount Decimal? @map("platform_commission_gst_refund_amount") @db.Decimal(14, 2)
-  brandCommercialRefundEntitlementAmount Decimal? @map("brand_commercial_refund_entitlement_amount") @db.Decimal(14, 2)
-  currency String? @db.VarChar(3)
-  reasonCode String? @map("reason_code")
-  reasonText String? @map("reason_text")
-  resolutionEvidence Json? @map("resolution_evidence")
-  residualObligations Json? @map("residual_obligations")
-  decidedByActorClass CollaborationActorClass? @map("decided_by_actor_class")
-  decidedByUserId String? @map("decided_by_user_id")
-  decidedAt DateTime? @map("decided_at")
-  resolvedAt DateTime? @map("resolved_at")
+  id                                     String                         @id @default(uuid())
+  collaborationId                        String                         @unique @map("collaboration_id")
+  collaboration                          Collaboration                  @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  status                                 CollaborationResolutionStatus  @default(NOT_REQUIRED)
+  outcome                                CollaborationFinancialOutcome?
+  creatorEntitlementAmount               Decimal?                       @map("creator_entitlement_amount") @db.Decimal(14, 2)
+  brandRefundEntitlementAmount           Decimal?                       @map("brand_refund_entitlement_amount") @db.Decimal(14, 2)
+  creatorGrossEntitlementAmount          Decimal?                       @map("creator_gross_entitlement_amount") @db.Decimal(14, 2)
+  creatorCommercialRefundAmount          Decimal?                       @map("creator_commercial_refund_amount") @db.Decimal(14, 2)
+  platformCommissionRetainedAmount       Decimal?                       @map("platform_commission_retained_amount") @db.Decimal(14, 2)
+  platformCommissionRefundAmount         Decimal?                       @map("platform_commission_refund_amount") @db.Decimal(14, 2)
+  platformCommissionGstRetainedAmount    Decimal?                       @map("platform_commission_gst_retained_amount") @db.Decimal(14, 2)
+  platformCommissionGstRefundAmount      Decimal?                       @map("platform_commission_gst_refund_amount") @db.Decimal(14, 2)
+  brandCommercialRefundEntitlementAmount Decimal?                       @map("brand_commercial_refund_entitlement_amount") @db.Decimal(14, 2)
+  currency                               String?                        @db.VarChar(3)
+  reasonCode                             String?                        @map("reason_code")
+  reasonText                             String?                        @map("reason_text")
+  resolutionEvidence                     Json?                          @map("resolution_evidence")
+  residualObligations                    Json?                          @map("residual_obligations")
+  decidedByActorClass                    CollaborationActorClass?       @map("decided_by_actor_class")
+  decidedByUserId                        String?                        @map("decided_by_user_id")
+  decidedAt                              DateTime?                      @map("decided_at")
+  resolvedAt                             DateTime?                      @map("resolved_at")
 
   @@index([status])
   @@index([outcome])
@@ -4009,60 +4044,60 @@ model CollaborationFinancialResolution {
 }
 
 model CollaborationSettlement {
-  id String @id @default(uuid())
-  collaborationId String @unique @map("collaboration_id")
-  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
-  state CollaborationSettlementState @default(NOT_ELIGIBLE)
-  creatorPayoutState CollaborationSettlementLegState @default(NOT_REQUIRED) @map("creator_payout_state")
-  brandRefundState CollaborationSettlementLegState @default(NOT_REQUIRED) @map("brand_refund_state")
-  creatorSettlementAmount Decimal? @map("creator_settlement_amount") @db.Decimal(14, 2)
-  brandRefundAmount Decimal? @map("brand_refund_amount") @db.Decimal(14, 2)
-  currency String? @db.VarChar(3)
-  payoutInstructionRef String? @map("payout_instruction_ref")
-  refundInstructionRef String? @map("refund_instruction_ref")
-  payoutExecutionRef String? @map("payout_execution_ref")
-  refundExecutionRef String? @map("refund_execution_ref")
-  payoutConfirmationRef String? @map("payout_confirmation_ref")
-  refundConfirmationRef String? @map("refund_confirmation_ref")
-  authoritativeConfirmationRef String? @map("authoritative_confirmation_ref")
-  eligibleAt DateTime? @map("eligible_at")
-  processingAt DateTime? @map("processing_at")
-  settledAt DateTime? @map("settled_at")
-  blockedAt DateTime? @map("blocked_at")
-  blockedReason String? @map("blocked_reason")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                           String                          @id @default(uuid())
+  collaborationId              String                          @unique @map("collaboration_id")
+  collaboration                Collaboration                   @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  state                        CollaborationSettlementState    @default(NOT_ELIGIBLE)
+  creatorPayoutState           CollaborationSettlementLegState @default(NOT_REQUIRED) @map("creator_payout_state")
+  brandRefundState             CollaborationSettlementLegState @default(NOT_REQUIRED) @map("brand_refund_state")
+  creatorSettlementAmount      Decimal?                        @map("creator_settlement_amount") @db.Decimal(14, 2)
+  brandRefundAmount            Decimal?                        @map("brand_refund_amount") @db.Decimal(14, 2)
+  currency                     String?                         @db.VarChar(3)
+  payoutInstructionRef         String?                         @map("payout_instruction_ref")
+  refundInstructionRef         String?                         @map("refund_instruction_ref")
+  payoutExecutionRef           String?                         @map("payout_execution_ref")
+  refundExecutionRef           String?                         @map("refund_execution_ref")
+  payoutConfirmationRef        String?                         @map("payout_confirmation_ref")
+  refundConfirmationRef        String?                         @map("refund_confirmation_ref")
+  authoritativeConfirmationRef String?                         @map("authoritative_confirmation_ref")
+  eligibleAt                   DateTime?                       @map("eligible_at")
+  processingAt                 DateTime?                       @map("processing_at")
+  settledAt                    DateTime?                       @map("settled_at")
+  blockedAt                    DateTime?                       @map("blocked_at")
+  blockedReason                String?                         @map("blocked_reason")
+  createdAt                    DateTime                        @default(now()) @map("created_at")
+  updatedAt                    DateTime                        @updatedAt @map("updated_at")
 
   @@index([state])
   @@map("collaboration_settlements")
 }
 
 model CollaborationFeedbackWindow {
-  id String @id @default(uuid())
-  collaborationId String @unique @map("collaboration_id")
-  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
-  openedAt DateTime @map("opened_at")
-  closesAt DateTime @map("closes_at")
-  visibility CollaborationFeedbackVisibility @default(HIDDEN)
-  revealedAt DateTime? @map("revealed_at")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id              String                          @id @default(uuid())
+  collaborationId String                          @unique @map("collaboration_id")
+  collaboration   Collaboration                   @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  openedAt        DateTime                        @map("opened_at")
+  closesAt        DateTime                        @map("closes_at")
+  visibility      CollaborationFeedbackVisibility @default(HIDDEN)
+  revealedAt      DateTime?                       @map("revealed_at")
+  createdAt       DateTime                        @default(now()) @map("created_at")
+  updatedAt       DateTime                        @updatedAt @map("updated_at")
 
   @@index([visibility, closesAt])
   @@map("collaboration_feedback_windows")
 }
 
 model CollaborationFeedback {
-  id String @id @default(uuid())
-  collaborationId String @map("collaboration_id")
-  collaboration Collaboration @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
-  authorRole CollaborationFeedbackAuthorRole @map("author_role")
-  authorUserId String @map("author_user_id")
-  rating Int
-  reviewText String? @map("review_text") @db.Text
-  submittedAt DateTime @default(now()) @map("submitted_at")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id              String                          @id @default(uuid())
+  collaborationId String                          @map("collaboration_id")
+  collaboration   Collaboration                   @relation(fields: [collaborationId], references: [id], onDelete: Cascade)
+  authorRole      CollaborationFeedbackAuthorRole @map("author_role")
+  authorUserId    String                          @map("author_user_id")
+  rating          Int
+  reviewText      String?                         @map("review_text") @db.Text
+  submittedAt     DateTime                        @default(now()) @map("submitted_at")
+  createdAt       DateTime                        @default(now()) @map("created_at")
+  updatedAt       DateTime                        @updatedAt @map("updated_at")
 
   @@unique([collaborationId, authorRole])
   @@index([collaborationId, submittedAt])
@@ -4602,9 +4637,8 @@ model Notification {
 
   recipients         NotificationRecipient[]
   emailDeliveries    NotificationEmailDelivery[]
-  creatorWorkspaceId String?           @map("creator_workspace_id")
-  creatorWorkspace   CreatorWorkspace? @relation(fields: [creatorWorkspaceId], references: [id], onDelete: Cascade)
-
+  creatorWorkspaceId String?                     @map("creator_workspace_id")
+  creatorWorkspace   CreatorWorkspace?           @relation(fields: [creatorWorkspaceId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, eventType, semanticEventKey])
   @@unique([creatorWorkspaceId, eventType, semanticEventKey], map: "notifications_creator_scope_semantic_key")
@@ -4654,8 +4688,8 @@ model NotificationJob {
   createdAt           DateTime                 @default(now()) @map("created_at")
 
   recipientSnapshots NotificationJobRecipient[]
-  creatorWorkspaceId String?           @map("creator_workspace_id")
-  creatorWorkspace   CreatorWorkspace? @relation(fields: [creatorWorkspaceId], references: [id], onDelete: Cascade)
+  creatorWorkspaceId String?                    @map("creator_workspace_id")
+  creatorWorkspace   CreatorWorkspace?          @relation(fields: [creatorWorkspaceId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, eventType, semanticEventKey])
   @@unique([creatorWorkspaceId, eventType, semanticEventKey], map: "notification_jobs_creator_scope_semantic_key")
@@ -5272,36 +5306,36 @@ model DataExtractionCapabilityResource {
 }
 
 model DataExtractionEvidenceItem {
-  id                           String                           @id @default(uuid())
-  evidenceRef                  String                           @unique @map("evidence_ref")
-  brandId                      String                           @map("brand_id")
-  brandProfile                 BrandProfile                     @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  capabilityId                 String                           @map("capability_id") @db.VarChar(100)
-  normalizationContractVersion String                           @map("normalization_contract_version") @db.VarChar(100)
-  resourceRef                  String                           @map("resource_ref")
-  resource                     DataExtractionResource           @relation(fields: [brandId, resourceRef], references: [brandId, resourceRef], onDelete: Restrict)
-  captureRef                   String                           @map("capture_ref")
-  capture                      DataExtractionCapture            @relation(fields: [brandId, captureRef, resourceRef], references: [brandId, captureRef, resourceRef], onDelete: Restrict)
-  contentArtifactRef           String?                          @map("content_artifact_ref")
-  contentArtifact              DataExtractionContentArtifact?   @relation(fields: [brandId, contentArtifactRef], references: [brandId, contentArtifactRef], onDelete: Restrict)
-  boundedPayload               Json?                            @map("bounded_payload")
-  contentHash                  String                           @map("content_hash") @db.VarChar(128)
+  id                           String                            @id @default(uuid())
+  evidenceRef                  String                            @unique @map("evidence_ref")
+  brandId                      String                            @map("brand_id")
+  brandProfile                 BrandProfile                      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  capabilityId                 String                            @map("capability_id") @db.VarChar(100)
+  normalizationContractVersion String                            @map("normalization_contract_version") @db.VarChar(100)
+  resourceRef                  String                            @map("resource_ref")
+  resource                     DataExtractionResource            @relation(fields: [brandId, resourceRef], references: [brandId, resourceRef], onDelete: Restrict)
+  captureRef                   String                            @map("capture_ref")
+  capture                      DataExtractionCapture             @relation(fields: [brandId, captureRef, resourceRef], references: [brandId, captureRef, resourceRef], onDelete: Restrict)
+  contentArtifactRef           String?                           @map("content_artifact_ref")
+  contentArtifact              DataExtractionContentArtifact?    @relation(fields: [brandId, contentArtifactRef], references: [brandId, contentArtifactRef], onDelete: Restrict)
+  boundedPayload               Json?                             @map("bounded_payload")
+  contentHash                  String                            @map("content_hash") @db.VarChar(128)
   polarity                     DataExtractionPolarity?
   representativeness           DataExtractionRepresentativeness
-  coverageSnapshot             DataExtractionCoverage           @map("coverage_snapshot")
-  freshnessAtEmission          DataExtractionFreshness          @map("freshness_at_emission")
-  freshnessBasis               String                           @map("freshness_basis") @db.Text
-  freshnessEvaluatedAt         DateTime                         @map("freshness_evaluated_at")
-  freshnessPriorCaptureRef     String?                          @map("freshness_prior_capture_ref")
-  freshnessSourceRevisionRef   String?                          @map("freshness_source_revision_ref") @db.VarChar(255)
-  qualitySnapshot              DataExtractionAcquisitionQuality @map("quality_snapshot")
-  qualityFailureCategories     String[]                         @default([]) @map("quality_failure_categories")
-  qualityDetailCodes           String[]                         @default([]) @map("quality_detail_codes")
+  coverageSnapshot             DataExtractionCoverage            @map("coverage_snapshot")
+  freshnessAtEmission          DataExtractionFreshness           @map("freshness_at_emission")
+  freshnessBasis               String                            @map("freshness_basis") @db.Text
+  freshnessEvaluatedAt         DateTime                          @map("freshness_evaluated_at")
+  freshnessPriorCaptureRef     String?                           @map("freshness_prior_capture_ref")
+  freshnessSourceRevisionRef   String?                           @map("freshness_source_revision_ref") @db.VarChar(255)
+  qualitySnapshot              DataExtractionAcquisitionQuality  @map("quality_snapshot")
+  qualityFailureCategories     String[]                          @default([]) @map("quality_failure_categories")
+  qualityDetailCodes           String[]                          @default([]) @map("quality_detail_codes")
   captureMethodClass           DataExtractionCaptureMethodClass? @map("capture_method_class")
-  parentEvidenceRefs           String[]                         @default([]) @map("parent_evidence_refs")
-  itemFingerprint              String                           @map("item_fingerprint") @db.VarChar(128)
-  semanticObservationKey       String?                          @map("semantic_observation_key") @db.VarChar(255)
-  createdAt                    DateTime                         @default(now()) @map("created_at")
+  parentEvidenceRefs           String[]                          @default([]) @map("parent_evidence_refs")
+  itemFingerprint              String                            @map("item_fingerprint") @db.VarChar(128)
+  semanticObservationKey       String?                           @map("semantic_observation_key") @db.VarChar(255)
+  createdAt                    DateTime                          @default(now()) @map("created_at")
 
   capabilityMemberships DataExtractionCapabilityEvidence[]
   observationSupports   DataExtractionObservationSupport[]
@@ -5623,6 +5657,28 @@ enum CreatorEntryContinuationIntent {
 
 enum InstagramSyncHealth {
   NOT_CONFIGURED
+}
+
+enum InstagramSyncCapabilityClass {
+  INITIAL_30_DAY
+  PROFILE_MEDIA_PERFORMANCE
+  AUDIENCE
+}
+
+enum InstagramSyncCoordinatorStatus {
+  PENDING
+  DUE
+  RUNNING
+  BACKOFF
+  BLOCKED_AUTHORIZATION
+  COMPLETED
+}
+
+enum InstagramSyncTrigger {
+  INITIAL_CONNECT
+  SCHEDULED
+  MANUAL
+  RECONNECT
 }
 
 enum NotificationEmailPolicy {
