@@ -11,6 +11,35 @@ import {
   type VisualStyleItemMetadata,
 } from "../../processors/visual-style/visual-style.types";
 
+const record = (
+  value: unknown,
+): Readonly<Record<string, unknown>> | undefined =>
+  value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Readonly<Record<string, unknown>>)
+    : undefined;
+
+function instagramVisualSupport(
+  item: SemanticValidationContext["evidenceManifest"][number] | undefined,
+): boolean {
+  if (
+    !item ||
+    item.capabilityId !== "instagram.media_visual_observations" ||
+    item.sourceClass !== "INSTAGRAM_OWNED" ||
+    item.freshness !== "CURRENT" ||
+    item.polarity === "EXPLICIT_NEGATIVE" ||
+    item.conflictGroupRef
+  )
+    return false;
+  const payload = record(item.normalizedPayload);
+  const semantic = record(payload?.semanticPayload) ?? payload;
+  const inspection = record(semantic?.inspection);
+  const executions = record(semantic?.visualExecutions);
+  return (
+    inspection?.depth !== "NOT_INSPECTED" &&
+    (inspection !== undefined || Array.isArray(executions?.values))
+  );
+}
+
 /** Grounded DOM-only MVP. No aesthetic inference from absent rendering or image presence. */
 export class VisualStyleSemanticValidator implements ProcessorSemanticValidator {
   readonly validatorId = "visual_style_synthesis";
@@ -40,7 +69,14 @@ export class VisualStyleSemanticValidator implements ProcessorSemanticValidator 
       if (!value.trim()) issue("VISUAL_BLANK_DESCRIPTION");
       if (meta.authority !== "CREATOR_SHOP_DERIVED")
         issue("VISUAL_INTERPRETATION_AUTHORITY");
-      if (!["OWNED_WEBSITE", "MULTI_SOURCE"].includes(meta.source_class))
+      const supportEntries = meta.evidence_refs.map((ref) => evidence.get(ref));
+      const instagram =
+        supportEntries.length >= 3 &&
+        supportEntries.every((entry) => instagramVisualSupport(entry));
+      if (
+        !["OWNED_WEBSITE", "MULTI_SOURCE"].includes(meta.source_class) &&
+        !(instagram && String(meta.source_class) === "INSTAGRAM_OWNED")
+      )
         issue("VISUAL_SOURCE_CLASS");
       if (
         meta.confidence != null &&
@@ -48,10 +84,10 @@ export class VisualStyleSemanticValidator implements ProcessorSemanticValidator 
       )
         issue("VISUAL_RENDERING_CONFIDENCE_ELEVATION");
       if (meta.freshness !== "CURRENT") issue("VISUAL_FRESHNESS_MISMATCH");
-      const support = meta.evidence_refs
-        .map((ref) => evidence.get(ref))
-        .map((e) => e && visualEvidenceSupport(e));
-      if (!support.length || support.some((e) => !e))
+      const support = supportEntries.map((entry) =>
+        entry ? visualEvidenceSupport(entry) : undefined,
+      );
+      if (!instagram && (!support.length || support.some((entry) => !entry)))
         issue("VISUAL_INSUFFICIENT_COMPONENT_SUPPORT");
       if (
         new Set(meta.evidence_refs).size !== meta.evidence_refs.length ||
@@ -60,6 +96,7 @@ export class VisualStyleSemanticValidator implements ProcessorSemanticValidator 
       )
         issue("VISUAL_DUPLICATE_REFERENCE");
       if (
+        !instagram &&
         graphic &&
         support.some(
           (e) => e?.evidence_semantic !== "LAYOUT_OR_COMPOSITION_OBSERVATION",
@@ -68,19 +105,21 @@ export class VisualStyleSemanticValidator implements ProcessorSemanticValidator 
         issue("VISUAL_GRAPHIC_SUPPORT_REQUIRED");
       // Attribution is mandatory because these observations are declarations, not computed pixels.
       if (
+        !instagram &&
         !/\b(source.declared|source declarations?|retained (DOM|source))\b/iu.test(
           value,
         )
       )
         issue("VISUAL_DECLARATION_ATTRIBUTION_REQUIRED");
-      if (
-        /\b(must|never|always|required|mandatory|approved|computed|rendered|canonical (logo|palette|font)|brand.confirmed|guarantee|clinically|efficacy|safer|superior|premium|luxurious|stunning|award.winning|shot list|call.to.action|campaign|photograph\w*|imagery|mood|lighting|camera)\b/iu.test(
+      const universalUnsupported =
+        /\b(must|never|always|required|mandatory|approved|canonical (logo|palette|font)|brand.confirmed|guarantee|clinically|efficacy|safer|superior|premium|luxurious|stunning|award.winning|shot list|call.to.action|campaign)\b|https?:\/\//iu.test(
           value,
-        ) ||
-        /\b(computed|rendered)\s+(appearance|style|colou?r|font|layout)\s+(is|shows|uses)|\b(no|without|absent|lacks?)\s+(images?|colou?rs?|fonts?|overlays?|graphics?)\b|https?:\/\/|#[a-f0-9]{3,8}\b/iu.test(
+        );
+      const websiteOnlyUnsupported =
+        /\b(computed|rendered|photograph\w*|imagery|mood|lighting|camera)\b|\b(no|without|absent|lacks?)\s+(images?|colou?rs?|fonts?|overlays?|graphics?)\b|#[a-f0-9]{3,8}\b/iu.test(
           value,
-        )
-      )
+        );
+      if (universalUnsupported || (!instagram && websiteOnlyUnsupported))
         issue("VISUAL_UNSUPPORTED_OR_PRESCRIPTIVE_INTERPRETATION");
       if (/\b(external stylesheet|external css)\b/iu.test(value))
         issue("VISUAL_UNRETAINED_STYLESHEET_INFERENCE");
@@ -109,7 +148,11 @@ export class VisualStyleSemanticValidator implements ProcessorSemanticValidator 
         ids.some((id) => !metaIds.includes(id))
       )
         issue("VISUAL_METADATA_ALIGNMENT");
-      if (imagery && items?.length)
+      const refs = (metas ?? []).flatMap((meta) => meta.evidence_refs);
+      const instagram =
+        refs.length >= 3 &&
+        refs.every((ref) => instagramVisualSupport(evidence.get(ref)));
+      if (imagery && items?.length && !instagram)
         issue("VISUAL_IMAGERY_SEMANTICS_UNOBSERVED");
       for (const item of items ?? []) {
         const meta = metas?.find((m) => m.semantic_id === item.semantic_id);

@@ -25,6 +25,8 @@ import { InstagramSyncController } from "./sync/instagram-sync.controller";
 import { InstagramSyncDispatcherService } from "./sync/instagram-sync-dispatcher.service";
 import { InstagramSyncPipelineAdapter } from "./sync/instagram-sync-pipeline.adapter";
 import { InstagramSyncPipelinePort } from "./sync/instagram-sync-pipeline.port";
+import { InstagramHiddenBrandRuntime } from "./hidden-brand/instagram-hidden-brand.runtime";
+import { InstagramHiddenBrandReader } from "./hidden-brand/instagram-hidden-brand.reader";
 
 @Module({
   imports: [
@@ -44,6 +46,8 @@ import { InstagramSyncPipelinePort } from "./sync/instagram-sync-pipeline.port";
     InstagramC2FoundationsService,
     InstagramC3SemanticsService,
     InstagramSyncDispatcherService,
+    InstagramHiddenBrandRuntime,
+    InstagramHiddenBrandReader,
     {
       provide: InstagramSyncPipelinePort,
       useClass: InstagramSyncPipelineAdapter,
@@ -65,6 +69,7 @@ import { InstagramSyncPipelinePort } from "./sync/instagram-sync-pipeline.port";
     InstagramC4RuntimeService,
     InstagramC2FoundationsService,
     InstagramC3SemanticsService,
+    InstagramHiddenBrandReader,
   ],
 })
 export class InstagramIntelligenceModule {}

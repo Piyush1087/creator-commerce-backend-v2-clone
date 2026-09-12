@@ -13,6 +13,7 @@ export const NORMALIZED_EVIDENCE_CAPABILITIES = [
   "owned_website.serviceability_evidence",
   "owned_website.location_evidence",
   "owned_website.offering_commercial_evidence",
+  ...INSTAGRAM_DE_CONTRACT.capabilities,
 ] as const;
 
 export type NormalizedEvidenceCapabilityId =
@@ -166,3 +167,4 @@ export interface IntelligenceEvidenceReader {
     request: IntelligenceEvidenceReadRequest,
   ): Promise<NormalizedEvidenceSet>;
 }
+import { INSTAGRAM_DE_CONTRACT } from "../../../instagram-intelligence/contracts/instagram-intelligence.registry";

@@ -20,6 +20,7 @@ import { InstagramC3SemanticsService } from "../semantics/instagram-c3-semantics
 import { InstagramC4RuntimeService } from "../runtime/instagram-c4.runtime.service";
 import type { InstagramSyncLease } from "./instagram-sync-coordinator.repository";
 import { InstagramSyncPipelinePort } from "./instagram-sync-pipeline.port";
+import { InstagramHiddenBrandRuntime } from "../hidden-brand/instagram-hidden-brand.runtime";
 
 const PROFILE_NORMALIZATION = "instagram.profile.c1.v1";
 const AUDIENCE_NORMALIZATION = "instagram.audience.c1.v1";
@@ -44,6 +45,7 @@ export class InstagramSyncPipelineAdapter extends InstagramSyncPipelinePort {
     private readonly foundations: InstagramC2FoundationsService,
     private readonly semantics: InstagramC3SemanticsService,
     private readonly c4: InstagramC4RuntimeService,
+    private readonly hiddenBrand: InstagramHiddenBrandRuntime,
   ) {
     super();
   }
@@ -116,6 +118,7 @@ export class InstagramSyncPipelineAdapter extends InstagramSyncPipelinePort {
     if (outcomes.some((item) => item.status !== "COMPLETED")) {
       throw new Error("INSTAGRAM_C4_PIPELINE_INCOMPLETE");
     }
+    const hiddenGenerationIds = await this.hiddenBrand.execute(lease);
     const processorIds = outcomes.map((item) => item.processorExecutionId);
     const generations = await this.prisma.intelligenceObjectGeneration.findMany(
       {
@@ -124,7 +127,12 @@ export class InstagramSyncPipelineAdapter extends InstagramSyncPipelinePort {
         orderBy: { id: "asc" },
       },
     );
-    return { generationIds: generations.map((row) => row.id) };
+    return {
+      generationIds: [
+        ...generations.map((row) => row.id),
+        ...hiddenGenerationIds,
+      ],
+    };
   }
 
   private async captureProfile(lease: InstagramSyncLease) {

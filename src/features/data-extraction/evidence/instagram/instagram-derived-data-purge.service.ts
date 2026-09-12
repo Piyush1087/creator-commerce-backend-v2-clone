@@ -43,7 +43,15 @@ export class InstagramDerivedDataPurgeService {
     const c4Generations = await tx.intelligenceObjectGeneration.findMany({
       where: {
         brandId: brandProfileId,
-        objectSemanticId: { in: [...C4_OBJECT_IDS] },
+        OR: [
+          { objectSemanticId: { in: [...C4_OBJECT_IDS] } },
+          {
+            objectMetadataPayload: {
+              path: ["sourceScope"],
+              equals: "INSTAGRAM_OWNED",
+            },
+          },
+        ],
       },
       select: { id: true },
     });
@@ -51,9 +59,17 @@ export class InstagramDerivedDataPurgeService {
     const c4Executions = await tx.intelligenceProcessorExecution.findMany({
       where: {
         brandId: brandProfileId,
-        processorId: { in: [...C4_OBJECT_IDS] },
+        OR: [
+          { processorId: { in: [...C4_OBJECT_IDS] } },
+          {
+            evidenceManifest: {
+              path: ["sourceProfile", "sourceScope"],
+              equals: "INSTAGRAM_OWNED",
+            },
+          },
+        ],
       },
-      select: { id: true },
+      select: { id: true, executionId: true },
     });
     const c4ExecutionIds = c4Executions.map((row) => row.id);
     const c4ComponentCount = c4GenerationIds.length
@@ -120,6 +136,13 @@ export class InstagramDerivedDataPurgeService {
       });
       await tx.intelligenceProcessorExecution.deleteMany({
         where: { brandId: brandProfileId, id: { in: c4ExecutionIds } },
+      });
+      await tx.intelligenceExecution.deleteMany({
+        where: {
+          brandId: brandProfileId,
+          id: { in: [...new Set(c4Executions.map((row) => row.executionId))] },
+          processorExecutions: { none: {} },
+        },
       });
     }
     const resources = await tx.dataExtractionResource.findMany({

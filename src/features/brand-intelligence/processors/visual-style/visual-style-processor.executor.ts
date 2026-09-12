@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { visualStyleOutputReadiness } from "./visual-style-plan";
 
 import { ContractRuntimeRegistry } from "../../contracts/registry/contract-runtime.registry";
@@ -38,6 +38,8 @@ import {
   validateVisualStyleIdentity,
 } from "./visual-style-identity";
 import { VisualStyleStateRepository } from "./visual-style-state.repository";
+import { InstagramBrandSourceAdmissionService } from "../../../instagram-intelligence/hidden-brand/instagram-brand-source-admission.service";
+import { INSTAGRAM_BRAND_SOURCE_INSTRUCTION } from "../../../instagram-intelligence/hidden-brand/instagram-brand-source-profile";
 
 function businessManifest(prepared: PreparedProcessorDependencies) {
   return visualStyleBusinessEntries(prepared.canonicalState).map((entry) => ({
@@ -61,6 +63,8 @@ export class VisualStyleProcessorExecutor implements ProcessorExecutor {
     private readonly semantic: SemanticValidator,
     @Inject(VISUAL_STYLE_MODEL_PROVIDER)
     private readonly model: VisualStyleModelProvider,
+    @Optional()
+    private readonly instagramSource?: InstagramBrandSourceAdmissionService,
   ) {}
 
   async execute(context: ProcessorExecutorContext) {
@@ -73,11 +77,18 @@ export class VisualStyleProcessorExecutor implements ProcessorExecutor {
         outputContractVersion: execution.outputContractVersion,
       };
       const bundle = this.contracts.getVerifiedBundle(registryKey);
-      const prepared = await this.dependencies.prepare({
-        brandId: execution.brandId,
-        registryKey,
-        activeScope: visualStyleScope(execution.activeScope, execution.brandId),
-      });
+      const sourcePrepared =
+        await this.instagramSource?.prepareExisting(execution);
+      const prepared =
+        sourcePrepared ??
+        (await this.dependencies.prepare({
+          brandId: execution.brandId,
+          registryKey,
+          activeScope: visualStyleScope(
+            execution.activeScope,
+            execution.brandId,
+          ),
+        }));
       if (!prepared.dependencyEligible)
         throw new ProcessorExecutorFailure({
           category: "DEPENDENCY_UNAVAILABLE",
@@ -107,7 +118,9 @@ export class VisualStyleProcessorExecutor implements ProcessorExecutor {
         prepared.canonicalState,
         execution.brandId,
       );
-      const current = await this.state.read(execution.brandId);
+      const current = sourcePrepared
+        ? []
+        : await this.state.read(execution.brandId);
       const business = businessManifest(prepared);
       const evidence = prepared.evidence.capabilityResults.flatMap((cap) =>
         cap.evidence.map((item) => ({
@@ -131,7 +144,9 @@ export class VisualStyleProcessorExecutor implements ProcessorExecutor {
       await context.heartbeat();
       const generated = await this.model.generate({
         processorExecutionId: execution.id,
-        instruction: VISUAL_STYLE_SYSTEM_INSTRUCTION,
+        instruction: sourcePrepared
+          ? `${VISUAL_STYLE_SYSTEM_INSTRUCTION}\n\n${INSTAGRAM_BRAND_SOURCE_INSTRUCTION}`
+          : VISUAL_STYLE_SYSTEM_INSTRUCTION,
         outputSchema: verifiedOutputZodSchema(bundle),
         evidenceRefs: evidence.map((item) => item.evidenceRef),
         approvedContext: {

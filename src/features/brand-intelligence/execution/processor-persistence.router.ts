@@ -16,6 +16,8 @@ import { ProcessorExecutorFailure } from "./executor/processor-executor";
 import type { ProcessorSuccessPersistenceHook } from "./processor-persistence.hook";
 import { OfferingFactualPersistenceHook } from "../processors/offering-factual/offering-factual-persistence.hook";
 import { InstagramC4PersistenceHook } from "../../instagram-intelligence/runtime/instagram-c4.persistence";
+import { InstagramHiddenBrandPersistenceHook } from "../../instagram-intelligence/hidden-brand/instagram-hidden-brand.persistence";
+import { sourceIdentityFromManifest } from "../../instagram-intelligence/hidden-brand/instagram-brand-source-profile";
 
 /** Bounded dispatch only; finalization still owns the transaction and live lease. */
 @Injectable()
@@ -34,12 +36,26 @@ export class ProcessorPersistenceRouter implements ProcessorSuccessPersistenceHo
     private readonly offeringFactual?: OfferingFactualPersistenceHook,
     @Optional()
     private readonly instagramC4?: InstagramC4PersistenceHook,
+    @Optional()
+    private readonly instagramHiddenBrand?: InstagramHiddenBrandPersistenceHook,
   ) {}
   async persistBeforeCompletion(
     tx: Prisma.TransactionClient,
     claim: ClaimedProcessorWork,
     result: ProcessorExecutionResult,
   ): Promise<void> {
+    if (sourceIdentityFromManifest(claim.processorExecution)) {
+      if (!this.instagramHiddenBrand)
+        throw new ProcessorExecutorFailure({
+          category: "CONFIGURATION_DRIFT",
+          code: "INSTAGRAM_HIDDEN_BRAND_PERSISTENCE_MISSING",
+        });
+      return this.instagramHiddenBrand.persistBeforeCompletion(
+        tx,
+        claim,
+        result,
+      );
+    }
     switch (claim.processorExecution.processorId) {
       case "instagram_content_behavior":
       case "instagram_audience_profile":

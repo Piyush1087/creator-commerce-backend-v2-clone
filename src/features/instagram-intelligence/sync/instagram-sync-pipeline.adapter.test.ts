@@ -85,10 +85,11 @@ describe("InstagramSyncPipelineAdapter", () => {
       foundations as never,
       semantics as never,
       c4 as never,
+      { execute: vi.fn().mockResolvedValue(["generation-hidden"]) } as never,
     );
 
     await expect(adapter.execute(lease)).resolves.toEqual({
-      generationIds: ["generation-a", "generation-b"],
+      generationIds: ["generation-a", "generation-b", "generation-hidden"],
     });
     expect(media.execute).toHaveBeenCalledTimes(1);
     expect(reads.execute).toHaveBeenCalledTimes(9);
@@ -133,6 +134,7 @@ describe("InstagramSyncPipelineAdapter", () => {
             { status: "FAILED_TERMINAL", processorExecutionId: "processor-a" },
           ]),
       } as never,
+      { execute: vi.fn() } as never,
     );
     await expect(adapter.execute(lease)).rejects.toThrow(
       "INSTAGRAM_C4_PIPELINE_INCOMPLETE",

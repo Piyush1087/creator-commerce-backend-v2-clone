@@ -61,7 +61,7 @@ describe("Instagram Intelligence V1 contract registry", () => {
         "instagram.media_offering_signals",
       ],
     });
-    expect(DATA_EXTRACTION_EVIDENCE_CAPABILITIES).not.toEqual(
+    expect(DATA_EXTRACTION_EVIDENCE_CAPABILITIES).toEqual(
       expect.arrayContaining(INSTAGRAM_DE_CONTRACT.capabilities),
     );
   });

@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { IntelligenceReadiness } from "@prisma/client";
 
 import { ContractRuntimeRegistry } from "../../contracts/registry/contract-runtime.registry";
@@ -27,6 +27,8 @@ import {
   BRAND_COMMUNICATION_SYSTEM_INSTRUCTION,
 } from "./brand-communication-prompt";
 import { verifiedOutputZodSchema } from "../../contracts/validation/verified-output-zod-schema";
+import { InstagramBrandSourceAdmissionService } from "../../../instagram-intelligence/hidden-brand/instagram-brand-source-admission.service";
+import { INSTAGRAM_BRAND_SOURCE_INSTRUCTION } from "../../../instagram-intelligence/hidden-brand/instagram-brand-source-profile";
 
 export const BRAND_COMMUNICATION_PROCESSOR_ID = "brand_communication" as const;
 export const BRAND_COMMUNICATION_PROCESSOR_VERSION = "1.0" as const;
@@ -80,6 +82,12 @@ function semanticManifests(prepared: PreparedProcessorDependencies): Readonly<{
             : capability.capabilityId,
         semanticId: item.evidenceRef,
         revisionIdentity: item.captureVersion,
+        sourceClass: item.sourceClass,
+        freshness: item.freshness.state,
+        representativeness: item.representativeness,
+        normalizedPayload: item.boundedNormalizedPayload,
+        polarity: item.polarity,
+        conflictGroupRef: item.conflictGroupRef,
       })),
     ),
     business: prepared.canonicalState.entries.map((entry) => ({
@@ -123,6 +131,8 @@ export class BrandCommunicationProcessorExecutor implements ProcessorExecutor {
     private readonly semanticValidator: SemanticValidator,
     @Inject(BRAND_COMMUNICATION_MODEL_PROVIDER)
     private readonly model: BrandCommunicationModelProvider,
+    @Optional()
+    private readonly instagramSource?: InstagramBrandSourceAdmissionService,
   ) {}
 
   async execute(context: ProcessorExecutorContext) {
@@ -136,11 +146,15 @@ export class BrandCommunicationProcessorExecutor implements ProcessorExecutor {
         outputContractVersion: execution.outputContractVersion,
       };
       const bundle = this.contracts.getVerifiedBundle(registryKey);
-      const prepared = await this.dependencies.prepare({
-        brandId: execution.brandId,
-        registryKey,
-        activeScope: scope,
-      });
+      const sourcePrepared =
+        await this.instagramSource?.prepareExisting(execution);
+      const prepared =
+        sourcePrepared ??
+        (await this.dependencies.prepare({
+          brandId: execution.brandId,
+          registryKey,
+          activeScope: scope,
+        }));
       if (!prepared.dependencyEligible) {
         throw new ProcessorExecutorFailure({
           category: "DEPENDENCY_UNAVAILABLE",
@@ -160,7 +174,9 @@ export class BrandCommunicationProcessorExecutor implements ProcessorExecutor {
       await context.heartbeat();
       const modelResult = await this.model.generate({
         processorExecutionId: execution.id,
-        instruction: BRAND_COMMUNICATION_SYSTEM_INSTRUCTION,
+        instruction: sourcePrepared
+          ? `${BRAND_COMMUNICATION_SYSTEM_INSTRUCTION}\n\n${INSTAGRAM_BRAND_SOURCE_INSTRUCTION}`
+          : BRAND_COMMUNICATION_SYSTEM_INSTRUCTION,
         approvedContext: this.approvedContext(prepared),
         evidenceRefs: prepared.evidence.capabilityResults.flatMap(
           (capability) => capability.evidence.map((item) => item.evidenceRef),

@@ -82,6 +82,21 @@ function metadataRefs(metadata: JsonRecord | undefined): {
   };
 }
 
+function recursiveEvidenceRefs(value: unknown): string[] {
+  if (Array.isArray(value))
+    return [...new Set(value.flatMap(recursiveEvidenceRefs))];
+  const object = record(value);
+  if (!object) return [];
+  return [
+    ...new Set([
+      ...metadataRefs(object).evidenceRefs,
+      ...Object.entries(object)
+        .filter(([key]) => key !== "evidence_refs")
+        .flatMap(([, child]) => recursiveEvidenceRefs(child)),
+    ]),
+  ];
+}
+
 function capabilityIds(bundle: VerifiedContractBundle): Set<string> {
   const evidence = bundle.artifacts.evidenceContract;
   const sections = [
@@ -280,6 +295,58 @@ class BrandCommunicationSemanticValidator implements ProcessorSemanticValidator 
         );
       }
     }
+    if (
+      context.evidenceManifest.some(
+        (entry) => entry.sourceClass === "INSTAGRAM_OWNED",
+      )
+    ) {
+      if (
+        Array.isArray(profile.communication_constraints) &&
+        profile.communication_constraints.length
+      ) {
+        issues.push(
+          semanticIssue(
+            "INSTAGRAM_PATTERN_CANNOT_CREATE_HARD_CONSTRAINT",
+            "Instagram patterns cannot establish hard communication constraints",
+            "$/f/communication_constraints",
+          ),
+        );
+      }
+      for (const field of [
+        "tone_traits",
+        "free_text_guidance",
+        "primary_language",
+      ] as const) {
+        const value = profile[field];
+        if (value == null || (Array.isArray(value) && value.length === 0))
+          continue;
+        const refs = recursiveEvidenceRefs(metadata[field]);
+        const support = refs
+          .map((ref) =>
+            context.evidenceManifest.find((entry) => entry.evidenceRef === ref),
+          )
+          .filter((entry) => entry !== undefined);
+        if (
+          refs.length < 3 ||
+          support.length !== refs.length ||
+          support.some(
+            (entry) =>
+              entry.capabilityId !== "instagram.caption_context" ||
+              entry.sourceClass !== "INSTAGRAM_OWNED" ||
+              entry.freshness !== "CURRENT" ||
+              entry.polarity === "EXPLICIT_NEGATIVE",
+          )
+        ) {
+          issues.push(
+            semanticIssue(
+              "INSTAGRAM_REPRESENTATIVE_SUPPORT_REQUIRED",
+              "Reusable Instagram communication output requires at least three current exact caption-context Evidence references",
+              `$/f/${field}`,
+            ),
+          );
+        }
+      }
+    }
     return issues;
   }
 
@@ -381,6 +448,10 @@ export class SemanticValidator {
       ]),
     );
     const allowedCapabilities = capabilityIds(context.bundle);
+    const instagramSourceProfileAllowed = Object.keys(
+      record(context.bundle.artifacts.evidenceContract.optional_enrichment) ??
+        {},
+    ).some((key) => key.startsWith("instagram."));
 
     if (
       evidenceByRef.size !== context.evidenceManifest.length ||
@@ -389,7 +460,12 @@ export class SemanticValidator {
           !entry.evidenceRef ||
           !entry.semanticId ||
           !entry.revisionIdentity ||
-          !allowedCapabilities.has(entry.capabilityId),
+          (!allowedCapabilities.has(entry.capabilityId) &&
+            !(
+              instagramSourceProfileAllowed &&
+              entry.capabilityId.startsWith("instagram.") &&
+              entry.sourceClass === "INSTAGRAM_OWNED"
+            )),
       )
     ) {
       issues.push(
