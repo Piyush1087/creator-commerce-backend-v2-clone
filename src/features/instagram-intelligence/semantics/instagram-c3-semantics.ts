@@ -195,16 +195,40 @@ export function assertCaptionIsData(text: string): void {
 
 export function extractCaptionTokens(text: string | undefined) {
   if (!text) return { hashtags: [] as string[], mentions: [] as string[] };
+  const normalizedText = text.normalize("NFKC");
   const collect = (pattern: RegExp) =>
-    [...text.matchAll(pattern)]
+    [...normalizedText.matchAll(pattern)]
       .map((match) => match[1]!.normalize("NFKC").toLocaleLowerCase("en-US"))
       .filter((value) => value.length <= 100)
       .filter((value, index, values) => values.indexOf(value) === index)
-      .sort((a, b) => a.localeCompare(b));
+      .sort(compareCanonical);
   return {
     hashtags: collect(/#([\p{L}\p{N}_]+)/gu).map((value) => `#${value}`),
-    mentions: collect(/@([A-Za-z0-9._]+)/gu).map((value) => `@${value}`),
+    mentions: extractInstagramMentions(normalizedText),
   };
+}
+
+function extractInstagramMentions(text: string) {
+  const mentions: string[] = [];
+  const pattern = /@([A-Za-z0-9_](?:[A-Za-z0-9._]{0,28}[A-Za-z0-9_])?)/gu;
+  for (const match of text.matchAll(pattern)) {
+    const start = match.index!;
+    const end = start + match[0].length;
+    const before = start === 0 ? "" : text[start - 1]!;
+    const after = end === text.length ? "" : text[end]!;
+    const tokenPrefix = text.slice(0, start).match(/[^\s]*$/u)?.[0] ?? "";
+    const validStart = start === 0 || /[\s([{"'“‘,!?;]/u.test(before);
+    const afterPeriod = end + 1 === text.length ? "" : text[end + 1]!;
+    const validEnd =
+      end === text.length ||
+      (after === "."
+        ? !afterPeriod || !/[A-Za-z0-9_]/u.test(afterPeriod)
+        : !/[A-Za-z0-9_@/-]/u.test(after));
+    const embeddedInUrl = /:\/\/|[/=#]/u.test(tokenPrefix);
+    if (validStart && validEnd && !embeddedInUrl)
+      mentions.push(`@${match[1]!.toLowerCase()}`);
+  }
+  return sortedUnique(mentions);
 }
 
 export function finalizeInstagramC3(
@@ -310,23 +334,33 @@ function finalizeField(
   values: readonly z.infer<typeof candidateValueSchema>[],
   context: InstagramC3AdmittedContext,
 ): InstagramC3FieldState {
-  const normalized = new Map<string, z.infer<typeof candidateValueSchema>>();
+  const normalized = new Map<
+    string,
+    { labels: Set<string>; supportModalities: Set<"CAPTION" | "VISUAL"> }
+  >();
   for (const value of values) {
     const label = normalizeLabel(value.label);
-    const key = label.toLocaleLowerCase("en-US");
-    const prior = normalized.get(key);
-    const modalities = sortedUnique(value.supportModalities);
-    if (!prior || modalities.length > prior.supportModalities.length) {
-      normalized.set(key, { ...value, label, supportModalities: modalities });
-    }
+    const key = normalizeName(label);
+    const group = normalized.get(key) ?? {
+      labels: new Set<string>(),
+      supportModalities: new Set<"CAPTION" | "VISUAL">(),
+    };
+    group.labels.add(label);
+    for (const modality of value.supportModalities)
+      group.supportModalities.add(modality);
+    normalized.set(key, group);
   }
-  const mapped = [...normalized.values()]
-    .sort((a, b) => a.label.localeCompare(b.label))
-    .map((value) => {
-      const refs = modalityRefs(value.supportModalities, context);
+  const mapped = [...normalized.entries()]
+    .sort(([a], [b]) => compareCanonical(a, b))
+    .map(([key, group]) => {
+      const label = [...group.labels].sort(compareCanonical)[0]!;
+      const refs = modalityRefs(
+        sortedUnique([...group.supportModalities]),
+        context,
+      );
       return {
-        semanticId: `${field}.${slug(value.label)}`,
-        label: value.label,
+        semanticId: `${field}.${slug(key)}`,
+        label,
         confidence: refs.length >= 2 ? ("MEDIUM" as const) : ("LOW" as const),
         evidenceRefs: refs,
       };
@@ -361,9 +395,14 @@ function finalizeCues(
     const record = cueRecord(cue, context);
     // One source cue/span is one vote even if repeated or relabelled.
     const spanKey = `${cue.sourceModality}:${record.supportHash}`;
-    if (!unique.has(spanKey)) unique.set(spanKey, record);
+    const prior = unique.get(spanKey);
+    if (prior && prior.signalClass !== record.signalClass)
+      throw new InstagramC3SemanticError("AMBIGUOUS_CUE_CLASSIFICATION");
+    if (!prior) unique.set(spanKey, record);
   }
-  return [...unique.values()].sort((a, b) => a.cueId.localeCompare(b.cueId));
+  return [...unique.values()].sort((a, b) =>
+    compareCanonical(a.cueId, b.cueId),
+  );
 }
 
 function cueRecord(
@@ -630,14 +669,39 @@ function modalityContains(
   if (modality === "CAPTION")
     return (
       context.caption.state === "AVAILABLE" &&
-      normalizeName(context.caption.text ?? "").includes(normalizedNeedle)
+      containsNormalizedPhrase(context.caption.text ?? "", normalizedNeedle)
     );
   return (
     context.visual.state === "AVAILABLE" &&
     visualStrings(context.visual.observation).some((value) =>
-      normalizeName(value).includes(normalizedNeedle),
+      containsNormalizedPhrase(value, normalizedNeedle),
     )
   );
+}
+
+export function containsNormalizedPhrase(source: string, phrase: string) {
+  const haystack = normalizeName(source);
+  const needle = normalizeName(phrase);
+  if (!needle) return false;
+  let from = 0;
+  while (from <= haystack.length - needle.length) {
+    const index = haystack.indexOf(needle, from);
+    if (index < 0) return false;
+    const before = index === 0 ? "" : haystack[index - 1]!;
+    const afterIndex = index + needle.length;
+    const after = afterIndex === haystack.length ? "" : haystack[afterIndex]!;
+    if (
+      (!before || !isTokenCharacter(before)) &&
+      (!after || !isTokenCharacter(after))
+    )
+      return true;
+    from = index + 1;
+  }
+  return false;
+}
+
+function isTokenCharacter(value: string) {
+  return /[\p{L}\p{N}_]/u.test(value);
 }
 
 function visualStrings(value: unknown): string[] {
@@ -673,7 +737,11 @@ function digest(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 function sortedUnique<T extends string>(values: readonly T[]): T[] {
-  return [...new Set(values)].sort((a, b) => a.localeCompare(b));
+  return [...new Set(values)].sort(compareCanonical);
+}
+
+function compareCanonical(a: string, b: string) {
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 export class InstagramC3SemanticError extends Error {
