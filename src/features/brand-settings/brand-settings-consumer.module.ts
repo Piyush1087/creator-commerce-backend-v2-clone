@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 
 import { PrismaModule } from "../../prisma/prisma.module";
 import { BrandCentreModule } from "../brand-centre/brand-centre.module";
@@ -13,7 +13,11 @@ import { InstagramIntelligenceAuthorizedImageAcquisitionService } from "./servic
 import { InstagramSyncCoordinatorRepository } from "../instagram-intelligence/sync/instagram-sync-coordinator.repository";
 
 @Module({
-  imports: [PrismaModule, BrandCentreModule, InstagramProviderClientModule],
+  imports: [
+    PrismaModule,
+    forwardRef(() => BrandCentreModule),
+    InstagramProviderClientModule,
+  ],
   providers: [
     BrandSettingsAccessService,
     BrandProviderReadinessService,

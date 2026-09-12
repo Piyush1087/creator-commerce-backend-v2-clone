@@ -30,7 +30,7 @@ import { BrandSettingsConsumerModule } from "./brand-settings-consumer.module";
     MailModule,
     ProviderOAuthModule,
     DataExtractionModule,
-    BrandSettingsConsumerModule,
+    forwardRef(() => BrandSettingsConsumerModule),
     forwardRef(() => NotificationsModule),
   ],
   controllers: [

@@ -1,3 +1,5 @@
+import { INSTAGRAM_DE_CONTRACT } from "../../../instagram-intelligence/contracts/instagram-intelligence.registry";
+
 export const INTELLIGENCE_EVIDENCE_READER = Symbol(
   "INTELLIGENCE_EVIDENCE_READER",
 );
@@ -167,4 +169,3 @@ export interface IntelligenceEvidenceReader {
     request: IntelligenceEvidenceReadRequest,
   ): Promise<NormalizedEvidenceSet>;
 }
-import { INSTAGRAM_DE_CONTRACT } from "../../../instagram-intelligence/contracts/instagram-intelligence.registry";
