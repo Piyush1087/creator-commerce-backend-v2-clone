@@ -517,7 +517,7 @@ describePostgres(
       ).toBe(true);
       const firstCounts = await counts(target.brand.id);
       expect(firstCounts).toEqual({
-        resources: 1,
+        resources: 2,
         captures: 2,
         artifacts: 4,
         evidence: 3,
