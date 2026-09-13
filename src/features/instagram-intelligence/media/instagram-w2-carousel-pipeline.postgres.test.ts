@@ -516,6 +516,18 @@ describePostgres(
         ),
       ).toBe(true);
       const firstCounts = await counts(target.brand.id);
+      expect(firstCounts).toEqual({
+        resources: 1,
+        captures: 2,
+        artifacts: 4,
+        evidence: 3,
+        capabilityExecutions: 2,
+        capabilityResources: 2,
+        capabilityEvidence: 3,
+        observations: 2,
+        observationSupports: 2,
+        providerLinks: 4,
+      });
       const replay = await service.execute(input);
       expect(replay).toMatchObject({ reused: true, coverage: first.coverage });
       expect(replay.evidenceRefs).toEqual(first.evidenceRefs);
