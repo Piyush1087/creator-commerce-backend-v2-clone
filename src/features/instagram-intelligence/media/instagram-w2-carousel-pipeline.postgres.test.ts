@@ -211,7 +211,27 @@ describePostgres(
         evidence: await prisma.dataExtractionEvidenceItem.count({
           where: { brandId },
         }),
+        capabilityExecutions:
+          await prisma.dataExtractionCapabilityExecution.count({
+            where: { brandId },
+          }),
+        capabilityResources:
+          await prisma.dataExtractionCapabilityResource.count({
+            where: { brandId },
+          }),
+        capabilityEvidence: await prisma.dataExtractionCapabilityEvidence.count(
+          {
+            where: { brandId },
+          },
+        ),
         observations: await prisma.dataExtractionSemanticObservation.count({
+          where: { brandId },
+        }),
+        observationSupports:
+          await prisma.dataExtractionObservationSupport.count({
+            where: { brandId },
+          }),
+        providerLinks: await prisma.dataExtractionProviderExecutionLink.count({
           where: { brandId },
         }),
       };
@@ -255,6 +275,18 @@ describePostgres(
 
       const first = await service.execute(input);
       const firstCounts = await counts(target.brand.id);
+      expect(firstCounts).toEqual({
+        resources: 1,
+        captures: 2,
+        artifacts: 4,
+        evidence: 3,
+        capabilityExecutions: 2,
+        capabilityResources: 2,
+        capabilityEvidence: 3,
+        observations: 2,
+        observationSupports: 2,
+        providerLinks: 4,
+      });
       const replay = await service.execute(input);
       expect(replay).toMatchObject({ reused: true, coverage: first.coverage });
       expect(replay.evidenceRefs).toEqual(first.evidenceRefs);
@@ -351,7 +383,12 @@ describePostgres(
         captures: 0,
         artifacts: 0,
         evidence: 0,
+        capabilityExecutions: 0,
+        capabilityResources: 0,
+        capabilityEvidence: 0,
         observations: 0,
+        observationSupports: 0,
+        providerLinks: 0,
       });
       expect(
         await prisma.dataExtractionResource.findUnique({
