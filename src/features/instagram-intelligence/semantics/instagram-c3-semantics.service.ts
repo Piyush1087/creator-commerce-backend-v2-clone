@@ -10,6 +10,7 @@ import {
 import { persistenceError } from "../../data-extraction/evidence/persistence/evidence-persistence.errors";
 import { createDataExtractionRepositorySet } from "../../data-extraction/evidence/persistence/prisma-evidence-repositories";
 import { INSTAGRAM_B3A_NORMALIZATION_CONTRACT_VERSION } from "../media/instagram-b3a-visual-observation";
+import { INSTAGRAM_VIDEO_NORMALIZATION_CONTRACT_VERSION } from "../../instagram/media/video/instagram-video.types";
 import { INSTAGRAM_B3B_NORMALIZATION_VERSION } from "../media/instagram-b3b-media-completion.service";
 import { INSTAGRAM_C2_CALCULATION_CONTRACT } from "../foundations/instagram-c2-exact-arithmetic";
 import { InstagramMediaObservationSchema } from "../contracts/instagram-intelligence.schemas";
@@ -26,6 +27,7 @@ import {
   INSTAGRAM_C3_NORMALIZATION_VERSION,
   INSTAGRAM_C3_OBSERVATION_PROFILE_VERSION,
   INSTAGRAM_C3_PROMPT_PROFILE_VERSION,
+  INSTAGRAM_C3_VIDEO_FRAME_INPUT_PROFILE_VERSION,
   InstagramC3SemanticError,
   normalizeName,
 } from "./instagram-c3-semantics";
@@ -183,12 +185,17 @@ export class InstagramC3SemanticsService {
     for (const light of eligible) {
       const payload = record(light.boundedPayload);
       const mediaId = payload.providerMediaId as string;
-      const visual = await this.loadVisual(request, light.resourceRef);
-      const context = buildContext(payload, light.evidenceRef, visual);
+      const visuals = await this.loadVisuals(request, light.resourceRef);
+      const context = buildContext(payload, light.evidenceRef, visuals);
       const manifest = {
         contractVersion: INSTAGRAM_C3_CONTRACT_VERSION,
         observationProfileVersion: INSTAGRAM_C3_OBSERVATION_PROFILE_VERSION,
         promptProfileVersion: this.model.modelProfileVersion,
+        semanticInputProfileVersion: context.inspection.reasonCodes.includes(
+          "SAMPLED_FRAMES_ARE_NOT_COMPLETE_VIDEO",
+        )
+          ? INSTAGRAM_C3_VIDEO_FRAME_INPUT_PROFILE_VERSION
+          : INSTAGRAM_C3_OBSERVATION_PROFILE_VERSION,
         modelIdentity: this.model.modelIdentity,
         brandProfileId: request.brandProfileId,
         providerAccountId: request.providerAccountId,
@@ -203,14 +210,10 @@ export class InstagramC3SemanticsService {
         inspection: context.inspection,
         sourceEvidence: [
           { evidenceRef: light.evidenceRef, contentHash: light.contentHash },
-          ...(visual
-            ? [
-                {
-                  evidenceRef: visual.evidenceRef,
-                  contentHash: visual.contentHash,
-                },
-              ]
-            : []),
+          ...visuals.map((visual) => ({
+            evidenceRef: visual.evidenceRef,
+            contentHash: visual.contentHash,
+          })),
         ].sort((a, b) => a.evidenceRef.localeCompare(b.evidenceRef)),
         c2: { evidenceRef: c2.evidenceRef, contentHash: c2.contentHash },
         offeringSnapshotHash: digestCanonical(offeringSnapshot),
@@ -266,7 +269,7 @@ export class InstagramC3SemanticsService {
         const refs = await this.persist(
           request,
           light,
-          visual,
+          visuals,
           c2,
           executionIdentity,
           manifest,
@@ -339,17 +342,21 @@ export class InstagramC3SemanticsService {
     return row;
   }
 
-  private async loadVisual(
+  private async loadVisuals(
     request: InstagramC3ExecutionRequest,
     resourceRef: string,
   ) {
-    return this.prisma.dataExtractionEvidenceItem.findFirst({
+    const rows = await this.prisma.dataExtractionEvidenceItem.findMany({
       where: {
         brandId: request.brandProfileId,
         resourceRef,
         capabilityId: "instagram.media_visual_observations",
-        normalizationContractVersion:
-          INSTAGRAM_B3A_NORMALIZATION_CONTRACT_VERSION,
+        normalizationContractVersion: {
+          in: [
+            INSTAGRAM_B3A_NORMALIZATION_CONTRACT_VERSION,
+            INSTAGRAM_VIDEO_NORMALIZATION_CONTRACT_VERSION,
+          ],
+        },
         capture: {
           status: "COMPLETED",
           capturedAt: { lte: request.executionCutoff },
@@ -364,6 +371,10 @@ export class InstagramC3SemanticsService {
       include: { capture: true, resource: true },
       orderBy: [{ capture: { capturedAt: "desc" } }, { evidenceRef: "asc" }],
     });
+    const latestCaptureRef = rows[0]?.captureRef;
+    return latestCaptureRef
+      ? rows.filter((row) => row.captureRef === latestCaptureRef)
+      : [];
   }
 
   private async loadReplay(
@@ -417,7 +428,7 @@ export class InstagramC3SemanticsService {
   private async persist(
     request: InstagramC3ExecutionRequest,
     light: C3EvidenceRow,
-    visual: C3EvidenceRow | null,
+    visuals: readonly C3EvidenceRow[],
     c2: C3EvidenceRow,
     executionIdentity: string,
     manifest: Readonly<Record<string, unknown>>,
@@ -432,13 +443,15 @@ export class InstagramC3SemanticsService {
           capabilityId,
           payloads[capabilityId],
           light.evidenceRef,
-          visual?.evidenceRef,
+          visuals.map((visual) => visual.evidenceRef),
           c2.evidenceRef,
         );
         const captureByEvidenceRef = new Map([
           [light.evidenceRef, light.captureRef],
           [c2.evidenceRef, c2.captureRef],
-          ...(visual ? [[visual.evidenceRef, visual.captureRef] as const] : []),
+          ...visuals.map(
+            (visual) => [visual.evidenceRef, visual.captureRef] as const,
+          ),
         ]);
         const normalizedPayload = {
           resultClass: "MODEL_DERIVED_RESULT",
@@ -575,7 +588,7 @@ function relevantParents(
   capabilityId: (typeof OWNER_CAPABILITIES)[number],
   semanticPayload: unknown,
   lightRef: string,
-  visualRef: string | undefined,
+  visualRefs: readonly string[],
   c2Ref: string,
 ) {
   if (capabilityId === "instagram.caption_context")
@@ -583,21 +596,19 @@ function relevantParents(
       lightRef,
       c2Ref,
       ...collectEvidenceRefs(semanticPayload).filter((ref) =>
-        [lightRef, visualRef, c2Ref].includes(ref),
+        [lightRef, ...visualRefs, c2Ref].includes(ref),
       ),
     ]);
   if (capabilityId === "instagram.media_visual_observations")
-    return [lightRef, ...(visualRef ? [visualRef] : [])].sort();
-  const admitted = new Set([lightRef, ...(visualRef ? [visualRef] : [])]);
+    return [lightRef, ...visualRefs].sort();
+  const admitted = new Set([lightRef, ...visualRefs]);
   const grounded = collectEvidenceRefs(semanticPayload).filter((ref) =>
     admitted.has(ref),
   );
   // UNKNOWN still records the admitted context that was inspected to reach a
   // deliberately non-assertive result; asserted fields use only their refs.
   return sortedUnique(
-    grounded.length > 0
-      ? grounded
-      : [lightRef, ...(visualRef ? [visualRef] : [])],
+    grounded.length > 0 ? grounded : [lightRef, ...visualRefs],
   );
 }
 
@@ -623,24 +634,41 @@ function sortedUnique(values: readonly string[]) {
 function buildContext(
   payload: Record<string, unknown>,
   lightEvidenceRef: string,
-  visual: C3EvidenceRow | null,
+  visuals: readonly C3EvidenceRow[],
 ) {
   const caption = field(payload.caption);
   const selected = field(payload.selection).selectionRank != null;
-  const visualPayload = record(visual?.boundedPayload);
-  const observation = record(visualPayload.observation);
-  const inspectionDepth = visualPayload.inspectionDepth;
+  const visualPayloads = visuals.map((visual) => record(visual.boundedPayload));
+  const videoFrames = visualPayloads
+    .filter((value) => value.inspectionDepth === "MULTI_FRAME_SAMPLED")
+    .map((value) => ({
+      frame: record(value.frame),
+      observation: record(value.observation),
+    }))
+    .sort(
+      (a, b) =>
+        Number(a.frame.frameOrdinal ?? 0) - Number(b.frame.frameOrdinal ?? 0),
+    );
+  const singleVisualPayload = visualPayloads[0] ?? {};
+  const observation =
+    videoFrames.length > 0
+      ? { sampledFrames: videoFrames }
+      : record(singleVisualPayload.observation);
+  const inspectionDepth = singleVisualPayload.inspectionDepth;
   const children = field(payload.carouselChildren);
   const childRows = Array.isArray(children.children) ? children.children : [];
   const depth = !selected
     ? "LIGHT_ONLY"
-    : visual && inspectionDepth === "IMAGE_ONLY"
-      ? "DEEP_SELECTED"
-      : visual && inspectionDepth === "CAROUSEL_REPRESENTATIVE_ONLY"
-        ? "PARTIAL_DEEP"
-        : visual && inspectionDepth === "COVER_ONLY"
-          ? "COVER_ONLY"
-          : "NOT_INSPECTED";
+    : visuals.length > 0 && videoFrames.length > 0
+      ? "PARTIAL_DEEP"
+      : visuals.length > 0 && inspectionDepth === "IMAGE_ONLY"
+        ? "DEEP_SELECTED"
+        : visuals.length > 0 &&
+            inspectionDepth === "CAROUSEL_REPRESENTATIVE_ONLY"
+          ? "PARTIAL_DEEP"
+          : visuals.length > 0 && inspectionDepth === "COVER_ONLY"
+            ? "COVER_ONLY"
+            : "NOT_INSPECTED";
   const selectionReasons = Array.isArray(field(payload.selection).reasonCodes)
     ? (field(payload.selection).reasonCodes as string[]).filter((reason) =>
         [
@@ -665,13 +693,20 @@ function buildContext(
           "AUDIO_NOT_ANALYZED",
           "TRANSCRIPT_NOT_ACQUIRED",
         ]
-      : depth === "PARTIAL_DEEP"
-        ? ["CAROUSEL_CHILD_UNAVAILABLE"]
-        : depth === "LIGHT_ONLY"
-          ? ["MEDIA_NOT_SELECTED_FOR_DEEP_ANALYSIS", "NOT_INSPECTED"]
-          : depth === "NOT_INSPECTED"
-            ? ["NOT_INSPECTED"]
-            : [];
+      : videoFrames.length > 0
+        ? [
+            "SAMPLED_FRAMES_ARE_NOT_COMPLETE_VIDEO",
+            "AUDIO_NOT_ANALYZED",
+            "TRANSCRIPT_NOT_ACQUIRED",
+            "TEMPORAL_SEQUENCE_NOT_ANALYZED",
+          ]
+        : depth === "PARTIAL_DEEP"
+          ? ["CAROUSEL_CHILD_UNAVAILABLE"]
+          : depth === "LIGHT_ONLY"
+            ? ["MEDIA_NOT_SELECTED_FOR_DEEP_ANALYSIS", "NOT_INSPECTED"]
+            : depth === "NOT_INSPECTED"
+              ? ["NOT_INSPECTED"]
+              : [];
   return {
     caption: {
       state:
@@ -692,20 +727,27 @@ function buildContext(
     },
     visual: {
       state:
-        visual && Object.keys(observation).length > 0
+        visuals.length > 0 && Object.keys(observation).length > 0
           ? ("AVAILABLE" as const)
           : ("UNKNOWN" as const),
-      ...(visual && Object.keys(observation).length > 0 ? { observation } : {}),
-      ...(visual ? { evidenceRef: visual.evidenceRef } : {}),
+      ...(visuals.length > 0 && Object.keys(observation).length > 0
+        ? { observation }
+        : {}),
+      ...(visuals[0] ? { evidenceRef: visuals[0].evidenceRef } : {}),
+      evidenceRefs: visuals.map((visual) => visual.evidenceRef).sort(),
     },
     inspection: {
       depth,
       selectedForDeepAnalysis: selected,
       selectionReasons,
-      inspectedChildCount: depth === "PARTIAL_DEEP" ? 1 : 0,
+      inspectedChildCount:
+        depth === "PARTIAL_DEEP" && videoFrames.length === 0 ? 1 : 0,
       availableChildCount: childRows.length,
-      inspectedFrameCount:
-        depth === "DEEP_SELECTED" || depth === "COVER_ONLY" ? 1 : 0,
+      inspectedFrameCount: videoFrames.length
+        ? videoFrames.length
+        : depth === "DEEP_SELECTED" || depth === "COVER_ONLY"
+          ? 1
+          : 0,
       reasonCodes,
     },
   } as const;

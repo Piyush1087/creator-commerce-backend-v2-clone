@@ -51,6 +51,7 @@ export abstract class InstagramPinnedHttpsTransport {
       pinnedAddress: InstagramResolvedAddress;
       headers: Readonly<Record<string, string>>;
       connectTimeoutMs: number;
+      readTimeoutMs?: number;
       signal?: AbortSignal;
     }>,
   ): Promise<InstagramPinnedResponse>;
@@ -80,6 +81,7 @@ export class NodeInstagramPinnedHttpsTransport extends InstagramPinnedHttpsTrans
       pinnedAddress: InstagramResolvedAddress;
       headers: Readonly<Record<string, string>>;
       connectTimeoutMs: number;
+      readTimeoutMs?: number;
       signal?: AbortSignal;
     }>,
   ): Promise<InstagramPinnedResponse> {
@@ -98,9 +100,12 @@ export class NodeInstagramPinnedHttpsTransport extends InstagramPinnedHttpsTrans
             ),
         },
         (response) => {
-          response.setTimeout(INSTAGRAM_IMAGE_READ_TIMEOUT_MS, () => {
-            response.destroy(new InstagramImageAcquisitionError("TIMEOUT"));
-          });
+          response.setTimeout(
+            input.readTimeoutMs ?? INSTAGRAM_IMAGE_READ_TIMEOUT_MS,
+            () => {
+              response.destroy(new InstagramImageAcquisitionError("TIMEOUT"));
+            },
+          );
           resolveRequest({
             statusCode: response.statusCode ?? 0,
             headers: response.headers,

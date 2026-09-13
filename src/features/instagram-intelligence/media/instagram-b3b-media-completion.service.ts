@@ -15,6 +15,7 @@ import {
   INSTAGRAM_B3B_SELECTOR_VERSION,
   selectInstagramB3bCorpus,
 } from "./instagram-b3b-selector";
+import { InstagramW1VideoPipelineService } from "./instagram-w1-video-pipeline.service";
 
 export const INSTAGRAM_B3B_NORMALIZATION_VERSION =
   "instagram.media-completion.b3b.v1";
@@ -52,6 +53,7 @@ export class InstagramB3bMediaCompletionService {
     private readonly reads: InstagramIntelligenceAuthorizedReadService,
     private readonly writer: InstagramCaptureWriterService,
     private readonly imagePipeline: InstagramB3aImagePipelineService,
+    private readonly videoPipeline?: InstagramW1VideoPipelineService,
   ) {}
 
   async execute(
@@ -105,7 +107,7 @@ export class InstagramB3bMediaCompletionService {
         children = childRead.result as InstagramCarouselChildrenTruth;
       }
 
-      await this.persistLightEvidence(
+      const lightLineage = await this.persistLightEvidence(
         input,
         media,
         insights,
@@ -125,7 +127,14 @@ export class InstagramB3bMediaCompletionService {
         continue;
       }
       results.push(
-        await this.inspectSelected(input, media, mediaType, children, now),
+        await this.inspectSelected(
+          input,
+          media,
+          mediaType,
+          children,
+          lightLineage,
+          now,
+        ),
       );
     }
     return {
@@ -263,7 +272,7 @@ export class InstagramB3bMediaCompletionService {
       visualReason: visual.reason,
       ...(children ? { carouselChildren: boundedChildren(children) } : {}),
     };
-    await this.writer.write({
+    return this.writer.write({
       ...writerBase(input, media.providerMediaId, "light", capturedAt, now),
       resourceType: "INSTAGRAM_MEDIA",
       capabilityId: "instagram.media_inventory",
@@ -304,6 +313,10 @@ export class InstagramB3bMediaCompletionService {
     media: InstagramMediaTruth,
     mediaType: string,
     children: InstagramCarouselChildrenTruth | undefined,
+    sourceLineage: Readonly<{
+      captureRef: string;
+      evidenceRefs: readonly string[];
+    }>,
     now: () => Date,
   ): Promise<InstagramB3bMediaCompletionResult["media"][number]> {
     const normalized = mediaType.toUpperCase();
@@ -334,6 +347,27 @@ export class InstagramB3bMediaCompletionService {
           INSTAGRAM_B3B_CAROUSEL_REPRESENTATIVE_VERSION,
       };
     } else if (["REEL", "REELS", "VIDEO"].includes(normalized)) {
+      if (this.videoPipeline?.isEnabled()) {
+        const result = await this.videoPipeline.execute({
+          brandProfileId: input.brandProfileId,
+          integrationId: input.integrationId,
+          providerAccountId: input.providerAccountId,
+          authorizationGeneration: input.authorizationGeneration,
+          mediaId: media.providerMediaId,
+          windowEnd: input.windowEnd,
+          sourceCaptureRef: sourceLineage.captureRef,
+          sourceEvidenceRefs: sourceLineage.evidenceRefs,
+          now,
+          ...(input.signal ? { signal: input.signal } : {}),
+        });
+        return {
+          providerMediaId: media.providerMediaId,
+          selected: true,
+          visualInspection: result.visualInspection,
+          visualSemanticResult: result.visualSemanticResult,
+          reason: result.reasonCode,
+        };
+      }
       locatorKind = "VIDEO_COVER";
       inspectionDepth = "COVER_ONLY";
       executionProfile = "b3b-cover-v1";

@@ -27,7 +27,7 @@ RUN node -e "const v=require('/package-lock.json').packages['node_modules/playwr
 FROM node:20-bookworm-slim AS chromium
 WORKDIR /usr/src/app
 
-RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates \
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates ffmpeg \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=playwright-version /playwright-version /playwright-version

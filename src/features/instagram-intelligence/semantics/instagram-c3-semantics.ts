@@ -12,6 +12,8 @@ export const INSTAGRAM_C3_CONTRACT_VERSION = "1.0" as const;
 export const INSTAGRAM_C3_OBSERVATION_PROFILE_VERSION = "1.0" as const;
 export const INSTAGRAM_C3_PROMPT_PROFILE_VERSION =
   "instagram-c3-per-media-v1" as const;
+export const INSTAGRAM_C3_VIDEO_FRAME_INPUT_PROFILE_VERSION =
+  "instagram-c3-sampled-video-frames-v1" as const;
 export const INSTAGRAM_C3_NORMALIZATION_VERSION =
   "instagram.per-media-semantics.c3.v1" as const;
 
@@ -127,6 +129,7 @@ export type InstagramC3AdmittedContext = Readonly<{
     state: "AVAILABLE" | "UNKNOWN";
     observation?: Readonly<Record<string, unknown>>;
     evidenceRef?: string;
+    evidenceRefs?: readonly string[];
   }>;
   inspection: Readonly<{
     depth:
@@ -314,9 +317,10 @@ export function finalizeInstagramC3(
     inspection: input.context.inspection,
     evidenceRefs: sortedUnique([
       input.context.caption.evidenceRef,
-      ...(input.context.visual.evidenceRef
-        ? [input.context.visual.evidenceRef]
-        : []),
+      ...(input.context.visual.evidenceRefs ??
+        (input.context.visual.evidenceRef
+          ? [input.context.visual.evidenceRef]
+          : [])),
       input.c2EvidenceRef,
     ]),
     derivationVersions: {
@@ -612,9 +616,8 @@ function modalityRefs(
     modalities.flatMap((modality) =>
       modality === "CAPTION"
         ? [context.caption.evidenceRef]
-        : context.visual.evidenceRef
-          ? [context.visual.evidenceRef]
-          : [],
+        : (context.visual.evidenceRefs ??
+          (context.visual.evidenceRef ? [context.visual.evidenceRef] : [])),
     ),
   );
 }

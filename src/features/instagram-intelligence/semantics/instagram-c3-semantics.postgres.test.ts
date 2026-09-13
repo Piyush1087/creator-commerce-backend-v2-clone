@@ -5,6 +5,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { InstagramCaptureWriterService } from "../../data-extraction/evidence/instagram/instagram-capture-writer.service";
 import { InstagramDerivedDataPurgeService } from "../../data-extraction/evidence/instagram/instagram-derived-data-purge.service";
 import { InstagramImageTemporaryStore } from "../../instagram/media/instagram-image-temporary-store";
+import { INSTAGRAM_VIDEO_NORMALIZATION_CONTRACT_VERSION } from "../../instagram/media/video/instagram-video.types";
 import { InstagramC2FoundationsService } from "../foundations/instagram-c2-foundations.service";
 import { INSTAGRAM_B3A_NORMALIZATION_CONTRACT_VERSION } from "../media/instagram-b3a-visual-observation";
 import { INSTAGRAM_B3B_NORMALIZATION_VERSION } from "../media/instagram-b3b-media-completion.service";
@@ -167,30 +168,34 @@ describePostgres("C3 per-media semantics PostgreSQL", () => {
         INSTAGRAM_B3B_NORMALIZATION_VERSION,
       );
       if (rank) {
-        await write(
-          brandId,
-          "account-c3",
-          7,
-          "instagram.media_visual_observations",
-          `${mediaId}-visual`,
-          {
-            inspectionDepth:
-              mediaType === "IMAGE"
-                ? "IMAGE_ONLY"
-                : mediaType === "CAROUSEL_ALBUM"
-                  ? "CAROUSEL_REPRESENTATIVE_ONLY"
-                  : "COVER_ONLY",
-            observation: {
-              description:
-                "A bounded still observation with brand and creator in still",
-              visibleElements: ["person", "product", "Launch Kit"],
-              dominantColors: ["blue"],
-              composition: "centered",
+        if (mediaType === "REEL") {
+          await writeVideoFrames(mediaId);
+        } else {
+          await write(
+            brandId,
+            "account-c3",
+            7,
+            "instagram.media_visual_observations",
+            `${mediaId}-visual`,
+            {
+              inspectionDepth:
+                mediaType === "IMAGE"
+                  ? "IMAGE_ONLY"
+                  : mediaType === "CAROUSEL_ALBUM"
+                    ? "CAROUSEL_REPRESENTATIVE_ONLY"
+                    : "COVER_ONLY",
+              observation: {
+                description:
+                  "A bounded still observation with brand and creator in still",
+                visibleElements: ["person", "product", "Launch Kit"],
+                dominantColors: ["blue"],
+                composition: "centered",
+              },
             },
-          },
-          mediaId,
-          INSTAGRAM_B3A_NORMALIZATION_CONTRACT_VERSION,
-        );
+            mediaId,
+            INSTAGRAM_B3A_NORMALIZATION_CONTRACT_VERSION,
+          );
+        }
       }
     }
     await write(
@@ -277,14 +282,29 @@ describePostgres("C3 per-media semantics PostgreSQL", () => {
       first.media.find((item) => item.mediaId === "media-reel")?.observation
         ?.inspection,
     ).toMatchObject({
-      depth: "COVER_ONLY",
+      depth: "PARTIAL_DEEP",
+      inspectedFrameCount: 2,
       reasonCodes: [
-        "COVER_ONLY",
-        "VIDEO_NOT_ANALYZED",
+        "SAMPLED_FRAMES_ARE_NOT_COMPLETE_VIDEO",
         "AUDIO_NOT_ANALYZED",
         "TRANSCRIPT_NOT_ACQUIRED",
+        "TEMPORAL_SEQUENCE_NOT_ANALYZED",
       ],
     });
+    const frameRows = await prisma.dataExtractionEvidenceItem.findMany({
+      where: {
+        brandId,
+        normalizationContractVersion:
+          INSTAGRAM_VIDEO_NORMALIZATION_CONTRACT_VERSION,
+      },
+      orderBy: { evidenceRef: "asc" },
+    });
+    expect(frameRows).toHaveLength(2);
+    const frameRefs = frameRows.map((row) => row.evidenceRef);
+    expect(
+      first.media.find((item) => item.mediaId === "media-reel")?.observation
+        ?.evidenceRefs,
+    ).toEqual(expect.arrayContaining(frameRefs));
     const derived = await prisma.dataExtractionEvidenceItem.findMany({
       where: {
         brandId,
@@ -556,6 +576,75 @@ describePostgres("C3 per-media semantics PostgreSQL", () => {
           representativeness: "CONTEXT_SPECIFIC",
         },
       ],
+    });
+  }
+
+  async function writeVideoFrames(mediaId: string) {
+    const payloads = [0, 1].map((frameOrdinal) => ({
+      providerMediaId: mediaId,
+      verifiedVideoFingerprint: "f".repeat(64),
+      videoAnalysisProfile: "selected-reel-frames-v1",
+      frameSelectionProfile: "canonical-six-timestamps-v1",
+      observationContractVersion: "1.0",
+      promptProfileVersion: "video-frame-description-v1",
+      modelProvider: "DETERMINISTIC_FIXTURE",
+      modelIdentity: "fixture-video-observer",
+      modelProfileVersion: "fixture-v1",
+      executionIdentity: "e".repeat(64),
+      inspectionDepth: "MULTI_FRAME_SAMPLED",
+      limitations: ["SAMPLED_FRAMES_ARE_NOT_COMPLETE_VIDEO"],
+      frame: {
+        verifiedVideoFingerprint: "f".repeat(64),
+        frameOrdinal,
+        requestedTimestampMilliseconds: frameOrdinal * 1_500,
+        actualTimestampMilliseconds: null,
+        mediaType: "image/jpeg",
+        byteLength: 1_024,
+        width: 1_280,
+        height: 720,
+        contentHash: String(frameOrdinal + 1).repeat(64),
+      },
+      observation: {
+        description: `Centered still sampled frame ${frameOrdinal}`,
+        visibleElements: ["person", "product", "Launch Kit"],
+        dominantColors: ["blue"],
+        composition: "centered",
+      },
+    }));
+    await writer.write({
+      brandId,
+      providerAccountId: "account-c3",
+      authorizationGeneration: 7,
+      resourceType: "INSTAGRAM_MEDIA",
+      mediaId,
+      capabilityId: "instagram.media_visual_observations",
+      requestKey: `c3:${mediaId}-video-frames:${brandId}`,
+      providerExecutionRef: `provider-execution:c3:${mediaId}-video-frames:${brandId}`,
+      normalizationContractVersion:
+        INSTAGRAM_VIDEO_NORMALIZATION_CONTRACT_VERSION,
+      startedAt: capturedAt,
+      completedAt: capturedAt,
+      capturedAt,
+      availability: "AVAILABLE",
+      retryability: "NOT_APPLICABLE",
+      reasonCodes: ["C3_W1_VIDEO_FIXTURE"],
+      coverage: "SINGLE_RESOURCE",
+      acquisitionQuality: {
+        state: "COMPLETE",
+        failureCategories: [],
+        detailCodes: [],
+      },
+      artifacts: payloads.map((payload, index) => ({
+        artifactKey: `frame-${index}`,
+        payload,
+      })),
+      evidence: payloads.map((payload, index) => ({
+        evidenceKey: `frame-${index}`,
+        artifactKey: `frame-${index}`,
+        payload,
+        freshness: "CURRENT",
+        representativeness: "CONTEXT_SPECIFIC",
+      })),
     });
   }
 

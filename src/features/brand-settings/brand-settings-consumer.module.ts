@@ -11,6 +11,7 @@ import { BrandProviderReadinessService } from "./services/brand-provider-readine
 import { BrandSettingsAccessService } from "./services/brand-settings-access.service";
 import { InstagramIntelligenceAuthorizedImageAcquisitionService } from "./services/instagram-intelligence-image-acquisition.service";
 import { InstagramSyncCoordinatorRepository } from "../instagram-intelligence/sync/instagram-sync-coordinator.repository";
+import { InstagramIntelligenceAuthorizedVideoAcquisitionService } from "./services/instagram-intelligence-video-acquisition.service";
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { InstagramSyncCoordinatorRepository } from "../instagram-intelligence/sy
     InstagramIntelligenceConnectionReadService,
     InstagramIntelligenceAuthorizedReadService,
     InstagramIntelligenceAuthorizedImageAcquisitionService,
+    InstagramIntelligenceAuthorizedVideoAcquisitionService,
     InstagramSyncCoordinatorRepository,
   ],
   exports: [
@@ -31,6 +33,7 @@ import { InstagramSyncCoordinatorRepository } from "../instagram-intelligence/sy
     InstagramIntelligenceConnectionReadService,
     InstagramIntelligenceAuthorizedReadService,
     InstagramIntelligenceAuthorizedImageAcquisitionService,
+    InstagramIntelligenceAuthorizedVideoAcquisitionService,
     InstagramSyncCoordinatorRepository,
     BrandSettingsAccessService,
   ],

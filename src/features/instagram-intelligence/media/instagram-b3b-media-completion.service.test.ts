@@ -395,6 +395,60 @@ describe("B3B thinner media completion", () => {
       }),
     );
   });
+
+  it.each(["REEL", "REELS", "VIDEO"])(
+    "routes only an already selected %s through Week 1 multi-frame inspection when enabled",
+    async (mediaType) => {
+      const reads = {
+        execute: vi.fn(async ({ command }) =>
+          command.kind === "MEDIA_INVENTORY"
+            ? {
+                result: {
+                  availability: "AVAILABLE",
+                  items: [media(0, mediaType)],
+                  coverage: inventoryCoverage(),
+                },
+              }
+            : {
+                result: {
+                  availability: "AVAILABLE",
+                  mediaType,
+                  metrics: {},
+                },
+              },
+        ),
+      };
+      const writer = {
+        write: vi.fn().mockResolvedValue({
+          captureRef: "capture:instagram:light:1",
+          evidenceRefs: ["evidence:instagram:light:1"],
+        }),
+      };
+      const imagePipeline = { execute: vi.fn() };
+      const videoPipeline = {
+        isEnabled: vi.fn().mockReturnValue(true),
+        execute: vi.fn().mockResolvedValue({
+          visualInspection: "INSPECTED",
+          visualSemanticResult: "AVAILABLE",
+          reasonCode: "MULTI_FRAME_INSPECTED",
+        }),
+      };
+      const result = await new InstagramB3bMediaCompletionService(
+        reads as never,
+        writer as never,
+        imagePipeline as never,
+        videoPipeline as never,
+      ).execute(executionInput());
+      expect(result.media[0]).toMatchObject({
+        selected: true,
+        reason: "MULTI_FRAME_INSPECTED",
+      });
+      expect(videoPipeline.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ mediaId: "media-00" }),
+      );
+      expect(imagePipeline.execute).not.toHaveBeenCalled();
+    },
+  );
 });
 
 function executionInput() {

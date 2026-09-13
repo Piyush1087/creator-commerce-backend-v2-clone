@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { DataExtractionSourceClass, Prisma } from "@prisma/client";
 
 import { InstagramImageTemporaryStore } from "../../../instagram/media/instagram-image-temporary-store";
+import { InstagramVideoTemporaryStore } from "../../../instagram/media/video/instagram-video-temporary-store";
 
 export type InstagramDerivedPurgeCounts = Readonly<{
   resources: number;
@@ -24,10 +25,17 @@ const C4_OBJECT_IDS = [
 
 @Injectable()
 export class InstagramDerivedDataPurgeService {
-  constructor(private readonly temporaryStore: InstagramImageTemporaryStore) {}
+  constructor(
+    private readonly temporaryStore: InstagramImageTemporaryStore,
+    private readonly videoTemporaryStore?: InstagramVideoTemporaryStore,
+  ) {}
 
-  purgeTemporaryScope(brandProfileId: string): Promise<number> {
-    return this.temporaryStore.purgeScope(brandProfileId);
+  async purgeTemporaryScope(brandProfileId: string): Promise<number> {
+    const [images, videos] = await Promise.all([
+      this.temporaryStore.purgeScope(brandProfileId),
+      this.videoTemporaryStore?.purgeScope(brandProfileId) ?? 0,
+    ]);
+    return images + videos;
   }
 
   async purgePersistentInTransaction(

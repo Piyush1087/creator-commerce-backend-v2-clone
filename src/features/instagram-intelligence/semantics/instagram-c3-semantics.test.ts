@@ -749,6 +749,53 @@ describe("Instagram C3 deterministic likely-collab matrix", () => {
     ).toMatchObject({ state: "UNKNOWN", confidence: null });
   });
 
+  it("grounds sampled-video positives in exact frame refs without publishing complete-video negatives", () => {
+    const frameRefs = [
+      "evidence:instagram:video-frame:0",
+      "evidence:instagram:video-frame:1",
+    ];
+    const admitted = context("PARTIAL_DEEP");
+    const sampled: InstagramC3AdmittedContext = {
+      ...admitted,
+      visual: {
+        state: "AVAILABLE",
+        observation: {
+          sampledFrames: [
+            { observation: { description: "product-led opening" } },
+            { observation: { description: "package remains centered" } },
+          ],
+        },
+        evidenceRef: frameRefs[0],
+        evidenceRefs: frameRefs,
+      },
+      inspection: {
+        ...admitted.inspection,
+        inspectedFrameCount: 2,
+        reasonCodes: ["SAMPLED_FRAMES_ARE_NOT_COMPLETE_VIDEO"],
+      },
+    };
+    const result = finalize(
+      candidate({
+        themes: [
+          {
+            label: "product-led opening",
+            confidence: "LOW",
+            supportModalities: ["VISUAL"],
+          },
+        ],
+      }),
+      sampled,
+      "REELS",
+    );
+    expect(result.fields.themes.values[0]?.evidenceRefs).toEqual(frameRefs);
+    expect(result.observation.evidenceRefs).toEqual(
+      [captionRef, ...frameRefs, "evidence:instagram:c2:1"].sort(),
+    );
+    expect(result.observation.creatorPresence.state).toBe("UNKNOWN");
+    expect(result.observation.offeringPresence.state).toBe("UNKNOWN");
+    expect(result.observation.likelyCollab.state).toBe("UNKNOWN");
+  });
+
   it("cannot fabricate provider HIGH or canonical Creator/Collaboration identity", () => {
     const result = classify([
       cue("EXPLICIT_CAPTION_COLLAB_LANGUAGE", "CAPTION"),

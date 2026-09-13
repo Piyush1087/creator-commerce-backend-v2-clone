@@ -27,6 +27,11 @@ import { InstagramSyncPipelineAdapter } from "./sync/instagram-sync-pipeline.ada
 import { InstagramSyncPipelinePort } from "./sync/instagram-sync-pipeline.port";
 import { InstagramHiddenBrandRuntime } from "./hidden-brand/instagram-hidden-brand.runtime";
 import { InstagramHiddenBrandReader } from "./hidden-brand/instagram-hidden-brand.reader";
+import { InstagramW1VideoPipelineService } from "./media/instagram-w1-video-pipeline.service";
+import {
+  InstagramW1VideoFrameModelPort,
+  UnavailableInstagramW1VideoFrameModelAdapter,
+} from "./media/instagram-w1-video-frame-observation";
 
 @Module({
   imports: [
@@ -40,6 +45,7 @@ import { InstagramHiddenBrandReader } from "./hidden-brand/instagram-hidden-bran
   providers: [
     InstagramB3aImagePipelineService,
     InstagramB3bMediaCompletionService,
+    InstagramW1VideoPipelineService,
     InstagramB4ConsumerService,
     InstagramContentBehaviorRuntimeService,
     InstagramC4RuntimeService,
@@ -60,10 +66,15 @@ import { InstagramHiddenBrandReader } from "./hidden-brand/instagram-hidden-bran
       provide: InstagramC3SemanticModelPort,
       useClass: StructuredInstagramC3SemanticModelAdapter,
     },
+    {
+      provide: InstagramW1VideoFrameModelPort,
+      useClass: UnavailableInstagramW1VideoFrameModelAdapter,
+    },
   ],
   exports: [
     InstagramB3aImagePipelineService,
     InstagramB3bMediaCompletionService,
+    InstagramW1VideoPipelineService,
     InstagramB4ConsumerService,
     InstagramContentBehaviorRuntimeService,
     InstagramC4RuntimeService,

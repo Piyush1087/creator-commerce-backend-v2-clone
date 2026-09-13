@@ -260,6 +260,9 @@ export default $config({
       POSTMARK_TEAM_INVITE_TEMPLATE_ID:
         process.env.POSTMARK_TEAM_INVITE_TEMPLATE_ID ?? "",
       EXTERNAL_API_TIMEOUT_MS: process.env.EXTERNAL_API_TIMEOUT_MS ?? "10000",
+      // Week 1 selected Reel/video frame analysis is fail-closed until enabled.
+      INSTAGRAM_SELECTED_VIDEO_FRAMES_ENABLED:
+        process.env.INSTAGRAM_SELECTED_VIDEO_FRAMES_ENABLED ?? "false",
     };
 
     cluster.addService("api", {

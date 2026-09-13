@@ -14,6 +14,12 @@ import {
   NodeInstagramImageDnsResolver,
   NodeInstagramPinnedHttpsTransport,
 } from "./media/instagram-secure-image-downloader";
+import { InstagramContainedVideoAcquisitionService } from "./media/video/instagram-contained-video-acquisition.service";
+import { FfmpegInstagramVideoDecoder } from "./media/video/instagram-video-decoder";
+import { InstagramVideoDecoderPort } from "./media/video/instagram-video-decoder";
+import { InstagramVideoLocatorClient } from "./media/video/instagram-video-locator.client";
+import { InstagramVideoTemporaryStore } from "./media/video/instagram-video-temporary-store";
+import { InstagramSecureVideoDownloader } from "./media/video/instagram-secure-video-downloader";
 
 /**
  * Stateless Instagram provider clients shared by Creator Entry and Settings.
@@ -30,6 +36,15 @@ import {
     NodeInstagramPinnedHttpsTransport,
     InstagramSecureImageDownloader,
     InstagramContainedImageAcquisitionService,
+    InstagramVideoLocatorClient,
+    InstagramVideoTemporaryStore,
+    InstagramSecureVideoDownloader,
+    InstagramContainedVideoAcquisitionService,
+    FfmpegInstagramVideoDecoder,
+    {
+      provide: InstagramVideoDecoderPort,
+      useExisting: FfmpegInstagramVideoDecoder,
+    },
     {
       provide: INSTAGRAM_INTELLIGENCE_PROVIDER_READ_CLIENT,
       useExisting: InstagramIntelligenceProviderClient,
@@ -41,6 +56,9 @@ import {
     INSTAGRAM_INTELLIGENCE_PROVIDER_READ_CLIENT,
     InstagramContainedImageAcquisitionService,
     InstagramImageTemporaryStore,
+    InstagramContainedVideoAcquisitionService,
+    InstagramVideoTemporaryStore,
+    InstagramVideoDecoderPort,
   ],
 })
 export class InstagramProviderClientModule {}
