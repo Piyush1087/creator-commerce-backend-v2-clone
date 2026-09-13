@@ -28,6 +28,7 @@ export const INSTAGRAM_DE_CONTRACT = {
     "instagram.audience_engaged",
     "instagram.caption_context",
     "instagram.media_visual_observations",
+    "instagram.media_audio_observations",
     "instagram.media_creator_signals",
     "instagram.media_offering_signals",
   ],

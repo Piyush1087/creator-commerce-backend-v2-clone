@@ -6,7 +6,7 @@ import { basename, dirname, join, resolve, sep } from "node:path";
 import { InstagramVideoError } from "./instagram-video.types";
 
 const SCOPE_NAME = /^scope-[a-f0-9]{64}$/;
-const ARTIFACT_NAME = /^[a-f0-9]{48}\.(?:video|jpg)$/;
+const ARTIFACT_NAME = /^[a-f0-9]{48}\.(?:video|jpg|wav)$/;
 
 export class InstagramVideoTemporaryStore {
   constructor(
@@ -22,6 +22,10 @@ export class InstagramVideoTemporaryStore {
 
   async createFrame(scopeIdentity: string) {
     return this.create(scopeIdentity, "jpg");
+  }
+
+  async createAudio(scopeIdentity: string) {
+    return this.create(scopeIdentity, "wav");
   }
 
   async remove(path: string): Promise<void> {
@@ -51,7 +55,10 @@ export class InstagramVideoTemporaryStore {
     return this.root;
   }
 
-  private async create(scopeIdentity: string, extension: "video" | "jpg") {
+  private async create(
+    scopeIdentity: string,
+    extension: "video" | "jpg" | "wav",
+  ) {
     const scope = await this.ensureScope(scopeIdentity);
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const path = join(

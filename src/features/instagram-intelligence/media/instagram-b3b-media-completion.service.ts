@@ -17,6 +17,7 @@ import {
 } from "./instagram-b3b-selector";
 import { InstagramW1VideoPipelineService } from "./instagram-w1-video-pipeline.service";
 import { InstagramW2CarouselPipelineService } from "./instagram-w2-carousel-pipeline.service";
+import { InstagramW4SpeechPipelineService } from "./instagram-w4-speech-pipeline.service";
 
 export const INSTAGRAM_B3B_NORMALIZATION_VERSION =
   "instagram.media-completion.b3b.v1";
@@ -56,6 +57,7 @@ export class InstagramB3bMediaCompletionService {
     private readonly imagePipeline: InstagramB3aImagePipelineService,
     private readonly videoPipeline?: InstagramW1VideoPipelineService,
     private readonly carouselPipeline?: InstagramW2CarouselPipelineService,
+    private readonly speechPipeline?: InstagramW4SpeechPipelineService,
   ) {}
 
   async execute(
@@ -371,6 +373,20 @@ export class InstagramB3bMediaCompletionService {
           INSTAGRAM_B3B_CAROUSEL_REPRESENTATIVE_VERSION,
       };
     } else if (["REEL", "REELS", "VIDEO"].includes(normalized)) {
+      if (this.speechPipeline?.isEnabled()) {
+        await this.speechPipeline.execute({
+          brandProfileId: input.brandProfileId,
+          integrationId: input.integrationId,
+          providerAccountId: input.providerAccountId,
+          authorizationGeneration: input.authorizationGeneration,
+          mediaId: media.providerMediaId,
+          windowEnd: input.windowEnd,
+          sourceCaptureRef: sourceLineage.captureRef,
+          sourceEvidenceRefs: sourceLineage.evidenceRefs,
+          now,
+          ...(input.signal ? { signal: input.signal } : {}),
+        });
+      }
       if (this.videoPipeline?.isEnabled()) {
         const result = await this.videoPipeline.execute({
           brandProfileId: input.brandProfileId,

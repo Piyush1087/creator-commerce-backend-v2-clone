@@ -44,6 +44,7 @@ export type InstagramCaptureEvidenceInput = Readonly<{
   freshness: EvidenceFreshness;
   representativeness: EvidenceRepresentativeness;
   semanticObservationKey?: string;
+  derivationParentEvidenceKey?: string;
 }>;
 
 export type WriteInstagramCaptureInput = Readonly<{
@@ -262,6 +263,14 @@ export class InstagramCaptureWriterService {
         }
         const payload = canonicalJson(evidence.payload);
         const evidenceRef = evidenceRefs[index];
+        const parentIndex = evidence.derivationParentEvidenceKey
+          ? input.evidence.findIndex(
+              (candidate) =>
+                candidate.evidenceKey === evidence.derivationParentEvidenceKey,
+            )
+          : -1;
+        if (evidence.derivationParentEvidenceKey && parentIndex >= index)
+          throw persistenceError("PERSISTENCE_INVARIANT");
         const semanticObservationKey = evidence.semanticObservationKey
           ? asSemanticObservationKey(evidence.semanticObservationKey)
           : undefined;
@@ -285,10 +294,12 @@ export class InstagramCaptureWriterService {
           qualitySnapshot: input.acquisitionQuality,
           provenance: {
             acquisitionOrNormalizationRunRef: capabilityExecutionRef,
-            captureMethodClass: "PROVIDER_MEDIATED_FETCH",
+            captureMethodClass:
+              parentIndex >= 0 ? "MODEL_DERIVATION" : "PROVIDER_MEDIATED_FETCH",
             normalizationContractVersion: input.normalizationContractVersion,
-            parentEvidenceRefs: [],
-            parentCaptureRefs: [],
+            parentEvidenceRefs:
+              parentIndex >= 0 ? [evidenceRefs[parentIndex]!] : [],
+            parentCaptureRefs: parentIndex >= 0 ? [captureRef] : [],
             providerExecutionRef,
           },
           deduplication: {
@@ -398,6 +409,12 @@ function validateInput(input: WriteInstagramCaptureInput): void {
       throw persistenceError("PERSISTENCE_INVARIANT");
     }
     evidenceKeys.add(evidence.evidenceKey);
+    if (
+      evidence.derivationParentEvidenceKey !== undefined &&
+      !evidenceKeys.has(evidence.derivationParentEvidenceKey)
+    ) {
+      throw persistenceError("PERSISTENCE_INVARIANT");
+    }
     if (
       evidence.artifactKey !== undefined &&
       (!evidence.artifactKey.trim() || !artifactKeys.has(evidence.artifactKey))

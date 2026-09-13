@@ -37,6 +37,9 @@ import {
   InstagramVisualTextModelPort,
   UnavailableInstagramVisualTextModelAdapter,
 } from "../instagram/media/instagram-visual-text";
+import { InstagramW4SpeechPipelineService } from "./media/instagram-w4-speech-pipeline.service";
+import { InstagramSpeechTranscriptionPort } from "../instagram/media/video/instagram-speech";
+import { GeminiInstagramSpeechTranscriptionAdapter } from "../instagram/media/video/instagram-gemini-speech.adapter";
 
 @Module({
   imports: [
@@ -52,6 +55,8 @@ import {
     InstagramB3bMediaCompletionService,
     InstagramW1VideoPipelineService,
     InstagramW2CarouselPipelineService,
+    InstagramW4SpeechPipelineService,
+    GeminiInstagramSpeechTranscriptionAdapter,
     InstagramB4ConsumerService,
     InstagramContentBehaviorRuntimeService,
     InstagramC4RuntimeService,
@@ -80,12 +85,17 @@ import {
       provide: InstagramVisualTextModelPort,
       useClass: UnavailableInstagramVisualTextModelAdapter,
     },
+    {
+      provide: InstagramSpeechTranscriptionPort,
+      useExisting: GeminiInstagramSpeechTranscriptionAdapter,
+    },
   ],
   exports: [
     InstagramB3aImagePipelineService,
     InstagramB3bMediaCompletionService,
     InstagramW1VideoPipelineService,
     InstagramW2CarouselPipelineService,
+    InstagramW4SpeechPipelineService,
     InstagramB4ConsumerService,
     InstagramContentBehaviorRuntimeService,
     InstagramC4RuntimeService,

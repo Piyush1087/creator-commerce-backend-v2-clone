@@ -20,6 +20,10 @@ import { InstagramVideoDecoderPort } from "./media/video/instagram-video-decoder
 import { InstagramVideoLocatorClient } from "./media/video/instagram-video-locator.client";
 import { InstagramVideoTemporaryStore } from "./media/video/instagram-video-temporary-store";
 import { InstagramSecureVideoDownloader } from "./media/video/instagram-secure-video-downloader";
+import {
+  FfmpegInstagramAudioExtractor,
+  InstagramAudioExtractorPort,
+} from "./media/video/instagram-audio-extractor";
 
 /**
  * Stateless Instagram provider clients shared by Creator Entry and Settings.
@@ -41,9 +45,14 @@ import { InstagramSecureVideoDownloader } from "./media/video/instagram-secure-v
     InstagramSecureVideoDownloader,
     InstagramContainedVideoAcquisitionService,
     FfmpegInstagramVideoDecoder,
+    FfmpegInstagramAudioExtractor,
     {
       provide: InstagramVideoDecoderPort,
       useExisting: FfmpegInstagramVideoDecoder,
+    },
+    {
+      provide: InstagramAudioExtractorPort,
+      useExisting: FfmpegInstagramAudioExtractor,
     },
     {
       provide: INSTAGRAM_INTELLIGENCE_PROVIDER_READ_CLIENT,
@@ -59,6 +68,7 @@ import { InstagramSecureVideoDownloader } from "./media/video/instagram-secure-v
     InstagramContainedVideoAcquisitionService,
     InstagramVideoTemporaryStore,
     InstagramVideoDecoderPort,
+    InstagramAudioExtractorPort,
   ],
 })
 export class InstagramProviderClientModule {}

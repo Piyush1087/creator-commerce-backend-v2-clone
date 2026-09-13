@@ -530,6 +530,58 @@ describe("B3B thinner media completion", () => {
       expect(imagePipeline.execute).not.toHaveBeenCalled();
     },
   );
+
+  it("routes selected video speech independently of the Week 1 frame rollout", async () => {
+    const reads = {
+      execute: vi.fn(async ({ command }) =>
+        command.kind === "MEDIA_INVENTORY"
+          ? {
+              result: {
+                availability: "AVAILABLE",
+                items: [media(0, "REEL")],
+                coverage: inventoryCoverage(),
+              },
+            }
+          : {
+              result: {
+                availability: "AVAILABLE",
+                mediaType: "REEL",
+                metrics: {},
+              },
+            },
+      ),
+    };
+    const writer = {
+      write: vi.fn().mockResolvedValue({
+        captureRef: "capture:instagram:light:1",
+        evidenceRefs: ["evidence:instagram:light:1"],
+      }),
+    };
+    const imagePipeline = {
+      execute: vi.fn().mockResolvedValue({
+        visualInspection: "INSPECTED",
+        visualSemanticResult: "AVAILABLE",
+        reasonCode: "COVER_INSPECTED",
+      }),
+    };
+    const speechPipeline = {
+      isEnabled: vi.fn().mockReturnValue(true),
+      execute: vi.fn().mockResolvedValue({ state: "OBSERVED" }),
+    };
+    await new InstagramB3bMediaCompletionService(
+      reads as never,
+      writer as never,
+      imagePipeline as never,
+      undefined,
+      undefined,
+      speechPipeline as never,
+    ).execute(executionInput());
+    expect(speechPipeline.execute).toHaveBeenCalledOnce();
+    expect(speechPipeline.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ mediaId: "media-00" }),
+    );
+    expect(imagePipeline.execute).toHaveBeenCalledOnce();
+  });
 });
 
 function executionInput() {
