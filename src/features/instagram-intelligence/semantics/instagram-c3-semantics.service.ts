@@ -12,6 +12,7 @@ import { createDataExtractionRepositorySet } from "../../data-extraction/evidenc
 import { INSTAGRAM_B3A_NORMALIZATION_CONTRACT_VERSION } from "../media/instagram-b3a-visual-observation";
 import { INSTAGRAM_VIDEO_NORMALIZATION_CONTRACT_VERSION } from "../../instagram/media/video/instagram-video.types";
 import { INSTAGRAM_B3B_NORMALIZATION_VERSION } from "../media/instagram-b3b-media-completion.service";
+import { INSTAGRAM_W2_NORMALIZATION_VERSION } from "../media/instagram-w2-carousel-pipeline.service";
 import { INSTAGRAM_C2_CALCULATION_CONTRACT } from "../foundations/instagram-c2-exact-arithmetic";
 import { InstagramMediaObservationSchema } from "../contracts/instagram-intelligence.schemas";
 import {
@@ -26,6 +27,7 @@ import {
   INSTAGRAM_C3_CONTRACT_VERSION,
   INSTAGRAM_C3_NORMALIZATION_VERSION,
   INSTAGRAM_C3_OBSERVATION_PROFILE_VERSION,
+  INSTAGRAM_C3_CAROUSEL_VISUAL_TEXT_INPUT_PROFILE_VERSION,
   INSTAGRAM_C3_PROMPT_PROFILE_VERSION,
   INSTAGRAM_C3_VIDEO_FRAME_INPUT_PROFILE_VERSION,
   InstagramC3SemanticError,
@@ -191,11 +193,13 @@ export class InstagramC3SemanticsService {
         contractVersion: INSTAGRAM_C3_CONTRACT_VERSION,
         observationProfileVersion: INSTAGRAM_C3_OBSERVATION_PROFILE_VERSION,
         promptProfileVersion: this.model.modelProfileVersion,
-        semanticInputProfileVersion: context.inspection.reasonCodes.includes(
-          "SAMPLED_FRAMES_ARE_NOT_COMPLETE_VIDEO",
-        )
-          ? INSTAGRAM_C3_VIDEO_FRAME_INPUT_PROFILE_VERSION
-          : INSTAGRAM_C3_OBSERVATION_PROFILE_VERSION,
+        semanticInputProfileVersion: isCarouselVisualContext(context)
+          ? INSTAGRAM_C3_CAROUSEL_VISUAL_TEXT_INPUT_PROFILE_VERSION
+          : context.inspection.reasonCodes.includes(
+                "SAMPLED_FRAMES_ARE_NOT_COMPLETE_VIDEO",
+              )
+            ? INSTAGRAM_C3_VIDEO_FRAME_INPUT_PROFILE_VERSION
+            : INSTAGRAM_C3_OBSERVATION_PROFILE_VERSION,
         modelIdentity: this.model.modelIdentity,
         brandProfileId: request.brandProfileId,
         providerAccountId: request.providerAccountId,
@@ -355,6 +359,7 @@ export class InstagramC3SemanticsService {
           in: [
             INSTAGRAM_B3A_NORMALIZATION_CONTRACT_VERSION,
             INSTAGRAM_VIDEO_NORMALIZATION_CONTRACT_VERSION,
+            INSTAGRAM_W2_NORMALIZATION_VERSION,
           ],
         },
         capture: {
@@ -649,26 +654,68 @@ function buildContext(
       (a, b) =>
         Number(a.frame.frameOrdinal ?? 0) - Number(b.frame.frameOrdinal ?? 0),
     );
+  const carouselVisuals = visualPayloads
+    .filter((value) => value.inspectionDepth === "CAROUSEL_FULL_BOUNDED")
+    .map((value) => ({
+      child: record(value.child),
+      observation: record(value.observation),
+      visualText: record(value.visualText),
+      atomicCues: record(value.atomicCues),
+      evidenceRef:
+        visuals.find((visual) => visual.boundedPayload === value)
+          ?.evidenceRef ?? null,
+      coverage: record(value.coverage),
+    }))
+    .sort(
+      (a, b) =>
+        Number(a.child.ordinal ?? 0) - Number(b.child.ordinal ?? 0) ||
+        String(a.child.providerMediaId ?? "").localeCompare(
+          String(b.child.providerMediaId ?? ""),
+        ),
+    );
   const singleVisualPayload = visualPayloads[0] ?? {};
   const observation =
-    videoFrames.length > 0
-      ? { sampledFrames: videoFrames }
-      : record(singleVisualPayload.observation);
+    carouselVisuals.length > 0
+      ? {
+          carouselChildren: carouselVisuals.map(
+            ({
+              child,
+              observation: visual,
+              visualText,
+              atomicCues,
+              evidenceRef,
+            }) => ({
+              child,
+              visual,
+              visualText,
+              atomicCues,
+              evidenceRef,
+            }),
+          ),
+        }
+      : videoFrames.length > 0
+        ? { sampledFrames: videoFrames }
+        : record(singleVisualPayload.observation);
   const inspectionDepth = singleVisualPayload.inspectionDepth;
   const children = field(payload.carouselChildren);
   const childRows = Array.isArray(children.children) ? children.children : [];
+  const carouselCoverage = carouselVisuals[0]?.coverage ?? {};
   const depth = !selected
     ? "LIGHT_ONLY"
-    : visuals.length > 0 && videoFrames.length > 0
-      ? "PARTIAL_DEEP"
-      : visuals.length > 0 && inspectionDepth === "IMAGE_ONLY"
-        ? "DEEP_SELECTED"
-        : visuals.length > 0 &&
-            inspectionDepth === "CAROUSEL_REPRESENTATIVE_ONLY"
+    : carouselVisuals.length > 0 && carouselCoverage.completeVideoScope === true
+      ? "DEEP_SELECTED"
+      : carouselVisuals.length > 0
+        ? "PARTIAL_DEEP"
+        : visuals.length > 0 && videoFrames.length > 0
           ? "PARTIAL_DEEP"
-          : visuals.length > 0 && inspectionDepth === "COVER_ONLY"
-            ? "COVER_ONLY"
-            : "NOT_INSPECTED";
+          : visuals.length > 0 && inspectionDepth === "IMAGE_ONLY"
+            ? "DEEP_SELECTED"
+            : visuals.length > 0 &&
+                inspectionDepth === "CAROUSEL_REPRESENTATIVE_ONLY"
+              ? "PARTIAL_DEEP"
+              : visuals.length > 0 && inspectionDepth === "COVER_ONLY"
+                ? "COVER_ONLY"
+                : "NOT_INSPECTED";
   const selectionReasons = Array.isArray(field(payload.selection).reasonCodes)
     ? (field(payload.selection).reasonCodes as string[]).filter((reason) =>
         [
@@ -686,27 +733,36 @@ function buildContext(
       )
     : [];
   const reasonCodes =
-    depth === "COVER_ONLY"
+    carouselVisuals.length > 0
       ? [
-          "COVER_ONLY",
-          "VIDEO_NOT_ANALYZED",
-          "AUDIO_NOT_ANALYZED",
-          "TRANSCRIPT_NOT_ACQUIRED",
+          ...(carouselCoverage.completeVisualScope === true
+            ? []
+            : ["CAROUSEL_CHILD_UNAVAILABLE"]),
+          ...(carouselCoverage.completeVideoScope === true
+            ? []
+            : ["VIDEO_NOT_ANALYZED"]),
         ]
-      : videoFrames.length > 0
+      : depth === "COVER_ONLY"
         ? [
-            "SAMPLED_FRAMES_ARE_NOT_COMPLETE_VIDEO",
+            "COVER_ONLY",
+            "VIDEO_NOT_ANALYZED",
             "AUDIO_NOT_ANALYZED",
             "TRANSCRIPT_NOT_ACQUIRED",
-            "TEMPORAL_SEQUENCE_NOT_ANALYZED",
           ]
-        : depth === "PARTIAL_DEEP"
-          ? ["CAROUSEL_CHILD_UNAVAILABLE"]
-          : depth === "LIGHT_ONLY"
-            ? ["MEDIA_NOT_SELECTED_FOR_DEEP_ANALYSIS", "NOT_INSPECTED"]
-            : depth === "NOT_INSPECTED"
-              ? ["NOT_INSPECTED"]
-              : [];
+        : videoFrames.length > 0
+          ? [
+              "SAMPLED_FRAMES_ARE_NOT_COMPLETE_VIDEO",
+              "AUDIO_NOT_ANALYZED",
+              "TRANSCRIPT_NOT_ACQUIRED",
+              "TEMPORAL_SEQUENCE_NOT_ANALYZED",
+            ]
+          : depth === "PARTIAL_DEEP"
+            ? ["CAROUSEL_CHILD_UNAVAILABLE"]
+            : depth === "LIGHT_ONLY"
+              ? ["MEDIA_NOT_SELECTED_FOR_DEEP_ANALYSIS", "NOT_INSPECTED"]
+              : depth === "NOT_INSPECTED"
+                ? ["NOT_INSPECTED"]
+                : [];
   return {
     caption: {
       state:
@@ -741,13 +797,24 @@ function buildContext(
       selectedForDeepAnalysis: selected,
       selectionReasons,
       inspectedChildCount:
-        depth === "PARTIAL_DEEP" && videoFrames.length === 0 ? 1 : 0,
-      availableChildCount: childRows.length,
+        carouselVisuals.length > 0
+          ? Number(carouselCoverage.childCountVisuallyInspected ?? 0)
+          : depth === "PARTIAL_DEEP" && videoFrames.length === 0
+            ? 1
+            : 0,
+      availableChildCount:
+        carouselVisuals.length > 0
+          ? Number(
+              carouselCoverage.providerChildCountReturned ?? childRows.length,
+            )
+          : childRows.length,
       inspectedFrameCount: videoFrames.length
         ? videoFrames.length
-        : depth === "DEEP_SELECTED" || depth === "COVER_ONLY"
-          ? 1
-          : 0,
+        : carouselVisuals.length > 0
+          ? 0
+          : depth === "DEEP_SELECTED" || depth === "COVER_ONLY"
+            ? 1
+            : 0,
       reasonCodes,
     },
   } as const;
@@ -770,7 +837,9 @@ function buildModelContext(
     visual: {
       state: context.visual.state,
       ...(context.visual.observation
-        ? { observation: context.visual.observation }
+        ? {
+            observation: modelSafeVisualObservation(context.visual.observation),
+          }
         : {}),
     },
     inspection: context.inspection,
@@ -870,6 +939,25 @@ function safeErrorCode(error: unknown) {
   return error instanceof Error && /^[A-Z0-9_]+$/u.test(error.message)
     ? error.message
     : "SEMANTIC_EXECUTION_FAILED";
+}
+
+function isCarouselVisualContext(context: ReturnType<typeof buildContext>) {
+  const observation = record(context.visual.observation);
+  return Array.isArray(observation.carouselChildren);
+}
+
+function modelSafeVisualObservation(
+  observation: Readonly<Record<string, unknown>>,
+) {
+  if (!Array.isArray(observation.carouselChildren)) return observation;
+  return {
+    ...observation,
+    carouselChildren: observation.carouselChildren.map((value) => {
+      const child = record(value);
+      const { evidenceRef: _evidenceRef, ...safeChild } = child;
+      return safeChild;
+    }),
+  };
 }
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)

@@ -9,6 +9,7 @@ import { INSTAGRAM_VIDEO_NORMALIZATION_CONTRACT_VERSION } from "../../instagram/
 import { InstagramC2FoundationsService } from "../foundations/instagram-c2-foundations.service";
 import { INSTAGRAM_B3A_NORMALIZATION_CONTRACT_VERSION } from "../media/instagram-b3a-visual-observation";
 import { INSTAGRAM_B3B_NORMALIZATION_VERSION } from "../media/instagram-b3b-media-completion.service";
+import { INSTAGRAM_W2_NORMALIZATION_VERSION } from "../media/instagram-w2-carousel-pipeline.service";
 import {
   InstagramC3SemanticModelPort,
   type InstagramC3ModelContext,
@@ -66,13 +67,22 @@ class FixtureC3Model extends InstagramC3SemanticModelPort {
               supportModalities: ["VISUAL" as const],
             }
           : { state: "UNKNOWN" as const, supportModalities: [] },
-        offeringPresence: caption
-          ? {
-              state: "PRESENT" as const,
-              supportModalities: ["CAPTION" as const],
-            }
-          : { state: "UNKNOWN" as const, supportModalities: [] },
-        offeringName: caption ? "Launch Kit" : null,
+        offeringPresence:
+          context.media.id === "media-carousel"
+            ? {
+                state: "PRESENT" as const,
+                supportModalities: ["VISUAL" as const],
+              }
+            : caption
+              ? {
+                  state: "PRESENT" as const,
+                  supportModalities: ["CAPTION" as const],
+                }
+              : { state: "UNKNOWN" as const, supportModalities: [] },
+        offeringName:
+          caption || context.media.id === "media-carousel"
+            ? "Launch Kit"
+            : null,
         collaborationCues:
           context.media.id === "media-image"
             ? [
@@ -87,7 +97,15 @@ class FixtureC3Model extends InstagramC3SemanticModelPort {
                   support: "brand and creator in still",
                 },
               ]
-            : [],
+            : context.media.id === "media-carousel"
+              ? [
+                  {
+                    signalClass: "EXPLICIT_PARTNERSHIP_DISCLOSURE" as const,
+                    sourceModality: "VISUAL" as const,
+                    support: "paid partnership",
+                  },
+                ]
+              : [],
       };
     },
   );
@@ -170,6 +188,8 @@ describePostgres("C3 per-media semantics PostgreSQL", () => {
       if (rank) {
         if (mediaType === "REEL") {
           await writeVideoFrames(mediaId);
+        } else if (mediaType === "CAROUSEL_ALBUM") {
+          await writeCarouselChildren(mediaId);
         } else {
           await write(
             brandId,
@@ -274,10 +294,60 @@ describePostgres("C3 per-media semantics PostgreSQL", () => {
       first.media.find((item) => item.mediaId === "media-carousel")?.observation
         ?.inspection,
     ).toMatchObject({
-      depth: "PARTIAL_DEEP",
-      inspectedChildCount: 1,
-      availableChildCount: 1,
+      depth: "DEEP_SELECTED",
+      inspectedChildCount: 2,
+      availableChildCount: 2,
+      reasonCodes: [],
     });
+    const carouselModelContext = model.analyze.mock.calls.find(
+      ([call]) => call.context.media.id === "media-carousel",
+    )?.[0].context;
+    expect(carouselModelContext).toMatchObject({
+      visual: { state: "AVAILABLE" },
+      inspection: { depth: "DEEP_SELECTED", inspectedChildCount: 2 },
+    });
+    expect(
+      (
+        carouselModelContext?.visual.observation as {
+          carouselChildren: readonly unknown[];
+        }
+      ).carouselChildren,
+    ).toHaveLength(2);
+    expect(JSON.stringify(carouselModelContext)).not.toMatch(/evidence:/i);
+    expect(
+      first.media.find((item) => item.mediaId === "media-carousel")?.observation
+        ?.likelyCollab,
+    ).toMatchObject({
+      state: "LIKELY_COLLAB",
+      confidence: "MEDIUM",
+      canonicalCollaborationId: null,
+    });
+    const carouselSourceRows = await prisma.dataExtractionEvidenceItem.findMany(
+      {
+        where: {
+          brandId,
+          normalizationContractVersion: INSTAGRAM_W2_NORMALIZATION_VERSION,
+        },
+      },
+    );
+    const carouselRefByOrdinal = new Map(
+      carouselSourceRows.map((row) => [
+        Number(asRecord(asRecord(row.boundedPayload).child).ordinal),
+        row.evidenceRef,
+      ]),
+    );
+    const carouselObservation = first.media.find(
+      (item) => item.mediaId === "media-carousel",
+    )!.observation!;
+    expect(carouselObservation.offeringPresence.evidenceRefs).toEqual([
+      carouselRefByOrdinal.get(0),
+    ]);
+    expect(carouselObservation.likelyCollab.evidenceRefs).toContain(
+      carouselRefByOrdinal.get(0),
+    );
+    expect(carouselObservation.likelyCollab.evidenceRefs).not.toContain(
+      carouselRefByOrdinal.get(1),
+    );
     expect(
       first.media.find((item) => item.mediaId === "media-reel")?.observation
         ?.inspection,
@@ -641,6 +711,84 @@ describePostgres("C3 per-media semantics PostgreSQL", () => {
       evidence: payloads.map((payload, index) => ({
         evidenceKey: `frame-${index}`,
         artifactKey: `frame-${index}`,
+        payload,
+        freshness: "CURRENT",
+        representativeness: "CONTEXT_SPECIFIC",
+      })),
+    });
+  }
+
+  async function writeCarouselChildren(mediaId: string) {
+    const payloads = [0, 1].map((ordinal) => ({
+      inspectionDepth: "CAROUSEL_FULL_BOUNDED",
+      child: {
+        providerMediaId: `carousel-child-image-${ordinal}`,
+        ordinal,
+        mediaType: "IMAGE",
+        inspectionMode: "IMAGE_FULL",
+      },
+      coverage: {
+        providerChildCountReturned: 2,
+        childCountRepresented: 2,
+        childCountAttempted: 2,
+        childCountVisuallyInspected: 2,
+        childCountOcrInspected: 2,
+        imageFullCount: 2,
+        videoCoverOnlyCount: 0,
+        unavailableUnsupportedFailedCount: 0,
+        completeVisualScope: true,
+        completeVideoScope: true,
+      },
+      observation: {
+        description: `Bounded carousel still ${ordinal}`,
+        visibleElements:
+          ordinal === 0
+            ? ["person", "product", "Launch Kit"]
+            : ["person", "product"],
+        dominantColors: ["blue"],
+        composition: "centered",
+      },
+      visualText: {
+        state: "OBSERVED",
+        spans:
+          ordinal === 0 ? ["Launch Kit", "Paid partnership"] : ["Shop now"],
+      },
+      atomicCues: {
+        cta: {
+          state: ordinal === 1 ? "OBSERVED" : "UNKNOWN",
+          phrases: ordinal === 1 ? ["shop now"] : [],
+        },
+      },
+    }));
+    await writer.write({
+      brandId,
+      providerAccountId: "account-c3",
+      authorizationGeneration: 7,
+      resourceType: "INSTAGRAM_MEDIA",
+      mediaId,
+      capabilityId: "instagram.media_visual_observations",
+      requestKey: `c3:${mediaId}-w2-carousel:${brandId}`,
+      providerExecutionRef: `provider-execution:c3:${mediaId}-w2-carousel:${brandId}`,
+      normalizationContractVersion: INSTAGRAM_W2_NORMALIZATION_VERSION,
+      startedAt: capturedAt,
+      completedAt: capturedAt,
+      capturedAt,
+      availability: "AVAILABLE",
+      retryability: "NOT_APPLICABLE",
+      reasonCodes: ["C3_W2_CAROUSEL_FIXTURE"],
+      coverage: "SINGLE_RESOURCE",
+      acquisitionQuality: {
+        state: "COMPLETE",
+        failureCategories: [],
+        detailCodes: [],
+      },
+      artifacts: payloads.map((payload, ordinal) => ({
+        artifactKey: `child-${ordinal}`,
+        payload,
+      })),
+      evidence: payloads.map((payload, ordinal) => ({
+        evidenceKey: `child-${ordinal}`,
+        artifactKey: `child-${ordinal}`,
         payload,
         freshness: "CURRENT",
         representativeness: "CONTEXT_SPECIFIC",

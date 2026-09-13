@@ -14,6 +14,8 @@ export const INSTAGRAM_C3_PROMPT_PROFILE_VERSION =
   "instagram-c3-per-media-v1" as const;
 export const INSTAGRAM_C3_VIDEO_FRAME_INPUT_PROFILE_VERSION =
   "instagram-c3-sampled-video-frames-v1" as const;
+export const INSTAGRAM_C3_CAROUSEL_VISUAL_TEXT_INPUT_PROFILE_VERSION =
+  "instagram-c3-carousel-visual-text-v1" as const;
 export const INSTAGRAM_C3_NORMALIZATION_VERSION =
   "instagram.per-media-semantics.c3.v1" as const;
 
@@ -422,7 +424,13 @@ function cueRecord(
   const support = normalizeLabel(cue.support);
   assertCueGrounding(cue.signalClass, cue.sourceModality, support, context);
   const supportHash = digest(support.toLocaleLowerCase("en-US"));
-  const evidenceRefs = modalityRefs([cue.sourceModality], context);
+  const exactVisualRefs =
+    cue.sourceModality === "VISUAL"
+      ? visualEvidenceRefsForSupport(support, context)
+      : [];
+  const evidenceRefs = exactVisualRefs.length
+    ? exactVisualRefs
+    : modalityRefs([cue.sourceModality], context);
   if (evidenceRefs.length === 0)
     throw new InstagramC3SemanticError("UNGROUNDED_CUE_SUPPORT");
   return {
@@ -504,7 +512,10 @@ export function finalizeLikelyCollab(
               reasonCodes: [],
               evidenceRefs: sortedUnique([
                 context.caption.evidenceRef,
-                context.visual.evidenceRef!,
+                ...(context.visual.evidenceRefs ??
+                  (context.visual.evidenceRef
+                    ? [context.visual.evidenceRef]
+                    : [])),
               ]),
             }
           : {
@@ -539,6 +550,23 @@ function finalizeOffering(
     state === "PRESENT" && matches.length === 1 && sourceGrounded
       ? matches[0]
       : null;
+  const presenceRefs = supportingRefsForPresence(
+    candidate.offeringPresence,
+    context,
+  );
+  const exactVisualRefs =
+    normalized &&
+    candidate.offeringPresence.supportModalities.includes("VISUAL")
+      ? visualEvidenceRefsForSupport(normalized, context)
+      : [];
+  const evidenceRefs = exactVisualRefs.length
+    ? sortedUnique([
+        ...exactVisualRefs,
+        ...(candidate.offeringPresence.supportModalities.includes("CAPTION")
+          ? [context.caption.evidenceRef]
+          : []),
+      ])
+    : presenceRefs;
   return {
     state,
     canonicalOfferingId: exact?.id ?? null,
@@ -551,10 +579,7 @@ function finalizeOffering(
         : candidate.offeringName && !exact
           ? ["OFFERING_MATCH_UNVERIFIED" as const]
           : [],
-    evidenceRefs: supportingRefsForPresence(
-      candidate.offeringPresence,
-      context,
-    ),
+    evidenceRefs,
   };
 }
 
@@ -619,6 +644,35 @@ function modalityRefs(
         : (context.visual.evidenceRefs ??
           (context.visual.evidenceRef ? [context.visual.evidenceRef] : [])),
     ),
+  );
+}
+
+function visualEvidenceRefsForSupport(
+  support: string,
+  context: InstagramC3AdmittedContext,
+) {
+  const observation = context.visual.observation;
+  if (!observation) return [];
+  const children = observation.carouselChildren;
+  if (!Array.isArray(children)) return [];
+  return sortedUnique(
+    children.flatMap((value) => {
+      if (!value || typeof value !== "object" || Array.isArray(value))
+        return [];
+      const child = value as Record<string, unknown>;
+      const evidenceRef = child.evidenceRef;
+      if (typeof evidenceRef !== "string") return [];
+      const supportSurface = {
+        visual: child.visual,
+        visualText: child.visualText,
+        atomicCues: child.atomicCues,
+      };
+      return visualStrings(supportSurface).some((candidate) =>
+        containsNormalizedPhrase(candidate, support),
+      )
+        ? [evidenceRef]
+        : [];
+    }),
   );
 }
 

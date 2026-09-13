@@ -342,6 +342,87 @@ describe("B3B thinner media completion", () => {
     });
   });
 
+  it("routes every returned child of a selected carousel through the Week 2 parent sweep", async () => {
+    const carousel = media(0, "CAROUSEL_ALBUM");
+    const children = [
+      {
+        providerMediaId: "child-image",
+        ordinal: 0,
+        mediaType: observed("IMAGE"),
+        mediaProductType: observed("FEED"),
+      },
+      {
+        providerMediaId: "child-video",
+        ordinal: 1,
+        mediaType: observed("VIDEO"),
+        mediaProductType: observed("FEED"),
+      },
+    ];
+    const reads = {
+      execute: vi.fn(async ({ command }) =>
+        command.kind === "MEDIA_INVENTORY"
+          ? {
+              result: {
+                availability: "AVAILABLE",
+                items: [carousel],
+                coverage: inventoryCoverage(),
+              },
+            }
+          : command.kind === "CAROUSEL_CHILDREN"
+            ? {
+                result: {
+                  availability: "AVAILABLE",
+                  stopReason: "EXHAUSTED",
+                  children,
+                },
+              }
+            : {
+                result: {
+                  availability: "AVAILABLE",
+                  mediaType: "CAROUSEL_ALBUM",
+                  metrics: {},
+                },
+              },
+      ),
+    };
+    const writer = {
+      write: vi.fn().mockResolvedValue({
+        captureRef: "capture:instagram:light:1",
+        evidenceRefs: ["evidence:instagram:light:1"],
+      }),
+    };
+    const imagePipeline = { execute: vi.fn() };
+    const carouselPipeline = {
+      execute: vi.fn().mockResolvedValue({
+        visualInspection: "INSPECTED",
+        visualSemanticResult: "AVAILABLE",
+        reasonCode: "CAROUSEL_CHILDREN_INSPECTED",
+      }),
+    };
+    const result = await new InstagramB3bMediaCompletionService(
+      reads as never,
+      writer as never,
+      imagePipeline as never,
+      undefined,
+      carouselPipeline as never,
+    ).execute(executionInput());
+
+    expect(result.media[0]).toMatchObject({
+      selected: true,
+      reason: "CAROUSEL_CHILDREN_INSPECTED",
+    });
+    expect(carouselPipeline.execute).toHaveBeenCalledOnce();
+    expect(carouselPipeline.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parentMediaId: "media-00",
+        children: expect.objectContaining({ children }),
+        sourceCaptureRef: "capture:instagram:light:1",
+        sourceEvidenceRefs: ["evidence:instagram:light:1"],
+      }),
+    );
+    expect(imagePipeline.execute).not.toHaveBeenCalled();
+  });
+
   it("keeps Reel cover failure UNKNOWN with cover-only limitations and existing light Evidence", async () => {
     const reel = media(0, "REEL");
     const reads = {

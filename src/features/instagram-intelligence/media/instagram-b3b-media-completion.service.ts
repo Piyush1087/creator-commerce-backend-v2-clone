@@ -16,6 +16,7 @@ import {
   selectInstagramB3bCorpus,
 } from "./instagram-b3b-selector";
 import { InstagramW1VideoPipelineService } from "./instagram-w1-video-pipeline.service";
+import { InstagramW2CarouselPipelineService } from "./instagram-w2-carousel-pipeline.service";
 
 export const INSTAGRAM_B3B_NORMALIZATION_VERSION =
   "instagram.media-completion.b3b.v1";
@@ -54,6 +55,7 @@ export class InstagramB3bMediaCompletionService {
     private readonly writer: InstagramCaptureWriterService,
     private readonly imagePipeline: InstagramB3aImagePipelineService,
     private readonly videoPipeline?: InstagramW1VideoPipelineService,
+    private readonly carouselPipeline?: InstagramW2CarouselPipelineService,
   ) {}
 
   async execute(
@@ -330,6 +332,28 @@ export class InstagramB3bMediaCompletionService {
       "b3a-v1";
     let visualContext: Record<string, unknown> | undefined;
     if (normalized === "CAROUSEL_ALBUM") {
+      if (this.carouselPipeline && children) {
+        const result = await this.carouselPipeline.execute({
+          brandProfileId: input.brandProfileId,
+          integrationId: input.integrationId,
+          providerAccountId: input.providerAccountId,
+          authorizationGeneration: input.authorizationGeneration,
+          parentMediaId: media.providerMediaId,
+          children,
+          windowEnd: input.windowEnd,
+          sourceCaptureRef: sourceLineage.captureRef,
+          sourceEvidenceRefs: sourceLineage.evidenceRefs,
+          now,
+          ...(input.signal ? { signal: input.signal } : {}),
+        });
+        return {
+          providerMediaId: media.providerMediaId,
+          selected: true,
+          visualInspection: result.visualInspection,
+          visualSemanticResult: result.visualSemanticResult,
+          reason: result.reasonCode,
+        };
+      }
       const representative = selectRepresentativeChild(children);
       if (!representative)
         return unavailable(

@@ -32,6 +32,11 @@ import {
   InstagramW1VideoFrameModelPort,
   UnavailableInstagramW1VideoFrameModelAdapter,
 } from "./media/instagram-w1-video-frame-observation";
+import { InstagramW2CarouselPipelineService } from "./media/instagram-w2-carousel-pipeline.service";
+import {
+  InstagramVisualTextModelPort,
+  UnavailableInstagramVisualTextModelAdapter,
+} from "../instagram/media/instagram-visual-text";
 
 @Module({
   imports: [
@@ -46,6 +51,7 @@ import {
     InstagramB3aImagePipelineService,
     InstagramB3bMediaCompletionService,
     InstagramW1VideoPipelineService,
+    InstagramW2CarouselPipelineService,
     InstagramB4ConsumerService,
     InstagramContentBehaviorRuntimeService,
     InstagramC4RuntimeService,
@@ -70,11 +76,16 @@ import {
       provide: InstagramW1VideoFrameModelPort,
       useClass: UnavailableInstagramW1VideoFrameModelAdapter,
     },
+    {
+      provide: InstagramVisualTextModelPort,
+      useClass: UnavailableInstagramVisualTextModelAdapter,
+    },
   ],
   exports: [
     InstagramB3aImagePipelineService,
     InstagramB3bMediaCompletionService,
     InstagramW1VideoPipelineService,
+    InstagramW2CarouselPipelineService,
     InstagramB4ConsumerService,
     InstagramContentBehaviorRuntimeService,
     InstagramC4RuntimeService,

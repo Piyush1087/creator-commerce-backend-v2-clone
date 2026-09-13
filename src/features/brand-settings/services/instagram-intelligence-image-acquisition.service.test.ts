@@ -32,6 +32,28 @@ const input = {
 };
 
 describe("B3A Settings-owned authorized image acquisition", () => {
+  it("checks the current replay fence without selecting or decrypting credentials", async () => {
+    const findUnique = vi.fn().mockResolvedValue({
+      ...integration,
+      accessTokenEncrypted: undefined,
+    });
+    const acquisition = { acquire: vi.fn() };
+    const service = new InstagramIntelligenceAuthorizedImageAcquisitionService(
+      { brandIntegration: { findUnique } } as never,
+      acquisition as never,
+    );
+
+    await expect(
+      service.assertReplayAuthorized(input),
+    ).resolves.toBeUndefined();
+    expect(findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.not.objectContaining({ accessTokenEncrypted: true }),
+      }),
+    );
+    expect(acquisition.acquire).not.toHaveBeenCalled();
+  });
+
   it.each([
     [
       "changed account",
