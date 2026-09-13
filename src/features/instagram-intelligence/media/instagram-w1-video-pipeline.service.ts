@@ -35,6 +35,17 @@ export type InstagramW1VideoResult = Readonly<{
   evidenceRefs: readonly string[];
 }>;
 
+type InstagramW1Replay = Readonly<{
+  framesRequested: number;
+  framesExtracted: number;
+  framesObserved: number;
+  availability: "AVAILABLE" | "PARTIAL";
+  evidenceRefs: readonly string[];
+}>;
+
+const PRE_ACQUISITION_REPLAY_MANIFEST_VERSION =
+  "instagram-w1-video-pre-acquisition-replay-v1";
+
 @Injectable()
 export class InstagramW1VideoPipelineService {
   constructor(
@@ -74,6 +85,37 @@ export class InstagramW1VideoPipelineService {
     let video: InstagramTemporaryVideoArtifact | undefined;
     let frames: readonly InstagramExtractedFrame[] = [];
     try {
+      await this.acquisition.assertReplayAuthorized({
+        brandProfileId: input.brandProfileId,
+        integrationId: input.integrationId,
+        expectedProviderAccountId: input.providerAccountId,
+        expectedAuthorizationGeneration: input.authorizationGeneration,
+      });
+      const preAcquisitionReplayIdentity = digestCanonical({
+        replayManifestVersion: PRE_ACQUISITION_REPLAY_MANIFEST_VERSION,
+        brandProfileId: input.brandProfileId,
+        providerAccountId: input.providerAccountId,
+        authorizationGeneration: input.authorizationGeneration,
+        providerMediaId: input.mediaId,
+        sourceCaptureRef: input.sourceCaptureRef,
+        sourceEvidenceRefs: [...input.sourceEvidenceRefs].sort(),
+        sourceCaptureWindowEnd: input.windowEnd.toISOString(),
+        videoAnalysisProfile: INSTAGRAM_VIDEO_ANALYSIS_PROFILE,
+        frameSelectionProfile: INSTAGRAM_VIDEO_FRAME_SELECTION_PROFILE,
+        frameObservationContract:
+          INSTAGRAM_VIDEO_FRAME_OBSERVATION_CONTRACT_VERSION,
+        framePromptProfile: INSTAGRAM_VIDEO_FRAME_PROMPT_PROFILE_VERSION,
+        modelProvider: this.model.providerIdentity,
+        modelIdentity: this.model.modelIdentity,
+        modelProfileVersion: this.model.modelProfileVersion,
+      });
+      const preAcquisitionReplay = await this.loadReplay(
+        input,
+        "preAcquisitionReplayIdentity",
+        preAcquisitionReplayIdentity,
+      );
+      if (preAcquisitionReplay) return replayResult(preAcquisitionReplay);
+
       const acquired = await this.acquisition.acquire({
         brandProfileId: input.brandProfileId,
         integrationId: input.integrationId,
@@ -102,19 +144,12 @@ export class InstagramW1VideoPipelineService {
         modelIdentity: this.model.modelIdentity,
         modelProfileVersion: this.model.modelProfileVersion,
       });
-      const replay = await this.loadReplay(input, executionIdentity);
-      if (replay.length > 0) {
-        return {
-          visualInspection: "INSPECTED",
-          visualSemanticResult: "AVAILABLE",
-          reasonCode: "EXACT_VIDEO_EXECUTION_REUSED",
-          framesRequested: replay.length,
-          framesExtracted: replay.length,
-          framesObserved: replay.length,
-          reused: true,
-          evidenceRefs: replay,
-        };
-      }
+      const legacyReplay = await this.loadReplay(
+        input,
+        "executionIdentity",
+        executionIdentity,
+      );
+      if (legacyReplay) return replayResult(legacyReplay);
 
       const probe = await this.decoder.probe(video, input.signal);
       const timestamps = selectInstagramVideoFrameTimestamps(
@@ -167,6 +202,7 @@ export class InstagramW1VideoPipelineService {
         modelProvider: this.model.providerIdentity,
         modelIdentity: this.model.modelIdentity,
         modelProfileVersion: this.model.modelProfileVersion,
+        preAcquisitionReplayIdentity,
         executionIdentity,
         sourceCaptureRef: input.sourceCaptureRef,
         sourceEvidenceRefs: [...input.sourceEvidenceRefs].sort(),
@@ -178,6 +214,11 @@ export class InstagramW1VideoPipelineService {
           "TEMPORAL_SEQUENCE_NOT_ANALYZED",
         ],
       } as const;
+      const availability =
+        successful.length === timestamps.length &&
+        frames.length === timestamps.length
+          ? "AVAILABLE"
+          : "PARTIAL";
       const artifacts = [
         {
           artifactKey: "verified-video-metadata",
@@ -189,6 +230,7 @@ export class InstagramW1VideoPipelineService {
             framesRequested: timestamps.length,
             framesExtracted: frames.length,
             framesObserved: successful.length,
+            resultAvailability: availability,
             processingLatencyMilliseconds: elapsedMilliseconds,
             cleanupPolicy: "NONE_AFTER_EXECUTION",
           },
@@ -210,11 +252,6 @@ export class InstagramW1VideoPipelineService {
         representativeness: "CONTEXT_SPECIFIC" as const,
         semanticObservationKey: `instagram:video-frame:${digestCanonical({ executionIdentity, ordinal: frame.ordinal })}`,
       }));
-      const availability =
-        successful.length === timestamps.length &&
-        frames.length === timestamps.length
-          ? "AVAILABLE"
-          : "PARTIAL";
       const lineage = await this.writer.write({
         brandId: input.brandProfileId,
         providerAccountId: input.providerAccountId,
@@ -369,7 +406,8 @@ export class InstagramW1VideoPipelineService {
       providerAccountId: string;
       authorizationGeneration: number;
     },
-    executionIdentity: string,
+    identityField: "preAcquisitionReplayIdentity" | "executionIdentity",
+    identity: string,
   ) {
     const rows = await this.prisma.dataExtractionEvidenceItem.findMany({
       where: {
@@ -378,8 +416,8 @@ export class InstagramW1VideoPipelineService {
         normalizationContractVersion:
           INSTAGRAM_VIDEO_NORMALIZATION_CONTRACT_VERSION,
         boundedPayload: {
-          path: ["executionIdentity"],
-          equals: executionIdentity,
+          path: [identityField],
+          equals: identity,
         },
         capture: {
           status: "COMPLETED",
@@ -387,11 +425,111 @@ export class InstagramW1VideoPipelineService {
           authorizationGeneration: input.authorizationGeneration,
         },
       },
-      select: { evidenceRef: true },
-      orderBy: { evidenceRef: "asc" },
+      select: {
+        evidenceRef: true,
+        captureRef: true,
+        boundedPayload: true,
+        capture: {
+          select: {
+            createdAt: true,
+            contentArtifacts: { select: { inlineContent: true } },
+          },
+        },
+      },
+      orderBy: [{ capture: { createdAt: "desc" } }, { evidenceRef: "asc" }],
     });
-    return rows.map((row) => row.evidenceRef);
+    const captureRef = rows[0]?.captureRef;
+    if (!captureRef) return null;
+    const replayRows = rows
+      .filter((row) => row.captureRef === captureRef)
+      .sort(
+        (left, right) =>
+          replayFrameOrdinal(left.boundedPayload) -
+          replayFrameOrdinal(right.boundedPayload),
+      );
+    const metadata = replayRows[0]?.capture.contentArtifacts
+      .map((artifact) => parseRecord(artifact.inlineContent))
+      .find((payload) => payload[identityField] === identity);
+    if (!metadata) return null;
+    const framesRequested = boundedCount(metadata.framesRequested);
+    const framesExtracted = boundedCount(metadata.framesExtracted);
+    const framesObserved = boundedCount(metadata.framesObserved);
+    if (
+      framesRequested === null ||
+      framesExtracted === null ||
+      framesObserved === null ||
+      framesRequested < framesExtracted ||
+      framesExtracted < framesObserved ||
+      framesObserved === 0 ||
+      framesObserved !== replayRows.length
+    )
+      return null;
+    const derivedAvailability =
+      framesRequested === framesExtracted && framesExtracted === framesObserved
+        ? "AVAILABLE"
+        : "PARTIAL";
+    const availability =
+      metadata.resultAvailability === "AVAILABLE" ||
+      metadata.resultAvailability === "PARTIAL"
+        ? metadata.resultAvailability
+        : derivedAvailability;
+    if (availability === "AVAILABLE" && derivedAvailability !== "AVAILABLE")
+      return null;
+    return {
+      framesRequested,
+      framesExtracted,
+      framesObserved,
+      availability,
+      evidenceRefs: replayRows.map((row) => row.evidenceRef),
+    } satisfies InstagramW1Replay;
   }
+}
+
+function replayResult(replay: InstagramW1Replay): InstagramW1VideoResult {
+  return {
+    visualInspection: "INSPECTED",
+    visualSemanticResult: "AVAILABLE",
+    reasonCode: "EXACT_VIDEO_EXECUTION_REUSED",
+    framesRequested: replay.framesRequested,
+    framesExtracted: replay.framesExtracted,
+    framesObserved: replay.framesObserved,
+    reused: true,
+    evidenceRefs: replay.evidenceRefs,
+  };
+}
+
+function parseRecord(value: string | null): Record<string, unknown> {
+  if (!value) return {};
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function boundedCount(value: unknown) {
+  return Number.isSafeInteger(value) && Number(value) >= 0 && Number(value) <= 6
+    ? Number(value)
+    : null;
+}
+
+function replayFrameOrdinal(value: unknown) {
+  const payload =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  const frame =
+    payload.frame &&
+    typeof payload.frame === "object" &&
+    !Array.isArray(payload.frame)
+      ? (payload.frame as Record<string, unknown>)
+      : {};
+  return Number.isSafeInteger(frame.frameOrdinal)
+    ? Number(frame.frameOrdinal)
+    : Number.MAX_SAFE_INTEGER;
 }
 
 function frameMetadata(

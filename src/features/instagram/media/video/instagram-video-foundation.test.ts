@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -26,6 +26,16 @@ afterEach(async () => {
 });
 
 describe("Week 1 shared video foundation", () => {
+  it("validates only the bounded MP4 prefix without whole-video buffering", async () => {
+    const source = await readFile(
+      join(__dirname, "instagram-secure-video-downloader.ts"),
+      "utf8",
+    );
+    expect(source).toContain("Buffer.alloc(12)");
+    expect(source).toContain("handle.read(bytes, 0, bytes.length, 0)");
+    expect(source).not.toMatch(/\breadFile\s*\(/u);
+  });
+
   it("selects the six canonical normalized timestamps", () => {
     expect(selectInstagramVideoFrameTimestamps(10_000)).toEqual([
       0, 1_500, 3_000, 5_000, 8_000, 9_750,

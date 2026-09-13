@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { createHash } from "node:crypto";
-import { open, readFile } from "node:fs/promises";
+import { open } from "node:fs/promises";
 import type { IncomingHttpHeaders } from "node:http";
 import { isIP } from "node:net";
 import { Readable, Transform } from "node:stream";
@@ -242,8 +242,6 @@ async function assertMp4Signature(path: string) {
     const { bytesRead } = await handle.read(bytes, 0, bytes.length, 0);
     if (bytesRead < 12 || bytes.subarray(4, 8).toString("ascii") !== "ftyp")
       throw new InstagramVideoError("UNSUPPORTED_VIDEO_TYPE");
-    const whole = await readFile(path);
-    if (whole.length < 12) throw new InstagramVideoError("INVALID_VIDEO");
   } finally {
     await handle.close();
   }

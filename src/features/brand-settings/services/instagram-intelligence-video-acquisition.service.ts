@@ -19,6 +19,29 @@ export class InstagramIntelligenceAuthorizedVideoAcquisitionService {
     private readonly acquisition: InstagramContainedVideoAcquisitionService,
   ) {}
 
+  async assertReplayAuthorized(input: {
+    brandProfileId: string;
+    integrationId: string;
+    expectedProviderAccountId: string;
+    expectedAuthorizationGeneration: number;
+  }) {
+    const integration = await this.prisma.brandIntegration.findUnique({
+      where: { id: input.integrationId },
+      select: {
+        brandProfileId: true,
+        provider: true,
+        status: true,
+        isActive: true,
+        providerAccountId: true,
+        identityVerification: true,
+        authorizationHealth: true,
+        firstPartyProfileCapability: true,
+        authorizationGeneration: true,
+      },
+    });
+    assertVideoAuthorizationFence(integration, input);
+  }
+
   async acquire(input: {
     brandProfileId: string;
     integrationId: string;
@@ -43,42 +66,7 @@ export class InstagramIntelligenceAuthorizedVideoAcquisitionService {
         accessTokenEncrypted: true,
       },
     });
-    if (!integration)
-      throw new InstagramIntelligenceReadFenceError("INTEGRATION_NOT_FOUND");
-    if (integration.provider !== BrandIntegrationProvider.INSTAGRAM)
-      throw new InstagramIntelligenceReadFenceError("PROVIDER_MISMATCH");
-    if (integration.brandProfileId !== input.brandProfileId)
-      throw new InstagramIntelligenceReadFenceError("BRAND_MISMATCH");
-    if (
-      !integration.providerAccountId ||
-      integration.identityVerification !==
-        InstagramIdentityVerification.VERIFIED
-    )
-      throw new InstagramIntelligenceReadFenceError("IDENTITY_UNVERIFIED");
-    if (integration.providerAccountId !== input.expectedProviderAccountId)
-      throw new InstagramIntelligenceReadFenceError("ACCOUNT_MISMATCH");
-    if (
-      integration.authorizationGeneration !==
-      input.expectedAuthorizationGeneration
-    )
-      throw new InstagramIntelligenceReadFenceError("GENERATION_MISMATCH");
-    if (!integration.isActive)
-      throw new InstagramIntelligenceReadFenceError("INTEGRATION_INACTIVE");
-    if (
-      (integration.status !== BrandIntegrationStatus.CONNECTED &&
-        integration.status !== BrandIntegrationStatus.PARTIALLY_CONNECTED) ||
-      (integration.authorizationHealth !==
-        InstagramAuthorizationHealth.CONNECTED_FULL &&
-        integration.authorizationHealth !==
-          InstagramAuthorizationHealth.PARTIALLY_CONNECTED)
-    )
-      throw new InstagramIntelligenceReadFenceError(
-        "AUTHORIZATION_UNAVAILABLE",
-      );
-    if (
-      integration.firstPartyProfileCapability !== InstagramCapabilityState.YES
-    )
-      throw new InstagramIntelligenceReadFenceError("CAPABILITY_UNAVAILABLE");
+    assertVideoAuthorizationFence(integration, input);
     if (!integration.accessTokenEncrypted)
       throw new InstagramIntelligenceReadFenceError("CREDENTIAL_UNAVAILABLE");
 
@@ -93,4 +81,59 @@ export class InstagramIntelligenceAuthorizedVideoAcquisitionService {
       ...(input.signal ? { signal: input.signal } : {}),
     });
   }
+}
+
+type VideoAuthorizationFence = Readonly<{
+  brandProfileId: string;
+  provider: BrandIntegrationProvider;
+  status: BrandIntegrationStatus;
+  isActive: boolean;
+  providerAccountId: string | null;
+  identityVerification: InstagramIdentityVerification;
+  authorizationHealth: InstagramAuthorizationHealth;
+  firstPartyProfileCapability: InstagramCapabilityState;
+  authorizationGeneration: number;
+}>;
+
+function assertVideoAuthorizationFence(
+  integration: VideoAuthorizationFence | null,
+  input: {
+    brandProfileId: string;
+    expectedProviderAccountId: string;
+    expectedAuthorizationGeneration: number;
+  },
+): asserts integration is VideoAuthorizationFence & {
+  providerAccountId: string;
+} {
+  if (!integration)
+    throw new InstagramIntelligenceReadFenceError("INTEGRATION_NOT_FOUND");
+  if (integration.provider !== BrandIntegrationProvider.INSTAGRAM)
+    throw new InstagramIntelligenceReadFenceError("PROVIDER_MISMATCH");
+  if (integration.brandProfileId !== input.brandProfileId)
+    throw new InstagramIntelligenceReadFenceError("BRAND_MISMATCH");
+  if (
+    !integration.providerAccountId ||
+    integration.identityVerification !== InstagramIdentityVerification.VERIFIED
+  )
+    throw new InstagramIntelligenceReadFenceError("IDENTITY_UNVERIFIED");
+  if (integration.providerAccountId !== input.expectedProviderAccountId)
+    throw new InstagramIntelligenceReadFenceError("ACCOUNT_MISMATCH");
+  if (
+    integration.authorizationGeneration !==
+    input.expectedAuthorizationGeneration
+  )
+    throw new InstagramIntelligenceReadFenceError("GENERATION_MISMATCH");
+  if (!integration.isActive)
+    throw new InstagramIntelligenceReadFenceError("INTEGRATION_INACTIVE");
+  if (
+    (integration.status !== BrandIntegrationStatus.CONNECTED &&
+      integration.status !== BrandIntegrationStatus.PARTIALLY_CONNECTED) ||
+    (integration.authorizationHealth !==
+      InstagramAuthorizationHealth.CONNECTED_FULL &&
+      integration.authorizationHealth !==
+        InstagramAuthorizationHealth.PARTIALLY_CONNECTED)
+  )
+    throw new InstagramIntelligenceReadFenceError("AUTHORIZATION_UNAVAILABLE");
+  if (integration.firstPartyProfileCapability !== InstagramCapabilityState.YES)
+    throw new InstagramIntelligenceReadFenceError("CAPABILITY_UNAVAILABLE");
 }

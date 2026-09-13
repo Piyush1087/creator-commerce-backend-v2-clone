@@ -119,8 +119,21 @@ describePostgres("Week 1 video PostgreSQL lineage and preservation", () => {
     ).toBeNull();
     const counts = await rowCounts(brandId);
     const replay = await firstFixture.service.execute(input());
-    expect(replay).toMatchObject({ reused: true, framesObserved: 2 });
+    expect(replay).toMatchObject({
+      reused: true,
+      framesRequested: 6,
+      framesExtracted: 2,
+      framesObserved: 2,
+      visualInspection: "INSPECTED",
+      visualSemanticResult: "AVAILABLE",
+    });
+    expect(replay.evidenceRefs).toEqual(first.evidenceRefs);
+    expect(
+      firstFixture.acquisition.assertReplayAuthorized,
+    ).toHaveBeenCalledTimes(2);
+    expect(firstFixture.acquisition.acquire).toHaveBeenCalledTimes(1);
     expect(firstFixture.decoder.probe).toHaveBeenCalledTimes(1);
+    expect(firstFixture.decoder.extractFrames).toHaveBeenCalledTimes(1);
     expect(firstFixture.model.observe).toHaveBeenCalledTimes(2);
     expect(await rowCounts(brandId)).toEqual(counts);
 
@@ -212,6 +225,35 @@ describePostgres("Week 1 video PostgreSQL lineage and preservation", () => {
 
   function pipeline(model: FixtureFrameModel) {
     const acquisition = {
+      assertReplayAuthorized: vi.fn(
+        async (request: {
+          brandProfileId: string;
+          integrationId: string;
+          expectedProviderAccountId: string;
+          expectedAuthorizationGeneration: number;
+        }) => {
+          const current = await prisma.brandIntegration.findUnique({
+            where: { id: request.integrationId },
+            select: {
+              brandProfileId: true,
+              providerAccountId: true,
+              authorizationGeneration: true,
+              status: true,
+              isActive: true,
+            },
+          });
+          if (
+            !current ||
+            current.brandProfileId !== request.brandProfileId ||
+            current.providerAccountId !== request.expectedProviderAccountId ||
+            current.authorizationGeneration !==
+              request.expectedAuthorizationGeneration ||
+            !current.isActive ||
+            !["CONNECTED", "PARTIALLY_CONNECTED"].includes(current.status)
+          )
+            throw new Error("authorization fence rejected");
+        },
+      ),
       acquire: vi.fn(
         async ({ brandProfileId: scope }: { brandProfileId: string }) => {
           const created = await videoStore.createVideo(scope);
@@ -265,6 +307,7 @@ describePostgres("Week 1 video PostgreSQL lineage and preservation", () => {
       ),
     };
     return {
+      acquisition,
       model,
       decoder,
       service: new InstagramW1VideoPipelineService(

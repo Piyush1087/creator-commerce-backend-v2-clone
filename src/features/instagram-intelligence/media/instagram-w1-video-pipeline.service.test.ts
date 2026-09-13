@@ -31,19 +31,78 @@ describe("InstagramW1VideoPipelineService", () => {
     expect(fixture.store.remove).toHaveBeenCalledTimes(4);
   });
 
-  it("reuses exact successful identity without probe, extraction, or model work", async () => {
-    const fixture = createFixture({ replay: ["evidence:a", "evidence:b"] });
+  it("reuses exact successful identity before acquisition with original partial coverage", async () => {
+    const fixture = createFixture({ failOrdinal: 1 });
+    const first = await fixture.service.execute(request());
     const result = await fixture.service.execute(request());
+    expect(first).toMatchObject({
+      framesRequested: 6,
+      framesExtracted: 3,
+      framesObserved: 2,
+      reused: false,
+    });
     expect(result).toMatchObject({
       reasonCode: "EXACT_VIDEO_EXECUTION_REUSED",
       reused: true,
+      framesRequested: 6,
+      framesExtracted: 3,
       framesObserved: 2,
     });
-    expect(fixture.decoder.probe).not.toHaveBeenCalled();
-    expect(fixture.decoder.extractFrames).not.toHaveBeenCalled();
-    expect(fixture.model.observe).not.toHaveBeenCalled();
-    expect(fixture.writer.write).not.toHaveBeenCalled();
-    expect(fixture.store.remove).toHaveBeenCalledTimes(1);
+    expect(result.evidenceRefs).toEqual(first.evidenceRefs);
+    expect(fixture.acquisition.assertReplayAuthorized).toHaveBeenCalledTimes(2);
+    expect(fixture.acquisition.acquire).toHaveBeenCalledTimes(1);
+    expect(fixture.decoder.probe).toHaveBeenCalledTimes(1);
+    expect(fixture.decoder.extractFrames).toHaveBeenCalledTimes(1);
+    expect(fixture.model.observe).toHaveBeenCalledTimes(3);
+    expect(fixture.writer.write).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reuse a zero-Evidence failure", async () => {
+    const fixture = createFixture({ failAll: true });
+    await fixture.service.execute(request());
+    const second = await fixture.service.execute(request());
+    expect(second.reused).toBe(false);
+    expect(fixture.acquisition.acquire).toHaveBeenCalledTimes(2);
+    expect(fixture.decoder.probe).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not collide changed source, window, media, or model identity", async () => {
+    const fixture = createFixture({});
+    await fixture.service.execute(request());
+    await fixture.service.execute({
+      ...request(),
+      sourceCaptureRef: "capture:instagram:light:2",
+    });
+    await fixture.service.execute({
+      ...request(),
+      windowEnd: new Date("2026-09-14T00:00:00.000Z"),
+    });
+    await fixture.service.execute({ ...request(), mediaId: "media-2" });
+    fixture.model.modelProfileVersion = "fixture-v2";
+    await fixture.service.execute(request());
+    expect(fixture.acquisition.acquire).toHaveBeenCalledTimes(5);
+    expect(fixture.decoder.probe).toHaveBeenCalledTimes(5);
+  });
+
+  it("rejects cross-Brand, account, generation, and current authorization loss before replay", async () => {
+    const fixture = createFixture({});
+    await fixture.service.execute(request());
+    for (const invalid of [
+      { ...request(), brandProfileId: "brand-2" },
+      { ...request(), providerAccountId: "account-2" },
+      { ...request(), authorizationGeneration: 2 },
+    ]) {
+      await expect(fixture.service.execute(invalid)).resolves.toMatchObject({
+        reasonCode: "FINAL_FENCE_REJECTED",
+        reused: false,
+      });
+    }
+    fixture.setAuthorized(false);
+    await expect(fixture.service.execute(request())).resolves.toMatchObject({
+      reasonCode: "FINAL_FENCE_REJECTED",
+      reused: false,
+    });
+    expect(fixture.acquisition.acquire).toHaveBeenCalledTimes(1);
   });
 
   it("fails closed when every frame model observation fails", async () => {
@@ -78,7 +137,6 @@ function createFixture(options: {
   failOrdinal?: number;
   failAll?: boolean;
   invalidFrame?: boolean;
-  replay?: string[];
   enabled?: string;
 }) {
   const config = {
@@ -88,16 +146,57 @@ function createFixture(options: {
         : undefined,
     ),
   };
+  let authorized = true;
+  let persisted:
+    | {
+        metadata: Record<string, unknown>;
+        payloads: readonly Record<string, unknown>[];
+        evidenceRefs: readonly string[];
+      }
+    | undefined;
   const prisma = {
     dataExtractionEvidenceItem: {
-      findMany: vi
-        .fn()
-        .mockResolvedValue(
-          (options.replay ?? []).map((evidenceRef) => ({ evidenceRef })),
-        ),
+      findMany: vi.fn(
+        async (query: {
+          where: {
+            boundedPayload: { path: [string]; equals: string };
+          };
+        }) => {
+          if (!persisted) return [];
+          const field = query.where.boundedPayload.path[0];
+          if (persisted.metadata[field] !== query.where.boundedPayload.equals)
+            return [];
+          return persisted.evidenceRefs.map((evidenceRef, index) => ({
+            evidenceRef,
+            captureRef: "capture:instagram:w1",
+            boundedPayload: persisted!.payloads[index],
+            capture: {
+              createdAt: new Date("2026-09-13T00:00:00.000Z"),
+              contentArtifacts: [
+                { inlineContent: JSON.stringify(persisted!.metadata) },
+              ],
+            },
+          }));
+        },
+      ),
     },
   };
   const acquisition = {
+    assertReplayAuthorized: vi.fn(
+      async (input: {
+        brandProfileId: string;
+        expectedProviderAccountId: string;
+        expectedAuthorizationGeneration: number;
+      }) => {
+        if (
+          !authorized ||
+          input.brandProfileId !== "brand-1" ||
+          input.expectedProviderAccountId !== "account-1" ||
+          input.expectedAuthorizationGeneration !== 1
+        )
+          throw new Error("authorization fence rejected");
+      },
+    ),
     acquire: vi.fn().mockResolvedValue({
       artifact: {
         temporaryPath: "task-owned.video",
@@ -140,10 +239,30 @@ function createFixture(options: {
     ),
   };
   const writer = {
-    write: vi.fn().mockResolvedValue({
-      reused: false,
-      evidenceRefs: ["evidence:0", "evidence:2"],
-    }),
+    write: vi.fn(
+      async (input: {
+        artifacts: readonly Readonly<{
+          artifactKey: string;
+          payload: Record<string, unknown>;
+        }>[];
+        evidence: readonly Readonly<{ payload: Record<string, unknown> }>[];
+      }) => {
+        const evidenceRefs = input.evidence.map(
+          (_value, index) => `evidence:${index}`,
+        );
+        const metadata = input.artifacts.find(
+          (artifact) => artifact.artifactKey === "verified-video-metadata",
+        )?.payload;
+        if (metadata && evidenceRefs.length > 0) {
+          persisted = {
+            metadata,
+            payloads: input.evidence.map((evidence) => evidence.payload),
+            evidenceRefs,
+          };
+        }
+        return { reused: false, evidenceRefs };
+      },
+    ),
   };
   const store = { remove: vi.fn().mockResolvedValue(undefined) };
   return {
@@ -157,9 +276,13 @@ function createFixture(options: {
       store as never,
     ),
     decoder,
+    acquisition,
     model,
     writer,
     store,
+    setAuthorized(value: boolean) {
+      authorized = value;
+    },
   };
 }
 
