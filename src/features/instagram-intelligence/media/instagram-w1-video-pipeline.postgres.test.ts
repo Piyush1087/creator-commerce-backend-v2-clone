@@ -118,6 +118,16 @@ describePostgres("Week 1 video PostgreSQL lineage and preservation", () => {
       ),
     ).toBeNull();
     const counts = await rowCounts(brandId);
+    expect(counts).toEqual({
+      resources: 1,
+      captures: 1,
+      artifacts: 3,
+      evidence: 2,
+      observations: 2,
+      objectGenerations: 0,
+      componentGenerations: 0,
+      currentComponents: 0,
+    });
     const replay = await firstFixture.service.execute(input());
     expect(replay).toMatchObject({
       reused: true,
@@ -381,6 +391,15 @@ describePostgres("Week 1 video PostgreSQL lineage and preservation", () => {
         where: { brandId: id },
       }),
       observations: await prisma.dataExtractionSemanticObservation.count({
+        where: { brandId: id },
+      }),
+      objectGenerations: await prisma.intelligenceObjectGeneration.count({
+        where: { brandId: id },
+      }),
+      componentGenerations: await prisma.intelligenceComponentGeneration.count({
+        where: { brandId: id },
+      }),
+      currentComponents: await prisma.intelligenceCurrentComponent.count({
         where: { brandId: id },
       }),
     };
