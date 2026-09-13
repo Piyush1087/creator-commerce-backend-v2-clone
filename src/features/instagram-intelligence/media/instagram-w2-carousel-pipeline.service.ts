@@ -54,8 +54,12 @@ type ChildCoverage = Readonly<{
   ordinal: number;
   mediaType: string;
   inspectionMode: "IMAGE_FULL" | "VIDEO_COVER_ONLY" | "UNSUPPORTED";
-  state: "AVAILABLE" | "EXPLICIT_EMPTY" | "UNKNOWN";
+  state: "AVAILABLE" | "PARTIAL" | "UNKNOWN";
   reasonCode: string;
+  visualState: "AVAILABLE" | "UNKNOWN";
+  visualReasonCode: string;
+  visualTextState: "OBSERVED" | "EXPLICIT_EMPTY" | "UNKNOWN";
+  visualTextReasonCode: string;
 }>;
 
 export type InstagramW2CarouselResult = Readonly<{
@@ -75,24 +79,29 @@ export type InstagramW2CarouselResult = Readonly<{
     childCountAttempted: number;
     childCountVisuallyInspected: number;
     childCountOcrInspected: number;
+    visualUnavailableCount: number;
+    ocrUnavailableCount: number;
+    unsupportedChildCount: number;
     imageFullCount: number;
     videoCoverOnlyCount: number;
     unavailableUnsupportedFailedCount: number;
     state: "COMPLETE" | "PARTIAL" | "UNAVAILABLE";
     completeVisualScope: boolean;
+    completeVisualTextScope: boolean;
     completeVideoScope: boolean;
     children: readonly ChildCoverage[];
   }>;
   evidenceRefs: readonly string[];
 }>;
 
-type SuccessfulChild = Readonly<{
+type SupportedChild = Readonly<{
   child: InstagramCarouselChildrenTruth["children"][number];
   mediaType: "IMAGE" | "VIDEO";
   inspectionMode: "IMAGE_FULL" | "VIDEO_COVER_ONLY";
   artifact: InstagramTemporaryImageArtifact;
-  visual: ReturnType<typeof instagramB3aVisualObservationSchema.parse>;
-  visualText: InstagramVisualTextObservation;
+  visual?: ReturnType<typeof instagramB3aVisualObservationSchema.parse>;
+  visualText?: InstagramVisualTextObservation;
+  coverage: ChildCoverage;
   atomicCues: ReturnType<typeof finalizeAtomicCues>;
 }>;
 
@@ -161,25 +170,10 @@ export class InstagramW2CarouselPipelineService {
       async (child) => this.inspectChild(input, child, offerings),
     );
     const successes = completed.filter(
-      (row): row is SuccessfulChild => "artifact" in row,
+      (row): row is SupportedChild => "artifact" in row,
     );
     const childCoverage: ChildCoverage[] = completed.map((row) =>
-      "artifact" in row
-        ? {
-            providerMediaId: row.child.providerMediaId,
-            ordinal: row.child.ordinal,
-            mediaType: row.mediaType,
-            inspectionMode: row.inspectionMode,
-            state:
-              row.visualText.state === "EXPLICIT_EMPTY"
-                ? "EXPLICIT_EMPTY"
-                : "AVAILABLE",
-            reasonCode:
-              row.visualText.state === "EXPLICIT_EMPTY"
-                ? "VISIBLE_TEXT_EXPLICIT_EMPTY"
-                : "CHILD_INSPECTED",
-          }
-        : row,
+      "artifact" in row ? row.coverage : row,
     );
     const coverage = buildCoverage(input.children, childCoverage);
     const completedAt = now().toISOString();
@@ -229,12 +223,22 @@ export class InstagramW2CarouselPipelineService {
             : coverage.state === "PARTIAL"
               ? "PARTIAL"
               : "UNAVAILABLE",
-        failureCategories: coverage.unavailableUnsupportedFailedCount
-          ? ["CAROUSEL_CHILD_VISUAL_TEXT"]
-          : [],
+        failureCategories:
+          coverage.visualUnavailableCount ||
+          coverage.ocrUnavailableCount ||
+          coverage.unsupportedChildCount
+            ? ["CAROUSEL_CHILD_VISUAL_TEXT"]
+            : [],
         detailCodes: childCoverage
-          .filter((row) => row.state === "UNKNOWN")
-          .map((row) => `${row.ordinal}:${row.reasonCode}`),
+          .filter((row) => row.state !== "AVAILABLE")
+          .flatMap((row) => [
+            ...(row.visualState === "UNKNOWN"
+              ? [`${row.ordinal}:${row.visualReasonCode}`]
+              : []),
+            ...(row.visualTextState === "UNKNOWN"
+              ? [`${row.ordinal}:${row.visualTextReasonCode}`]
+              : []),
+          ]),
       },
       artifacts:
         coverage.state === "UNAVAILABLE"
@@ -265,7 +269,7 @@ export class InstagramW2CarouselPipelineService {
     input: W2Input,
     child: InstagramCarouselChildrenTruth["children"][number],
     offerings: readonly Readonly<{ id: string; name: string }>[],
-  ): Promise<SuccessfulChild | ChildCoverage> {
+  ): Promise<SupportedChild | ChildCoverage> {
     const mediaType = observedType(child);
     if (mediaType === "UNKNOWN")
       return unknownChild(child, mediaType, "UNSUPPORTED_CHILD_TYPE");
@@ -285,7 +289,7 @@ export class InstagramW2CarouselPipelineService {
         ...(input.signal ? { signal: input.signal } : {}),
       });
       artifact = acquired.artifact;
-      const [visualCandidate, textCandidate] = await Promise.all([
+      const [visualSettled, textSettled] = await Promise.allSettled([
         this.visualModel.observe({
           temporaryPath: artifact.temporaryPath,
           mediaType: artifact.mediaType,
@@ -309,8 +313,22 @@ export class InstagramW2CarouselPipelineService {
           untrustedImageTextIsDataOnly: true,
         }),
       ]);
-      const visual = instagramB3aVisualObservationSchema.parse(visualCandidate);
-      const visualText = finalizeInstagramVisualText(textCandidate);
+      const visual = settleValidated(
+        visualSettled,
+        instagramB3aVisualObservationSchema.parse,
+      );
+      const visualText = settleValidated(
+        textSettled,
+        finalizeInstagramVisualText,
+      );
+      const coverage = modalityCoverage(
+        child,
+        mediaType,
+        inspectionMode,
+        visual,
+        visualText,
+      );
+      if (!visual && !visualText) return coverage;
       return {
         child,
         mediaType,
@@ -318,6 +336,7 @@ export class InstagramW2CarouselPipelineService {
         artifact,
         visual,
         visualText,
+        coverage,
         atomicCues: finalizeAtomicCues(visual, visualText, offerings),
       };
     } catch {
@@ -378,7 +397,8 @@ export class InstagramW2CarouselPipelineService {
     const coverage = parseCoverage(metadata?.coverage);
     if (
       !coverage ||
-      replayRows.length !== coverage.childCountVisuallyInspected ||
+      replayRows.length !==
+        coverage.children.filter((row) => row.state !== "UNKNOWN").length ||
       replayRows.length === 0
     )
       return null;
@@ -391,7 +411,7 @@ export class InstagramW2CarouselPipelineService {
 }
 
 function childPayload(
-  row: SuccessfulChild,
+  row: SupportedChild,
   metadata: Readonly<Record<string, unknown>>,
 ) {
   return {
@@ -410,21 +430,32 @@ function childPayload(
       width: row.artifact.width,
       height: row.artifact.height,
     },
-    observation: row.visual,
-    visualText: row.visualText,
+    modalityTruth: {
+      visualState: row.coverage.visualState,
+      visualReasonCode: row.coverage.visualReasonCode,
+      visualTextState: row.coverage.visualTextState,
+      visualTextReasonCode: row.coverage.visualTextReasonCode,
+      overallState: row.coverage.state,
+    },
+    ...(row.visual ? { observation: row.visual } : {}),
+    ...(row.visualText ? { visualText: row.visualText } : {}),
     atomicCues: row.atomicCues,
   };
 }
 
 function finalizeAtomicCues(
-  visual: ReturnType<typeof instagramB3aVisualObservationSchema.parse>,
-  visualText: InstagramVisualTextObservation,
+  visual:
+    | ReturnType<typeof instagramB3aVisualObservationSchema.parse>
+    | undefined,
+  visualText: InstagramVisualTextObservation | undefined,
   offerings: readonly Readonly<{ id: string; name: string }>[],
 ) {
-  const spans = visualText.spans.map((span) => normalizeVisibleText(span));
+  const spans = (visualText?.spans ?? []).map((span) =>
+    normalizeVisibleText(span),
+  );
   const searchable = [
     ...spans,
-    ...visual.visibleElements.map(normalizeVisibleText),
+    ...(visual?.visibleElements ?? []).map(normalizeVisibleText),
   ];
   const ctaPhrases = exactPhrases(spans, [
     "buy now",
@@ -457,7 +488,7 @@ function finalizeAtomicCues(
     cta: {
       state: ctaPhrases.length
         ? "OBSERVED"
-        : visualText.state === "EXPLICIT_EMPTY"
+        : visualText?.state === "EXPLICIT_EMPTY"
           ? "NOT_OBSERVED"
           : "UNKNOWN",
       phrases: ctaPhrases,
@@ -467,7 +498,7 @@ function finalizeAtomicCues(
       state:
         productLike.length || uniqueOffering
           ? "OBSERVED"
-          : visualText.state === "EXPLICIT_EMPTY"
+          : visualText?.state === "EXPLICIT_EMPTY" && visual !== undefined
             ? "NOT_OBSERVED"
             : "UNKNOWN",
       phrases: productLike,
@@ -478,7 +509,7 @@ function finalizeAtomicCues(
     disclosure: {
       state: disclosurePhrases.length
         ? "OBSERVED"
-        : visualText.state === "EXPLICIT_EMPTY"
+        : visualText?.state === "EXPLICIT_EMPTY"
           ? "NOT_OBSERVED"
           : "UNKNOWN",
       phrases: disclosurePhrases,
@@ -512,19 +543,38 @@ function buildCoverage(
   const attempted = rows.filter(
     (row) => row.inspectionMode !== "UNSUPPORTED",
   ).length;
-  const inspected = rows.filter((row) => row.state !== "UNKNOWN").length;
-  const failures = rows.length - inspected;
+  const visualInspected = rows.filter(
+    (row) => row.visualState === "AVAILABLE",
+  ).length;
+  const ocrInspected = rows.filter(
+    (row) => row.visualTextState !== "UNKNOWN",
+  ).length;
+  const supported = rows.filter((row) => row.state !== "UNKNOWN").length;
+  const failures = rows.length - supported;
+  const unsupported = rows.filter(
+    (row) => row.inspectionMode === "UNSUPPORTED",
+  ).length;
+  const visualUnavailable = rows.filter(
+    (row) => row.visualState === "UNKNOWN",
+  ).length;
+  const ocrUnavailable = rows.filter(
+    (row) => row.visualTextState === "UNKNOWN",
+  ).length;
   const enumerationComplete =
     children.availability === "AVAILABLE" &&
     children.stopReason === "EXHAUSTED";
   const completeVisualScope =
     enumerationComplete &&
-    failures === 0 &&
+    visualUnavailable === 0 &&
+    rows.length === children.children.length;
+  const completeVisualTextScope =
+    enumerationComplete &&
+    ocrUnavailable === 0 &&
     rows.length === children.children.length;
   const state =
-    inspected === 0
+    supported === 0
       ? "UNAVAILABLE"
-      : completeVisualScope
+      : completeVisualScope && completeVisualTextScope
         ? "COMPLETE"
         : "PARTIAL";
   return {
@@ -533,18 +583,24 @@ function buildCoverage(
     providerChildCountReturned: children.children.length,
     childCountRepresented: rows.length,
     childCountAttempted: attempted,
-    childCountVisuallyInspected: inspected,
-    childCountOcrInspected: inspected,
+    childCountVisuallyInspected: visualInspected,
+    childCountOcrInspected: ocrInspected,
+    visualUnavailableCount: visualUnavailable,
+    ocrUnavailableCount: ocrUnavailable,
+    unsupportedChildCount: unsupported,
     imageFullCount: rows.filter(
-      (row) => row.inspectionMode === "IMAGE_FULL" && row.state !== "UNKNOWN",
+      (row) =>
+        row.inspectionMode === "IMAGE_FULL" && row.visualState === "AVAILABLE",
     ).length,
     videoCoverOnlyCount: rows.filter(
       (row) =>
-        row.inspectionMode === "VIDEO_COVER_ONLY" && row.state !== "UNKNOWN",
+        row.inspectionMode === "VIDEO_COVER_ONLY" &&
+        row.visualState === "AVAILABLE",
     ).length,
     unavailableUnsupportedFailedCount: failures,
     state,
     completeVisualScope,
+    completeVisualTextScope,
     completeVideoScope:
       completeVisualScope &&
       rows.every((row) => row.inspectionMode === "IMAGE_FULL"),
@@ -561,9 +617,10 @@ function resultFor(
     visualInspection: coverage.childCountVisuallyInspected
       ? "INSPECTED"
       : "UNAVAILABLE",
-    visualSemanticResult: coverage.childCountVisuallyInspected
-      ? "AVAILABLE"
-      : "UNKNOWN",
+    visualSemanticResult:
+      coverage.childCountVisuallyInspected || coverage.childCountOcrInspected
+        ? "AVAILABLE"
+        : "UNKNOWN",
     reasonCode: reused
       ? "EXACT_CAROUSEL_EXECUTION_REUSED"
       : coverage.state === "COMPLETE"
@@ -602,6 +659,63 @@ function unknownChild(
     inspectionMode,
     state: "UNKNOWN",
     reasonCode,
+    visualState: "UNKNOWN",
+    visualReasonCode: reasonCode,
+    visualTextState: "UNKNOWN",
+    visualTextReasonCode: reasonCode,
+  };
+}
+
+function settleValidated<T>(
+  settled: PromiseSettledResult<unknown>,
+  validate: (value: unknown) => T,
+): T | undefined {
+  if (settled.status === "rejected") return undefined;
+  try {
+    return validate(settled.value);
+  } catch {
+    return undefined;
+  }
+}
+
+function modalityCoverage(
+  child: InstagramCarouselChildrenTruth["children"][number],
+  mediaType: "IMAGE" | "VIDEO",
+  inspectionMode: "IMAGE_FULL" | "VIDEO_COVER_ONLY",
+  visual:
+    | ReturnType<typeof instagramB3aVisualObservationSchema.parse>
+    | undefined,
+  visualText: InstagramVisualTextObservation | undefined,
+): ChildCoverage {
+  const visualState = visual ? "AVAILABLE" : "UNKNOWN";
+  const visualTextState = visualText?.state ?? "UNKNOWN";
+  const state =
+    visual && visualText
+      ? "AVAILABLE"
+      : visual || visualText
+        ? "PARTIAL"
+        : "UNKNOWN";
+  return {
+    providerMediaId: child.providerMediaId,
+    ordinal: child.ordinal,
+    mediaType,
+    inspectionMode,
+    state,
+    reasonCode:
+      state === "AVAILABLE"
+        ? "CHILD_INSPECTED"
+        : state === "PARTIAL"
+          ? "CHILD_MODALITY_PARTIAL"
+          : "CHILD_INSPECTION_FAILED",
+    visualState,
+    visualReasonCode: visual ? "VISUAL_OBSERVED" : "VISUAL_OBSERVATION_FAILED",
+    visualTextState,
+    visualTextReasonCode:
+      visualText?.state === "OBSERVED"
+        ? "VISIBLE_TEXT_OBSERVED"
+        : visualText?.state === "EXPLICIT_EMPTY"
+          ? "VISIBLE_TEXT_EXPLICIT_EMPTY"
+          : "VISUAL_TEXT_OBSERVATION_FAILED",
   };
 }
 
@@ -655,6 +769,9 @@ function parseCoverage(
     row.childCountAttempted,
     row.childCountVisuallyInspected,
     row.childCountOcrInspected,
+    row.visualUnavailableCount,
+    row.ocrUnavailableCount,
+    row.unsupportedChildCount,
     row.imageFullCount,
     row.videoCoverOnlyCount,
     row.unavailableUnsupportedFailedCount,
@@ -666,11 +783,43 @@ function parseCoverage(
     row.providerChildCountReturned === row.children.length &&
     row.childCountRepresented === row.children.length &&
     row.childCountAttempted <= row.childCountRepresented &&
-    row.childCountVisuallyInspected === row.childCountOcrInspected &&
-    row.childCountVisuallyInspected + row.unavailableUnsupportedFailedCount ===
+    row.children.every(
+      (child) =>
+        ["AVAILABLE", "PARTIAL", "UNKNOWN"].includes(child.state) &&
+        ["AVAILABLE", "UNKNOWN"].includes(child.visualState) &&
+        ["OBSERVED", "EXPLICIT_EMPTY", "UNKNOWN"].includes(
+          child.visualTextState,
+        ),
+    ) &&
+    row.children.filter((child) => child.state !== "UNKNOWN").length +
+      row.unavailableUnsupportedFailedCount ===
       row.childCountRepresented &&
-    row.imageFullCount + row.videoCoverOnlyCount ===
-      row.childCountVisuallyInspected &&
+    row.childCountVisuallyInspected ===
+      row.children.filter((child) => child.visualState === "AVAILABLE")
+        .length &&
+    row.childCountOcrInspected ===
+      row.children.filter((child) => child.visualTextState !== "UNKNOWN")
+        .length &&
+    row.visualUnavailableCount ===
+      row.children.filter((child) => child.visualState === "UNKNOWN").length &&
+    row.ocrUnavailableCount ===
+      row.children.filter((child) => child.visualTextState === "UNKNOWN")
+        .length &&
+    row.unsupportedChildCount ===
+      row.children.filter((child) => child.inspectionMode === "UNSUPPORTED")
+        .length &&
+    row.imageFullCount ===
+      row.children.filter(
+        (child) =>
+          child.inspectionMode === "IMAGE_FULL" &&
+          child.visualState === "AVAILABLE",
+      ).length &&
+    row.videoCoverOnlyCount ===
+      row.children.filter(
+        (child) =>
+          child.inspectionMode === "VIDEO_COVER_ONLY" &&
+          child.visualState === "AVAILABLE",
+      ).length &&
     ["COMPLETE", "PARTIAL"].includes(row.state)
     ? row
     : null;

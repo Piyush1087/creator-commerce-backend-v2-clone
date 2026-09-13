@@ -660,6 +660,7 @@ function buildContext(
       child: record(value.child),
       observation: record(value.observation),
       visualText: record(value.visualText),
+      modalityTruth: record(value.modalityTruth),
       atomicCues: record(value.atomicCues),
       evidenceRef:
         visuals.find((visual) => visual.boundedPayload === value)
@@ -682,12 +683,14 @@ function buildContext(
               child,
               observation: visual,
               visualText,
+              modalityTruth,
               atomicCues,
               evidenceRef,
             }) => ({
               child,
               visual,
               visualText,
+              modalityTruth,
               atomicCues,
               evidenceRef,
             }),
@@ -815,6 +818,14 @@ function buildContext(
           : depth === "DEEP_SELECTED" || depth === "COVER_ONLY"
             ? 1
             : 0,
+      ...(carouselVisuals.length > 0
+        ? {
+            completeVisualScope: carouselCoverage.completeVisualScope === true,
+            completeVisualTextScope:
+              carouselCoverage.completeVisualTextScope === true,
+            completeVideoScope: carouselCoverage.completeVideoScope === true,
+          }
+        : {}),
       reasonCodes,
     },
   } as const;

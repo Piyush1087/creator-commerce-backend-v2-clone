@@ -145,6 +145,9 @@ export type InstagramC3AdmittedContext = Readonly<{
     inspectedChildCount: number;
     availableChildCount: number;
     inspectedFrameCount: number;
+    completeVisualScope?: boolean;
+    completeVisualTextScope?: boolean;
+    completeVideoScope?: boolean;
     reasonCodes: readonly string[];
   }>;
 }>;
@@ -316,7 +319,15 @@ export function finalizeInstagramC3(
     offeringPresence,
     likelyCollab,
     metrics: input.metrics,
-    inspection: input.context.inspection,
+    inspection: {
+      depth: input.context.inspection.depth,
+      selectedForDeepAnalysis: input.context.inspection.selectedForDeepAnalysis,
+      selectionReasons: input.context.inspection.selectionReasons,
+      inspectedChildCount: input.context.inspection.inspectedChildCount,
+      availableChildCount: input.context.inspection.availableChildCount,
+      inspectedFrameCount: input.context.inspection.inspectedFrameCount,
+      reasonCodes: input.context.inspection.reasonCodes,
+    },
     evidenceRefs: sortedUnique([
       input.context.caption.evidenceRef,
       ...(input.context.visual.evidenceRefs ??
@@ -465,7 +476,10 @@ export function finalizeLikelyCollab(
     context.caption.state !== "UNKNOWN" &&
     context.inspection.selectedForDeepAnalysis &&
     context.visual.state === "AVAILABLE" &&
-    context.inspection.depth === "DEEP_SELECTED";
+    context.inspection.depth === "DEEP_SELECTED" &&
+    context.inspection.completeVisualScope !== false &&
+    context.inspection.completeVisualTextScope !== false &&
+    context.inspection.completeVideoScope !== false;
   const common = {
     canonicalCreatorId: null,
     canonicalCreatorMatch: "NONE" as const,
@@ -625,6 +639,9 @@ function assertCandidateModalities(
         context.visual.state !== "AVAILABLE" ||
         context.caption.state === "UNKNOWN" ||
         context.inspection.depth !== "DEEP_SELECTED" ||
+        context.inspection.completeVisualScope === false ||
+        context.inspection.completeVisualTextScope === false ||
+        context.inspection.completeVideoScope === false ||
         presence.supportModalities.length !== 2 ||
         !presence.supportModalities.includes("CAPTION") ||
         !presence.supportModalities.includes("VISUAL"))
@@ -695,7 +712,10 @@ function safeNegativePresence(
     (!context.inspection.selectedForDeepAnalysis ||
       context.visual.state !== "AVAILABLE" ||
       context.caption.state === "UNKNOWN" ||
-      context.inspection.depth !== "DEEP_SELECTED")
+      context.inspection.depth !== "DEEP_SELECTED" ||
+      context.inspection.completeVisualScope === false ||
+      context.inspection.completeVisualTextScope === false ||
+      context.inspection.completeVideoScope === false)
     ? ("UNKNOWN" as const)
     : candidate.state;
 }

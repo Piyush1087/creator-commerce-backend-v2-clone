@@ -76,4 +76,19 @@ describe("Instagram bounded visual text", () => {
       }),
     ).toThrow();
   });
+
+  it("rechecks each span after compatibility normalization expands it", () => {
+    expect(() =>
+      finalizeInstagramVisualText({
+        state: "OBSERVED",
+        spans: ["ﬀ".repeat(81)],
+      }),
+    ).toThrow("normalized bound");
+    expect(
+      finalizeInstagramVisualText({
+        state: "OBSERVED",
+        spans: ["ﬀ".repeat(80)],
+      }).spans[0],
+    ).toHaveLength(INSTAGRAM_VISUAL_TEXT_MAX_SPAN_CHARS);
+  });
 });

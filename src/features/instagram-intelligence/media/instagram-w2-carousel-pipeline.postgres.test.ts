@@ -399,5 +399,130 @@ describePostgres(
       await expect(access(targetTemp.path)).rejects.toThrow();
       await expect(access(otherTemp.path)).resolves.toBeUndefined();
     });
+
+    it("persists visual-only and OCR-only child lineage and replays exact modality-partial truth without new rows or work", async () => {
+      const target = await fixture("modality-partial");
+      const source = await lightLineage(target);
+      const mediaByHash = new Map<string, string>();
+      const authorization = {
+        assertReplayAuthorized: vi.fn().mockResolvedValue(undefined),
+        acquire: vi.fn(async (input: { mediaId: string }) => {
+          const created = await store.create(target.brand.id);
+          const bytes = Buffer.from(`bounded-child-${input.mediaId}`);
+          const sha256 = createHash("sha256").update(bytes).digest("hex");
+          mediaByHash.set(sha256, input.mediaId);
+          await created.handle.writeFile(bytes);
+          await created.handle.close();
+          return {
+            artifact: {
+              temporaryPath: created.path,
+              mediaType: "image/png" as const,
+              byteLength: bytes.length,
+              width: 3,
+              height: 4,
+              sha256,
+              acquiredAt: "2026-09-13T00:00:02.000Z",
+            },
+            providerMediaId: input.mediaId,
+            providerObservedAt: null,
+          };
+        }),
+      };
+      const visual = {
+        providerIdentity: "DETERMINISTIC_FIXTURE",
+        modelIdentity: "w2-partial-visual",
+        modelProfileVersion: "w2-partial-visual-v1",
+        observe: vi.fn(async (input: { sha256: string }) => {
+          if (mediaByHash.get(input.sha256) === "child-ocr-only")
+            throw new Error("visual unavailable");
+          return {
+            description: "A supported product still.",
+            visibleElements: ["Launch Kit"],
+            dominantColors: ["blue"],
+            composition: "centered",
+          };
+        }),
+      };
+      const text = {
+        providerIdentity: "DETERMINISTIC_FIXTURE",
+        modelIdentity: "w2-partial-text",
+        modelProfileVersion: "w2-partial-text-v1",
+        observe: vi.fn(async (input: { sha256: string }) => {
+          if (mediaByHash.get(input.sha256) === "child-visual-only")
+            throw new Error("OCR unavailable");
+          return { state: "OBSERVED" as const, spans: ["Shop now"] };
+        }),
+      };
+      const service = new InstagramW2CarouselPipelineService(
+        prisma,
+        authorization as never,
+        visual as never,
+        text as never,
+        writer,
+        store,
+      );
+      const input = {
+        brandProfileId: target.brand.id,
+        integrationId: target.integration.id,
+        providerAccountId: target.providerAccountId,
+        authorizationGeneration: 7,
+        parentMediaId: "carousel-parent-partial",
+        children: {
+          availability: "AVAILABLE" as const,
+          stopReason: "EXHAUSTED" as const,
+          children: ["child-visual-only", "child-ocr-only"].map(
+            (providerMediaId, ordinal) => ({
+              providerMediaId,
+              ordinal,
+              mediaType: { state: "OBSERVED" as const, value: "IMAGE" },
+              mediaProductType: {
+                state: "OBSERVED" as const,
+                value: "FEED",
+              },
+            }),
+          ),
+        },
+        windowEnd: new Date("2026-09-13T00:00:00.000Z"),
+        sourceCaptureRef: source.captureRef,
+        sourceEvidenceRefs: source.evidenceRefs,
+        now: () => new Date("2026-09-13T00:00:03.000Z"),
+      };
+      const first = await service.execute(input);
+      expect(first.coverage).toMatchObject({
+        childCountVisuallyInspected: 1,
+        childCountOcrInspected: 1,
+        visualUnavailableCount: 1,
+        ocrUnavailableCount: 1,
+        state: "PARTIAL",
+        completeVisualScope: false,
+        completeVisualTextScope: false,
+      });
+      expect(first.evidenceRefs).toHaveLength(2);
+      const persisted = await prisma.dataExtractionEvidenceItem.findMany({
+        where: { evidenceRef: { in: [...first.evidenceRefs] } },
+        orderBy: { evidenceRef: "asc" },
+      });
+      const payloads = persisted.map(
+        (row) => row.boundedPayload as Record<string, unknown>,
+      );
+      expect(
+        payloads.some(
+          (payload) => "observation" in payload && !("visualText" in payload),
+        ),
+      ).toBe(true);
+      expect(
+        payloads.some(
+          (payload) => "visualText" in payload && !("observation" in payload),
+        ),
+      ).toBe(true);
+      const firstCounts = await counts(target.brand.id);
+      const replay = await service.execute(input);
+      expect(replay).toMatchObject({ reused: true, coverage: first.coverage });
+      expect(replay.evidenceRefs).toEqual(first.evidenceRefs);
+      expect(await counts(target.brand.id)).toEqual(firstCounts);
+      expect(authorization.acquire).toHaveBeenCalledTimes(2);
+      expect(visual.observe).toHaveBeenCalledTimes(2);
+      expect(text.observe).toHaveBeenCalledTimes(2);
+    });
   },
 );

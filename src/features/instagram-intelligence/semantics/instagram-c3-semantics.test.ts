@@ -749,6 +749,26 @@ describe("Instagram C3 deterministic likely-collab matrix", () => {
     ).toMatchObject({ state: "UNKNOWN", confidence: null });
   });
 
+  it("fails combined negatives closed when either carousel modality scope is partial", () => {
+    for (const incomplete of [
+      { completeVisualScope: false, completeVisualTextScope: true },
+      { completeVisualScope: true, completeVisualTextScope: false },
+      {
+        completeVisualScope: true,
+        completeVisualTextScope: true,
+        completeVideoScope: false,
+      },
+    ]) {
+      const admitted = context();
+      expect(
+        classify([], {
+          ...admitted,
+          inspection: { ...admitted.inspection, ...incomplete },
+        }),
+      ).toMatchObject({ state: "UNKNOWN", confidence: null });
+    }
+  });
+
   it("grounds sampled-video positives in exact frame refs without publishing complete-video negatives", () => {
     const frameRefs = [
       "evidence:instagram:video-frame:0",

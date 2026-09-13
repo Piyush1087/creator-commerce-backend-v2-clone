@@ -168,29 +168,129 @@ describe("InstagramW2CarouselPipelineService", () => {
     expect(rows[1].payload.atomicCues.cta.state).toBe("NOT_OBSERVED");
   });
 
-  it("fails closed and removes temporary media when the visual-text model is invalid or unconfigured", async () => {
+  it("retains valid visual Evidence when the visual-text model is invalid or unavailable", async () => {
     for (const fixture of [
       harness({ childCount: 1, invalidText: true }),
       harness({ childCount: 1, unconfiguredText: true }),
     ]) {
       const result = await fixture.service.execute(request(fixture.children));
       expect(result).toMatchObject({
-        visualSemanticResult: "UNKNOWN",
-        evidenceRefs: [],
+        visualSemanticResult: "AVAILABLE",
         coverage: {
           childCountAttempted: 1,
-          childCountVisuallyInspected: 0,
-          unavailableUnsupportedFailedCount: 1,
-          state: "UNAVAILABLE",
+          childCountVisuallyInspected: 1,
+          childCountOcrInspected: 0,
+          visualUnavailableCount: 0,
+          ocrUnavailableCount: 1,
+          state: "PARTIAL",
+          completeVisualScope: true,
+          completeVisualTextScope: false,
         },
       });
+      expect(result.evidenceRefs).toHaveLength(1);
       expect(fixture.store.remove).toHaveBeenCalledOnce();
-      expect(fixture.writer.write.mock.calls[0]![0]).toMatchObject({
-        availability: "UNAVAILABLE",
-        artifacts: [],
-        evidence: [],
+      expect(
+        fixture.writer.write.mock.calls[0]![0].evidence[0].payload,
+      ).toMatchObject({
+        modalityTruth: {
+          visualState: "AVAILABLE",
+          visualTextState: "UNKNOWN",
+          overallState: "PARTIAL",
+        },
       });
     }
+  });
+
+  it("retains exact OCR text and CTA Evidence when visual output fails validation or execution", async () => {
+    for (const fixture of [
+      harness({ childCount: 1, invalidVisualOrdinals: [0] }),
+      harness({ childCount: 1, failingVisualOrdinals: [0] }),
+    ]) {
+      const result = await fixture.service.execute(request(fixture.children));
+      expect(result.visualSemanticResult).toBe("AVAILABLE");
+      expect(result.coverage).toMatchObject({
+        childCountVisuallyInspected: 0,
+        childCountOcrInspected: 1,
+        visualUnavailableCount: 1,
+        ocrUnavailableCount: 0,
+        state: "PARTIAL",
+        completeVisualScope: false,
+        completeVisualTextScope: true,
+      });
+      const payload =
+        fixture.writer.write.mock.calls[0]![0].evidence[0].payload;
+      expect(payload).not.toHaveProperty("observation");
+      expect(payload).toMatchObject({
+        visualText: {
+          state: "OBSERVED",
+          spans: ["Glow Serum", "Paid partnership", "Shop now"],
+        },
+        modalityTruth: {
+          visualState: "UNKNOWN",
+          visualTextState: "OBSERVED",
+          overallState: "PARTIAL",
+        },
+        atomicCues: { cta: { state: "OBSERVED", phrases: ["shop now"] } },
+      });
+    }
+  });
+
+  it("keeps both modalities unknown with no Evidence when both fail", async () => {
+    const fixture = harness({
+      childCount: 1,
+      failingVisualOrdinals: [0],
+      failingTextOrdinals: [0],
+    });
+    const result = await fixture.service.execute(request(fixture.children));
+    expect(result).toMatchObject({
+      evidenceRefs: [],
+      coverage: {
+        childCountVisuallyInspected: 0,
+        childCountOcrInspected: 0,
+        state: "UNAVAILABLE",
+      },
+    });
+  });
+
+  it("keeps visual availability distinct from OCR explicit-empty truth", async () => {
+    const fixture = harness({ childCount: 1, explicitEmptyOrdinals: [0] });
+    const result = await fixture.service.execute(request(fixture.children));
+    expect(result.coverage.children[0]).toMatchObject({
+      state: "AVAILABLE",
+      visualState: "AVAILABLE",
+      visualTextState: "EXPLICIT_EMPTY",
+    });
+    expect(result.coverage).toMatchObject({
+      childCountVisuallyInspected: 1,
+      childCountOcrInspected: 1,
+      completeVisualScope: true,
+      completeVisualTextScope: true,
+    });
+  });
+
+  it("preserves mixed modality-partial counters and truth on exact replay", async () => {
+    const fixture = harness({
+      childCount: 3,
+      failingTextOrdinals: [0],
+      failingVisualOrdinals: [1],
+      explicitEmptyOrdinals: [2],
+    });
+    const first = await fixture.service.execute(request(fixture.children));
+    const replay = await fixture.service.execute(request(fixture.children));
+    expect(first.coverage).toMatchObject({
+      childCountVisuallyInspected: 2,
+      childCountOcrInspected: 2,
+      visualUnavailableCount: 1,
+      ocrUnavailableCount: 1,
+      state: "PARTIAL",
+      completeVisualScope: false,
+      completeVisualTextScope: false,
+    });
+    expect(replay).toMatchObject({ reused: true, coverage: first.coverage });
+    expect(replay.evidenceRefs).toEqual(first.evidenceRefs);
+    expect(fixture.acquisition.acquire).toHaveBeenCalledTimes(3);
+    expect(fixture.visual.observe).toHaveBeenCalledTimes(3);
+    expect(fixture.text.observe).toHaveBeenCalledTimes(3);
   });
 
   it("does not reuse zero-Evidence failures or changed manifest/source/window/model identity", async () => {
@@ -247,6 +347,9 @@ function harness(options: {
   duplicateOfferings?: boolean;
   invalidText?: boolean;
   unconfiguredText?: boolean;
+  failingTextOrdinals?: number[];
+  failingVisualOrdinals?: number[];
+  invalidVisualOrdinals?: number[];
   availability?: "AVAILABLE" | "PARTIAL" | "UNAVAILABLE";
   stopReason?:
     | "EXHAUSTED"
@@ -316,12 +419,19 @@ function harness(options: {
     providerIdentity: "fixture",
     modelIdentity: "visual-fixture",
     modelProfileVersion: "visual-v1",
-    observe: vi.fn(async () => ({
-      description: "A package with visible text",
-      visibleElements: ["product"],
-      dominantColors: ["blue"],
-      composition: "Centered package",
-    })),
+    observe: vi.fn(async (input: any) => {
+      const ordinal = Number(String(input.temporaryPath).match(/(\d+)/u)?.[1]);
+      if (options.failingVisualOrdinals?.includes(ordinal))
+        throw new Error("visual model failed");
+      if (options.invalidVisualOrdinals?.includes(ordinal))
+        return { description: "invalid" };
+      return {
+        description: "A package with visible text",
+        visibleElements: ["product"],
+        dominantColors: ["blue"],
+        composition: "Centered package",
+      };
+    }),
   };
   const text = {
     providerIdentity: "fixture",
@@ -333,6 +443,8 @@ function harness(options: {
       if (options.invalidText)
         return { state: "OBSERVED", spans: ["ignored"], unexpected: true };
       const ordinal = Number(String(input.temporaryPath).match(/(\d+)/u)?.[1]);
+      if (options.failingTextOrdinals?.includes(ordinal))
+        throw new Error("visual-text model failed");
       return options.explicitEmptyOrdinals?.includes(ordinal)
         ? { state: "EXPLICIT_EMPTY", spans: [] }
         : {

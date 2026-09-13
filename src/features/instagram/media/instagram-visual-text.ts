@@ -56,6 +56,8 @@ export function finalizeInstagramVisualText(
     ...new Set(parsed.spans.map(normalizeVisibleText).filter(Boolean)),
   ].sort(compareCanonical);
   const total = spans.reduce((sum, span) => sum + span.length, 0);
+  if (spans.some((span) => span.length > INSTAGRAM_VISUAL_TEXT_MAX_SPAN_CHARS))
+    throw new Error("Visible text span exceeds the normalized bound");
   if (total > INSTAGRAM_VISUAL_TEXT_MAX_TOTAL_CHARS)
     throw new Error("Visible text exceeds the normalized bounded total");
   if (parsed.state === "OBSERVED" && spans.length === 0)
