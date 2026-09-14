@@ -51,19 +51,15 @@ const metrics = {
 describe("Creator Content provider-neutral pipeline", () => {
   it("uses the real provider route, withholds metrics from semantics, persists lineage and replays before acquisition", async () => {
     const fence = {
-      project: vi
-        .fn()
-        .mockResolvedValue({
-          ...identity,
-          authorized: true,
-          sourceStatus: "CONNECTED",
-        }),
-      acquire: vi
-        .fn()
-        .mockResolvedValue({
-          ...identity,
-          accessToken: "synthetic-test-value",
-        }),
+      project: vi.fn().mockResolvedValue({
+        ...identity,
+        authorized: true,
+        sourceStatus: "CONNECTED",
+      }),
+      acquire: vi.fn().mockResolvedValue({
+        ...identity,
+        accessToken: "synthetic-test-value",
+      }),
     };
     const current = {
       contractVersion: "creator_content_v0.1",
@@ -132,46 +128,42 @@ describe("Creator Content provider-neutral pipeline", () => {
       readLatestCurrentSameAccount: vi.fn(),
     };
     const provider = {
-      readMediaInventory: vi
-        .fn()
-        .mockResolvedValue({
-          availability: "AVAILABLE",
-          items: [media],
-          coverage: {
-            windowStart: "",
-            windowEnd: "",
-            pagesAttempted: 1,
-            pagesCompleted: 1,
-            rowsReturned: 1,
-            rowsEligible: 1,
-            rowsMissingTimestamp: 0,
-            duplicatesDiscarded: 0,
-            oldestObservedTimestamp: now.toISOString(),
-            newestObservedTimestamp: now.toISOString(),
-            stopReason: "EXHAUSTED",
-          },
-        }),
-      readMediaInsights: vi
-        .fn()
-        .mockResolvedValue({
-          availability: "AVAILABLE",
-          mediaType: "IMAGE",
-          metrics,
-          units: Object.fromEntries(
-            Object.keys(metrics).map((key) => [key, "COUNT"]),
-          ),
-          denominators: Object.fromEntries(
-            Object.keys(metrics).map((key) => [
-              key,
-              { state: "UNAVAILABLE", reason: "NO_PROVIDER_DENOMINATOR" },
-            ]),
-          ),
-          providerObservationTime: {
-            state: "UNAVAILABLE",
-            reason: "PROVIDER_DOES_NOT_RETURN_OBSERVATION_TIME",
-          },
-          providerLagLimitHours: 48,
-        }),
+      readMediaInventory: vi.fn().mockResolvedValue({
+        availability: "AVAILABLE",
+        items: [media],
+        coverage: {
+          windowStart: "",
+          windowEnd: "",
+          pagesAttempted: 1,
+          pagesCompleted: 1,
+          rowsReturned: 1,
+          rowsEligible: 1,
+          rowsMissingTimestamp: 0,
+          duplicatesDiscarded: 0,
+          oldestObservedTimestamp: now.toISOString(),
+          newestObservedTimestamp: now.toISOString(),
+          stopReason: "EXHAUSTED",
+        },
+      }),
+      readMediaInsights: vi.fn().mockResolvedValue({
+        availability: "AVAILABLE",
+        mediaType: "IMAGE",
+        metrics,
+        units: Object.fromEntries(
+          Object.keys(metrics).map((key) => [key, "COUNT"]),
+        ),
+        denominators: Object.fromEntries(
+          Object.keys(metrics).map((key) => [
+            key,
+            { state: "UNAVAILABLE", reason: "NO_PROVIDER_DENOMINATOR" },
+          ]),
+        ),
+        providerObservationTime: {
+          state: "UNAVAILABLE",
+          reason: "PROVIDER_DOES_NOT_RETURN_OBSERVATION_TIME",
+        },
+        providerLagLimitHours: 48,
+      }),
     };
     const semantic = {
       analyze: vi.fn().mockImplementation(async (request) => {
@@ -188,16 +180,14 @@ describe("Creator Content provider-neutral pipeline", () => {
       }),
     };
     const executions = {
-      createOrReturnOwnerScoped: vi
-        .fn()
-        .mockResolvedValue({
-          processorExecutions: [
-            {
-              id: "processor",
-              status: IntelligenceProcessorExecutionStatus.COMPLETED,
-            },
-          ],
-        }),
+      createOrReturnOwnerScoped: vi.fn().mockResolvedValue({
+        processorExecutions: [
+          {
+            id: "processor",
+            status: IntelligenceProcessorExecutionStatus.COMPLETED,
+          },
+        ],
+      }),
     };
     const service = new CreatorContentPipelineService(
       fence as unknown as CreatorAudienceCredentialFenceService,
@@ -234,13 +224,11 @@ describe("Creator Content provider-neutral pipeline", () => {
     const provider = { readMediaInventory: vi.fn() };
     const service = new CreatorContentPipelineService(
       {
-        project: vi
-          .fn()
-          .mockResolvedValue({
-            ...identity,
-            authorizationGeneration: 3,
-            authorized: true,
-          }),
+        project: vi.fn().mockResolvedValue({
+          ...identity,
+          authorizationGeneration: 3,
+          authorized: true,
+        }),
       } as unknown as CreatorAudienceCredentialFenceService,
       { replay: vi.fn() } as unknown as CreatorContentRepository,
       {} as IntelligenceExecutionService,

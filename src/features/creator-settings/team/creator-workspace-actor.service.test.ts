@@ -113,9 +113,9 @@ function serviceFixture(input: {
 
 describe("C05 Creator subject/actor resolution", () => {
   it.each([
-    [CreatorTeamRole.OWNER, 13],
-    [CreatorTeamRole.MANAGER, 13],
-    [CreatorTeamRole.ASSISTANT, 1],
+    [CreatorTeamRole.OWNER, 14],
+    [CreatorTeamRole.MANAGER, 14],
+    [CreatorTeamRole.ASSISTANT, 2],
   ])(
     "projects %s with its exact Settings capabilities",
     async (role, count) => {
@@ -134,6 +134,7 @@ describe("C05 Creator subject/actor resolution", () => {
       ).toHaveLength(count);
       expect(context.allowedActions).toContain("CAMPAIGN_OPPORTUNITY_VIEW");
       expect(context.allowedActions).toContain("CAMPAIGN_APPLICATION_APPLY");
+      expect(context.allowedActions).toContain("INSIGHTS_CONTENT_READ");
       expect(
         context.allowedActions.includes(
           "CAMPAIGN_APPLICATION_WITHDRAW_PENDING",
