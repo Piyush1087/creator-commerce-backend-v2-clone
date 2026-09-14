@@ -10,7 +10,7 @@ import { READ_ONLY_OBJECT_CONTRACTS } from "./projection/current-read-contracts.
 import { ProcessorDependencyProfileRegistry } from "./input/dependency/processor-dependency-profile.registry";
 
 describe("visual_style_synthesis architecture boundaries", () => {
-  it("pins the sixth executable to authority and owns exactly 22 frozen paths", () => {
+  it("pins the visual executable to authority and owns exactly 22 frozen paths", () => {
     const runtime = contracts(),
       bundle = runtime.getVerifiedBundle(registryKey);
     expect(
@@ -19,7 +19,7 @@ describe("visual_style_synthesis architecture boundaries", () => {
         .filter(
           (r) => r.executionEnabled && !r.processorId.startsWith("offering_"),
         ),
-    ).toHaveLength(7);
+    ).toHaveLength(10);
     expect(
       runtime
         .registrations()

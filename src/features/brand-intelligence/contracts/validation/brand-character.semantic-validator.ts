@@ -80,9 +80,18 @@ export class BrandCharacterSemanticValidator implements ProcessorSemanticValidat
         const support = context.evidenceManifest.filter((entry) =>
           refs.includes(entry.evidenceRef),
         );
-        const establishing = support.filter((entry) =>
-          this.establishes(entry, objectId),
-        );
+        const instagramRepeated =
+          support.length >= 3 &&
+          support.every(
+            (entry) =>
+              entry.capabilityId === "instagram.caption_context" &&
+              entry.sourceClass === "INSTAGRAM_OWNED" &&
+              entry.freshness === "CURRENT" &&
+              entry.polarity !== "EXPLICIT_NEGATIVE",
+          );
+        const establishing = instagramRepeated
+          ? support
+          : support.filter((entry) => this.establishes(entry, objectId));
         if (!establishing.length)
           fail("NON_ESTABLISHING_CHARACTER_EVIDENCE", objectId);
         if (

@@ -1,0 +1,5 @@
+contract: shared_intelligence_metadata
+version: "1.0"
+status: FROZEN
+source_scope: INSTAGRAM_OWNED
+authority: CREATOR_SHOP_DERIVED

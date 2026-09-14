@@ -98,11 +98,19 @@ import {
   OfferingCreatorCommunicationProcessorExecutor,
 } from "./processors/offering-derived/offering-derived-processor.executor";
 import {
+  InstagramC4AudienceProfileProcessor,
+  InstagramC4ContentBehaviorProcessor,
+  InstagramC4OrganicPerformanceProcessor,
+} from "../instagram-intelligence/runtime/instagram-c4.processor";
+import { InstagramC4PersistenceHook } from "../instagram-intelligence/runtime/instagram-c4.persistence";
+import {
   OFFERING_ACTIONABILITY_MODEL_PROVIDER,
   OFFERING_CREATOR_MODEL_PROVIDER,
   StructuredOfferingActionabilityModelProvider,
   StructuredOfferingCreatorModelProvider,
 } from "./processors/offering-derived/offering-derived-model.provider";
+import { InstagramBrandSourceAdmissionService } from "../instagram-intelligence/hidden-brand/instagram-brand-source-admission.service";
+import { InstagramHiddenBrandPersistenceHook } from "../instagram-intelligence/hidden-brand/instagram-hidden-brand.persistence";
 
 const internalProviders = [
   ServiceabilityProcessorExecutor,
@@ -152,6 +160,12 @@ const internalProviders = [
   OfferingFactualPersistenceHook,
   OfferingCreatorCommunicationProcessorExecutor,
   OfferingActionabilityProcessorExecutor,
+  InstagramC4ContentBehaviorProcessor,
+  InstagramC4AudienceProfileProcessor,
+  InstagramC4OrganicPerformanceProcessor,
+  InstagramC4PersistenceHook,
+  InstagramBrandSourceAdmissionService,
+  InstagramHiddenBrandPersistenceHook,
   {
     provide: OFFERING_FACTUAL_MODEL_PROVIDER,
     useClass: StructuredOfferingFactualModelProvider,

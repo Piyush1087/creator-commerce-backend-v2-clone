@@ -1,0 +1,13 @@
+contract: instagram_content_behavior_object
+version: "1.0"
+status: FROZEN
+engine: instagram_intelligence
+owner_engine: instagram_intelligence
+branch: content_behavior_complete
+source_scope: INSTAGRAM_OWNED
+authority: CREATOR_SHOP_DERIVED
+objects:
+  - id: instagram_content_behavior
+    object_contract_version: "1.0"
+    output_contract_version: "1.0"
+    components: [window, corpus_summary, posting_cadence, format_mix, theme_patterns, caption_patterns, creative_structure_patterns, offering_presence_patterns, creator_presence_patterns, representative_media_refs, bounded_learnings, coverage]

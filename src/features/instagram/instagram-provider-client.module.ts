@@ -1,14 +1,74 @@
 import { Module } from "@nestjs/common";
 
 import { InstagramGraphClient } from "./instagram-graph.client";
+import { InstagramIntelligenceProviderClient } from "./instagram-intelligence-provider.client";
+import { INSTAGRAM_INTELLIGENCE_PROVIDER_READ_CLIENT } from "./instagram-intelligence-provider.types";
 import { InstagramOAuthClient } from "./instagram-oauth.client";
+import {
+  InstagramContainedImageAcquisitionService,
+  InstagramImageLocatorClient,
+} from "./media/instagram-contained-image-acquisition.service";
+import { InstagramImageTemporaryStore } from "./media/instagram-image-temporary-store";
+import {
+  InstagramSecureImageDownloader,
+  NodeInstagramImageDnsResolver,
+  NodeInstagramPinnedHttpsTransport,
+} from "./media/instagram-secure-image-downloader";
+import { InstagramContainedVideoAcquisitionService } from "./media/video/instagram-contained-video-acquisition.service";
+import { FfmpegInstagramVideoDecoder } from "./media/video/instagram-video-decoder";
+import { InstagramVideoDecoderPort } from "./media/video/instagram-video-decoder";
+import { InstagramVideoLocatorClient } from "./media/video/instagram-video-locator.client";
+import { InstagramVideoTemporaryStore } from "./media/video/instagram-video-temporary-store";
+import { InstagramSecureVideoDownloader } from "./media/video/instagram-secure-video-downloader";
+import {
+  FfmpegInstagramAudioExtractor,
+  InstagramAudioExtractorPort,
+} from "./media/video/instagram-audio-extractor";
 
 /**
  * Stateless Instagram provider clients shared by Creator Entry and Settings.
  * Provider configuration and behavior remain owned by the existing clients.
  */
 @Module({
-  providers: [InstagramOAuthClient, InstagramGraphClient],
-  exports: [InstagramOAuthClient, InstagramGraphClient],
+  providers: [
+    InstagramOAuthClient,
+    InstagramGraphClient,
+    InstagramIntelligenceProviderClient,
+    InstagramImageLocatorClient,
+    InstagramImageTemporaryStore,
+    NodeInstagramImageDnsResolver,
+    NodeInstagramPinnedHttpsTransport,
+    InstagramSecureImageDownloader,
+    InstagramContainedImageAcquisitionService,
+    InstagramVideoLocatorClient,
+    InstagramVideoTemporaryStore,
+    InstagramSecureVideoDownloader,
+    InstagramContainedVideoAcquisitionService,
+    FfmpegInstagramVideoDecoder,
+    FfmpegInstagramAudioExtractor,
+    {
+      provide: InstagramVideoDecoderPort,
+      useExisting: FfmpegInstagramVideoDecoder,
+    },
+    {
+      provide: InstagramAudioExtractorPort,
+      useExisting: FfmpegInstagramAudioExtractor,
+    },
+    {
+      provide: INSTAGRAM_INTELLIGENCE_PROVIDER_READ_CLIENT,
+      useExisting: InstagramIntelligenceProviderClient,
+    },
+  ],
+  exports: [
+    InstagramOAuthClient,
+    InstagramGraphClient,
+    INSTAGRAM_INTELLIGENCE_PROVIDER_READ_CLIENT,
+    InstagramContainedImageAcquisitionService,
+    InstagramImageTemporaryStore,
+    InstagramContainedVideoAcquisitionService,
+    InstagramVideoTemporaryStore,
+    InstagramVideoDecoderPort,
+    InstagramAudioExtractorPort,
+  ],
 })
 export class InstagramProviderClientModule {}

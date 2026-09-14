@@ -1,3 +1,5 @@
+import { INSTAGRAM_DE_CONTRACT } from "../../../instagram-intelligence/contracts/instagram-intelligence.registry";
+
 export const WAVE1_EVIDENCE_CAPABILITIES = [
   "owned_website.brand_messaging",
   "owned_website.brand_company_context",
@@ -21,6 +23,7 @@ export const DATA_EXTRACTION_EVIDENCE_CAPABILITIES = [
   ...WAVE1_EVIDENCE_CAPABILITIES,
   ...WAVE2_EVIDENCE_CAPABILITIES,
   ...OFFERING_COMMERCIAL_EVIDENCE_CAPABILITIES,
+  ...INSTAGRAM_DE_CONTRACT.capabilities,
 ] as const;
 
 export type EvidenceCapabilityId =
@@ -76,11 +79,16 @@ export type EvidencePolarity =
   | "RESTRICTION"
   | "NEUTRAL";
 
-export type EvidenceObservedSourceClass = "OWNED_WEBSITE";
+export type EvidenceObservedSourceClass =
+  | "OWNED_WEBSITE"
+  | typeof INSTAGRAM_DE_CONTRACT.sourceClass;
 export type EvidenceSourceClass =
   | EvidenceObservedSourceClass
   | "SYSTEM_DERIVATION_INPUT";
-export type EvidenceResourceType = "OWNED_WEB_PAGE" | "OWNED_WEB_FRAGMENT";
+export type EvidenceResourceType =
+  | "OWNED_WEB_PAGE"
+  | "OWNED_WEB_FRAGMENT"
+  | (typeof INSTAGRAM_DE_CONTRACT.resourceTypes)[number];
 
 export type EvidencePageRole =
   | "HOMEPAGE"

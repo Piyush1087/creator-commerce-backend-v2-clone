@@ -1,0 +1,21 @@
+id: instagram_content_behavior_evidence
+version: "1.1"
+status: FROZEN
+processor: instagram_content_behavior
+owner_engine: instagram_intelligence
+owning_branch: content_behavior_complete
+source_scope: INSTAGRAM_OWNED
+authority: CREATOR_SHOP_DERIVED
+processor_definition: intelligence/engines/instagram_intelligence/branches/content_behavior_complete/processors/instagram_content_behavior.yaml
+reasoning_authority: intelligence/engines/instagram_intelligence/branches/content_behavior_complete/artifacts/instagram_content_behavior/reasoning.yaml
+output_contract_authority: intelligence/engines/instagram_intelligence/branches/content_behavior_complete/artifacts/instagram_content_behavior/output_contract.yaml
+shared_metadata_authority: intelligence/engines/instagram_intelligence/branches/content_behavior_complete/shared_metadata_contract.yaml
+capabilities:
+  instagram.media_inventory: {source_scope: INSTAGRAM_OWNED, completed_capture_required: true}
+  instagram.media_insights: {source_scope: INSTAGRAM_OWNED, completed_capture_required: true}
+  instagram.caption_context: {source_scope: INSTAGRAM_OWNED, completed_capture_required: true}
+  instagram.media_visual_observations: {source_scope: INSTAGRAM_OWNED, completed_capture_required: true}
+  instagram.media_creator_signals: {source_scope: INSTAGRAM_OWNED, completed_capture_required: true}
+  instagram.media_offering_signals: {source_scope: INSTAGRAM_OWNED, completed_capture_required: true}
+lineage_required: [brand_subject, integration, provider_account, authorization_generation, window, media_identity, capture_or_execution, evidence_identity]
+provenance_classes: [PROVIDER_MEDIATED_FETCH, DETERMINISTIC_DERIVATION, MODEL_DERIVATION]

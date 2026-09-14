@@ -1,0 +1,137 @@
+{
+  "manifestSchemaVersion": 1,
+  "bundleId": "instagram_intelligence.instagram_organic_performance_profile",
+  "bundleVersion": "1.0",
+  "ownerEngine": "instagram_intelligence",
+  "owningBranch": "performance",
+  "architectureRepository": "Piyush1087/dummy_tcs",
+  "architectureCommitSha": "a7c691047ab6802098d3c4a84e73cc3fe95d753a",
+  "processorId": "instagram_organic_performance_profile",
+  "processorVersion": "1.0",
+  "outputContractId": "instagram_organic_performance_profile_output_contract",
+  "outputContractVersion": "1.0",
+  "evidenceContractId": "instagram_organic_performance_profile_evidence",
+  "evidenceContractVersion": "1.0",
+  "ownedObjectSemanticIds": [
+    "instagram_organic_performance_profile"
+  ],
+  "ownedPathPatterns": [
+    {
+      "objectSemanticId": "instagram_organic_performance_profile",
+      "componentPathPattern": "$"
+    },
+    {
+      "objectSemanticId": "instagram_organic_performance_profile",
+      "componentPathPattern": "$/f/components/f/window"
+    },
+    {
+      "objectSemanticId": "instagram_organic_performance_profile",
+      "componentPathPattern": "$/f/components/f/account_results"
+    },
+    {
+      "objectSemanticId": "instagram_organic_performance_profile",
+      "componentPathPattern": "$/f/components/f/metric_coverage"
+    },
+    {
+      "objectSemanticId": "instagram_organic_performance_profile",
+      "componentPathPattern": "$/f/components/f/format_baselines"
+    },
+    {
+      "objectSemanticId": "instagram_organic_performance_profile",
+      "componentPathPattern": "$/f/components/f/response_distribution"
+    },
+    {
+      "objectSemanticId": "instagram_organic_performance_profile",
+      "componentPathPattern": "$/f/components/f/high_response_cohorts"
+    },
+    {
+      "objectSemanticId": "instagram_organic_performance_profile",
+      "componentPathPattern": "$/f/components/f/low_response_cohorts"
+    },
+    {
+      "objectSemanticId": "instagram_organic_performance_profile",
+      "componentPathPattern": "$/f/components/f/content_performance_signals"
+    },
+    {
+      "objectSemanticId": "instagram_organic_performance_profile",
+      "componentPathPattern": "$/f/components/f/snapshot_change"
+    },
+    {
+      "objectSemanticId": "instagram_organic_performance_profile",
+      "componentPathPattern": "$/f/components/f/representative_media_refs"
+    },
+    {
+      "objectSemanticId": "instagram_organic_performance_profile",
+      "componentPathPattern": "$/f/components/f/bounded_learnings"
+    },
+    {
+      "objectSemanticId": "instagram_organic_performance_profile",
+      "componentPathPattern": "$/f/components/f/coverage"
+    }
+  ],
+  "generatedNotice": "GENERATED — DO NOT EDIT",
+  "generatorVersion": "1.0.0",
+  "artifacts": [
+    {
+      "role": "EVIDENCE_CONTRACT",
+      "path": "artifacts/evidence_contract.yaml",
+      "semanticId": "instagram_organic_performance_profile_evidence",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 1979,
+      "sha256": "2ea8151a500530762658d88a281f57ac5e0dd881eb9b5ec50bd23c3189a75632"
+    },
+    {
+      "role": "OBJECT_CONTRACT",
+      "path": "artifacts/object_contract.yaml",
+      "semanticId": "instagram_organic_performance_profile_object",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 607,
+      "sha256": "984de054d5b0d914982195cd5890f56463fb696e6b042bc8d5cc3eacfd0ab82e"
+    },
+    {
+      "role": "OUTPUT_CONTRACT",
+      "path": "artifacts/output_contract.yaml",
+      "semanticId": "instagram_organic_performance_profile_output_contract",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 2342,
+      "sha256": "1221d8f763632ab7bbcafd1e8e66a1e41b3add534ab0334ea8693cff0bd729e5"
+    },
+    {
+      "role": "PROCESSOR_DEFINITION",
+      "path": "artifacts/processor_definition.yaml",
+      "semanticId": "instagram_organic_performance_profile",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 299,
+      "sha256": "37ca91c44128e67e7a0b817a68645bf01736ea1a67d52403662c307172b4c8ea"
+    },
+    {
+      "role": "REASONING_CONTRACT",
+      "path": "artifacts/reasoning_contract.yaml",
+      "semanticId": "instagram_organic_performance_profile_reasoning",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 1117,
+      "sha256": "ae96274572954b9a2154bdb6296f4daf9f3ee77d2771ddc244bb4b34960aa048"
+    },
+    {
+      "role": "SHARED_METADATA_CONTRACT",
+      "path": "artifacts/shared_metadata_contract.yaml",
+      "semanticId": "shared_intelligence_metadata",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 168,
+      "sha256": "6f4d7621392dc9c9c685e8abdc40ce33876e29f00089ce5cca1986feba7c4c47"
+    }
+  ],
+  "bundleContentHash": "e16f8b5c24a2541b0efc0603cc32c424183415a3dac19ee58e3337e133a8b486"
+}

@@ -1,0 +1,8 @@
+id: instagram_organic_performance_profile
+version: "1.0"
+status: FROZEN
+owner_engine: instagram_intelligence
+owning_branch: performance
+source_scope: INSTAGRAM_OWNED
+authority: CREATOR_SHOP_DERIVED
+authority_register: intelligence/architecture/instagram_intelligence_c4_executable_authority_v1.json

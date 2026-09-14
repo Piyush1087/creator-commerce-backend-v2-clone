@@ -70,7 +70,10 @@ describe.skipIf(process.env.BS06_DATABASE_TEST !== "true")(
     const states = new BrandInstagramOAuthStateService(
       new ProviderOAuthTransactionService(db),
     );
-    const deletion = new BrandInstagramDeletionService(db, access);
+    const deletion = new BrandInstagramDeletionService(db, access, {
+      purgeTemporaryScope: vi.fn().mockResolvedValue(0),
+      purgePersistentInTransaction: vi.fn().mockResolvedValue({}),
+    } as never);
     const socialSync = new BrandSocialSyncService(
       db,
       oauth,

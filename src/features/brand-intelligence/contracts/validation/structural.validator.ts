@@ -16,11 +16,19 @@ function record(value: unknown): ContractNode | undefined {
 }
 
 function allowedTypes(node: ContractNode): readonly string[] {
-  if (node.type === "enum") return ["string"];
+  if (node.type === "enum") {
+    return Array.isArray(node.values)
+      ? [...new Set(node.values.map(actualType))]
+      : [];
+  }
   if (Array.isArray(node.type)) {
     return node.type
       .filter((item): item is string => typeof item === "string")
-      .map((item) => (item === "enum" ? "string" : item));
+      .flatMap((item) =>
+        item === "enum" && Array.isArray(node.values)
+          ? [...new Set(node.values.map(actualType))]
+          : [item],
+      );
   }
   return typeof node.type === "string"
     ? [node.type]

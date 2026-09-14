@@ -243,6 +243,11 @@ function context(): ProcessorExecutorContext {
 function executor(
   preparedInput: PreparedProcessorDependencies,
   generate: BrandCommunicationModelProvider["generate"],
+  instagramSource?: {
+    prepareExisting: (
+      execution: IntelligenceProcessorExecution,
+    ) => Promise<PreparedProcessorDependencies | null>;
+  },
 ) {
   const dependencyService = {
     prepare: vi.fn(async () => preparedInput),
@@ -253,10 +258,28 @@ function executor(
     new StructuralValidator(),
     new SemanticValidator(),
     { generate },
+    instagramSource as never,
   );
 }
 
 describe("BrandCommunicationProcessorExecutor", () => {
+  it("reuses the existing processor implementation through the source-profile admission hook", async () => {
+    const snapshot = prepared();
+    const source = { prepareExisting: vi.fn(async () => snapshot) };
+    const generate = vi.fn(async (request: BrandCommunicationModelRequest) => ({
+      output: request.outputSchema.parse(validOutput),
+      providerAttemptCount: 1,
+    }));
+    const result = await executor(snapshot, generate, source).execute(
+      context(),
+    );
+    expect(source.prepareExisting).toHaveBeenCalledOnce();
+    expect(result.persistencePayload).toMatchObject({
+      kind: "BRAND_COMMUNICATION_V1",
+    });
+    expect(generate).toHaveBeenCalledOnce();
+  });
+
   it("uses the verified schema and returns validated persistence material", async () => {
     const generate = vi.fn(async (request: BrandCommunicationModelRequest) => ({
       output: request.outputSchema.parse(validOutput),
