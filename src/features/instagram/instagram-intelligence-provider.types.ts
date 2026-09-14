@@ -115,6 +115,8 @@ export type InstagramAudienceInsightsTruth = {
   breakdown: InstagramAudienceBreakdown;
   timeframe: InstagramAudienceTimeframe;
   values: Array<{ dimension: string; value: number }>;
+  /** Provider total_value denominator when explicitly returned and valid. */
+  denominator?: number;
   limitation:
     | null
     | "PROVIDER_EMPTY_OR_THRESHOLD_SUPPRESSED"

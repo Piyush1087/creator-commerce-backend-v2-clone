@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { CreatorPayoutProfileModule } from "../brand-escrow/creator-payout-profile.module";
 import { InstagramProviderClientModule } from "../instagram/instagram-provider-client.module";
+import { InstagramSyncCoordinatorModule } from "../instagram-intelligence/sync/instagram-sync-coordinator.module";
 import { ProviderOAuthModule } from "../provider-oauth/provider-oauth.module";
 import { CreatorProfileContactController } from "./creator-profile-contact.controller";
 import { CreatorSettingsController } from "./creator-settings.controller";
@@ -29,6 +30,7 @@ import { CreatorSettingsHomeReadService } from "./home/creator-settings-home-rea
     CreatorPayoutProfileModule,
     CreatorTeamModule,
     InstagramProviderClientModule,
+    InstagramSyncCoordinatorModule,
     ProviderOAuthModule,
   ],
   controllers: [

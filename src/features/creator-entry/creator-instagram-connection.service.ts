@@ -2,7 +2,9 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
+  Optional,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import {
@@ -43,6 +45,10 @@ import {
   resolveCreatorInstagramRedirectUri,
 } from "./creator-instagram-authority";
 import type { CreatorInstagramCompleteDto } from "./dto/creator-entry.dto";
+import {
+  CREATOR_INSTAGRAM_AUDIENCE_PROCESSING_PORT,
+  type CreatorInstagramAudienceProcessingPort,
+} from "./creator-instagram-audience-processing.port";
 
 type CapabilityEvidence = {
   tokenScopePermissions: string[];
@@ -71,6 +77,9 @@ export class CreatorInstagramConnectionService {
     private readonly graph: InstagramGraphClient,
     private readonly state: CreatorEntryStateService,
     private readonly workspaceActors: CreatorWorkspaceActorService,
+    @Inject(CREATOR_INSTAGRAM_AUDIENCE_PROCESSING_PORT)
+    @Optional()
+    private readonly audienceProcessing?: CreatorInstagramAudienceProcessingPort,
   ) {}
 
   async authorize(user: AuthUser) {
@@ -140,13 +149,23 @@ export class CreatorInstagramConnectionService {
     const me = await this.fetchStableIdentity(token.accessToken);
     this.assertProfessionalAccount(me.accountType);
     const evidence = await this.classifyCapabilities(token);
-    await this.promoteInitialConnection({
+    const integration = await this.promoteInitialConnection({
       creator,
       attemptGeneration: attempt.expectedGeneration,
       token,
       me,
       evidence,
     });
+    if (evidence.insights === ProviderCapabilityState.AVAILABLE) {
+      await this.audienceProcessing?.scheduleCreatorAudience({
+        creatorProfileId: creator.subjectCreatorProfileId,
+        creatorWorkspaceId: creator.workspaceId,
+        integrationId: integration.id,
+        providerAccountId: integration.nativePlatformUserId,
+        authorizationGeneration: integration.authorizationGeneration,
+        trigger: "INITIAL_CONNECT",
+      });
+    }
 
     return {
       connected: true as const,
@@ -308,14 +327,14 @@ export class CreatorInstagramConnectionService {
     token: InstagramTokenExchangeResult;
     me: InstagramMeProfile;
     evidence: CapabilityEvidence;
-  }): Promise<void> {
+  }) {
     const now = new Date();
     const encryptedToken = encryptField(args.token.accessToken);
     const expiresAt = new Date(
       now.getTime() + args.token.expiresInSeconds * 1000,
     );
     try {
-      await this.prisma.$transaction(async (tx) => {
+      return await this.prisma.$transaction(async (tx) => {
         await this.assertInitialConnectContextInTransaction(tx, args.creator);
         const existing = await tx.creatorSocialIntegration.findUnique({
           where: {
@@ -339,7 +358,7 @@ export class CreatorInstagramConnectionService {
         });
         if (owner) throw this.identityAlreadyInUse();
 
-        await tx.creatorSocialIntegration.create({
+        return tx.creatorSocialIntegration.create({
           data: {
             creatorProfileId: args.creator.subjectCreatorProfileId,
             platformNetwork: SocialNetworkProvider.INSTAGRAM,

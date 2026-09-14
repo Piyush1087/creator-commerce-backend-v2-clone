@@ -10,7 +10,7 @@ import {
 import { BrandProviderReadinessService } from "./services/brand-provider-readiness.service";
 import { BrandSettingsAccessService } from "./services/brand-settings-access.service";
 import { InstagramIntelligenceAuthorizedImageAcquisitionService } from "./services/instagram-intelligence-image-acquisition.service";
-import { InstagramSyncCoordinatorRepository } from "../instagram-intelligence/sync/instagram-sync-coordinator.repository";
+import { InstagramSyncCoordinatorModule } from "../instagram-intelligence/sync/instagram-sync-coordinator.module";
 import { InstagramIntelligenceAuthorizedVideoAcquisitionService } from "./services/instagram-intelligence-video-acquisition.service";
 
 @Module({
@@ -18,6 +18,7 @@ import { InstagramIntelligenceAuthorizedVideoAcquisitionService } from "./servic
     PrismaModule,
     forwardRef(() => BrandCentreModule),
     InstagramProviderClientModule,
+    InstagramSyncCoordinatorModule,
   ],
   providers: [
     BrandSettingsAccessService,
@@ -26,7 +27,6 @@ import { InstagramIntelligenceAuthorizedVideoAcquisitionService } from "./servic
     InstagramIntelligenceAuthorizedReadService,
     InstagramIntelligenceAuthorizedImageAcquisitionService,
     InstagramIntelligenceAuthorizedVideoAcquisitionService,
-    InstagramSyncCoordinatorRepository,
   ],
   exports: [
     BrandProviderReadinessService,
@@ -34,7 +34,7 @@ import { InstagramIntelligenceAuthorizedVideoAcquisitionService } from "./servic
     InstagramIntelligenceAuthorizedReadService,
     InstagramIntelligenceAuthorizedImageAcquisitionService,
     InstagramIntelligenceAuthorizedVideoAcquisitionService,
-    InstagramSyncCoordinatorRepository,
+    InstagramSyncCoordinatorModule,
     BrandSettingsAccessService,
   ],
 })

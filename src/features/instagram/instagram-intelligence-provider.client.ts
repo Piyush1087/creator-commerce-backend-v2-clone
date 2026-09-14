@@ -348,12 +348,14 @@ export class InstagramIntelligenceProviderClient implements InstagramIntelligenc
       };
     }
     const values = extractAudienceValues(result.body.data).slice(0, 45);
+    const denominator = extractAudienceDenominator(result.body.data);
     return {
       availability: values.length > 0 ? "AVAILABLE" : "UNAVAILABLE",
       population,
       breakdown,
       timeframe,
       values,
+      ...(denominator === null ? {} : { denominator }),
       limitation:
         values.length === 0
           ? "PROVIDER_EMPTY_OR_THRESHOLD_SUPPRESSED"
@@ -479,6 +481,21 @@ export class InstagramIntelligenceProviderClient implements InstagramIntelligenc
       return { ok: false, classification: "TRANSIENT" };
     }
   }
+}
+
+function extractAudienceDenominator(
+  rows: Array<Record<string, unknown>>,
+): number | null {
+  const denominators = rows
+    .map((row) => (isRecord(row.total_value) ? row.total_value.value : null))
+    .filter(
+      (value): value is number =>
+        typeof value === "number" && Number.isFinite(value) && value >= 0,
+    );
+  if (denominators.length === 0) return null;
+  return denominators.every((value) => value === denominators[0])
+    ? denominators[0]
+    : null;
 }
 
 function failure<T>(

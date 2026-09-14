@@ -595,6 +595,35 @@ describe("Instagram intelligence provider truth client", () => {
       values: [{ dimension: "IN", value: 12 }],
       limitation: null,
     });
+    expect(result.denominator).toBeUndefined();
+  });
+
+  it("retains only a consistent explicit provider audience denominator", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          data: [
+            {
+              total_value: {
+                value: 20,
+                breakdowns: [
+                  { results: [{ dimension_values: ["18-24"], value: 12 }] },
+                ],
+              },
+            },
+          ],
+        }),
+      ),
+    );
+    await expect(
+      new InstagramIntelligenceProviderClient().readAudienceInsights(
+        credential,
+        "FOLLOWERS",
+        "AGE",
+        "THIS_MONTH",
+      ),
+    ).resolves.toMatchObject({ denominator: 20 });
   });
 
   it("distinguishes empty, partial-failure, and safety-capped child coverage without insights", async () => {

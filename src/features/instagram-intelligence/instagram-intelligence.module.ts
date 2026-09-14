@@ -4,6 +4,7 @@ import { BrandSettingsConsumerModule } from "../brand-settings/brand-settings-co
 import { BrandCentreModule } from "../brand-centre/brand-centre.module";
 import { BrandIntelligenceModule } from "../brand-intelligence/brand-intelligence.module";
 import { DataExtractionModule } from "../data-extraction/data-extraction.module";
+import { CreatorAudienceModule } from "../creator-audience/creator-audience.module";
 import { InstagramProviderClientModule } from "../instagram/instagram-provider-client.module";
 import { InstagramB3aImagePipelineService } from "./media/instagram-b3a-image-pipeline.service";
 import { InstagramB3bMediaCompletionService } from "./media/instagram-b3b-media-completion.service";
@@ -23,6 +24,7 @@ import {
 import { InstagramC3SemanticsService } from "./semantics/instagram-c3-semantics.service";
 import { InstagramSyncController } from "./sync/instagram-sync.controller";
 import { InstagramSyncDispatcherService } from "./sync/instagram-sync-dispatcher.service";
+import { InstagramSyncCoordinatorModule } from "./sync/instagram-sync-coordinator.module";
 import { InstagramSyncPipelineAdapter } from "./sync/instagram-sync-pipeline.adapter";
 import { InstagramSyncPipelinePort } from "./sync/instagram-sync-pipeline.port";
 import { InstagramHiddenBrandRuntime } from "./hidden-brand/instagram-hidden-brand.runtime";
@@ -47,7 +49,9 @@ import { GeminiInstagramSpeechTranscriptionAdapter } from "../instagram/media/vi
     BrandCentreModule,
     BrandIntelligenceModule,
     DataExtractionModule,
+    CreatorAudienceModule,
     InstagramProviderClientModule,
+    InstagramSyncCoordinatorModule,
   ],
   controllers: [InstagramB4ConsumerController, InstagramSyncController],
   providers: [

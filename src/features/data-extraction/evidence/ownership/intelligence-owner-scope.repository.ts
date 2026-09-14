@@ -62,17 +62,40 @@ export class IntelligenceOwnerScopeRepository {
       const counts = await tx.$queryRaw<
         Array<{ deleted_count: bigint }>
       >(Prisma.sql`
-        WITH deleted_subjects AS (
-          DELETE FROM intelligence_subjects WHERE owner_scope_id = ${scopeId} AND subject_type = 'CREATOR' RETURNING 1
-        ), deleted_resources AS (
-          DELETE FROM data_extraction_resources WHERE owner_scope_id = ${scopeId} AND source_class = 'INSTAGRAM_OWNED' RETURNING 1
-        ), deleted_sync AS (
-          DELETE FROM instagram_intelligence_sync_jobs WHERE owner_scope_id = ${scopeId} RETURNING 1
-        )
-        SELECT
-          (SELECT count(*) FROM deleted_subjects) +
+        WITH
+        target_resources AS MATERIALIZED (
+          SELECT resource_ref FROM data_extraction_resources
+          WHERE owner_scope_id=${scopeId} AND source_class='INSTAGRAM_OWNED'
+        ),
+        target_captures AS MATERIALIZED (
+          SELECT capture_ref FROM data_extraction_captures
+          WHERE owner_scope_id=${scopeId} AND resource_ref IN (SELECT resource_ref FROM target_resources)
+        ),
+        target_objects AS MATERIALIZED (
+          SELECT object_generation_id, action_id FROM intelligence_object_generations
+          WHERE owner_scope_id=${scopeId} AND object_semantic_id='creator_audience'
+        ),
+        deleted_transitions AS (DELETE FROM intelligence_component_transitions WHERE owner_scope_id=${scopeId} AND object_semantic_id='creator_audience' RETURNING 1),
+        deleted_candidates AS (DELETE FROM intelligence_component_candidates WHERE owner_scope_id=${scopeId} AND object_semantic_id='creator_audience' RETURNING 1),
+        deleted_current AS (DELETE FROM intelligence_current_components WHERE owner_scope_id=${scopeId} AND object_semantic_id='creator_audience' RETURNING 1),
+        deleted_intel_evidence AS (DELETE FROM intelligence_evidence_references WHERE owner_scope_id=${scopeId} AND object_generation_id IN (SELECT object_generation_id FROM target_objects) RETURNING 1),
+        deleted_business_refs AS (DELETE FROM intelligence_business_state_references WHERE owner_scope_id=${scopeId} AND object_generation_id IN (SELECT object_generation_id FROM target_objects) RETURNING 1),
+        deleted_components AS (DELETE FROM intelligence_component_generations WHERE owner_scope_id=${scopeId} AND object_generation_id IN (SELECT object_generation_id FROM target_objects) RETURNING 1),
+        deleted_objects AS (DELETE FROM intelligence_object_generations WHERE owner_scope_id=${scopeId} AND object_generation_id IN (SELECT object_generation_id FROM target_objects) RETURNING action_id),
+        deleted_actions AS (DELETE FROM intelligence_actions WHERE owner_scope_id=${scopeId} AND action_id IN (SELECT action_id FROM deleted_objects WHERE action_id IS NOT NULL) RETURNING 1),
+        deleted_evidence AS (DELETE FROM data_extraction_evidence_items WHERE owner_scope_id=${scopeId} AND capture_ref IN (SELECT capture_ref FROM target_captures) RETURNING 1),
+        deleted_captures AS (DELETE FROM data_extraction_captures WHERE owner_scope_id=${scopeId} AND capture_ref IN (SELECT capture_ref FROM target_captures) RETURNING 1),
+        deleted_resources AS (DELETE FROM data_extraction_resources WHERE owner_scope_id=${scopeId} AND resource_ref IN (SELECT resource_ref FROM target_resources) RETURNING 1),
+        deleted_sync AS (DELETE FROM instagram_intelligence_sync_jobs WHERE owner_scope_id=${scopeId} AND creator_integration_id IS NOT NULL RETURNING 1)
+        SELECT (
+          (SELECT count(*) FROM deleted_transitions) + (SELECT count(*) FROM deleted_candidates) +
+          (SELECT count(*) FROM deleted_current) + (SELECT count(*) FROM deleted_intel_evidence) +
+          (SELECT count(*) FROM deleted_business_refs) + (SELECT count(*) FROM deleted_components) +
+          (SELECT count(*) FROM deleted_objects) + (SELECT count(*) FROM deleted_actions) +
+          (SELECT count(*) FROM deleted_evidence) + (SELECT count(*) FROM deleted_captures) +
           (SELECT count(*) FROM deleted_resources) +
-          (SELECT count(*) FROM deleted_sync) AS deleted_count
+          (SELECT count(*) FROM deleted_sync)
+        ) AS deleted_count
       `);
       return Number(counts[0]?.deleted_count ?? 0n);
     });

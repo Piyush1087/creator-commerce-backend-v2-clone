@@ -12,11 +12,17 @@ import {
   InstagramSyncCapabilityClass,
   InstagramSyncCoordinatorStatus,
   InstagramSyncTrigger,
+  InstagramProfessionalAccountType,
+  OAuthTokenStatus,
+  ProviderAuthorizationHealth,
+  ProviderCapabilityState,
+  SocialNetworkProvider,
   Prisma,
 } from "@prisma/client";
 import { createHash, randomUUID } from "node:crypto";
 
 import { PrismaService } from "../../../prisma/prisma.service";
+import type { CreatorWorkspaceActorContext } from "../../../shared/creator/creator-workspace-actor.contract";
 
 const DAY_MS = 86_400_000;
 const WEEK_MS = 7 * DAY_MS;
@@ -39,9 +45,79 @@ export type InstagramSyncLease = Readonly<{
   windowEnd: Date;
 }>;
 
+export type CreatorAudienceSyncLease = Readonly<{
+  jobId: string;
+  leaseToken: string;
+  leaseOwnerRef: string;
+  actor: CreatorWorkspaceActorContext;
+  integrationId: string;
+  providerAccountId: string;
+  authorizationGeneration: number;
+  capabilityClass: typeof InstagramSyncCapabilityClass.AUDIENCE;
+  trigger: InstagramSyncTrigger;
+  requestIdentity: string;
+  attemptNumber: number;
+  windowEnd: Date;
+}>;
+
 @Injectable()
 export class InstagramSyncCoordinatorRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  async scheduleCreatorAudience(input: {
+    creatorProfileId: string;
+    creatorWorkspaceId: string;
+    integrationId: string;
+    providerAccountId: string;
+    authorizationGeneration: number;
+    trigger: "INITIAL_CONNECT" | "RECONNECT";
+  }): Promise<void> {
+    const now = new Date();
+    const requestIdentity = identity(
+      input,
+      InstagramSyncCapabilityClass.AUDIENCE,
+      now,
+    );
+    await this.prisma.$transaction(async (tx) => {
+      const scopes = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        INSERT INTO intelligence_owner_scopes
+          (owner_type, owner_key, creator_profile_id, creator_workspace_id)
+        VALUES ('CREATOR', ${`CREATOR:${input.creatorProfileId}`},
+          ${input.creatorProfileId}, ${input.creatorWorkspaceId})
+        ON CONFLICT (creator_profile_id) WHERE creator_profile_id IS NOT NULL
+        DO UPDATE SET updated_at = intelligence_owner_scopes.updated_at
+        RETURNING owner_scope_id AS id
+      `);
+      const scopeId = scopes[0].id;
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE instagram_intelligence_sync_jobs
+        SET status='BLOCKED_AUTHORIZATION', next_due_at=NULL, backoff_until=NULL,
+            lease_token=NULL, lease_owner_ref=NULL, lease_expires_at=NULL,
+            reason_codes=ARRAY['AUTHORIZATION_GENERATION_SUPERSEDED']
+        WHERE owner_scope_id=${scopeId}
+          AND creator_integration_id=${input.integrationId}
+          AND authorization_generation <> ${input.authorizationGeneration}
+          AND status <> 'COMPLETED'
+      `);
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO instagram_intelligence_sync_jobs
+          (sync_job_id, owner_scope_id, brand_id, integration_id,
+           creator_integration_id, provider_account_id,
+           authorization_generation, capability_class, status, trigger,
+           request_identity, next_due_at, updated_at)
+        VALUES (${randomUUID()}::uuid, ${scopeId}, NULL, NULL, ${input.integrationId},
+          ${input.providerAccountId}, ${input.authorizationGeneration},
+          'AUDIENCE', 'DUE', ${input.trigger}::"InstagramSyncTrigger",
+          ${requestIdentity}, ${now}, CURRENT_TIMESTAMP)
+        ON CONFLICT (owner_scope_id, creator_integration_id, provider_account_id,
+          authorization_generation, capability_class)
+          WHERE creator_integration_id IS NOT NULL
+        DO UPDATE SET status='DUE', trigger=EXCLUDED.trigger,
+          request_identity=EXCLUDED.request_identity, next_due_at=EXCLUDED.next_due_at,
+          backoff_until=NULL, reason_codes=ARRAY[]::text[], updated_at=CURRENT_TIMESTAMP
+      `);
+    });
+  }
 
   async scheduleConnection(input: {
     brandProfileId: string;
@@ -177,7 +253,7 @@ export class InstagramSyncCoordinatorRepository {
         job.capabilityClass,
         now,
       );
-      await tx.instagramIntelligenceSyncJob.update({
+      await tx.instagramIntelligenceSyncJob.updateMany({
         where: { id: job.id },
         data: {
           trigger: InstagramSyncTrigger.MANUAL,
@@ -251,7 +327,7 @@ export class InstagramSyncCoordinatorRepository {
           ? job.executionWindowEnd
           : now;
       const attemptNumber = job.attemptCount + 1;
-      await tx.instagramIntelligenceSyncJob.update({
+      await tx.instagramIntelligenceSyncJob.updateMany({
         where: { id: job.id },
         data: {
           status: InstagramSyncCoordinatorStatus.RUNNING,
@@ -282,7 +358,121 @@ export class InstagramSyncCoordinatorRepository {
     });
   }
 
-  async heartbeat(lease: InstagramSyncLease): Promise<void> {
+  async claimNextCreator(
+    workerIdentity: string,
+  ): Promise<CreatorAudienceSyncLease | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const now = await databaseNow(tx);
+      const rows = await tx.$queryRaw<
+        Array<{
+          id: string;
+          scopeId: string;
+          integrationId: string;
+          creatorProfileId: string;
+          workspaceId: string;
+          organizationId: string;
+          ownerUserId: string;
+          providerAccountId: string;
+          authorizationGeneration: number;
+          status: InstagramSyncCoordinatorStatus;
+          trigger: InstagramSyncTrigger;
+          requestIdentity: string;
+          attemptCount: number;
+          executionWindowEnd: Date | null;
+        }>
+      >(Prisma.sql`
+        SELECT job.sync_job_id AS id, job.owner_scope_id AS "scopeId",
+          job.creator_integration_id AS "integrationId",
+          scope.creator_profile_id AS "creatorProfileId",
+          scope.creator_workspace_id AS "workspaceId",
+          workspace.organization_id AS "organizationId",
+          profile.user_id AS "ownerUserId",
+          job.provider_account_id AS "providerAccountId",
+          job.authorization_generation AS "authorizationGeneration",
+          job.status, job.trigger, job.request_identity AS "requestIdentity",
+          job.attempt_count AS "attemptCount",
+          job.execution_window_end AS "executionWindowEnd"
+        FROM instagram_intelligence_sync_jobs job
+        JOIN intelligence_owner_scopes scope ON scope.owner_scope_id=job.owner_scope_id
+        JOIN creator_workspaces workspace ON workspace.id=scope.creator_workspace_id
+        JOIN creator_profiles profile ON profile.id=scope.creator_profile_id
+        WHERE ((job.status IN ('PENDING','DUE') AND job.next_due_at <= ${now})
+          OR (job.status='BACKOFF' AND job.backoff_until <= ${now})
+          OR (job.status='RUNNING' AND job.lease_expires_at <= ${now}))
+          AND job.brand_id IS NULL AND job.creator_integration_id IS NOT NULL
+          AND job.capability_class='AUDIENCE'
+        ORDER BY COALESCE(job.backoff_until, job.next_due_at, job.lease_expires_at), job.sync_job_id
+        FOR UPDATE OF job SKIP LOCKED LIMIT 1
+      `);
+      if (!rows[0]) return null;
+      const row = rows[0];
+      const integration = await tx.creatorSocialIntegration.findUnique({
+        where: { id: row.integrationId },
+      });
+      if (
+        !creatorUsable(integration, {
+          creatorIntegrationId: row.integrationId,
+          providerAccountId: row.providerAccountId,
+          authorizationGeneration: row.authorizationGeneration,
+          capabilityClass: InstagramSyncCapabilityClass.AUDIENCE,
+        })
+      ) {
+        await tx.$executeRaw(Prisma.sql`
+          UPDATE instagram_intelligence_sync_jobs
+          SET status='BLOCKED_AUTHORIZATION', next_due_at=NULL,
+            backoff_until=NULL, lease_token=NULL, lease_owner_ref=NULL,
+            lease_expires_at=NULL,
+            reason_codes=ARRAY['AUTHORIZATION_FENCE_REJECTED']
+          WHERE sync_job_id=${row.id}::uuid
+        `);
+        return null;
+      }
+      const leaseToken = randomUUID();
+      const windowEnd =
+        (row.status === InstagramSyncCoordinatorStatus.BACKOFF ||
+          row.status === InstagramSyncCoordinatorStatus.RUNNING) &&
+        row.executionWindowEnd
+          ? row.executionWindowEnd
+          : now;
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE instagram_intelligence_sync_jobs
+        SET status='RUNNING', lease_token=${leaseToken}::uuid,
+          lease_owner_ref=${workerIdentity},
+          lease_expires_at=${new Date(now.getTime() + INSTAGRAM_SYNC_LEASE_MS)},
+          last_heartbeat_at=${now}, last_attempt_at=${now},
+          attempt_count=attempt_count+1, execution_window_start=NULL,
+          execution_window_end=${windowEnd}, updated_at=CURRENT_TIMESTAMP
+        WHERE sync_job_id=${row.id}::uuid
+      `);
+      return {
+        jobId: row.id,
+        leaseToken,
+        leaseOwnerRef: workerIdentity,
+        actor: {
+          actorUserId: row.ownerUserId,
+          actorMembershipId: `system:${row.scopeId}`,
+          actorRole: "OWNER",
+          workspaceId: row.workspaceId,
+          organizationId: row.organizationId,
+          subjectCreatorProfileId: row.creatorProfileId,
+          subjectOwnerUserId: row.ownerUserId,
+          allowedActions: ["INSIGHTS_AUDIENCE_READ"],
+        },
+        integrationId: row.integrationId,
+        providerAccountId: row.providerAccountId,
+        authorizationGeneration: row.authorizationGeneration,
+        capabilityClass: InstagramSyncCapabilityClass.AUDIENCE,
+        trigger: row.trigger,
+        requestIdentity: row.requestIdentity,
+        attemptNumber: row.attemptCount + 1,
+        windowEnd,
+      };
+    });
+  }
+
+  async heartbeat(
+    lease: InstagramSyncLease | CreatorAudienceSyncLease,
+  ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const now = await databaseNow(tx);
       const refreshed = await tx.instagramIntelligenceSyncJob.updateMany({
@@ -302,7 +492,10 @@ export class InstagramSyncCoordinatorRepository {
     });
   }
 
-  async complete(lease: InstagramSyncLease, generationIds: string[]) {
+  async complete(
+    lease: InstagramSyncLease | CreatorAudienceSyncLease,
+    generationIds: string[],
+  ) {
     return this.finishWithLease(lease, async (tx, now) => {
       const current = await tx.instagramIntelligenceSyncJob.findUniqueOrThrow({
         where: { id: lease.jobId },
@@ -319,7 +512,7 @@ export class InstagramSyncCoordinatorRepository {
         : recurring
           ? new Date(now.getTime() + interval + jitter(lease, "recurring"))
           : null;
-      await tx.instagramIntelligenceSyncJob.update({
+      await tx.instagramIntelligenceSyncJob.updateMany({
         where: { id: lease.jobId },
         data: {
           status: current.manualPending
@@ -353,7 +546,7 @@ export class InstagramSyncCoordinatorRepository {
   }
 
   async fail(
-    lease: InstagramSyncLease,
+    lease: InstagramSyncLease | CreatorAudienceSyncLease,
     classification: "AUTHORIZATION" | "TRANSIENT" | "TERMINAL",
     reasonCode: string,
   ) {
@@ -363,7 +556,7 @@ export class InstagramSyncCoordinatorRepository {
         now.getTime() +
           Math.min(60 * 60_000, 1000 * 2 ** Math.min(failureCount, 10)),
       );
-      await tx.instagramIntelligenceSyncJob.update({
+      await tx.instagramIntelligenceSyncJob.updateMany({
         where: { id: lease.jobId },
         data: {
           status: blocked
@@ -383,7 +576,7 @@ export class InstagramSyncCoordinatorRepository {
   }
 
   private async finishWithLease(
-    lease: InstagramSyncLease,
+    lease: InstagramSyncLease | CreatorAudienceSyncLease,
     action: (
       tx: Prisma.TransactionClient,
       now: Date,
@@ -446,6 +639,38 @@ function usable(
   return job.capabilityClass === InstagramSyncCapabilityClass.AUDIENCE
     ? integration.firstPartyInsightsCapability === InstagramCapabilityState.YES
     : integration.firstPartyProfileCapability === InstagramCapabilityState.YES;
+}
+
+function creatorUsable(
+  integration: Awaited<
+    ReturnType<PrismaService["creatorSocialIntegration"]["findUnique"]>
+  >,
+  job: {
+    creatorIntegrationId: string | null;
+    providerAccountId: string;
+    authorizationGeneration: number;
+    capabilityClass: InstagramSyncCapabilityClass;
+  },
+): boolean {
+  return Boolean(
+    integration &&
+    job.capabilityClass === InstagramSyncCapabilityClass.AUDIENCE &&
+    job.creatorIntegrationId === integration.id &&
+    integration.platformNetwork === SocialNetworkProvider.INSTAGRAM &&
+    integration.nativePlatformUserId === job.providerAccountId &&
+    integration.authorizationGeneration === job.authorizationGeneration &&
+    integration.disconnectedAt === null &&
+    integration.tokenStateCondition === OAuthTokenStatus.ACTIVE &&
+    (!integration.tokenExpiresAt || integration.tokenExpiresAt > new Date()) &&
+    integration.authorizationHealth === ProviderAuthorizationHealth.USABLE &&
+    integration.basicAuthorizationCapability ===
+      ProviderCapabilityState.AVAILABLE &&
+    integration.insightsCapability === ProviderCapabilityState.AVAILABLE &&
+    (integration.professionalAccountType ===
+      InstagramProfessionalAccountType.BUSINESS ||
+      integration.professionalAccountType ===
+        InstagramProfessionalAccountType.CREATOR),
+  );
 }
 
 function identity(

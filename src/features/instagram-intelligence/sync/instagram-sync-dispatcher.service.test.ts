@@ -62,4 +62,48 @@ describe("InstagramSyncDispatcherService", () => {
       "GENERATION_MISMATCH",
     );
   });
+
+  it("uses the same hourly dispatcher for a due Creator Audience lease", async () => {
+    const creatorLease = {
+      ...lease,
+      actor: {
+        actorUserId: "owner-user",
+        actorMembershipId: "system:scope",
+        actorRole: "OWNER",
+        workspaceId: "workspace",
+        organizationId: "organization",
+        subjectCreatorProfileId: "creator",
+        subjectOwnerUserId: "owner-user",
+        allowedActions: ["INSIGHTS_AUDIENCE_READ"],
+      },
+      capabilityClass: "AUDIENCE",
+    } as const;
+    const repository = {
+      claimNext: vi.fn().mockResolvedValue(null),
+      claimNextCreator: vi.fn().mockResolvedValue(creatorLease),
+      complete: vi.fn().mockResolvedValue(undefined),
+      fail: vi.fn(),
+    };
+    const creatorAudience = {
+      execute: vi
+        .fn()
+        .mockResolvedValue({ generationIds: ["creator-generation"] }),
+    };
+    const dispatcher = new InstagramSyncDispatcherService(
+      repository as never,
+      { execute: vi.fn() } as never,
+      creatorAudience as never,
+    );
+    await expect(dispatcher.dispatch()).resolves.toEqual({ processed: true });
+    expect(creatorAudience.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actor: creatorLease.actor,
+        integrationId: creatorLease.integrationId,
+        requestIdentity: creatorLease.requestIdentity,
+      }),
+    );
+    expect(repository.complete).toHaveBeenCalledWith(creatorLease, [
+      "creator-generation",
+    ]);
+  });
 });

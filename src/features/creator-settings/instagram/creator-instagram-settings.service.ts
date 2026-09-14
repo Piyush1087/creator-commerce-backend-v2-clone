@@ -6,6 +6,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import {
@@ -47,6 +48,7 @@ import {
   type InstagramTokenExchangeResult,
 } from "../../instagram/instagram-oauth.client";
 import { CreatorInstagramOAuthTransactionService } from "../../provider-oauth/creator-instagram-oauth-transaction.service";
+import { InstagramSyncCoordinatorRepository } from "../../instagram-intelligence/sync/instagram-sync-coordinator.repository";
 import {
   CREATOR_INSTAGRAM_SETTINGS_ACTOR_PORT,
   type CreatorInstagramSettingsActorPort,
@@ -75,6 +77,8 @@ export class CreatorInstagramSettingsService {
     private readonly transactions: CreatorInstagramOAuthTransactionService,
     private readonly oauth: InstagramOAuthClient,
     private readonly graph: InstagramGraphClient,
+    @Optional()
+    private readonly instagramSync?: InstagramSyncCoordinatorRepository,
   ) {}
 
   async read(user: AuthUser): Promise<CreatorInstagramSettingsReadModel> {
@@ -220,6 +224,16 @@ export class CreatorInstagramSettingsService {
       me,
       evidence,
     });
+    if (evidence.insights === ProviderCapabilityState.AVAILABLE) {
+      await this.instagramSync?.scheduleCreatorAudience({
+        creatorProfileId: actor.subjectCreatorProfileId,
+        creatorWorkspaceId: actor.workspaceId,
+        integrationId: integration.id,
+        providerAccountId: me.userId,
+        authorizationGeneration: attempt.expectedGeneration + 1,
+        trigger: "RECONNECT",
+      });
+    }
     return { connected: true as const, settings: await this.readFor(actor) };
   }
 

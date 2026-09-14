@@ -5,6 +5,8 @@ import { PrismaModule } from "../../prisma/prisma.module";
 import { AuthModule } from "../auth/auth.module";
 import { CreatorSettingsModule } from "../creator-settings/creator-settings.module";
 import { InstagramModule } from "../instagram/instagram.module";
+import { InstagramSyncCoordinatorModule } from "../instagram-intelligence/sync/instagram-sync-coordinator.module";
+import { InstagramSyncCoordinatorRepository } from "../instagram-intelligence/sync/instagram-sync-coordinator.repository";
 import { ProviderOAuthModule } from "../provider-oauth/provider-oauth.module";
 import { CreatorEntryController } from "./creator-entry.controller";
 import { CreatorCampaignApplyContinuationService } from "./creator-campaign-apply-continuation.service";
@@ -18,6 +20,7 @@ import { CreatorEntryProvisioningService } from "./creator-entry-provisioning.se
 import { CreatorEntryRegistrationService } from "./creator-entry-registration.service";
 import { CreatorEntryStateService } from "./creator-entry-state.service";
 import { CreatorPlatformAccessGuard } from "./creator-platform-access.guard";
+import { CREATOR_INSTAGRAM_AUDIENCE_PROCESSING_PORT } from "./creator-instagram-audience-processing.port";
 
 @Module({
   imports: [
@@ -26,6 +29,7 @@ import { CreatorPlatformAccessGuard } from "./creator-platform-access.guard";
     AuthModule,
     CreatorSettingsModule,
     InstagramModule,
+    InstagramSyncCoordinatorModule,
     ProviderOAuthModule,
   ],
   controllers: [CreatorEntryController],
@@ -41,6 +45,10 @@ import { CreatorPlatformAccessGuard } from "./creator-platform-access.guard";
     CreatorInstagramTokenRefreshService,
     CreatorInstagramTokenRefreshScheduler,
     CreatorPlatformAccessGuard,
+    {
+      provide: CREATOR_INSTAGRAM_AUDIENCE_PROCESSING_PORT,
+      useExisting: InstagramSyncCoordinatorRepository,
+    },
   ],
   exports: [
     CreatorEntryStateService,
