@@ -54,4 +54,56 @@ describe("Creator Content authenticated consumer", () => {
       service.readAt({ id: "user" } as never, now),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
+
+  it("projects a degraded source while preserving the last verified current", async () => {
+    const actors = {
+      resolveReadOnly: async () => ({
+        actorRole: "MANAGER",
+        subjectCreatorProfileId: "creator",
+        workspaceId: "workspace",
+        allowedActions: ["INSIGHTS_CONTENT_READ"],
+      }),
+    };
+    const disconnectedFence = {
+      project: async () => ({
+        integrationId: null,
+        providerAccountId: null,
+        authorizationGeneration: null,
+        sourceStatus: "DISCONNECTED",
+        authorized: false,
+      }),
+    };
+    const unavailable = await new CreatorContentService(
+      actors as unknown as CreatorWorkspaceActorService,
+      disconnectedFence as unknown as CreatorAudienceCredentialFenceService,
+      {} as CreatorContentRepository,
+    ).readAt({ id: "user" } as never, now);
+    const current = {
+      value: { ...unavailable, currentPreserved: false },
+      generatedAt: new Date("2026-09-15T10:00:00.000Z"),
+      authorizationGeneration: 7,
+    };
+    const repository = {
+      readLatestCurrentSameAccount: async () => current,
+      readProcessingTruth: async () => "IDLE",
+    };
+    const reauthFence = {
+      project: async () => ({
+        integrationId: "integration",
+        providerAccountId: "account",
+        authorizationGeneration: 7,
+        sourceStatus: "REAUTH_REQUIRED",
+        authorized: false,
+      }),
+    };
+    const projected = await new CreatorContentService(
+      actors as unknown as CreatorWorkspaceActorService,
+      reauthFence as unknown as CreatorAudienceCredentialFenceService,
+      repository as unknown as CreatorContentRepository,
+    ).readAt({ id: "user" } as never, now);
+    expect(projected.context.role).toBe("MANAGER");
+    expect(projected.sourceStatus).toBe("REAUTH_REQUIRED");
+    expect(projected.currentPreserved).toBe(true);
+    expect(projected.generatedAt).toBe(unavailable.generatedAt);
+  });
 });
