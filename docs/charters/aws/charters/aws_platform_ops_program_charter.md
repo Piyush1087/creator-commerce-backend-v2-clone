@@ -24,6 +24,7 @@ Monitor / Cost / Capacity      →  docs/charters/aws/  (this program)
 - Worker charters under this folder (each with **hard role / IAM / boundary** sections)  
 - Later: installed alarms, budgets, dashboards, email confirmed  
 - Later: deeper IAM and data-access files  
+- Rehearsal + return-to-placeholder + worker runtime docs (this package) 
 
 ## 3. Non-negotiables
 

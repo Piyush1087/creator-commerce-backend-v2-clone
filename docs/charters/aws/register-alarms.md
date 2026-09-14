@@ -84,4 +84,9 @@ Severities:
 
 - Creating the SNS topic or alarms in this documentation pass  
 - PagerDuty / Slack  
-- Auto-remediation (belongs to mutate mode + Capacity/Monitor allow-list later)
+- Auto-remediation (belongs to mutate mode + Capacity/Monitor allow-list later)  
+- Always-on agent processes (workers are scheduled/on-demand — see `worker-runtime-and-automation.md`)
+
+## Cost of this register
+
+Alarm/dashboard/SNS ballparks (USD + INR): `docs/charters/aws/cost-estimates.md`. Prefer deleting rehearsal alarms when returning to PLACEHOLDER so monitoring extras do not linger.

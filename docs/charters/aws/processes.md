@@ -118,3 +118,48 @@ Until that day: keep designing here; do **not** treat missing alarms as an incid
 | Do we need bigger machines? | Capacity → Product |
 | What exists in AWS this week? | Auditor |
 | Email not arriving? | Check SNS/subscription once installed; until then docs-only |
+
+---
+
+## J. Temp prod ops rehearsal (complete worker test)
+
+**Goal:** Prove Deploy + Auditor + Monitor + Cost + Capacity + alarms + teardown **once**, with Git evidence — then return to PLACEHOLDER. Not permanent LIVE.
+
+### Preconditions
+
+- Product names `TEMP_PROD_OPS_REHEARSAL` and requires `RETURN_TO_PLACEHOLDER` at end.  
+- SSO `creator-prod`.  
+- **No Wix / pretty CNAME** required.  
+- **No login/OTP required** (Postmark may be down). Use automated **non-auth** smoke (health, gatekeeper, etc.).  
+- Workers run **on demand per step** — not continuously (`worker-runtime-and-automation.md`).  
+- Happy path = **SST + CLI + workers** only (no console click-ops).
+
+### Sequence
+
+1. Copy `docs/aws-environments/rehearsals/_template/` → `rehearsals/YYYY-MM-DD-temp-prod-ops/`.  
+2. Fill `00-authorization.md`.  
+3. **Auditor baseline** (PLACEHOLDER proof) → `01-baseline-auditor.md`.  
+4. **Deploy** `sst deploy --stage prod` → `02-bring-up.md` (record SHA, ALB DNS).  
+5. **Automated smoke** → `03-automated-smoke.md`.  
+6. **Monitor** read-only pass → `04-monitor.md` (`ACCESS=READ_ONLY`).  
+7. **Cost** skim with **USD + INR** → `05-cost.md` (`cost-estimates.md`).  
+8. **Capacity** recommend-only → `06-capacity.md`.  
+9. Product names `INSTALL_MONITORING` (optional same day): install alarms, force one test, confirm email → `07-alarms.md`.  
+10. **Boundary negatives** → `08-boundary-negatives.md`.  
+11. Fill **weekly-style pack** for the short window → `09-weekly-style-pack.md`.  
+12. Product names `RETURN_TO_PLACEHOLDER` → follow `return-to-placeholder.md` → `10-teardown.md`.  
+13. **Auditor after** → `11-after-auditor.md`.  
+14. Write `HUMAN-REPORT.md` and email/Slack the short version to stakeholders.
+
+### Pass criteria
+
+- Every worker ran once with correct access mode.  
+- Alarms email proven (if install step included).  
+- Negatives refused.  
+- PLACEHOLDER restored (no ALB/ECS/Aurora left burning).  
+- Full folder + human report committed.
+
+### Cost awareness
+
+Track stack + monitoring extras in USD and INR (`cost-estimates.md`). Tear down same day when possible (~ALB dominates overnight cost).
+

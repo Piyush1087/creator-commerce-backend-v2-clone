@@ -36,6 +36,7 @@ Do not introduce a third SST stage, a TEST_MINI stack in the prod account, or mo
 | [`aws_hotfix_ai_worker_initiation.md`](./aws_hotfix_ai_worker_initiation.md) | Start the Hotfix worker (paste into a new chat). Optional API overlay; not SST |
 | [`charters/`](./charters/) | Principal worker charters (Auditor, Deploy, Hotfix), same layout as dummy_tcs `docs/organization/charters` |
 | [`../charters/aws/`](../charters/aws/) | **Platform ops design** (Monitor / Cost / Capacity, control plane, alarm register, human processes). TBD; not a substitute for this folder’s live inventory |
+| [`rehearsals/`](./rehearsals/) | Temp prod / ops rehearsal recording templates (full + human reports) |
 | [`../deployment/hotfix/README.md`](../deployment/hotfix/README.md) | Hotfix procedure + [`manifests/`](../deployment/hotfix/manifests/) (dev ready; prod blocked until LIVE) |
 
 Older cost-fix logs remain at [`../aws-optimization/`](../aws-optimization/). Prefer this folder for “what should we do with prod.”

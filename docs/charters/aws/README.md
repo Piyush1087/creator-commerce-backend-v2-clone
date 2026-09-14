@@ -2,9 +2,10 @@
 
 **Status:** TBD — design package only. No live CloudWatch alarms or scheduled audits are installed yet.  
 **Notify (v1 design):** email → `brian@growthverse.in`  
-**Accounts:** `creator-dev` (smoke / rehearsal) · `creator-prod` (design target for LIVE; today often PLACEHOLDER)
+**Accounts:** `creator-dev` (smoke / rehearsal) · `creator-prod` (design target for LIVE; today often PLACEHOLDER)  
+**Money:** quotes in **USD and INR** — see [`cost-estimates.md`](./cost-estimates.md) (FX dated in that file)
 
-This folder designs how we **automate an AWS expert’s ongoing role**: monitor health, catch cost blow-ups, advise (and later optionally apply) scale, and leave durable docs so we are not re-asking chat to “just check AWS.”
+This folder designs how we **automate an AWS expert’s ongoing role**: health, cost, capacity — via **SST, CLI, and named workers**, not console click-ops or endless chat audits.
 
 Deploying the app remains a **different** job — see `docs/aws-environments/` (Auditor, Deploy, Hotfix).
 
@@ -23,16 +24,29 @@ SST can **create and update** infrastructure when someone deploys. That is not t
 
 Today, those questions are answered by ad‑hoc agent audits. This package turns that into **named workers + written processes** so when production goes live we can activate them immediately.
 
+### How and when workers run (important)
+
+**Workers are not always on.** CloudWatch/SNS (after install) watch 24/7; **Monitor / Cost / Capacity / Auditor run only when triggered** — weekly schedule, monthly pack, alarm email, or on-demand assignment — then stop.
+
+| Trigger | Runs |
+| --- | --- |
+| On demand (chat initiation) | Any worker |
+| Weekly / monthly automation (later) | Auditor + Cost (+ Capacity monthly) |
+| Alarm email | Human/automation starts Monitor |
+| Temp prod rehearsal | Full sequence once, then teardown |
+
+Details: [`worker-runtime-and-automation.md`](./worker-runtime-and-automation.md).
+
 ### Two environments (simple picture)
 
 | | **creator-dev** | **creator-prod** |
 | --- | --- | --- |
 | Purpose | Smoke tests, shared URLs, cheap rehearsal | Real users (when LIVE) |
-| Today | Small real stack (often scheduled down nights/Sunday) | Often a **PLACEHOLDER** (~$2/mo): almost no compute/DB |
-| How we treat alarms | Softer; “off at night” can be normal | PLACEHOLDER vs LIVE profiles (see `env/prod.md`) |
+| Today | Small real stack (often scheduled down nights/Sunday) | Often a **PLACEHOLDER** (~$2/mo / ~₹190): almost no compute/DB |
+| How we treat alarms | Softer; “off is OK” at night | PLACEHOLDER vs LIVE profiles (see `env/prod.md`) |
 | Primary design target for “real ops” | Practice ground | **Yes — design as if LIVE is coming** |
 
-Important: a normal `sst deploy --stage prod` is **not** a harmless refresh. If the account is still a placeholder, that deploy **creates** the expensive stack (API load balancer, containers, Aurora database, bastion). Product must authorize go-live separately.
+Important: a normal `sst deploy --stage prod` is **not** a harmless refresh. If the account is still a placeholder, that deploy **creates** the expensive stack. Product must authorize go-live **or** a temp rehearsal that **returns to PLACEHOLDER** after.
 
 ### Who does what (workers)
 
@@ -41,38 +55,35 @@ Important: a normal `sst deploy --stage prod` is **not** a harmless refresh. If 
 | **Auditor** | Read-only: what exists, what it costs, docs vs AWS | **Read-only** | `docs/aws-environments/` |
 | **Deploy** | Run SST deploy when authorized | Elevated (Deploy charter only) | `docs/aws-environments/` |
 | **Hotfix** | Optional API image overlay (not full SST) | Elevated (Hotfix charter only) | `docs/aws-environments/` |
-| **Monitor** | Health, outages; designs alarms | **Read-only** (install alarms only with Product envelope) | `charters/` here |
-| **Cost** | Budgets design, spikes, monthly history | **Read-only** (budgets install only with envelope) | `charters/` here |
-| **Capacity** | “Enough resources?” recommend | **Read-only** (scale apply only with Product allow-list) | `charters/` here |
+| **Monitor** | Health, outages; designs alarms | **Read-only** (install only with envelope) | `charters/` here |
+| **Cost** | Budgets design, spikes, history | **Read-only** (install only with envelope) | `charters/` here |
+| **Capacity** | “Enough resources?” recommend | **Read-only** (mutate only with allow-list) | `charters/` here |
 
-**Boundaries beat SSO:** even with admin login, ops workers stay read-only unless Product names an install/mutate envelope. Details: `charters/aws_platform_ops_program_charter.md` §4.
+**Boundaries beat SSO.** Details: `charters/aws_platform_ops_program_charter.md` §4.
 
 ### Two operating modes (Product chooses later)
 
-Both are **designed now**:
+1. **Recommend-only / read-only (default)** — observe; Git + email; Deploy/SST changes AWS.  
+2. **Named Product envelopes** — `INSTALL_MONITORING`, `INSTALL_BUDGETS`, `MUTATE_CAPACITY`, `MUTATE_COST_STOP`, `RETURN_TO_PLACEHOLDER`.
 
-1. **Recommend-only / read-only (default)** — all three ops workers **observe only**; Git reports + email; humans/Deploy change AWS.  
-2. **Named Product envelopes** — rare writes: `INSTALL_MONITORING`, `INSTALL_BUDGETS`, `MUTATE_CAPACITY`, `MUTATE_COST_STOP` — each with a hard allow-list. Admin SSO does not skip this.
+### Temp prod test (before permanent LIVE)
 
-Default until Product says otherwise: **read-only / recommend-only**.
+See [`processes.md`](./processes.md) §J. Bring stack up with SST → automated **non-auth** smoke (no login/CNAME) → run each worker once → test alarms/email → record full + human reports → [`return-to-placeholder.md`](./return-to-placeholder.md). Templates: `docs/aws-environments/rehearsals/`.
 
 ### Where to go next
 
 | I want… | Open |
 | --- | --- |
-| Plain-language processes (weekly, monthly, incident, go-live) | [`processes.md`](./processes.md) |
-| What AWS auto-manages vs what we control / how to scale | [`control-plane.md`](./control-plane.md) |
-| Intended alarms (not installed yet) + email target | [`register-alarms.md`](./register-alarms.md) |
-| Dev-specific thresholds and “off is OK” | [`env/dev.md`](./env/dev.md) |
-| Prod PLACEHOLDER vs LIVE profiles | [`env/prod.md`](./env/prod.md) |
-| Scenario catalog (outage, cost, scale, drift) | [`scenarios.md`](./scenarios.md) |
-| Backup / restore | [`backup-and-restore.md`](./backup-and-restore.md) |
-| Logs and how we debug | [`logging-and-tracing.md`](./logging-and-tracing.md) |
-| WAF / edge decision | [`edge-and-waf.md`](./edge-and-waf.md) |
-| Postmark, Razorpay, DNS, etc. | [`external-dependencies.md`](./external-dependencies.md) |
-| SSO / IAM overview (deeper file later) | [`iam-and-sso.md`](./iam-and-sso.md) |
-| Who may touch DB / bastion (deeper file later) | [`data-access.md`](./data-access.md) |
-| Region / DR posture | [`disaster-recovery.md`](./disaster-recovery.md) |
-| Worker charters + kickoff prompts | [`charters/`](./charters/) |
+| Processes (weekly, monthly, incident, go-live, **temp rehearsal**) | [`processes.md`](./processes.md) |
+| How/when workers run + automation | [`worker-runtime-and-automation.md`](./worker-runtime-and-automation.md) |
+| USD + INR cost + monitoring extras | [`cost-estimates.md`](./cost-estimates.md) |
+| Scale prod back to cheap skeleton | [`return-to-placeholder.md`](./return-to-placeholder.md) |
+| Auto vs manual / scale guide | [`control-plane.md`](./control-plane.md) |
+| Alarm catalog | [`register-alarms.md`](./register-alarms.md) |
+| Dev / prod overlays | [`env/dev.md`](./env/dev.md), [`env/prod.md`](./env/prod.md) |
+| Scenarios | [`scenarios.md`](./scenarios.md) |
+| Backup, logs, WAF, deps, IAM, data, DR | linked files in this folder |
+| Worker charters | [`charters/`](./charters/) |
+| Rehearsal templates | [`../aws-environments/rehearsals/`](../aws-environments/rehearsals/) |
 
-Live account snapshots and cost notes stay in **`docs/aws-environments/`** (`current-state.md`, `differential-and-costs.md`). This folder does not replace those facts — it defines how we **run** on top of them.
+Live inventory stays in **`docs/aws-environments/`** (`current-state.md`, `differential-and-costs.md`).
