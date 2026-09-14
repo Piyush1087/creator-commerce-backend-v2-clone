@@ -326,7 +326,7 @@ export class IntelligenceCurrentStateRepository {
     if (address.subjectId) return { ...address, subjectId: address.subjectId };
     const subject = await resolveIntelligenceSubject(
       client,
-      address.ownerScopeId,
+      semanticAddressOwnerScopeId(address),
     );
     return { ...address, subjectId: subject.id };
   }
