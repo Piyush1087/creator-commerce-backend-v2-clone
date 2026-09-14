@@ -143,6 +143,12 @@ export class InstagramSyncCoordinatorRepository {
           })
         : null;
       if (!job) throw new ConflictException("Instagram sync is not configured");
+      if (!job.integrationId) {
+        throw new ConflictException(
+          "Instagram Brand integration is unavailable",
+        );
+      }
+      const integrationId = job.integrationId;
       if (
         job.lastManualRequestedAt &&
         now.getTime() - job.lastManualRequestedAt.getTime() <
@@ -161,12 +167,16 @@ export class InstagramSyncCoordinatorRepository {
         );
       }
       const integration = await tx.brandIntegration.findUnique({
-        where: { id: job.integrationId },
+        where: { id: integrationId },
       });
       if (!usable(integration, job)) {
         throw new ConflictException("Instagram authorization is unavailable");
       }
-      const requestIdentity = identity(job, job.capabilityClass, now);
+      const requestIdentity = identity(
+        { integrationId, authorizationGeneration: job.authorizationGeneration },
+        job.capabilityClass,
+        now,
+      );
       await tx.instagramIntelligenceSyncJob.update({
         where: { id: job.id },
         data: {
@@ -204,6 +214,8 @@ export class InstagramSyncCoordinatorRepository {
           OR ("status" = 'BACKOFF' AND "backoff_until" <= ${now})
           OR ("status" = 'RUNNING' AND "lease_expires_at" <= ${now})
         )
+          AND "brand_id" IS NOT NULL
+          AND "integration_id" IS NOT NULL
         ORDER BY COALESCE("backoff_until", "next_due_at", "lease_expires_at"), "sync_job_id"
         FOR UPDATE SKIP LOCKED LIMIT 1
       `);
@@ -211,6 +223,7 @@ export class InstagramSyncCoordinatorRepository {
       const job = await tx.instagramIntelligenceSyncJob.findUniqueOrThrow({
         where: { id: rows[0].id },
       });
+      if (!job.integrationId) return null;
       const integration = await tx.brandIntegration.findUnique({
         where: { id: job.integrationId },
       });

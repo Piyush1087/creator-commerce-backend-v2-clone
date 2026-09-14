@@ -14,7 +14,7 @@ describe("B1 Instagram DE resource identity and vocabulary", () => {
       "INSTAGRAM_ACCOUNT",
       "INSTAGRAM_MEDIA",
     ]);
-    expect(INSTAGRAM_DE_CONTRACT.capabilities).toHaveLength(9);
+    expect(INSTAGRAM_DE_CONTRACT.capabilities).toHaveLength(10);
   });
 
   it("constructs the exact stable account and media keys", () => {

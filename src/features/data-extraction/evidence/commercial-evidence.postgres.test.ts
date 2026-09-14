@@ -42,7 +42,7 @@ describe("P2B-2 additive migration shape", () => {
     for (const check of checks)
       expect(
         [...check[1].matchAll(/'([^']+)'/g)].map((match) => match[1]),
-      ).toEqual(DATA_EXTRACTION_EVIDENCE_CAPABILITIES);
+      ).toEqual(DATA_EXTRACTION_EVIDENCE_CAPABILITIES.slice(0, 10));
   });
 });
 

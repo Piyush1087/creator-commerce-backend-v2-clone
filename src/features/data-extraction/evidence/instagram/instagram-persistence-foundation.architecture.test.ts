@@ -59,7 +59,7 @@ describe("B1 Instagram DE persistence architecture boundary", () => {
       "INSTAGRAM_ACCOUNT",
       "INSTAGRAM_MEDIA",
     ]);
-    expect(INSTAGRAM_DE_CONTRACT.capabilities).toHaveLength(9);
+    expect(INSTAGRAM_DE_CONTRACT.capabilities).toHaveLength(10);
     for (const value of [
       INSTAGRAM_DE_CONTRACT.sourceClass,
       ...INSTAGRAM_DE_CONTRACT.resourceTypes,
@@ -77,7 +77,7 @@ describe("B1 Instagram DE persistence architecture boundary", () => {
     expect(migration).not.toMatch(/CREATE TABLE/i);
   });
 
-  it("replaces exactly seven allowlists with the identical 19 capabilities", () => {
+  it("freezes the B1 allowlists before the later audio capability uplift", () => {
     const dropped = [...migration.matchAll(/DROP CONSTRAINT "([^"]+)"/g)].map(
       (match) => match[1],
     );
@@ -96,7 +96,9 @@ describe("B1 Instagram DE persistence architecture boundary", () => {
       );
       expect(values).toEqual([
         ...websiteCapabilities,
-        ...INSTAGRAM_DE_CONTRACT.capabilities,
+        ...INSTAGRAM_DE_CONTRACT.capabilities.filter(
+          (capability) => capability !== "instagram.media_audio_observations",
+        ),
       ]);
       expect(new Set(values).size).toBe(19);
     }

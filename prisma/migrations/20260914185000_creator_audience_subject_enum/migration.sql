@@ -1,0 +1,1 @@
+ALTER TYPE "IntelligenceSubjectType" ADD VALUE IF NOT EXISTS 'CREATOR';

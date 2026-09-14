@@ -1360,6 +1360,12 @@ enum IntelligenceComponentTransitionOutcome {
 enum IntelligenceSubjectType {
   BRAND
   OFFERING
+  CREATOR
+}
+
+enum IntelligenceOwnerType {
+  BRAND
+  CREATOR
 }
 
 // ============================================================================
@@ -5965,18 +5971,36 @@ model NotificationJobRecipient {
 // PERMANENT BRAND INTELLIGENCE PERSISTENCE FOUNDATION (W1.0A)
 // ============================================================================
 
+/// Shared, canonical owner/tenancy scope for Brand and Creator Intelligence.
+/// Database constraints enforce exactly one owner arm and canonical Creator
+/// workspace ownership; ownerKey is a deterministic immutable address.
+model IntelligenceOwnerScope {
+  id                 String                @id @default(uuid()) @map("owner_scope_id")
+  ownerType          IntelligenceOwnerType @map("owner_type")
+  ownerKey           String                @unique(map: "uq_intelligence_owner_scope_key") @map("owner_key") @db.VarChar(255)
+  brandProfileId     String?               @unique(map: "uq_intelligence_owner_scope_brand") @map("brand_profile_id")
+  creatorProfileId   String?               @unique(map: "uq_intelligence_owner_scope_creator") @map("creator_profile_id")
+  creatorWorkspaceId String?               @unique(map: "uq_intelligence_owner_scope_workspace") @map("creator_workspace_id")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
+
+  @@index([ownerType], map: "idx_intelligence_owner_scope_type")
+  @@map("intelligence_owner_scopes")
+}
+
 /// Durable, typed scope for shared Intelligence execution and semantic state.
 /// V1 admits only an exact Brand or an exact same-Brand canonical Offering.
 model IntelligenceSubject {
-  id          String                  @id @default(uuid()) @map("subject_id")
-  brandId     String                  @map("brand_id")
-  brand       BrandProfile            @relation(fields: [brandId], references: [id], onDelete: Restrict)
-  subjectType IntelligenceSubjectType @map("subject_type")
-  subjectRef  String                  @map("subject_ref") @db.VarChar(255)
-  offeringId  String?                 @map("offering_id")
-  offering    Offering?               @relation(fields: [brandId, offeringId], references: [brandProfileId, id], onDelete: Restrict)
-  createdAt   DateTime                @default(now()) @map("created_at")
-  updatedAt   DateTime                @updatedAt @map("updated_at")
+  id           String                  @id @default(uuid()) @map("subject_id")
+  brandId      String                  @map("brand_id")
+  ownerScopeId String                  @default(dbgenerated()) @map("owner_scope_id")
+  brand        BrandProfile            @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  subjectType  IntelligenceSubjectType @map("subject_type")
+  subjectRef   String                  @map("subject_ref") @db.VarChar(255)
+  offeringId   String?                 @map("offering_id")
+  offering     Offering?               @relation(fields: [brandId, offeringId], references: [brandProfileId, id], onDelete: Restrict)
+  createdAt    DateTime                @default(now()) @map("created_at")
+  updatedAt    DateTime                @updatedAt @map("updated_at")
 
   executions           IntelligenceExecution[]
   processorExecutions  IntelligenceProcessorExecution[]
@@ -5998,6 +6022,7 @@ model IntelligenceSubject {
 model IntelligenceExecution {
   id                    String                                @id @default(uuid()) @map("execution_id")
   brandId               String                                @map("brand_id")
+  ownerScopeId          String                                @default(dbgenerated()) @map("owner_scope_id")
   brand                 BrandProfile                          @relation(fields: [brandId], references: [id], onDelete: Restrict)
   subjectId             String                                @map("subject_id")
   subject               IntelligenceSubject                   @relation(fields: [subjectId, brandId], references: [id, brandId], onDelete: Restrict)
@@ -6029,6 +6054,7 @@ model IntelligenceProcessorExecution {
   id                     String                               @id @default(uuid()) @map("processor_execution_id")
   executionId            String                               @map("execution_id")
   brandId                String                               @map("brand_id")
+  ownerScopeId           String                               @default(dbgenerated()) @map("owner_scope_id")
   subjectId              String                               @map("subject_id")
   execution              IntelligenceExecution                @relation(fields: [executionId, brandId, subjectId], references: [id, brandId, subjectId], onDelete: Restrict)
   brand                  BrandProfile                         @relation(fields: [brandId], references: [id], onDelete: Restrict)
@@ -6085,6 +6111,7 @@ model IntelligenceProcessorAttempt {
   id                   String                             @id @default(uuid()) @map("attempt_id")
   processorExecutionId String                             @map("processor_execution_id")
   brandId              String                             @map("brand_id")
+  ownerScopeId         String                             @default(dbgenerated()) @map("owner_scope_id")
   processorExecution   IntelligenceProcessorExecution     @relation(fields: [processorExecutionId, brandId], references: [id, brandId], onDelete: Restrict)
   brand                BrandProfile                       @relation(fields: [brandId], references: [id], onDelete: Restrict)
   attemptNumber        Int                                @map("attempt_number")
@@ -6116,6 +6143,7 @@ model IntelligenceProcessorAttempt {
 model IntelligenceAction {
   id                       String                          @id @default(uuid()) @map("action_id")
   brandId                  String                          @map("brand_id")
+  ownerScopeId             String                          @default(dbgenerated()) @map("owner_scope_id")
   brand                    BrandProfile                    @relation(fields: [brandId], references: [id], onDelete: Restrict)
   subjectId                String                          @map("subject_id")
   subject                  IntelligenceSubject             @relation(fields: [subjectId, brandId], references: [id, brandId], onDelete: Restrict)
@@ -6149,6 +6177,7 @@ model IntelligenceAction {
 model IntelligenceObjectGeneration {
   id                           String                          @id @default(uuid()) @map("object_generation_id")
   brandId                      String                          @map("brand_id")
+  ownerScopeId                 String                          @default(dbgenerated()) @map("owner_scope_id")
   brand                        BrandProfile                    @relation(fields: [brandId], references: [id], onDelete: Restrict)
   subjectId                    String                          @map("subject_id")
   subject                      IntelligenceSubject             @relation(fields: [subjectId, brandId], references: [id, brandId], onDelete: Restrict)
@@ -6206,6 +6235,7 @@ model IntelligenceObjectGeneration {
 model IntelligenceComponentGeneration {
   id                              String                           @id @default(uuid()) @map("component_generation_id")
   brandId                         String                           @map("brand_id")
+  ownerScopeId                    String                           @default(dbgenerated()) @map("owner_scope_id")
   brand                           BrandProfile                     @relation(fields: [brandId], references: [id], onDelete: Restrict)
   subjectId                       String                           @map("subject_id")
   subject                         IntelligenceSubject              @relation(fields: [subjectId, brandId], references: [id, brandId], onDelete: Restrict)
@@ -6256,6 +6286,7 @@ model IntelligenceComponentGeneration {
 model IntelligenceCurrentComponent {
   id                           String                                @id @default(uuid()) @map("current_component_id")
   brandId                      String                                @map("brand_id")
+  ownerScopeId                 String                                @default(dbgenerated()) @map("owner_scope_id")
   brand                        BrandProfile                          @relation(fields: [brandId], references: [id], onDelete: Restrict)
   subjectId                    String                                @map("subject_id")
   subject                      IntelligenceSubject                   @relation(fields: [subjectId, brandId], references: [id, brandId], onDelete: Restrict)
@@ -6300,6 +6331,7 @@ model IntelligenceCurrentComponent {
 model IntelligenceComponentCandidate {
   id                                String                               @id @default(uuid()) @map("component_candidate_id")
   brandId                           String                               @map("brand_id")
+  ownerScopeId                      String                               @default(dbgenerated()) @map("owner_scope_id")
   brand                             BrandProfile                         @relation(fields: [brandId], references: [id], onDelete: Restrict)
   subjectId                         String                               @map("subject_id")
   subject                           IntelligenceSubject                  @relation(fields: [subjectId, brandId], references: [id, brandId], onDelete: Restrict)
@@ -6339,6 +6371,7 @@ model IntelligenceComponentCandidate {
 model IntelligenceEvidenceReference {
   id                    String                         @id @default(uuid()) @map("evidence_reference_id")
   brandId               String                         @map("brand_id")
+  ownerScopeId          String                         @default(dbgenerated()) @map("owner_scope_id")
   brand                 BrandProfile                   @relation(fields: [brandId], references: [id], onDelete: Restrict)
   objectGenerationId    String                         @map("object_generation_id")
   objectGeneration      IntelligenceObjectGeneration   @relation(fields: [objectGenerationId, brandId], references: [id, brandId], onDelete: Restrict)
@@ -6366,6 +6399,7 @@ model IntelligenceEvidenceReference {
 model IntelligenceBusinessStateReference {
   id                    String                                @id @default(uuid()) @map("business_state_reference_id")
   brandId               String                                @map("brand_id")
+  ownerScopeId          String                                @default(dbgenerated()) @map("owner_scope_id")
   brand                 BrandProfile                          @relation(fields: [brandId], references: [id], onDelete: Restrict)
   objectGenerationId    String                                @map("object_generation_id")
   objectGeneration      IntelligenceObjectGeneration          @relation(fields: [objectGenerationId, brandId], references: [id, brandId], onDelete: Restrict)
@@ -6390,6 +6424,7 @@ model IntelligenceBusinessStateReference {
 model IntelligenceComponentTransition {
   id                    String                                 @id @default(uuid()) @map("component_transition_id")
   brandId               String                                 @map("brand_id")
+  ownerScopeId          String                                 @default(dbgenerated()) @map("owner_scope_id")
   brand                 BrandProfile                           @relation(fields: [brandId], references: [id], onDelete: Restrict)
   subjectId             String                                 @map("subject_id")
   subject               IntelligenceSubject                    @relation(fields: [subjectId, brandId], references: [id, brandId], onDelete: Restrict)
@@ -6436,6 +6471,7 @@ model DataExtractionResource {
   id                       String                     @id @default(uuid())
   resourceRef              String                     @unique @map("resource_ref")
   brandId                  String                     @map("brand_id")
+  ownerScopeId             String                     @default(dbgenerated()) @map("owner_scope_id")
   brandProfile             BrandProfile               @relation(fields: [brandId], references: [id], onDelete: Cascade)
   sourceClass              DataExtractionSourceClass  @default(OWNED_WEBSITE) @map("source_class")
   resourceType             DataExtractionResourceType @map("resource_type")
@@ -6462,6 +6498,7 @@ model DataExtractionCapture {
   id                       String                             @id @default(uuid())
   captureRef               String                             @unique @map("capture_ref")
   brandId                  String                             @map("brand_id")
+  ownerScopeId             String                             @default(dbgenerated()) @map("owner_scope_id")
   brandProfile             BrandProfile                       @relation(fields: [brandId], references: [id], onDelete: Cascade)
   resourceRef              String                             @map("resource_ref")
   resource                 DataExtractionResource             @relation(fields: [brandId, resourceRef], references: [brandId, resourceRef], onDelete: Cascade)
@@ -6501,6 +6538,7 @@ model DataExtractionContentArtifact {
   id                           String                            @id @default(uuid())
   contentArtifactRef           String                            @unique @map("content_artifact_ref")
   brandId                      String                            @map("brand_id")
+  ownerScopeId                 String                            @default(dbgenerated()) @map("owner_scope_id")
   brandProfile                 BrandProfile                      @relation(fields: [brandId], references: [id], onDelete: Cascade)
   captureRef                   String                            @map("capture_ref")
   capture                      DataExtractionCapture             @relation(fields: [brandId, captureRef], references: [brandId, captureRef], onDelete: Cascade)
@@ -6524,6 +6562,7 @@ model DataExtractionCapabilityExecution {
   id                           String                               @id @default(uuid())
   capabilityExecutionRef       String                               @unique @map("capability_execution_ref")
   brandId                      String                               @map("brand_id")
+  ownerScopeId                 String                               @default(dbgenerated()) @map("owner_scope_id")
   brandProfile                 BrandProfile                         @relation(fields: [brandId], references: [id], onDelete: Cascade)
   capabilityId                 String                               @map("capability_id") @db.VarChar(100)
   normalizationContractVersion String                               @map("normalization_contract_version") @db.VarChar(100)
@@ -6559,7 +6598,9 @@ model DataExtractionCapabilityExecution {
 }
 
 model DataExtractionCapabilityResource {
-  brandId                String                            @map("brand_id")
+  brandId String @map("brand_id")
+
+  ownerScopeId           String                            @default(dbgenerated()) @map("owner_scope_id")
   capabilityExecutionRef String                            @map("capability_execution_ref")
   capabilityId           String                            @map("capability_id") @db.VarChar(100)
   resourceRef            String                            @map("resource_ref")
@@ -6567,7 +6608,7 @@ model DataExtractionCapabilityResource {
   resource               DataExtractionResource            @relation(fields: [brandId, resourceRef], references: [brandId, resourceRef], onDelete: Restrict)
   createdAt              DateTime                          @default(now()) @map("created_at")
 
-  @@id([brandId, capabilityExecutionRef, resourceRef])
+  @@id([ownerScopeId, capabilityExecutionRef, resourceRef])
   @@index([brandId, resourceRef], map: "idx_de_capresource_brand_resource")
   @@map("data_extraction_capability_resources")
 }
@@ -6576,6 +6617,7 @@ model DataExtractionEvidenceItem {
   id                           String                           @id @default(uuid())
   evidenceRef                  String                           @unique @map("evidence_ref")
   brandId                      String                           @map("brand_id")
+  ownerScopeId                 String                           @default(dbgenerated()) @map("owner_scope_id")
   brandProfile                 BrandProfile                     @relation(fields: [brandId], references: [id], onDelete: Cascade)
   capabilityId                 String                           @map("capability_id") @db.VarChar(100)
   normalizationContractVersion String                           @map("normalization_contract_version") @db.VarChar(100)
@@ -6619,7 +6661,9 @@ model DataExtractionEvidenceItem {
 }
 
 model DataExtractionCapabilityEvidence {
-  brandId                String                            @map("brand_id")
+  brandId String @map("brand_id")
+
+  ownerScopeId           String                            @default(dbgenerated()) @map("owner_scope_id")
   capabilityExecutionRef String                            @map("capability_execution_ref")
   capabilityId           String                            @map("capability_id") @db.VarChar(100)
   evidenceRef            String                            @map("evidence_ref")
@@ -6627,7 +6671,7 @@ model DataExtractionCapabilityEvidence {
   evidence               DataExtractionEvidenceItem        @relation(fields: [brandId, evidenceRef, capabilityId], references: [brandId, evidenceRef, capabilityId], onDelete: Restrict)
   createdAt              DateTime                          @default(now()) @map("created_at")
 
-  @@id([brandId, capabilityExecutionRef, evidenceRef])
+  @@id([ownerScopeId, capabilityExecutionRef, evidenceRef])
   @@index([evidenceRef], map: "idx_de_capevidence_evidence_ref")
   @@map("data_extraction_capability_evidence")
 }
@@ -6636,6 +6680,7 @@ model DataExtractionSemanticObservation {
   id                     String       @id @default(uuid())
   semanticObservationKey String       @map("semantic_observation_key") @db.VarChar(255)
   brandId                String       @map("brand_id")
+  ownerScopeId           String       @default(dbgenerated()) @map("owner_scope_id")
   brandProfile           BrandProfile @relation(fields: [brandId], references: [id], onDelete: Cascade)
   capabilityId           String       @map("capability_id") @db.VarChar(100)
   repetitionCount        Int          @default(1) @map("repetition_count")
@@ -6652,7 +6697,9 @@ model DataExtractionSemanticObservation {
 }
 
 model DataExtractionObservationSupport {
-  brandId                String                            @map("brand_id")
+  brandId String @map("brand_id")
+
+  ownerScopeId           String                            @default(dbgenerated()) @map("owner_scope_id")
   semanticObservationKey String                            @map("semantic_observation_key") @db.VarChar(255)
   capabilityId           String                            @map("capability_id") @db.VarChar(100)
   evidenceRef            String                            @map("evidence_ref")
@@ -6660,12 +6707,14 @@ model DataExtractionObservationSupport {
   evidence               DataExtractionEvidenceItem        @relation(fields: [brandId, evidenceRef, capabilityId], references: [brandId, evidenceRef, capabilityId], onDelete: Restrict)
   createdAt              DateTime                          @default(now()) @map("created_at")
 
-  @@id([brandId, semanticObservationKey, evidenceRef])
+  @@id([ownerScopeId, semanticObservationKey, evidenceRef])
   @@map("data_extraction_observation_support")
 }
 
 model DataExtractionObservationRelation {
-  brandId              String                                        @map("brand_id")
+  brandId String @map("brand_id")
+
+  ownerScopeId         String                                        @default(dbgenerated()) @map("owner_scope_id")
   sourceObservationKey String                                        @map("source_observation_key") @db.VarChar(255)
   targetObservationKey String                                        @map("target_observation_key") @db.VarChar(255)
   capabilityId         String                                        @map("capability_id") @db.VarChar(100)
@@ -6674,7 +6723,7 @@ model DataExtractionObservationRelation {
   targetObservation    DataExtractionSemanticObservation             @relation("DataExtractionObservationRelationTarget", fields: [brandId, targetObservationKey, capabilityId], references: [brandId, semanticObservationKey, capabilityId], onDelete: Cascade)
   createdAt            DateTime                                      @default(now()) @map("created_at")
 
-  @@id([brandId, sourceObservationKey, targetObservationKey, relationType])
+  @@id([ownerScopeId, sourceObservationKey, targetObservationKey, relationType])
   @@index([brandId, capabilityId], map: "idx_de_observation_relation_capability")
   @@map("data_extraction_observation_relations")
 }
@@ -6682,6 +6731,7 @@ model DataExtractionObservationRelation {
 model DataExtractionFreshnessAssessment {
   id                String                            @id @default(uuid())
   brandId           String                            @map("brand_id")
+  ownerScopeId      String                            @default(dbgenerated()) @map("owner_scope_id")
   brandProfile      BrandProfile                      @relation(fields: [brandId], references: [id], onDelete: Cascade)
   targetType        DataExtractionFreshnessTargetType @map("target_type")
   targetRef         String                            @map("target_ref") @db.VarChar(255)
@@ -6701,6 +6751,7 @@ model DataExtractionFreshnessAssessment {
 model DataExtractionProviderExecutionLink {
   id                     String                             @id @default(uuid())
   brandId                String                             @map("brand_id")
+  ownerScopeId           String                             @default(dbgenerated()) @map("owner_scope_id")
   brandProfile           BrandProfile                       @relation(fields: [brandId], references: [id], onDelete: Cascade)
   captureRef             String?                            @map("capture_ref")
   capture                DataExtractionCapture?             @relation(fields: [brandId, captureRef], references: [brandId, captureRef], onDelete: Restrict)
@@ -6725,9 +6776,11 @@ enum InstagramSyncCapabilityClass {
 model InstagramIntelligenceSyncJob {
   id                         String                         @id @default(uuid()) @map("sync_job_id")
   brandProfileId             String                         @map("brand_id")
+  ownerScopeId               String                         @default(dbgenerated()) @map("owner_scope_id")
   brandProfile               BrandProfile                   @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
-  integrationId              String                         @map("integration_id")
-  integration                BrandIntegration               @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  integrationId              String?                        @map("integration_id")
+  integration                BrandIntegration?              @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  creatorIntegrationId       String?                        @map("creator_integration_id")
   providerAccountId          String                         @map("provider_account_id") @db.VarChar(100)
   authorizationGeneration    Int                            @map("authorization_generation")
   capabilityClass            InstagramSyncCapabilityClass   @map("capability_class")

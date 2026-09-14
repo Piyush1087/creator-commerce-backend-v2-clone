@@ -182,8 +182,8 @@ describe("Instagram bounded speech foundation", () => {
       join(__dirname, "instagram-audio-extractor.ts"),
       "utf8",
     );
-    expect(source).toContain('"-ac",\n          "1"');
-    expect(source).toContain('"-ar",\n          "16000"');
+    expect(source).toMatch(/"-ac",\r?\n\s+"1"/u);
+    expect(source).toMatch(/"-ar",\r?\n\s+"16000"/u);
     expect(source).toContain('"pcm_s16le"');
     expect(source).toContain("INSTAGRAM_AUDIO_MAX_BYTES");
     expect(source).toContain("runBounded(");
