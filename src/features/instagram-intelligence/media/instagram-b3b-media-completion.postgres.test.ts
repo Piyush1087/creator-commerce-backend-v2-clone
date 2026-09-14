@@ -71,6 +71,9 @@ describePostgres("B3B PostgreSQL mixed-media completion", () => {
       await prisma.$transaction((tx) =>
         purge.purgePersistentInTransaction(tx, brandId),
       );
+      await prisma.intelligenceOwnerScope.deleteMany({
+        where: { brandProfileId: brandId },
+      });
       await prisma.brandProfile.delete({ where: { id: brandId } });
     }
     await prisma.$disconnect();

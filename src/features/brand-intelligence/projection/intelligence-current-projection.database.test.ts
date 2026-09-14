@@ -284,16 +284,61 @@ describe.skipIf(!databaseEnabled)("W1.0F current projection database", () => {
       });
     }
 
+    await prisma.dataExtractionResource.create({
+      data: {
+        resourceRef: "resource:w1.0f:1",
+        brandId,
+        sourceClass: "OWNED_WEBSITE",
+        resourceType: "OWNED_WEB_PAGE",
+        pageRole: "HOMEPAGE",
+        canonicalResourceKey: "https://w1-0f.example/",
+        canonicalResourceKeyHash: hash("w1-0f-resource"),
+        canonicalUrl: "https://w1-0f.example/",
+      },
+    });
+    await prisma.dataExtractionCapture.create({
+      data: {
+        captureRef: "capture:1",
+        brandId,
+        resourceRef: "resource:w1.0f:1",
+        acquisitionRequestKey: "request:w1.0f:1",
+        status: "COMPLETED",
+        startedAt: new Date("2026-08-25T10:00:00.000Z"),
+        capturedAt: new Date("2026-08-25T10:00:00.000Z"),
+        acquisitionQuality: "COMPLETE",
+      },
+    });
+    const sourceEvidence = await prisma.dataExtractionEvidenceItem.create({
+      data: {
+        evidenceRef: "evidence:w1.0f:1",
+        brandId,
+        capabilityId: "owned_website.brand_messaging",
+        normalizationContractVersion: "1.0",
+        resourceRef: "resource:w1.0f:1",
+        captureRef: "capture:1",
+        boundedPayload: { excerpt: "projection fixture" },
+        contentHash: hash("w1-0f-content"),
+        polarity: "AFFIRMATIVE",
+        representativeness: "CONTEXT_SPECIFIC",
+        coverageSnapshot: "SINGLE_RESOURCE",
+        freshnessAtEmission: "POSSIBLY_STALE",
+        freshnessBasis: "fixture",
+        freshnessEvaluatedAt: new Date("2026-08-25T10:00:00.000Z"),
+        qualitySnapshot: "COMPLETE",
+        itemFingerprint: hash("w1-0f-evidence"),
+      },
+    });
     await prisma.intelligenceEvidenceReference.create({
       data: {
         brandId,
+        ownerScopeId: sourceEvidence.ownerScopeId,
         objectGenerationId: root.objectGenerationId,
         componentSemanticPath: "$",
         evidenceRef: "evidence:w1.0f:1",
-        capabilityId: "website.observation",
+        capabilityId: "owned_website.brand_messaging",
         captureId: "capture:1",
         captureVersion: "1",
-        sourceClass: "PUBLIC_WEB",
+        sourceClass: "OWNED_WEBSITE",
         capturedAt: new Date("2026-08-25T10:00:00.000Z"),
         observedFreshness: IntelligenceEvidenceFreshness.POSSIBLY_STALE,
         evidenceManifestHash: hash("evidence-manifest"),
@@ -344,6 +389,18 @@ describe.skipIf(!databaseEnabled)("W1.0F current projection database", () => {
     });
     await prisma.intelligenceSubject.deleteMany({
       where: { brandId: { in: [brandId, otherBrandId] } },
+    });
+    await prisma.dataExtractionEvidenceItem.deleteMany({
+      where: { brandId: { in: [brandId, otherBrandId] } },
+    });
+    await prisma.dataExtractionCapture.deleteMany({
+      where: { brandId: { in: [brandId, otherBrandId] } },
+    });
+    await prisma.dataExtractionResource.deleteMany({
+      where: { brandId: { in: [brandId, otherBrandId] } },
+    });
+    await prisma.intelligenceOwnerScope.deleteMany({
+      where: { brandProfileId: { in: [brandId, otherBrandId] } },
     });
     await prisma.brandProfile.deleteMany({
       where: { id: { in: [brandId, otherBrandId] } },

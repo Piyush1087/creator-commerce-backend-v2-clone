@@ -34,6 +34,17 @@ postgres("C1 Instagram sync coordinator PostgreSQL", () => {
 
   afterAll(async () => prisma.$disconnect());
   afterEach(async () => {
+    const brands = await prisma.brandProfile.findMany({
+      where: { domain: { startsWith: "c1-" } },
+      select: { id: true },
+    });
+    const brandIds = brands.map(({ id }) => id);
+    await prisma.instagramIntelligenceSyncJob.deleteMany({
+      where: { brandProfileId: { in: brandIds } },
+    });
+    await prisma.intelligenceOwnerScope.deleteMany({
+      where: { brandProfileId: { in: brandIds } },
+    });
     await prisma.brandProfile.deleteMany({
       where: { domain: { startsWith: "c1-" } },
     });

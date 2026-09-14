@@ -198,6 +198,9 @@ postgres("D_COMBINED hidden Brand PostgreSQL round trip", () => {
         where: { brandProfileId: id },
       });
       await prisma.intelligenceSubject.deleteMany({ where: { brandId: id } });
+      await prisma.intelligenceOwnerScope.deleteMany({
+        where: { brandProfileId: id },
+      });
       await prisma.brandProfile.deleteMany({ where: { id } });
     }
     await prisma.$disconnect();

@@ -33,6 +33,53 @@ export interface PersistGenerationCommand {
   readonly businessStateReferences?: readonly BusinessStateReferenceWrite[];
 }
 
+export interface OwnerScopedGenerationCommand {
+  readonly ownerScopeId: string;
+  readonly subjectId: string;
+  readonly object: Readonly<{
+    id: string;
+    objectSemanticId: string;
+    objectContractId: string;
+    objectContractVersion: string;
+    outputContractId: string;
+    outputContractVersion: string;
+    producerId: string;
+    producerVersion: string;
+    bundleId: string;
+    bundleVersion: string;
+    bundleHash: string;
+    processorExecutionId: string;
+    successfulAttemptId: string;
+    valuePayload: Prisma.InputJsonValue;
+    valueHash: string;
+    metadataPayload: Prisma.InputJsonValue;
+    readiness: "READY" | "PARTIAL";
+    activeScope: Prisma.InputJsonValue;
+    activeScopeHash: string;
+  }>;
+  readonly components: readonly Readonly<{
+    id: string;
+    path: string;
+    contractId: string;
+    contractVersion: string;
+    valuePayload: Prisma.InputJsonValue;
+    valueHash: string;
+    readiness: "READY" | "PARTIAL";
+    metadataPayload: Prisma.InputJsonValue;
+    order: number;
+  }>[];
+  readonly evidence: readonly Readonly<{
+    id: string;
+    componentPath: string;
+    evidenceRef: string;
+    capabilityId: string;
+    captureRef: string;
+    capturedAt: Date;
+    manifestRef: string;
+    manifestHash: string;
+  }>[];
+}
+
 const generationInclude =
   Prisma.validator<Prisma.IntelligenceObjectGenerationInclude>()({
     componentGenerations: true,
@@ -60,23 +107,36 @@ function canonicalize(value: unknown): string {
 }
 
 function commandMaterial(command: PersistGenerationCommand): unknown {
-  const { id: _objectId, ...object } = command.object;
+  const {
+    id: _objectId,
+    ownerScopeId: _ownerScopeId,
+    ...object
+  } = command.object;
   return {
     object,
     components: command.components
-      .map(({ id: _componentId, ...component }) => component)
+      .map(
+        ({ id: _componentId, ownerScopeId: _ownerScopeId, ...component }) =>
+          component,
+      )
       .sort((left, right) =>
         left.componentSemanticPath.localeCompare(right.componentSemanticPath),
       ),
     evidenceReferences: [...(command.evidenceReferences ?? [])]
-      .map(({ id: _referenceId, ...reference }) => reference)
+      .map(
+        ({ id: _referenceId, ownerScopeId: _ownerScopeId, ...reference }) =>
+          reference,
+      )
       .sort((left, right) =>
         `${left.componentSemanticPath}:${left.evidenceRef}:${left.capabilityId}`.localeCompare(
           `${right.componentSemanticPath}:${right.evidenceRef}:${right.capabilityId}`,
         ),
       ),
     businessStateReferences: [...(command.businessStateReferences ?? [])]
-      .map(({ id: _referenceId, ...reference }) => reference)
+      .map(
+        ({ id: _referenceId, ownerScopeId: _ownerScopeId, ...reference }) =>
+          reference,
+      )
       .sort((left, right) =>
         `${left.componentSemanticPath}:${left.entityType}:${left.entityId}:${left.semanticFieldPath}:${left.revisionToken}`.localeCompare(
           `${right.componentSemanticPath}:${right.entityType}:${right.entityId}:${right.semanticFieldPath}:${right.revisionToken}`,
@@ -88,6 +148,7 @@ function commandMaterial(command: PersistGenerationCommand): unknown {
 function storedMaterial(generation: PersistedGeneration): unknown {
   const {
     id: _objectId,
+    ownerScopeId: _ownerScopeId,
     subjectId: _subjectId,
     createdAt: _objectCreatedAt,
     componentGenerations,
@@ -101,6 +162,7 @@ function storedMaterial(generation: PersistedGeneration): unknown {
       .map(
         ({
           id: _componentId,
+          ownerScopeId: _ownerScopeId,
           brandId: _brandId,
           subjectId: _subjectId,
           objectGenerationId: _objectGenerationId,
@@ -116,6 +178,7 @@ function storedMaterial(generation: PersistedGeneration): unknown {
       .map(
         ({
           id: _referenceId,
+          ownerScopeId: _ownerScopeId,
           brandId: _brandId,
           objectGenerationId: _objectGenerationId,
           createdAt: _referenceCreatedAt,
@@ -131,6 +194,7 @@ function storedMaterial(generation: PersistedGeneration): unknown {
       .map(
         ({
           id: _referenceId,
+          ownerScopeId: _ownerScopeId,
           brandId: _brandId,
           objectGenerationId: _objectGenerationId,
           createdAt: _referenceCreatedAt,
@@ -193,6 +257,7 @@ export class IntelligenceGenerationRepository {
         data: command.components.map((component) => ({
           ...component,
           brandId: object.brandId,
+          ownerScopeId: object.ownerScopeId,
           subjectId,
           objectGenerationId: object.id,
           objectSemanticId: object.objectSemanticId,
@@ -204,6 +269,7 @@ export class IntelligenceGenerationRepository {
         data: command.evidenceReferences!.map((reference) => ({
           ...reference,
           brandId: object.brandId,
+          ownerScopeId: object.ownerScopeId,
           objectGenerationId: object.id,
         })),
       });
@@ -213,6 +279,7 @@ export class IntelligenceGenerationRepository {
         data: command.businessStateReferences!.map((reference) => ({
           ...reference,
           brandId: object.brandId,
+          ownerScopeId: object.ownerScopeId,
           objectGenerationId: object.id,
         })),
       });
@@ -221,6 +288,103 @@ export class IntelligenceGenerationRepository {
       where: { id: object.id },
       include: generationInclude,
     });
+  }
+
+  /** Shared generation persistence for the nullable legacy Brand-key Creator arm. */
+  async persistOwnerScopedInTransaction(
+    tx: Prisma.TransactionClient,
+    command: OwnerScopedGenerationCommand,
+  ): Promise<void> {
+    if (command.components.length === 0) {
+      throw new IntelligencePersistenceError(
+        "PERSISTENCE_INVARIANT",
+        "An owner-scoped Object generation requires components",
+      );
+    }
+    for (const component of command.components) {
+      this.pathCodec.assertCanonical(component.path, 1);
+    }
+    const existing = await tx.$queryRaw<
+      Array<{ id: string; valueHash: string }>
+    >(
+      Prisma.sql`SELECT object_generation_id AS id, value_hash AS "valueHash"
+        FROM intelligence_object_generations
+        WHERE owner_scope_id=${command.ownerScopeId}
+          AND processor_execution_id=${command.object.processorExecutionId}
+          AND object_semantic_id=${command.object.objectSemanticId}`,
+    );
+    if (existing[0]) {
+      if (
+        existing[0].id !== command.object.id ||
+        existing[0].valueHash !== command.object.valueHash
+      ) {
+        throw new IntelligencePersistenceError(
+          "IDEMPOTENCY_CONFLICT",
+          "Owner-scoped generation replay has different content",
+        );
+      }
+      return;
+    }
+    await tx.$executeRaw(Prisma.sql`
+      INSERT INTO intelligence_object_generations
+        (object_generation_id, owner_scope_id, brand_id, subject_id,
+         object_semantic_id, object_contract_id, object_contract_version,
+         output_contract_id, output_contract_version, producer_kind,
+         producer_id, producer_version, bundle_id, bundle_version, bundle_hash,
+         processor_execution_id, successful_attempt_id, value_state,
+         value_payload, value_hash, object_metadata_payload, readiness,
+         freshness_at_generation, active_scope, active_scope_hash,
+         generation_ordinal)
+      VALUES (${command.object.id}, ${command.ownerScopeId}, NULL,
+        ${command.subjectId}, ${command.object.objectSemanticId},
+        ${command.object.objectContractId}, ${command.object.objectContractVersion},
+        ${command.object.outputContractId}, ${command.object.outputContractVersion},
+        'PROCESSOR_OUTPUT'::"IntelligenceProducerKind", ${command.object.producerId},
+        ${command.object.producerVersion}, ${command.object.bundleId},
+        ${command.object.bundleVersion}, ${command.object.bundleHash},
+        ${command.object.processorExecutionId}, ${command.object.successfulAttemptId},
+        'VALUE'::"IntelligenceValueState", ${JSON.stringify(command.object.valuePayload)}::jsonb,
+        ${command.object.valueHash}, ${JSON.stringify(command.object.metadataPayload)}::jsonb,
+        ${command.object.readiness}::"IntelligenceReadiness",
+        'CURRENT'::"IntelligenceFreshness", ${JSON.stringify(command.object.activeScope)}::jsonb,
+        ${command.object.activeScopeHash}, 1)
+    `);
+    for (const component of command.components) {
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO intelligence_component_generations
+          (component_generation_id, owner_scope_id, brand_id, subject_id,
+           object_generation_id, object_semantic_id, path_scheme_version,
+           component_semantic_path, node_kind, component_contract_id,
+           component_contract_version, value_state, value_payload, value_hash,
+           authority, source_class, readiness, freshness_at_generation,
+           metadata_payload, presentation_order)
+        VALUES (${component.id}, ${command.ownerScopeId}, NULL, ${command.subjectId},
+          ${command.object.id}, ${command.object.objectSemanticId}, 1,
+          ${component.path}, 'OBJECT_FIELD'::"IntelligenceNodeKind",
+          ${component.contractId}, ${component.contractVersion},
+          'VALUE'::"IntelligenceValueState", ${JSON.stringify(component.valuePayload)}::jsonb,
+          ${component.valueHash}, 'CREATOR_SHOP_DERIVED'::"IntelligenceAuthority",
+          'INSTAGRAM_OWNED', ${component.readiness}::"IntelligenceReadiness",
+          'CURRENT'::"IntelligenceFreshness", ${JSON.stringify(component.metadataPayload)}::jsonb,
+          ${component.order})
+      `);
+    }
+    for (const reference of command.evidence) {
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO intelligence_evidence_references
+          (evidence_reference_id, owner_scope_id, brand_id,
+           object_generation_id, component_semantic_path, evidence_ref,
+           capability_id, capture_id, capture_version, source_class,
+           captured_at, observed_freshness, evidence_manifest_ref,
+           evidence_manifest_hash)
+        VALUES (${reference.id}, ${command.ownerScopeId}, NULL,
+          ${command.object.id}, ${reference.componentPath},
+          ${reference.evidenceRef}, ${reference.capabilityId},
+          ${reference.captureRef}, '1', 'INSTAGRAM_OWNED',
+          ${reference.capturedAt}, 'CURRENT'::"IntelligenceEvidenceFreshness",
+          ${reference.manifestRef}, ${reference.manifestHash})
+      `);
+    }
   }
 
   getById(id: string): Promise<PersistedGeneration | null> {

@@ -61,6 +61,18 @@ export interface CreateIntelligenceExecutionCommand {
   readonly processors: readonly ProcessorExecutionRequest[];
 }
 
+/** Typed Creator arm of the one shared Intelligence execution runtime. */
+export interface CreateOwnerScopedIntelligenceExecutionCommand {
+  readonly ownerScopeId: string;
+  readonly subjectRef: string;
+  readonly triggerType: string;
+  readonly triggerRef: string;
+  readonly triggerIdempotencyKey: string;
+  readonly correlationRef: string;
+  readonly requestedImpact: Prisma.InputJsonValue;
+  readonly processors: readonly ProcessorExecutionRequest[];
+}
+
 export interface CreatedIntelligenceExecution {
   readonly execution: IntelligenceExecution;
   readonly processorExecutions: readonly IntelligenceProcessorExecution[];

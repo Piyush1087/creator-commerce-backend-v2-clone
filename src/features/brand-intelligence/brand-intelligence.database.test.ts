@@ -296,6 +296,18 @@ describe.skipIf(!databaseEnabled)("W1.0B Brand Intelligence database", () => {
     await prisma.intelligenceSubject.deleteMany({
       where: { brandId: { in: [brandId, otherBrandId] } },
     });
+    await prisma.dataExtractionEvidenceItem.deleteMany({
+      where: { brandId: { in: [brandId, otherBrandId] } },
+    });
+    await prisma.dataExtractionCapture.deleteMany({
+      where: { brandId: { in: [brandId, otherBrandId] } },
+    });
+    await prisma.dataExtractionResource.deleteMany({
+      where: { brandId: { in: [brandId, otherBrandId] } },
+    });
+    await prisma.intelligenceOwnerScope.deleteMany({
+      where: { brandProfileId: { in: [brandId, otherBrandId] } },
+    });
     await prisma.brandProfile.deleteMany({
       where: { id: { in: [brandId, otherBrandId] } },
     });
@@ -303,6 +315,50 @@ describe.skipIf(!databaseEnabled)("W1.0B Brand Intelligence database", () => {
   });
 
   it("persists an immutable Object aggregate idempotently with reference-only lineage", async () => {
+    await prisma.dataExtractionResource.create({
+      data: {
+        resourceRef: "resource:test:1",
+        brandId,
+        sourceClass: "OWNED_WEBSITE",
+        resourceType: "OWNED_WEB_PAGE",
+        pageRole: "HOMEPAGE",
+        canonicalResourceKey: "https://repository-test.example/",
+        canonicalResourceKeyHash: hash("repository-test-resource"),
+        canonicalUrl: "https://repository-test.example/",
+      },
+    });
+    await prisma.dataExtractionCapture.create({
+      data: {
+        captureRef: "capture-1",
+        brandId,
+        resourceRef: "resource:test:1",
+        acquisitionRequestKey: "request:repository-test:1",
+        status: "COMPLETED",
+        startedAt: new Date("2026-08-25T00:00:00.000Z"),
+        capturedAt: new Date("2026-08-25T00:00:00.000Z"),
+        acquisitionQuality: "COMPLETE",
+      },
+    });
+    await prisma.dataExtractionEvidenceItem.create({
+      data: {
+        evidenceRef: "evidence:test:1",
+        brandId,
+        capabilityId: "owned_website.brand_messaging",
+        normalizationContractVersion: "1.0",
+        resourceRef: "resource:test:1",
+        captureRef: "capture-1",
+        boundedPayload: { excerpt: "repository test" },
+        contentHash: hash("repository-test-content"),
+        polarity: "AFFIRMATIVE",
+        representativeness: "CONTEXT_SPECIFIC",
+        coverageSnapshot: "SINGLE_RESOURCE",
+        freshnessAtEmission: "POSSIBLY_STALE",
+        freshnessBasis: "fixture",
+        freshnessEvaluatedAt: new Date("2026-08-25T00:00:00.000Z"),
+        qualitySnapshot: "COMPLETE",
+        itemFingerprint: hash("repository-test-evidence"),
+      },
+    });
     const producerActionId = randomUUID();
     await prisma.intelligenceAction.create({
       data: {
@@ -378,7 +434,7 @@ describe.skipIf(!databaseEnabled)("W1.0B Brand Intelligence database", () => {
           id: randomUUID(),
           componentSemanticPath: path,
           evidenceRef: "evidence:test:1",
-          capabilityId: "owned-website-test",
+          capabilityId: "owned_website.brand_messaging",
           captureId: "capture-1",
           captureVersion: "1",
           sourceClass: "OWNED_WEBSITE",

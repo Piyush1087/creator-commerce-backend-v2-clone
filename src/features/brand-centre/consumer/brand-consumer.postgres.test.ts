@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  OrganizationKind,
   Prisma,
   PrismaClient,
   type IntelligenceProcessorExecutionStatus,
@@ -90,7 +91,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
 
     async function brand() {
       const org = await prisma.organization.create({
-        data: { name: "Consumer test" },
+        data: { name: "Consumer test", kind: OrganizationKind.BRAND },
       });
       const b = await prisma.brandProfile.create({
         data: {
@@ -465,11 +466,7 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         "offering_creator_communication",
         "offering_factual_synthesis",
       ]);
-      expect(
-        executableIds.filter(
-          (processorId) => !productIds.includes(processorId),
-        ),
-      ).toEqual([
+      const brandProcessorIds = [
         "audience_persona_synthesis",
         "brand_character",
         "brand_communication",
@@ -477,7 +474,13 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
         "brand_meaning",
         "serviceability_synthesis",
         "visual_style_synthesis",
-      ]);
+      ];
+      expect(
+        executableIds.filter((processorId) =>
+          brandProcessorIds.includes(processorId),
+        ),
+      ).toEqual(brandProcessorIds);
+      expect(executableIds).toContain("creator_audience_v0");
     });
 
     it("partial and explicit-null current remain truthful; no legacy values promoted", async () => {
@@ -900,14 +903,19 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
       ])
         expect(JSON.stringify(result)).not.toContain(forbidden);
       const creatorId = randomUUID();
+      const creatorOrganization = await prisma.organization.create({
+        data: { name: "Consumer creator", kind: OrganizationKind.CREATOR },
+      });
       await prisma.user.create({
         data: {
           id: creatorId,
+          organizationId: creatorOrganization.id,
           role: "CREATOR",
           authState: "ACTIVE",
           email: `${randomUUID()}@example.test`,
           name: "Creator",
           emailVerifiedAt: new Date(),
+          creatorProfile: { create: {} },
         },
       });
       const { accessToken: creatorToken } = await sessions.create(creatorId);
@@ -916,28 +924,18 @@ describe.skipIf(process.env.BRAND_CENTRE_DATABASE_TEST !== "true")(
       });
       expect(denied.status).toBe(403);
       const organizationlessUserId = randomUUID();
-      await prisma.user.create({
-        data: {
-          id: organizationlessUserId,
-          role: "BRAND",
-          authState: "ACTIVE",
-          email: `${randomUUID()}@example.test`,
-          name: "Organizationless Brand",
-          emailVerifiedAt: new Date(),
-        },
-      });
-      const { accessToken: organizationlessToken } = await sessions.create(
-        organizationlessUserId,
-      );
-      const noOrganization = await fetch(
-        `${baseUrl}/api/v1/brand-centre/brand`,
-        {
-          headers: {
-            authorization: `Bearer ${organizationlessToken}`,
+      await expect(
+        prisma.user.create({
+          data: {
+            id: organizationlessUserId,
+            role: "BRAND",
+            authState: "ACTIVE",
+            email: `${randomUUID()}@example.test`,
+            name: "Organizationless Brand",
+            emailVerifiedAt: new Date(),
           },
-        },
-      );
-      expect(noOrganization.status).toBe(403);
+        }),
+      ).rejects.toThrow();
     });
   },
 );

@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { createHash } from "node:crypto";
 import {
   IntelligenceActionActorType,
   IntelligenceAuthority,
@@ -19,6 +20,8 @@ import { IntelligenceCandidateRepository } from "../persistence/intelligence-can
 import {
   compareSemanticAddresses,
   IntelligenceCurrentStateRepository,
+  type OwnerScopedComponentAddress,
+  type OwnerScopedCurrentSnapshot,
 } from "../persistence/intelligence-current-state.repository";
 import { ComponentPathCodec } from "../semantic-path/component-path.codec";
 import type { ComponentSemanticAddress } from "../semantic-path/component-path.types";
@@ -41,6 +44,12 @@ function isProtected(current: IntelligenceCurrentComponent): boolean {
 
 function isProcessor(action: TransitionActionContext): boolean {
   return action.actorType === IntelligenceActionActorType.PROCESSOR;
+}
+
+export interface OwnerScopedApplyDecision {
+  readonly address: OwnerScopedComponentAddress;
+  readonly generationId: string;
+  readonly expected: OwnerScopedCurrentSnapshot | null;
 }
 
 @Injectable()
@@ -135,6 +144,168 @@ export class IntelligenceTransitionService {
       replayed: false,
       outcomes,
     };
+  }
+
+  /** Creator arm of the same recorded transition/CAS runtime. */
+  async applyOwnerScopedInTransaction(
+    tx: Prisma.TransactionClient,
+    input: Readonly<{
+      ownerScopeId: string;
+      actionId: string;
+      subjectId: string;
+      processorExecutionId: string;
+      requestIdempotencyKey: string;
+      correlationRef: string;
+      actorRef: string;
+      decisions: readonly OwnerScopedApplyDecision[];
+    }>,
+  ): Promise<readonly string[]> {
+    await tx.$executeRaw(Prisma.sql`
+      INSERT INTO intelligence_actions
+        (action_id, owner_scope_id, brand_id, subject_id, action_type,
+         actor_type, actor_ref, request_idempotency_key, correlation_ref,
+         reason_code, requested_atomicity, outcome, processor_execution_id)
+      VALUES (${input.actionId}, ${input.ownerScopeId}, NULL, ${input.subjectId},
+        'PROCESSOR_GENERATION_APPLY', 'PROCESSOR'::"IntelligenceActionActorType",
+        ${input.actorRef}, ${input.requestIdempotencyKey}, ${input.correlationRef},
+        'CREATOR_AUDIENCE_VALIDATED_OBJECT', 'PER_PATH_RECORDED', 'RECORDED',
+        ${input.processorExecutionId})
+      ON CONFLICT (action_id) DO NOTHING
+    `);
+    const outcomes: string[] = [];
+    for (const decision of [...input.decisions].sort((left, right) =>
+      this.currentRepository
+        .ownerScopedKey(left.address)
+        .localeCompare(this.currentRepository.ownerScopedKey(right.address)),
+    )) {
+      const generation = await tx.$queryRaw<
+        Array<{
+          nodeKind: string;
+          contractId: string;
+          contractVersion: string;
+          authority: string;
+          sourceClass: string;
+          readiness: string;
+          freshness: string;
+        }>
+      >(Prisma.sql`
+        SELECT node_kind::text AS "nodeKind",
+          component_contract_id AS "contractId",
+          component_contract_version AS "contractVersion",
+          authority::text AS authority, source_class AS "sourceClass",
+          readiness::text AS readiness,
+          freshness_at_generation::text AS freshness
+        FROM intelligence_component_generations
+        WHERE owner_scope_id=${input.ownerScopeId}
+          AND component_generation_id=${decision.generationId}
+          AND subject_id=${input.subjectId}
+          AND object_semantic_id=${decision.address.objectSemanticId}
+          AND component_semantic_path=${decision.address.componentSemanticPath}
+      `);
+      if (!generation[0]) {
+        throw new IntelligencePersistenceError(
+          "TENANCY_VIOLATION",
+          "Owner-scoped transition generation lineage is invalid",
+        );
+      }
+      const currentId =
+        decision.expected?.id ??
+        stableUuid(
+          `creator-current:${this.currentRepository.ownerScopedKey(decision.address)}`,
+        );
+      let resultingRevision: bigint;
+      if (!decision.expected) {
+        const inserted = await tx.$queryRaw<Array<{ revision: bigint }>>(
+          Prisma.sql`
+            INSERT INTO intelligence_current_components
+              (current_component_id, owner_scope_id, brand_id, subject_id,
+               object_semantic_id, path_scheme_version, component_semantic_path,
+               node_kind, current_component_generation_id, current_contract_id,
+               current_contract_version, current_authority,
+               current_source_class, current_readiness, current_freshness,
+               protection_state, lifecycle_status, revision, updated_at)
+            VALUES (${currentId}, ${input.ownerScopeId}, NULL, ${input.subjectId},
+              ${decision.address.objectSemanticId},
+              ${decision.address.pathSchemeVersion},
+              ${decision.address.componentSemanticPath},
+              ${generation[0].nodeKind}::"IntelligenceNodeKind",
+              ${decision.generationId}, ${generation[0].contractId},
+              ${generation[0].contractVersion},
+              ${generation[0].authority}::"IntelligenceAuthority",
+              ${generation[0].sourceClass},
+              ${generation[0].readiness}::"IntelligenceReadiness",
+              ${generation[0].freshness}::"IntelligenceFreshness",
+              'UNPROTECTED'::"IntelligenceProtectionState",
+              'ACTIVE'::"IntelligenceCurrentComponentLifecycle", 1,
+              CURRENT_TIMESTAMP)
+            ON CONFLICT (current_component_id) DO NOTHING
+            RETURNING revision
+          `,
+        );
+        if (!inserted[0]) {
+          throw new IntelligencePersistenceError(
+            "CAS_CONFLICT",
+            "Owner-scoped current appeared after the expected-absent lock",
+          );
+        }
+        resultingRevision = inserted[0].revision;
+      } else {
+        const updated = await tx.$queryRaw<Array<{ revision: bigint }>>(
+          Prisma.sql`
+            UPDATE intelligence_current_components SET
+              current_component_generation_id=${decision.generationId},
+              current_contract_id=${generation[0].contractId},
+              current_contract_version=${generation[0].contractVersion},
+              current_authority=${generation[0].authority}::"IntelligenceAuthority",
+              current_source_class=${generation[0].sourceClass},
+              current_readiness=${generation[0].readiness}::"IntelligenceReadiness",
+              current_freshness=${generation[0].freshness}::"IntelligenceFreshness",
+              revision=revision+1, updated_at=CURRENT_TIMESTAMP
+            WHERE current_component_id=${decision.expected.id}
+              AND owner_scope_id=${input.ownerScopeId}
+              AND revision=${decision.expected.revision}
+              AND current_component_generation_id=${decision.expected.currentComponentGenerationId}
+            RETURNING revision
+          `,
+        );
+        if (!updated[0]) {
+          throw new IntelligencePersistenceError(
+            "CAS_CONFLICT",
+            "Owner-scoped current revision changed before transition apply",
+          );
+        }
+        resultingRevision = updated[0].revision;
+      }
+      const transitionId = stableUuid(
+        `creator-transition:${input.actionId}:${decision.address.componentSemanticPath}`,
+      );
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO intelligence_component_transitions
+          (component_transition_id, owner_scope_id, brand_id, subject_id,
+           action_id, current_component_id, object_semantic_id,
+           path_scheme_version, component_semantic_path, from_generation_id,
+           expected_exists, expected_revision, expected_generation_id,
+           observed_revision, observed_generation_id, proposed_generation_id,
+           to_generation_id, transition_type, outcome, reason_code,
+           resulting_revision)
+        VALUES (${transitionId}, ${input.ownerScopeId}, NULL, ${input.subjectId},
+          ${input.actionId}, ${currentId}, ${decision.address.objectSemanticId},
+          ${decision.address.pathSchemeVersion},
+          ${decision.address.componentSemanticPath},
+          ${decision.expected?.currentComponentGenerationId ?? null},
+          ${Boolean(decision.expected)}, ${decision.expected?.revision ?? null},
+          ${decision.expected?.currentComponentGenerationId ?? null},
+          ${decision.expected?.revision ?? null},
+          ${decision.expected?.currentComponentGenerationId ?? null},
+          ${decision.generationId}, ${decision.generationId},
+          'APPLY_GENERATION',
+          'APPLIED_CURRENT'::"IntelligenceComponentTransitionOutcome",
+          'CREATOR_AUDIENCE_VALIDATED_OBJECT', ${resultingRevision})
+        ON CONFLICT (component_transition_id) DO NOTHING
+      `);
+      outcomes.push("APPLIED_CURRENT");
+    }
+    return outcomes;
   }
 
   private async applyDecision(
@@ -844,6 +1015,18 @@ export class IntelligenceTransitionService {
       "Transition persistence failed",
     );
   }
+}
+
+function stableUuid(material: string): string {
+  const chars = createHash("sha256")
+    .update(material)
+    .digest("hex")
+    .slice(0, 32)
+    .split("") as string[];
+  chars[12] = "5";
+  chars[16] = ((Number.parseInt(chars[16], 16) & 3) | 8).toString(16);
+  const hex = chars.join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 async function currentValueHash(

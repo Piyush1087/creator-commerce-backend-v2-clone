@@ -21,6 +21,25 @@ export interface FreshnessMutation {
   readonly invalidatingRef?: string | null;
 }
 
+export interface OwnerScopedComponentAddress {
+  readonly ownerScopeId: string;
+  readonly subjectId: string;
+  readonly objectSemanticId: string;
+  readonly pathSchemeVersion: number;
+  readonly componentSemanticPath: string;
+}
+
+export interface OwnerScopedCurrentSnapshot {
+  readonly id: string;
+  readonly currentComponentGenerationId: string;
+  readonly currentAuthority: string;
+  readonly currentSourceClass: string;
+  readonly currentReadiness: string;
+  readonly currentFreshness: string;
+  readonly protectionState: string;
+  readonly revision: bigint;
+}
+
 export function compareSemanticAddresses(
   left: ComponentSemanticAddress,
   right: ComponentSemanticAddress,
@@ -107,6 +126,40 @@ export class IntelligenceCurrentStateRepository {
         locked.set(addressKey, current);
         if (!original.subjectId) locked.set(this.key(original), current);
       }
+    }
+    return locked;
+  }
+
+  async lockOwnerScopedInCanonicalOrder(
+    tx: Prisma.TransactionClient,
+    addresses: readonly OwnerScopedComponentAddress[],
+  ): Promise<Map<string, OwnerScopedCurrentSnapshot>> {
+    const locked = new Map<string, OwnerScopedCurrentSnapshot>();
+    const ordered = [...addresses].sort((left, right) =>
+      this.ownerScopedKey(left).localeCompare(this.ownerScopedKey(right)),
+    );
+    for (const address of ordered) {
+      const key = this.ownerScopedKey(address);
+      await tx.$queryRaw(Prisma.sql`
+        SELECT 1 WHERE pg_advisory_xact_lock(hashtextextended(${key}, 0)) IS NULL
+      `);
+      const rows = await tx.$queryRaw<OwnerScopedCurrentSnapshot[]>(Prisma.sql`
+        SELECT current_component_id AS id,
+          current_component_generation_id AS "currentComponentGenerationId",
+          current_authority::text AS "currentAuthority",
+          current_source_class AS "currentSourceClass",
+          current_readiness::text AS "currentReadiness",
+          current_freshness::text AS "currentFreshness",
+          protection_state::text AS "protectionState", revision
+        FROM intelligence_current_components
+        WHERE owner_scope_id=${address.ownerScopeId}
+          AND subject_id=${address.subjectId}
+          AND object_semantic_id=${address.objectSemanticId}
+          AND path_scheme_version=${address.pathSchemeVersion}
+          AND component_semantic_path=${address.componentSemanticPath}
+        FOR UPDATE
+      `);
+      if (rows[0]) locked.set(key, rows[0]);
     }
     return locked;
   }
@@ -238,6 +291,16 @@ export class IntelligenceCurrentStateRepository {
   key(address: ComponentSemanticAddress): string {
     return JSON.stringify([
       address.brandId,
+      address.subjectId,
+      address.objectSemanticId,
+      address.pathSchemeVersion,
+      address.componentSemanticPath,
+    ]);
+  }
+
+  ownerScopedKey(address: OwnerScopedComponentAddress): string {
+    return JSON.stringify([
+      address.ownerScopeId,
       address.subjectId,
       address.objectSemanticId,
       address.pathSchemeVersion,

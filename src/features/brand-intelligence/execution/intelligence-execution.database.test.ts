@@ -164,6 +164,9 @@ describe.skipIf(!databaseEnabled)("W1.0D PostgreSQL execution runtime", () => {
     });
     await prisma.intelligenceExecution.deleteMany({ where: { brandId } });
     await prisma.intelligenceSubject.deleteMany({ where: { brandId } });
+    await prisma.intelligenceOwnerScope.deleteMany({
+      where: { brandProfileId: brandId },
+    });
     await prisma.brandProfile.delete({ where: { id: brandId } });
     await prisma.$disconnect();
   });

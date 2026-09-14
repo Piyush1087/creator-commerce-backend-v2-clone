@@ -19,6 +19,10 @@ export class CreatorAudienceService {
   ) {}
 
   async read(user: AuthUser): Promise<CreatorAudienceConsumer> {
+    return this.readAt(user, new Date());
+  }
+
+  async readAt(user: AuthUser, now: Date): Promise<CreatorAudienceConsumer> {
     const actor = await this.actors.resolveReadOnly(user);
     if (!actor.allowedActions.includes("INSIGHTS_AUDIENCE_READ")) {
       throw new ForbiddenException("Creator Audience read access required");
@@ -28,7 +32,7 @@ export class CreatorAudienceService {
       source.integrationId &&
       source.providerAccountId &&
       source.authorizationGeneration !== null
-        ? await this.repository.readCurrent({
+        ? await this.repository.readLatestCurrentSameAccount({
             creatorProfileId: actor.subjectCreatorProfileId,
             creatorWorkspaceId: actor.workspaceId,
             integrationId: source.integrationId,
@@ -36,13 +40,46 @@ export class CreatorAudienceService {
             authorizationGeneration: source.authorizationGeneration,
           })
         : null;
+    const processingState =
+      source.integrationId && source.providerAccountId
+        ? await this.repository.readProcessingTruth({
+            creatorProfileId: actor.subjectCreatorProfileId,
+            creatorWorkspaceId: actor.workspaceId,
+            integrationId: source.integrationId,
+            providerAccountId: source.providerAccountId,
+          })
+        : "IDLE";
     if (current) {
+      const capturedAt = current.value.snapshotBasis.capturedAt
+        ? new Date(current.value.snapshotBasis.capturedAt)
+        : current.generatedAt;
+      const stale =
+        now.getTime() - capturedAt.getTime() >= 192 * 60 * 60 * 1000;
+      const awaitingReplacement =
+        source.authorizationGeneration !== current.authorizationGeneration;
+      const projectedProcessing =
+        processingState === "FAILED"
+          ? "FAILED"
+          : awaitingReplacement && source.authorized
+            ? "PROCESSING"
+            : processingState;
       return CreatorAudienceConsumerSchema.parse({
-        ...current,
+        ...current.value,
         context: { role: actor.actorRole },
-        sourceStatus: source.sourceStatus,
+        freshness: {
+          state: stale ? "STALE" : "CURRENT",
+          staleAfterHours: 192,
+        },
+        processingState: projectedProcessing,
+        sourceStatus:
+          projectedProcessing === "FAILED"
+            ? "PROVIDER_FAILURE"
+            : source.sourceStatus,
         currentPreserved:
-          current.currentPreserved || source.sourceStatus !== "CONNECTED",
+          current.value.currentPreserved ||
+          source.sourceStatus !== "CONNECTED" ||
+          awaitingReplacement ||
+          projectedProcessing === "FAILED",
       });
     }
     return CreatorAudienceConsumerSchema.parse({
@@ -61,7 +98,12 @@ export class CreatorAudienceService {
       highlights: [],
       cohorts: [],
       freshness: { state: "UNKNOWN", staleAfterHours: 192 },
-      processingState: source.authorized ? "PROCESSING" : "IDLE",
+      processingState:
+        processingState === "FAILED"
+          ? "FAILED"
+          : source.authorized
+            ? "PROCESSING"
+            : "IDLE",
       currentPreserved: false,
       limitations: ["AUDIENCE_DATA_NOT_YET_AVAILABLE"],
       settingsRecoveryRoute: "/creator/settings/instagram",

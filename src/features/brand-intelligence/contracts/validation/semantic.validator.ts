@@ -16,6 +16,10 @@ import {
 } from "../../../instagram-intelligence/runtime/instagram-content-behavior.semantic-validator";
 
 import type { VerifiedContractBundle } from "../bundle/contract-bundle.types";
+import {
+  CREATOR_AUDIENCE_PROCESSOR_ID,
+  CreatorAudienceProcessorInputSchema,
+} from "../../../creator-audience/creator-audience-runtime.contract";
 import { accepted, rejected } from "./validation-result";
 import type {
   SemanticValidationContext,
@@ -399,6 +403,45 @@ class BrandCommunicationSemanticValidator implements ProcessorSemanticValidator 
   }
 }
 
+class CreatorAudienceSemanticValidator implements ProcessorSemanticValidator {
+  readonly validatorId = CREATOR_AUDIENCE_PROCESSOR_ID;
+
+  validate(
+    output: JsonRecord,
+    context: SemanticValidationContext,
+  ): readonly ValidationIssue[] {
+    const parsed = CreatorAudienceProcessorInputSchema.safeParse({
+      kind: "CREATOR_AUDIENCE_PROCESSOR_INPUT_V1",
+      value: output,
+    });
+    if (!parsed.success) {
+      return [
+        semanticIssue(
+          "CREATOR_AUDIENCE_CONTRACT_INVALID",
+          "Creator Audience output must satisfy the frozen strict V0 contract",
+        ),
+      ];
+    }
+    const admitted = new Set(
+      context.evidenceManifest.map((entry) => entry.evidenceRef),
+    );
+    if (
+      parsed.data.value.highlights.some((highlight) =>
+        highlight.evidence.some((reference) => !admitted.has(reference)),
+      )
+    ) {
+      return [
+        semanticIssue(
+          "CREATOR_AUDIENCE_HIGHLIGHT_LINEAGE_INVALID",
+          "Every Audience Highlight reference must be admitted Evidence",
+          "$/f/audience_highlights",
+        ),
+      ];
+    }
+    return [];
+  }
+}
+
 @Injectable()
 export class SemanticValidator {
   private readonly validators: ReadonlyMap<string, ProcessorSemanticValidator> =
@@ -417,6 +460,7 @@ export class SemanticValidator {
         new InstagramContentBehaviorSemanticValidator(),
         new InstagramAudienceProfileSemanticValidator(),
         new InstagramOrganicPerformanceSemanticValidator(),
+        new CreatorAudienceSemanticValidator(),
       ].map((validator) => [validator.validatorId, validator]),
     );
 

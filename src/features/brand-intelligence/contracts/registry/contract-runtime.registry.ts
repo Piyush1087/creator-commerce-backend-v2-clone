@@ -12,6 +12,7 @@ import type {
 } from "../bundle/contract-bundle.types";
 import { ContractRuntimeError } from "../bundle/contract-runtime.error";
 import { SemanticValidator } from "../validation/semantic.validator";
+import { creatorAudienceVerifiedContract } from "../../../creator-audience/creator-audience-runtime.contract";
 
 function keyOf(key: ContractRegistryKey): string {
   return [
@@ -63,7 +64,33 @@ export class ContractRuntimeRegistry implements OnModuleInit {
       "intelligence_persistence_transition_v1",
       ...this.semanticValidator.registeredValidatorIds(),
     ]);
-    this.runtime = this.integrity.verifyRoot(root, validatorIds);
+    const generated = this.integrity.verifyRoot(root, validatorIds);
+    const creatorAudience = creatorAudienceVerifiedContract();
+    const key = keyOf(creatorAudience.registration);
+    if (
+      generated.bundles.has(key) ||
+      generated.registry.registrations.some(
+        (registration) => keyOf(registration) === key,
+      )
+    ) {
+      throw new ContractRuntimeError(
+        "DUPLICATE_CONTRACT_REGISTRY_KEY",
+        "Compiled Creator Audience contract conflicts with a generated bundle",
+      );
+    }
+    this.runtime = {
+      registry: {
+        ...generated.registry,
+        registrations: [
+          ...generated.registry.registrations,
+          creatorAudience.registration,
+        ],
+      },
+      bundles: new Map([
+        ...generated.bundles,
+        [key, creatorAudience.bundle] as const,
+      ]),
+    };
     this.startupFailure = undefined;
   }
 

@@ -248,6 +248,9 @@ describePostgres("C3 per-media semantics PostgreSQL", () => {
         purge.purgePersistentInTransaction(tx, id),
       );
       await prisma.offering.deleteMany({ where: { brandProfileId: id } });
+      await prisma.intelligenceOwnerScope.deleteMany({
+        where: { brandProfileId: id },
+      });
       await prisma.brandProfile.delete({ where: { id } });
     }
     await prisma.$disconnect();

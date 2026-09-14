@@ -53,6 +53,9 @@ describePostgres("B3A PostgreSQL lineage and Settings deletion", () => {
           purge.purgePersistentInTransaction(tx, brandId),
         );
       }
+      await prisma.intelligenceOwnerScope.deleteMany({
+        where: { brandProfileId: { in: brandIds } },
+      });
       await prisma.brandProfile.deleteMany({ where: { id: { in: brandIds } } });
     }
     await prisma.$disconnect();

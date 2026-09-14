@@ -328,6 +328,9 @@ describe.skipIf(!enabled)("P1B-2 generic Intelligence subject scope", () => {
     await prisma.offering.deleteMany({
       where: { brandProfileId: { in: brands } },
     });
+    await prisma.intelligenceOwnerScope.deleteMany({
+      where: { brandProfileId: { in: brands } },
+    });
     await prisma.brandProfile.deleteMany({ where: { id: { in: brands } } });
     await prisma.$disconnect();
   });
@@ -358,12 +361,8 @@ describe.skipIf(!enabled)("P1B-2 generic Intelligence subject scope", () => {
         evidenceManifestHash: hash("evidence"),
         executionIntentKey: "same-intent",
       });
-    expect(key(subjectAId, offeringAId)).toBe(
-      key(subjectAId, offeringAId),
-    );
-    expect(key(subjectAId, offeringAId)).not.toBe(
-      key(subjectBId, offeringBId),
-    );
+    expect(key(subjectAId, offeringAId)).toBe(key(subjectAId, offeringAId));
+    expect(key(subjectAId, offeringAId)).not.toBe(key(subjectBId, offeringBId));
   });
 
   it("isolates sibling current, candidate, CAS, and stale completion state", async () => {

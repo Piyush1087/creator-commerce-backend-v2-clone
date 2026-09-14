@@ -71,6 +71,9 @@ describePostgres(
         await prisma.offering.deleteMany({
           where: { brandProfileId: { in: brandIds } },
         });
+        await prisma.intelligenceOwnerScope.deleteMany({
+          where: { brandProfileId: { in: brandIds } },
+        });
         await prisma.brandProfile.deleteMany({
           where: { id: { in: brandIds } },
         });

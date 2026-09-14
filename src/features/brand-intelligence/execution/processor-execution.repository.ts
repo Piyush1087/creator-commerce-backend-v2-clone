@@ -55,39 +55,32 @@ export class ProcessorExecutionRepository {
         LIMIT 1
       `);
           if (!rows[0]) return null;
-          const current =
-            await tx.intelligenceProcessorExecution.findUniqueOrThrow({
-              where: { id: rows[0].id },
-            });
+          const current = await this.readProcessorRaw(tx, rows[0].id);
           const attemptNumber = current.attemptCount + 1;
           const leaseToken = randomUUID();
           const leaseExpiresAt = new Date(now.getTime() + leaseDurationMs);
-          const processorExecution =
-            await tx.intelligenceProcessorExecution.update({
-              where: { id: current.id },
-              data: {
-                status: IntelligenceProcessorExecutionStatus.RUNNING,
-                attemptCount: attemptNumber,
-                leaseToken,
-                leaseOwnerRef: workerIdentity,
-                leaseExpiresAt,
-                lastHeartbeatAt: now,
-                startedAt: current.startedAt ?? now,
-                completedAt: null,
-              },
-            });
-          const attempt = await tx.intelligenceProcessorAttempt.create({
-            data: {
-              processorExecutionId: current.id,
-              brandId: current.brandId,
-              attemptNumber,
-              workerIdentityRef: workerIdentity,
-              leaseToken,
-              leaseAcquiredAt: now,
-              leaseExpiresAt,
-              lastHeartbeatAt: now,
-            },
-          });
+          await tx.$executeRaw(Prisma.sql`
+            UPDATE intelligence_processor_executions
+            SET status='RUNNING'::"IntelligenceProcessorExecutionStatus",
+              attempt_count=${attemptNumber}, lease_token=${leaseToken},
+              lease_owner_ref=${workerIdentity}, lease_expires_at=${leaseExpiresAt},
+              last_heartbeat_at=${now}, started_at=COALESCE(started_at, ${now}),
+              completed_at=NULL, updated_at=${now}
+            WHERE processor_execution_id=${current.id}
+          `);
+          const processorExecution = await this.readProcessorRaw(
+            tx,
+            current.id,
+          );
+          const attempt = await this.createAttempt(
+            tx,
+            current,
+            attemptNumber,
+            workerIdentity,
+            leaseToken,
+            now,
+            leaseExpiresAt,
+          );
           await tx.$executeRaw(Prisma.sql`
         UPDATE "intelligence_executions"
         SET "status" = 'RUNNING'::"IntelligenceExecutionStatus",
@@ -127,54 +120,39 @@ export class ProcessorExecutionRepository {
         FOR UPDATE SKIP LOCKED
       `);
           if (!rows[0]) return null;
-          const current =
-            await tx.intelligenceProcessorExecution.findUniqueOrThrow({
-              where: { id: rows[0].id },
-            });
+          const current = await this.readProcessorRaw(tx, rows[0].id);
           const attemptNumber = current.attemptCount + 1;
           const leaseToken = randomUUID();
           const leaseExpiresAt = new Date(now.getTime() + leaseDurationMs);
-          const processorExecution =
-            await tx.intelligenceProcessorExecution.update({
-              where: { id: current.id },
-              data: {
-                status: IntelligenceProcessorExecutionStatus.RUNNING,
-                attemptCount: attemptNumber,
-                leaseToken,
-                leaseOwnerRef: workerIdentity,
-                leaseExpiresAt,
-                lastHeartbeatAt: now,
-                startedAt: current.startedAt ?? now,
-                completedAt: null,
-              },
-            });
-          const attempt = await tx.intelligenceProcessorAttempt.create({
-            data: {
-              processorExecutionId: current.id,
-              brandId: current.brandId,
-              attemptNumber,
-              workerIdentityRef: workerIdentity,
-              leaseToken,
-              leaseAcquiredAt: now,
-              leaseExpiresAt,
-              lastHeartbeatAt: now,
-            },
-          });
-          await tx.intelligenceExecution.updateMany({
-            where: {
-              id: current.executionId,
-              status: {
-                in: [
-                  IntelligenceExecutionStatus.PENDING,
-                  IntelligenceExecutionStatus.RUNNING,
-                ],
-              },
-            },
-            data: {
-              status: IntelligenceExecutionStatus.RUNNING,
-              startedAt: now,
-            },
-          });
+          await tx.$executeRaw(Prisma.sql`
+            UPDATE intelligence_processor_executions
+            SET status='RUNNING'::"IntelligenceProcessorExecutionStatus",
+              attempt_count=${attemptNumber}, lease_token=${leaseToken},
+              lease_owner_ref=${workerIdentity}, lease_expires_at=${leaseExpiresAt},
+              last_heartbeat_at=${now}, started_at=COALESCE(started_at, ${now}),
+              completed_at=NULL, updated_at=${now}
+            WHERE processor_execution_id=${current.id}
+          `);
+          const processorExecution = await this.readProcessorRaw(
+            tx,
+            current.id,
+          );
+          const attempt = await this.createAttempt(
+            tx,
+            current,
+            attemptNumber,
+            workerIdentity,
+            leaseToken,
+            now,
+            leaseExpiresAt,
+          );
+          await tx.$executeRaw(Prisma.sql`
+            UPDATE intelligence_executions
+            SET status='RUNNING'::"IntelligenceExecutionStatus",
+              started_at=COALESCE(started_at, ${now})
+            WHERE execution_id=${current.executionId}
+              AND status IN ('PENDING'::"IntelligenceExecutionStatus", 'RUNNING'::"IntelligenceExecutionStatus")
+          `);
           return { processorExecution, attempt };
         }),
       "Exact Processor claim failed a persistence invariant",
@@ -453,19 +431,17 @@ export class ProcessorExecutionRepository {
       WHERE "processor_execution_id" = ${lease.processorExecutionId}
       FOR UPDATE
     `);
-    const processorExecution =
-      await tx.intelligenceProcessorExecution.findUnique({
-        where: { id: lease.processorExecutionId },
-      });
+    const processorExecution = await this.readProcessorRawOrNull(
+      tx,
+      lease.processorExecutionId,
+    );
     await tx.$queryRaw(Prisma.sql`
       SELECT "attempt_id"
       FROM "intelligence_processor_attempts"
       WHERE "attempt_id" = ${lease.attemptId}
       FOR UPDATE
     `);
-    const attempt = await tx.intelligenceProcessorAttempt.findUnique({
-      where: { id: lease.attemptId },
-    });
+    const attempt = await this.readAttemptRawOrNull(tx, lease.attemptId);
     if (
       !processorExecution ||
       !attempt ||
@@ -491,6 +467,119 @@ export class ProcessorExecutionRepository {
       SELECT CURRENT_TIMESTAMP AS "now"
     `);
     return rows[0].now;
+  }
+
+  private async createAttempt(
+    tx: Prisma.TransactionClient,
+    current: IntelligenceProcessorExecution,
+    attemptNumber: number,
+    workerIdentity: string,
+    leaseToken: string,
+    now: Date,
+    leaseExpiresAt: Date,
+  ): Promise<IntelligenceProcessorAttempt> {
+    if ((current.brandId as string | null) !== null) {
+      return tx.intelligenceProcessorAttempt.create({
+        data: {
+          processorExecutionId: current.id,
+          brandId: current.brandId,
+          attemptNumber,
+          workerIdentityRef: workerIdentity,
+          leaseToken,
+          leaseAcquiredAt: now,
+          leaseExpiresAt,
+          lastHeartbeatAt: now,
+        },
+      });
+    }
+    const attemptId = randomUUID();
+    const scope = await tx.$queryRaw<Array<{ ownerScopeId: string }>>(
+      Prisma.sql`SELECT owner_scope_id AS "ownerScopeId"
+        FROM intelligence_processor_executions
+        WHERE processor_execution_id=${current.id}`,
+    );
+    if (!scope[0]) this.leaseLost();
+    await tx.$executeRaw(Prisma.sql`
+      INSERT INTO intelligence_processor_attempts
+        (attempt_id, processor_execution_id, owner_scope_id, brand_id,
+         attempt_number, worker_identity_ref, lease_token, lease_acquired_at,
+         lease_expires_at, last_heartbeat_at, status)
+      VALUES (${attemptId}, ${current.id}, ${scope[0].ownerScopeId}, NULL,
+        ${attemptNumber}, ${workerIdentity}, ${leaseToken}, ${now},
+        ${leaseExpiresAt}, ${now}, 'RUNNING'::"IntelligenceProcessorAttemptStatus")
+    `);
+    return this.readAttemptRaw(tx, attemptId);
+  }
+
+  async readProcessorRaw(
+    tx: Prisma.TransactionClient,
+    id: string,
+  ): Promise<IntelligenceProcessorExecution> {
+    const row = await this.readProcessorRawOrNull(tx, id);
+    if (!row) this.leaseLost();
+    return row;
+  }
+
+  private async readProcessorRawOrNull(
+    tx: Prisma.TransactionClient,
+    id: string,
+  ): Promise<IntelligenceProcessorExecution | null> {
+    const rows = await tx.$queryRaw<
+      IntelligenceProcessorExecution[]
+    >(Prisma.sql`
+      SELECT processor_execution_id AS id, execution_id AS "executionId",
+        brand_id AS "brandId", owner_scope_id AS "ownerScopeId",
+        subject_id AS "subjectId", processor_id AS "processorId",
+        processor_version AS "processorVersion", bundle_id AS "bundleId",
+        bundle_version AS "bundleVersion", bundle_hash AS "bundleHash",
+        output_contract_id AS "outputContractId",
+        output_contract_version AS "outputContractVersion",
+        active_scope AS "activeScope", active_scope_hash AS "activeScopeHash",
+        dependency_manifest AS "dependencyManifest",
+        dependency_manifest_hash AS "dependencyManifestHash",
+        evidence_manifest AS "evidenceManifest",
+        evidence_manifest_hash AS "evidenceManifestHash",
+        trigger_intent_key AS "triggerIntentKey",
+        processor_execution_key AS "processorExecutionKey",
+        processor_key_version AS "processorKeyVersion", max_attempts AS "maxAttempts",
+        status, result_readiness AS "resultReadiness", eligible_at AS "eligibleAt",
+        attempt_count AS "attemptCount", lease_token AS "leaseToken",
+        lease_owner_ref AS "leaseOwnerRef", lease_expires_at AS "leaseExpiresAt",
+        last_heartbeat_at AS "lastHeartbeatAt",
+        last_error_category AS "lastErrorCategory", last_error_code AS "lastErrorCode",
+        created_at AS "createdAt", started_at AS "startedAt",
+        completed_at AS "completedAt", updated_at AS "updatedAt"
+      FROM intelligence_processor_executions
+      WHERE processor_execution_id=${id}
+    `);
+    return rows[0] ?? null;
+  }
+
+  async readAttemptRaw(
+    tx: Prisma.TransactionClient,
+    id: string,
+  ): Promise<IntelligenceProcessorAttempt> {
+    const row = await this.readAttemptRawOrNull(tx, id);
+    if (!row) this.leaseLost();
+    return row;
+  }
+
+  private async readAttemptRawOrNull(
+    tx: Prisma.TransactionClient,
+    id: string,
+  ): Promise<IntelligenceProcessorAttempt | null> {
+    const rows = await tx.$queryRaw<IntelligenceProcessorAttempt[]>(Prisma.sql`
+      SELECT attempt_id AS id, processor_execution_id AS "processorExecutionId",
+        brand_id AS "brandId", owner_scope_id AS "ownerScopeId",
+        attempt_number AS "attemptNumber", worker_identity_ref AS "workerIdentityRef",
+        lease_token AS "leaseToken", lease_acquired_at AS "leaseAcquiredAt",
+        lease_expires_at AS "leaseExpiresAt", last_heartbeat_at AS "lastHeartbeatAt",
+        started_at AS "startedAt", completed_at AS "completedAt", status,
+        prompt_build_ref AS "promptBuildRef", runtime_telemetry_summary AS "runtimeTelemetry",
+        error_category AS "errorCategory", error_code AS "errorCode"
+      FROM intelligence_processor_attempts WHERE attempt_id=${id}
+    `);
+    return rows[0] ?? null;
   }
 
   private assertLeaseDuration(leaseDurationMs: number): void {

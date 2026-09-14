@@ -8,6 +8,7 @@ import { Reflector } from "@nestjs/core";
 import { Test } from "@nestjs/testing";
 import { ThrottlerGuard } from "@nestjs/throttler";
 import {
+  OrganizationKind,
   Prisma,
   PrismaClient,
   type IntelligenceProcessorExecutionStatus,
@@ -127,7 +128,7 @@ database("Product consumer exact-Offering PostgreSQL surface", () => {
 
   async function brand(label: string) {
     const organization = await prisma.organization.create({
-      data: { name: `Product consumer ${label}` },
+      data: { name: `Product consumer ${label}`, kind: OrganizationKind.BRAND },
     });
     const profile = await prisma.brandProfile.create({
       data: {

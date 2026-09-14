@@ -39,6 +39,9 @@ describePostgres("Week 4 speech PostgreSQL lineage and replay", () => {
     await prisma.offering.deleteMany({
       where: { brandProfileId: { in: brandIds } },
     });
+    await prisma.intelligenceOwnerScope.deleteMany({
+      where: { brandProfileId: { in: brandIds } },
+    });
     await prisma.brandProfile.deleteMany({ where: { id: { in: brandIds } } });
     await prisma.$disconnect();
     await rm(root, { recursive: true, force: true });

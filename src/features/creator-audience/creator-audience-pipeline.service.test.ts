@@ -4,6 +4,8 @@ import type { InstagramIntelligenceProviderReadClient } from "../instagram/insta
 import type { CreatorAudienceCredentialFenceService } from "./creator-audience-credential-fence.service";
 import { CreatorAudiencePipelineService } from "./creator-audience-pipeline.service";
 import type { CreatorAudienceRepository } from "./creator-audience.repository";
+import type { IntelligenceExecutionService } from "../brand-intelligence/execution/intelligence-execution.service";
+import type { ProcessorWorkerService } from "../brand-intelligence/execution/processor-worker.service";
 
 const actor = {
   actorUserId: "owner",
@@ -46,14 +48,52 @@ function fixture(options: { unavailable?: boolean } = {}) {
     begin: vi.fn().mockResolvedValue({}),
     fail: vi.fn().mockResolvedValue(undefined),
     readCurrent: vi.fn().mockResolvedValue(null),
-    publish: vi.fn().mockImplementation(({ value }) => {
-      current = value;
-      return Promise.resolve({
-        objectGenerationId: "generation",
-        evidenceRefs: [],
-      });
-    }),
+    completeAcquisition: vi
+      .fn()
+      .mockImplementation(({ value, acquisition }) => {
+        current = value;
+        return Promise.resolve({
+          kind: "CREATOR_AUDIENCE_EVIDENCE_MANIFEST_V1",
+          identity: {
+            ownerScopeId: "00000000-0000-4000-8000-000000000001",
+            creatorProfileId: "00000000-0000-4000-8000-000000000002",
+            creatorWorkspaceId: "00000000-0000-4000-8000-000000000003",
+            integrationId: "00000000-0000-4000-8000-000000000004",
+            providerAccountId: "provider-account",
+            authorizationGeneration: 2,
+            requestIdentity: identity.requestIdentity,
+            captureRef: "capture",
+            resourceRef: "resource",
+          },
+          evidence: acquisition.results.map((result, index) => ({
+            evidenceRef: `evidence-${index}`,
+            capabilityId:
+              result.population === "FOLLOWERS"
+                ? "instagram.audience_followers"
+                : "instagram.audience_engaged",
+            population: result.population,
+            breakdown: result.breakdown,
+            capturedAt: identity.capturedAt.toISOString(),
+            contentHash: index.toString(16).padStart(64, "0"),
+          })),
+        });
+      }),
+    generationIdsForProcessorExecution: vi
+      .fn()
+      .mockResolvedValue(["generation"]),
   } as unknown as CreatorAudienceRepository;
+  const executions = {
+    createOrReturnOwnerScoped: vi.fn().mockResolvedValue({
+      replayed: false,
+      execution: {},
+      processorExecutions: [{ id: "processor", status: "QUEUED" }],
+    }),
+  } as unknown as IntelligenceExecutionService;
+  const worker = {
+    runExact: vi.fn().mockResolvedValue({
+      processorExecution: { id: "processor", status: "COMPLETED" },
+    }),
+  } as unknown as ProcessorWorkerService;
   const provider = {
     readProfile: vi.fn().mockResolvedValue({
       availability: "AVAILABLE",
@@ -86,16 +126,25 @@ function fixture(options: { unavailable?: boolean } = {}) {
     readCarouselChildren: vi.fn(),
   } as unknown as InstagramIntelligenceProviderReadClient;
   return {
-    service: new CreatorAudiencePipelineService(fence, repository, provider),
+    service: new CreatorAudiencePipelineService(
+      fence,
+      repository,
+      executions,
+      worker,
+      provider,
+    ),
     fence,
     repository,
     provider,
+    executions,
+    worker,
   };
 }
 
 describe("Creator Audience provider → shared current pipeline", () => {
   it("replays exactly without a second credential, provider or persistence execution", async () => {
-    const { service, fence, repository, provider } = fixture();
+    const { service, fence, repository, provider, executions, worker } =
+      fixture();
     const first = await service.execute(identity);
     const second = await service.execute(identity);
     expect(first.reused).toBe(false);
@@ -104,7 +153,9 @@ describe("Creator Audience provider → shared current pipeline", () => {
     expect(fence.acquire).toHaveBeenCalledTimes(1);
     expect(provider.readProfile).toHaveBeenCalledTimes(1);
     expect(provider.readAudienceInsights).toHaveBeenCalledTimes(8);
-    expect(repository.publish).toHaveBeenCalledTimes(1);
+    expect(repository.completeAcquisition).toHaveBeenCalledTimes(1);
+    expect(executions.createOrReturnOwnerScoped).toHaveBeenCalledTimes(1);
+    expect(worker.runExact).toHaveBeenCalledTimes(1);
   });
 
   it("does not publish empty failure over current", async () => {
@@ -112,7 +163,7 @@ describe("Creator Audience provider → shared current pipeline", () => {
     const result = await service.execute(identity);
     expect(result.value.status).toBe("UNAVAILABLE");
     expect(repository.fail).toHaveBeenCalledTimes(1);
-    expect(repository.publish).not.toHaveBeenCalled();
+    expect(repository.completeAcquisition).not.toHaveBeenCalled();
   });
 
   it("rejects changed account/generation before provider work", async () => {

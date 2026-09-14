@@ -81,6 +81,9 @@ describePostgres("Week 1 video PostgreSQL lineage and preservation", () => {
       await prisma.dataExtractionResource.deleteMany({
         where: { brandId: id },
       });
+      await prisma.intelligenceOwnerScope.deleteMany({
+        where: { brandProfileId: id },
+      });
       await prisma.brandProfile.deleteMany({ where: { id } });
     }
     await prisma.$disconnect();

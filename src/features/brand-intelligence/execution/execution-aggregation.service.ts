@@ -25,7 +25,11 @@ export class ExecutionAggregationService {
   ): Promise<void> {
     const parent = await tx.intelligenceExecution.findUniqueOrThrow({
       where: { id: executionId },
-      select: { status: true, aggregateResult: true, brandId: true },
+      select: {
+        status: true,
+        aggregateResult: true,
+        brandId: true,
+      },
     });
     if (parent.status === IntelligenceExecutionStatus.CANCELLED) return;
     const children = await tx.intelligenceProcessorExecution.findMany({
@@ -100,6 +104,7 @@ export class ExecutionAggregationService {
       parent.status === IntelligenceExecutionStatus.FAILED;
     if (wasTerminal) return;
     if (
+      (parent.brandId as string | null) !== null &&
       status === IntelligenceExecutionStatus.COMPLETED &&
       (aggregate === IntelligenceExecutionAggregateResult.SUCCEEDED ||
         aggregate === IntelligenceExecutionAggregateResult.PARTIAL)
@@ -116,6 +121,7 @@ export class ExecutionAggregationService {
         triggerUserId: null,
       });
     } else if (
+      (parent.brandId as string | null) !== null &&
       status === IntelligenceExecutionStatus.FAILED &&
       aggregate === IntelligenceExecutionAggregateResult.FAILED
     ) {

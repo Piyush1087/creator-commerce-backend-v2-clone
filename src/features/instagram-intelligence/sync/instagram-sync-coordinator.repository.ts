@@ -82,7 +82,7 @@ export class InstagramSyncCoordinatorRepository {
       const scopes = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
         INSERT INTO intelligence_owner_scopes
           (owner_type, owner_key, creator_profile_id, creator_workspace_id)
-        VALUES ('CREATOR', ${`CREATOR:${input.creatorProfileId}`},
+        VALUES ('CREATOR', ${`CREATOR:${input.creatorProfileId}:${input.creatorWorkspaceId}`},
           ${input.creatorProfileId}, ${input.creatorWorkspaceId})
         ON CONFLICT (creator_profile_id) WHERE creator_profile_id IS NOT NULL
         DO UPDATE SET updated_at = intelligence_owner_scopes.updated_at
@@ -280,9 +280,10 @@ export class InstagramSyncCoordinatorRepository {
   }
 
   async claimNext(workerIdentity: string): Promise<InstagramSyncLease | null> {
-    return this.prisma.$transaction(async (tx) => {
-      const now = await databaseNow(tx);
-      const rows = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+    return this.prisma.$transaction(
+      async (tx) => {
+        const now = await databaseNow(tx);
+        const rows = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
         SELECT "sync_job_id" AS "id"
         FROM "instagram_intelligence_sync_jobs"
         WHERE (
@@ -295,92 +296,95 @@ export class InstagramSyncCoordinatorRepository {
         ORDER BY COALESCE("backoff_until", "next_due_at", "lease_expires_at"), "sync_job_id"
         FOR UPDATE SKIP LOCKED LIMIT 1
       `);
-      if (!rows[0]) return null;
-      const job = await tx.instagramIntelligenceSyncJob.findUniqueOrThrow({
-        where: { id: rows[0].id },
-      });
-      if (!job.integrationId) return null;
-      const integration = await tx.brandIntegration.findUnique({
-        where: { id: job.integrationId },
-      });
-      if (!usable(integration, job)) {
-        await tx.instagramIntelligenceSyncJob.update({
+        if (!rows[0]) return null;
+        const job = await tx.instagramIntelligenceSyncJob.findUniqueOrThrow({
+          where: { id: rows[0].id },
+        });
+        if (!job.integrationId) return null;
+        const integration = await tx.brandIntegration.findUnique({
+          where: { id: job.integrationId },
+        });
+        if (!usable(integration, job)) {
+          await tx.instagramIntelligenceSyncJob.update({
+            where: { id: job.id },
+            data: {
+              status: InstagramSyncCoordinatorStatus.BLOCKED_AUTHORIZATION,
+              nextDueAt: null,
+              backoffUntil: null,
+              leaseToken: null,
+              leaseOwnerRef: null,
+              leaseExpiresAt: null,
+              reasonCodes: ["AUTHORIZATION_FENCE_REJECTED"],
+            },
+          });
+          return null;
+        }
+        const leaseToken = randomUUID();
+        const resumeExistingWindow =
+          job.status === InstagramSyncCoordinatorStatus.BACKOFF ||
+          job.status === InstagramSyncCoordinatorStatus.RUNNING;
+        const windowEnd =
+          resumeExistingWindow && job.executionWindowEnd
+            ? job.executionWindowEnd
+            : now;
+        const attemptNumber = job.attemptCount + 1;
+        await tx.instagramIntelligenceSyncJob.updateMany({
           where: { id: job.id },
           data: {
-            status: InstagramSyncCoordinatorStatus.BLOCKED_AUTHORIZATION,
-            nextDueAt: null,
-            backoffUntil: null,
-            leaseToken: null,
-            leaseOwnerRef: null,
-            leaseExpiresAt: null,
-            reasonCodes: ["AUTHORIZATION_FENCE_REJECTED"],
+            status: InstagramSyncCoordinatorStatus.RUNNING,
+            leaseToken,
+            leaseOwnerRef: workerIdentity,
+            leaseExpiresAt: new Date(now.getTime() + INSTAGRAM_SYNC_LEASE_MS),
+            lastHeartbeatAt: now,
+            lastAttemptAt: now,
+            attemptCount: { increment: 1 },
+            executionWindowStart: new Date(windowEnd.getTime() - 30 * DAY_MS),
+            executionWindowEnd: windowEnd,
           },
         });
-        return null;
-      }
-      const leaseToken = randomUUID();
-      const resumeExistingWindow =
-        job.status === InstagramSyncCoordinatorStatus.BACKOFF ||
-        job.status === InstagramSyncCoordinatorStatus.RUNNING;
-      const windowEnd =
-        resumeExistingWindow && job.executionWindowEnd
-          ? job.executionWindowEnd
-          : now;
-      const attemptNumber = job.attemptCount + 1;
-      await tx.instagramIntelligenceSyncJob.updateMany({
-        where: { id: job.id },
-        data: {
-          status: InstagramSyncCoordinatorStatus.RUNNING,
+        return {
+          jobId: job.id,
           leaseToken,
           leaseOwnerRef: workerIdentity,
-          leaseExpiresAt: new Date(now.getTime() + INSTAGRAM_SYNC_LEASE_MS),
-          lastHeartbeatAt: now,
-          lastAttemptAt: now,
-          attemptCount: { increment: 1 },
-          executionWindowStart: new Date(windowEnd.getTime() - 30 * DAY_MS),
-          executionWindowEnd: windowEnd,
-        },
-      });
-      return {
-        jobId: job.id,
-        leaseToken,
-        leaseOwnerRef: workerIdentity,
-        brandProfileId: job.brandProfileId,
-        integrationId: job.integrationId,
-        providerAccountId: job.providerAccountId,
-        authorizationGeneration: job.authorizationGeneration,
-        capabilityClass: job.capabilityClass,
-        trigger: job.trigger,
-        requestIdentity: job.requestIdentity,
-        attemptNumber,
-        windowEnd,
-      };
-    });
+          brandProfileId: job.brandProfileId,
+          integrationId: job.integrationId,
+          providerAccountId: job.providerAccountId,
+          authorizationGeneration: job.authorizationGeneration,
+          capabilityClass: job.capabilityClass,
+          trigger: job.trigger,
+          requestIdentity: job.requestIdentity,
+          attemptNumber,
+          windowEnd,
+        };
+      },
+      { maxWait: 10_000, timeout: 15_000 },
+    );
   }
 
   async claimNextCreator(
     workerIdentity: string,
   ): Promise<CreatorAudienceSyncLease | null> {
-    return this.prisma.$transaction(async (tx) => {
-      const now = await databaseNow(tx);
-      const rows = await tx.$queryRaw<
-        Array<{
-          id: string;
-          scopeId: string;
-          integrationId: string;
-          creatorProfileId: string;
-          workspaceId: string;
-          organizationId: string;
-          ownerUserId: string;
-          providerAccountId: string;
-          authorizationGeneration: number;
-          status: InstagramSyncCoordinatorStatus;
-          trigger: InstagramSyncTrigger;
-          requestIdentity: string;
-          attemptCount: number;
-          executionWindowEnd: Date | null;
-        }>
-      >(Prisma.sql`
+    return this.prisma.$transaction(
+      async (tx) => {
+        const now = await databaseNow(tx);
+        const rows = await tx.$queryRaw<
+          Array<{
+            id: string;
+            scopeId: string;
+            integrationId: string;
+            creatorProfileId: string;
+            workspaceId: string;
+            organizationId: string;
+            ownerUserId: string;
+            providerAccountId: string;
+            authorizationGeneration: number;
+            status: InstagramSyncCoordinatorStatus;
+            trigger: InstagramSyncTrigger;
+            requestIdentity: string;
+            attemptCount: number;
+            executionWindowEnd: Date | null;
+          }>
+        >(Prisma.sql`
         SELECT job.sync_job_id AS id, job.owner_scope_id AS "scopeId",
           job.creator_integration_id AS "integrationId",
           scope.creator_profile_id AS "creatorProfileId",
@@ -404,20 +408,20 @@ export class InstagramSyncCoordinatorRepository {
         ORDER BY COALESCE(job.backoff_until, job.next_due_at, job.lease_expires_at), job.sync_job_id
         FOR UPDATE OF job SKIP LOCKED LIMIT 1
       `);
-      if (!rows[0]) return null;
-      const row = rows[0];
-      const integration = await tx.creatorSocialIntegration.findUnique({
-        where: { id: row.integrationId },
-      });
-      if (
-        !creatorUsable(integration, {
-          creatorIntegrationId: row.integrationId,
-          providerAccountId: row.providerAccountId,
-          authorizationGeneration: row.authorizationGeneration,
-          capabilityClass: InstagramSyncCapabilityClass.AUDIENCE,
-        })
-      ) {
-        await tx.$executeRaw(Prisma.sql`
+        if (!rows[0]) return null;
+        const row = rows[0];
+        const integration = await tx.creatorSocialIntegration.findUnique({
+          where: { id: row.integrationId },
+        });
+        if (
+          !creatorUsable(integration, {
+            creatorIntegrationId: row.integrationId,
+            providerAccountId: row.providerAccountId,
+            authorizationGeneration: row.authorizationGeneration,
+            capabilityClass: InstagramSyncCapabilityClass.AUDIENCE,
+          })
+        ) {
+          await tx.$executeRaw(Prisma.sql`
           UPDATE instagram_intelligence_sync_jobs
           SET status='BLOCKED_AUTHORIZATION', next_due_at=NULL,
             backoff_until=NULL, lease_token=NULL, lease_owner_ref=NULL,
@@ -425,16 +429,16 @@ export class InstagramSyncCoordinatorRepository {
             reason_codes=ARRAY['AUTHORIZATION_FENCE_REJECTED']
           WHERE sync_job_id=${row.id}::uuid
         `);
-        return null;
-      }
-      const leaseToken = randomUUID();
-      const windowEnd =
-        (row.status === InstagramSyncCoordinatorStatus.BACKOFF ||
-          row.status === InstagramSyncCoordinatorStatus.RUNNING) &&
-        row.executionWindowEnd
-          ? row.executionWindowEnd
-          : now;
-      await tx.$executeRaw(Prisma.sql`
+          return null;
+        }
+        const leaseToken = randomUUID();
+        const windowEnd =
+          (row.status === InstagramSyncCoordinatorStatus.BACKOFF ||
+            row.status === InstagramSyncCoordinatorStatus.RUNNING) &&
+          row.executionWindowEnd
+            ? row.executionWindowEnd
+            : now;
+        await tx.$executeRaw(Prisma.sql`
         UPDATE instagram_intelligence_sync_jobs
         SET status='RUNNING', lease_token=${leaseToken}::uuid,
           lease_owner_ref=${workerIdentity},
@@ -444,30 +448,32 @@ export class InstagramSyncCoordinatorRepository {
           execution_window_end=${windowEnd}, updated_at=CURRENT_TIMESTAMP
         WHERE sync_job_id=${row.id}::uuid
       `);
-      return {
-        jobId: row.id,
-        leaseToken,
-        leaseOwnerRef: workerIdentity,
-        actor: {
-          actorUserId: row.ownerUserId,
-          actorMembershipId: `system:${row.scopeId}`,
-          actorRole: "OWNER",
-          workspaceId: row.workspaceId,
-          organizationId: row.organizationId,
-          subjectCreatorProfileId: row.creatorProfileId,
-          subjectOwnerUserId: row.ownerUserId,
-          allowedActions: ["INSIGHTS_AUDIENCE_READ"],
-        },
-        integrationId: row.integrationId,
-        providerAccountId: row.providerAccountId,
-        authorizationGeneration: row.authorizationGeneration,
-        capabilityClass: InstagramSyncCapabilityClass.AUDIENCE,
-        trigger: row.trigger,
-        requestIdentity: row.requestIdentity,
-        attemptNumber: row.attemptCount + 1,
-        windowEnd,
-      };
-    });
+        return {
+          jobId: row.id,
+          leaseToken,
+          leaseOwnerRef: workerIdentity,
+          actor: {
+            actorUserId: row.ownerUserId,
+            actorMembershipId: `system:${row.scopeId}`,
+            actorRole: "OWNER",
+            workspaceId: row.workspaceId,
+            organizationId: row.organizationId,
+            subjectCreatorProfileId: row.creatorProfileId,
+            subjectOwnerUserId: row.ownerUserId,
+            allowedActions: ["INSIGHTS_AUDIENCE_READ"],
+          },
+          integrationId: row.integrationId,
+          providerAccountId: row.providerAccountId,
+          authorizationGeneration: row.authorizationGeneration,
+          capabilityClass: InstagramSyncCapabilityClass.AUDIENCE,
+          trigger: row.trigger,
+          requestIdentity: row.requestIdentity,
+          attemptNumber: row.attemptCount + 1,
+          windowEnd,
+        };
+      },
+      { maxWait: 10_000, timeout: 15_000 },
+    );
   }
 
   async heartbeat(

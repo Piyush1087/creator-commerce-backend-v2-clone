@@ -46,6 +46,9 @@ describePostgres("C2 deterministic foundations PostgreSQL", () => {
       await prisma.$transaction((tx) =>
         purge.purgePersistentInTransaction(tx, id),
       );
+      await prisma.intelligenceOwnerScope.deleteMany({
+        where: { brandProfileId: id },
+      });
       await prisma.brandProfile.delete({ where: { id } });
     }
     await prisma.$disconnect();
