@@ -185,9 +185,62 @@ describePostgres("Week 4 speech PostgreSQL lineage and replay", () => {
     };
   }
 
+  async function sourceLineage(
+    state: Awaited<ReturnType<typeof fixture>>,
+    mediaId: string,
+    evidenceCount = 1,
+  ) {
+    return writer.write({
+      brandId: state.brand.id,
+      providerAccountId: state.providerAccountId,
+      authorizationGeneration: 4,
+      resourceType: "INSTAGRAM_MEDIA",
+      mediaId,
+      capabilityId: "instagram.media_inventory",
+      requestKey: `w4-source:${mediaId}:${randomUUID()}`,
+      providerExecutionRef: `provider-execution:w4-source:${randomUUID()}`,
+      normalizationContractVersion: "instagram-w4-source-fixture-v1",
+      startedAt: "2026-09-13T23:59:58.000Z",
+      capturedAt: "2026-09-14T00:00:00.000Z",
+      completedAt: "2026-09-14T00:00:00.500Z",
+      availability: "AVAILABLE",
+      retryability: "NOT_APPLICABLE",
+      reasonCodes: ["SOURCE_MEDIA_ADMITTED"],
+      coverage: "SINGLE_RESOURCE",
+      acquisitionQuality: {
+        state: "COMPLETE",
+        failureCategories: [],
+        detailCodes: [],
+      },
+      artifacts: [],
+      evidence: Array.from({ length: evidenceCount }, (_, index) => ({
+        evidenceKey: `admitted-source-media-${index}`,
+        payload: { providerMediaId: mediaId, admitted: true, index },
+        freshness: "CURRENT",
+        representativeness: "CONTEXT_SPECIFIC",
+      })),
+    });
+  }
+
   it("persists bounded speech lineage, replays without work, isolates tenants, and purges target only", async () => {
     const target = await fixture("target");
     const other = await fixture("other");
+    const targetSource = await sourceLineage(target, "reel-1", 2);
+    const otherSource = await sourceLineage(other, "reel-1");
+    const websiteResourceRef = `resource:website:w4-preserved:${randomUUID()}`;
+    await prisma.dataExtractionResource.create({
+      data: {
+        resourceRef: websiteResourceRef,
+        brandId: other.brand.id,
+        sourceClass: "OWNED_WEBSITE",
+        resourceType: "OWNED_WEB_PAGE",
+        canonicalResourceKey: "https://example.test/w4-preserved",
+        canonicalResourceKeyHash: createHash("sha256")
+          .update("https://example.test/w4-preserved")
+          .digest("hex"),
+        canonicalUrl: "https://example.test/w4-preserved",
+      },
+    });
     const targetPipeline = pipeline(target);
     const otherPipeline = pipeline(other);
     const input = {
@@ -197,8 +250,12 @@ describePostgres("Week 4 speech PostgreSQL lineage and replay", () => {
       authorizationGeneration: 4,
       mediaId: "reel-1",
       windowEnd: new Date("2026-09-14T00:00:00.000Z"),
-      sourceCaptureRef: "capture:instagram:source:1",
-      sourceEvidenceRefs: ["evidence:instagram:source:1"],
+      sourceCaptureRef: targetSource.captureRef,
+      sourceEvidenceRefs: [
+        targetSource.evidenceRefs[1]!,
+        targetSource.evidenceRefs[0]!,
+        targetSource.evidenceRefs[1]!,
+      ],
       now: () => new Date("2026-09-14T00:00:02.000Z"),
     };
     const first = await targetPipeline.service.execute(input);
@@ -207,6 +264,8 @@ describePostgres("Week 4 speech PostgreSQL lineage and replay", () => {
       brandProfileId: other.brand.id,
       integrationId: other.integration.id,
       providerAccountId: other.providerAccountId,
+      sourceCaptureRef: otherSource.captureRef,
+      sourceEvidenceRefs: otherSource.evidenceRefs,
     });
     if (first.state === "UNKNOWN") {
       const pending = targetPipeline.persistence.write.mock.results[0]?.value;
@@ -221,9 +280,9 @@ describePostgres("Week 4 speech PostgreSQL lineage and replay", () => {
     const stable = await counts(target.brand.id);
     expect(stable).toEqual({
       resources: 1,
-      captures: 1,
+      captures: 2,
       artifacts: 1,
-      evidence: 2,
+      evidence: 4,
       observations: 1,
       supports: 1,
     });
@@ -262,16 +321,29 @@ describePostgres("Week 4 speech PostgreSQL lineage and replay", () => {
       orderBy: { evidenceRef: "asc" },
     });
     expect(evidence.map((row) => row.captureMethodClass).sort()).toEqual([
+      "DETERMINISTIC_DERIVATION",
       "MODEL_DERIVATION",
       "PROVIDER_MEDIATED_FETCH",
+      "PROVIDER_MEDIATED_FETCH",
     ]);
-    const derived = evidence.find(
+    const transcript = evidence.find(
       (row) => row.captureMethodClass === "MODEL_DERIVATION",
+    );
+    const audio = evidence.find(
+      (row) => row.captureMethodClass === "DETERMINISTIC_DERIVATION",
     );
     const source = evidence.find(
       (row) => row.captureMethodClass === "PROVIDER_MEDIATED_FETCH",
     );
-    expect(derived?.parentEvidenceRefs).toEqual([source?.evidenceRef]);
+    expect(audio?.parentEvidenceRefs).toEqual(
+      [...targetSource.evidenceRefs].sort(),
+    );
+    expect(transcript?.parentEvidenceRefs).toEqual([audio?.evidenceRef]);
+    expect(audio?.captureRef).not.toBe(source?.captureRef);
+    expect(transcript?.captureRef).toBe(audio?.captureRef);
+    expect(source?.capture.capturedAt!.getTime()).toBeLessThanOrEqual(
+      audio?.capture.capturedAt!.getTime() ?? 0,
+    );
     expect(
       evidence.every(
         (row) =>
@@ -281,7 +353,7 @@ describePostgres("Week 4 speech PostgreSQL lineage and replay", () => {
     expect(JSON.stringify(evidence)).not.toMatch(
       /temporaryPath|accessToken|refreshToken|media_url|cdninstagram|fbcdn|base64|system prompt|developer message|reasoning/i,
     );
-    expect(await counts(other.brand.id)).toMatchObject({ evidence: 2 });
+    expect(await counts(other.brand.id)).toMatchObject({ evidence: 3 });
 
     const temp = await store.createAudio(target.brand.id);
     await temp.handle.writeFile("delete");
@@ -299,6 +371,111 @@ describePostgres("Week 4 speech PostgreSQL lineage and replay", () => {
       observations: 0,
       supports: 0,
     });
-    expect(await counts(other.brand.id)).toMatchObject({ evidence: 2 });
+    expect(await counts(other.brand.id)).toMatchObject({ evidence: 3 });
+    await expect(
+      prisma.dataExtractionResource.findUniqueOrThrow({
+        where: { resourceRef: websiteResourceRef },
+      }),
+    ).resolves.toMatchObject({ sourceClass: "OWNED_WEBSITE" });
+  });
+
+  it("atomically rejects every invalid external source-parent substitution", async () => {
+    const execute = async (
+      state: Awaited<ReturnType<typeof fixture>>,
+      source: Awaited<ReturnType<typeof sourceLineage>>,
+      overrides: Partial<{
+        mediaId: string;
+        sourceCaptureRef: string;
+        sourceEvidenceRefs: readonly string[];
+      }> = {},
+    ) => {
+      const subject = pipeline(state);
+      const before = await counts(state.brand.id);
+      const result = await subject.service.execute({
+        brandProfileId: state.brand.id,
+        integrationId: state.integration.id,
+        providerAccountId: state.providerAccountId,
+        authorizationGeneration: 4,
+        mediaId: "reel-invalid-parent",
+        windowEnd: new Date("2026-09-14T00:00:00.000Z"),
+        sourceCaptureRef: source.captureRef,
+        sourceEvidenceRefs: source.evidenceRefs,
+        now: () => new Date("2026-09-14T00:00:02.000Z"),
+        ...overrides,
+      });
+      expect(result).toMatchObject({ state: "UNKNOWN", evidenceRefs: [] });
+      expect(await counts(state.brand.id)).toEqual(before);
+    };
+
+    const nonexistent = await fixture("nonexistent-parent");
+    const nonexistentSource = await sourceLineage(
+      nonexistent,
+      "reel-invalid-parent",
+    );
+    await execute(nonexistent, nonexistentSource, {
+      sourceEvidenceRefs: ["evidence:instagram:missing-parent"],
+    });
+
+    const crossBrand = await fixture("cross-brand-parent-target");
+    const crossBrandSourceOwner = await fixture("cross-brand-parent-owner");
+    const crossBrandSource = await sourceLineage(
+      crossBrandSourceOwner,
+      "reel-invalid-parent",
+    );
+    await execute(crossBrand, crossBrandSource);
+
+    const account = await fixture("account-parent");
+    const accountSource = await sourceLineage(account, "reel-invalid-parent");
+    await prisma.dataExtractionCapture.update({
+      where: { captureRef: accountSource.captureRef },
+      data: { providerAccountId: "different-account" },
+    });
+    await execute(account, accountSource);
+
+    const generation = await fixture("generation-parent");
+    const generationSource = await sourceLineage(
+      generation,
+      "reel-invalid-parent",
+    );
+    await prisma.dataExtractionCapture.update({
+      where: { captureRef: generationSource.captureRef },
+      data: { authorizationGeneration: 3 },
+    });
+    await execute(generation, generationSource);
+
+    const media = await fixture("media-parent");
+    const mediaSource = await sourceLineage(media, "different-reel");
+    await execute(media, mediaSource);
+
+    const capture = await fixture("capture-parent");
+    const captureSource = await sourceLineage(capture, "reel-invalid-parent");
+    await execute(capture, captureSource, {
+      sourceCaptureRef: "capture:instagram:different-source",
+    });
+
+    const circular = await fixture("circular-parent");
+    const circularSource = await sourceLineage(circular, "reel-invalid-parent");
+    const successful = pipeline(circular);
+    const successfulResult = await successful.service.execute({
+      brandProfileId: circular.brand.id,
+      integrationId: circular.integration.id,
+      providerAccountId: circular.providerAccountId,
+      authorizationGeneration: 4,
+      mediaId: "reel-invalid-parent",
+      windowEnd: new Date("2026-09-14T00:00:00.000Z"),
+      sourceCaptureRef: circularSource.captureRef,
+      sourceEvidenceRefs: circularSource.evidenceRefs,
+      now: () => new Date("2026-09-14T00:00:02.000Z"),
+    });
+    const audio = await prisma.dataExtractionEvidenceItem.findFirstOrThrow({
+      where: {
+        evidenceRef: { in: [...successfulResult.evidenceRefs] },
+        captureMethodClass: "DETERMINISTIC_DERIVATION",
+      },
+    });
+    await execute(circular, circularSource, {
+      sourceCaptureRef: audio.captureRef,
+      sourceEvidenceRefs: [audio.evidenceRef],
+    });
   });
 });

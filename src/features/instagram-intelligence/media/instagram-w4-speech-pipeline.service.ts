@@ -69,6 +69,7 @@ export class InstagramW4SpeechPipelineService {
   }): Promise<InstagramW4SpeechResult> {
     const now = input.now ?? (() => new Date());
     const startedAt = now().toISOString();
+    const sourceEvidenceRefs = canonicalRefs(input.sourceEvidenceRefs);
     let video: InstagramTemporaryVideoArtifact | undefined;
     let audio: InstagramTemporaryAudioArtifact | undefined;
     try {
@@ -93,7 +94,7 @@ export class InstagramW4SpeechPipelineService {
         authorizationGeneration: input.authorizationGeneration,
         mediaId: input.mediaId,
         sourceCaptureRef: input.sourceCaptureRef,
-        sourceEvidenceRefs: [...input.sourceEvidenceRefs].sort(),
+        sourceEvidenceRefs,
         windowEnd: input.windowEnd.toISOString(),
         speechProfile: INSTAGRAM_SPEECH_ANALYSIS_PROFILE,
         audioProfile: INSTAGRAM_AUDIO_EXTRACTION_PROFILE,
@@ -151,7 +152,7 @@ export class InstagramW4SpeechPipelineService {
         providerMediaId: input.mediaId,
         verifiedVideoFingerprint: video.sha256,
         sourceCaptureRef: input.sourceCaptureRef,
-        sourceEvidenceRefs: [...input.sourceEvidenceRefs].sort(),
+        sourceEvidenceRefs,
         speechProfile: INSTAGRAM_SPEECH_ANALYSIS_PROFILE,
         audioProfile: INSTAGRAM_AUDIO_EXTRACTION_PROFILE,
         transcriptContractVersion: INSTAGRAM_SPEECH_TRANSCRIPT_CONTRACT_VERSION,
@@ -190,6 +191,10 @@ export class InstagramW4SpeechPipelineService {
           failureCategories: [],
           detailCodes: [`SEGMENTS_${transcript.segments.length}`],
         },
+        externalDeterministicSourceParents: {
+          sourceCaptureRef: input.sourceCaptureRef,
+          sourceEvidenceRefs,
+        },
         artifacts: [
           {
             artifactKey: "audio-technical",
@@ -213,6 +218,7 @@ export class InstagramW4SpeechPipelineService {
             payload: { ...metadata, audioAvailable: true },
             freshness: "CURRENT",
             representativeness: "CONTEXT_SPECIFIC",
+            usesExternalDeterministicSourceParents: true,
           },
           {
             evidenceKey: "transcript",
@@ -315,7 +321,7 @@ export class InstagramW4SpeechPipelineService {
       .sort((left, right) =>
         left.captureMethodClass === right.captureMethodClass
           ? left.evidenceRef.localeCompare(right.evidenceRef)
-          : left.captureMethodClass === "PROVIDER_MEDIATED_FETCH"
+          : left.captureMethodClass === "DETERMINISTIC_DERIVATION"
             ? -1
             : 1,
       )
@@ -344,6 +350,12 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+}
+
+function canonicalRefs(refs: readonly string[]) {
+  return [...new Set(refs.map((ref) => ref.trim()))].sort((left, right) =>
+    left.localeCompare(right),
+  );
 }
 
 function audioSizeClass(byteLength: number) {

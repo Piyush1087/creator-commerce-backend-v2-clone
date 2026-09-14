@@ -25,7 +25,7 @@ describe("InstagramW4SpeechPipelineService", () => {
                 evidenceRef,
                 boundedPayload: saved.payloads[index],
                 captureMethodClass:
-                  index === 0 ? "PROVIDER_MEDIATED_FETCH" : "MODEL_DERIVATION",
+                  index === 0 ? "DETERMINISTIC_DERIVATION" : "MODEL_DERIVATION",
               }))
             : [],
         ),
@@ -110,7 +110,7 @@ describe("InstagramW4SpeechPipelineService", () => {
       mediaId: "reel-1",
       windowEnd: new Date("2026-09-14T00:00:00.000Z"),
       sourceCaptureRef: "capture:source",
-      sourceEvidenceRefs: ["evidence:source"],
+      sourceEvidenceRefs: [" evidence:source ", "evidence:source"],
       now: () => new Date("2026-09-14T00:00:00.000Z"),
     };
     const first = await service.execute(input);
@@ -132,6 +132,15 @@ describe("InstagramW4SpeechPipelineService", () => {
     expect(extractor.extract).toHaveBeenCalledTimes(1);
     expect(transcription.transcribe).toHaveBeenCalledTimes(1);
     expect(writer.write).toHaveBeenCalledTimes(1);
+    expect(writer.write.mock.calls[0]![0]).toMatchObject({
+      externalDeterministicSourceParents: {
+        sourceCaptureRef: "capture:source",
+        sourceEvidenceRefs: ["evidence:source"],
+      },
+    });
+    expect(writer.write.mock.calls[0]![0].evidence[0]).toMatchObject({
+      usesExternalDeterministicSourceParents: true,
+    });
     expect(writer.write.mock.calls[0]![0].evidence[1]).toMatchObject({
       derivationParentEvidenceKey: "audio-technical",
     });

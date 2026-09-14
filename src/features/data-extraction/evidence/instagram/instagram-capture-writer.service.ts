@@ -13,6 +13,8 @@ import {
   asProviderExecutionRef,
   asSemanticObservationKey,
   type BrandId,
+  type CaptureRef,
+  type EvidenceRef,
 } from "../domain/evidence-identities";
 import type {
   AcquisitionQuality,
@@ -45,6 +47,12 @@ export type InstagramCaptureEvidenceInput = Readonly<{
   representativeness: EvidenceRepresentativeness;
   semanticObservationKey?: string;
   derivationParentEvidenceKey?: string;
+  usesExternalDeterministicSourceParents?: true;
+}>;
+
+export type InstagramExternalDeterministicSourceParents = Readonly<{
+  sourceCaptureRef: string;
+  sourceEvidenceRefs: readonly string[];
 }>;
 
 export type WriteInstagramCaptureInput = Readonly<{
@@ -75,6 +83,7 @@ export type WriteInstagramCaptureInput = Readonly<{
   }>;
   artifacts: readonly InstagramCaptureArtifactInput[];
   evidence: readonly InstagramCaptureEvidenceInput[];
+  externalDeterministicSourceParents?: InstagramExternalDeterministicSourceParents;
 }>;
 
 export type InstagramCaptureWriteResult = Readonly<{
@@ -132,6 +141,7 @@ export class InstagramCaptureWriterService {
         `evidence:instagram:${digest(`${identityKey}:evidence:${evidence.evidenceKey}`)}`,
       ),
     );
+    const externalParentEvidenceRefs = canonicalExternalParentRefs(input);
 
     return this.prisma.$transaction(async (tx) => {
       const integrations = await tx.$queryRaw<LockedInstagramIntegration[]>(
@@ -166,6 +176,17 @@ export class InstagramCaptureWriterService {
       ) {
         throw persistenceError("STALE_AUTHORIZATION_GENERATION");
       }
+
+      const externalParentCaptureRefs = input.externalDeterministicSourceParents
+        ? await validateExternalDeterministicParents({
+            tx,
+            input,
+            identityResourceRef: identity.resourceRef,
+            integration,
+            derivedEvidenceRefs: evidenceRefs,
+            parentEvidenceRefs: externalParentEvidenceRefs,
+          })
+        : [];
 
       const repositories = createDataExtractionRepositorySet(tx);
       const resource = await repositories.resources.createOrGet({
@@ -274,6 +295,8 @@ export class InstagramCaptureWriterService {
         const semanticObservationKey = evidence.semanticObservationKey
           ? asSemanticObservationKey(evidence.semanticObservationKey)
           : undefined;
+        const usesExternalParents =
+          evidence.usesExternalDeterministicSourceParents === true;
         await repositories.evidenceItems.insertOrGetExact({
           brandId,
           evidenceRef,
@@ -295,11 +318,24 @@ export class InstagramCaptureWriterService {
           provenance: {
             acquisitionOrNormalizationRunRef: capabilityExecutionRef,
             captureMethodClass:
-              parentIndex >= 0 ? "MODEL_DERIVATION" : "PROVIDER_MEDIATED_FETCH",
+              parentIndex >= 0
+                ? "MODEL_DERIVATION"
+                : usesExternalParents
+                  ? "DETERMINISTIC_DERIVATION"
+                  : "PROVIDER_MEDIATED_FETCH",
             normalizationContractVersion: input.normalizationContractVersion,
             parentEvidenceRefs:
-              parentIndex >= 0 ? [evidenceRefs[parentIndex]!] : [],
-            parentCaptureRefs: parentIndex >= 0 ? [captureRef] : [],
+              parentIndex >= 0
+                ? [evidenceRefs[parentIndex]!]
+                : usesExternalParents
+                  ? externalParentEvidenceRefs
+                  : [],
+            parentCaptureRefs:
+              parentIndex >= 0
+                ? [captureRef]
+                : usesExternalParents
+                  ? externalParentCaptureRefs
+                  : [],
             providerExecutionRef,
           },
           deduplication: {
@@ -401,6 +437,7 @@ function validateInput(input: WriteInstagramCaptureInput): void {
     assertSafePayload(artifact.payload);
   }
   const evidenceKeys = new Set<string>();
+  let externalParentConsumerCount = 0;
   for (const evidence of input.evidence) {
     if (
       !evidence.evidenceKey.trim() ||
@@ -421,8 +458,94 @@ function validateInput(input: WriteInstagramCaptureInput): void {
     ) {
       throw persistenceError("PERSISTENCE_INVARIANT");
     }
+    if (evidence.usesExternalDeterministicSourceParents) {
+      externalParentConsumerCount += 1;
+      if (evidence.derivationParentEvidenceKey !== undefined) {
+        throw persistenceError("PERSISTENCE_INVARIANT");
+      }
+    }
     assertSafePayload(evidence.payload);
   }
+  if (input.externalDeterministicSourceParents) {
+    if (
+      input.capabilityId !== "instagram.media_audio_observations" ||
+      input.resourceType !== "INSTAGRAM_MEDIA" ||
+      !input.mediaId?.trim() ||
+      !input.externalDeterministicSourceParents.sourceCaptureRef.trim() ||
+      input.externalDeterministicSourceParents.sourceEvidenceRefs.length ===
+        0 ||
+      externalParentConsumerCount !== 1
+    ) {
+      throw persistenceError("PERSISTENCE_INVARIANT");
+    }
+  } else if (externalParentConsumerCount !== 0) {
+    throw persistenceError("PERSISTENCE_INVARIANT");
+  }
+}
+
+function canonicalExternalParentRefs(
+  input: WriteInstagramCaptureInput,
+): readonly EvidenceRef[] {
+  const refs = input.externalDeterministicSourceParents?.sourceEvidenceRefs;
+  if (!refs) return [];
+  const canonical = [...new Set(refs.map((ref) => ref.trim()))].sort((a, b) =>
+    a.localeCompare(b),
+  );
+  if (canonical.some((ref) => !ref)) {
+    throw persistenceError("PERSISTENCE_INVARIANT");
+  }
+  return canonical.map(asEvidenceRef);
+}
+
+async function validateExternalDeterministicParents(input: {
+  tx: Prisma.TransactionClient;
+  input: WriteInstagramCaptureInput;
+  identityResourceRef: string;
+  integration: LockedInstagramIntegration;
+  derivedEvidenceRefs: readonly string[];
+  parentEvidenceRefs: readonly EvidenceRef[];
+}): Promise<readonly CaptureRef[]> {
+  const context = input.input.externalDeterministicSourceParents!;
+  if (
+    input.parentEvidenceRefs.length === 0 ||
+    input.parentEvidenceRefs.some((ref) =>
+      input.derivedEvidenceRefs.includes(ref),
+    )
+  ) {
+    throw persistenceError("PERSISTENCE_INVARIANT");
+  }
+  const rows = await input.tx.dataExtractionEvidenceItem.findMany({
+    where: { evidenceRef: { in: [...input.parentEvidenceRefs] } },
+    include: { capture: true, resource: true },
+  });
+  if (rows.length !== input.parentEvidenceRefs.length) {
+    throw persistenceError("PERSISTENCE_INVARIANT");
+  }
+  const expectedCapturedAt = input.input.capturedAt
+    ? new Date(input.input.capturedAt)
+    : undefined;
+  for (const row of rows) {
+    if (
+      row.brandId !== input.input.brandId ||
+      row.resource.sourceClass !== "INSTAGRAM_OWNED" ||
+      row.resource.resourceType !== "INSTAGRAM_MEDIA" ||
+      row.resourceRef !== input.identityResourceRef ||
+      row.resource.providerAccountId !== input.input.providerAccountId ||
+      row.captureRef !== context.sourceCaptureRef ||
+      row.capture.resourceRef !== input.identityResourceRef ||
+      row.capture.providerIntegrationId !== input.integration.integrationId ||
+      row.capture.providerAccountId !== input.input.providerAccountId ||
+      row.capture.authorizationGeneration !==
+        input.input.authorizationGeneration ||
+      row.capture.status !== "COMPLETED" ||
+      !row.capture.capturedAt ||
+      (expectedCapturedAt && row.capture.capturedAt > expectedCapturedAt) ||
+      row.capabilityId === "instagram.media_audio_observations"
+    ) {
+      throw persistenceError("PERSISTENCE_INVARIANT");
+    }
+  }
+  return [asCaptureRef(context.sourceCaptureRef)];
 }
 
 function assertSafePayload(value: Readonly<Record<string, unknown>>): void {
