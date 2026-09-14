@@ -350,6 +350,14 @@ describePostgres("Week 4 speech PostgreSQL lineage and replay", () => {
           row.capture.status === "COMPLETED" && row.capture.capturedAt !== null,
       ),
     ).toBe(true);
+    expect(
+      evidence.every((row) => /^[a-f0-9]{64}$/u.test(row.contentHash)),
+    ).toBe(true);
+    const artifact = await prisma.dataExtractionContentArtifact.findFirstOrThrow(
+      { where: { brandId: target.brand.id } },
+    );
+    expect(artifact.contentHash).toMatch(/^[a-f0-9]{64}$/u);
+    expect(artifact.byteLength).toBeGreaterThan(0);
     expect(JSON.stringify(evidence)).not.toMatch(
       /temporaryPath|accessToken|refreshToken|media_url|cdninstagram|fbcdn|base64|system prompt|developer message|reasoning/i,
     );
