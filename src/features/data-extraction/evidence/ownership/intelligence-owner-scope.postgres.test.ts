@@ -134,5 +134,50 @@ describe.skipIf(!enabled)(
         brandProfileId: brand.id,
       });
     });
+
+    it("rejects cross-Creator lineage even though legacy brand keys are null", async () => {
+      const first = await creator();
+      const second = await creator();
+      const firstScope = await repository.resolve({
+        kind: "CREATOR",
+        creatorProfileId: first.profile.id,
+        creatorWorkspaceId: first.workspace.id,
+      });
+      const secondScope = await repository.resolve({
+        kind: "CREATOR",
+        creatorProfileId: second.profile.id,
+        creatorWorkspaceId: second.workspace.id,
+      });
+      const resourceRef = `creator-resource:${randomUUID()}`;
+      await db.$executeRawUnsafe(
+        `INSERT INTO data_extraction_resources
+         (id, resource_ref, owner_scope_id, brand_id, source_class, resource_type,
+          canonical_resource_key, canonical_resource_key_hash, canonical_url, provider_account_id)
+         VALUES ($1,$2,$3,NULL,'INSTAGRAM_OWNED','INSTAGRAM_ACCOUNT',$4,$5,$6,$7)`,
+        randomUUID(),
+        resourceRef,
+        firstScope.id,
+        resourceRef,
+        "d".repeat(64),
+        "instagram://creator-account/first",
+        "provider-first",
+      );
+
+      await expect(
+        db.$executeRawUnsafe(
+          `INSERT INTO data_extraction_captures
+           (id, capture_ref, owner_scope_id, brand_id, resource_ref,
+            acquisition_request_key, status, started_at, acquisition_quality,
+            provider_account_id, authorization_generation)
+           VALUES ($1,$2,$3,NULL,$4,$5,'RUNNING',CURRENT_TIMESTAMP,'COMPLETE',$6,1)`,
+          randomUUID(),
+          `creator-capture:${randomUUID()}`,
+          secondScope.id,
+          resourceRef,
+          `request:${randomUUID()}`,
+          "provider-second",
+        ),
+      ).rejects.toThrow(/OWNER_SCOPE_RESOURCE_LINEAGE_MISMATCH/);
+    });
   },
 );
