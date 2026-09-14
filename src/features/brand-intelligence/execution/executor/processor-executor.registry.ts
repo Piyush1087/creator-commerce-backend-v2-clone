@@ -22,6 +22,7 @@ import {
   InstagramC4OrganicPerformanceProcessor,
 } from "../../../instagram-intelligence/runtime/instagram-c4.processor";
 import { CreatorAudienceProcessorExecutor } from "../../../creator-audience/creator-audience-processor.executor";
+import { CreatorContentProcessorExecutor } from "../../../creator-content/creator-content-processor.executor";
 
 @Injectable()
 export class ProcessorExecutorRegistry {
@@ -57,6 +58,8 @@ export class ProcessorExecutorRegistry {
     instagramOrganicPerformanceExecutor?: InstagramC4OrganicPerformanceProcessor,
     @Optional()
     creatorAudienceExecutor?: CreatorAudienceProcessorExecutor,
+    @Optional()
+    creatorContentExecutor?: CreatorContentProcessorExecutor,
   ) {
     const executors: [string, ProcessorExecutor][] = [
       [SYNTHETIC_PROCESSOR_ID, syntheticExecutor],
@@ -125,6 +128,11 @@ export class ProcessorExecutorRegistry {
       executors.push([
         creatorAudienceExecutor.processorId,
         creatorAudienceExecutor,
+      ]);
+    if (creatorContentExecutor)
+      executors.push([
+        creatorContentExecutor.processorId,
+        creatorContentExecutor,
       ]);
     this.executors = new Map(executors);
   }

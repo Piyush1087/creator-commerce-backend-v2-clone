@@ -11,4 +11,12 @@ export interface CreatorInstagramAudienceProcessingPort {
     authorizationGeneration: number;
     trigger: "INITIAL_CONNECT" | "RECONNECT";
   }): Promise<void>;
+  scheduleCreatorContent(input: {
+    creatorProfileId: string;
+    creatorWorkspaceId: string;
+    integrationId: string;
+    providerAccountId: string;
+    authorizationGeneration: number;
+    trigger: "INITIAL_CONNECT" | "RECONNECT";
+  }): Promise<void>;
 }

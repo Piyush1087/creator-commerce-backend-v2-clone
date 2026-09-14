@@ -106,4 +106,48 @@ describe("InstagramSyncDispatcherService", () => {
       "creator-generation",
     ]);
   });
+
+  it("routes the existing Creator daily media lease to Content without a second scheduler", async () => {
+    const creatorLease = {
+      ...lease,
+      actor: {
+        actorUserId: "owner-user",
+        actorMembershipId: "system:scope",
+        actorRole: "OWNER",
+        workspaceId: "workspace",
+        organizationId: "organization",
+        subjectCreatorProfileId: "creator",
+        subjectOwnerUserId: "owner-user",
+        allowedActions: ["INSIGHTS_CONTENT_READ"],
+      },
+      capabilityClass: "PROFILE_MEDIA_PERFORMANCE",
+    } as const;
+    const repository = {
+      claimNext: vi.fn().mockResolvedValue(null),
+      claimNextCreator: vi.fn().mockResolvedValue(creatorLease),
+      complete: vi.fn().mockResolvedValue(undefined),
+      fail: vi.fn(),
+    };
+    const content = {
+      execute: vi
+        .fn()
+        .mockResolvedValue({ generationIds: ["content-generation"] }),
+    };
+    const dispatcher = new InstagramSyncDispatcherService(
+      repository as never,
+      { execute: vi.fn() } as never,
+      undefined,
+      content as never,
+    );
+    await expect(dispatcher.dispatch()).resolves.toEqual({ processed: true });
+    expect(content.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actor: creatorLease.actor,
+        requestIdentity: creatorLease.requestIdentity,
+      }),
+    );
+    expect(repository.complete).toHaveBeenCalledWith(creatorLease, [
+      "content-generation",
+    ]);
+  });
 });

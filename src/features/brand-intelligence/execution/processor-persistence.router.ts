@@ -20,6 +20,8 @@ import { InstagramHiddenBrandPersistenceHook } from "../../instagram-intelligenc
 import { sourceIdentityFromManifest } from "../../instagram-intelligence/hidden-brand/instagram-brand-source-profile";
 import { CreatorAudiencePersistenceHook } from "../../creator-audience/creator-audience-persistence.hook";
 import { CREATOR_AUDIENCE_PROCESSOR_ID } from "../../creator-audience/creator-audience-runtime.contract";
+import { CreatorContentPersistenceHook } from "../../creator-content/creator-content-persistence.hook";
+import { CREATOR_CONTENT_PROCESSOR_ID } from "../../creator-content/creator-content-runtime.contract";
 
 /** Bounded dispatch only; finalization still owns the transaction and live lease. */
 @Injectable()
@@ -42,6 +44,8 @@ export class ProcessorPersistenceRouter implements ProcessorSuccessPersistenceHo
     private readonly instagramHiddenBrand?: InstagramHiddenBrandPersistenceHook,
     @Optional()
     private readonly creatorAudience?: CreatorAudiencePersistenceHook,
+    @Optional()
+    private readonly creatorContent?: CreatorContentPersistenceHook,
   ) {}
   async persistBeforeCompletion(
     tx: Prisma.TransactionClient,
@@ -61,6 +65,13 @@ export class ProcessorPersistenceRouter implements ProcessorSuccessPersistenceHo
       );
     }
     switch (claim.processorExecution.processorId) {
+      case CREATOR_CONTENT_PROCESSOR_ID:
+        if (!this.creatorContent)
+          throw new ProcessorExecutorFailure({
+            category: "CONFIGURATION_DRIFT",
+            code: "CREATOR_CONTENT_PERSISTENCE_MISSING",
+          });
+        return this.creatorContent.persistBeforeCompletion(tx, claim, result);
       case CREATOR_AUDIENCE_PROCESSOR_ID:
         if (!this.creatorAudience)
           throw new ProcessorExecutorFailure({

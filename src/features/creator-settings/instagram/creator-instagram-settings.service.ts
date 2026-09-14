@@ -233,6 +233,14 @@ export class CreatorInstagramSettingsService {
         authorizationGeneration: attempt.expectedGeneration + 1,
         trigger: "RECONNECT",
       });
+      await this.instagramSync?.scheduleCreatorContent({
+        creatorProfileId: actor.subjectCreatorProfileId,
+        creatorWorkspaceId: actor.workspaceId,
+        integrationId: integration.id,
+        providerAccountId: me.userId,
+        authorizationGeneration: attempt.expectedGeneration + 1,
+        trigger: "RECONNECT",
+      });
     }
     return { connected: true as const, settings: await this.readFor(actor) };
   }

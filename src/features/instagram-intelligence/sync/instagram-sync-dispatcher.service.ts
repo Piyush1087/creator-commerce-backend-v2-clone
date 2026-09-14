@@ -3,6 +3,8 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 
 import { InstagramIntelligenceReadFenceError } from "../../brand-settings/services/instagram-intelligence-provider-read.service";
 import { CreatorAudiencePipelineService } from "../../creator-audience/creator-audience-pipeline.service";
+import { CreatorContentPipelineService } from "../../creator-content/creator-content-pipeline.service";
+import { InstagramSyncCapabilityClass } from "@prisma/client";
 import { InstagramSyncCoordinatorRepository } from "./instagram-sync-coordinator.repository";
 import { InstagramSyncPipelinePort } from "./instagram-sync-pipeline.port";
 
@@ -15,6 +17,8 @@ export class InstagramSyncDispatcherService {
     private readonly pipeline: InstagramSyncPipelinePort,
     @Optional()
     private readonly creatorAudience?: CreatorAudiencePipelineService,
+    @Optional()
+    private readonly creatorContent?: CreatorContentPipelineService,
   ) {}
 
   @Cron(CronExpression.EVERY_HOUR, {
@@ -29,9 +33,13 @@ export class InstagramSyncDispatcherService {
       }
       const creatorLease = await this.coordinator.claimNextCreator(worker);
       if (!creatorLease) return { processed: false };
-      if (!this.creatorAudience) {
-        throw new Error("CREATOR_AUDIENCE_PIPELINE_UNAVAILABLE");
-      }
+      const creatorPipeline =
+        creatorLease.capabilityClass ===
+        InstagramSyncCapabilityClass.PROFILE_MEDIA_PERFORMANCE
+          ? this.creatorContent
+          : this.creatorAudience;
+      if (!creatorPipeline)
+        throw new Error("CREATOR_INSIGHTS_PIPELINE_UNAVAILABLE");
       const heartbeat = setInterval(() => {
         void this.coordinator
           .heartbeat(creatorLease)
@@ -43,7 +51,7 @@ export class InstagramSyncDispatcherService {
       }, 60_000);
       heartbeat.unref();
       try {
-        const result = await this.creatorAudience.execute({
+        const result = await creatorPipeline.execute({
           actor: creatorLease.actor,
           integrationId: creatorLease.integrationId,
           providerAccountId: creatorLease.providerAccountId,
@@ -106,6 +114,7 @@ function safeReason(error: unknown): string {
 function isCreatorAuthorizationError(error: unknown): boolean {
   return (
     error instanceof Error &&
-    error.message === "CREATOR_AUDIENCE_AUTHORIZATION_FENCE_REJECTED"
+    (error.message === "CREATOR_AUDIENCE_AUTHORIZATION_FENCE_REJECTED" ||
+      error.message === "CREATOR_CONTENT_AUTHORIZATION_FENCE_REJECTED")
   );
 }

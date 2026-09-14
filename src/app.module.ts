@@ -21,6 +21,7 @@ import { CoPilotModule } from "./features/co-pilot/co-pilot.module";
 import { ChatModule } from "./features/chat/chat.module";
 import { CreatorCoPilotModule } from "./features/creator-co-pilot/creator-co-pilot.module";
 import { CreatorAudienceModule } from "./features/creator-audience/creator-audience.module";
+import { CreatorContentModule } from "./features/creator-content/creator-content.module";
 import { CreatorCentreModule } from "./features/creator-centre/creator-centre.module";
 import { CreatorEntryModule } from "./features/creator-entry/creator-entry.module";
 import { CreatorHomeModule } from "./features/creator-home/creator-home.module";
@@ -76,6 +77,7 @@ import { S3Module } from "./shared/s3/s3.module";
     ChatModule,
     CreatorMarketplaceModule,
     CreatorAudienceModule,
+    CreatorContentModule,
     CreatorOnboardingModule,
     CreatorEntryModule,
     CreatorHomeModule,

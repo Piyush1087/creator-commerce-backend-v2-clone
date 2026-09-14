@@ -13,6 +13,7 @@ import type {
 import { ContractRuntimeError } from "../bundle/contract-runtime.error";
 import { SemanticValidator } from "../validation/semantic.validator";
 import { creatorAudienceVerifiedContract } from "../../../creator-audience/creator-audience-runtime.contract";
+import { creatorContentVerifiedContract } from "../../../creator-content/creator-content-runtime.contract";
 
 function keyOf(key: ContractRegistryKey): string {
   return [
@@ -66,11 +67,14 @@ export class ContractRuntimeRegistry implements OnModuleInit {
     ]);
     const generated = this.integrity.verifyRoot(root, validatorIds);
     const creatorAudience = creatorAudienceVerifiedContract();
+    const creatorContent = creatorContentVerifiedContract();
     const key = keyOf(creatorAudience.registration);
+    const contentKey = keyOf(creatorContent.registration);
     if (
       generated.bundles.has(key) ||
-      generated.registry.registrations.some(
-        (registration) => keyOf(registration) === key,
+      generated.bundles.has(contentKey) ||
+      generated.registry.registrations.some((registration) =>
+        [key, contentKey].includes(keyOf(registration)),
       )
     ) {
       throw new ContractRuntimeError(
@@ -84,11 +88,13 @@ export class ContractRuntimeRegistry implements OnModuleInit {
         registrations: [
           ...generated.registry.registrations,
           creatorAudience.registration,
+          creatorContent.registration,
         ],
       },
       bundles: new Map([
         ...generated.bundles,
         [key, creatorAudience.bundle] as const,
+        [contentKey, creatorContent.bundle] as const,
       ]),
     };
     this.startupFailure = undefined;

@@ -20,6 +20,10 @@ import {
   CREATOR_AUDIENCE_PROCESSOR_ID,
   CreatorAudienceProcessorInputSchema,
 } from "../../../creator-audience/creator-audience-runtime.contract";
+import {
+  CREATOR_CONTENT_PROCESSOR_ID,
+  CreatorContentProcessorInputSchema,
+} from "../../../creator-content/creator-content-runtime.contract";
 import { accepted, rejected } from "./validation-result";
 import type {
   SemanticValidationContext,
@@ -442,6 +446,25 @@ class CreatorAudienceSemanticValidator implements ProcessorSemanticValidator {
   }
 }
 
+class CreatorContentSemanticValidator implements ProcessorSemanticValidator {
+  readonly validatorId = CREATOR_CONTENT_PROCESSOR_ID;
+
+  validate(output: JsonRecord): readonly ValidationIssue[] {
+    const parsed = CreatorContentProcessorInputSchema.safeParse({
+      kind: "CREATOR_CONTENT_PROCESSOR_INPUT_V1",
+      value: output,
+    });
+    return parsed.success
+      ? []
+      : [
+          semanticIssue(
+            "CREATOR_CONTENT_INVALID",
+            "Creator Content output violates the frozen V0 contract",
+          ),
+        ];
+  }
+}
+
 @Injectable()
 export class SemanticValidator {
   private readonly validators: ReadonlyMap<string, ProcessorSemanticValidator> =
@@ -461,6 +484,7 @@ export class SemanticValidator {
         new InstagramAudienceProfileSemanticValidator(),
         new InstagramOrganicPerformanceSemanticValidator(),
         new CreatorAudienceSemanticValidator(),
+        new CreatorContentSemanticValidator(),
       ].map((validator) => [validator.validatorId, validator]),
     );
 

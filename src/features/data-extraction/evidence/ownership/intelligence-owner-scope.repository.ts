@@ -73,16 +73,18 @@ export class IntelligenceOwnerScopeRepository {
         ),
         target_objects AS MATERIALIZED (
           SELECT object_generation_id, action_id FROM intelligence_object_generations
-          WHERE owner_scope_id=${scopeId} AND object_semantic_id='creator_audience'
+          WHERE owner_scope_id=${scopeId}
+            AND object_semantic_id IN ('creator_audience', 'creator_content')
         ),
         target_processors AS MATERIALIZED (
           SELECT processor_execution_id, execution_id
           FROM intelligence_processor_executions
-          WHERE owner_scope_id=${scopeId} AND processor_id='creator_audience_v0'
+          WHERE owner_scope_id=${scopeId}
+            AND processor_id IN ('creator_audience_v0', 'creator_content_v0')
         ),
-        deleted_transitions AS (DELETE FROM intelligence_component_transitions WHERE owner_scope_id=${scopeId} AND object_semantic_id='creator_audience' RETURNING 1),
-        deleted_candidates AS (DELETE FROM intelligence_component_candidates WHERE owner_scope_id=${scopeId} AND object_semantic_id='creator_audience' RETURNING 1),
-        deleted_current AS (DELETE FROM intelligence_current_components WHERE owner_scope_id=${scopeId} AND object_semantic_id='creator_audience' RETURNING 1),
+        deleted_transitions AS (DELETE FROM intelligence_component_transitions WHERE owner_scope_id=${scopeId} AND object_semantic_id IN ('creator_audience', 'creator_content') RETURNING 1),
+        deleted_candidates AS (DELETE FROM intelligence_component_candidates WHERE owner_scope_id=${scopeId} AND object_semantic_id IN ('creator_audience', 'creator_content') RETURNING 1),
+        deleted_current AS (DELETE FROM intelligence_current_components WHERE owner_scope_id=${scopeId} AND object_semantic_id IN ('creator_audience', 'creator_content') RETURNING 1),
         deleted_intel_evidence AS (DELETE FROM intelligence_evidence_references WHERE owner_scope_id=${scopeId} AND object_generation_id IN (SELECT object_generation_id FROM target_objects) RETURNING 1),
         deleted_business_refs AS (DELETE FROM intelligence_business_state_references WHERE owner_scope_id=${scopeId} AND object_generation_id IN (SELECT object_generation_id FROM target_objects) RETURNING 1),
         deleted_components AS (DELETE FROM intelligence_component_generations WHERE owner_scope_id=${scopeId} AND object_generation_id IN (SELECT object_generation_id FROM target_objects) RETURNING 1),

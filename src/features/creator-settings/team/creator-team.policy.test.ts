@@ -31,6 +31,7 @@ describe("C05 Creator Team policy", () => {
       "CAMPAIGN_OPPORTUNITY_VIEW",
       "CAMPAIGN_APPLICATION_APPLY",
       "INSIGHTS_AUDIENCE_READ",
+      "INSIGHTS_CONTENT_READ",
     ]);
     expect(() => assertCreatorTeamManager(CreatorTeamRole.ASSISTANT)).toThrow(
       ForbiddenException,
@@ -53,6 +54,16 @@ describe("C05 Creator Team policy", () => {
         "INSTAGRAM_SETTINGS_MANAGE",
       );
     }
+  });
+
+  it.each([
+    CreatorTeamRole.OWNER,
+    CreatorTeamRole.MANAGER,
+    CreatorTeamRole.ASSISTANT,
+  ])("allows %s to read Creator Content", (role) => {
+    expect(creatorWorkspaceActionsForRole(role)).toContain(
+      "INSIGHTS_CONTENT_READ",
+    );
   });
 
   it.each([CreatorTeamRole.MANAGER, CreatorTeamRole.ASSISTANT])(

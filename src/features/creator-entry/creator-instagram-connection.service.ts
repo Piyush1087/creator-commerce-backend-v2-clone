@@ -165,6 +165,14 @@ export class CreatorInstagramConnectionService {
         authorizationGeneration: integration.authorizationGeneration,
         trigger: "INITIAL_CONNECT",
       });
+      await this.audienceProcessing?.scheduleCreatorContent({
+        creatorProfileId: creator.subjectCreatorProfileId,
+        creatorWorkspaceId: creator.workspaceId,
+        integrationId: integration.id,
+        providerAccountId: integration.nativePlatformUserId,
+        authorizationGeneration: integration.authorizationGeneration,
+        trigger: "INITIAL_CONNECT",
+      });
     }
 
     return {

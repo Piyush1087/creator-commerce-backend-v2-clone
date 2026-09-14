@@ -53,7 +53,9 @@ export type CreatorAudienceSyncLease = Readonly<{
   integrationId: string;
   providerAccountId: string;
   authorizationGeneration: number;
-  capabilityClass: typeof InstagramSyncCapabilityClass.AUDIENCE;
+  capabilityClass:
+    | typeof InstagramSyncCapabilityClass.AUDIENCE
+    | typeof InstagramSyncCapabilityClass.PROFILE_MEDIA_PERFORMANCE;
   trigger: InstagramSyncTrigger;
   requestIdentity: string;
   attemptNumber: number;
@@ -108,6 +110,48 @@ export class InstagramSyncCoordinatorRepository {
         VALUES (${randomUUID()}::uuid, ${scopeId}, NULL, NULL, ${input.integrationId},
           ${input.providerAccountId}, ${input.authorizationGeneration},
           'AUDIENCE', 'DUE', ${input.trigger}::"InstagramSyncTrigger",
+          ${requestIdentity}, ${now}, CURRENT_TIMESTAMP)
+        ON CONFLICT (owner_scope_id, creator_integration_id, provider_account_id,
+          authorization_generation, capability_class)
+          WHERE creator_integration_id IS NOT NULL
+        DO UPDATE SET status='DUE', trigger=EXCLUDED.trigger,
+          request_identity=EXCLUDED.request_identity, next_due_at=EXCLUDED.next_due_at,
+          backoff_until=NULL, reason_codes=ARRAY[]::text[], updated_at=CURRENT_TIMESTAMP
+      `);
+    });
+  }
+
+  async scheduleCreatorContent(input: {
+    creatorProfileId: string;
+    creatorWorkspaceId: string;
+    integrationId: string;
+    providerAccountId: string;
+    authorizationGeneration: number;
+    trigger: "INITIAL_CONNECT" | "RECONNECT";
+  }): Promise<void> {
+    const now = new Date();
+    const capability = InstagramSyncCapabilityClass.PROFILE_MEDIA_PERFORMANCE;
+    const requestIdentity = identity(input, capability, now);
+    await this.prisma.$transaction(async (tx) => {
+      const scopes = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        INSERT INTO intelligence_owner_scopes
+          (owner_type, owner_key, creator_profile_id, creator_workspace_id)
+        VALUES ('CREATOR', ${`CREATOR:${input.creatorProfileId}:${input.creatorWorkspaceId}`},
+          ${input.creatorProfileId}, ${input.creatorWorkspaceId})
+        ON CONFLICT (creator_profile_id) WHERE creator_profile_id IS NOT NULL
+        DO UPDATE SET updated_at = intelligence_owner_scopes.updated_at
+        RETURNING owner_scope_id AS id
+      `);
+      const scopeId = scopes[0].id;
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO instagram_intelligence_sync_jobs
+          (sync_job_id, owner_scope_id, brand_id, integration_id,
+           creator_integration_id, provider_account_id,
+           authorization_generation, capability_class, status, trigger,
+           request_identity, next_due_at, updated_at)
+        VALUES (${randomUUID()}::uuid, ${scopeId}, NULL, NULL, ${input.integrationId},
+          ${input.providerAccountId}, ${input.authorizationGeneration},
+          'PROFILE_MEDIA_PERFORMANCE', 'DUE', ${input.trigger}::"InstagramSyncTrigger",
           ${requestIdentity}, ${now}, CURRENT_TIMESTAMP)
         ON CONFLICT (owner_scope_id, creator_integration_id, provider_account_id,
           authorization_generation, capability_class)
@@ -381,6 +425,9 @@ export class InstagramSyncCoordinatorRepository {
             status: InstagramSyncCoordinatorStatus;
             trigger: InstagramSyncTrigger;
             requestIdentity: string;
+            capabilityClass:
+              | typeof InstagramSyncCapabilityClass.AUDIENCE
+              | typeof InstagramSyncCapabilityClass.PROFILE_MEDIA_PERFORMANCE;
             attemptCount: number;
             executionWindowEnd: Date | null;
           }>
@@ -393,6 +440,7 @@ export class InstagramSyncCoordinatorRepository {
           profile.user_id AS "ownerUserId",
           job.provider_account_id AS "providerAccountId",
           job.authorization_generation AS "authorizationGeneration",
+          job.capability_class AS "capabilityClass",
           job.status, job.trigger, job.request_identity AS "requestIdentity",
           job.attempt_count AS "attemptCount",
           job.execution_window_end AS "executionWindowEnd"
@@ -404,7 +452,7 @@ export class InstagramSyncCoordinatorRepository {
           OR (job.status='BACKOFF' AND job.backoff_until <= ${now})
           OR (job.status='RUNNING' AND job.lease_expires_at <= ${now}))
           AND job.brand_id IS NULL AND job.creator_integration_id IS NOT NULL
-          AND job.capability_class='AUDIENCE'
+          AND job.capability_class IN ('AUDIENCE', 'PROFILE_MEDIA_PERFORMANCE')
         ORDER BY COALESCE(job.backoff_until, job.next_due_at, job.lease_expires_at), job.sync_job_id
         FOR UPDATE OF job SKIP LOCKED LIMIT 1
       `);
@@ -418,7 +466,7 @@ export class InstagramSyncCoordinatorRepository {
             creatorIntegrationId: row.integrationId,
             providerAccountId: row.providerAccountId,
             authorizationGeneration: row.authorizationGeneration,
-            capabilityClass: InstagramSyncCapabilityClass.AUDIENCE,
+            capabilityClass: row.capabilityClass,
           })
         ) {
           await tx.$executeRaw(Prisma.sql`
@@ -460,12 +508,12 @@ export class InstagramSyncCoordinatorRepository {
             organizationId: row.organizationId,
             subjectCreatorProfileId: row.creatorProfileId,
             subjectOwnerUserId: row.ownerUserId,
-            allowedActions: ["INSIGHTS_AUDIENCE_READ"],
+            allowedActions: ["INSIGHTS_AUDIENCE_READ", "INSIGHTS_CONTENT_READ"],
           },
           integrationId: row.integrationId,
           providerAccountId: row.providerAccountId,
           authorizationGeneration: row.authorizationGeneration,
-          capabilityClass: InstagramSyncCapabilityClass.AUDIENCE,
+          capabilityClass: row.capabilityClass,
           trigger: row.trigger,
           requestIdentity: row.requestIdentity,
           attemptNumber: row.attemptCount + 1,
@@ -660,7 +708,9 @@ function creatorUsable(
 ): boolean {
   return Boolean(
     integration &&
-    job.capabilityClass === InstagramSyncCapabilityClass.AUDIENCE &&
+    (job.capabilityClass === InstagramSyncCapabilityClass.AUDIENCE ||
+      job.capabilityClass ===
+        InstagramSyncCapabilityClass.PROFILE_MEDIA_PERFORMANCE) &&
     job.creatorIntegrationId === integration.id &&
     integration.platformNetwork === SocialNetworkProvider.INSTAGRAM &&
     integration.nativePlatformUserId === job.providerAccountId &&

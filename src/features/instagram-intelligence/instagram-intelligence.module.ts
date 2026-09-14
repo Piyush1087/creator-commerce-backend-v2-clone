@@ -5,6 +5,7 @@ import { BrandCentreModule } from "../brand-centre/brand-centre.module";
 import { BrandIntelligenceModule } from "../brand-intelligence/brand-intelligence.module";
 import { DataExtractionModule } from "../data-extraction/data-extraction.module";
 import { CreatorAudienceModule } from "../creator-audience/creator-audience.module";
+import { CreatorContentModule } from "../creator-content/creator-content.module";
 import { InstagramProviderClientModule } from "../instagram/instagram-provider-client.module";
 import { InstagramB3aImagePipelineService } from "./media/instagram-b3a-image-pipeline.service";
 import { InstagramB3bMediaCompletionService } from "./media/instagram-b3b-media-completion.service";
@@ -50,6 +51,7 @@ import { GeminiInstagramSpeechTranscriptionAdapter } from "../instagram/media/vi
     BrandIntelligenceModule,
     DataExtractionModule,
     CreatorAudienceModule,
+    CreatorContentModule,
     InstagramProviderClientModule,
     InstagramSyncCoordinatorModule,
   ],
