@@ -35,13 +35,21 @@ Ops and deploy work today often use **broad admin SSO** (e.g. AdministratorAcces
 
 Exact managed policies and group names: **TBD in deeper IAM doc**.
 
-## Worker expectations
+## Worker expectations (strict)
 
-| Worker | IAM expectation |
-| --- | --- |
-| Auditor / Cost / Monitor (recommend) | Read-only sufficient |
-| Deploy / Hotfix | Elevated; human SSO + charter envelope |
-| Capacity mutate mode | Only after Product unlock + allow-list |
+Standing posture is **read-only** for Monitor, Cost, Capacity, and Auditor. Broader SSO (including AdministratorAccess) **does not** override the worker charter.
+
+| Worker | Standing IAM intent | Writes only if Product names |
+| --- | --- | --- |
+| Monitor | Read-only metrics/logs/describe/health | `INSTALL_MONITORING` (alarms/SNS/dashboards only) |
+| Cost | Read-only Cost Explorer + inventory | `INSTALL_BUDGETS`; optional `MUTATE_COST_STOP` allow-list |
+| Capacity | Read-only metrics + describe | `MUTATE_CAPACITY` + allow-list |
+| Auditor | Read-only | Never (other folder) |
+| Deploy / Hotfix | Elevated inside **their** envelopes | Per `docs/aws-environments` charters |
+
+Shared denials for ops workers: no `GetSecretValue`, no SST deploy, no hotfix, no migrate, no deleting ALB/VPC/Aurora “to save money” without Product.
+
+Full matrix: `docs/charters/aws/charters/aws_platform_ops_program_charter.md` §4.
 
 ## Related
 

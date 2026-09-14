@@ -75,22 +75,29 @@ Use ALB request count + target response time + ECS CPU/mem + Aurora ACU/connecti
 
 ## 4. What Monitor vs Cost vs Capacity own
 
-| Concern | Owner |
-| --- | --- |
-| Down / degraded / alarm firing now | Monitor |
-| $ spike, idle waste, budget forecast | Cost |
-| “Will we survive next week’s campaign?” | Capacity |
-| “What is actually in the account?” | Auditor (`docs/aws-environments`) |
-| “Ship a new image / change SST” | Deploy / Hotfix |
+| Concern | Owner | Standing access |
+| --- | --- | --- |
+| Down / degraded / alarm firing now | Monitor | **Read-only** |
+| $ spike, idle waste, budget forecast | Cost | **Read-only** |
+| “Will we survive next week’s campaign?” | Capacity | **Read-only** (mutate only with Product envelope) |
+| “What is actually in the account?” | Auditor (`docs/aws-environments`) | **Read-only** |
+| “Ship a new image / change SST” | Deploy / Hotfix | Elevated inside **their** charters only |
+
+Program law (roles, envelopes, hard denials): `charters/aws_platform_ops_program_charter.md` §4.
 
 ---
 
 ## 5. Mutation policy (designed, gated)
 
-| Mode | Workers may | Workers must not |
-| --- | --- | --- |
-| **Recommend-only** (default) | Update docs, email `brian@growthverse.in`, propose SST diffs | Change desired count, ACU, delete ALB, deploy |
-| **Mutate-authorized** | Execute Product-named allow-list only | Expand allow-list themselves; touch secrets values; `migrate reset` |
+| Mode | Who | Workers may | Workers must not |
+| --- | --- | --- | --- |
+| **Recommend-only** (default) | All three ops workers | Update docs, email `brian@growthverse.in`, propose SST diffs | Any AWS write; deploy; secrets |
+| **`INSTALL_MONITORING`** | Monitor only if Product names it | Alarms, SNS email sub, dashboards per register | ECS/RDS/Aurora/ALB/VPC; deploy |
+| **`INSTALL_BUDGETS`** | Cost only if Product names it | Budgets + anomaly → email | Delete compute; deploy |
+| **`MUTATE_CAPACITY`** | Capacity only if Product names allow-list | Exact allow-list only | Expand allow-list; delete ALB/VPC; prod deploy; migrate reset; secrets |
+| **`MUTATE_COST_STOP`** | Cost only if Product names allow-list | e.g. stop bastion if listed | Anything not listed |
+
+**Charter beats SSO:** AdministratorAccess in the human session does not authorize crossing these boundaries.
 
 Allow-list candidates (for later Product call): ECS desired count within a band; Aurora max ACU within a band; stop bastion; **not** delete ALB/VPC; **not** prod deploy.
 

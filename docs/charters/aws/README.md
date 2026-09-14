@@ -36,23 +36,25 @@ Important: a normal `sst deploy --stage prod` is **not** a harmless refresh. If 
 
 ### Who does what (workers)
 
-| Worker | In one sentence | Lives in |
-| --- | --- | --- |
-| **Auditor** | Read-only: what exists, what it costs, docs vs AWS | `docs/aws-environments/` (already exists) |
-| **Deploy** | Run SST deploy when authorized | `docs/aws-environments/` |
-| **Hotfix** | Optional API image overlay (not full SST) | `docs/aws-environments/` |
-| **Monitor** | Health, outages, alarm design → email | `charters/` here (TBD) |
-| **Cost** | Budgets, spikes, waste, monthly history | `charters/` here (TBD) |
-| **Capacity** | “Enough resources for this traffic?” recommend or apply | `charters/` here (TBD) |
+| Worker | In one sentence | Access (standing) | Lives in |
+| --- | --- | --- | --- |
+| **Auditor** | Read-only: what exists, what it costs, docs vs AWS | **Read-only** | `docs/aws-environments/` |
+| **Deploy** | Run SST deploy when authorized | Elevated (Deploy charter only) | `docs/aws-environments/` |
+| **Hotfix** | Optional API image overlay (not full SST) | Elevated (Hotfix charter only) | `docs/aws-environments/` |
+| **Monitor** | Health, outages; designs alarms | **Read-only** (install alarms only with Product envelope) | `charters/` here |
+| **Cost** | Budgets design, spikes, monthly history | **Read-only** (budgets install only with envelope) | `charters/` here |
+| **Capacity** | “Enough resources?” recommend | **Read-only** (scale apply only with Product allow-list) | `charters/` here |
+
+**Boundaries beat SSO:** even with admin login, ops workers stay read-only unless Product names an install/mutate envelope. Details: `charters/aws_platform_ops_program_charter.md` §4.
 
 ### Two operating modes (Product chooses later)
 
 Both are **designed now**:
 
-1. **Recommend-only** — workers write Git reports + email summaries; humans change SST / AWS.  
-2. **Mutate-authorized** — workers may apply a named allow-list (e.g. scale ECS desired count, raise Aurora max ACU) after Product unlocks that mode.
+1. **Recommend-only / read-only (default)** — all three ops workers **observe only**; Git reports + email; humans/Deploy change AWS.  
+2. **Named Product envelopes** — rare writes: `INSTALL_MONITORING`, `INSTALL_BUDGETS`, `MUTATE_CAPACITY`, `MUTATE_COST_STOP` — each with a hard allow-list. Admin SSO does not skip this.
 
-Default until Product says otherwise: **recommend-only**.
+Default until Product says otherwise: **read-only / recommend-only**.
 
 ### Where to go next
 
