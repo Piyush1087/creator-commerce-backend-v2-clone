@@ -112,7 +112,7 @@ export class BrandMeaningPersistenceHook implements ProcessorSuccessPersistenceH
     const scope = prepared.activeScope;
     if (
       prepared.brandId !== execution.brandId ||
-      scope.some((address) => address.brandId !== execution.brandId) ||
+      scope.some((address) => address.ownerScopeId !== execution.brandId) ||
       sha256CanonicalExecution(canonicalActiveScope(scope)) !==
         execution.activeScopeHash ||
       prepared.dependencyManifestHash !== execution.dependencyManifestHash ||
@@ -317,7 +317,7 @@ export class BrandMeaningPersistenceHook implements ProcessorSuccessPersistenceH
       },
       decisions: proposals.map((proposal) => ({
         kind: "APPLY_GENERATION" as const,
-        brandId: proposal.brandId,
+        ownerScopeId: proposal.ownerScopeId,
         objectSemanticId: proposal.objectSemanticId,
         pathSchemeVersion: proposal.pathSchemeVersion,
         componentSemanticPath: proposal.componentSemanticPath,

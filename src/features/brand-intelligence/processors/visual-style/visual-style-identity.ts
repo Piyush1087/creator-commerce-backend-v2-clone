@@ -31,13 +31,14 @@ export function visualStyleScope(
     if (
       row.objectSemanticId !== VISUAL_STYLE_OBJECT ||
       row.pathSchemeVersion !== 1 ||
-      (row.brandId !== undefined && row.brandId !== brandId) ||
+      ((row.ownerScopeId ?? row.brandId) !== undefined &&
+        (row.ownerScopeId ?? row.brandId) !== brandId) ||
       typeof row.componentSemanticPath !== "string"
     )
       return visualStyleInvalid("VISUAL_INVALID_SCOPE");
     new ComponentPathCodec().assertCanonical(row.componentSemanticPath);
     return {
-      brandId,
+      ownerScopeId: brandId,
       objectSemanticId: VISUAL_STYLE_OBJECT,
       pathSchemeVersion: 1,
       componentSemanticPath: row.componentSemanticPath,

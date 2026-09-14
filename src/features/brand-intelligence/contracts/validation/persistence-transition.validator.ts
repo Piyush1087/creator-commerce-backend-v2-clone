@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 
 import { BundlePathOwnershipRegistry } from "../registry/bundle-path-ownership.registry";
 import { ContractRuntimeRegistry } from "../registry/contract-runtime.registry";
+import { semanticAddressOwnerScopeId } from "../../semantic-path/component-path.types";
 import { accepted, rejected } from "./validation-result";
 import type {
   CurrentComponentSnapshot,
@@ -12,13 +13,15 @@ import type {
 } from "./validation.types";
 
 function addressKey(address: {
-  readonly brandId: string;
+  readonly ownerScopeId: string;
+  readonly subjectId?: string;
   readonly objectSemanticId: string;
   readonly pathSchemeVersion: number;
   readonly componentSemanticPath: string;
 }): string {
   return [
-    address.brandId,
+    semanticAddressOwnerScopeId(address),
+    address.subjectId ?? "",
     address.objectSemanticId,
     address.pathSchemeVersion,
     address.componentSemanticPath,

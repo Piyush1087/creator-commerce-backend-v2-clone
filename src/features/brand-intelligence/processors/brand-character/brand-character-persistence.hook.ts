@@ -124,7 +124,7 @@ export class BrandCharacterPersistenceHook implements ProcessorSuccessPersistenc
     const { prepared, output, current: before } = payload;
     if (
       prepared.brandId !== execution.brandId ||
-      prepared.activeScope.some((a) => a.brandId !== execution.brandId) ||
+      prepared.activeScope.some((a) => a.ownerScopeId !== execution.brandId) ||
       sha256CanonicalExecution(canonicalActiveScope(prepared.activeScope)) !==
         execution.activeScopeHash ||
       prepared.dependencyManifestHash !== execution.dependencyManifestHash ||
@@ -138,7 +138,7 @@ export class BrandCharacterPersistenceHook implements ProcessorSuccessPersistenc
       objectSemanticId: string,
       componentSemanticPath: string,
     ): ComponentSemanticAddress => ({
-      brandId: execution.brandId,
+      ownerScopeId: execution.brandId,
       objectSemanticId,
       componentSemanticPath,
       pathSchemeVersion: 1,
@@ -445,7 +445,7 @@ export class BrandCharacterPersistenceHook implements ProcessorSuccessPersistenc
       },
       decisions: proposals.map((proposal) => ({
         kind: "APPLY_GENERATION" as const,
-        brandId: proposal.brandId,
+        ownerScopeId: proposal.ownerScopeId,
         objectSemanticId: proposal.objectSemanticId,
         componentSemanticPath: proposal.componentSemanticPath,
         pathSchemeVersion: 1,

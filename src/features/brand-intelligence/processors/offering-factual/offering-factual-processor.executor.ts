@@ -53,13 +53,14 @@ function activeScope(
       address.objectSemanticId !== OFFERING_FACTUAL_OBJECT ||
       address.pathSchemeVersion !== 1 ||
       typeof address.componentSemanticPath !== "string" ||
-      (address.brandId !== undefined && address.brandId !== brandId) ||
+      ((address.ownerScopeId ?? address.brandId) !== undefined &&
+        (address.ownerScopeId ?? address.brandId) !== brandId) ||
       (address.subjectId !== undefined && address.subjectId !== subjectId)
     ) {
       throw new Error("INVALID_ACTIVE_SCOPE");
     }
     return {
-      brandId,
+      ownerScopeId: brandId,
       subjectId,
       objectSemanticId: OFFERING_FACTUAL_OBJECT,
       pathSchemeVersion: 1,

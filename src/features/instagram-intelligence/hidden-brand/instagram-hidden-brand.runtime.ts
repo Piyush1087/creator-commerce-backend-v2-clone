@@ -76,7 +76,7 @@ export class InstagramHiddenBrandRuntime {
       PROCESSORS.map(async ({ registryKey, scopes }) => {
         const activeScope: readonly ComponentSemanticAddress[] = scopes.map(
           ([objectSemanticId, componentSemanticPath]) => ({
-            brandId: lease.brandProfileId,
+            ownerScopeId: lease.brandProfileId,
             objectSemanticId,
             pathSchemeVersion: 1,
             componentSemanticPath,

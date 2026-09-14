@@ -51,7 +51,7 @@ export class InstagramContentBehaviorRuntimeService {
           registryKey: INSTAGRAM_CONTENT_BEHAVIOR_REGISTRY_KEY,
           activeScope: [
             {
-              brandId: parsed.brandProfileId,
+              ownerScopeId: parsed.brandProfileId,
               objectSemanticId: INSTAGRAM_CONTENT_BEHAVIOR_OBJECT_ID,
               pathSchemeVersion: 1,
               componentSemanticPath: "$",

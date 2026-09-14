@@ -104,13 +104,6 @@ export class CreatorAudiencePersistenceHook implements ProcessorSuccessPersisten
       tx,
       addresses,
     );
-    const compatibilityAddresses = addresses.map((address) => ({
-      brandId: address.ownerScopeId,
-      subjectId: address.subjectId,
-      objectSemanticId: address.objectSemanticId,
-      pathSchemeVersion: address.pathSchemeVersion,
-      componentSemanticPath: address.componentSemanticPath,
-    }));
     const refsFor = (path: string): string[] => {
       if (path === "$/f/follower_audience") {
         return payload.data.evidence
@@ -135,8 +128,8 @@ export class CreatorAudiencePersistenceHook implements ProcessorSuccessPersisten
     };
     const validation = this.persistenceValidator.validate({
       registryKey: CREATOR_AUDIENCE_REGISTRY_KEY,
-      activeScope: compatibilityAddresses,
-      currentState: compatibilityAddresses.map((address, index) => {
+      activeScope: addresses,
+      currentState: addresses.map((address, index) => {
         const prior = locked.get(this.current.ownerScopedKey(addresses[index]));
         return prior
           ? {
@@ -149,7 +142,7 @@ export class CreatorAudiencePersistenceHook implements ProcessorSuccessPersisten
             }
           : { ...address, exists: false as const, protected: false };
       }),
-      proposals: compatibilityAddresses.map((address, index) => {
+      proposals: addresses.map((address, index) => {
         const prior = locked.get(this.current.ownerScopedKey(addresses[index]));
         return {
           ...address,
@@ -209,7 +202,7 @@ export class CreatorAudiencePersistenceHook implements ProcessorSuccessPersisten
           captureRef: payload.data.identity.captureRef,
         },
         readiness,
-        activeScope: compatibilityAddresses as unknown as Prisma.InputJsonValue,
+        activeScope: addresses as unknown as Prisma.InputJsonValue,
         activeScopeHash: execution.activeScopeHash,
       },
       components: addresses.map((address, index) => {

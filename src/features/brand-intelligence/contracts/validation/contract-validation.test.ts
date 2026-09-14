@@ -56,7 +56,7 @@ function address(
   componentSemanticPath = "$",
 ): ComponentSemanticAddress {
   return {
-    brandId: "brand-1",
+    ownerScopeId: "brand-1",
     objectSemanticId,
     pathSchemeVersion: 1,
     componentSemanticPath,
@@ -104,6 +104,12 @@ describe("W1.0C contract validation", () => {
       ownership.validateActiveScope(COMMUNICATION_KEY, [owned[1], owned[1]])
         .valid,
     ).toBe(false);
+    expect(
+      ownership.validateActiveScope(COMMUNICATION_KEY, [
+        owned[1],
+        { ...owned[1], ownerScopeId: "brand-2" },
+      ]).valid,
+    ).toBe(true);
   });
 
   it.each([

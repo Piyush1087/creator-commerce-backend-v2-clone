@@ -32,7 +32,7 @@ function syntheticRequest(): ProcessorExecutionRequest {
     registryKey,
     activeScope: [
       {
-        brandId,
+        ownerScopeId: brandId,
         objectSemanticId: "synthetic_test_object",
         pathSchemeVersion: 1,
         componentSemanticPath: "$",
@@ -50,13 +50,13 @@ function syntheticRequest(): ProcessorExecutionRequest {
 describe("W1.0D execution identity", () => {
   it("canonicalizes active scope independently of request order", () => {
     const left = {
-      brandId,
+      ownerScopeId: brandId,
       objectSemanticId: "object-b",
       pathSchemeVersion: 1,
       componentSemanticPath: "$/f/b",
     };
     const right = {
-      brandId,
+      ownerScopeId: brandId,
       objectSemanticId: "object-a",
       pathSchemeVersion: 1,
       componentSemanticPath: "$/f/a",
@@ -106,7 +106,7 @@ describe("W1.0D execution identity", () => {
           ...base,
           activeScope: [
             {
-              brandId,
+              ownerScopeId: brandId,
               objectSemanticId: "different-object",
               pathSchemeVersion: 1,
               componentSemanticPath: "$",

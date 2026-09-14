@@ -176,7 +176,8 @@ export class CreatorAudiencePipelineService {
           registryKey: CREATOR_AUDIENCE_REGISTRY_KEY,
           activeScope: CREATOR_AUDIENCE_COMPONENT_PATHS.map(
             (componentSemanticPath) => ({
-              brandId: manifest.identity.ownerScopeId,
+              ownerScopeId: manifest.identity.ownerScopeId,
+              subjectId: manifest.identity.creatorProfileId,
               objectSemanticId: "creator_audience",
               pathSchemeVersion: 1,
               componentSemanticPath,

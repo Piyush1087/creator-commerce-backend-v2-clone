@@ -193,7 +193,7 @@ export class OfferingFactualPersistenceHook implements ProcessorSuccessPersisten
       prepared.canonicalState.offeringFacts[0].offeringId !== offeringRef ||
       scope.some(
         (address) =>
-          address.brandId !== execution.brandId ||
+          address.ownerScopeId !== execution.brandId ||
           address.subjectId !== execution.subjectId ||
           address.objectSemanticId !== config.objectSemanticId,
       ) ||

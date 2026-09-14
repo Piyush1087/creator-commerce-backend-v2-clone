@@ -25,13 +25,14 @@ export function audienceScope(
     if (
       r.objectSemanticId !== AUDIENCE_OBJECT ||
       r.pathSchemeVersion !== 1 ||
-      (r.brandId !== undefined && r.brandId !== brandId) ||
+      ((r.ownerScopeId ?? r.brandId) !== undefined &&
+        (r.ownerScopeId ?? r.brandId) !== brandId) ||
       typeof r.componentSemanticPath !== "string"
     )
       return audienceInvalid("AUDIENCE_INVALID_SCOPE");
     new ComponentPathCodec().assertCanonical(r.componentSemanticPath);
     return {
-      brandId,
+      ownerScopeId: brandId,
       objectSemanticId: AUDIENCE_OBJECT,
       pathSchemeVersion: 1,
       componentSemanticPath: r.componentSemanticPath,

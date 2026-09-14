@@ -24,7 +24,10 @@ import {
   type OwnerScopedCurrentSnapshot,
 } from "../persistence/intelligence-current-state.repository";
 import { ComponentPathCodec } from "../semantic-path/component-path.codec";
-import type { ComponentSemanticAddress } from "../semantic-path/component-path.types";
+import {
+  semanticAddressOwnerScopeId,
+  type ComponentSemanticAddress,
+} from "../semantic-path/component-path.types";
 import type {
   IntelligenceTransitionCommand,
   IntelligenceTransitionDecision,
@@ -419,7 +422,7 @@ export class IntelligenceTransitionService {
         );
       }
       const candidate = await this.candidateRepository.createOrGetPending(tx, {
-        brandId: decision.brandId,
+        brandId: semanticAddressOwnerScopeId(decision),
         subjectId: decision.subjectId ?? action.subjectId!,
         currentComponentId: current.id,
         objectSemanticId: decision.objectSemanticId,
@@ -559,7 +562,7 @@ export class IntelligenceTransitionService {
     if (
       !candidate ||
       candidate.status !== IntelligenceComponentCandidateStatus.PENDING ||
-      candidate.brandId !== decision.brandId ||
+      candidate.brandId !== semanticAddressOwnerScopeId(decision) ||
       candidate.currentComponentId !== current.id ||
       candidate.basisCurrentComponentGenerationId !==
         current.currentComponentGenerationId ||
@@ -655,7 +658,7 @@ export class IntelligenceTransitionService {
     if (
       !candidate ||
       candidate.status !== IntelligenceComponentCandidateStatus.PENDING ||
-      candidate.brandId !== decision.brandId ||
+      candidate.brandId !== semanticAddressOwnerScopeId(decision) ||
       candidate.currentComponentId !== current.id ||
       candidate.basisCurrentComponentGenerationId !==
         current.currentComponentGenerationId ||
@@ -834,7 +837,7 @@ export class IntelligenceTransitionService {
   ): Promise<IntelligenceComponentTransition> {
     const expected = decision.expectedCurrent;
     return this.actionRepository.createTransition(tx, {
-      brandId: decision.brandId,
+      brandId: semanticAddressOwnerScopeId(decision),
       subjectId: decision.subjectId ?? action.subjectId!,
       actionId: action.id,
       currentComponentId: current?.id ?? null,
@@ -900,7 +903,7 @@ export class IntelligenceTransitionService {
     generation: IntelligenceComponentGeneration,
   ): boolean {
     return (
-      generation.brandId === address.brandId &&
+      generation.brandId === semanticAddressOwnerScopeId(address) &&
       generation.subjectId === address.subjectId &&
       generation.objectSemanticId === address.objectSemanticId &&
       generation.pathSchemeVersion === address.pathSchemeVersion &&
@@ -921,7 +924,7 @@ export class IntelligenceTransitionService {
         decision.componentSemanticPath,
         decision.pathSchemeVersion,
       );
-      if (decision.brandId !== command.action.brandId) {
+      if (semanticAddressOwnerScopeId(decision) !== command.action.brandId) {
         throw new IntelligencePersistenceError(
           "TENANCY_VIOLATION",
           "Every transition decision must belong to the action Brand",
@@ -968,7 +971,7 @@ export class IntelligenceTransitionService {
       const candidateId =
         "candidateId" in decision ? decision.candidateId : null;
       if (
-        transition.brandId !== decision.brandId ||
+        transition.brandId !== semanticAddressOwnerScopeId(decision) ||
         transition.subjectId !== decision.subjectId ||
         transition.objectSemanticId !== decision.objectSemanticId ||
         transition.pathSchemeVersion !== decision.pathSchemeVersion ||

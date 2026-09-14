@@ -86,7 +86,7 @@ export class InstagramC4PersistenceHook implements ProcessorSuccessPersistenceHo
     const addresses: ComponentSemanticAddress[] = instagramC4Paths(
       definition.objectId,
     ).map((componentSemanticPath) => ({
-      brandId: execution.brandId,
+      ownerScopeId: execution.brandId,
       subjectId: execution.subjectId,
       objectSemanticId: definition.objectId,
       pathSchemeVersion: 1,

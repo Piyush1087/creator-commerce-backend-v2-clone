@@ -90,7 +90,7 @@ export class BrandDifferentiationPersistenceHook implements ProcessorSuccessPers
       prepared.evidence.brandId !== execution.brandId ||
       prepared.activeScope.some(
         (a) =>
-          a.brandId !== execution.brandId ||
+          a.ownerScopeId !== execution.brandId ||
           a.objectSemanticId !== DIFFERENTIATION_OBJECT,
       ) ||
       sha256CanonicalExecution(canonicalActiveScope(prepared.activeScope)) !==
@@ -100,7 +100,7 @@ export class BrandDifferentiationPersistenceHook implements ProcessorSuccessPers
     )
       differentiationInvalid("DIFFERENTIATION_PERSISTENCE_BASIS_MISMATCH");
     const address = (path: string) => ({
-      brandId: execution.brandId,
+      ownerScopeId: execution.brandId,
       objectSemanticId: DIFFERENTIATION_OBJECT,
       pathSchemeVersion: 1,
       componentSemanticPath: path,

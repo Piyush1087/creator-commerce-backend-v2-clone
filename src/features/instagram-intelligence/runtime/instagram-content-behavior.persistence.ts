@@ -81,7 +81,7 @@ export class InstagramContentBehaviorPersistenceHook implements ProcessorSuccess
     }
 
     const address: ComponentSemanticAddress = {
-      brandId: execution.brandId,
+      ownerScopeId: execution.brandId,
       subjectId: execution.subjectId,
       objectSemanticId: INSTAGRAM_CONTENT_BEHAVIOR_OBJECT_ID,
       pathSchemeVersion: 1,

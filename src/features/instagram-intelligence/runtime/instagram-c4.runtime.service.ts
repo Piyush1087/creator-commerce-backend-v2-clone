@@ -57,7 +57,7 @@ export class InstagramC4RuntimeService {
           {
             registryKey: instagramC4RegistryKey(definition.processorId),
             activeScope: paths.map((componentSemanticPath) => ({
-              brandId: parsed.brandProfileId,
+              ownerScopeId: parsed.brandProfileId,
               objectSemanticId: definition.objectId,
               pathSchemeVersion: 1,
               componentSemanticPath,

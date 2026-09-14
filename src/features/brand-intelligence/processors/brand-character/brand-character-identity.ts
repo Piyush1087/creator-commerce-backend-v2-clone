@@ -33,7 +33,8 @@ export function characterScope(
     if (
       !BRAND_CHARACTER_OBJECTS.some((id) => id === row.objectSemanticId) ||
       row.pathSchemeVersion !== 1 ||
-      (row.brandId !== undefined && row.brandId !== brandId) ||
+      ((row.ownerScopeId ?? row.brandId) !== undefined &&
+        (row.ownerScopeId ?? row.brandId) !== brandId) ||
       typeof row.componentSemanticPath !== "string"
     )
       return characterInvalid("INVALID_ACTIVE_SCOPE");
@@ -46,7 +47,7 @@ export function characterScope(
     )
       return characterInvalid("INVALID_ACTIVE_SCOPE");
     return {
-      brandId,
+      ownerScopeId: brandId,
       objectSemanticId: row.objectSemanticId as BrandCharacterObject,
       componentSemanticPath: row.componentSemanticPath,
       pathSchemeVersion: 1,

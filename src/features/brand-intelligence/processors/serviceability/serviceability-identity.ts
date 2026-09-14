@@ -30,13 +30,14 @@ export function serviceabilityScope(
     if (
       row.objectSemanticId !== SERVICEABILITY_OBJECT ||
       row.pathSchemeVersion !== 1 ||
-      (row.brandId !== undefined && row.brandId !== brandId) ||
+      ((row.ownerScopeId ?? row.brandId) !== undefined &&
+        (row.ownerScopeId ?? row.brandId) !== brandId) ||
       typeof row.componentSemanticPath !== "string"
     )
       return serviceabilityInvalid("SERVICEABILITY_INVALID_SCOPE");
     new ComponentPathCodec().assertCanonical(row.componentSemanticPath);
     return {
-      brandId,
+      ownerScopeId: brandId,
       objectSemanticId: SERVICEABILITY_OBJECT,
       pathSchemeVersion: 1,
       componentSemanticPath: row.componentSemanticPath,

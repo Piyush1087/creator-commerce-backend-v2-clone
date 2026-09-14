@@ -4,6 +4,7 @@ import type {
   ComponentPathOwnershipRegistry,
   ComponentSemanticAddress,
 } from "../../semantic-path/component-path.types";
+import { semanticAddressOwnerScopeId } from "../../semantic-path/component-path.types";
 import { ComponentPathCodec } from "../../semantic-path/component-path.codec";
 import type { ContractRegistryKey } from "../bundle/contract-bundle.types";
 import { accepted, rejected } from "../validation/validation-result";
@@ -60,7 +61,8 @@ export class BundlePathOwnershipRegistry implements ComponentPathOwnershipRegist
         continue;
       }
       const identity = [
-        address.brandId,
+        semanticAddressOwnerScopeId(address),
+        address.subjectId ?? "",
         address.objectSemanticId,
         address.pathSchemeVersion,
         address.componentSemanticPath,

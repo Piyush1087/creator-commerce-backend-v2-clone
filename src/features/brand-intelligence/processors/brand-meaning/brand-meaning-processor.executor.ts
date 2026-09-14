@@ -66,11 +66,12 @@ function scopeOf(
       !BRAND_MEANING_OBJECTS.some((id) => id === row.objectSemanticId) ||
       row.componentSemanticPath !== "$" ||
       row.pathSchemeVersion !== 1 ||
-      (row.brandId !== undefined && row.brandId !== brandId)
+      ((row.ownerScopeId ?? row.brandId) !== undefined &&
+        (row.ownerScopeId ?? row.brandId) !== brandId)
     )
       throw new Error("INVALID_ACTIVE_SCOPE");
     return {
-      brandId,
+      ownerScopeId: brandId,
       objectSemanticId: row.objectSemanticId as BrandMeaningObject,
       componentSemanticPath: "$",
       pathSchemeVersion: 1,

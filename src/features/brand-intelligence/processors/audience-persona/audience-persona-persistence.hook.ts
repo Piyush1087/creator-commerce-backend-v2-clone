@@ -84,7 +84,7 @@ export class AudiencePersonaPersistenceHook implements ProcessorSuccessPersisten
     } = raw as AudiencePersistencePayload;
     const execution = claim.processorExecution;
     const address = (path: string) => ({
-      brandId: execution.brandId,
+      ownerScopeId: execution.brandId,
       objectSemanticId: AUDIENCE_OBJECT,
       pathSchemeVersion: 1,
       componentSemanticPath: path,

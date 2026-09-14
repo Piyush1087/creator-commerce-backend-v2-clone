@@ -113,7 +113,7 @@ export class IntelligenceCurrentContractScopeService {
         });
       }
       return this.ownership.owns({
-        brandId,
+        ownerScopeId: brandId,
         objectSemanticId,
         pathSchemeVersion: 1,
         componentSemanticPath,

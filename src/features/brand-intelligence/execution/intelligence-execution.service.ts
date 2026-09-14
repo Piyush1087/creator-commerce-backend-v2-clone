@@ -12,6 +12,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { canonicalJson } from "../contracts/bundle/canonical-json";
 import { BundlePathOwnershipRegistry } from "../contracts/registry/bundle-path-ownership.registry";
 import { ComponentPathCodec } from "../semantic-path/component-path.codec";
+import { semanticAddressOwnerScopeId } from "../semantic-path/component-path.types";
 import { IntelligenceExecutionError } from "./domain/intelligence-execution.error";
 import type {
   CreateIntelligenceExecutionCommand,
@@ -318,7 +319,7 @@ export class IntelligenceExecutionService {
     }
     return command.processors.map((request) => {
       for (const address of request.activeScope) {
-        if (address.brandId !== command.ownerScopeId) {
+        if (semanticAddressOwnerScopeId(address) !== command.ownerScopeId) {
           throw new IntelligenceExecutionError(
             "INVALID_EXECUTION_STATE",
             "Creator active scope cannot cross owner-scope boundaries",
@@ -395,7 +396,7 @@ export class IntelligenceExecutionService {
         );
       }
       for (const address of request.activeScope) {
-        if (address.brandId !== command.brandId) {
+        if (semanticAddressOwnerScopeId(address) !== command.brandId) {
           throw new IntelligenceExecutionError(
             "INVALID_EXECUTION_STATE",
             "Active scope cannot cross Brand boundaries",

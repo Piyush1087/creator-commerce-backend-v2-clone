@@ -10,7 +10,10 @@ import {
 } from "@prisma/client";
 
 import { PrismaService } from "../../../prisma/prisma.service";
-import type { ComponentSemanticAddress } from "../semantic-path/component-path.types";
+import {
+  semanticAddressOwnerScopeId,
+  type ComponentSemanticAddress,
+} from "../semantic-path/component-path.types";
 import { resolveIntelligenceSubject } from "../subject/intelligence-subject.resolver";
 
 export interface FreshnessMutation {
@@ -45,7 +48,9 @@ export function compareSemanticAddresses(
   right: ComponentSemanticAddress,
 ): number {
   return (
-    left.brandId.localeCompare(right.brandId) ||
+    semanticAddressOwnerScopeId(left).localeCompare(
+      semanticAddressOwnerScopeId(right),
+    ) ||
     (left.subjectId ?? "").localeCompare(right.subjectId ?? "") ||
     left.objectSemanticId.localeCompare(right.objectSemanticId) ||
     left.pathSchemeVersion - right.pathSchemeVersion ||
@@ -82,7 +87,13 @@ export class IntelligenceCurrentStateRepository {
     return this.prisma.intelligenceCurrentComponent.findUnique({
       where: {
         brandId_subjectId_objectSemanticId_pathSchemeVersion_componentSemanticPath:
-          scoped,
+          {
+            brandId: semanticAddressOwnerScopeId(scoped),
+            subjectId: scoped.subjectId,
+            objectSemanticId: scoped.objectSemanticId,
+            pathSchemeVersion: scoped.pathSchemeVersion,
+            componentSemanticPath: scoped.componentSemanticPath,
+          },
       },
     });
   }
@@ -110,7 +121,7 @@ export class IntelligenceCurrentStateRepository {
       const rows = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
         SELECT "current_component_id" AS "id"
         FROM "intelligence_current_components"
-        WHERE "brand_id" = ${address.brandId}
+        WHERE "brand_id" = ${semanticAddressOwnerScopeId(address)}
           AND "subject_id" = ${address.subjectId}
           AND "object_semantic_id" = ${address.objectSemanticId}
           AND "path_scheme_version" = ${address.pathSchemeVersion}
@@ -178,7 +189,7 @@ export class IntelligenceCurrentStateRepository {
     try {
       return await tx.intelligenceCurrentComponent.create({
         data: {
-          brandId: address.brandId,
+          brandId: semanticAddressOwnerScopeId(address),
           subjectId: scoped.subjectId,
           objectSemanticId: address.objectSemanticId,
           pathSchemeVersion: address.pathSchemeVersion,
@@ -290,7 +301,7 @@ export class IntelligenceCurrentStateRepository {
 
   key(address: ComponentSemanticAddress): string {
     return JSON.stringify([
-      address.brandId,
+      semanticAddressOwnerScopeId(address),
       address.subjectId,
       address.objectSemanticId,
       address.pathSchemeVersion,
@@ -300,7 +311,7 @@ export class IntelligenceCurrentStateRepository {
 
   ownerScopedKey(address: OwnerScopedComponentAddress): string {
     return JSON.stringify([
-      address.ownerScopeId,
+      semanticAddressOwnerScopeId(address),
       address.subjectId,
       address.objectSemanticId,
       address.pathSchemeVersion,
@@ -313,7 +324,10 @@ export class IntelligenceCurrentStateRepository {
     address: ComponentSemanticAddress,
   ): Promise<ComponentSemanticAddress & { readonly subjectId: string }> {
     if (address.subjectId) return { ...address, subjectId: address.subjectId };
-    const subject = await resolveIntelligenceSubject(client, address.brandId);
+    const subject = await resolveIntelligenceSubject(
+      client,
+      address.ownerScopeId,
+    );
     return { ...address, subjectId: subject.id };
   }
 }

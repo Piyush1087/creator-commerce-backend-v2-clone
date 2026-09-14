@@ -96,7 +96,7 @@ export class VisualStylePersistenceHook implements ProcessorSuccessPersistenceHo
       prepared.evidence.brandId !== execution.brandId ||
       prepared.activeScope.some(
         (a) =>
-          a.brandId !== execution.brandId ||
+          a.ownerScopeId !== execution.brandId ||
           a.objectSemanticId !== VISUAL_STYLE_OBJECT,
       ) ||
       sha256CanonicalExecution(canonicalActiveScope(prepared.activeScope)) !==
@@ -106,7 +106,7 @@ export class VisualStylePersistenceHook implements ProcessorSuccessPersistenceHo
     )
       visualStyleInvalid("VISUAL_STYLE_PERSISTENCE_BASIS_MISMATCH");
     const address = (path: string) => ({
-      brandId: execution.brandId,
+      ownerScopeId: execution.brandId,
       objectSemanticId: VISUAL_STYLE_OBJECT,
       pathSchemeVersion: 1,
       componentSemanticPath: path,

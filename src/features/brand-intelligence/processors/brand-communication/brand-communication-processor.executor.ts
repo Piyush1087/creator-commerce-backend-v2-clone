@@ -56,7 +56,7 @@ function activeScope(
       throw new Error("INVALID_ACTIVE_SCOPE");
     }
     return {
-      brandId,
+      ownerScopeId: brandId,
       objectSemanticId: address.objectSemanticId,
       pathSchemeVersion: address.pathSchemeVersion,
       componentSemanticPath: address.componentSemanticPath,
