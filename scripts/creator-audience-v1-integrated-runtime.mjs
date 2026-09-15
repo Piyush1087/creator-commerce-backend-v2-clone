@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 const require = createRequire(import.meta.url);
 require("reflect-metadata");
 const { Test } = require("@nestjs/testing");
+const { ValidationPipe } = require("@nestjs/common");
 const { PrismaClient } = require("@prisma/client");
 const load = (path) => require("../dist/" + path);
 const { AppModule } = load("app.module");
@@ -287,6 +288,7 @@ try {
     builder = builder.overrideProvider(load(path)[name]).useValue(value);
   const module = await builder.compile();
   app = module.createNestApplication({ logger: false });
+  app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   app.enableCors({ origin: "http://localhost:43491", credentials: true });
   await app.listen(port, "127.0.0.1");
   for (const endpoint of ["/health/live", "/health"]) {
