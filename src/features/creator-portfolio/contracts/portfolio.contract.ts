@@ -24,7 +24,7 @@ export function normalizePortfolioDestination(input: string): string {
     throw new Error("PORTFOLIO_UNSAFE_DESTINATION");
   for (const key of url.searchParams.keys())
     if (
-      /token|signature|credential|secret|password|x-amz|x-goog|expires|oauth|authkey/iu.test(
+      /token|signature|credential|secret|password|x-amz|x-goog|expires|expiry|oauth|authkey|^(?:sig|policy|key-pair-id|hmac|sas)$/iu.test(
         key,
       )
     )

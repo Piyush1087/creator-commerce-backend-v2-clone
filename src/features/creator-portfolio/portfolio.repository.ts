@@ -6,6 +6,11 @@ import {
 import { createHash } from "node:crypto";
 import { Prisma, type CreatorPortfolioItem } from "@prisma/client";
 import type { z } from "zod";
+import {
+  PortfolioSourceReader,
+  type PortfolioSourceBatch,
+} from "./portfolio-source-reader";
+import { materializePortfolioSources } from "./portfolio-source-materializer";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AuthUser } from "../auth/types/auth-user";
 import type { CreatorWorkspaceActorContext } from "../../shared/creator/creator-workspace-actor.contract";
@@ -59,16 +64,28 @@ export class PortfolioRepository {
   constructor(
     private readonly prisma: PrismaService,
     private readonly actors: CreatorWorkspaceActorService,
+    private readonly sourceReader: PortfolioSourceReader = new PortfolioSourceReader(),
   ) {}
 
   read(user: AuthUser, query: z.infer<typeof PortfolioQuerySchema>) {
     return this.prisma.$transaction(
       async (tx) => {
-        const actor = await this.actors.resolveReadOnlyInTransaction(tx, user);
+        let actor = await this.actors.resolveReadOnlyInTransaction(tx, user);
         assertCreatorWorkspaceAction(actor.allowedActions, "PORTFOLIO_READ");
-        return this.readInTransaction(tx, actor, query);
+        const workspaceId = actor.workspaceId;
+        await lockCreatorTeam(tx, workspaceId);
+        actor = await this.actors.resolveReadOnlyInTransaction(tx, user);
+        if (actor.workspaceId !== workspaceId)
+          throw new ConflictException({ code: "PORTFOLIO_SUBJECT_CHANGED" });
+        assertCreatorWorkspaceAction(actor.allowedActions, "PORTFOLIO_READ");
+        const batch = await this.sourceReader.read(tx, actor);
+        await materializePortfolioSources(tx, actor, batch);
+        return this.readInTransaction(tx, actor, query, batch);
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+        timeout: 15_000,
+      },
     );
   }
   async findAggregate(
@@ -86,6 +103,7 @@ export class PortfolioRepository {
     tx: Prisma.TransactionClient,
     actor: CreatorWorkspaceActorContext,
     query: z.infer<typeof PortfolioQuerySchema>,
+    batch?: PortfolioSourceBatch,
   ) {
     const aggregate = await this.findAggregate(tx, actor);
     const where: Prisma.CreatorPortfolioItemWhereInput = {
@@ -125,30 +143,39 @@ export class PortfolioRepository {
         const item = portfolioItemFromRow(row);
         return {
           ...item,
-          provenance: item.provenance.map((p) =>
-            p.source === "INSTAGRAM"
-              ? {
-                  source: p.source,
-                  classification: p.classification,
-                  confidence: p.confidence,
-                  observedAt: p.observedAt,
-                  basis: "SPONSORSHIP_DISCLOSURE",
-                }
-              : p.source === "CREATOR_SHOP"
+          provenance: item.provenance
+            .filter(
+              (p) =>
+                p.source !== "CREATOR_PROVIDED" ||
+                !item.provenance.some(
+                  (other) => other.source === "CREATOR_SHOP",
+                ),
+            )
+            .map((p) =>
+              p.source === "INSTAGRAM"
                 ? {
                     source: p.source,
-                    verification: "COMPLETED_WORK",
-                    verifiedAt: p.verifiedAt,
+                    classification: p.classification,
+                    confidence: p.confidence,
+                    observedAt: p.observedAt,
+                    basis: "SPONSORSHIP_DISCLOSURE",
                   }
-                : p,
-          ),
+                : p.source === "CREATOR_SHOP"
+                  ? {
+                      source: p.source,
+                      verification: "COMPLETED_WORK",
+                      verifiedAt: p.verifiedAt,
+                    }
+                  : p,
+            ),
         };
       }),
       nextCursor: rows.length > 100 ? rows[99].id : null,
-      discovery: "NOT_PROCESSED",
+      discovery: batch?.discovery ?? "NOT_PROCESSED",
       limitations: [
         "STATIC_PRESENTATION_NOT_AVAILABLE",
         "STORY_CAPABILITY_NOT_AVAILABLE",
+        ...(batch?.limitations ?? []),
       ],
     });
   }

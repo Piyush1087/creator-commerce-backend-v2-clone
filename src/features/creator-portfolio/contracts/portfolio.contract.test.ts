@@ -23,6 +23,9 @@ describe("Portfolio V3 exact source, provenance and curation contracts", () => {
     "https://example.com/?access_token=synthetic",
     "https://example.com/?X-Amz-Signature=synthetic",
     "https://example.com/?expires=10",
+    "https://example.com/?sig=synthetic",
+    "https://example.com/?Policy=synthetic",
+    "https://example.com/?Key-Pair-Id=synthetic",
   ])("rejects unsafe or ephemeral destination %s", (url) => {
     expect(DestinationSchema.safeParse(url).success).toBe(false);
   });

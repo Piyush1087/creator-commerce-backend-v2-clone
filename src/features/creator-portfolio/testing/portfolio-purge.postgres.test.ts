@@ -77,6 +77,7 @@ describe.skipIf(!enabled)(
         ![
           "/creator_portfolio_v3_p0",
           "/creator_portfolio_v3_p1",
+          "/creator_portfolio_v3_p2",
           "/creator_portfolio_v3_p4",
         ].includes(url.pathname)
       )

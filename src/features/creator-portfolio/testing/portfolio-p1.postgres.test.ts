@@ -32,7 +32,11 @@ describe.skipIf(process.env.CREATOR_PORTFOLIO_DATABASE_TEST !== "true")(
       if (
         route.hostname !== "localhost" ||
         route.port !== "55472" ||
-        route.pathname !== "/creator_portfolio_v3_p1"
+        ![
+          "/creator_portfolio_v3_p1",
+          "/creator_portfolio_v3_p2",
+          "/creator_portfolio_v3_p4",
+        ].includes(route.pathname)
       )
         throw new Error("TASK_OWNED_PORTFOLIO_P1_DATABASE_REQUIRED");
       await db.$connect();

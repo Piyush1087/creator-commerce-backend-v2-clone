@@ -1,4 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { rm } from "node:fs/promises";
+import { basename, dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import type { PrismaClient } from "@prisma/client";
 import { ConfigService } from "@nestjs/config";
 import { CreatorAudienceCredentialFenceService } from "../../creator-audience/creator-audience-credential-fence.service";
@@ -12,6 +15,7 @@ import { InstagramSecureVideoDownloader } from "../../instagram/media/video/inst
 export async function audienceV1ContentTestFixture(
   db: PrismaClient,
   capturedAt: Date,
+  captionForIndex: (index: number) => string = () => "untrusted source text",
 ) {
   let providerCalls = 0;
   const failProvider = false;
@@ -59,7 +63,7 @@ export async function audienceV1ContentTestFixture(
         },
         caption: {
           state: "OBSERVED" as const,
-          value: "untrusted source text",
+          value: captionForIndex(index),
         },
         timestamp: {
           state: "OBSERVED" as const,
@@ -176,5 +180,23 @@ export async function audienceV1ContentTestFixture(
     external.speech,
     external.grounded,
   );
-  return { provider, analyzer, external, providerCalls: () => providerCalls };
+  return {
+    provider,
+    analyzer,
+    external,
+    providerCalls: () => providerCalls,
+    cleanup: async () => {
+      const root = resolve(
+        dirname(external.imageStore.getRootForDiagnostics()),
+      );
+      if (
+        dirname(root) !== resolve(tmpdir()) ||
+        !/^creator-content-correction-portfolio-v3-[a-f0-9-]{36}$/u.test(
+          basename(root),
+        )
+      )
+        throw new Error("TASK_OWNED_MEDIA_CLEANUP_REQUIRED");
+      await rm(root, { recursive: true, force: true });
+    },
+  };
 }
