@@ -41,6 +41,7 @@ const ASSISTANT_ACTIONS: readonly CreatorWorkspaceAction[] = [
   "INSIGHTS_AUDIENCE_READ",
   "INSIGHTS_CONTENT_READ",
   "CREATOR_BRAND_READ",
+  "COMMERCIAL_SETUP_READ",
 ];
 
 export function creatorWorkspaceActionsForRole(
