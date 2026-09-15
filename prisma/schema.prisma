@@ -1504,6 +1504,7 @@ model Organization {
 }
 
 model User {
+  creatorPortfolioRevisions          CreatorPortfolioRevision[]
   creatorBrandRevisions              CreatorBrandRevision[]
   creatorWorkPreferencesRevisions    CreatorWorkPreferencesRevision[]
   creatorRateCardRevisions           CreatorRateCardRevision[]
@@ -3620,6 +3621,7 @@ model UceCampaignReportingAssetGallery {
 // ============================================================================
 
 model CreatorProfile {
+  creatorPortfolios              CreatorPortfolio[]
   creatorBrandProfiles           CreatorBrandProfile[]
   creatorWorkPreferencesProfiles CreatorWorkPreferences[]
   creatorRateCardProfiles        CreatorRateCard[]
@@ -3875,6 +3877,7 @@ model UserBrandNotificationPreference {
 }
 
 model CreatorWorkspace {
+  creatorPortfolio        CreatorPortfolio?
   creatorWorkPreferences  CreatorWorkPreferences?
   creatorRateCard         CreatorRateCard?
   creatorBrandProfile     CreatorBrandProfile?
@@ -3903,6 +3906,7 @@ model CreatorWorkspace {
 }
 
 model CreatorWorkspaceMember {
+  creatorPortfolioRevisions       CreatorPortfolioRevision[]
   creatorBrandRevisions           CreatorBrandRevision[]
   creatorWorkPreferencesRevisions CreatorWorkPreferencesRevision[]
   creatorRateCardRevisions        CreatorRateCardRevision[]
@@ -6996,4 +7000,80 @@ enum InstagramSyncCoordinatorStatus {
   BACKOFF
   BLOCKED_AUTHORIZATION
   COMPLETED
+}
+
+/// Portfolio owns curation and bounded derived provenance, never source lifecycle.
+model CreatorPortfolio {
+  id              String                     @id @default(uuid())
+  workspaceId     String                     @unique @map("workspace_id")
+  ownerProfileId  String                     @map("owner_profile_id")
+  workspace       CreatorWorkspace           @relation(fields: [workspaceId, ownerProfileId], references: [id, ownerProfileId], onDelete: Restrict)
+  ownerProfile    CreatorProfile             @relation(fields: [ownerProfileId], references: [id], onDelete: Restrict)
+  currentRevision Int                        @map("current_revision")
+  createdAt       DateTime                   @default(now()) @map("created_at")
+  updatedAt       DateTime                   @updatedAt @map("updated_at")
+  items           CreatorPortfolioItem[]
+  revisions       CreatorPortfolioRevision[]
+
+  @@unique([workspaceId, ownerProfileId])
+  @@map("creator_portfolios")
+}
+
+model CreatorPortfolioItem {
+  id             String                  @id
+  portfolioId    String                  @map("portfolio_id")
+  portfolio      CreatorPortfolio        @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  kind           String                  @db.VarChar(40)
+  destination    String                  @db.VarChar(4096)
+  title          String                  @db.VarChar(160)
+  creatorContext String?                 @map("creator_context") @db.VarChar(300)
+  brandLabel     String?                 @map("brand_label") @db.VarChar(160)
+  workDate       DateTime?               @map("work_date")
+  state          String                  @db.VarChar(16)
+  sources        String[]
+  /// Strict validated source-specific envelopes; no raw payload or locators.
+  provenance     Json
+  lastRevision   Int                     @map("last_revision")
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+  aliases        CreatorPortfolioAlias[]
+
+  @@unique([portfolioId, id])
+  @@index([portfolioId, state, workDate, id])
+  @@index([sources], type: Gin)
+  @@map("creator_portfolio_items")
+}
+
+model CreatorPortfolioAlias {
+  id          String               @id @default(uuid())
+  portfolioId String               @map("portfolio_id")
+  itemId      String               @map("item_id")
+  item        CreatorPortfolioItem @relation(fields: [portfolioId, itemId], references: [portfolioId, id], onDelete: Cascade)
+  alias       String               @db.VarChar(500)
+
+  @@unique([portfolioId, alias])
+  @@map("creator_portfolio_aliases")
+}
+
+model CreatorPortfolioRevision {
+  id                String                 @id @default(uuid())
+  portfolioId       String                 @map("portfolio_id")
+  portfolio         CreatorPortfolio       @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  revision          Int
+  previousRevision  Int                    @map("previous_revision")
+  /// Bounded changed-item snapshot, not an unbounded whole-Portfolio export.
+  snapshot          Json
+  actorUserId       String                 @map("actor_user_id")
+  actorUser         User                   @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  actorMembershipId String                 @map("actor_membership_id")
+  actorMembership   CreatorWorkspaceMember @relation(fields: [actorMembershipId], references: [id], onDelete: Restrict)
+  actorRole         CreatorTeamRole        @map("actor_role")
+  origin            String                 @db.VarChar(24)
+  idempotencyKey    String                 @map("idempotency_key") @db.VarChar(200)
+  commandHash       String                 @map("command_hash") @db.VarChar(64)
+  createdAt         DateTime               @default(now()) @map("created_at")
+
+  @@unique([portfolioId, revision])
+  @@unique([portfolioId, idempotencyKey])
+  @@map("creator_portfolio_revisions")
 }

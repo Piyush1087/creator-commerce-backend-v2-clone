@@ -22,6 +22,8 @@ export const CREATOR_WORKSPACE_ACTIONS = [
   "COMMERCIAL_SETUP_READ",
   "WORK_PREFERENCES_EDIT",
   "RATE_CARD_EDIT",
+  "PORTFOLIO_READ",
+  "PORTFOLIO_CURATE",
 ] as const;
 
 export type CreatorWorkspaceAction = (typeof CREATOR_WORKSPACE_ACTIONS)[number];

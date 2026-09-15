@@ -36,6 +36,7 @@ const OWNER_ACTIONS: readonly CreatorWorkspaceAction[] =
 
 const MANAGER_ACTIONS: readonly CreatorWorkspaceAction[] = OWNER_ACTIONS;
 const ASSISTANT_ACTIONS: readonly CreatorWorkspaceAction[] = [
+  "PORTFOLIO_READ",
   "CAMPAIGN_OPPORTUNITY_VIEW",
   "CAMPAIGN_APPLICATION_APPLY",
   "INSIGHTS_AUDIENCE_READ",

@@ -23,6 +23,7 @@ import { CreatorCoPilotModule } from "./features/creator-co-pilot/creator-co-pil
 import { CreatorAudienceModule } from "./features/creator-audience/creator-audience.module";
 import { CreatorContentModule } from "./features/creator-content/creator-content.module";
 import { CreatorBrandModule } from "./features/creator-brand/creator-brand.module";
+import { PortfolioModule } from "./features/creator-portfolio/portfolio.module";
 import { WorkPreferencesModule } from "./features/creator-commercial-setup/work-preferences/work-preferences.module";
 import { RateCardModule } from "./features/creator-commercial-setup/rate-card/rate-card.module";
 import { CreatorCentreModule } from "./features/creator-centre/creator-centre.module";
@@ -82,6 +83,7 @@ import { S3Module } from "./shared/s3/s3.module";
     CreatorAudienceModule,
     CreatorContentModule,
     CreatorBrandModule,
+    PortfolioModule,
     WorkPreferencesModule,
     RateCardModule,
     CreatorOnboardingModule,

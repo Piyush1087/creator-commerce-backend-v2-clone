@@ -28,6 +28,7 @@ describe("C05 Creator Team policy", () => {
 
   it("denies Assistant Team and workspace administration", () => {
     expect(creatorWorkspaceActionsForRole(CreatorTeamRole.ASSISTANT)).toEqual([
+      "PORTFOLIO_READ",
       "CAMPAIGN_OPPORTUNITY_VIEW",
       "CAMPAIGN_APPLICATION_APPLY",
       "INSIGHTS_AUDIENCE_READ",

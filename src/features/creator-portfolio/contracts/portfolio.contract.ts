@@ -14,6 +14,7 @@ export function normalizePortfolioDestination(input: string): string {
     url.protocol !== "https:" ||
     url.username ||
     url.password ||
+    url.hostname.endsWith(".") ||
     (url.port && url.port !== "443") ||
     isIP(url.hostname) ||
     !url.hostname.includes(".") ||
@@ -130,6 +131,48 @@ export const PortfolioItemSchema = z
       });
   });
 export type PortfolioItem = z.infer<typeof PortfolioItemSchema>;
+/** Consumer labels/basis only; persisted source identities and authorization
+ * generations are deliberately not transport fields. */
+export const PortfolioPublicProvenanceSchema = z.discriminatedUnion("source", [
+  z
+    .object({
+      source: z.literal("INSTAGRAM"),
+      classification: z.literal("POSSIBLE_COLLABORATION"),
+      confidence: z.enum(["LOW", "MEDIUM"]),
+      observedAt: z.string().datetime(),
+      basis: z.literal("SPONSORSHIP_DISCLOSURE"),
+    })
+    .strict(),
+  z
+    .object({
+      source: z.literal("CREATOR_SHOP"),
+      verification: z.literal("COMPLETED_WORK"),
+      verifiedAt: z.string().datetime(),
+    })
+    .strict(),
+  z
+    .object({
+      source: z.literal("CREATOR_PROVIDED"),
+      createdAt: z.string().datetime(),
+    })
+    .strict(),
+]);
+export const PortfolioPublicItemSchema = PortfolioItemSchema.innerType()
+  .omit({ provenance: true })
+  .extend({
+    provenance: z.array(PortfolioPublicProvenanceSchema).min(1).max(32),
+  })
+  .superRefine((item, ctx) => {
+    if (
+      item.kind === "INSTAGRAM_STORY" ||
+      (item.provenance.some((p) => p.source === "INSTAGRAM") &&
+        !item.destination.startsWith("https://www.instagram.com/"))
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Exact supported source destination required",
+      });
+  });
 export const PortfolioMutationSchema = z.discriminatedUnion("intent", [
   z
     .object({
@@ -171,11 +214,44 @@ export const PortfolioConsumerSchema = z
     context: z
       .object({ role: PortfolioRoleSchema, canCurate: z.boolean() })
       .strict(),
-    items: z.array(PortfolioItemSchema),
+    items: z.array(PortfolioPublicItemSchema).max(100),
+    nextCursor: z
+      .string()
+      .regex(/^portfolio-item:[a-f0-9]{64}$/u)
+      .nullable(),
     discovery: z.enum(["AVAILABLE", "PARTIAL", "UNAVAILABLE", "NOT_PROCESSED"]),
     limitations: z.array(normalizedText(200)).max(32),
   })
+  .strict()
+  .superRefine((consumer, ctx) => {
+    if (consumer.context.canCurate !== (consumer.context.role !== "ASSISTANT"))
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Role and curation authority must agree",
+      });
+    if (
+      new Set(consumer.items.map((item) => item.id)).size !==
+      consumer.items.length
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Duplicate item identity is invalid",
+      });
+  });
+export const PortfolioQuerySchema = z
+  .object({
+    filter: z
+      .enum(["ALL", "INSTAGRAM", "CREATOR_SHOP", "CREATOR_PROVIDED", "REMOVED"])
+      .default("ALL"),
+    cursor: z
+      .string()
+      .regex(/^portfolio-item:[a-f0-9]{64}$/u)
+      .optional(),
+  })
   .strict();
+export function portfolioDestinationAlias(destination: string) {
+  return `destination:${createHash("sha256").update(normalizePortfolioDestination(destination)).digest("hex")}`;
+}
 export function portfolioIdentity(
   owner: string,
   sourceIdentity: string,

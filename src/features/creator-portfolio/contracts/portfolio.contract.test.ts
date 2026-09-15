@@ -4,6 +4,8 @@ import {
   PortfolioItemSchema,
   PortfolioMutationSchema,
   PortfolioProvenanceSchema,
+  PortfolioConsumerSchema,
+  PortfolioPublicProvenanceSchema,
   normalizePortfolioDestination,
   portfolioIdentity,
 } from "./portfolio.contract";
@@ -14,6 +16,8 @@ describe("Portfolio V3 exact source, provenance and curation contracts", () => {
     "https://user:pass@example.com/work",
     "https://127.0.0.1/work",
     "https://localhost/work",
+    "https://localhost./work",
+    "https://private.local./work",
     "https://cdninstagram.com/work",
     "https://fbcdn.net/work",
     "https://example.com/?access_token=synthetic",
@@ -70,6 +74,61 @@ describe("Portfolio V3 exact source, provenance and curation contracts", () => {
     presentation: "SOURCE_LINK_ONLY",
     access: "ACCESS_REQUIREMENTS_UNKNOWN",
   };
+  it("keeps durable lineage internal, rejects transport authorization generations and processor identities", () => {
+    const visible = {
+      source: "INSTAGRAM",
+      classification: "POSSIBLE_COLLABORATION",
+      confidence: "LOW",
+      observedAt: now,
+      basis: "SPONSORSHIP_DISCLOSURE",
+    };
+    expect(PortfolioPublicProvenanceSchema.safeParse(visible).success).toBe(
+      true,
+    );
+    for (const extra of [
+      { authorizationGeneration: 1 },
+      { accountId: "account" },
+      { sourceCaptureRef: "capture" },
+      { evidenceRefs: ["evidence"] },
+      { sourceHash: "a".repeat(64) },
+      { modelProfile: "internal" },
+    ])
+      expect(
+        PortfolioPublicProvenanceSchema.safeParse({ ...visible, ...extra })
+          .success,
+      ).toBe(false);
+  });
+  it("bounds each transport page without introducing a lifetime item cap; checks role and deduplication truth", () => {
+    const consumer = {
+      contractVersion: "creator-portfolio-v3.1",
+      currentRevision: 1,
+      context: { role: "OWNER", canCurate: true },
+      items: [base],
+      nextCursor: null,
+      discovery: "NOT_PROCESSED",
+      limitations: [],
+    };
+    expect(PortfolioConsumerSchema.safeParse(consumer).success).toBe(true);
+    expect(
+      PortfolioConsumerSchema.safeParse({
+        ...consumer,
+        context: { role: "ASSISTANT", canCurate: true },
+      }).success,
+    ).toBe(false);
+    expect(
+      PortfolioConsumerSchema.safeParse({ ...consumer, items: [base, base] })
+        .success,
+    ).toBe(false);
+    expect(
+      PortfolioConsumerSchema.safeParse({
+        ...consumer,
+        items: Array.from({ length: 101 }, (_, index) => ({
+          ...base,
+          id: portfolioIdentity("owner", String(index)),
+        })),
+      }).success,
+    ).toBe(false);
+  });
   it("is an individual reference, not a project, upload or player", () => {
     expect(PortfolioItemSchema.safeParse(base).success).toBe(true);
     for (const extra of [

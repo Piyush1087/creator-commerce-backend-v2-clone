@@ -10,7 +10,7 @@ import {
 } from "../../creator-audience-v1/creator-audience-v1.test-fixture";
 import { AudienceV1ProcessorExecutor } from "../../creator-audience-v1/creator-audience-v1.processor";
 import { AUDIENCE_V1_PATHS } from "../../creator-audience-v1/creator-audience-v1.contract";
-import { audienceV1ContentTestFixture } from "../../creator-audience-v1/creator-audience-v1.content-test-fixture";
+import { audienceV1ContentTestFixture } from "./portfolio-content.fixture";
 import { rm } from "node:fs/promises";
 import { dirname, basename, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -74,7 +74,11 @@ describe.skipIf(!enabled)(
       if (
         url.hostname !== "localhost" ||
         url.port !== "55472" ||
-        !["/creator_portfolio_v3_p0"].includes(url.pathname)
+        ![
+          "/creator_portfolio_v3_p0",
+          "/creator_portfolio_v3_p1",
+          "/creator_portfolio_v3_p4",
+        ].includes(url.pathname)
       )
         throw new Error("TASK_OWNED_PORTFOLIO_RECOVERY_DATABASE_REQUIRED");
       await db.$connect();
@@ -548,7 +552,7 @@ describe.skipIf(!enabled)(
         );
         if (
           dirname(root) !== resolve(tmpdir()) ||
-          !/^creator-content-correction-audience-v1-[a-f0-9-]+$/u.test(
+          !/^creator-content-correction-portfolio-v3-[a-f0-9-]+$/u.test(
             basename(root),
           )
         )
