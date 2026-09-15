@@ -20,6 +20,24 @@ export type CreatorContentSemanticObservation = Readonly<{
   captionPatterns: readonly string[];
   creativeStructures: readonly string[];
   visualExecution: readonly string[];
+  /** Internal bounded provenance, never part of the public workspace DTO. */
+  provenance?: Readonly<{
+    manifestIdentity: string;
+    modelIdentity: string;
+    modelVersions?: readonly Readonly<{
+      provider: string;
+      model: string;
+      profile: string;
+    }>[];
+    groundedSupport?: unknown;
+    modalities: readonly Readonly<{
+      supportIdentity: string;
+      mode: string;
+      state: "AVAILABLE" | "PARTIAL" | "UNAVAILABLE" | "UNKNOWN";
+      contentHash?: string;
+      observations: readonly unknown[];
+    }>[];
+  }>;
 }>;
 
 export type CreatorContentAcquiredMedia = Readonly<{
@@ -27,6 +45,7 @@ export type CreatorContentAcquiredMedia = Readonly<{
   insights: InstagramMediaInsightsTruth;
   semantic: CreatorContentSemanticObservation;
   evidenceRef: string;
+  sourceEvidenceRef?: string;
 }>;
 
 function field<T>(value: InstagramField<T>): T | null {
@@ -104,6 +123,7 @@ export function calculateCreatorContent(input: {
   windowEnd: Date;
   providerRowsReturned: number;
   rows: readonly CreatorContentAcquiredMedia[];
+  providerInventoryComplete?: boolean;
   role?: "OWNER" | "MANAGER" | "ASSISTANT";
 }): CreatorContentConsumer {
   const media = input.rows.map((row): CreatorContentMedia => {
@@ -140,9 +160,16 @@ export function calculateCreatorContent(input: {
     media.flatMap((item) => item.themes.map((value) => ({ value, item }))),
   );
   const formats = group(media.map((item) => ({ value: item.mediaType, item })));
-  const claims = themes.flatMap((theme) =>
-    comparisonClaims(theme.value, media, theme.items),
-  );
+  const claims =
+    input.providerInventoryComplete === false
+      ? []
+      : themes.flatMap((theme) =>
+          comparisonClaims(
+            theme.value,
+            media.filter((item) => item.semanticState === "AVAILABLE"),
+            theme.items.filter((item) => item.semanticState === "AVAILABLE"),
+          ),
+        );
   const highlights: CreatorContentConsumer["highlights"] = claims
     .slice(0, 2)
     .map((claim) => ({
@@ -152,7 +179,12 @@ export function calculateCreatorContent(input: {
       confidence: claim.confidence,
       evidenceRefs: claim.evidenceRefs,
     }));
-  if (highlights.length < 3 && themes[0] && themes[0].items.length >= 3)
+  if (
+    input.providerInventoryComplete !== false &&
+    highlights.length < 3 &&
+    themes[0] &&
+    themes[0].items.length >= 3
+  )
     highlights.push({
       id: `recurrence:${themes[0].value}`,
       kind: "RECURRENCE",
@@ -161,6 +193,9 @@ export function calculateCreatorContent(input: {
       evidenceRefs: themes[0].items.map((item) => item.evidenceRefs[0]).sort(),
     });
   const limitations = [
+    ...(input.providerInventoryComplete === false
+      ? ["PROVIDER_INVENTORY_PARTIAL_LATEST_CORPUS_UNCONFIRMED"]
+      : []),
     ...(media.some((item) => item.semanticState !== "AVAILABLE")
       ? ["SOME_MEDIA_SEMANTICS_PARTIAL_OR_UNKNOWN"]
       : []),

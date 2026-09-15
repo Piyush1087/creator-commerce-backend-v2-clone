@@ -7,10 +7,28 @@ import { InstagramProviderClientModule } from "../instagram/instagram-provider-c
 import { CreatorContentController } from "./creator-content.controller";
 import { CreatorContentPipelineService } from "./creator-content-pipeline.service";
 import { CreatorContentRepository } from "./creator-content.repository";
+import { CREATOR_CONTENT_SEMANTIC_ANALYZER } from "./creator-content-semantic.port";
 import {
-  CREATOR_CONTENT_SEMANTIC_ANALYZER,
-  MissingCreatorContentSemanticAnalyzer,
-} from "./creator-content-semantic.port";
+  CreatorContentMultimodalService,
+  CreatorContentGroundedModelPort,
+  UnavailableCreatorContentGroundedModel,
+} from "./creator-content-multimodal.service";
+import {
+  InstagramB3aVisualModelPort,
+  UnavailableInstagramB3aVisualModelAdapter,
+} from "../instagram-intelligence/media/instagram-b3a-visual-observation";
+import {
+  InstagramW1VideoFrameModelPort,
+  UnavailableInstagramW1VideoFrameModelAdapter,
+} from "../instagram-intelligence/media/instagram-w1-video-frame-observation";
+import {
+  InstagramVisualTextModelPort,
+  UnavailableInstagramVisualTextModelAdapter,
+} from "../instagram/media/instagram-visual-text";
+import {
+  InstagramSpeechTranscriptionPort,
+  UnavailableInstagramSpeechTranscriptionAdapter,
+} from "../instagram/media/video/instagram-speech";
 import { CreatorContentService } from "./creator-content.service";
 
 @Module({
@@ -26,9 +44,30 @@ import { CreatorContentService } from "./creator-content.service";
     CreatorContentRepository,
     CreatorContentPipelineService,
     CreatorContentService,
+    CreatorContentMultimodalService,
+    {
+      provide: InstagramB3aVisualModelPort,
+      useClass: UnavailableInstagramB3aVisualModelAdapter,
+    },
+    {
+      provide: InstagramW1VideoFrameModelPort,
+      useClass: UnavailableInstagramW1VideoFrameModelAdapter,
+    },
+    {
+      provide: InstagramVisualTextModelPort,
+      useClass: UnavailableInstagramVisualTextModelAdapter,
+    },
+    {
+      provide: InstagramSpeechTranscriptionPort,
+      useClass: UnavailableInstagramSpeechTranscriptionAdapter,
+    },
+    {
+      provide: CreatorContentGroundedModelPort,
+      useClass: UnavailableCreatorContentGroundedModel,
+    },
     {
       provide: CREATOR_CONTENT_SEMANTIC_ANALYZER,
-      useClass: MissingCreatorContentSemanticAnalyzer,
+      useExisting: CreatorContentMultimodalService,
     },
   ],
   exports: [CreatorContentPipelineService, CreatorContentRepository],

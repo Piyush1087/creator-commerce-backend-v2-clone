@@ -9,6 +9,47 @@ const credential = {
 };
 
 describe("Instagram intelligence provider truth client", () => {
+  it("requests the explicit bounded 90-day Content window at the real transport boundary", async () => {
+    const end = new Date("2026-09-15T12:00:00.000Z");
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        data: [
+          {
+            id: "day45",
+            media_type: "IMAGE",
+            timestamp: "2026-08-01T12:00:00.000Z",
+          },
+          {
+            id: "day91",
+            media_type: "IMAGE",
+            timestamp: "2026-06-16T12:00:00.000Z",
+          },
+        ],
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const result =
+      await new InstagramIntelligenceProviderClient().readMediaInventory(
+        credential,
+        end,
+        90,
+      );
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.searchParams.get("since")).toBe(
+      String(Date.parse("2026-06-17T12:00:00.000Z") / 1000),
+    );
+    expect(url.searchParams.get("until")).toBe(String(end.getTime() / 1000));
+    expect(result.coverage.windowStart).toBe("2026-06-17T12:00:00.000Z");
+    expect(result.coverage.windowEnd).toBe(end.toISOString());
+    expect(result.items.map((item) => item.providerMediaId)).toEqual(["day45"]);
+    await expect(
+      new InstagramIntelligenceProviderClient().readMediaInventory(
+        credential,
+        end,
+        120 as 90,
+      ),
+    ).rejects.toThrow("outside admitted bounds");
+  });
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();

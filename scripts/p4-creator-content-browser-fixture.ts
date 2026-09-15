@@ -9,7 +9,24 @@ import {
 } from "@prisma/client";
 import { AppModule } from "../src/app.module";
 import { CreatorContentPipelineService } from "../src/features/creator-content/creator-content-pipeline.service";
-import { CREATOR_CONTENT_SEMANTIC_ANALYZER } from "../src/features/creator-content/creator-content-semantic.port";
+import { CreatorContentGroundedModelPort } from "../src/features/creator-content/creator-content-multimodal.service";
+import { creatorContentExternalFixture } from "../src/features/creator-content/testing/creator-content-external.fixture";
+import { InstagramImageLocatorClient } from "../src/features/instagram/media/instagram-contained-image-acquisition.service";
+import { InstagramImageTemporaryStore } from "../src/features/instagram/media/instagram-image-temporary-store";
+import {
+  NodeInstagramImageDnsResolver,
+  NodeInstagramPinnedHttpsTransport,
+} from "../src/features/instagram/media/instagram-secure-image-downloader";
+import { InstagramVideoTemporaryStore } from "../src/features/instagram/media/video/instagram-video-temporary-store";
+import { InstagramVideoLocatorClient } from "../src/features/instagram/media/video/instagram-video-locator.client";
+import { InstagramVideoDecoderPort } from "../src/features/instagram/media/video/instagram-video-decoder";
+import { InstagramAudioExtractorPort } from "../src/features/instagram/media/video/instagram-audio-extractor";
+import { InstagramB3aVisualModelPort } from "../src/features/instagram-intelligence/media/instagram-b3a-visual-observation";
+import { InstagramW1VideoFrameModelPort } from "../src/features/instagram-intelligence/media/instagram-w1-video-frame-observation";
+import { InstagramVisualTextModelPort } from "../src/features/instagram/media/instagram-visual-text";
+import { InstagramSpeechTranscriptionPort } from "../src/features/instagram/media/video/instagram-speech";
+import { rm } from "node:fs/promises";
+import { dirname } from "node:path";
 import {
   INSTAGRAM_INTELLIGENCE_PROVIDER_READ_CLIENT,
   type InstagramIntelligenceProviderReadClient,
@@ -48,7 +65,7 @@ async function main() {
     throw new Error("P4 fixture requires the exact disposable local database");
   let failProvider = false;
   let providerCalls = 0;
-  let semanticCalls = 0;
+  const external = await creatorContentExternalFixture("p4-integrated");
   const capturedAt = new Date();
   const provider: InstagramIntelligenceProviderReadClient = {
     readProfile: async () => {
@@ -58,9 +75,21 @@ async function main() {
       throw new Error("UNEXPECTED_PROVIDER_METHOD");
     },
     readCarouselChildren: async () => {
-      throw new Error("UNEXPECTED_PROVIDER_METHOD");
+      providerCalls += 1;
+      return {
+        availability: "AVAILABLE",
+        stopReason: "EXHAUSTED",
+        children: [0, 1].map((ordinal) => ({
+          providerMediaId: `carousel-child-${ordinal}`,
+          ordinal,
+          mediaType: { state: "OBSERVED", value: "IMAGE" },
+          mediaProductType: { state: "OBSERVED", value: "FEED" },
+        })),
+      };
     },
-    readMediaInventory: async () => {
+    readMediaInventory: async (_credential, end, days) => {
+      if (days !== 90 || end.toISOString() !== capturedAt.toISOString())
+        throw new Error("CONTENT_WINDOW_REQUEST_MISMATCH");
       providerCalls += 1;
       if (failProvider) throw new Error("SYNTHETIC_PROVIDER_FAILURE");
       const items = Array.from({ length: 8 }, (_, index) => ({
@@ -85,7 +114,7 @@ async function main() {
         timestamp: {
           state: "OBSERVED" as const,
           value: new Date(
-            capturedAt.getTime() - index * 86_400_000,
+            capturedAt.getTime() - (index === 7 ? 45 : index) * 86_400_000,
           ).toISOString(),
         },
       }));
@@ -155,21 +184,6 @@ async function main() {
           reason: "PROVIDER_DOES_NOT_RETURN_OBSERVATION_TIME" as const,
         },
         providerLagLimitHours: 48 as const,
-      };
-    },
-  };
-  const semantic = {
-    analyze: async ({ media }: { media: { providerMediaId: string } }) => {
-      semanticCalls += 1;
-      return {
-        providerMediaId: media.providerMediaId,
-        state: "AVAILABLE" as const,
-        themes: [
-          Number(media.providerMediaId.slice(-1)) < 4 ? "Tutorial" : "Story",
-        ],
-        captionPatterns: ["Direct"],
-        creativeStructures: ["Demonstration"],
-        visualExecution: ["Close framing"],
       };
     },
   };
@@ -280,8 +294,32 @@ async function main() {
     module = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(INSTAGRAM_INTELLIGENCE_PROVIDER_READ_CLIENT)
       .useValue(provider)
-      .overrideProvider(CREATOR_CONTENT_SEMANTIC_ANALYZER)
-      .useValue(semantic)
+      .overrideProvider(InstagramImageLocatorClient)
+      .useValue(external.imageLocator)
+      .overrideProvider(InstagramVideoLocatorClient)
+      .useValue(external.videoLocator)
+      .overrideProvider(NodeInstagramImageDnsResolver)
+      .useValue(external.resolver)
+      .overrideProvider(NodeInstagramPinnedHttpsTransport)
+      .useValue(external.transport)
+      .overrideProvider(InstagramImageTemporaryStore)
+      .useValue(external.imageStore)
+      .overrideProvider(InstagramVideoTemporaryStore)
+      .useValue(external.videoStore)
+      .overrideProvider(InstagramVideoDecoderPort)
+      .useValue(external.decoder)
+      .overrideProvider(InstagramAudioExtractorPort)
+      .useValue(external.audio)
+      .overrideProvider(InstagramB3aVisualModelPort)
+      .useValue(external.visual)
+      .overrideProvider(InstagramW1VideoFrameModelPort)
+      .useValue(external.frameModel)
+      .overrideProvider(InstagramVisualTextModelPort)
+      .useValue(external.ocr)
+      .overrideProvider(InstagramSpeechTranscriptionPort)
+      .useValue(external.speech)
+      .overrideProvider(CreatorContentGroundedModelPort)
+      .useValue(external.grounded)
       .compile();
     await module.init();
     const pipeline = module.get(CreatorContentPipelineService);
@@ -306,7 +344,7 @@ async function main() {
     const success = await pipeline.execute(input);
     const callsAfterSuccess = {
       provider: providerCalls,
-      semantic: semanticCalls,
+      external: { ...external.count },
     };
     const replay = await pipeline.execute(input);
     failProvider = true;
@@ -324,7 +362,8 @@ async function main() {
       !replay.reused ||
       !failed ||
       providerCalls !== callsAfterSuccess.provider + 1 ||
-      semanticCalls !== callsAfterSuccess.semantic
+      JSON.stringify(external.count) !==
+        JSON.stringify(callsAfterSuccess.external)
     )
       throw new Error("P4 success/replay/failure proof failed");
     const rows = await db.$queryRawUnsafe<Array<Record<string, bigint>>>(
@@ -336,7 +375,7 @@ async function main() {
         credentials: "NOT_REPORTED",
         provider: "SYNTHETIC_NO_NETWORK",
         providerCalls: callsAfterSuccess.provider,
-        semanticCalls: callsAfterSuccess.semantic,
+        modalityCalls: callsAfterSuccess.external,
         replayAdditionalCalls: 0,
         failedChangedExecution: "CURRENT_PRESERVED",
         lineage: Object.fromEntries(
@@ -347,6 +386,10 @@ async function main() {
   } finally {
     await module?.close();
     await db.$disconnect();
+    await rm(dirname(external.imageStore.getRootForDiagnostics()), {
+      recursive: true,
+      force: true,
+    });
   }
 }
 void main();

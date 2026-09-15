@@ -69,13 +69,17 @@ export class CreatorContentRepository {
   async replay(
     identity: CreatorContentPersistenceIdentity,
   ): Promise<CreatorContentConsumer | null> {
-    const current = await this.readCurrent(identity);
-    if (!current) return null;
     const scope = await this.resolveScope(identity);
-    const rows = await this.prisma.$queryRaw<Array<{ count: bigint }>>(
-      Prisma.sql`SELECT count(*) count FROM data_extraction_captures capture WHERE capture.owner_scope_id=${scope.id} AND capture.acquisition_request_key=${identity.requestIdentity} AND capture.status='COMPLETED' AND capture.provider_integration_id=${identity.integrationId} AND capture.provider_account_id=${identity.providerAccountId} AND capture.authorization_generation=${identity.authorizationGeneration} AND EXISTS (SELECT 1 FROM intelligence_executions execution WHERE execution.owner_scope_id=${scope.id} AND execution.trigger_idempotency_key=${identity.requestIdentity} AND execution.status='COMPLETED')`,
+    const rows = await this.prisma.$queryRaw<Array<{ value: unknown }>>(
+      Prisma.sql`SELECT og.value_payload value FROM intelligence_object_generations og
+        JOIN intelligence_processor_executions processor ON processor.owner_scope_id=og.owner_scope_id AND processor.processor_execution_id=og.processor_execution_id
+        JOIN intelligence_executions execution ON execution.owner_scope_id=processor.owner_scope_id AND execution.execution_id=processor.execution_id
+        WHERE og.owner_scope_id=${scope.id} AND og.object_semantic_id='creator_content' AND execution.trigger_idempotency_key=${identity.requestIdentity} AND execution.status='COMPLETED'
+          AND og.object_metadata_payload->>'integrationId'=${identity.integrationId} AND og.object_metadata_payload->>'providerAccountId'=${identity.providerAccountId} AND og.object_metadata_payload->>'authorizationGeneration'=${String(identity.authorizationGeneration)}
+          AND EXISTS (SELECT 1 FROM data_extraction_captures capture WHERE capture.owner_scope_id=${scope.id} AND capture.acquisition_request_key=${identity.requestIdentity} AND capture.status='COMPLETED' AND capture.provider_integration_id=${identity.integrationId} AND capture.provider_account_id=${identity.providerAccountId} AND capture.authorization_generation=${identity.authorizationGeneration})
+        ORDER BY og.created_at DESC LIMIT 1`,
     );
-    return rows[0]?.count === 1n ? current : null;
+    return rows[0] ? CreatorContentConsumerSchema.parse(rows[0].value) : null;
   }
 
   async begin(identity: CreatorContentPersistenceIdentity) {
@@ -133,12 +137,73 @@ export class CreatorContentRepository {
           throw new Error("CREATOR_CONTENT_CAPTURE_STATE_CONFLICT");
       }
       for (const item of evidence) {
+        const row = input.rows.find(
+          (row) => row.evidenceRef === item.evidenceRef,
+        )!;
         const bounded = value.snapshot.media.find(
           (media) => media.providerMediaId === item.providerMediaId,
         )!;
+        const sourceEvidenceRef = row.sourceEvidenceRef ?? item.evidenceRef;
+        const sourcePayload = {
+          providerMediaId: bounded.providerMediaId,
+          publishedAt: bounded.publishedAt,
+          mediaType: bounded.mediaType,
+          permalink: bounded.permalink,
+          metrics: bounded.metrics,
+          captionHash: hash(JSON.stringify(row.media.caption)),
+          caption:
+            row.media.caption.state === "OBSERVED" ||
+            row.media.caption.state === "EXPLICIT_EMPTY"
+              ? row.media.caption.value.normalize("NFKC").slice(0, 2200)
+              : null,
+        };
+        if (
+          /(?:x-amz-(?:signature|credential)|[?&](?:access_token|signature|token)=|(?:cdninstagram|fbcdn)\.)/i.test(
+            JSON.stringify(sourcePayload),
+          )
+        )
+          throw new Error("CONTENT_SOURCE_PAYLOAD_REJECTED");
+        const sourceHash = hash(JSON.stringify(sourcePayload));
         await tx.$executeRaw(
-          Prisma.sql`INSERT INTO data_extraction_evidence_items (id, evidence_ref, owner_scope_id, brand_id, capability_id, normalization_contract_version, resource_ref, capture_ref, bounded_payload, content_hash, representativeness, coverage_snapshot, freshness_at_emission, freshness_basis, freshness_evaluated_at, quality_snapshot, item_fingerprint, semantic_observation_key, capture_method_class) VALUES (${randomUUID()}, ${item.evidenceRef}, ${refs.scopeId}, NULL, 'instagram.media_insights', 'creator.content.instagram.v0.1', ${refs.resourceRef}, ${refs.captureRef}, ${JSON.stringify(bounded)}::jsonb, ${item.contentHash}, 'CONTEXT_SPECIFIC', 'SINGLE_RESOURCE', 'CURRENT', 'authoritative provider publication and capture timestamps', ${new Date(item.capturedAt)}, ${bounded.semanticState === "AVAILABLE" ? "COMPLETE" : "PARTIAL"}::"DataExtractionAcquisitionQuality", ${item.contentHash}, ${`creator-content:${item.providerMediaId}`}, 'PROVIDER_MEDIATED_FETCH') ON CONFLICT (evidence_ref) DO NOTHING`,
+          Prisma.sql`INSERT INTO data_extraction_evidence_items (id, evidence_ref, owner_scope_id, brand_id, capability_id, normalization_contract_version, resource_ref, capture_ref, bounded_payload, content_hash, representativeness, coverage_snapshot, freshness_at_emission, freshness_basis, freshness_evaluated_at, quality_snapshot, item_fingerprint, semantic_observation_key, capture_method_class) VALUES (${randomUUID()}, ${sourceEvidenceRef}, ${refs.scopeId}, NULL, 'instagram.media_insights', 'creator.content.instagram.v0.1', ${refs.resourceRef}, ${refs.captureRef}, ${JSON.stringify(sourcePayload)}::jsonb, ${sourceHash}, 'CONTEXT_SPECIFIC', 'SINGLE_RESOURCE', 'CURRENT', 'authoritative provider publication and capture timestamps', ${new Date(item.capturedAt)}, 'COMPLETE', ${sourceHash}, NULL, 'PROVIDER_MEDIATED_FETCH') ON CONFLICT (evidence_ref) DO NOTHING`,
         );
+        if (row.semantic.provenance) {
+          const payload = {
+            semantic: {
+              themes: row.semantic.themes,
+              captionPatterns: row.semantic.captionPatterns,
+              creativeStructures: row.semantic.creativeStructures,
+              visualExecution: row.semantic.visualExecution,
+              state: row.semantic.state,
+            },
+            provenance: row.semantic.provenance,
+            supportingEvidenceRefs: [sourceEvidenceRef],
+            sourceCaptureRef: refs.captureRef,
+          };
+          const serialized = JSON.stringify(payload);
+          if (
+            Buffer.byteLength(serialized) > 65_536 ||
+            /(?:x-amz-(?:signature|credential)|[?&](?:access_token|signature|token)=|(?:cdninstagram|fbcdn)\.|temporaryPath|accessToken|rawVideo|rawImage|rawFrame|base64)/i.test(
+              serialized,
+            )
+          )
+            throw new Error("CONTENT_BOUNDED_PROVENANCE_REJECTED");
+          const derivedRef = item.evidenceRef;
+          const semanticKey = `creator-content-semantic:${hash(`${refs.scopeId}:${row.semantic.provenance.manifestIdentity}`)}`;
+          const derivedHash = hash(serialized);
+          await tx.$executeRaw(
+            Prisma.sql`INSERT INTO data_extraction_evidence_items (id, evidence_ref, owner_scope_id, brand_id, capability_id, normalization_contract_version, resource_ref, capture_ref, bounded_payload, content_hash, representativeness, coverage_snapshot, freshness_at_emission, freshness_basis, freshness_evaluated_at, quality_snapshot, item_fingerprint, semantic_observation_key, capture_method_class, parent_evidence_refs) VALUES (${randomUUID()}, ${derivedRef}, ${refs.scopeId}, NULL, 'instagram.media_insights', 'creator.content.multimodal.v0.1', ${refs.resourceRef}, ${refs.captureRef}, ${serialized}::jsonb, ${derivedHash}, 'CONTEXT_SPECIFIC', 'SINGLE_RESOURCE', 'CURRENT', 'completed source capture and validated bounded modality observations', ${new Date(item.capturedAt)}, ${row.semantic.state === "AVAILABLE" ? "COMPLETE" : "PARTIAL"}::"DataExtractionAcquisitionQuality", ${derivedHash}, ${semanticKey}, 'MODEL_DERIVATION', ARRAY[${sourceEvidenceRef}]) ON CONFLICT (evidence_ref) DO NOTHING`,
+          );
+          await tx.$executeRaw(
+            Prisma.sql`INSERT INTO data_extraction_semantic_observations (id, semantic_observation_key, owner_scope_id, brand_id, capability_id) VALUES (${randomUUID()}, ${semanticKey}, ${refs.scopeId}, NULL, 'instagram.media_insights') ON CONFLICT (owner_scope_id, semantic_observation_key) DO NOTHING`,
+          );
+          await tx.$executeRaw(
+            Prisma.sql`INSERT INTO data_extraction_observation_support (owner_scope_id, brand_id, semantic_observation_key, capability_id, evidence_ref) VALUES (${refs.scopeId}, NULL, ${semanticKey}, 'instagram.media_insights', ${derivedRef}) ON CONFLICT DO NOTHING`,
+          );
+          item.contentHash = derivedHash;
+        } else {
+          item.contentHash = sourceHash;
+        }
       }
     });
     return {

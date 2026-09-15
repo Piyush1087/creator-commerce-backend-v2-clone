@@ -89,13 +89,14 @@ export class InstagramIntelligenceProviderClient implements InstagramIntelligenc
   async readMediaInventory(
     credential: InstagramProviderCredential,
     windowEnd: Date,
+    windowDays: 30 | 90 = INSTAGRAM_MEDIA_WINDOW_DAYS,
   ): Promise<InstagramMediaInventoryTruth> {
     if (!Number.isFinite(windowEnd.getTime())) {
       throw new Error("Instagram media window end must be a valid date");
     }
-    const windowStart = new Date(
-      windowEnd.getTime() - INSTAGRAM_MEDIA_WINDOW_DAYS * 86_400_000,
-    );
+    if (windowDays !== 30 && windowDays !== 90)
+      throw new Error("Instagram inventory window is outside admitted bounds");
+    const windowStart = new Date(windowEnd.getTime() - windowDays * 86_400_000);
     const coverage: InstagramMediaInventoryTruth["coverage"] = {
       windowStart: windowStart.toISOString(),
       windowEnd: windowEnd.toISOString(),

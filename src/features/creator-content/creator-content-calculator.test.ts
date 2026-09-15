@@ -98,6 +98,31 @@ function row(
 }
 
 describe("Creator Content V0 deterministic contract", () => {
+  it("retains partial inventory truth without claiming a complete latest corpus or patterns", () => {
+    const rows = Array.from({ length: 8 }, (_, index) =>
+      row(
+        `p${index}`,
+        15 - index,
+        index < 4 ? "Tutorial" : "Story",
+        100,
+        index < 4 ? 20 : 5,
+      ),
+    );
+    const value = calculateCreatorContent({
+      capturedAt: end,
+      windowEnd: end,
+      providerRowsReturned: 8,
+      rows,
+      providerInventoryComplete: false,
+    });
+    expect(value.status).toBe("PARTIAL");
+    expect(value.highlights).toEqual([]);
+    expect(value.performance.claims).toEqual([]);
+    expect(value.limitations).toContain(
+      "PROVIDER_INVENTORY_PARTIAL_LATEST_CORPUS_UNCONFIRMED",
+    );
+    expect(value.snapshot.media).toHaveLength(8);
+  });
   it("selects only the latest 24 eligible rows in the exact 90-day window with stable ties", () => {
     const rows = Array.from({ length: 28 }, (_, index) =>
       media(

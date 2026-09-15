@@ -147,6 +147,7 @@ export interface InstagramIntelligenceProviderReadClient {
   readMediaInventory(
     credential: InstagramProviderCredential,
     windowEnd: Date,
+    windowDays?: 30 | 90,
   ): Promise<InstagramMediaInventoryTruth>;
   readMediaInsights(
     credential: InstagramProviderCredential,

@@ -56,9 +56,23 @@ export class CreatorContentPipelineService {
       integrationId: input.integrationId,
       providerAccountId: input.providerAccountId,
       authorizationGeneration: input.authorizationGeneration,
-      requestIdentity:
-        input.requestIdentity ??
-        creatorContentRequestIdentity({ ...input, capturedAt }),
+      requestIdentity: `creator-content:${hash(
+        JSON.stringify({
+          request:
+            input.requestIdentity ??
+            creatorContentRequestIdentity({ ...input, capturedAt }),
+          owner: input.actor.subjectCreatorProfileId,
+          workspace: input.actor.workspaceId,
+          integration: input.integrationId,
+          account: input.providerAccountId,
+          generation: input.authorizationGeneration,
+          windowEnd: capturedAt.toISOString(),
+          windowDays: 90,
+          semanticProfile:
+            this.semantic.replayProfileIdentity?.() ??
+            "creator-content-semantic-v0.1",
+        }),
+      )}`,
     };
     const projected = await this.fence.project(input.actor);
     if (
@@ -71,15 +85,23 @@ export class CreatorContentPipelineService {
     const replay = await this.repository.replay(identity);
     if (replay) return { value: replay, reused: true, generationIds: [] };
     const credential = await this.fence.acquire(input.actor, identity);
-    await this.repository.begin(identity);
+    const source = await this.repository.begin(identity);
     try {
       const inventory = await this.provider.readMediaInventory(
         credential,
         capturedAt,
+        90,
       );
+      if (
+        inventory.coverage.windowStart !==
+          new Date(capturedAt.getTime() - 90 * 86_400_000).toISOString() ||
+        inventory.coverage.windowEnd !== capturedAt.toISOString()
+      )
+        throw new Error("CREATOR_CONTENT_PROVIDER_WINDOW_MISMATCH");
       const corpus = selectCreatorContentCorpus(inventory.items, capturedAt);
       const rows: CreatorContentAcquiredMedia[] = [];
       for (const media of corpus) {
+        const evidenceRef = `creator-content-evidence:${hash(`${identity.requestIdentity}:${media.providerMediaId}`)}`;
         const mediaType =
           observed(media.mediaProductType) === "REELS"
             ? "REEL"
@@ -93,19 +115,55 @@ export class CreatorContentPipelineService {
           this.semantic.analyze({
             media,
             profileVersion: "creator-content-semantic-v0.1",
+            actor: input.actor,
+            identity,
+            windowEnd: capturedAt,
+            sourceCaptureRef: source.captureRef,
+            sourceEvidenceRef: evidenceRef,
           }),
         ]);
         rows.push({
           media,
           insights,
           semantic,
-          evidenceRef: `creator-content-evidence:${hash(`${identity.requestIdentity}:${media.providerMediaId}`)}`,
+          sourceEvidenceRef: evidenceRef,
+          evidenceRef: semantic.provenance
+            ? `${evidenceRef}:semantic`
+            : evidenceRef,
         });
+      }
+      if (
+        rows.length > 0 &&
+        rows.every((row) => row.semantic.state === "UNKNOWN")
+      ) {
+        const previous = await this.repository.readCurrent(identity);
+        if (
+          previous?.snapshot.media.some(
+            (media) => media.semanticState !== "UNKNOWN",
+          )
+        ) {
+          await this.repository.fail(identity);
+          return {
+            value: {
+              ...previous,
+              processingState: "FAILED" as const,
+              currentPreserved: true,
+            },
+            reused: false,
+            generationIds: [],
+          };
+        }
       }
       const value = calculateCreatorContent({
         capturedAt,
         windowEnd: capturedAt,
         providerRowsReturned: inventory.coverage.rowsReturned,
+        providerInventoryComplete:
+          inventory.availability === "AVAILABLE" &&
+          ["EXHAUSTED", "EMPTY_SUCCESS"].includes(
+            inventory.coverage.stopReason,
+          ) &&
+          inventory.coverage.rowsMissingTimestamp === 0,
         rows,
       });
       if (value.status === "UNAVAILABLE") {

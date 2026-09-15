@@ -1,8 +1,10 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
 import { IntelligenceOwnerType, Prisma } from "@prisma/client";
 
 import { PrismaService } from "../../../../prisma/prisma.service";
 import type { IntelligenceOwnerScope } from "../../../creator-audience/contracts/creator-audience-v0.contract";
+import { InstagramImageTemporaryStore } from "../../../instagram/media/instagram-image-temporary-store";
+import { InstagramVideoTemporaryStore } from "../../../instagram/media/video/instagram-video-temporary-store";
 
 export type PersistedOwnerScope = Readonly<{
   id: string;
@@ -12,7 +14,11 @@ export type PersistedOwnerScope = Readonly<{
 
 @Injectable()
 export class IntelligenceOwnerScopeRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly imageStore?: InstagramImageTemporaryStore,
+    @Optional() private readonly videoStore?: InstagramVideoTemporaryStore,
+  ) {}
 
   async resolve(scope: IntelligenceOwnerScope): Promise<PersistedOwnerScope> {
     if (scope.kind === "BRAND") {
@@ -52,7 +58,16 @@ export class IntelligenceOwnerScopeRepository {
 
   /** Exact internal Creator Instagram purge; the canonical Creator scope survives. */
   async purgeCreatorInstagram(scopeId: string): Promise<number> {
-    return this.prisma.$transaction(async (tx) => {
+    const target = await this.prisma.intelligenceOwnerScope.findUnique({
+      where: { id: scopeId },
+    });
+    if (
+      !target ||
+      target.ownerType !== IntelligenceOwnerType.CREATOR ||
+      !target.creatorProfileId
+    )
+      throw new Error("CREATOR_OWNER_SCOPE_REQUIRED");
+    const deletedRows = await this.prisma.$transaction(async (tx) => {
       const scope = await tx.intelligenceOwnerScope.findUnique({
         where: { id: scopeId },
       });
@@ -112,7 +127,16 @@ export class IntelligenceOwnerScopeRepository {
             AND (SELECT count(*) FROM deleted_processors) >= 0
           RETURNING 1
         ),
-        deleted_evidence AS (DELETE FROM data_extraction_evidence_items WHERE owner_scope_id=${scopeId} AND capture_ref IN (SELECT capture_ref FROM target_captures) RETURNING 1),
+        target_observations AS MATERIALIZED (
+          SELECT semantic_observation_key FROM data_extraction_semantic_observations o
+          WHERE o.owner_scope_id=${scopeId}
+            AND EXISTS (SELECT 1 FROM data_extraction_observation_support s JOIN data_extraction_evidence_items e ON e.owner_scope_id=s.owner_scope_id AND e.evidence_ref=s.evidence_ref WHERE s.owner_scope_id=o.owner_scope_id AND s.semantic_observation_key=o.semantic_observation_key AND e.capture_ref IN (SELECT capture_ref FROM target_captures))
+            AND NOT EXISTS (SELECT 1 FROM data_extraction_observation_support s JOIN data_extraction_evidence_items e ON e.owner_scope_id=s.owner_scope_id AND e.evidence_ref=s.evidence_ref WHERE s.owner_scope_id=o.owner_scope_id AND s.semantic_observation_key=o.semantic_observation_key AND e.capture_ref NOT IN (SELECT capture_ref FROM target_captures))
+        ),
+        deleted_relations AS (DELETE FROM data_extraction_observation_relations WHERE owner_scope_id=${scopeId} AND (source_observation_key IN (SELECT semantic_observation_key FROM target_observations) OR target_observation_key IN (SELECT semantic_observation_key FROM target_observations)) RETURNING 1),
+        deleted_supports AS (DELETE FROM data_extraction_observation_support WHERE owner_scope_id=${scopeId} AND evidence_ref IN (SELECT evidence_ref FROM data_extraction_evidence_items WHERE owner_scope_id=${scopeId} AND capture_ref IN (SELECT capture_ref FROM target_captures)) RETURNING 1),
+        deleted_observations AS (DELETE FROM data_extraction_semantic_observations WHERE owner_scope_id=${scopeId} AND semantic_observation_key IN (SELECT semantic_observation_key FROM target_observations) AND (SELECT count(*) FROM deleted_supports)>=0 AND (SELECT count(*) FROM deleted_relations)>=0 RETURNING 1),
+        deleted_evidence AS (DELETE FROM data_extraction_evidence_items WHERE owner_scope_id=${scopeId} AND capture_ref IN (SELECT capture_ref FROM target_captures) AND (SELECT count(*) FROM deleted_observations)>=0 RETURNING 1),
         deleted_captures AS (DELETE FROM data_extraction_captures WHERE owner_scope_id=${scopeId} AND capture_ref IN (SELECT capture_ref FROM target_captures) RETURNING 1),
         deleted_resources AS (DELETE FROM data_extraction_resources WHERE owner_scope_id=${scopeId} AND resource_ref IN (SELECT resource_ref FROM target_resources) RETURNING 1),
         deleted_sync AS (DELETE FROM instagram_intelligence_sync_jobs WHERE owner_scope_id=${scopeId} AND creator_integration_id IS NOT NULL RETURNING 1)
@@ -123,6 +147,7 @@ export class IntelligenceOwnerScopeRepository {
           (SELECT count(*) FROM deleted_objects) + (SELECT count(*) FROM deleted_actions) +
           (SELECT count(*) FROM deleted_attempts) + (SELECT count(*) FROM deleted_processors) +
           (SELECT count(*) FROM deleted_executions) +
+          (SELECT count(*) FROM deleted_relations) + (SELECT count(*) FROM deleted_supports) + (SELECT count(*) FROM deleted_observations) +
           (SELECT count(*) FROM deleted_evidence) + (SELECT count(*) FROM deleted_captures) +
           (SELECT count(*) FROM deleted_resources) +
           (SELECT count(*) FROM deleted_sync)
@@ -130,5 +155,8 @@ export class IntelligenceOwnerScopeRepository {
       `);
       return Number(counts[0]?.deleted_count ?? 0n);
     });
+    await this.imageStore?.purgeScope(`creator:${target.creatorProfileId}`);
+    await this.videoStore?.purgeScope(`creator:${target.creatorProfileId}`);
+    return deletedRows;
   }
 }

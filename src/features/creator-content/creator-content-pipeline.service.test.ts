@@ -97,7 +97,7 @@ describe("Creator Content provider-neutral pipeline", () => {
         .fn()
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(current),
-      begin: vi.fn(),
+      begin: vi.fn().mockResolvedValue({ captureRef: "capture" }),
       fail: vi.fn(),
       completeAcquisition: vi
         .fn()
@@ -132,8 +132,8 @@ describe("Creator Content provider-neutral pipeline", () => {
         availability: "AVAILABLE",
         items: [media],
         coverage: {
-          windowStart: "",
-          windowEnd: "",
+          windowStart: "2026-06-17T12:00:00.000Z",
+          windowEnd: now.toISOString(),
           pagesAttempted: 1,
           pagesCompleted: 1,
           rowsReturned: 1,

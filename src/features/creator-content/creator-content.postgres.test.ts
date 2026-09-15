@@ -32,6 +32,15 @@ import { CreatorContentPersistenceHook } from "./creator-content-persistence.hoo
 import { CreatorContentPipelineService } from "./creator-content-pipeline.service";
 import { CreatorContentProcessorExecutor } from "./creator-content-processor.executor";
 import { CreatorContentRepository } from "./creator-content.repository";
+import { ConfigService } from "@nestjs/config";
+import { CreatorContentMultimodalService } from "./creator-content-multimodal.service";
+import { creatorContentExternalFixture } from "./testing/creator-content-external.fixture";
+import { InstagramContainedImageAcquisitionService } from "../instagram/media/instagram-contained-image-acquisition.service";
+import { InstagramContainedVideoAcquisitionService } from "../instagram/media/video/instagram-contained-video-acquisition.service";
+import { InstagramSecureImageDownloader } from "../instagram/media/instagram-secure-image-downloader";
+import { InstagramSecureVideoDownloader } from "../instagram/media/video/instagram-secure-video-downloader";
+import { rm } from "node:fs/promises";
+import { dirname } from "node:path";
 
 const enabled = process.env.CREATOR_CONTENT_DATABASE_TEST === "true";
 describe.skipIf(!enabled)(
@@ -42,6 +51,7 @@ describe.skipIf(!enabled)(
     let scopes: IntelligenceOwnerScopeRepository;
     let providerCalls = 0;
     let failProvider = false;
+    let external: Awaited<ReturnType<typeof creatorContentExternalFixture>>;
     const capturedAt = new Date("2026-09-15T12:00:00.000Z");
     const provider: InstagramIntelligenceProviderReadClient = {
       readProfile: async () => {
@@ -51,9 +61,21 @@ describe.skipIf(!enabled)(
         throw new Error("UNEXPECTED_METHOD");
       },
       readCarouselChildren: async () => {
-        throw new Error("UNEXPECTED_METHOD");
+        providerCalls += 1;
+        return {
+          availability: "AVAILABLE",
+          stopReason: "EXHAUSTED",
+          children: [0, 1].map((ordinal) => ({
+            providerMediaId: `child-${ordinal}`,
+            ordinal,
+            mediaType: { state: "OBSERVED", value: "IMAGE" },
+            mediaProductType: { state: "OBSERVED", value: "FEED" },
+          })),
+        };
       },
-      readMediaInventory: async () => {
+      readMediaInventory: async (_credential, end, days) => {
+        expect(days).toBe(90);
+        expect(end).toEqual(capturedAt);
         providerCalls += 1;
         if (failProvider) throw new Error("FIXTURE_PROVIDER_FAILURE");
         const items = Array.from({ length: 8 }, (_, index) => ({
@@ -78,7 +100,7 @@ describe.skipIf(!enabled)(
           timestamp: {
             state: "OBSERVED" as const,
             value: new Date(
-              capturedAt.getTime() - index * 86_400_000,
+              capturedAt.getTime() - (index === 7 ? 45 : index) * 86_400_000,
             ).toISOString(),
           },
         }));
@@ -224,19 +246,49 @@ describe.skipIf(!enabled)(
         executors,
         persistence,
       );
-      scopes = new IntelligenceOwnerScopeRepository(prisma);
-      const semanticFixture = {
-        analyze: async ({ media }: { media: { providerMediaId: string } }) => ({
-          providerMediaId: media.providerMediaId,
-          state: "AVAILABLE" as const,
-          themes: [
-            Number(media.providerMediaId.slice(-1)) < 4 ? "Tutorial" : "Story",
-          ],
-          captionPatterns: ["Direct"],
-          creativeStructures: ["Demonstration"],
-          visualExecution: ["Close framing"],
+      external = await creatorContentExternalFixture(
+        `postgres-${randomUUID()}`,
+      );
+      scopes = new IntelligenceOwnerScopeRepository(
+        prisma,
+        external.imageStore,
+        external.videoStore,
+      );
+      const fence = new CreatorAudienceCredentialFenceService(prisma);
+      const semanticFixture = new CreatorContentMultimodalService(
+        new ConfigService({
+          INSTAGRAM_IMAGE_VISUAL_ENABLED: "true",
+          INSTAGRAM_SELECTED_VIDEO_FRAMES_ENABLED: "true",
+          INSTAGRAM_SELECTED_VIDEO_SPEECH_ENABLED: "true",
         }),
-      };
+        fence,
+        provider,
+        new InstagramContainedImageAcquisitionService(
+          external.imageLocator,
+          new InstagramSecureImageDownloader(
+            external.resolver,
+            external.transport,
+            external.imageStore,
+          ),
+        ),
+        external.imageStore,
+        new InstagramContainedVideoAcquisitionService(
+          external.videoLocator,
+          new InstagramSecureVideoDownloader(
+            external.resolver,
+            external.transport,
+            external.videoStore,
+          ),
+        ),
+        external.videoStore,
+        external.decoder,
+        external.audio,
+        external.visual,
+        external.ocr,
+        external.frameModel,
+        external.speech,
+        external.grounded,
+      );
       pipeline = new CreatorContentPipelineService(
         new CreatorAudienceCredentialFenceService(prisma),
         new CreatorContentRepository(prisma, scopes),
@@ -251,7 +303,14 @@ describe.skipIf(!enabled)(
         semanticFixture,
       );
     }, 30_000);
-    afterAll(async () => db.$disconnect());
+    afterAll(async () => {
+      await db.$disconnect();
+      if (external)
+        await rm(dirname(external.imageStore.getRootForDiagnostics()), {
+          recursive: true,
+          force: true,
+        });
+    });
 
     async function owner() {
       const suffix = randomUUID();
@@ -320,6 +379,7 @@ describe.skipIf(!enabled)(
       const before = providerCalls;
       const first = await pipeline.execute(input);
       const firstCalls = providerCalls;
+      const externalAfterFirst = { ...external.count };
       const scope = await db.intelligenceOwnerScope.findUniqueOrThrow({
         where: {
           ownerKey: `CREATOR:${fixture.profile.id}:${fixture.workspace.id}`,
@@ -337,15 +397,58 @@ describe.skipIf(!enabled)(
       expect(first.generationIds).toHaveLength(1);
       expect(second.reused).toBe(true);
       expect(providerCalls).toBe(firstCalls);
-      expect(firstCalls - before).toBe(9);
+      expect(external.count).toEqual(externalAfterFirst);
+      expect(firstCalls - before).toBe(10);
       expect(afterFirst).toEqual({
         captures: 1n,
-        evidence: 8n,
+        evidence: 16n,
         objects: 1n,
         components: 8n,
         current: 8n,
       });
       expect(afterReplay).toEqual(afterFirst);
+      const derived = await db.$queryRawUnsafe<
+        Array<{ payload: unknown; parents: string[]; method: string }>
+      >(
+        `SELECT bounded_payload payload, parent_evidence_refs parents, capture_method_class::text method FROM data_extraction_evidence_items WHERE owner_scope_id=$1 AND capture_method_class='MODEL_DERIVATION'`,
+        scope.id,
+      );
+      expect(derived).toHaveLength(8);
+      expect(
+        derived.every(
+          (row) =>
+            row.parents.length === 1 && row.method === "MODEL_DERIVATION",
+        ),
+      ).toBe(true);
+      expect(
+        await db.dataExtractionSemanticObservation.count({
+          where: { ownerScopeId: scope.id },
+        }),
+      ).toBe(8);
+      expect(
+        await db.dataExtractionObservationSupport.count({
+          where: { ownerScopeId: scope.id },
+        }),
+      ).toBe(8);
+      expect(
+        first.value.snapshot.media.some(
+          (media) => media.providerMediaId === "media-7",
+        ),
+      ).toBe(true);
+      expect(externalAfterFirst).toMatchObject({
+        videoLocator: 1,
+        probe: 1,
+        extract: 1,
+        frameModel: 6,
+        audio: 1,
+        speech: 1,
+      });
+      expect(
+        await external.imageStore.purgeScope(`creator:${fixture.profile.id}`),
+      ).toBe(0);
+      expect(
+        await external.videoStore.purgeScope(`creator:${fixture.profile.id}`),
+      ).toBe(0);
       expect(first.value.performance.claims.length).toBeGreaterThan(0);
       expect(first.value.representatives.length).toBeLessThanOrEqual(6);
     }, 30_000);
@@ -408,6 +511,128 @@ describe.skipIf(!enabled)(
           },
         }),
       ).toBe(8);
+    }, 30_000);
+
+    it("preserves exact partial modality coverage on replay and valid current after changed-model failure", async () => {
+      const fixture = await owner();
+      const input = {
+        actor: fixture.actor,
+        integrationId: fixture.integration.id,
+        providerAccountId: fixture.providerAccountId,
+        authorizationGeneration: 1,
+        capturedAt,
+        requestIdentity: `partial:${randomUUID()}`,
+      };
+      external.setOcrUnavailable(true);
+      const first = await pipeline.execute(input);
+      const scope = await scopes.resolve({
+        kind: "CREATOR",
+        creatorProfileId: fixture.profile.id,
+        creatorWorkspaceId: fixture.workspace.id,
+      });
+      const before = { ...external.count };
+      const beforeProvider = providerCalls;
+      const refsBefore = await db.$queryRawUnsafe<
+        Array<{ ref: string; payload: unknown }>
+      >(
+        `SELECT evidence_ref ref, bounded_payload payload FROM data_extraction_evidence_items WHERE owner_scope_id=$1 ORDER BY evidence_ref`,
+        scope.id,
+      );
+      const replay = await pipeline.execute(input);
+      expect(replay.reused).toBe(true);
+      expect(replay.value).toEqual(first.value);
+      expect(replay.value.snapshot.coverage).toBe(0);
+      expect(
+        replay.value.snapshot.media.every(
+          (media) => media.semanticState === "PARTIAL",
+        ),
+      ).toBe(true);
+      expect(external.count).toEqual(before);
+      expect(providerCalls).toBe(beforeProvider);
+      expect(
+        await db.$queryRawUnsafe(
+          `SELECT evidence_ref ref, bounded_payload payload FROM data_extraction_evidence_items WHERE owner_scope_id=$1 ORDER BY evidence_ref`,
+          scope.id,
+        ),
+      ).toEqual(refsBefore);
+      external.setOcrUnavailable(false);
+      external.setGroundedUnavailable(true);
+      Object.assign(external.grounded, { modelProfileVersion: "changed-v2" });
+      const failed = await pipeline.execute(input);
+      expect(failed.reused).toBe(false);
+      expect(failed.value.currentPreserved).toBe(true);
+      expect(failed.value.processingState).toBe("FAILED");
+      expect(
+        await db.intelligenceObjectGeneration.count({
+          where: { ownerScopeId: scope.id },
+        }),
+      ).toBe(1);
+      expect(
+        await db.dataExtractionEvidenceItem.count({
+          where: { ownerScopeId: scope.id },
+        }),
+      ).toBe(16);
+      external.setGroundedUnavailable(false);
+      Object.assign(external.grounded, { modelProfileVersion: "v1" });
+      for (const changed of [
+        { providerAccountId: "other-account" },
+        { authorizationGeneration: 2 },
+        { actor: { ...fixture.actor, subjectCreatorProfileId: randomUUID() } },
+      ])
+        await expect(
+          pipeline.execute({ ...input, ...changed }),
+        ).rejects.toThrow("FENCE");
+      expect(
+        await db.dataExtractionEvidenceItem.count({
+          where: { ownerScopeId: scope.id },
+        }),
+      ).toBe(16);
+      const websiteRef = `website:${randomUUID()}`;
+      await db.$executeRawUnsafe(
+        `INSERT INTO data_extraction_resources (id, resource_ref, owner_scope_id, brand_id, source_class, resource_type, canonical_resource_key, canonical_resource_key_hash, canonical_url) VALUES ($1,$2,$3,NULL,'OWNED_WEBSITE','OWNED_WEB_PAGE',$2,$4,'https://example.test/')`,
+        randomUUID(),
+        websiteRef,
+        scope.id,
+        "d".repeat(64),
+      );
+      const survivor = await owner();
+      const targetTemporary = await external.imageStore.create(
+        `creator:${fixture.profile.id}`,
+      );
+      await targetTemporary.handle.close();
+      const targetVideoTemporary = await external.videoStore.createVideo(
+        `creator:${fixture.profile.id}`,
+      );
+      await targetVideoTemporary.handle.close();
+      const survivorTemporary = await external.imageStore.create(
+        `creator:${survivor.profile.id}`,
+      );
+      await survivorTemporary.handle.close();
+      expect(await scopes.purgeCreatorInstagram(scope.id)).toBeGreaterThan(0);
+      expect(
+        await external.imageStore.purgeScope(`creator:${fixture.profile.id}`),
+      ).toBe(0);
+      expect(
+        await external.videoStore.purgeScope(`creator:${fixture.profile.id}`),
+      ).toBe(0);
+      expect(
+        await external.imageStore.purgeScope(`creator:${survivor.profile.id}`),
+      ).toBe(1);
+      expect(
+        await db.dataExtractionSemanticObservation.count({
+          where: { ownerScopeId: scope.id },
+        }),
+      ).toBe(0);
+      expect(
+        await db.dataExtractionObservationSupport.count({
+          where: { ownerScopeId: scope.id },
+        }),
+      ).toBe(0);
+      expect(
+        await db.dataExtractionResource.count({
+          where: { resourceRef: websiteRef },
+        }),
+      ).toBe(1);
     }, 30_000);
 
     it("uses the existing hourly coordinator with immediate first run and daily Content cadence", async () => {

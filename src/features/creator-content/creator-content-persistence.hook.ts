@@ -105,7 +105,10 @@ export class CreatorContentPersistenceHook implements ProcessorSuccessPersistenc
             payload.data.value.highlights.flatMap((item) => item.evidenceRefs),
           ),
         ].sort();
-      if (path === "$/f/representative_content")
+      if (
+        path === "$/f/representative_content" &&
+        payload.data.value.representatives.length > 0
+      )
         return [
           ...new Set(
             payload.data.value.representatives.flatMap(
