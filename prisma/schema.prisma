@@ -1506,6 +1506,7 @@ model Organization {
 model User {
   creatorBrandRevisions              CreatorBrandRevision[]
   creatorWorkPreferencesRevisions    CreatorWorkPreferencesRevision[]
+  creatorRateCardRevisions           CreatorRateCardRevision[]
   id                                 String                            @id @default(uuid())
   email                              String                            @unique
   /// Database trigger derives this canonical authority from email on every write.
@@ -3621,6 +3622,7 @@ model UceCampaignReportingAssetGallery {
 model CreatorProfile {
   creatorBrandProfiles           CreatorBrandProfile[]
   creatorWorkPreferencesProfiles CreatorWorkPreferences[]
+  creatorRateCardProfiles        CreatorRateCard[]
   fundingLineageConfirmations    CollaborationTrustedConfirmation[]
   id                             String                             @id @default(uuid())
   userId                         String                             @unique @map("user_id")
@@ -3874,6 +3876,7 @@ model UserBrandNotificationPreference {
 
 model CreatorWorkspace {
   creatorWorkPreferences  CreatorWorkPreferences?
+  creatorRateCard         CreatorRateCard?
   creatorBrandProfile     CreatorBrandProfile?
   notifications           Notification[]
   notificationJobs        NotificationJob[]
@@ -3902,6 +3905,7 @@ model CreatorWorkspace {
 model CreatorWorkspaceMember {
   creatorBrandRevisions           CreatorBrandRevision[]
   creatorWorkPreferencesRevisions CreatorWorkPreferencesRevision[]
+  creatorRateCardRevisions        CreatorRateCardRevision[]
   id                              String                           @id @default(uuid())
   workspaceId                     String                           @map("workspace_id")
   workspace                       CreatorWorkspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -3968,6 +3972,68 @@ model CreatorWorkPreferencesRevision {
   @@unique([profileId, revision])
   @@unique([profileId, idempotencyKey])
   @@map("creator_work_preferences_revisions")
+}
+
+model CreatorRateCard {
+  id                        String                    @id @default(uuid())
+  workspaceId               String                    @unique @map("workspace_id")
+  ownerProfileId            String                    @map("owner_profile_id")
+  workspace                 CreatorWorkspace          @relation(fields: [workspaceId, ownerProfileId], references: [id, ownerProfileId], onDelete: Restrict)
+  ownerProfile              CreatorProfile            @relation(fields: [ownerProfileId], references: [id], onDelete: Restrict)
+  currentRevision           Int                       @map("current_revision")
+  authoritySource           String                    @map("authority_source") @db.VarChar(20)
+  authorityReference        String                    @map("authority_reference")
+  authorityVersion          Int                       @map("authority_version")
+  authorityLegalVersion     Int?                      @map("authority_legal_version")
+  country                   String                    @db.Char(2)
+  currency                  String                    @db.VarChar(3)
+  authorityFingerprint      String                    @map("authority_fingerprint") @db.VarChar(64)
+  reelEnabled               Boolean                   @map("reel_enabled")
+  reelAmountMinor           BigInt?                   @map("reel_amount_minor")
+  storyEnabled              Boolean                   @map("story_enabled")
+  storyAmountMinor          BigInt?                   @map("story_amount_minor")
+  carouselEnabled           Boolean                   @map("carousel_enabled")
+  carouselAmountMinor       BigInt?                   @map("carousel_amount_minor")
+  photoshootEnabled         Boolean                   @map("photoshoot_enabled")
+  photoshootAmountMinor     BigInt?                   @map("photoshoot_amount_minor")
+  linkInBioEnabled          Boolean                   @map("link_in_bio_enabled")
+  linkInBioAmountMinor      BigInt?                   @map("link_in_bio_amount_minor")
+  partnershipAdsEnabled     Boolean                   @map("partnership_ads_enabled")
+  partnershipAdsAmountMinor BigInt?                   @map("partnership_ads_amount_minor")
+  contentUsageRights        String?                   @map("content_usage_rights") @db.VarChar(3)
+  usageDays                 BigInt?                   @map("usage_days")
+  advancePercent            Int?                      @map("advance_percent")
+  balanceTerm               String?                   @map("balance_term") @db.VarChar(6)
+  createdAt                 DateTime                  @default(now()) @map("created_at")
+  updatedAt                 DateTime                  @updatedAt @map("updated_at")
+  revisions                 CreatorRateCardRevision[]
+
+  @@unique([workspaceId, ownerProfileId])
+  @@map("creator_rate_cards")
+}
+
+model CreatorRateCardRevision {
+  id                 String                 @id @default(uuid())
+  profileId          String                 @map("profile_id")
+  profile            CreatorRateCard        @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  revision           Int
+  previousRevision   Int                    @map("previous_revision")
+  snapshot           Json
+  authoritySnapshot  Json                   @map("authority_snapshot")
+  transitionSnapshot Json?                  @map("transition_snapshot")
+  actorUserId        String                 @map("actor_user_id")
+  actorUser          User                   @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  actorMembershipId  String                 @map("actor_membership_id")
+  actorMembership    CreatorWorkspaceMember @relation(fields: [actorMembershipId], references: [id], onDelete: Restrict)
+  actorRole          CreatorTeamRole        @map("actor_role")
+  origin             String                 @db.VarChar(40)
+  idempotencyKey     String                 @map("idempotency_key") @db.Uuid
+  commandHash        String                 @map("command_hash") @db.VarChar(64)
+  createdAt          DateTime               @default(now()) @map("created_at")
+
+  @@unique([profileId, revision])
+  @@unique([profileId, idempotencyKey])
+  @@map("creator_rate_card_revisions")
 }
 
 model CreatorBrandProfile {

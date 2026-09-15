@@ -8,6 +8,7 @@ import { ThrottlerModule } from "@nestjs/throttler";
 import type { AuthModule } from "../../auth/auth.module";
 import type { AuthSessionService } from "../../auth/auth-session.service";
 import type { WorkPreferencesModule } from "./work-preferences.module";
+import type { RateCardModule } from "../rate-card/rate-card.module";
 import { readdirSync } from "node:fs";
 import { PrismaClient, UserRole, type CreatorTeamRole } from "@prisma/client";
 import { beforeAll, afterAll, describe, it, expect } from "vitest";
@@ -463,6 +464,13 @@ describe.skipIf(process.env.CREATOR_WORK_PREFERENCES_DATABASE_TEST !== "true")(
               ),
             ) as { WorkPreferencesModule: typeof WorkPreferencesModule }
           ).WorkPreferencesModule,
+          (
+            requireCompiled(
+              resolve(
+                "dist/features/creator-commercial-setup/rate-card/rate-card.module.js",
+              ),
+            ) as { RateCardModule: typeof RateCardModule }
+          ).RateCardModule,
         ],
       }).compile();
       const app = module.createNestApplication({ logger: false });
@@ -532,11 +540,89 @@ describe.skipIf(process.env.CREATOR_WORK_PREFERENCES_DATABASE_TEST !== "true")(
             ).json()
           ).currentRevision,
         ).toBe(2);
+        const rateBase = base.replace("work-preferences", "rate-card");
+        const rateGet = (token: string, suffix = "") =>
+          fetch(rateBase + suffix, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        const ratePut = (token: string, body: unknown) =>
+          fetch(rateBase, {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+          });
+        const currentPreferences = await (await get(owner)).json();
+        const rateCommand = {
+          expectedRevision: 0,
+          expectedWorkPreferencesRevision: 2,
+          authorityFingerprint: currentPreferences.country.authorityFingerprint,
+          idempotencyKey: randomUUID(),
+          values: {
+            REEL_VIDEO: { enabled: true, amountMinor: 10000 },
+            STORY: { enabled: false, amountMinor: null },
+            BANNER_CAROUSEL: { enabled: false, amountMinor: null },
+            PHOTOSHOOT: { enabled: false, amountMinor: null },
+            linkInBio: { enabled: false, amountMinor: null },
+            paidAmplification: { enabled: false, amountMinor: null },
+            contentUsageRights: null,
+            usageDays: null,
+            advancePercent: 25,
+            balanceTerm: "NET_30",
+          },
+        };
+        expect((await fetch(rateBase)).status).toBe(401);
+        for (const token of [owner, manager, assistant])
+          expect((await rateGet(token)).status).toBe(200);
+        expect((await ratePut(assistant, rateCommand)).status).toBe(403);
+        expect((await ratePut(owner, rateCommand)).status).toBe(200);
+        expect((await ratePut(owner, rateCommand)).status).toBe(200);
+        expect(
+          (
+            await ratePut(manager, {
+              ...rateCommand,
+              expectedRevision: 1,
+              idempotencyKey: randomUUID(),
+            })
+          ).status,
+        ).toBe(200);
+        expect(
+          (
+            await ratePut(owner, {
+              ...rateCommand,
+              idempotencyKey: randomUUID(),
+            })
+          ).status,
+        ).toBe(409);
+        expect(
+          (
+            await ratePut(owner, {
+              ...rateCommand,
+              ownerCreatorProfileId: b.profile.id,
+            })
+          ).status,
+        ).toBe(400);
+        expect((await (await rateGet(other)).json()).currentRevision).toBe(0);
+        expect(
+          (
+            await (
+              await rateGet(owner, `?workspaceId=${b.workspace.id}`)
+            ).json()
+          ).currentRevision,
+        ).toBe(2);
+        expect(
+          await db.creatorRateCardRevision.count({
+            where: { profile: { workspaceId: a.workspace.id } },
+          }),
+        ).toBe(2);
         await db.creatorWorkspaceMember.update({
           where: { id: a.assistantSeat.id },
           data: { isActive: false },
         });
         expect((await get(assistant)).status).toBe(403);
+        expect((await rateGet(assistant)).status).toBe(403);
         expect(await counts(a.workspace.id)).toEqual({
           profiles: 1,
           revisions: 2,

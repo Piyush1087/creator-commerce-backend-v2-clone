@@ -24,6 +24,7 @@ import { CreatorAudienceModule } from "./features/creator-audience/creator-audie
 import { CreatorContentModule } from "./features/creator-content/creator-content.module";
 import { CreatorBrandModule } from "./features/creator-brand/creator-brand.module";
 import { WorkPreferencesModule } from "./features/creator-commercial-setup/work-preferences/work-preferences.module";
+import { RateCardModule } from "./features/creator-commercial-setup/rate-card/rate-card.module";
 import { CreatorCentreModule } from "./features/creator-centre/creator-centre.module";
 import { CreatorEntryModule } from "./features/creator-entry/creator-entry.module";
 import { CreatorHomeModule } from "./features/creator-home/creator-home.module";
@@ -82,6 +83,7 @@ import { S3Module } from "./shared/s3/s3.module";
     CreatorContentModule,
     CreatorBrandModule,
     WorkPreferencesModule,
+    RateCardModule,
     CreatorOnboardingModule,
     CreatorEntryModule,
     CreatorHomeModule,
