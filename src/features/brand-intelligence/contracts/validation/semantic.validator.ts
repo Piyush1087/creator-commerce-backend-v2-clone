@@ -25,6 +25,7 @@ import {
   CreatorContentProcessorInputSchema,
 } from "../../../creator-content/creator-content-runtime.contract";
 import { accepted, rejected } from "./validation-result";
+import { CreatorBrandSuggestionsSchema } from "../../../creator-brand/contracts/creator-brand-suggestions.contract";
 import type {
   SemanticValidationContext,
   ValidationIssue,
@@ -446,6 +447,20 @@ class CreatorAudienceSemanticValidator implements ProcessorSemanticValidator {
   }
 }
 
+class CreatorBrandSuggestionsSemanticValidator implements ProcessorSemanticValidator {
+  readonly validatorId = "creator_brand_suggestions_v0";
+  validate(output: JsonRecord): readonly ValidationIssue[] {
+    return CreatorBrandSuggestionsSchema.safeParse(output).success
+      ? []
+      : [
+          semanticIssue(
+            "CREATOR_BRAND_SUGGESTIONS_INVALID",
+            "Creator Brand suggestions violate the frozen P0 contract",
+          ),
+        ];
+  }
+}
+
 class CreatorContentSemanticValidator implements ProcessorSemanticValidator {
   readonly validatorId = CREATOR_CONTENT_PROCESSOR_ID;
 
@@ -485,6 +500,7 @@ export class SemanticValidator {
         new InstagramOrganicPerformanceSemanticValidator(),
         new CreatorAudienceSemanticValidator(),
         new CreatorContentSemanticValidator(),
+        new CreatorBrandSuggestionsSemanticValidator(),
       ].map((validator) => [validator.validatorId, validator]),
     );
 

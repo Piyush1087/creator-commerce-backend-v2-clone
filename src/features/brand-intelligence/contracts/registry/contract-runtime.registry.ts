@@ -14,6 +14,7 @@ import { ContractRuntimeError } from "../bundle/contract-runtime.error";
 import { SemanticValidator } from "../validation/semantic.validator";
 import { creatorAudienceVerifiedContract } from "../../../creator-audience/creator-audience-runtime.contract";
 import { creatorContentVerifiedContract } from "../../../creator-content/creator-content-runtime.contract";
+import { creatorBrandVerifiedContract } from "../../../creator-brand/creator-brand-runtime.contract";
 
 function keyOf(key: ContractRegistryKey): string {
   return [
@@ -68,13 +69,16 @@ export class ContractRuntimeRegistry implements OnModuleInit {
     const generated = this.integrity.verifyRoot(root, validatorIds);
     const creatorAudience = creatorAudienceVerifiedContract();
     const creatorContent = creatorContentVerifiedContract();
+    const creatorBrand = creatorBrandVerifiedContract();
     const key = keyOf(creatorAudience.registration);
     const contentKey = keyOf(creatorContent.registration);
+    const brandKey = keyOf(creatorBrand.registration);
     if (
       generated.bundles.has(key) ||
       generated.bundles.has(contentKey) ||
+      generated.bundles.has(brandKey) ||
       generated.registry.registrations.some((registration) =>
-        [key, contentKey].includes(keyOf(registration)),
+        [key, contentKey, brandKey].includes(keyOf(registration)),
       )
     ) {
       throw new ContractRuntimeError(
@@ -89,12 +93,14 @@ export class ContractRuntimeRegistry implements OnModuleInit {
           ...generated.registry.registrations,
           creatorAudience.registration,
           creatorContent.registration,
+          creatorBrand.registration,
         ],
       },
       bundles: new Map([
         ...generated.bundles,
         [key, creatorAudience.bundle] as const,
         [contentKey, creatorContent.bundle] as const,
+        [brandKey, creatorBrand.bundle] as const,
       ]),
     };
     this.startupFailure = undefined;
