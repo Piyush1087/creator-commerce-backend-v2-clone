@@ -19,7 +19,10 @@ describe.skipIf(!enabled)(
       const url = new URL(process.env.DATABASE_URL ?? "");
       if (
         url.hostname !== "localhost" ||
-        url.pathname !== "/creator_audience_p1_clean"
+        ![
+          "/creator_audience_p1_clean",
+          "/c05_creator_brand_upgrade_shared",
+        ].includes(url.pathname)
       ) {
         throw new Error("CREATOR_AUDIENCE_P1_DISPOSABLE_DATABASE_REQUIRED");
       }

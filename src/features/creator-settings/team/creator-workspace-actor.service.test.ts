@@ -113,9 +113,9 @@ function serviceFixture(input: {
 
 describe("C05 Creator subject/actor resolution", () => {
   it.each([
-    [CreatorTeamRole.OWNER, 14],
-    [CreatorTeamRole.MANAGER, 14],
-    [CreatorTeamRole.ASSISTANT, 2],
+    [CreatorTeamRole.OWNER, 17],
+    [CreatorTeamRole.MANAGER, 17],
+    [CreatorTeamRole.ASSISTANT, 3],
   ])(
     "projects %s with its exact Settings capabilities",
     async (role, count) => {

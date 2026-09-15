@@ -179,7 +179,9 @@ describe.skipIf(!enabled)(
       const url = new URL(process.env.DATABASE_URL ?? "");
       if (
         url.hostname !== "localhost" ||
-        url.pathname !== "/creator_content_p2"
+        !["/creator_content_p2", "/c05_creator_brand_upgrade_shared"].includes(
+          url.pathname,
+        )
       )
         throw new Error("CREATOR_CONTENT_DISPOSABLE_DATABASE_REQUIRED");
       await db.$connect();

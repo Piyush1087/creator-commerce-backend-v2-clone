@@ -1504,6 +1504,7 @@ model Organization {
 }
 
 model User {
+  creatorBrandRevisions              CreatorBrandRevision[]
   id                                 String                            @id @default(uuid())
   email                              String                            @unique
   /// Database trigger derives this canonical authority from email on every write.
@@ -3617,6 +3618,7 @@ model UceCampaignReportingAssetGallery {
 // ============================================================================
 
 model CreatorProfile {
+  creatorBrandProfiles        CreatorBrandProfile[]
   fundingLineageConfirmations CollaborationTrustedConfirmation[]
   id                          String                             @id @default(uuid())
   userId                      String                             @unique @map("user_id")
@@ -3869,16 +3871,17 @@ model UserBrandNotificationPreference {
 }
 
 model CreatorWorkspace {
+  creatorBrandProfile     CreatorBrandProfile?
   notifications           Notification[]
   notificationJobs        NotificationJob[]
-  id                      String            @id @default(uuid())
-  ownerProfileId          String            @map("owner_profile_id")
-  ownerProfile            CreatorProfile    @relation("CreatorWorkspaceOwner", fields: [ownerProfileId], references: [id], onDelete: Cascade)
-  organizationId          String            @unique @map("organization_id")
-  organization            Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  organizationDisplayName String            @default("My Creative Workspace") @map("organization_display_name") @db.VarChar(150)
-  createdAt               DateTime          @default(now()) @map("created_at")
-  updatedAt               DateTime          @updatedAt @map("updated_at")
+  id                      String               @id @default(uuid())
+  ownerProfileId          String               @map("owner_profile_id")
+  ownerProfile            CreatorProfile       @relation("CreatorWorkspaceOwner", fields: [ownerProfileId], references: [id], onDelete: Cascade)
+  organizationId          String               @unique @map("organization_id")
+  organization            Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  organizationDisplayName String               @default("My Creative Workspace") @map("organization_display_name") @db.VarChar(150)
+  createdAt               DateTime             @default(now()) @map("created_at")
+  updatedAt               DateTime             @updatedAt @map("updated_at")
 
   members                  CreatorWorkspaceMember[]
   invitations              CreatorWorkspaceInvitation[]
@@ -3894,6 +3897,7 @@ model CreatorWorkspace {
 }
 
 model CreatorWorkspaceMember {
+  creatorBrandRevisions    CreatorBrandRevision[]
   id                       String                   @id @default(uuid())
   workspaceId              String                   @map("workspace_id")
   workspace                CreatorWorkspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -3914,6 +3918,47 @@ model CreatorWorkspaceMember {
   @@index([associatedEmail, isActive])
   @@index([userId, isActive], map: "creator_workspace_members_user_id_is_active_idx")
   @@map("creator_workspace_members")
+}
+
+model CreatorBrandProfile {
+  id              String                 @id @default(uuid())
+  workspaceId     String                 @unique @map("workspace_id")
+  ownerProfileId  String                 @map("owner_profile_id")
+  workspace       CreatorWorkspace       @relation(fields: [workspaceId, ownerProfileId], references: [id, ownerProfileId], onDelete: Restrict)
+  ownerProfile    CreatorProfile         @relation(fields: [ownerProfileId], references: [id], onDelete: Restrict)
+  currentRevision Int                    @map("current_revision")
+  snapshot        Json
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+  revisions       CreatorBrandRevision[]
+
+  @@unique([workspaceId, ownerProfileId])
+  @@map("creator_brand_profiles")
+}
+
+model CreatorBrandRevision {
+  id                              String                 @id @default(uuid())
+  profileId                       String                 @map("profile_id")
+  profile                         CreatorBrandProfile    @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  revision                        Int
+  previousRevision                Int                    @map("previous_revision")
+  snapshot                        Json
+  actorUserId                     String                 @map("actor_user_id")
+  actorUser                       User                   @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  actorMembershipId               String                 @map("actor_membership_id")
+  actorMembership                 CreatorWorkspaceMember @relation(fields: [actorMembershipId], references: [id], onDelete: Restrict)
+  actorRole                       CreatorTeamRole        @map("actor_role")
+  origin                          String                 @db.VarChar(30)
+  idempotencyKey                  String                 @map("idempotency_key") @db.Uuid
+  commandHash                     String                 @map("command_hash") @db.VarChar(64)
+  suggestionObjectGenerationId    String?                @map("suggestion_object_generation_id")
+  suggestionComponentGenerationId String?                @map("suggestion_component_generation_id")
+  suggestionCandidateId           String?                @map("suggestion_candidate_id") @db.VarChar(100)
+  createdAt                       DateTime               @default(now()) @map("created_at")
+
+  @@unique([profileId, revision])
+  @@unique([profileId, idempotencyKey])
+  @@map("creator_brand_revisions")
 }
 
 model CreatorWorkspaceInvitation {

@@ -505,9 +505,9 @@ describe("Creator Brand P0 executable contracts (no runtime implementation)", ()
     ).toEqual([contract.registration]);
     expect(readdirSync(join(__dirname, ".."))).not.toEqual(
       expect.arrayContaining([
-        "creator-brand.module.ts",
-        "creator-brand.controller.ts",
-        "creator-brand.service.ts",
+        "creator-brand-processor.executor.ts",
+        "creator-brand-content-read.adapter.ts",
+        "creator-brand-scheduler.ts",
       ]),
     );
   });
