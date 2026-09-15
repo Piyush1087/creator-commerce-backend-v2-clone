@@ -95,7 +95,7 @@ export class IntelligenceOwnerScopeRepository {
           SELECT processor_execution_id, execution_id
           FROM intelligence_processor_executions
           WHERE owner_scope_id=${scopeId}
-            AND processor_id IN ('creator_audience_v0','creator_content_v0','creator_brand_suggestions_v0')
+            AND processor_id IN ('creator_audience_v0','creator_audience_v1','creator_content_v0','creator_brand_suggestions_v0')
         ),
         deleted_transitions AS (DELETE FROM intelligence_component_transitions WHERE owner_scope_id=${scopeId} AND object_semantic_id IN ('creator_audience','creator_content','creator_brand_suggestions') RETURNING 1),
         deleted_candidates AS (DELETE FROM intelligence_component_candidates WHERE owner_scope_id=${scopeId} AND object_semantic_id IN ('creator_audience','creator_content','creator_brand_suggestions') RETURNING 1),
@@ -124,7 +124,7 @@ export class IntelligenceOwnerScopeRepository {
           DELETE FROM intelligence_executions
           WHERE owner_scope_id=${scopeId}
             AND execution_id IN (SELECT execution_id FROM target_processors)
-            AND NOT EXISTS (SELECT 1 FROM intelligence_processor_executions sibling WHERE sibling.owner_scope_id=intelligence_executions.owner_scope_id AND sibling.execution_id=intelligence_executions.execution_id AND sibling.processor_id NOT IN ('creator_audience_v0','creator_content_v0','creator_brand_suggestions_v0'))
+            AND NOT EXISTS (SELECT 1 FROM intelligence_processor_executions sibling WHERE sibling.owner_scope_id=intelligence_executions.owner_scope_id AND sibling.execution_id=intelligence_executions.execution_id AND sibling.processor_id NOT IN ('creator_audience_v0','creator_audience_v1','creator_content_v0','creator_brand_suggestions_v0'))
             AND (SELECT count(*) FROM deleted_processors) >= 0
           RETURNING 1
         ),

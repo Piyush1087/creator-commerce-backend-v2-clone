@@ -1,3 +1,9 @@
+import { AudienceV1SourceReader } from "./creator-audience-v1.source";
+import { AUDIENCE_V1_REGISTRY_KEY } from "./creator-audience-v1.runtime";
+import {
+  AUDIENCE_V1_VERSION,
+  audienceV1EvidenceRefs,
+} from "./creator-audience-v1.contract";
 import { createHash } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
@@ -17,15 +23,14 @@ import { IntelligenceCurrentStateRepository } from "../brand-intelligence/persis
 import { IntelligenceGenerationRepository } from "../brand-intelligence/persistence/intelligence-generation.repository";
 import { IntelligenceTransitionService } from "../brand-intelligence/transitions/intelligence-transition.service";
 import {
-  CREATOR_AUDIENCE_COMPONENT_PATHS,
-  CREATOR_AUDIENCE_REGISTRY_KEY,
-  CreatorAudienceEvidenceManifestSchema,
-  CreatorAudiencePersistencePayloadSchema,
-  creatorAudienceComponentValue,
-} from "./creator-audience-runtime.contract";
+  AUDIENCE_V1_PATHS,
+  AudienceV1ManifestSchema,
+  AudienceV1PayloadSchema,
+  audienceV1Component,
+} from "./creator-audience-v1.contract";
 
 @Injectable()
-export class CreatorAudiencePersistenceHook implements ProcessorSuccessPersistenceHook {
+export class AudienceV1PersistenceHook implements ProcessorSuccessPersistenceHook {
   constructor(
     private readonly generations: IntelligenceGenerationRepository,
     private readonly current: IntelligenceCurrentStateRepository,
@@ -34,6 +39,7 @@ export class CreatorAudiencePersistenceHook implements ProcessorSuccessPersisten
     private readonly structuralValidator: StructuralValidator,
     private readonly semanticValidator: SemanticValidator,
     private readonly contracts: ContractRuntimeRegistry,
+    private readonly source: AudienceV1SourceReader,
   ) {}
 
   async persistBeforeCompletion(
@@ -41,16 +47,14 @@ export class CreatorAudiencePersistenceHook implements ProcessorSuccessPersisten
     claim: ClaimedProcessorWork,
     result: ProcessorExecutionResult,
   ): Promise<void> {
-    const payload = CreatorAudiencePersistencePayloadSchema.safeParse(
+    const payload = AudienceV1PayloadSchema.safeParse(
       result.persistencePayload,
     );
-    const manifest = CreatorAudienceEvidenceManifestSchema.safeParse(
+    const manifest = AudienceV1ManifestSchema.safeParse(
       claim.processorExecution.evidenceManifest,
     );
     if (!payload.success || !manifest.success) this.fail("INVALID_PAYLOAD");
-    const verified = this.contracts.getVerifiedBundle(
-      CREATOR_AUDIENCE_REGISTRY_KEY,
-    );
+    const verified = this.contracts.getVerifiedBundle(AUDIENCE_V1_REGISTRY_KEY);
     const execution = claim.processorExecution;
     if (
       execution.processorId !== verified.manifest.processorId ||
@@ -66,6 +70,28 @@ export class CreatorAudiencePersistenceHook implements ProcessorSuccessPersisten
       this.fail("CONTRACT_OR_LINEAGE_MISMATCH");
     }
     await this.assertCurrentIntegration(tx, payload.data.identity);
+    const workspace = await tx.creatorWorkspace.findUnique({
+      where: { id: payload.data.identity.creatorWorkspaceId },
+      include: { ownerProfile: true },
+    });
+    if (!workspace) this.fail("WORKSPACE_MISMATCH");
+    const admitted = await this.source.readInTransaction(tx, {
+      workspaceId: workspace.id,
+      subjectCreatorProfileId: payload.data.identity.creatorProfileId,
+      subjectOwnerUserId: workspace.ownerProfile.userId,
+      organizationId: workspace.organizationId,
+      actorUserId: workspace.ownerProfile.userId,
+      actorMembershipId: workspace.id,
+      actorRole: "OWNER",
+      allowedActions: ["INSIGHTS_AUDIENCE_READ"],
+    });
+    if (
+      !admitted ||
+      admitted.subjectId !== execution.subjectId ||
+      canonicalJson(admitted.manifest) !== canonicalJson(manifest.data) ||
+      canonicalJson(admitted.value) !== canonicalJson(payload.data.value)
+    )
+      this.fail("SOURCE_CHANGED_BEFORE_FINALIZATION");
 
     const structural = this.structuralValidator.validate(
       verified,
@@ -91,47 +117,29 @@ export class CreatorAudiencePersistenceHook implements ProcessorSuccessPersisten
       );
     }
 
-    const addresses = CREATOR_AUDIENCE_COMPONENT_PATHS.map(
-      (componentSemanticPath) => ({
-        ownerScopeId: payload.data.identity.ownerScopeId,
-        subjectId: execution.subjectId,
-        objectSemanticId: "creator_audience",
-        pathSchemeVersion: 1,
-        componentSemanticPath,
-      }),
-    );
+    const addresses = AUDIENCE_V1_PATHS.map((componentSemanticPath) => ({
+      ownerScopeId: payload.data.identity.ownerScopeId,
+      subjectId: execution.subjectId,
+      objectSemanticId: "creator_audience",
+      pathSchemeVersion: 1,
+      componentSemanticPath,
+    }));
     const locked = await this.current.lockOwnerScopedInCanonicalOrder(
       tx,
       addresses,
     );
     const refsFor = (path: string): string[] => {
-      if (path === "$/f/follower_audience") {
-        return payload.data.evidence
-          .filter(
-            (item) => item.capabilityId === "instagram.audience_followers",
-          )
-          .map((item) => item.evidenceRef);
-      }
-      if (path === "$/f/engaged_audience") {
-        return payload.data.evidence
-          .filter((item) => item.capabilityId === "instagram.audience_engaged")
-          .map((item) => item.evidenceRef);
-      }
-      if (path === "$/f/audience_highlights") {
-        // An explicitly empty highlight component still retains its source lineage.
-        // Do not invent a highlight or waive the shared transition Evidence requirement.
-        if (!payload.data.value.highlights.length)
-          return payload.data.evidence.map((item) => item.evidenceRef);
-        return [
-          ...new Set(
-            payload.data.value.highlights.flatMap((item) => item.evidence),
-          ),
-        ].sort();
-      }
-      return payload.data.evidence.map((item) => item.evidenceRef);
+      const refs = audienceV1EvidenceRefs(payload.data.value, path);
+      return refs.length
+        ? refs
+        : payload.data.evidence
+            .filter(
+              (row) => row.captureRef === payload.data.identity.captureRef,
+            )
+            .map((row) => row.evidenceRef);
     };
     const validation = this.persistenceValidator.validate({
-      registryKey: CREATOR_AUDIENCE_REGISTRY_KEY,
+      registryKey: AUDIENCE_V1_REGISTRY_KEY,
       activeScope: addresses,
       currentState: addresses.map((address, index) => {
         const prior = locked.get(this.current.ownerScopedKey(addresses[index]));
@@ -184,7 +192,7 @@ export class CreatorAudiencePersistenceHook implements ProcessorSuccessPersisten
         id: objectId,
         objectSemanticId: "creator_audience",
         objectContractId: "creator_audience",
-        objectContractVersion: "creator_audience_v0.1",
+        objectContractVersion: AUDIENCE_V1_VERSION,
         outputContractId: execution.outputContractId,
         outputContractVersion: execution.outputContractVersion,
         producerId: execution.processorId,
@@ -204,13 +212,19 @@ export class CreatorAudiencePersistenceHook implements ProcessorSuccessPersisten
             payload.data.identity.authorizationGeneration,
           requestIdentity: payload.data.identity.requestIdentity,
           captureRef: payload.data.identity.captureRef,
+          audienceObjectGenerationId:
+            payload.data.identity.audienceObjectGenerationId,
+          contentObjectGenerationId:
+            payload.data.identity.contentObjectGenerationId,
+          historyObjectGenerationIds:
+            payload.data.identity.historyObjectGenerationIds,
         },
         readiness,
         activeScope: addresses as unknown as Prisma.InputJsonValue,
         activeScopeHash: execution.activeScopeHash,
       },
       components: addresses.map((address, index) => {
-        const componentValue = creatorAudienceComponentValue(
+        const componentValue = audienceV1Component(
           payload.data.value,
           address.componentSemanticPath,
         );
@@ -218,7 +232,7 @@ export class CreatorAudiencePersistenceHook implements ProcessorSuccessPersisten
           id: componentIds.get(address.componentSemanticPath)!,
           path: address.componentSemanticPath,
           contractId: `creator_audience.${address.componentSemanticPath.slice("$/f/".length)}`,
-          contractVersion: "creator_audience_v0.1",
+          contractVersion: AUDIENCE_V1_VERSION,
           valuePayload: componentValue as Prisma.InputJsonValue,
           valueHash: hash(canonicalJson(componentValue)),
           readiness,
@@ -241,7 +255,7 @@ export class CreatorAudiencePersistenceHook implements ProcessorSuccessPersisten
             componentPath: address.componentSemanticPath,
             evidenceRef: item.evidenceRef,
             capabilityId: item.capabilityId,
-            captureRef: payload.data.identity.captureRef,
+            captureRef: item.captureRef,
             capturedAt: new Date(item.capturedAt),
             manifestRef: execution.executionId,
             manifestHash: execution.evidenceManifestHash,

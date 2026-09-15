@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { Inject, Injectable, Optional } from "@nestjs/common";
 import { CreatorBrandSuggestionsPipeline } from "../creator-brand/creator-brand-suggestions.pipeline";
+import { AudienceV1Pipeline } from "../creator-audience-v1/creator-audience-v1.pipeline";
 import { IntelligenceProcessorExecutionStatus } from "@prisma/client";
 import type { CreatorWorkspaceActorContext } from "../../shared/creator/creator-workspace-actor.contract";
 import { IntelligenceExecutionService } from "../brand-intelligence/execution/intelligence-execution.service";
@@ -42,6 +43,7 @@ export class CreatorContentPipelineService {
     private readonly semantic: CreatorContentSemanticAnalyzer,
     @Optional()
     private readonly brandSuggestions?: CreatorBrandSuggestionsPipeline,
+    @Optional() private readonly audienceV1?: AudienceV1Pipeline,
   ) {}
 
   async execute(input: {
@@ -86,7 +88,11 @@ export class CreatorContentPipelineService {
     )
       throw new Error("CREATOR_CONTENT_AUTHORIZATION_FENCE_REJECTED");
     const replay = await this.repository.replay(identity);
-    if (replay) return { value: replay, reused: true, generationIds: [] };
+    if (replay) {
+      if (this.audienceV1)
+        await this.audienceV1.execute(input.actor).catch(() => undefined);
+      return { value: replay, reused: true, generationIds: [] };
+    }
     const credential = await this.fence.acquire(input.actor, identity);
     const source = await this.repository.begin(identity);
     try {
@@ -252,6 +258,8 @@ export class CreatorContentPipelineService {
         }
       }
       // One bounded downstream continuation. Optional P2 failure never changes Content success.
+      if (this.audienceV1)
+        await this.audienceV1.execute(input.actor).catch(() => undefined);
       if (this.brandSuggestions) {
         try {
           await this.brandSuggestions.execute(input.actor);

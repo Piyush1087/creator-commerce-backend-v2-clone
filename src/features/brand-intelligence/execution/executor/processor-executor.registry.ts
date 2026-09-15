@@ -24,6 +24,7 @@ import {
 import { CreatorAudienceProcessorExecutor } from "../../../creator-audience/creator-audience-processor.executor";
 import { CreatorContentProcessorExecutor } from "../../../creator-content/creator-content-processor.executor";
 import { CreatorBrandSuggestionsProcessor } from "../../../creator-brand/creator-brand-suggestions.processor";
+import { AudienceV1ProcessorExecutor } from "../../../creator-audience-v1/creator-audience-v1.processor";
 
 @Injectable()
 export class ProcessorExecutorRegistry {
@@ -62,6 +63,7 @@ export class ProcessorExecutorRegistry {
     @Optional()
     creatorContentExecutor?: CreatorContentProcessorExecutor,
     @Optional() creatorBrandExecutor?: CreatorBrandSuggestionsProcessor,
+    @Optional() audienceV1Executor?: AudienceV1ProcessorExecutor,
   ) {
     const executors: [string, ProcessorExecutor][] = [
       [SYNTHETIC_PROCESSOR_ID, syntheticExecutor],
@@ -136,6 +138,8 @@ export class ProcessorExecutorRegistry {
         creatorContentExecutor.processorId,
         creatorContentExecutor,
       ]);
+    if (audienceV1Executor)
+      executors.push([audienceV1Executor.processorId, audienceV1Executor]);
     if (creatorBrandExecutor)
       executors.push([creatorBrandExecutor.processorId, creatorBrandExecutor]);
     this.executors = new Map(executors);

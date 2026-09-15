@@ -1,4 +1,5 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
+import { AudienceV1Pipeline } from "../creator-audience-v1/creator-audience-v1.pipeline";
 import { createHash } from "node:crypto";
 import { IntelligenceProcessorExecutionStatus } from "@prisma/client";
 
@@ -46,6 +47,7 @@ export class CreatorAudiencePipelineService {
     private readonly worker: ProcessorWorkerService,
     @Inject(INSTAGRAM_INTELLIGENCE_PROVIDER_READ_CLIENT)
     private readonly provider: InstagramIntelligenceProviderReadClient,
+    @Optional() private readonly audienceV1?: AudienceV1Pipeline,
   ) {}
 
   async execute(input: {
@@ -80,7 +82,10 @@ export class CreatorAudiencePipelineService {
       throw new Error("CREATOR_AUDIENCE_AUTHORIZATION_FENCE_REJECTED");
     }
     const replay = await this.repository.replay(identity);
-    if (replay) return { value: replay, reused: true, generationIds: [] };
+    if (replay) {
+      await this.updateAudienceV1(input.actor);
+      return { value: replay, reused: true, generationIds: [] };
+    }
     const credential = await this.fence.acquire(input.actor, identity);
     await this.repository.begin(identity);
     let profile;
@@ -224,11 +229,20 @@ export class CreatorAudiencePipelineService {
     }
     const generationIds =
       await this.repository.generationIdsForProcessorExecution(processor.id);
+    await this.updateAudienceV1(input.actor);
     return {
       value: boundValue,
       reused: false,
       generationIds,
     };
+  }
+  private async updateAudienceV1(
+    actor: CreatorWorkspaceActorContext,
+  ): Promise<void> {
+    // Derived failure cannot invalidate accepted source-native acquisition/current.
+    // The shared worker retains failed execution truth; read-only consumers project it separately.
+    if (this.audienceV1)
+      await this.audienceV1.execute(actor).catch(() => undefined);
   }
 }
 

@@ -26,6 +26,10 @@ import {
 } from "../../../creator-content/creator-content-runtime.contract";
 import { accepted, rejected } from "./validation-result";
 import { CreatorBrandSuggestionsSchema } from "../../../creator-brand/contracts/creator-brand-suggestions.contract";
+import {
+  AudienceV1ConsumerSchema,
+  audienceV1EvidenceRefs,
+} from "../../../creator-audience-v1/creator-audience-v1.contract";
 import type {
   SemanticValidationContext,
   ValidationIssue,
@@ -408,6 +412,56 @@ class BrandCommunicationSemanticValidator implements ProcessorSemanticValidator 
   }
 }
 
+class AudienceV1SemanticValidator implements ProcessorSemanticValidator {
+  readonly validatorId = "creator_audience_v1";
+  validate(
+    output: JsonRecord,
+    context: SemanticValidationContext,
+  ): readonly ValidationIssue[] {
+    const parsed = AudienceV1ConsumerSchema.safeParse(output);
+    if (!parsed.success)
+      return [
+        semanticIssue(
+          "CREATOR_AUDIENCE_V1_CONTRACT_INVALID",
+          "Strict V1 source-native contract required",
+        ),
+      ];
+    const admitted = new Map(
+      context.evidenceManifest.map((row) => [
+        row.evidenceRef,
+        row.capabilityId,
+      ]),
+    );
+    if (
+      audienceV1EvidenceRefs(parsed.data).some((ref) => !admitted.has(ref)) ||
+      parsed.data.contentContext.some((row) =>
+        row.contentFact.evidenceRefs.some(
+          (ref) => admitted.get(ref) !== "instagram.media_insights",
+        ),
+      ) ||
+      [
+        ...parsed.data.overview.facts,
+        ...parsed.data.profiles.flatMap((row) => row.facts),
+        ...parsed.data.contentContext.map((row) => row.audienceFact),
+      ].some((fact) =>
+        fact.evidenceRefs.some(
+          (ref) =>
+            admitted.get(ref) !==
+            (fact.cohort === "FOLLOWERS"
+              ? "instagram.audience_followers"
+              : "instagram.audience_engaged"),
+        ),
+      )
+    )
+      return [
+        semanticIssue(
+          "CREATOR_AUDIENCE_V1_LINEAGE_INVALID",
+          "Exact admitted source-family support required",
+        ),
+      ];
+    return [];
+  }
+}
 class CreatorAudienceSemanticValidator implements ProcessorSemanticValidator {
   readonly validatorId = CREATOR_AUDIENCE_PROCESSOR_ID;
 
@@ -499,6 +553,7 @@ export class SemanticValidator {
         new InstagramAudienceProfileSemanticValidator(),
         new InstagramOrganicPerformanceSemanticValidator(),
         new CreatorAudienceSemanticValidator(),
+        new AudienceV1SemanticValidator(),
         new CreatorContentSemanticValidator(),
         new CreatorBrandSuggestionsSemanticValidator(),
       ].map((validator) => [validator.validatorId, validator]),

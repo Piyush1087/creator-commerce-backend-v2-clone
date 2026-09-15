@@ -115,7 +115,6 @@ import { CreatorAudienceProcessorExecutor } from "../creator-audience/creator-au
 import { CreatorAudiencePersistenceHook } from "../creator-audience/creator-audience-persistence.hook";
 import { CreatorContentProcessorExecutor } from "../creator-content/creator-content-processor.executor";
 import { CreatorContentPersistenceHook } from "../creator-content/creator-content-persistence.hook";
-import { CreatorBrandContentSourceAdapter } from "../creator-brand/creator-brand-content-source.adapter";
 import {
   CreatorBrandSuggestionsProcessor,
   CREATOR_BRAND_SEMANTIC_PORT,
@@ -123,6 +122,11 @@ import {
 } from "../creator-brand/creator-brand-suggestions.processor";
 import { CreatorBrandSuggestionsPersistenceHook } from "../creator-brand/creator-brand-suggestions.persistence";
 import { CreatorBrandSuggestionsPipeline } from "../creator-brand/creator-brand-suggestions.pipeline";
+import { AudienceV1SourceReader } from "../creator-audience-v1/creator-audience-v1.source";
+import { CreatorContentCurrentSourceAdapter } from "../creator-content/creator-content-current-source.adapter";
+import { AudienceV1ProcessorExecutor } from "../creator-audience-v1/creator-audience-v1.processor";
+import { AudienceV1PersistenceHook } from "../creator-audience-v1/creator-audience-v1.persistence";
+import { AudienceV1Pipeline } from "../creator-audience-v1/creator-audience-v1.pipeline";
 
 const internalProviders = [
   ServiceabilityProcessorExecutor,
@@ -182,10 +186,14 @@ const internalProviders = [
   CreatorAudiencePersistenceHook,
   CreatorContentProcessorExecutor,
   CreatorContentPersistenceHook,
-  CreatorBrandContentSourceAdapter,
+  CreatorContentCurrentSourceAdapter,
   CreatorBrandSuggestionsProcessor,
   CreatorBrandSuggestionsPersistenceHook,
   CreatorBrandSuggestionsPipeline,
+  AudienceV1SourceReader,
+  AudienceV1ProcessorExecutor,
+  AudienceV1PersistenceHook,
+  AudienceV1Pipeline,
   {
     provide: CREATOR_BRAND_SEMANTIC_PORT,
     useClass: MissingCreatorBrandSemanticPort,

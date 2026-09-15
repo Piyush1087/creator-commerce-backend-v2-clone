@@ -78,6 +78,7 @@ export const AudienceV1ConsumerSchema = CreatorAudienceConsumerSchema.extend({
   change: z
     .object({
       state: z.enum([
+        "NOT_PROCESSED",
         "AVAILABLE",
         "INSUFFICIENT_COMPARABLE_HISTORY",
         "SERIES_BREAK",

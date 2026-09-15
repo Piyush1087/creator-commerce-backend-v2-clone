@@ -15,6 +15,7 @@ import { SemanticValidator } from "../validation/semantic.validator";
 import { creatorAudienceVerifiedContract } from "../../../creator-audience/creator-audience-runtime.contract";
 import { creatorContentVerifiedContract } from "../../../creator-content/creator-content-runtime.contract";
 import { creatorBrandVerifiedContract } from "../../../creator-brand/creator-brand-runtime.contract";
+import { audienceV1VerifiedContract } from "../../../creator-audience-v1/creator-audience-v1.runtime";
 
 function keyOf(key: ContractRegistryKey): string {
   return [
@@ -70,6 +71,8 @@ export class ContractRuntimeRegistry implements OnModuleInit {
     const creatorAudience = creatorAudienceVerifiedContract();
     const creatorContent = creatorContentVerifiedContract();
     const creatorBrand = creatorBrandVerifiedContract();
+    const audienceV1 = audienceV1VerifiedContract();
+    const audienceV1Key = keyOf(audienceV1.registration);
     const key = keyOf(creatorAudience.registration);
     const contentKey = keyOf(creatorContent.registration);
     const brandKey = keyOf(creatorBrand.registration);
@@ -77,8 +80,11 @@ export class ContractRuntimeRegistry implements OnModuleInit {
       generated.bundles.has(key) ||
       generated.bundles.has(contentKey) ||
       generated.bundles.has(brandKey) ||
+      generated.bundles.has(audienceV1Key) ||
       generated.registry.registrations.some((registration) =>
-        [key, contentKey, brandKey].includes(keyOf(registration)),
+        [key, contentKey, brandKey, audienceV1Key].includes(
+          keyOf(registration),
+        ),
       )
     ) {
       throw new ContractRuntimeError(
@@ -94,6 +100,7 @@ export class ContractRuntimeRegistry implements OnModuleInit {
           creatorAudience.registration,
           creatorContent.registration,
           creatorBrand.registration,
+          audienceV1.registration,
         ],
       },
       bundles: new Map([
@@ -101,6 +108,7 @@ export class ContractRuntimeRegistry implements OnModuleInit {
         [key, creatorAudience.bundle] as const,
         [contentKey, creatorContent.bundle] as const,
         [brandKey, creatorBrand.bundle] as const,
+        [audienceV1Key, audienceV1.bundle] as const,
       ]),
     };
     this.startupFailure = undefined;

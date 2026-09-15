@@ -53,6 +53,14 @@ describe("Creator Audience Settings-owned credential fence", () => {
       authorizationGeneration: 3,
     });
     expect(findUnique).toHaveBeenCalledTimes(1);
+    expect(findUnique.mock.calls[0][0].select).not.toHaveProperty(
+      "oauthAccessTokenEncrypted",
+    );
+    expect(
+      Object.values(findUnique.mock.calls[0][0].select).every(
+        (value) => value === true,
+      ),
+    ).toBe(true);
   });
 
   it.each([

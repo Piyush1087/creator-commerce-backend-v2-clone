@@ -35,6 +35,19 @@ export class CreatorAudienceCredentialFenceService {
     actor: CreatorWorkspaceActorContext,
   ): Promise<CreatorAudienceFenceProjection> {
     const integration = await this.prisma.creatorSocialIntegration.findUnique({
+      select: {
+        id: true,
+        creatorProfileId: true,
+        nativePlatformUserId: true,
+        authorizationGeneration: true,
+        disconnectedAt: true,
+        tokenStateCondition: true,
+        tokenExpiresAt: true,
+        authorizationHealth: true,
+        basicAuthorizationCapability: true,
+        insightsCapability: true,
+        professionalAccountType: true,
+      },
       where: {
         creatorProfileId_platformNetwork: {
           creatorProfileId: actor.subjectCreatorProfileId,
