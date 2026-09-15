@@ -25,7 +25,9 @@ describe.skipIf(process.env.CREATOR_PORTFOLIO_DATABASE_TEST !== "true")(
       if (
         u.hostname !== "localhost" ||
         u.port !== "55472" ||
-        u.pathname !== "/creator_portfolio_v3_p2"
+        !["/creator_portfolio_v3_p2", "/creator_portfolio_v3_p4"].includes(
+          u.pathname,
+        )
       )
         throw new Error("TASK_OWNED_P2_DATABASE_REQUIRED");
       await db.$connect();
