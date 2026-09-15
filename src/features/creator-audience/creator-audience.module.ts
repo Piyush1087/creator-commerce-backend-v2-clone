@@ -9,6 +9,7 @@ import { CreatorAudienceCredentialFenceService } from "./creator-audience-creden
 import { CreatorAudiencePipelineService } from "./creator-audience-pipeline.service";
 import { CreatorAudienceRepository } from "./creator-audience.repository";
 import { CreatorAudienceService } from "./creator-audience.service";
+import { AudienceV1ConsumerService } from "../creator-audience-v1/creator-audience-v1.consumer.service";
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { CreatorAudienceService } from "./creator-audience.service";
     CreatorAudienceRepository,
     CreatorAudiencePipelineService,
     CreatorAudienceService,
+    AudienceV1ConsumerService,
   ],
   exports: [
     CreatorAudienceCredentialFenceService,

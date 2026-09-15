@@ -276,6 +276,46 @@ describe.skipIf(!enabled)(
       });
       expect(new Set(rows.map((row) => row.captureId)).size).toBe(3);
     }, 20_000);
+    it("canonicalizes retained input identity independently of database Evidence row order", async () => {
+      mode = "AVAILABLE";
+      const fixture = await audienceV1TestOwner(db);
+      share = 50;
+      await acquire(fixture, new Date("2026-09-01T10:00:00.000Z"));
+      share = 60;
+      await acquire(fixture, new Date("2026-09-08T10:00:00.000Z"));
+      share = 70;
+      await acquire(fixture);
+      const now = new Date("2026-09-15T10:00:00.000Z");
+      await db.$transaction(async (tx) => {
+        const first = await runtime.source.readInTransaction(
+          tx,
+          fixture.actor,
+          now,
+        );
+        const shuffled = new Proxy(tx, {
+          get(target, property) {
+            if (property === "dataExtractionEvidenceItem")
+              return new Proxy(target.dataExtractionEvidenceItem, {
+                get(delegate, key) {
+                  if (key === "findMany")
+                    return async (args: unknown) =>
+                      [...(await delegate.findMany(args as never))].reverse();
+                  return Reflect.get(delegate, key);
+                },
+              });
+            return Reflect.get(target, property);
+          },
+        });
+        const second = await runtime.source.readInTransaction(
+          shuffled,
+          fixture.actor,
+          now,
+        );
+        expect(first).not.toBeNull();
+        expect(second?.manifest).toEqual(first?.manifest);
+        expect(second?.value).toEqual(first?.value);
+      });
+    }, 20_000);
     it.each([
       "disconnect",
       "generation",

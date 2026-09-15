@@ -482,6 +482,9 @@ export class AudienceV1SourceReader {
         evidenceRef: { in: manifest.evidence.map((row) => row.evidenceRef) },
       },
     });
+    // SQL IN-query physical order is not an execution identity. Canonicalize
+    // before constructing retained breakdown arrays used by the replay hash.
+    evidence.sort((a, b) => a.evidenceRef.localeCompare(b.evidenceRef));
     if (evidence.length !== manifest.evidence.length)
       this.fail("MISSING_EVIDENCE");
     for (const item of evidence) {
