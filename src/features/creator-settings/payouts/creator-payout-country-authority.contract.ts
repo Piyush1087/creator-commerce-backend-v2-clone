@@ -45,6 +45,7 @@ export function finalizePayoutCountryAuthority(input: {
   destinations: readonly PayoutCountryDestination[];
   legal: PayoutCountryLegal | null;
   observedAt: Date;
+  latestDestinationVersion?: number;
 }): CreatorPayoutCountryAuthority {
   const base = {
     creatorProfileId: input.creatorProfileId,
@@ -83,6 +84,11 @@ export function finalizePayoutCountryAuthority(input: {
       ...base,
       state: "ABSENT",
     });
+  if (
+    input.latestDestinationVersion !== undefined &&
+    input.latestDestinationVersion !== destination.version
+  )
+    return conflict("UNRESOLVED_VERSION");
   if (
     !isIso31661Alpha2CountryCode(destination.countryCode) ||
     new GeoRoutingService().resolveGeoContext(destination.countryCode)

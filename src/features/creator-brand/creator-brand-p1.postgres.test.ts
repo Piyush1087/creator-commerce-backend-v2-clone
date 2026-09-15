@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import { randomUUID } from "node:crypto";
+import { readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { createRequire } from "node:module";
@@ -267,7 +268,13 @@ describe.skipIf(process.env.CREATOR_BRAND_P1_DATABASE_TEST !== "true")(
         await db.$queryRaw<
           Array<{ n: number }>
         >`SELECT count(*)::int n FROM _prisma_migrations WHERE finished_at IS NOT NULL`,
-      ).toEqual([{ n: 102 }]);
+      ).toEqual([
+        {
+          n: readdirSync("prisma/migrations", { withFileTypes: true }).filter(
+            (entry) => entry.isDirectory(),
+          ).length,
+        },
+      ]);
       expect(
         await db.creatorBrandProfile.count({
           where: { workspaceId: { in: [a.workspace.id, b.workspace.id] } },

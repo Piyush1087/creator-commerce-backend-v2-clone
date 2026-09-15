@@ -1505,6 +1505,7 @@ model Organization {
 
 model User {
   creatorBrandRevisions              CreatorBrandRevision[]
+  creatorWorkPreferencesRevisions    CreatorWorkPreferencesRevision[]
   id                                 String                            @id @default(uuid())
   email                              String                            @unique
   /// Database trigger derives this canonical authority from email on every write.
@@ -3618,23 +3619,24 @@ model UceCampaignReportingAssetGallery {
 // ============================================================================
 
 model CreatorProfile {
-  creatorBrandProfiles        CreatorBrandProfile[]
-  fundingLineageConfirmations CollaborationTrustedConfirmation[]
-  id                          String                             @id @default(uuid())
-  userId                      String                             @unique @map("user_id")
-  user                        User                               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  displayName                 String?                            @map("display_name")
-  instagramHandle             String?                            @map("instagram_handle")
+  creatorBrandProfiles           CreatorBrandProfile[]
+  creatorWorkPreferencesProfiles CreatorWorkPreferences[]
+  fundingLineageConfirmations    CollaborationTrustedConfirmation[]
+  id                             String                             @id @default(uuid())
+  userId                         String                             @unique @map("user_id")
+  user                           User                               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName                    String?                            @map("display_name")
+  instagramHandle                String?                            @map("instagram_handle")
   /// Public media-kit URL slug (e.g. chef-insights from @chef_insights).
-  publicSlug                  String?                            @unique @map("public_slug")
-  isMediaKitPublic            Boolean                            @default(true) @map("is_media_kit_public")
-  tiktokHandle                String?                            @map("tiktok_handle")
-  avatarUrl                   String?                            @map("avatar_url")
-  primaryRegion               String                             @default("US") @map("primary_region")
-  followerCount               Int                                @default(0) @map("follower_count")
-  audienceDemographicsMatrix  Json                               @default("{}") @map("audience_demographics_matrix")
-  createdAt                   DateTime                           @default(now()) @map("created_at")
-  updatedAt                   DateTime                           @updatedAt @map("updated_at")
+  publicSlug                     String?                            @unique @map("public_slug")
+  isMediaKitPublic               Boolean                            @default(true) @map("is_media_kit_public")
+  tiktokHandle                   String?                            @map("tiktok_handle")
+  avatarUrl                      String?                            @map("avatar_url")
+  primaryRegion                  String                             @default("US") @map("primary_region")
+  followerCount                  Int                                @default(0) @map("follower_count")
+  audienceDemographicsMatrix     Json                               @default("{}") @map("audience_demographics_matrix")
+  createdAt                      DateTime                           @default(now()) @map("created_at")
+  updatedAt                      DateTime                           @updatedAt @map("updated_at")
 
   bankDetails                 CreatorBankDetails[]
   shippingAddresses           CreatorShippingAddress[]
@@ -3871,17 +3873,18 @@ model UserBrandNotificationPreference {
 }
 
 model CreatorWorkspace {
+  creatorWorkPreferences  CreatorWorkPreferences?
   creatorBrandProfile     CreatorBrandProfile?
   notifications           Notification[]
   notificationJobs        NotificationJob[]
-  id                      String               @id @default(uuid())
-  ownerProfileId          String               @map("owner_profile_id")
-  ownerProfile            CreatorProfile       @relation("CreatorWorkspaceOwner", fields: [ownerProfileId], references: [id], onDelete: Cascade)
-  organizationId          String               @unique @map("organization_id")
-  organization            Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  organizationDisplayName String               @default("My Creative Workspace") @map("organization_display_name") @db.VarChar(150)
-  createdAt               DateTime             @default(now()) @map("created_at")
-  updatedAt               DateTime             @updatedAt @map("updated_at")
+  id                      String                  @id @default(uuid())
+  ownerProfileId          String                  @map("owner_profile_id")
+  ownerProfile            CreatorProfile          @relation("CreatorWorkspaceOwner", fields: [ownerProfileId], references: [id], onDelete: Cascade)
+  organizationId          String                  @unique @map("organization_id")
+  organization            Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  organizationDisplayName String                  @default("My Creative Workspace") @map("organization_display_name") @db.VarChar(150)
+  createdAt               DateTime                @default(now()) @map("created_at")
+  updatedAt               DateTime                @updatedAt @map("updated_at")
 
   members                  CreatorWorkspaceMember[]
   invitations              CreatorWorkspaceInvitation[]
@@ -3897,27 +3900,74 @@ model CreatorWorkspace {
 }
 
 model CreatorWorkspaceMember {
-  creatorBrandRevisions    CreatorBrandRevision[]
-  id                       String                   @id @default(uuid())
-  workspaceId              String                   @map("workspace_id")
-  workspace                CreatorWorkspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  assignedProfileId        String?                  @map("assigned_profile_id")
-  assignedProfile          CreatorProfile?          @relation("CreatorWorkspaceMemberProfile", fields: [assignedProfileId], references: [id], onDelete: SetNull)
-  userId                   String?                  @map("user_id")
-  user                     User?                    @relation("CreatorWorkspaceMemberUser", fields: [userId], references: [id], onDelete: SetNull)
-  associatedEmail          String                   @map("associated_email") @db.VarChar(255)
-  securityRole             CreatorTeamRole          @default(ASSISTANT) @map("security_role_token")
-  isActive                 Boolean                  @default(true) @map("is_active_active")
-  joinedAt                 DateTime?                @map("joined_at")
-  createdAt                DateTime                 @default(now()) @map("created_at")
-  updatedAt                DateTime                 @updatedAt @map("updated_at")
-  applicationActorEvidence UceApplication[]         @relation("ApplicationActorMembership")
-  applicationDomainEvents  ApplicationDomainEvent[] @relation("ApplicationEventActorMembership")
+  creatorBrandRevisions           CreatorBrandRevision[]
+  creatorWorkPreferencesRevisions CreatorWorkPreferencesRevision[]
+  id                              String                           @id @default(uuid())
+  workspaceId                     String                           @map("workspace_id")
+  workspace                       CreatorWorkspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assignedProfileId               String?                          @map("assigned_profile_id")
+  assignedProfile                 CreatorProfile?                  @relation("CreatorWorkspaceMemberProfile", fields: [assignedProfileId], references: [id], onDelete: SetNull)
+  userId                          String?                          @map("user_id")
+  user                            User?                            @relation("CreatorWorkspaceMemberUser", fields: [userId], references: [id], onDelete: SetNull)
+  associatedEmail                 String                           @map("associated_email") @db.VarChar(255)
+  securityRole                    CreatorTeamRole                  @default(ASSISTANT) @map("security_role_token")
+  isActive                        Boolean                          @default(true) @map("is_active_active")
+  joinedAt                        DateTime?                        @map("joined_at")
+  createdAt                       DateTime                         @default(now()) @map("created_at")
+  updatedAt                       DateTime                         @updatedAt @map("updated_at")
+  applicationActorEvidence        UceApplication[]                 @relation("ApplicationActorMembership")
+  applicationDomainEvents         ApplicationDomainEvent[]         @relation("ApplicationEventActorMembership")
 
   @@unique([workspaceId, associatedEmail])
   @@index([associatedEmail, isActive])
   @@index([userId, isActive], map: "creator_workspace_members_user_id_is_active_idx")
   @@map("creator_workspace_members")
+}
+
+model CreatorWorkPreferences {
+  id                            String                           @id @default(uuid())
+  workspaceId                   String                           @unique @map("workspace_id")
+  ownerProfileId                String                           @map("owner_profile_id")
+  workspace                     CreatorWorkspace                 @relation(fields: [workspaceId, ownerProfileId], references: [id, ownerProfileId], onDelete: Restrict)
+  ownerProfile                  CreatorProfile                   @relation(fields: [ownerProfileId], references: [id], onDelete: Restrict)
+  currentRevision               Int                              @map("current_revision")
+  baseCountry                   String                           @map("base_country") @db.Char(2)
+  openToInternationalBrands     String?                          @map("open_to_international_brands") @db.VarChar(3)
+  preferredIndustryIds          IndustryVertical[]               @map("preferred_industry_ids")
+  excludedIndustryIds           IndustryVertical[]               @map("excluded_industry_ids")
+  availability                  String                           @db.VarChar(42)
+  pausedUntil                   DateTime?                        @map("paused_until")
+  physicalProductCollaborations String?                          @map("physical_product_collaborations") @db.VarChar(3)
+  ugcProjects                   String?                          @map("ugc_projects") @db.VarChar(3)
+  giftingBarter                 String?                          @map("gifting_barter") @db.VarChar(3)
+  createdAt                     DateTime                         @default(now()) @map("created_at")
+  updatedAt                     DateTime                         @updatedAt @map("updated_at")
+  revisions                     CreatorWorkPreferencesRevision[]
+
+  @@unique([workspaceId, ownerProfileId])
+  @@map("creator_work_preferences")
+}
+
+model CreatorWorkPreferencesRevision {
+  id                String                 @id @default(uuid())
+  profileId         String                 @map("profile_id")
+  profile           CreatorWorkPreferences @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  revision          Int
+  previousRevision  Int                    @map("previous_revision")
+  snapshot          Json
+  actorUserId       String                 @map("actor_user_id")
+  actorUser         User                   @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  actorMembershipId String                 @map("actor_membership_id")
+  actorMembership   CreatorWorkspaceMember @relation(fields: [actorMembershipId], references: [id], onDelete: Restrict)
+  actorRole         CreatorTeamRole        @map("actor_role")
+  origin            String                 @db.VarChar(40)
+  idempotencyKey    String                 @map("idempotency_key") @db.Uuid
+  commandHash       String                 @map("command_hash") @db.VarChar(64)
+  createdAt         DateTime               @default(now()) @map("created_at")
+
+  @@unique([profileId, revision])
+  @@unique([profileId, idempotencyKey])
+  @@map("creator_work_preferences_revisions")
 }
 
 model CreatorBrandProfile {
