@@ -137,7 +137,7 @@ describe("Creator Brand P1 service/controller/static boundary", () => {
       contractVersion: "creator-brand-v0.1",
       currentRevision: 1,
       context: { manualFirst: true, sourceIndependent: true },
-      suggestions: { state: "NOT_IMPLEMENTED" },
+      suggestions: { state: "UNAVAILABLE", autoApply: false },
     });
     expect(JSON.stringify(response)).not.toContain("must-not-project");
     const controller = new CreatorBrandController(service);

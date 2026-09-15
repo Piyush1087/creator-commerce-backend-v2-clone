@@ -22,6 +22,7 @@ import { CreatorAudiencePersistenceHook } from "../../creator-audience/creator-a
 import { CREATOR_AUDIENCE_PROCESSOR_ID } from "../../creator-audience/creator-audience-runtime.contract";
 import { CreatorContentPersistenceHook } from "../../creator-content/creator-content-persistence.hook";
 import { CREATOR_CONTENT_PROCESSOR_ID } from "../../creator-content/creator-content-runtime.contract";
+import { CreatorBrandSuggestionsPersistenceHook } from "../../creator-brand/creator-brand-suggestions.persistence";
 
 /** Bounded dispatch only; finalization still owns the transaction and live lease. */
 @Injectable()
@@ -46,6 +47,8 @@ export class ProcessorPersistenceRouter implements ProcessorSuccessPersistenceHo
     private readonly creatorAudience?: CreatorAudiencePersistenceHook,
     @Optional()
     private readonly creatorContent?: CreatorContentPersistenceHook,
+    @Optional()
+    private readonly creatorBrand?: CreatorBrandSuggestionsPersistenceHook,
   ) {}
   async persistBeforeCompletion(
     tx: Prisma.TransactionClient,
@@ -65,6 +68,13 @@ export class ProcessorPersistenceRouter implements ProcessorSuccessPersistenceHo
       );
     }
     switch (claim.processorExecution.processorId) {
+      case "creator_brand_suggestions_v0":
+        if (!this.creatorBrand)
+          throw new ProcessorExecutorFailure({
+            category: "CONFIGURATION_DRIFT",
+            code: "CREATOR_BRAND_PERSISTENCE_MISSING",
+          });
+        return this.creatorBrand.persistBeforeCompletion(tx, claim, result);
       case CREATOR_CONTENT_PROCESSOR_ID:
         if (!this.creatorContent)
           throw new ProcessorExecutorFailure({

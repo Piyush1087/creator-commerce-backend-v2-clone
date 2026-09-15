@@ -111,7 +111,7 @@ describe("contract runtime registry and startup integrity", () => {
       ["offering_actionability_synthesis", true],
       ["creator_audience_v0", true],
       ["creator_content_v0", true],
-      ["creator_brand_suggestions_v0", false],
+      ["creator_brand_suggestions_v0", true],
     ]);
     expect(
       runtime.getVerifiedBundle({

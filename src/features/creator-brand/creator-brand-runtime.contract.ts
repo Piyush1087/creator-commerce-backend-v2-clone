@@ -138,7 +138,7 @@ export function creatorBrandVerifiedContract(): {
       persistenceValidatorId: "intelligence_persistence_transition_v1",
       bundled: true,
       registered: true,
-      executionEnabled: false,
+      executionEnabled: true,
     },
     bundle: {
       manifest: { ...identity, artifacts: [], bundleContentHash },

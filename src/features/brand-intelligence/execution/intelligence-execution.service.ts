@@ -228,7 +228,7 @@ export class IntelligenceExecutionService {
             ${item.triggerIntentKey}, ${item.processorExecutionKey}, 2,
             ${item.request.maxAttempts},
             ${item.request.dependencyEligible ? "QUEUED" : "WAITING_FOR_DEPENDENCY"}::"IntelligenceProcessorExecutionStatus",
-            ${item.request.dependencyEligible ? new Date() : null}, CURRENT_TIMESTAMP)
+            CASE WHEN ${item.request.dependencyEligible} THEN CURRENT_TIMESTAMP ELSE NULL END, CURRENT_TIMESTAMP)
           ON CONFLICT (processor_execution_id) DO NOTHING
         `);
       }

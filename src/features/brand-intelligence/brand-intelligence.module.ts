@@ -115,6 +115,14 @@ import { CreatorAudienceProcessorExecutor } from "../creator-audience/creator-au
 import { CreatorAudiencePersistenceHook } from "../creator-audience/creator-audience-persistence.hook";
 import { CreatorContentProcessorExecutor } from "../creator-content/creator-content-processor.executor";
 import { CreatorContentPersistenceHook } from "../creator-content/creator-content-persistence.hook";
+import { CreatorBrandContentSourceAdapter } from "../creator-brand/creator-brand-content-source.adapter";
+import {
+  CreatorBrandSuggestionsProcessor,
+  CREATOR_BRAND_SEMANTIC_PORT,
+  MissingCreatorBrandSemanticPort,
+} from "../creator-brand/creator-brand-suggestions.processor";
+import { CreatorBrandSuggestionsPersistenceHook } from "../creator-brand/creator-brand-suggestions.persistence";
+import { CreatorBrandSuggestionsPipeline } from "../creator-brand/creator-brand-suggestions.pipeline";
 
 const internalProviders = [
   ServiceabilityProcessorExecutor,
@@ -174,6 +182,14 @@ const internalProviders = [
   CreatorAudiencePersistenceHook,
   CreatorContentProcessorExecutor,
   CreatorContentPersistenceHook,
+  CreatorBrandContentSourceAdapter,
+  CreatorBrandSuggestionsProcessor,
+  CreatorBrandSuggestionsPersistenceHook,
+  CreatorBrandSuggestionsPipeline,
+  {
+    provide: CREATOR_BRAND_SEMANTIC_PORT,
+    useClass: MissingCreatorBrandSemanticPort,
+  },
   {
     provide: OFFERING_FACTUAL_MODEL_PROVIDER,
     useClass: StructuredOfferingFactualModelProvider,

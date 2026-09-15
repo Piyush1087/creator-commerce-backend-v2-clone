@@ -16,6 +16,7 @@ import { CreatorBrandConsumerSchema } from "./dto/creator-brand-consumer.schema"
 import { Test } from "@nestjs/testing";
 import { ConfigModule } from "@nestjs/config";
 import { ThrottlerModule } from "@nestjs/throttler";
+import { ScheduleModule } from "@nestjs/schedule";
 import { AuthModule } from "../auth/auth.module";
 import { AuthSessionService } from "../auth/auth-session.service";
 import { CreatorBrandModule } from "./creator-brand.module";
@@ -285,7 +286,7 @@ describe.skipIf(process.env.CREATOR_BRAND_P1_DATABASE_TEST !== "true")(
           creatorName: "Canonical owner",
           primaryInstagramHandle: null,
         },
-        suggestions: { state: "NOT_IMPLEMENTED" },
+        suggestions: { state: "UNAVAILABLE", autoApply: false },
       });
       const input = command(0, emptyBrand(), sharedIdempotencyKey);
       const first = await service.mutate(a.owner, input);
@@ -600,6 +601,11 @@ describe.skipIf(process.env.CREATOR_BRAND_P1_DATABASE_TEST !== "true")(
       const module = await Test.createTestingModule({
         imports: [
           ConfigModule.forRoot({ isGlobal: true }),
+          ScheduleModule.forRoot({
+            cronJobs: false,
+            intervals: false,
+            timeouts: false,
+          }),
           ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),
           (
             createRequire(resolve("package.json"))(

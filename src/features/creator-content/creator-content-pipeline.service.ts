@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
+import { CreatorBrandSuggestionsPipeline } from "../creator-brand/creator-brand-suggestions.pipeline";
 import { IntelligenceProcessorExecutionStatus } from "@prisma/client";
 import type { CreatorWorkspaceActorContext } from "../../shared/creator/creator-workspace-actor.contract";
 import { IntelligenceExecutionService } from "../brand-intelligence/execution/intelligence-execution.service";
@@ -39,6 +40,8 @@ export class CreatorContentPipelineService {
     private readonly provider: InstagramIntelligenceProviderReadClient,
     @Inject(CREATOR_CONTENT_SEMANTIC_ANALYZER)
     private readonly semantic: CreatorContentSemanticAnalyzer,
+    @Optional()
+    private readonly brandSuggestions?: CreatorBrandSuggestionsPipeline,
   ) {}
 
   async execute(input: {
@@ -246,6 +249,14 @@ export class CreatorContentPipelineService {
               generationIds: [],
             };
           throw new Error("CREATOR_CONTENT_INTELLIGENCE_EXECUTION_FAILED");
+        }
+      }
+      // One bounded downstream continuation. Optional P2 failure never changes Content success.
+      if (this.brandSuggestions) {
+        try {
+          await this.brandSuggestions.execute(input.actor);
+        } catch {
+          /* P2 attempt records failure; Content remains successful. */
         }
       }
       return {

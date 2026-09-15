@@ -4,6 +4,7 @@ import { BundlePathOwnershipRegistry } from "../registry/bundle-path-ownership.r
 import { ContractRuntimeRegistry } from "../registry/contract-runtime.registry";
 import { semanticAddressOwnerScopeId } from "../../semantic-path/component-path.types";
 import { accepted, rejected } from "./validation-result";
+import { creatorBrandVerifiedContract } from "../../../creator-brand/creator-brand-runtime.contract";
 import type {
   CurrentComponentSnapshot,
   PersistenceValidationRequest,
@@ -102,6 +103,17 @@ export class PersistenceTransitionValidator {
         : [],
     );
     const activeKeys = new Set(request.activeScope.map(addressKey));
+    // Frozen P0 declares derived authority on the strict Object contract, not generated metadata.
+    // This exact compiled-bundle bridge does not broaden any other processor's authority.
+    const creatorBrand = creatorBrandVerifiedContract().bundle;
+    if (
+      bundle.manifest.processorId === creatorBrand.manifest.processorId &&
+      bundle.manifest.bundleContentHash ===
+        creatorBrand.manifest.bundleContentHash &&
+      bundle.artifacts.objectContract.authority === "CREATOR_SHOP_DERIVED" &&
+      bundle.artifacts.objectContract.protection === "UNPROTECTED"
+    )
+      allowedAuthorities.add("CREATOR_SHOP_DERIVED");
     const snapshots = new Map(
       request.currentState.map((state) => [addressKey(state), state]),
     );

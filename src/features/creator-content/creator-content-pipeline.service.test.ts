@@ -5,6 +5,7 @@ import type { ProcessorWorkerService } from "../brand-intelligence/execution/pro
 import type { CreatorAudienceCredentialFenceService } from "../creator-audience/creator-audience-credential-fence.service";
 import type { InstagramIntelligenceProviderReadClient } from "../instagram/instagram-intelligence-provider.types";
 import { CreatorContentPipelineService } from "./creator-content-pipeline.service";
+import type { CreatorBrandSuggestionsPipeline } from "../creator-brand/creator-brand-suggestions.pipeline";
 import type { CreatorContentRepository } from "./creator-content.repository";
 import type { CreatorContentSemanticAnalyzer } from "./creator-content-semantic.port";
 
@@ -189,6 +190,11 @@ describe("Creator Content provider-neutral pipeline", () => {
         ],
       }),
     };
+    const optionalSuggestions = {
+      execute: vi
+        .fn()
+        .mockRejectedValue(new Error("OPTIONAL_DOWNSTREAM_FAILURE")),
+    };
     const service = new CreatorContentPipelineService(
       fence as unknown as CreatorAudienceCredentialFenceService,
       repository as unknown as CreatorContentRepository,
@@ -196,6 +202,7 @@ describe("Creator Content provider-neutral pipeline", () => {
       {} as ProcessorWorkerService,
       provider as unknown as InstagramIntelligenceProviderReadClient,
       semantic as CreatorContentSemanticAnalyzer,
+      optionalSuggestions as unknown as CreatorBrandSuggestionsPipeline,
     );
     const first = await service.execute({
       actor,
@@ -218,6 +225,7 @@ describe("Creator Content provider-neutral pipeline", () => {
     expect(semantic.analyze).toHaveBeenCalledTimes(1);
     expect(repository.completeAcquisition).toHaveBeenCalledTimes(1);
     expect(executions.createOrReturnOwnerScoped).toHaveBeenCalledTimes(1);
+    expect(optionalSuggestions.execute).toHaveBeenCalledTimes(1);
   });
 
   it("rejects mismatched authorization before provider access", async () => {

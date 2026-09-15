@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { encryptField } from "../../shared/crypto/field-encryption.util";
 import type { CreatorWorkspaceActorContext } from "../../shared/creator/creator-workspace-actor.contract";
 import { ContractBundleIntegrityVerifier } from "../brand-intelligence/contracts/bundle/contract-bundle.integrity";
@@ -41,6 +41,22 @@ import { InstagramSecureImageDownloader } from "../instagram/media/instagram-sec
 import { InstagramSecureVideoDownloader } from "../instagram/media/video/instagram-secure-video-downloader";
 import { rm } from "node:fs/promises";
 import { dirname } from "node:path";
+import { CreatorBrandContentSourceAdapter } from "../creator-brand/creator-brand-content-source.adapter";
+import {
+  CreatorBrandSuggestionsProcessor,
+  type CreatorBrandSemanticPort,
+} from "../creator-brand/creator-brand-suggestions.processor";
+import { CreatorBrandSuggestionsPersistenceHook } from "../creator-brand/creator-brand-suggestions.persistence";
+import { CreatorBrandSuggestionsPipeline } from "../creator-brand/creator-brand-suggestions.pipeline";
+import { creatorBrandCanonicalArchetypes } from "../creator-brand/contracts/creator-brand-archetype.adapter";
+import { CreatorBrandRepository } from "../creator-brand/creator-brand.repository";
+import { CreatorBrandService } from "../creator-brand/creator-brand.service";
+import {
+  CreatorBrandSuggestionsConsumer,
+  emptyCreatorBrandProfile,
+} from "../creator-brand/creator-brand-suggestions.consumer";
+import { CreatorWorkspaceActorService } from "../creator-settings/team/creator-workspace-actor.service";
+import type { AuthUser } from "../auth/types/auth-user";
 
 const enabled = process.env.CREATOR_CONTENT_DATABASE_TEST === "true";
 describe.skipIf(!enabled)(
@@ -49,8 +65,80 @@ describe.skipIf(!enabled)(
     const db = new PrismaClient();
     let pipeline: CreatorContentPipelineService;
     let scopes: IntelligenceOwnerScopeRepository;
+    let suggestions: CreatorBrandSuggestionsPipeline;
+    let sourceAdapter: CreatorBrandContentSourceAdapter;
+    let semanticCalls = 0;
+    let failSuggestions = false;
+    let omitLanguageSuggestion = false;
+    let p2FailureMode: "NONE" | "VALIDATION" | "PERSISTENCE" = "NONE";
+    const suggestionModel: CreatorBrandSemanticPort = {
+      identity: () => ({
+        provider: "LOCAL_FIXTURE",
+        model: "grounded-fixture",
+        profileVersion: "1.0",
+      }),
+      observe: async ({ posts }) => {
+        semanticCalls += 1;
+        if (failSuggestions) throw new Error("FIXTURE_SEMANTIC_UNAVAILABLE");
+        if (p2FailureMode === "VALIDATION")
+          return { contractVersion: "1.0", candidates: [], HIGH: true };
+        const eligible = posts
+          .filter((post) => post.semantic.state === "AVAILABLE" && post.caption)
+          .slice(0, 5);
+        const support = eligible.map((post) => ({
+          providerMediaId: post.providerMediaId,
+          modality: "caption",
+          excerpt: post.caption!.slice(0, 200),
+        }));
+        const visual = posts
+          .filter(
+            (post) =>
+              post.semantic.state === "AVAILABLE" &&
+              post.semantic.visualExecution.length,
+          )
+          .slice(0, 5);
+        return {
+          contractVersion: "1.0",
+          candidates: [
+            { field: "primaryNicheIds", value: ["EDUCATION"], support },
+            { field: "headline", value: "Tutorial creator", support },
+            { field: "voiceDescriptorIds", value: ["EDUCATIONAL"], support },
+            {
+              field: "voiceDescription",
+              value: "Source-supported tutorial delivery",
+              support,
+            },
+            {
+              field: "creatorArchetypeIds",
+              value: [creatorBrandCanonicalArchetypes()[0].id],
+              support,
+            },
+            ...(omitLanguageSuggestion
+              ? []
+              : [{ field: "languageTags", value: ["en"], support }]),
+            ...(visual.length >= 3
+              ? [
+                  {
+                    field: "visualStyleDescriptors",
+                    value: [
+                      visual[0].semantic.visualExecution[0].slice(0, 100),
+                    ],
+                    support: visual.map((post) => ({
+                      providerMediaId: post.providerMediaId,
+                      modality: "visualExecution",
+                      excerpt: post.semantic.visualExecution[0],
+                    })),
+                  },
+                ]
+              : []),
+          ],
+        };
+      },
+    };
     let providerCalls = 0;
     let failProvider = false;
+    let contentPostCount = 8;
+    let availableMediaCount = Number.POSITIVE_INFINITY;
     let external: Awaited<ReturnType<typeof creatorContentExternalFixture>>;
     const capturedAt = new Date("2026-09-15T12:00:00.000Z");
     const provider: InstagramIntelligenceProviderReadClient = {
@@ -78,7 +166,7 @@ describe.skipIf(!enabled)(
         expect(end).toEqual(capturedAt);
         providerCalls += 1;
         if (failProvider) throw new Error("FIXTURE_PROVIDER_FAILURE");
-        const items = Array.from({ length: 8 }, (_, index) => ({
+        const items = Array.from({ length: contentPostCount }, (_, index) => ({
           providerMediaId: `media-${index}`,
           mediaType: {
             state: "OBSERVED" as const,
@@ -211,6 +299,7 @@ describe.skipIf(!enabled)(
         undefined,
         undefined,
         executor,
+        new CreatorBrandSuggestionsProcessor(suggestionModel),
       );
       const ownership = new BundlePathOwnershipRegistry(contracts, codec);
       const aggregation = new ExecutionAggregationService();
@@ -237,6 +326,17 @@ describe.skipIf(!enabled)(
         semantic,
         contracts,
       );
+      sourceAdapter = new CreatorBrandContentSourceAdapter(prisma);
+      const suggestionPersistence = new CreatorBrandSuggestionsPersistenceHook(
+        new IntelligenceGenerationRepository(prisma, codec),
+        current,
+        transitions,
+        new PersistenceTransitionValidator(contracts, ownership),
+        new StructuralValidator(),
+        semantic,
+        contracts,
+        sourceAdapter,
+      );
       const worker = new ProcessorWorkerService(
         processorRepository,
         new ProcessorFinalizationService(
@@ -246,7 +346,34 @@ describe.skipIf(!enabled)(
           retry,
         ),
         executors,
-        persistence,
+        {
+          persistBeforeCompletion: async (tx, claim, result) => {
+            if (
+              claim.processorExecution.processorId ===
+              "creator_brand_suggestions_v0"
+            ) {
+              await suggestionPersistence.persistBeforeCompletion(
+                tx,
+                claim,
+                result,
+              );
+              if (p2FailureMode === "PERSISTENCE")
+                throw new Error("LOCAL_P2_FINALIZATION_ROLLBACK");
+            } else await persistence.persistBeforeCompletion(tx, claim, result);
+          },
+        },
+      );
+      suggestions = new CreatorBrandSuggestionsPipeline(
+        sourceAdapter,
+        new IntelligenceExecutionService(
+          prisma,
+          new ExecutionContractGate(contracts, executors),
+          ownership,
+          codec,
+        ),
+        worker,
+        prisma,
+        suggestionModel,
       );
       external = await creatorContentExternalFixture(
         `postgres-${randomUUID()}`,
@@ -302,7 +429,22 @@ describe.skipIf(!enabled)(
         ),
         worker,
         provider,
-        semanticFixture,
+        {
+          replayProfileIdentity: () =>
+            `${semanticFixture.replayProfileIdentity()}:creator-content-fixture-available-${availableMediaCount}`,
+          analyze: async (request) =>
+            Number(request.media.providerMediaId.split("-").at(-1)) <
+            availableMediaCount
+              ? semanticFixture.analyze(request)
+              : {
+                  providerMediaId: request.media.providerMediaId,
+                  state: "UNKNOWN",
+                  themes: [],
+                  captionPatterns: [],
+                  creativeStructures: [],
+                  visualExecution: [],
+                },
+        },
       );
     }, 30_000);
     afterAll(async () => {
@@ -368,6 +510,629 @@ describe.skipIf(!enabled)(
       return { profile, workspace, integration, actor, providerAccountId };
     }
 
+    it("P2 reads exact accepted Content, publishes five-path shared current, replays without acquisition, confirms explicitly and purges derived state only", async () => {
+      const fixture = await owner();
+      const integration = {
+        integrationId: fixture.integration.id,
+        providerAccountId: fixture.providerAccountId,
+        authorizationGeneration: 1,
+      };
+      await pipeline.execute({
+        actor: fixture.actor,
+        ...integration,
+        capturedAt,
+        requestIdentity: `p2-source:${randomUUID()}`,
+      });
+      const source = await sourceAdapter.read(fixture.actor);
+      expect(source).not.toBeNull();
+      expect(source!.componentGenerations).toHaveLength(8);
+      expect(source!.posts).toHaveLength(8);
+      expect(JSON.stringify(source!.posts)).not.toMatch(
+        /metrics|highlights|performance|oauthAccessToken|encrypted/,
+      );
+      const scopeId = source!.ownerScopeId;
+      const count = async () => ({
+        captures: await db.dataExtractionCapture.count({
+          where: { ownerScopeId: scopeId },
+        }),
+        deEvidence: await db.dataExtractionEvidenceItem.count({
+          where: { ownerScopeId: scopeId },
+        }),
+        executions: await db.intelligenceExecution.count({
+          where: { ownerScopeId: scopeId },
+        }),
+        processors: await db.intelligenceProcessorExecution.count({
+          where: { ownerScopeId: scopeId },
+        }),
+        attempts: await db.intelligenceProcessorAttempt.count({
+          where: { ownerScopeId: scopeId },
+        }),
+        objects: await db.intelligenceObjectGeneration.count({
+          where: { ownerScopeId: scopeId },
+        }),
+        components: await db.intelligenceComponentGeneration.count({
+          where: { ownerScopeId: scopeId },
+        }),
+        refs: await db.intelligenceEvidenceReference.count({
+          where: { ownerScopeId: scopeId },
+        }),
+        current: await db.intelligenceCurrentComponent.count({
+          where: { ownerScopeId: scopeId },
+        }),
+        profiles: await db.creatorBrandProfile.count({
+          where: { workspaceId: fixture.workspace.id },
+        }),
+        revisions: await db.creatorBrandRevision.count({
+          where: { profile: { workspaceId: fixture.workspace.id } },
+        }),
+      });
+      const before = await count();
+      const acquisitionBefore = {
+        provider: providerCalls,
+        external: { ...external.count },
+      };
+      const calls = semanticCalls;
+      const first = await suggestions.execute(fixture.actor);
+      const after = await count();
+      expect(first.reused).toBe(false);
+      expect(first.generationIds).toHaveLength(1);
+      expect(after).toMatchObject({
+        captures: before.captures,
+        deEvidence: before.deEvidence,
+        executions: before.executions + 1,
+        processors: before.processors + 1,
+        attempts: before.attempts + 1,
+        objects: before.objects + 1,
+        components: before.components + 5,
+        current: before.current + 5,
+        profiles: 0,
+        revisions: 0,
+      });
+      expect(semanticCalls - calls).toBe(1);
+      const replay = await suggestions.execute(fixture.actor);
+      expect(replay).toEqual({ ...first, reused: true });
+      expect(await count()).toEqual(after);
+      expect(semanticCalls - calls).toBe(1);
+      expect({
+        provider: providerCalls,
+        external: { ...external.count },
+      }).toEqual(acquisitionBefore);
+      const consumer = new CreatorBrandSuggestionsConsumer(
+        db as never,
+        sourceAdapter,
+      );
+      const view = await consumer.read(fixture.actor);
+      expect(view).toMatchObject({
+        state: "AVAILABLE",
+        freshness: "CURRENT",
+        processing: "IDLE",
+      });
+      const pendingId = randomUUID(),
+        pendingRef = `p2-pending:${randomUUID()}`;
+      await db.$executeRawUnsafe(
+        `INSERT INTO data_extraction_captures (id,capture_ref,brand_id,owner_scope_id,resource_ref,acquisition_request_key,status,started_at,acquisition_quality,provider_integration_id,provider_account_id,authorization_generation)
+        SELECT $1,$2,brand_id,owner_scope_id,resource_ref,$2,'RUNNING',CURRENT_TIMESTAMP,acquisition_quality,provider_integration_id,provider_account_id,authorization_generation
+        FROM data_extraction_captures WHERE capture_ref=$3`,
+        pendingId,
+        pendingRef,
+        source!.captureRef,
+      );
+      try {
+        expect(await consumer.read(fixture.actor)).toMatchObject({
+          objectGenerationId: first.generationIds[0],
+          state: "AVAILABLE",
+          processing: "PROCESSING",
+        });
+        await db.dataExtractionCapture.updateMany({
+          where: { id: pendingId },
+          data: { status: "FAILED" },
+        });
+        expect(await consumer.read(fixture.actor)).toMatchObject({
+          objectGenerationId: first.generationIds[0],
+          state: "DEGRADED",
+          processing: "FAILED",
+        });
+      } finally {
+        await db.dataExtractionCapture.deleteMany({ where: { id: pendingId } });
+      }
+      const clock = vi
+        .spyOn(Date, "now")
+        .mockReturnValue(new Date(source!.windowEnd).getTime() + 49 * 3600_000);
+      try {
+        expect((await consumer.read(fixture.actor)).freshness).toBe("STALE");
+      } finally {
+        clock.mockRestore();
+      }
+      expect(view.objectGenerationId).toBe(first.generationIds[0]);
+      expect(view.autoApply).toBe(false);
+      const headline = view.families.positioning.candidates.find(
+        (candidate) => candidate.field === "headline",
+      )!;
+      expect(headline).toBeDefined();
+      expect(headline.confidence).toBe("MEDIUM");
+      expect(headline.supportingPosts).toBe(5);
+      const object = await db.intelligenceObjectGeneration.findUniqueOrThrow({
+        where: { id: first.generationIds[0] },
+        select: { valuePayload: true },
+      });
+      const persisted = object.valuePayload as unknown as {
+        families: Record<
+          string,
+          Record<
+            string,
+            {
+              availability: string;
+              support?: {
+                evidenceRefs: string[];
+                sourceComponentGenerationIds: string[];
+              };
+            }
+          >
+        >;
+      };
+      for (const family of Object.values(persisted.families))
+        for (const field of Object.values(family))
+          if (field.availability === "AVAILABLE") {
+            expect(
+              field.support!.evidenceRefs.every((ref) =>
+                source!.evidence.some((item) => item.evidenceRef === ref),
+              ),
+            ).toBe(true);
+            expect(
+              field.support!.sourceComponentGenerationIds.every((id) =>
+                source!.componentGenerations.some(
+                  (item) => item.generationId === id,
+                ),
+              ),
+            ).toBe(true);
+          }
+      const ownerUser = await db.user.findUniqueOrThrow({
+        where: { id: fixture.actor.subjectOwnerUserId },
+      });
+      const seat = async (role: "OWNER" | "MANAGER" | "ASSISTANT") => {
+        const user =
+          role === "OWNER"
+            ? ownerUser
+            : await db.user.create({
+                data: {
+                  email: `${randomUUID()}@example.test`,
+                  role: "CREATOR",
+                  authState: "ACTIVE",
+                  organizationId: fixture.actor.organizationId,
+                },
+              });
+        await db.creatorWorkspaceMember.create({
+          data: {
+            workspaceId: fixture.workspace.id,
+            userId: user.id,
+            assignedProfileId: role === "OWNER" ? fixture.profile.id : null,
+            associatedEmail: user.email,
+            securityRole: role,
+            isActive: true,
+          },
+        });
+        return {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          organizationId: user.organizationId,
+          name: null,
+        } as AuthUser;
+      };
+      const ownerActor = await seat("OWNER"),
+        manager = await seat("MANAGER"),
+        assistant = await seat("ASSISTANT");
+      const service = new CreatorBrandService(
+        new CreatorBrandRepository(
+          db as never,
+          new CreatorWorkspaceActorService(db as never),
+          consumer,
+        ),
+        consumer,
+      );
+      const manual = {
+        intent: "MANUAL",
+        expectedRevision: 0,
+        idempotencyKey: randomUUID(),
+        values: {
+          ...emptyCreatorBrandProfile(),
+          commercialBio: "Manual independent bio",
+        },
+      };
+      await service.mutate(ownerActor, manual);
+      const reference = {
+        objectGenerationId: first.generationIds[0],
+        componentGenerationId: headline.componentGenerationId,
+        candidateId: headline.candidateId,
+      };
+      const use = {
+        intent: "USE_SUGGESTION",
+        expectedRevision: 1,
+        idempotencyKey: randomUUID(),
+        suggestionReference: reference,
+      };
+      const used = await service.mutate(manager, use);
+      expect(used.profile!.headline).toBe(headline.value);
+      expect(used.profile!.commercialBio).toBe("Manual independent bio");
+      expect(used.currentRevision).toBe(2);
+      expect(await service.mutate(manager, use)).toEqual(used);
+      const usedRevision = await db.creatorBrandRevision.findFirstOrThrow({
+        where: { profile: { workspaceId: fixture.workspace.id }, revision: 2 },
+      });
+      expect(usedRevision).toMatchObject({
+        origin: "SUGGESTION_USED",
+        suggestionObjectGenerationId: reference.objectGenerationId,
+        suggestionComponentGenerationId: reference.componentGenerationId,
+        suggestionCandidateId: reference.candidateId,
+      });
+      await expect(
+        service.mutate(assistant, {
+          ...use,
+          idempotencyKey: randomUUID(),
+          expectedRevision: 2,
+        }),
+      ).rejects.toThrow();
+      expect((await service.read(assistant)).currentRevision).toBe(2);
+      await expect(
+        service.mutate(ownerActor, {
+          ...use,
+          idempotencyKey: randomUUID(),
+          expectedRevision: 2,
+          suggestionReference: { ...reference, candidateId: "f".repeat(64) },
+        }),
+      ).rejects.toThrow();
+      await expect(
+        service.mutate(ownerActor, {
+          intent: "EDIT_SUGGESTION",
+          expectedRevision: 2,
+          idempotencyKey: randomUUID(),
+          suggestionReference: reference,
+          values: {
+            ...used.profile,
+            headline: "Edited tutorial",
+            commercialBio: "Unrelated change",
+          },
+        }),
+      ).rejects.toMatchObject({
+        response: { code: "CREATOR_BRAND_SUGGESTION_EDIT_UNRELATED_FIELDS" },
+      });
+      const edited = await service.mutate(ownerActor, {
+        intent: "EDIT_SUGGESTION",
+        expectedRevision: 2,
+        idempotencyKey: randomUUID(),
+        suggestionReference: reference,
+        values: { ...used.profile, headline: "Creator-authored tutorial" },
+      });
+      expect(edited.profile!.headline).toBe("Creator-authored tutorial");
+      expect(edited.profile!.commercialBio).toBe("Manual independent bio");
+      expect(
+        await db.creatorBrandRevision.findFirstOrThrow({
+          where: {
+            profile: { workspaceId: fixture.workspace.id },
+            revision: 3,
+          },
+        }),
+      ).toMatchObject({
+        origin: "SUGGESTION_EDITED",
+        suggestionCandidateId: reference.candidateId,
+      });
+      const ownerUse = await service.mutate(ownerActor, {
+        ...use,
+        expectedRevision: 3,
+        idempotencyKey: randomUUID(),
+      });
+      const managerEdit = await service.mutate(manager, {
+        intent: "EDIT_SUGGESTION",
+        expectedRevision: 4,
+        idempotencyKey: randomUUID(),
+        suggestionReference: reference,
+        values: { ...ownerUse.profile, headline: "Manager-authored tutorial" },
+      });
+      expect(managerEdit.currentRevision).toBe(5);
+      const canonical = managerEdit.profile;
+      const originalIntegration =
+        await db.creatorSocialIntegration.findUniqueOrThrow({
+          where: { id: fixture.integration.id },
+        });
+      for (const data of [
+        { disconnectedAt: new Date() },
+        { tokenStateCondition: "EXPIRED" as const },
+        { insightsCapability: "UNKNOWN" as const },
+        { authorizationGeneration: 2 },
+        { nativePlatformUserId: "substituted-account" },
+      ]) {
+        await db.creatorSocialIntegration.update({
+          where: { id: fixture.integration.id },
+          data,
+        });
+        try {
+          await expect(suggestions.execute(fixture.actor)).rejects.toThrow();
+          await expect(service.mutate(manager, use)).rejects.toThrow();
+          const fencedView = await consumer.read(fixture.actor);
+          expect(
+            Object.values(fencedView.families)
+              .flatMap((family) => family.candidates)
+              .every((candidate) => !candidate.confirmable),
+          ).toBe(true);
+          expect((await service.read(ownerActor)).profile).toEqual(canonical);
+        } finally {
+          await db.creatorSocialIntegration.update({
+            where: { id: fixture.integration.id },
+            data: {
+              disconnectedAt: originalIntegration.disconnectedAt,
+              tokenStateCondition: originalIntegration.tokenStateCondition,
+              insightsCapability: originalIntegration.insightsCapability,
+              authorizationGeneration:
+                originalIntegration.authorizationGeneration,
+              nativePlatformUserId: originalIntegration.nativePlatformUserId,
+            },
+          });
+        }
+      }
+      await expect(
+        db.$transaction(async (tx) => {
+          await tx.dataExtractionEvidenceItem.updateMany({
+            where: {
+              ownerScopeId: scopeId,
+              evidenceRef: source!.evidence[0].evidenceRef,
+            },
+            data: { contentHash: "0".repeat(64) },
+          });
+          await expect(
+            sourceAdapter.readInTransaction(tx, fixture.actor),
+          ).rejects.toThrow();
+          throw new Error("P2_ADMISSION_ROLLBACK");
+        }),
+      ).rejects.toThrow("P2_ADMISSION_ROLLBACK");
+      expect((await sourceAdapter.read(fixture.actor))!.manifestHash).toBe(
+        source!.manifestHash,
+      );
+      await pipeline.execute({
+        actor: fixture.actor,
+        ...integration,
+        capturedAt,
+        requestIdentity: `p2-new-source:${randomUUID()}`,
+      });
+      await expect(
+        db.$transaction(async (tx) => {
+          await tx.intelligenceCurrentComponent.updateMany({
+            where: {
+              ownerScopeId: scopeId,
+              objectSemanticId: "creator_content",
+              componentSemanticPath: source!.componentGenerations[0].path,
+            },
+            data: {
+              currentComponentGenerationId:
+                source!.componentGenerations[0].generationId,
+            },
+          });
+          await expect(
+            sourceAdapter.readInTransaction(tx, fixture.actor),
+          ).rejects.toThrow();
+          throw new Error("P2_NONCURRENT_SOURCE_ROLLBACK");
+        }),
+      ).rejects.toThrow("P2_NONCURRENT_SOURCE_ROLLBACK");
+      failSuggestions = true;
+      try {
+        await expect(suggestions.execute(fixture.actor)).rejects.toThrow(
+          "CURRENT_PRESERVED",
+        );
+      } finally {
+        failSuggestions = false;
+      }
+      expect(await consumer.read(fixture.actor)).toMatchObject({
+        objectGenerationId: first.generationIds[0],
+        state: "DEGRADED",
+        processing: "FAILED",
+        freshness: "STALE",
+      });
+      expect((await service.read(ownerActor)).profile).toEqual(canonical);
+      await expect(
+        service.mutate(ownerActor, {
+          ...use,
+          idempotencyKey: randomUUID(),
+          expectedRevision: 5,
+        }),
+      ).rejects.toThrow();
+      await expect(suggestions.execute(fixture.actor)).rejects.toThrow();
+      for (const mode of ["VALIDATION", "PERSISTENCE"] as const) {
+        await pipeline.execute({
+          actor: fixture.actor,
+          ...integration,
+          capturedAt,
+          requestIdentity: `p2-${mode.toLowerCase()}-failure:${randomUUID()}`,
+        });
+        const failureBefore = await count();
+        p2FailureMode = mode;
+        try {
+          await expect(suggestions.execute(fixture.actor)).rejects.toThrow(
+            "CURRENT_PRESERVED",
+          );
+        } finally {
+          p2FailureMode = "NONE";
+        }
+        const failureAfter = await count();
+        expect(failureAfter).toEqual({
+          ...failureBefore,
+          executions: failureBefore.executions + 1,
+          processors: failureBefore.processors + 1,
+          attempts: failureBefore.attempts + 1,
+        });
+        expect((await consumer.read(fixture.actor)).objectGenerationId).toBe(
+          first.generationIds[0],
+        );
+        expect((await service.read(ownerActor)).profile).toEqual(canonical);
+      }
+      // Failed exact execution is terminal and cannot be replayed as success; a new basis is required.
+      await pipeline.execute({
+        actor: fixture.actor,
+        ...integration,
+        capturedAt,
+        requestIdentity: `p2-recovered-source:${randomUUID()}`,
+      });
+      omitLanguageSuggestion = true;
+      let second;
+      try {
+        second = await suggestions.execute(fixture.actor);
+        expect((await consumer.read(fixture.actor)).state).toBe("PARTIAL");
+        expect(
+          (await consumer.read(fixture.actor)).families.languages.candidates,
+        ).toHaveLength(0);
+      } finally {
+        omitLanguageSuggestion = false;
+      }
+      expect(second.generationIds[0]).not.toBe(first.generationIds[0]);
+      expect((await service.read(ownerActor)).profile).toEqual(canonical);
+      contentPostCount = 9;
+      availableMediaCount = 3;
+      const priorCalls = semanticCalls;
+      try {
+        await pipeline.execute({
+          actor: fixture.actor,
+          ...integration,
+          capturedAt,
+          requestIdentity: `p2-insufficient-source:${randomUUID()}`,
+        });
+        const insufficient = await suggestions.execute(fixture.actor);
+        expect(insufficient.generationIds[0]).not.toBe(second.generationIds[0]);
+        expect(
+          Object.values((await consumer.read(fixture.actor)).families).flatMap(
+            (family) => family.candidates,
+          ),
+        ).toHaveLength(0);
+        expect(semanticCalls).toBe(priorCalls);
+        expect((await service.read(ownerActor)).profile).toEqual(canonical);
+      } finally {
+        contentPostCount = 8;
+        availableMediaCount = Number.POSITIVE_INFINITY;
+      }
+      const other = await owner();
+      await pipeline.execute({
+        actor: other.actor,
+        integrationId: other.integration.id,
+        providerAccountId: other.providerAccountId,
+        authorizationGeneration: 1,
+        capturedAt,
+        requestIdentity: `p2-other-source:${randomUUID()}`,
+      });
+      const otherSuggestions = await suggestions.execute(other.actor);
+      const otherSource = await sourceAdapter.read(other.actor);
+      await expect(
+        service.mutate(ownerActor, {
+          ...use,
+          idempotencyKey: randomUUID(),
+          expectedRevision: 5,
+          suggestionReference: {
+            ...reference,
+            objectGenerationId: otherSuggestions.generationIds[0],
+          },
+        }),
+      ).rejects.toThrow();
+      await expect(
+        sourceAdapter.read({
+          ...fixture.actor,
+          workspaceId: other.workspace.id,
+        }),
+      ).rejects.toThrow("SUBJECT_MISMATCH");
+      await db.creatorSocialIntegration.update({
+        where: { id: fixture.integration.id },
+        data: { authorizationGeneration: 2 },
+      });
+      await expect(sourceAdapter.read(fixture.actor)).rejects.toThrow(
+        "CONTENT_IDENTITY_MISMATCH",
+      );
+      expect(
+        (await consumer.read(fixture.actor)).objectGenerationId,
+      ).toBeNull();
+      expect((await service.read(ownerActor)).profile).toEqual(canonical);
+      await db.creatorSocialIntegration.update({
+        where: { id: fixture.integration.id },
+        data: { authorizationGeneration: 1 },
+      });
+      const otherBefore = await db.creatorSocialIntegration.findUniqueOrThrow({
+        where: { id: other.integration.id },
+      });
+      await scopes.purgeCreatorInstagram(scopeId);
+      expect(
+        await db.intelligenceObjectGeneration.count({
+          where: {
+            ownerScopeId: scopeId,
+            objectSemanticId: "creator_brand_suggestions",
+          },
+        }),
+      ).toBe(0);
+      expect(
+        await db.intelligenceProcessorExecution.count({
+          where: {
+            ownerScopeId: scopeId,
+            processorId: "creator_brand_suggestions_v0",
+          },
+        }),
+      ).toBe(0);
+      expect((await service.read(ownerActor)).profile).toEqual(canonical);
+      expect(
+        await db.creatorBrandRevision.count({
+          where: { profile: { workspaceId: fixture.workspace.id } },
+        }),
+      ).toBe(5);
+      expect(
+        await db.intelligenceCurrentComponent.count({
+          where: { ownerScopeId: otherSource!.ownerScopeId },
+        }),
+      ).toBe(13);
+      expect(
+        await db.creatorSocialIntegration.findUniqueOrThrow({
+          where: { id: other.integration.id },
+        }),
+      ).toEqual(otherBefore);
+      expect((await consumer.read(fixture.actor)).state).toBe("UNAVAILABLE");
+      console.info("P2_SANITIZED_ROW_COUNTS", {
+        before,
+        after,
+        replay: after,
+        final: await count(),
+      });
+    }, 120_000);
+
+    it.each([
+      [6, 3, "LOW"],
+      [10, 7, "MEDIUM"],
+    ] as const)(
+      "P2 accepted current with %i posts/%i observed proves inclusive %s boundary",
+      async (total, observed, confidence) => {
+        const fixture = await owner();
+        contentPostCount = total;
+        availableMediaCount = observed;
+        try {
+          const input = {
+            actor: fixture.actor,
+            integrationId: fixture.integration.id,
+            providerAccountId: fixture.providerAccountId,
+            authorizationGeneration: 1,
+            capturedAt,
+            requestIdentity: `p2-boundary:${randomUUID()}`,
+          };
+          await pipeline.execute(input);
+          const source = await sourceAdapter.read(fixture.actor);
+          expect(source!.semanticCoverage).toBe(observed / total);
+          await suggestions.execute(fixture.actor);
+          const view = await new CreatorBrandSuggestionsConsumer(
+            db as never,
+            sourceAdapter,
+          ).read(fixture.actor);
+          expect(
+            view.families.positioning.candidates.find(
+              (candidate) => candidate.field === "headline",
+            )!.confidence,
+          ).toBe(confidence);
+        } finally {
+          contentPostCount = 8;
+          availableMediaCount = Number.POSITIVE_INFINITY;
+        }
+      },
+      60_000,
+    );
+
     it("runs provider DI through Capture/Evidence and eight-path shared current, then exact-replays with stable rows", async () => {
       const fixture = await owner();
       const input = {
@@ -379,6 +1144,7 @@ describe.skipIf(!enabled)(
         requestIdentity: `creator-content:${randomUUID()}`,
       };
       const before = providerCalls;
+      const externalBefore = { ...external.count };
       const first = await pipeline.execute(input);
       const firstCalls = providerCalls;
       const externalAfterFirst = { ...external.count };
@@ -437,7 +1203,14 @@ describe.skipIf(!enabled)(
           (media) => media.providerMediaId === "media-7",
         ),
       ).toBe(true);
-      expect(externalAfterFirst).toMatchObject({
+      expect(
+        Object.fromEntries(
+          Object.entries(externalAfterFirst).map(([key, value]) => [
+            key,
+            value - externalBefore[key as keyof typeof externalBefore],
+          ]),
+        ),
+      ).toMatchObject({
         videoLocator: 1,
         probe: 1,
         extract: 1,
@@ -648,7 +1421,13 @@ describe.skipIf(!enabled)(
         authorizationGeneration: 1,
         trigger: "INITIAL_CONNECT",
       });
-      const lease = await coordinator.claimNextCreator("content-test-worker");
+      // Existing coordinator eligibility is still checked against database time.
+      // Observe the due gate briefly to tolerate local host/container clock skew; never alter it.
+      let lease = await coordinator.claimNextCreator("content-test-worker");
+      for (let retry = 0; !lease && retry < 10; retry++) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        lease = await coordinator.claimNextCreator("content-test-worker");
+      }
       expect(lease?.capabilityClass).toBe("PROFILE_MEDIA_PERFORMANCE");
       expect(lease?.actor.allowedActions).toContain("INSIGHTS_CONTENT_READ");
       await coordinator.complete(lease!, []);

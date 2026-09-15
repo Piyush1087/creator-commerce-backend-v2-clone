@@ -454,7 +454,7 @@ describe("Creator Brand P0 executable contracts (no runtime implementation)", ()
       CREATOR_BRAND_MUTATION_BOUNDARY.rewriteHistoricalApplicationsCollaborations,
     ).toBe(false);
   });
-  it("registers exactly five verified paths with deterministic hash and execution DISABLED", () => {
+  it("retains frozen P0 bundle hash and five paths when P2 activates registration", () => {
     const contract = creatorBrandVerifiedContract();
     const { artifacts, bundleContentHash, ...identity } =
       contract.bundle.manifest;
@@ -464,7 +464,13 @@ describe("Creator Brand P0 executable contracts (no runtime implementation)", ()
     );
     expect(contract).toEqual(creatorBrandVerifiedContract());
     expect(contract.registration.ownedPathPatterns).toHaveLength(5);
-    expect(contract.registration.executionEnabled).toBe(false);
+    expect(contract.registration.executionEnabled).toBe(true);
+    expect(
+      contract.bundle.artifacts.processorDefinition.execution_enabled,
+    ).toBe(false);
+    expect(contract.bundle.manifest.bundleContentHash).toBe(
+      "5f8c179abd6d9a6e146d9322d93a961f80467183889c6d49f801dfb15410472c",
+    );
     const registry = new ContractRuntimeRegistry(
       new ContractBundleIntegrityVerifier(),
       new SemanticValidator(),

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CreatorBrandSuggestionProjectionSchema } from "../creator-brand-suggestions.consumer";
 import {
   CreatorBrandProfileInputSchema,
   CreatorBrandMutationRequestSchema,
@@ -28,7 +29,7 @@ export const CreatorBrandConsumerSchema = z
         sourceIndependent: z.literal(true),
       })
       .strict(),
-    suggestions: z.object({ state: z.literal("NOT_IMPLEMENTED") }).strict(),
+    suggestions: CreatorBrandSuggestionProjectionSchema,
   })
   .strict()
   .superRefine((value, context) => {
