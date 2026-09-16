@@ -24,6 +24,10 @@ export const CREATOR_WORKSPACE_ACTIONS = [
   "RATE_CARD_EDIT",
   "PORTFOLIO_READ",
   "PORTFOLIO_CURATE",
+  "MEDIA_KIT_READ",
+  "MEDIA_KIT_MANAGE",
+  "MEDIA_KIT_PUBLISH",
+  "MEDIA_KIT_PDF_DOWNLOAD",
 ] as const;
 
 export type CreatorWorkspaceAction = (typeof CREATOR_WORKSPACE_ACTIONS)[number];

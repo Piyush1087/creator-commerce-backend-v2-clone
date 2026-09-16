@@ -1504,6 +1504,7 @@ model Organization {
 }
 
 model User {
+  creatorMediaKitRevisions           CreatorMediaKitRevision[]
   creatorPortfolioRevisions          CreatorPortfolioRevision[]
   creatorBrandRevisions              CreatorBrandRevision[]
   creatorWorkPreferencesRevisions    CreatorWorkPreferencesRevision[]
@@ -3621,6 +3622,7 @@ model UceCampaignReportingAssetGallery {
 // ============================================================================
 
 model CreatorProfile {
+  creatorMediaKit                CreatorMediaKit?
   creatorPortfolios              CreatorPortfolio[]
   creatorBrandProfiles           CreatorBrandProfile[]
   creatorWorkPreferencesProfiles CreatorWorkPreferences[]
@@ -3877,6 +3879,7 @@ model UserBrandNotificationPreference {
 }
 
 model CreatorWorkspace {
+  creatorMediaKit         CreatorMediaKit?
   creatorPortfolio        CreatorPortfolio?
   creatorWorkPreferences  CreatorWorkPreferences?
   creatorRateCard         CreatorRateCard?
@@ -3906,6 +3909,7 @@ model CreatorWorkspace {
 }
 
 model CreatorWorkspaceMember {
+  creatorMediaKitRevisions        CreatorMediaKitRevision[]
   creatorPortfolioRevisions       CreatorPortfolioRevision[]
   creatorBrandRevisions           CreatorBrandRevision[]
   creatorWorkPreferencesRevisions CreatorWorkPreferencesRevision[]
@@ -7076,4 +7080,82 @@ model CreatorPortfolioRevision {
   @@unique([portfolioId, revision])
   @@unique([portfolioId, idempotencyKey])
   @@map("creator_portfolio_revisions")
+}
+
+enum CreatorMediaKitLifecycle {
+  DRAFT
+  LIVE
+}
+
+enum CreatorMediaKitEventType {
+  KIT_VIEW
+  PUBLIC_THUMBNAIL_SOURCE_OPENED
+  WORK_WITH_CREATOR_CLICK
+  REVEAL_EMAIL_ID_CLICK
+  MEDIA_KIT_PDF_DOWNLOAD
+}
+
+/// Media Kit owns composition configuration only; all displayed facts remain upstream-owned.
+model CreatorMediaKit {
+  id                       String                    @id @default(uuid())
+  workspaceId              String                    @unique @map("workspace_id")
+  ownerProfileId           String                    @unique @map("owner_profile_id")
+  workspace                CreatorWorkspace          @relation(fields: [workspaceId, ownerProfileId], references: [id, ownerProfileId], onDelete: Restrict)
+  ownerProfile             CreatorProfile            @relation(fields: [ownerProfileId], references: [id], onDelete: Restrict)
+  publicId                 String                    @unique @map("public_id") @db.VarChar(64)
+  lifecycle                CreatorMediaKitLifecycle  @default(DRAFT)
+  currentRevision          Int                       @default(0) @map("current_revision")
+  showAudience             Boolean                   @default(true) @map("show_audience")
+  showContent              Boolean                   @default(true) @map("show_content")
+  showPortfolio            Boolean                   @default(true) @map("show_portfolio")
+  showRateCard             Boolean                   @default(true) @map("show_rate_card")
+  publicVisuals            Json                      @default("[]") @map("public_visuals")
+  featuredPortfolioItemIds String[]                  @default([]) @map("featured_portfolio_item_ids")
+  publishedAt              DateTime?                 @map("published_at")
+  publishedByUserId        String?                   @map("published_by_user_id")
+  unpublishedAt            DateTime?                 @map("unpublished_at")
+  unpublishedByUserId      String?                   @map("unpublished_by_user_id")
+  createdAt                DateTime                  @default(now()) @map("created_at")
+  updatedAt                DateTime                  @updatedAt @map("updated_at")
+  revisions                CreatorMediaKitRevision[]
+  events                   CreatorMediaKitEvent[]
+
+  @@unique([workspaceId, ownerProfileId])
+  @@index([lifecycle, publicId])
+  @@map("creator_media_kits")
+}
+
+model CreatorMediaKitRevision {
+  id                String                 @id @default(uuid())
+  mediaKitId        String                 @map("media_kit_id")
+  mediaKit          CreatorMediaKit        @relation(fields: [mediaKitId], references: [id], onDelete: Cascade)
+  revision          Int
+  previousRevision  Int                    @map("previous_revision")
+  snapshot          Json
+  actorUserId       String                 @map("actor_user_id")
+  actorUser         User                   @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  actorMembershipId String                 @map("actor_membership_id")
+  actorMembership   CreatorWorkspaceMember @relation(fields: [actorMembershipId], references: [id], onDelete: Restrict)
+  actorRole         CreatorTeamRole        @map("actor_role")
+  intent            String                 @db.VarChar(32)
+  idempotencyKey    String                 @map("idempotency_key") @db.VarChar(200)
+  commandHash       String                 @map("command_hash") @db.Char(64)
+  createdAt         DateTime               @default(now()) @map("created_at")
+
+  @@unique([mediaKitId, revision])
+  @@unique([mediaKitId, idempotencyKey])
+  @@map("creator_media_kit_revisions")
+}
+
+model CreatorMediaKitEvent {
+  id                String                   @id @default(uuid())
+  mediaKitId        String                   @map("media_kit_id")
+  mediaKit          CreatorMediaKit          @relation(fields: [mediaKitId], references: [id], onDelete: Cascade)
+  eventType         CreatorMediaKitEventType @map("event_type")
+  kitRevision       Int                      @map("kit_revision")
+  recognizedBrandId String?                  @map("recognized_brand_id")
+  createdAt         DateTime                 @default(now()) @map("created_at")
+
+  @@index([mediaKitId, eventType, createdAt])
+  @@map("creator_media_kit_events")
 }

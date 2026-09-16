@@ -35,6 +35,7 @@ describe("C05 Creator Team policy", () => {
       "INSIGHTS_CONTENT_READ",
       "CREATOR_BRAND_READ",
       "COMMERCIAL_SETUP_READ",
+      "MEDIA_KIT_READ",
     ]);
     expect(() => assertCreatorTeamManager(CreatorTeamRole.ASSISTANT)).toThrow(
       ForbiddenException,

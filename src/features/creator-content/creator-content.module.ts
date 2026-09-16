@@ -70,6 +70,10 @@ import { CreatorContentService } from "./creator-content.service";
       useExisting: CreatorContentMultimodalService,
     },
   ],
-  exports: [CreatorContentPipelineService, CreatorContentRepository],
+  exports: [
+    CreatorContentPipelineService,
+    CreatorContentRepository,
+    CreatorContentService,
+  ],
 })
 export class CreatorContentModule {}

@@ -1,12 +1,15 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 
 import { PrismaService } from "../../prisma/prisma.service";
-import { serializeMediaKit } from "../../shared/creator/media-kit-serializer";
 import { isUuid } from "../../shared/creator/creator-slug.util";
+import { CreatorMediaKitService } from "../creator-media-kit/creator-media-kit.service";
 
 @Injectable()
 export class PublicCreatorService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mediaKit: CreatorMediaKitService,
+  ) {}
 
   async getPublicMediaKit(slug: string) {
     const profile = await this.resolveCreatorProfile(slug);
@@ -14,24 +17,10 @@ export class PublicCreatorService {
       throw new NotFoundException("Creator media kit not found");
     }
 
-    if (!profile.isMediaKitPublic) {
-      throw new NotFoundException("Creator media kit not found");
-    }
-
-    const userProfile = profile.user.userProfile;
-    if (!userProfile) {
-      throw new NotFoundException("Creator media kit not found");
-    }
-
-    return {
-      slug: profile.publicSlug,
-      creator_id: profile.id,
-      media_kit: serializeMediaKit(userProfile, {
-        instagramHandle: profile.instagramHandle,
-        avatarUrl: profile.avatarUrl,
-        displayName: profile.displayName,
-      }),
-    };
+    // Legacy true-by-default flags are never publication authority. This route
+    // remains only as a fail-closed compatibility alias for an explicitly LIVE
+    // V3 aggregate.
+    return this.mediaKit.readLegacyLiveForCreatorProfile(profile.id);
   }
 
   private async resolveCreatorProfile(slug: string) {
@@ -47,9 +36,7 @@ export class PublicCreatorService {
     return this.loadProfile({ publicSlug: normalized });
   }
 
-  private async loadProfile(
-    where: { id: string } | { publicSlug: string },
-  ) {
+  private async loadProfile(where: { id: string } | { publicSlug: string }) {
     return this.prisma.creatorProfile.findUnique({
       where,
       include: {

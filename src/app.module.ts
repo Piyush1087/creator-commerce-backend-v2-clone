@@ -41,6 +41,7 @@ import { IntelligenceConsumerModule } from "./features/intelligence-consumer/int
 import { NotificationsModule } from "./features/notifications/notifications.module";
 import { PublicBrandModule } from "./features/public-brand/public-brand.module";
 import { PublicCreatorModule } from "./features/public-creator/public-creator.module";
+import { CreatorMediaKitModule } from "./features/creator-media-kit/creator-media-kit.module";
 import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { S3Module } from "./shared/s3/s3.module";
@@ -98,6 +99,7 @@ import { S3Module } from "./shared/s3/s3.module";
     CreatorUceModule,
     PublicBrandModule,
     PublicCreatorModule,
+    CreatorMediaKitModule,
   ],
   controllers: [AppController],
 })

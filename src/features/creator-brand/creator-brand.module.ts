@@ -13,5 +13,6 @@ import { CreatorBrandSuggestionsConsumer } from "./creator-brand-suggestions.con
     CreatorBrandRepository,
     CreatorBrandSuggestionsConsumer,
   ],
+  exports: [CreatorBrandService],
 })
 export class CreatorBrandModule {}

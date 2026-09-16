@@ -30,6 +30,7 @@ import { AudienceV1ConsumerService } from "../creator-audience-v1/creator-audien
     CreatorAudienceCredentialFenceService,
     CreatorAudiencePipelineService,
     CreatorAudienceRepository,
+    AudienceV1ConsumerService,
   ],
 })
 export class CreatorAudienceModule {}
