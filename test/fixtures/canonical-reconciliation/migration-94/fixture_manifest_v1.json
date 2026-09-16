@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "fixtureVersion": "canonical-migration-94-fixture-v1",
+  "purpose": "Deterministic synthetic input for the canonical reconciliation migration 94 to 106 upgrade gate",
+  "authority": {
+    "repository": "Piyush1087/dummy_tcs",
+    "registerCommit": "346ae2a065825fab8112f684c112290ae9f408bc",
+    "registerBlob": "c9e0349d12df17bfc87e206f30f7fe7298261c5c"
+  },
+  "backendBase": {
+    "repository": "Piyush1087/creator-commerce-backend-v2-clone",
+    "commit": "129b291ecbca4a1e79451215a81726000cfb5bff",
+    "tree": "9fe6585addf8d8ccee9973b9b55cc0312c6e2b0b",
+    "migrationCount": 94
+  },
+  "laterUpgradeTarget": {
+    "commit": "da1d19d15198699465040c32ce075b6be1c85faf",
+    "tree": "560e2b90e95c3456ac7eef7ce9351861ab04a576",
+    "migrationCount": 106,
+    "executedByGateA0": false
+  },
+  "fixtureFile": {
+    "path": "test/fixtures/canonical-reconciliation/migration-94/canonical_migration_94_fixture_v1.sql",
+    "sha256": "c103589aa5e6c9220e25b428458069509ebfdaf59e7ff32c22e51739bd6b8e5f",
+    "bytes": 19562,
+    "lines": 242,
+    "insertedRows": 43,
+    "insertedTables": 24
+  },
+  "validation": {
+    "databaseEngine": "PostgreSQL 16",
+    "independentCleanBuilds": 2,
+    "completedMigrationCountPerBuild": 94,
+    "canonicalSnapshotSha256": "30888a28f4fe1caa8c7893c26825d6d488d127655ed0f02eeb80eb17c14aaf60",
+    "canonicalSnapshotRows": 43,
+    "deterministicMatch": true
+  },
+  "coverage": {
+    "capabilityFamilies": [
+      "owned_website.brand_messaging",
+      "derived_communication_constraint_evidence",
+      "owned_website.visual_evidence"
+    ],
+    "c2ReferenceSpellings": [
+      "supporting_evidence_refs",
+      "supportingEvidenceRefs"
+    ],
+    "creatorPrerequisites": [
+      "ACTIVE creator user",
+      "creator profile",
+      "creator workspace",
+      "active OWNER workspace member"
+    ],
+    "intelligenceGraph": [
+      "subject",
+      "system action",
+      "object generation",
+      "component generation",
+      "current component",
+      "evidence reference"
+    ],
+    "laterMigrations": [
+      "20260911020000_instagram_de_persistence_foundation",
+      "20260912090000_c3_r0_evidence_model_derivation_provenance",
+      "20260912170000_instagram_c1_sync_coordinator",
+      "20260914010000_instagram_w4_audio_observations",
+      "20260914185000_creator_audience_subject_enum",
+      "20260914190000_creator_audience_shared_owner_scope",
+      "20260914191000_creator_audience_owner_scope_lineage",
+      "20260915100000_creator_brand_canonical_profile_revision",
+      "20260915200000_creator_work_preferences_canonical_revision",
+      "20260915210000_creator_rate_card_canonical_revision",
+      "20260916170000_creator_portfolio_v3_canonical_item_revision",
+      "20260916180000_creator_media_kit_v3"
+    ]
+  },
+  "attestations": {
+    "fullySynthetic": true,
+    "containsProductionOrStagingData": false,
+    "containsRealProviderIdentifiersOrTokens": false,
+    "containsSecretsOrCredentials": false,
+    "containsCustomerOrPersonalData": false,
+    "sharedDatabaseUsed": false,
+    "migrations95Through106Executed": false
+  }
+}
