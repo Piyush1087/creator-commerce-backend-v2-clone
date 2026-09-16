@@ -31,8 +31,10 @@ export class IntelligenceCurrentContractScopeService {
     }
     const registrations = this.runtime
       .registrations()
-      .filter((registration) =>
-        registration.ownedObjectSemanticIds.includes(objectSemanticId),
+      .filter(
+        (registration) =>
+          registration.executionEnabled &&
+          registration.ownedObjectSemanticIds.includes(objectSemanticId),
       );
     const readOnly = READ_ONLY_OBJECT_CONTRACTS.find(
       (entry) => entry.objectSemanticId === objectSemanticId,

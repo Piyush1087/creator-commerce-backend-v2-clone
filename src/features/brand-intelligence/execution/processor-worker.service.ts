@@ -47,6 +47,32 @@ export class ProcessorWorkerService {
         "No queued ProcessorExecution is currently eligible",
       );
     }
+    return this.runClaim(claim, leaseDurationMs);
+  }
+
+  async runExact(
+    processorExecutionId: string,
+    workerIdentity: string,
+    leaseDurationMs: number,
+  ): Promise<ProcessorWorkerRunResult> {
+    const claim = await this.repository.claimExact(
+      processorExecutionId,
+      workerIdentity,
+      leaseDurationMs,
+    );
+    if (!claim) {
+      throw new IntelligenceExecutionError(
+        "NO_ELIGIBLE_WORK",
+        "The requested ProcessorExecution is not eligible for direct execution",
+      );
+    }
+    return this.runClaim(claim, leaseDurationMs);
+  }
+
+  private async runClaim(
+    claim: ClaimedProcessorWork,
+    leaseDurationMs: number,
+  ): Promise<ProcessorWorkerRunResult> {
     let executor;
     try {
       executor = this.executors.get(claim.processorExecution.processorId);

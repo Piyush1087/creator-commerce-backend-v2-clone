@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { MODULE_METADATA } from "@nestjs/common/constants";
 import { describe, expect, it } from "vitest";
 
+import { BrandCentreModule } from "../brand-centre/brand-centre.module";
 import { BrandSettingsConsumerModule } from "../brand-settings/brand-settings-consumer.module";
 import { BrandSettingsModule } from "../brand-settings/brand-settings.module";
 import { BrandProviderReadinessService } from "../brand-settings/services/brand-provider-readiness.service";
@@ -63,7 +64,7 @@ describe("permanent Chat P3 architecture", () => {
     ).toEqual([]);
   });
 
-  it("uses only narrow P5-A read modules without forward references", () => {
+  it("uses narrow P5-A read modules with only the runtime-required Settings forward references", () => {
     const chatModule = readFileSync(join(root, "chat.module.ts"), "utf8");
     expect(chatModule).toContain("CollaborationConsumerModule");
     expect(chatModule).toContain("BrandSettingsConsumerModule");
@@ -97,7 +98,6 @@ describe("permanent Chat P3 architecture", () => {
 
     for (const narrowModule of [
       CollaborationConsumerModule,
-      BrandSettingsConsumerModule,
       BrandWorkspaceReadinessModule,
     ]) {
       expect(
@@ -109,6 +109,38 @@ describe("permanent Chat P3 architecture", () => {
         ),
       ).toBe(false);
     }
+
+    const brandSettingsConsumerImports = moduleMetadata(
+      MODULE_METADATA.IMPORTS,
+      BrandSettingsConsumerModule,
+    );
+    expect(brandSettingsConsumerImports).not.toContain(BrandCentreModule);
+    expect(
+      brandSettingsConsumerImports.filter(
+        (entry) =>
+          typeof entry === "object" &&
+          entry !== null &&
+          "forwardRef" in entry &&
+          typeof entry.forwardRef === "function" &&
+          entry.forwardRef() === BrandCentreModule,
+      ),
+    ).toHaveLength(1);
+
+    const brandSettingsImports = moduleMetadata(
+      MODULE_METADATA.IMPORTS,
+      BrandSettingsModule,
+    );
+    expect(brandSettingsImports).not.toContain(BrandSettingsConsumerModule);
+    expect(
+      brandSettingsImports.filter(
+        (entry) =>
+          typeof entry === "object" &&
+          entry !== null &&
+          "forwardRef" in entry &&
+          typeof entry.forwardRef === "function" &&
+          entry.forwardRef() === BrandSettingsConsumerModule,
+      ),
+    ).toHaveLength(1);
   });
 
   it("keeps shared thread lookup user + Brand + thread scoped", () => {

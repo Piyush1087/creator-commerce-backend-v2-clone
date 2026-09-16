@@ -48,6 +48,7 @@ import { NotificationDispatchService } from "../../notifications/services/notifi
 import { BrandInstagramDeletionService } from "./brand-instagram-deletion.service";
 import { BrandSettingsAccessService } from "./brand-settings-access.service";
 import { BrandInstagramOAuthStateService } from "./brand-instagram-oauth-state.service";
+import { InstagramSyncCoordinatorRepository } from "../../instagram-intelligence/sync/instagram-sync-coordinator.repository";
 
 export const INSTAGRAM_REFRESH_WINDOW_MS =
   INSTAGRAM_LONG_LIVED_TOKEN_REFRESH_WINDOW_MS;
@@ -90,6 +91,8 @@ export class BrandSettingsIntegrationsService {
     private readonly states: BrandInstagramOAuthStateService,
     @Optional() private readonly deletion?: BrandInstagramDeletionService,
     @Optional() private readonly notifications?: NotificationDispatchService,
+    @Optional()
+    private readonly instagramSync?: InstagramSyncCoordinatorRepository,
   ) {}
 
   async getIntegrations(user: AuthUser) {
@@ -305,6 +308,20 @@ export class BrandSettingsIntegrationsService {
       providerAccountId: me.userId,
       providerAppScopedUserId: me.appScopedUserId,
     });
+    if (this.instagramSync && row.providerAccountId) {
+      await this.instagramSync.scheduleConnection({
+        brandProfileId,
+        integrationId: row.id,
+        providerAccountId: row.providerAccountId,
+        authorizationGeneration: row.authorizationGeneration,
+        profileCapability: row.firstPartyProfileCapability,
+        insightsCapability: row.firstPartyInsightsCapability,
+        trigger:
+          attempt.intent === InstagramOAuthIntent.INITIAL_CONNECT
+            ? "INITIAL_CONNECT"
+            : "RECONNECT",
+      });
+    }
     return {
       conflict: false as const,
       connected: true,

@@ -21,6 +21,7 @@ import type {
   ContractArtifactRole,
   ContractBundleManifest,
   ContractBundleManifestIdentity,
+  ContractSourceSpec,
 } from "./contract-bundle.types";
 import { CONTRACT_SOURCE_SPECS } from "./contract-source.spec";
 
@@ -34,6 +35,14 @@ const GENERATED_ROOT = join(
 );
 
 const temporaryRoots: string[] = [];
+
+function sourceSpec(processorId: string): ContractSourceSpec {
+  const spec = CONTRACT_SOURCE_SPECS.find(
+    (candidate) => candidate.processorId === processorId,
+  );
+  if (!spec) throw new Error(`Missing contract source spec '${processorId}'`);
+  return spec;
+}
 
 function command(root: string, ...args: string[]): string {
   return execFileSync("git", ["-C", root, ...args], {
@@ -103,6 +112,12 @@ function outputRoot(): string {
   return join(parent, "contract-bundles");
 }
 
+function manifest(root: string, processorId: string): ContractBundleManifest {
+  return JSON.parse(
+    readFileSync(join(root, processorId, "1.0", "manifest.json"), "utf8"),
+  ) as ContractBundleManifest;
+}
+
 afterEach(() => {
   for (const root of temporaryRoots.splice(0)) {
     rmSync(root, { recursive: true, force: true });
@@ -118,7 +133,8 @@ describe("deterministic contract bundle generator", () => {
       outputRoot: first,
       commitSha: source.sha,
     });
-    const artifact = CONTRACT_SOURCE_SPECS[1].artifactPaths.EVIDENCE_CONTRACT;
+    const artifact =
+      sourceSpec("brand_meaning").artifactPaths.EVIDENCE_CONTRACT;
     writeFileSync(
       join(source.root, artifact),
       readFileSync(join(source.root, artifact), "utf8") + "\n",
@@ -197,7 +213,8 @@ describe("deterministic contract bundle generator", () => {
       commitSha: source.sha,
       architectureRepository: "fixture/architecture",
     });
-    const artifact = CONTRACT_SOURCE_SPECS[0].artifactPaths.REASONING_CONTRACT;
+    const artifact = sourceSpec("brand_communication").artifactPaths
+      .REASONING_CONTRACT;
     writeFileSync(
       join(source.root, artifact),
       `${readFileSync(join(source.root, artifact), "utf8")} `,
@@ -231,10 +248,180 @@ describe("deterministic contract bundle generator", () => {
     expect(before.bundleContentHash).not.toBe(after.bundleContentHash);
   });
 
+  it("reads an independently pinned Instagram authority commit byte-for-byte", () => {
+    const source = createArchitectureFixture();
+    const instagram = sourceSpec("instagram_content_behavior");
+    const first = outputRoot();
+    generateContractBundles({
+      sourceRoot: source.root,
+      outputRoot: first,
+      commitSha: source.sha,
+      specs: [instagram],
+    });
+    const reasoningPath = instagram.artifactPaths.REASONING_CONTRACT;
+    writeFileSync(
+      join(source.root, reasoningPath),
+      `${readFileSync(join(source.root, reasoningPath), "utf8")} `,
+    );
+    command(source.root, "add", reasoningPath);
+    command(source.root, "commit", "-m", "independent-instagram-authority");
+    const independentSha = command(source.root, "rev-parse", "HEAD");
+    command(source.root, "checkout", "--detach", source.sha);
+    expect(() =>
+      command(
+        source.root,
+        "merge-base",
+        "--is-ancestor",
+        independentSha,
+        source.sha,
+      ),
+    ).toThrow();
+
+    const second = outputRoot();
+    generateContractBundles({
+      sourceRoot: source.root,
+      outputRoot: second,
+      commitSha: source.sha,
+      specs: [instagram],
+      processorCommitShas: { instagram_content_behavior: independentSha },
+    });
+    const before = manifest(first, instagram.processorId);
+    const after = manifest(second, instagram.processorId);
+    expect(after.architectureCommitSha).toBe(independentSha);
+    expect(
+      before.artifacts.find((entry) => entry.role === "REASONING_CONTRACT")
+        ?.sha256,
+    ).not.toBe(
+      after.artifacts.find((entry) => entry.role === "REASONING_CONTRACT")
+        ?.sha256,
+    );
+    expect(before.bundleContentHash).not.toBe(after.bundleContentHash);
+    expect(
+      readFileSync(
+        join(
+          second,
+          instagram.processorId,
+          instagram.processorVersion,
+          "artifacts/reasoning_contract.yaml",
+        ),
+      ),
+    ).toEqual(
+      execFileSync("git", [
+        "-C",
+        source.root,
+        "show",
+        `${independentSha}:${reasoningPath}`,
+      ]),
+    );
+  });
+
+  it("cannot replace committed authority bytes with a backend-only string", () => {
+    const source = createArchitectureFixture();
+    const instagram = sourceSpec("instagram_content_behavior");
+    const injected = {
+      ...instagram,
+      backendOnlyArtifactText: Object.fromEntries(
+        Object.keys(instagram.artifactPaths).map((role) => [
+          role,
+          "status: FROZEN\nmalicious: backend-only\n",
+        ]),
+      ),
+    } as ContractSourceSpec;
+    const output = outputRoot();
+    generateContractBundles({
+      sourceRoot: source.root,
+      outputRoot: output,
+      commitSha: source.sha,
+      specs: [injected],
+    });
+    for (const entry of manifest(output, instagram.processorId).artifacts) {
+      expect(
+        readFileSync(
+          join(
+            output,
+            instagram.processorId,
+            instagram.processorVersion,
+            entry.path,
+          ),
+        ),
+      ).toEqual(
+        readFileSync(
+          join(
+            source.root,
+            instagram.artifactPaths[entry.role as ContractArtifactRole],
+          ),
+        ),
+      );
+    }
+  });
+
+  it("fails closed for missing, wrong-path, and invalid independent authority", () => {
+    const source = createArchitectureFixture();
+    const instagram = sourceSpec("instagram_content_behavior");
+    const withArtifactPath = (path: string): ContractSourceSpec => ({
+      ...instagram,
+      artifactPaths: { ...instagram.artifactPaths, EVIDENCE_CONTRACT: path },
+    });
+    expect(() =>
+      generateContractBundles({
+        sourceRoot: source.root,
+        outputRoot: outputRoot(),
+        commitSha: source.sha,
+        specs: [withArtifactPath("missing/evidence.yaml")],
+      }),
+    ).toThrow("Required source artifact is missing");
+    expect(() =>
+      generateContractBundles({
+        sourceRoot: source.root,
+        outputRoot: outputRoot(),
+        commitSha: source.sha,
+        specs: [withArtifactPath(instagram.artifactPaths.PROCESSOR_DEFINITION)],
+      }),
+    ).toThrow("processor/owner mismatch");
+    expect(() =>
+      generateContractBundles({
+        sourceRoot: source.root,
+        outputRoot: outputRoot(),
+        commitSha: source.sha,
+        specs: [instagram],
+        processorCommitShas: {
+          instagram_content_behavior:
+            "0000000000000000000000000000000000000000",
+        },
+      }),
+    ).toThrow("Independent authority commit does not exist");
+  });
+
+  it("detects verify-only generated-file drift", () => {
+    const source = createArchitectureFixture();
+    const output = outputRoot();
+    const options = {
+      sourceRoot: source.root,
+      outputRoot: output,
+      commitSha: source.sha,
+      architectureRepository: "fixture/architecture",
+    };
+    generateContractBundles(options);
+    const generatedArtifact = join(
+      output,
+      "instagram_content_behavior",
+      "1.0",
+      "artifacts",
+      "object_contract.yaml",
+    );
+    writeFileSync(
+      generatedArtifact,
+      `${readFileSync(generatedArtifact, "utf8")} `,
+    );
+    expect(() =>
+      generateContractBundles({ ...options, verifyOnly: true }),
+    ).toThrow("Generated bundle content drift");
+  });
+
   it("fails dirty, non-frozen, and cross-linked Object ownership sources", () => {
     const dirty = createArchitectureFixture();
-    const processorPath =
-      CONTRACT_SOURCE_SPECS[0].artifactPaths.PROCESSOR_DEFINITION;
+    const processorPath = sourceSpec("brand_communication").artifactPaths
+      .PROCESSOR_DEFINITION;
     writeFileSync(
       join(dirty.root, processorPath),
       `${readFileSync(join(dirty.root, processorPath), "utf8")} `,
@@ -249,7 +436,8 @@ describe("deterministic contract bundle generator", () => {
     ).toThrow("dirty");
 
     const invalid = createArchitectureFixture();
-    const outputPath = CONTRACT_SOURCE_SPECS[0].artifactPaths.OUTPUT_CONTRACT;
+    const outputPath = sourceSpec("brand_communication").artifactPaths
+      .OUTPUT_CONTRACT;
     const changed = readFileSync(
       join(invalid.root, outputPath),
       "utf8",
@@ -268,7 +456,7 @@ describe("deterministic contract bundle generator", () => {
 
     const proposed = createArchitectureFixture();
     const evidencePath =
-      CONTRACT_SOURCE_SPECS[1].artifactPaths.EVIDENCE_CONTRACT;
+      sourceSpec("brand_meaning").artifactPaths.EVIDENCE_CONTRACT;
     writeFileSync(
       join(proposed.root, evidencePath),
       readFileSync(join(proposed.root, evidencePath), "utf8").replace(

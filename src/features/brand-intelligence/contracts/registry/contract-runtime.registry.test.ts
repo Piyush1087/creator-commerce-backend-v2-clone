@@ -28,6 +28,11 @@ const COMMUNICATION_MANIFEST = join(
   "1.0",
   "manifest.json",
 );
+const INSTAGRAM_MANIFEST = join(
+  "instagram_content_behavior",
+  "1.0",
+  "manifest.json",
+);
 const temporaryRoots: string[] = [];
 
 function registry(): ContractRuntimeRegistry {
@@ -84,12 +89,16 @@ describe("contract runtime registry and startup integrity", () => {
     const runtime = registry();
     runtime.verifyAtRoot(GENERATED_ROOT);
     expect(runtime.isReady()).toBe(true);
-    expect(runtime.registrations()).toHaveLength(10);
+    expect(runtime.registrations()).toHaveLength(14);
     expect(
       runtime
         .registrations()
         .map((entry) => [entry.processorId, entry.executionEnabled]),
     ).toEqual([
+      ["instagram_content_behavior", false],
+      ["instagram_content_behavior", true],
+      ["instagram_audience_profile", true],
+      ["instagram_organic_performance_profile", true],
       ["brand_communication", true],
       ["brand_meaning", true],
       ["brand_character", true],
@@ -109,6 +118,19 @@ describe("contract runtime registry and startup integrity", () => {
         outputContractVersion: "1.0",
       }).manifest.bundleId,
     ).toBe("brand_intelligence.brand_communication");
+    expect(
+      runtime.getVerifiedBundle({
+        processorId: "instagram_content_behavior",
+        processorVersion: "1.0",
+        outputContractId: "instagram_content_behavior_output_contract",
+        outputContractVersion: "1.0",
+      }).manifest.ownedPathPatterns,
+    ).toEqual([
+      {
+        objectSemanticId: "instagram_content_behavior",
+        componentPathPattern: "$",
+      },
+    ]);
   });
 
   it.each([
@@ -210,6 +232,84 @@ describe("contract runtime registry and startup integrity", () => {
     writeFileSync(join(unexpected, "manual.yaml"), "status: FROZEN\n");
     expect(() => registry().verifyAtRoot(unexpected)).toThrow(
       "file set contains drift",
+    );
+  });
+
+  it("verifies the complete Instagram artifact inventory and rejects its drift", () => {
+    const runtime = registry();
+    runtime.verifyAtRoot(GENERATED_ROOT);
+    const bundle = runtime.getVerifiedBundle({
+      processorId: "instagram_content_behavior",
+      processorVersion: "1.0",
+      outputContractId: "instagram_content_behavior_output_contract",
+      outputContractVersion: "1.0",
+    });
+    expect(bundle.manifest.artifacts).toHaveLength(6);
+    expect(
+      new Set(bundle.manifest.artifacts.map((entry) => entry.role)).size,
+    ).toBe(6);
+    expect(bundle.manifest.bundleContentHash).toMatch(/^[0-9a-f]{64}$/u);
+
+    const tampered = copiedRoot();
+    const output = join(
+      tampered,
+      "instagram_content_behavior",
+      "1.0",
+      "artifacts",
+      "output_contract.yaml",
+    );
+    writeFileSync(output, `${readFileSync(output, "utf8")} `);
+    expect(() => registry().verifyAtRoot(tampered)).toThrow("integrity failed");
+
+    const missing = copiedRoot();
+    unlinkSync(
+      join(
+        missing,
+        "instagram_content_behavior",
+        "1.0",
+        "artifacts",
+        "evidence_contract.yaml",
+      ),
+    );
+    expect(() => registry().verifyAtRoot(missing)).toThrow(
+      "Missing required artifact",
+    );
+
+    const hashDrift = copiedRoot();
+    mutateJson(join(hashDrift, INSTAGRAM_MANIFEST), (value) => {
+      value.bundleContentHash = "0".repeat(64);
+    });
+    expect(() => registry().verifyAtRoot(hashDrift)).toThrow(
+      "Bundle content hash",
+    );
+  });
+
+  it("rejects unknown Instagram validator and conflicting path ownership", () => {
+    const validator = copiedRoot();
+    mutateJson(join(validator, "registry.json"), (value) => {
+      const registrations = value.registrations as Record<string, unknown>[];
+      registrations.find(
+        (entry) => entry.processorId === "instagram_content_behavior",
+      )!.semanticValidatorId = "instagram_unregistered";
+    });
+    expect(() => registry().verifyAtRoot(validator)).toThrow(
+      "not compiled into the backend",
+    );
+
+    const ownership = copiedRoot();
+    mutateJson(join(ownership, "registry.json"), (value) => {
+      const registrations = value.registrations as Record<string, unknown>[];
+      registrations.find(
+        (entry) => entry.processorId === "brand_communication",
+      )!.ownedPathPatterns = [
+        {
+          objectSemanticId: "instagram_content_behavior",
+          componentPathPattern: "$",
+        },
+      ];
+    });
+    expect(() => registry().verifyAtRoot(ownership)).toThrow(
+      "exactly one registered owner",
     );
   });
 

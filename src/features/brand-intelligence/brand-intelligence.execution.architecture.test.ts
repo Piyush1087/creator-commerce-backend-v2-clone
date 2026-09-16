@@ -37,7 +37,7 @@ describe("W1.0D architecture boundary", () => {
     }
   });
 
-  it("uses only the synthetic executor, seven Brand executors, and one Product executor", () => {
+  it("uses only registered synthetic, Brand, Product, and Instagram executors", () => {
     const registry = readFileSync(
       join(executionRoot, "executor", "processor-executor.registry.ts"),
       "utf8",
@@ -49,11 +49,14 @@ describe("W1.0D architecture boundary", () => {
     expect(registry).toContain("AudiencePersonaProcessorExecutor");
     expect(registry).toContain("ServiceabilityProcessorExecutor");
     expect(registry).toContain("OfferingFactualProcessorExecutor");
+    expect(registry).toContain("InstagramC4ContentBehaviorProcessor");
+    expect(registry).toContain("InstagramC4AudienceProfileProcessor");
+    expect(registry).toContain("InstagramC4OrganicPerformanceProcessor");
     expect(registry).not.toContain("brand_communication");
     expect(registry).not.toContain("brand_meaning");
   });
 
-  it("retains seven Brand processors and activates exactly one Product processor", () => {
+  it("retains Brand/Product processors and admits the verified Instagram processor", () => {
     const registry = JSON.parse(
       readFileSync(
         join(__dirname, "generated", "contract-bundles", "registry.json"),
@@ -75,6 +78,30 @@ describe("W1.0D architecture boundary", () => {
         executionEnabled: registration.executionEnabled,
       })),
     ).toEqual([
+      {
+        processorId: "instagram_content_behavior",
+        bundled: true,
+        registered: true,
+        executionEnabled: false,
+      },
+      {
+        processorId: "instagram_content_behavior",
+        bundled: true,
+        registered: true,
+        executionEnabled: true,
+      },
+      {
+        processorId: "instagram_audience_profile",
+        bundled: true,
+        registered: true,
+        executionEnabled: true,
+      },
+      {
+        processorId: "instagram_organic_performance_profile",
+        bundled: true,
+        registered: true,
+        executionEnabled: true,
+      },
       {
         processorId: "brand_communication",
         bundled: true,

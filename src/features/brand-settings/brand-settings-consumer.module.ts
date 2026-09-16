@@ -1,13 +1,41 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 
 import { PrismaModule } from "../../prisma/prisma.module";
 import { BrandCentreModule } from "../brand-centre/brand-centre.module";
+import { InstagramProviderClientModule } from "../instagram/instagram-provider-client.module";
+import {
+  InstagramIntelligenceAuthorizedReadService,
+  InstagramIntelligenceConnectionReadService,
+} from "./services/instagram-intelligence-provider-read.service";
 import { BrandProviderReadinessService } from "./services/brand-provider-readiness.service";
 import { BrandSettingsAccessService } from "./services/brand-settings-access.service";
+import { InstagramIntelligenceAuthorizedImageAcquisitionService } from "./services/instagram-intelligence-image-acquisition.service";
+import { InstagramSyncCoordinatorRepository } from "../instagram-intelligence/sync/instagram-sync-coordinator.repository";
+import { InstagramIntelligenceAuthorizedVideoAcquisitionService } from "./services/instagram-intelligence-video-acquisition.service";
 
 @Module({
-  imports: [PrismaModule, BrandCentreModule],
-  providers: [BrandSettingsAccessService, BrandProviderReadinessService],
-  exports: [BrandProviderReadinessService],
+  imports: [
+    PrismaModule,
+    forwardRef(() => BrandCentreModule),
+    InstagramProviderClientModule,
+  ],
+  providers: [
+    BrandSettingsAccessService,
+    BrandProviderReadinessService,
+    InstagramIntelligenceConnectionReadService,
+    InstagramIntelligenceAuthorizedReadService,
+    InstagramIntelligenceAuthorizedImageAcquisitionService,
+    InstagramIntelligenceAuthorizedVideoAcquisitionService,
+    InstagramSyncCoordinatorRepository,
+  ],
+  exports: [
+    BrandProviderReadinessService,
+    InstagramIntelligenceConnectionReadService,
+    InstagramIntelligenceAuthorizedReadService,
+    InstagramIntelligenceAuthorizedImageAcquisitionService,
+    InstagramIntelligenceAuthorizedVideoAcquisitionService,
+    InstagramSyncCoordinatorRepository,
+    BrandSettingsAccessService,
+  ],
 })
 export class BrandSettingsConsumerModule {}

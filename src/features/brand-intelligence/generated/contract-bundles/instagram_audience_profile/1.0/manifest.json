@@ -1,0 +1,121 @@
+{
+  "manifestSchemaVersion": 1,
+  "bundleId": "instagram_intelligence.instagram_audience_profile",
+  "bundleVersion": "1.0",
+  "ownerEngine": "instagram_intelligence",
+  "owningBranch": "audience_profile",
+  "architectureRepository": "Piyush1087/dummy_tcs",
+  "architectureCommitSha": "a7c691047ab6802098d3c4a84e73cc3fe95d753a",
+  "processorId": "instagram_audience_profile",
+  "processorVersion": "1.0",
+  "outputContractId": "instagram_audience_profile_output_contract",
+  "outputContractVersion": "1.0",
+  "evidenceContractId": "instagram_audience_profile_evidence",
+  "evidenceContractVersion": "1.0",
+  "ownedObjectSemanticIds": [
+    "instagram_audience_profile"
+  ],
+  "ownedPathPatterns": [
+    {
+      "objectSemanticId": "instagram_audience_profile",
+      "componentPathPattern": "$"
+    },
+    {
+      "objectSemanticId": "instagram_audience_profile",
+      "componentPathPattern": "$/f/components/f/window"
+    },
+    {
+      "objectSemanticId": "instagram_audience_profile",
+      "componentPathPattern": "$/f/components/f/follower_audience"
+    },
+    {
+      "objectSemanticId": "instagram_audience_profile",
+      "componentPathPattern": "$/f/components/f/engaged_audience"
+    },
+    {
+      "objectSemanticId": "instagram_audience_profile",
+      "componentPathPattern": "$/f/components/f/distribution_concentration"
+    },
+    {
+      "objectSemanticId": "instagram_audience_profile",
+      "componentPathPattern": "$/f/components/f/material_differences"
+    },
+    {
+      "objectSemanticId": "instagram_audience_profile",
+      "componentPathPattern": "$/f/components/f/limitations"
+    },
+    {
+      "objectSemanticId": "instagram_audience_profile",
+      "componentPathPattern": "$/f/components/f/coverage"
+    },
+    {
+      "objectSemanticId": "instagram_audience_profile",
+      "componentPathPattern": "$/f/components/f/summary"
+    }
+  ],
+  "generatedNotice": "GENERATED — DO NOT EDIT",
+  "generatorVersion": "1.0.0",
+  "artifacts": [
+    {
+      "role": "EVIDENCE_CONTRACT",
+      "path": "artifacts/evidence_contract.yaml",
+      "semanticId": "instagram_audience_profile_evidence",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 1334,
+      "sha256": "910609e0c07a9dddb38831bd99203ca1b3e5105b8d869affb183b9755f33b1b0"
+    },
+    {
+      "role": "OBJECT_CONTRACT",
+      "path": "artifacts/object_contract.yaml",
+      "semanticId": "instagram_audience_profile_object",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 487,
+      "sha256": "fcaf2f6c6df88d2cc7657e144ccff165a9446253acb5aa6346ea3bd375c585d5"
+    },
+    {
+      "role": "OUTPUT_CONTRACT",
+      "path": "artifacts/output_contract.yaml",
+      "semanticId": "instagram_audience_profile_output_contract",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 2198,
+      "sha256": "d917bdab22dc13b17e8da4536eed5a38519f860480240979fed91bb61143390e"
+    },
+    {
+      "role": "PROCESSOR_DEFINITION",
+      "path": "artifacts/processor_definition.yaml",
+      "semanticId": "instagram_audience_profile",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 293,
+      "sha256": "0ee5158f1e9ca868e528982c57e62194eda05110e4cd4d678d0861de97de9233"
+    },
+    {
+      "role": "REASONING_CONTRACT",
+      "path": "artifacts/reasoning_contract.yaml",
+      "semanticId": "instagram_audience_profile_reasoning",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 964,
+      "sha256": "18353376f345d97548c9d727e2b6cc45d79b0b19677023db5d49e05848bbcd6f"
+    },
+    {
+      "role": "SHARED_METADATA_CONTRACT",
+      "path": "artifacts/shared_metadata_contract.yaml",
+      "semanticId": "shared_intelligence_metadata",
+      "semanticVersion": "1.0",
+      "status": "FROZEN",
+      "required": true,
+      "byteLength": 168,
+      "sha256": "6f4d7621392dc9c9c685e8abdc40ce33876e29f00089ce5cca1986feba7c4c47"
+    }
+  ],
+  "bundleContentHash": "5a84da93416b9f0075ebf676922fbab2128693abea5b35c990a7449fe70ceb47"
+}

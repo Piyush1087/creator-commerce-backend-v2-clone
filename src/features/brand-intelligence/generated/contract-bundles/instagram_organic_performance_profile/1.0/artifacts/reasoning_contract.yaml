@@ -1,0 +1,23 @@
+id: instagram_organic_performance_profile_reasoning
+version: "1.0"
+status: FROZEN
+processor: instagram_organic_performance_profile
+owner_engine: instagram_intelligence
+owning_branch: performance
+source_scope: INSTAGRAM_OWNED
+authority: CREATOR_SHOP_DERIVED
+processor_definition: intelligence/engines/instagram_intelligence/branches/performance/processors/instagram_organic_performance_profile.yaml
+object_authority: intelligence/engines/instagram_intelligence/branches/performance/objects.yaml
+shared_metadata_authority: intelligence/engines/instagram_intelligence/branches/performance/shared_metadata_contract.yaml
+rules:
+  consumes_accepted_c2_result_identities_and_hashes: true
+  independently_recalculates_c2_arithmetic: false
+  c3_use: DETERMINISTIC_GROUPING_OR_EXPLANATION_ONLY
+  unavailable_metric_is_zero: false
+  observed_zero_is_unavailable: false
+  instagram_organic_is_campaign_performance: false
+  causal_claims_allowed: false
+  performance_band_minimum_comparable_posts: 4
+  trend_minimum_valid_snapshots: 3
+  trend_minimum_elapsed_days: 14
+  below_threshold_state: INTENTIONALLY_ABSENT_OR_INCONCLUSIVE

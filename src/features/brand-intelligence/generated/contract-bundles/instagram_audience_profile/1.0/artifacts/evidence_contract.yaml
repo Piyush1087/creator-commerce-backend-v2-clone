@@ -1,0 +1,18 @@
+id: instagram_audience_profile_evidence
+version: "1.0"
+status: FROZEN
+processor: instagram_audience_profile
+owner_engine: instagram_intelligence
+owning_branch: audience_profile
+source_scope: INSTAGRAM_OWNED
+authority: CREATOR_SHOP_DERIVED
+processor_definition: intelligence/engines/instagram_intelligence/branches/audience_profile/processors/instagram_audience_profile.yaml
+reasoning_authority: intelligence/engines/instagram_intelligence/branches/audience_profile/artifacts/instagram_audience_profile/reasoning.yaml
+output_contract_authority: intelligence/engines/instagram_intelligence/branches/audience_profile/artifacts/instagram_audience_profile/output_contract.yaml
+shared_metadata_authority: intelligence/engines/instagram_intelligence/branches/audience_profile/shared_metadata_contract.yaml
+capabilities:
+  instagram.account_profile: {source_scope: INSTAGRAM_OWNED, completed_capture_required: true}
+  instagram.audience_followers: {source_scope: INSTAGRAM_OWNED, completed_capture_required: true}
+  instagram.audience_engaged: {source_scope: INSTAGRAM_OWNED, completed_capture_required: true}
+lineage_required: [brand_subject, integration, provider_account, authorization_generation, audience_snapshot_boundary, capture_or_execution, evidence_identity]
+provenance_classes: [PROVIDER_MEDIATED_FETCH, DETERMINISTIC_DERIVATION]

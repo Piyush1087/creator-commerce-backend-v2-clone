@@ -1,0 +1,39 @@
+id: instagram_content_behavior_output_contract
+version: "1.1"
+status: FROZEN
+processor: instagram_content_behavior
+owner_engine: instagram_intelligence
+owning_branch: content_behavior_complete
+source_scope: INSTAGRAM_OWNED
+authority: CREATOR_SHOP_DERIVED
+public_object_contract_version: "1.0"
+public_payload_output_contract_version: "1.0"
+objects: [instagram_content_behavior]
+processor_definition: intelligence/engines/instagram_intelligence/branches/content_behavior_complete/processors/instagram_content_behavior.yaml
+reasoning_authority: intelligence/engines/instagram_intelligence/branches/content_behavior_complete/artifacts/instagram_content_behavior/reasoning.yaml
+object_authority: intelligence/engines/instagram_intelligence/branches/content_behavior_complete/objects.yaml
+shared_metadata_authority: intelligence/engines/instagram_intelligence/branches/content_behavior_complete/shared_metadata_contract.yaml
+response:
+  type: object
+  required: [semanticId, objectContractVersion, outputContractVersion, sourceScope, state, readiness, freshness, currentPreserved, generatedAt, window, results, signals, learnings, components, coverage, evidenceRefs]
+  additional_properties: false
+  properties:
+    semanticId: {type: enum, values: [instagram_content_behavior]}
+    objectContractVersion: {type: enum, values: ["1.0"]}
+    outputContractVersion: {type: enum, values: ["1.0"]}
+    sourceScope: {type: enum, values: [INSTAGRAM_OWNED]}
+    state: {type: enum, values: [PARTIAL_CURRENT, CURRENT]}
+    readiness: {type: enum, values: [PARTIAL, READY]}
+    freshness: {type: enum, values: [CURRENT]}
+    currentPreserved: {type: enum, values: [false]}
+    generatedAt: {type: string, min_length: 1}
+    window: {type: object}
+    results: {type: array, item_type: object}
+    signals: {type: array, item_type: object}
+    learnings: {type: array, item_type: object}
+    components: {type: object, required_keys: [window, corpus_summary, posting_cadence, format_mix, theme_patterns, caption_patterns, creative_structure_patterns, offering_presence_patterns, creator_presence_patterns, representative_media_refs, bounded_learnings, coverage]}
+    coverage: {type: object}
+    evidenceRefs: {type: array, unique_items: true, item_type: string}
+shared_generated_metadata:
+  fields:
+    authority: {type: enum, values: [CREATOR_SHOP_DERIVED]}

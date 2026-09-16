@@ -1,3 +1,5 @@
+import { INSTAGRAM_DE_CONTRACT } from "../../../instagram-intelligence/contracts/instagram-intelligence.registry";
+
 export const INTELLIGENCE_EVIDENCE_READER = Symbol(
   "INTELLIGENCE_EVIDENCE_READER",
 );
@@ -13,6 +15,7 @@ export const NORMALIZED_EVIDENCE_CAPABILITIES = [
   "owned_website.serviceability_evidence",
   "owned_website.location_evidence",
   "owned_website.offering_commercial_evidence",
+  ...INSTAGRAM_DE_CONTRACT.capabilities,
 ] as const;
 
 export type NormalizedEvidenceCapabilityId =
@@ -81,7 +84,8 @@ export interface EvidenceProvenanceSummary {
     | "PROVIDER_MEDIATED_FETCH"
     | "CONNECTED_API"
     | "USER_ACTION_CAPTURE"
-    | "DETERMINISTIC_DERIVATION";
+    | "DETERMINISTIC_DERIVATION"
+    | "MODEL_DERIVATION";
   readonly normalizationContractVersion: string;
   readonly parentEvidenceRefs: readonly string[];
   readonly parentCaptureRefs: readonly string[];

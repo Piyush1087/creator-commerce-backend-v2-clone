@@ -11,7 +11,7 @@ import { ComponentPathCodec } from "./semantic-path/component-path.codec";
 import { READ_ONLY_OBJECT_CONTRACTS } from "./projection/current-read-contracts.generated";
 
 describe("Audience processor boundaries", () => {
-  it("owns the frozen Audience paths while retaining seven Brand and three Product processors", () => {
+  it("owns the frozen Audience paths while retaining active Brand, Product, and Instagram processors", () => {
     const runtime = contracts(),
       bundle = runtime.getVerifiedBundle(registryKey);
     expect(bundle.manifest.architectureCommitSha).toBe(
@@ -43,6 +43,9 @@ describe("Audience processor boundaries", () => {
       "brand_communication",
       "brand_differentiation",
       "brand_meaning",
+      "instagram_audience_profile",
+      "instagram_content_behavior",
+      "instagram_organic_performance_profile",
       "offering_actionability_synthesis",
       "offering_creator_communication",
       "offering_factual_synthesis",

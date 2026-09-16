@@ -88,4 +88,12 @@ export interface ContractSourceSpec {
   readonly ownedObjectSemanticIds: readonly string[];
   readonly ownedPathPatterns: readonly OwnedPathPattern[];
   readonly artifactPaths: Readonly<Record<ContractArtifactRole, string>>;
+  /** Allows only this explicitly registered processor to use an exact commit
+   * outside the legacy architecture commit's ancestry. Artifacts are still
+   * read exclusively from that commit through Git. */
+  readonly independentAuthorityCommit?: true;
+  /** Exact immutable authority for this processor version. */
+  readonly architectureCommitSha?: string;
+  /** Historical bundles remain verifiable without being executable. */
+  readonly executionEnabled?: boolean;
 }

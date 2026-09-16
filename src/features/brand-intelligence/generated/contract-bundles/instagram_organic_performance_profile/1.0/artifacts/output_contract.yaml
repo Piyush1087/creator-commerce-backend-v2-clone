@@ -1,0 +1,39 @@
+id: instagram_organic_performance_profile_output_contract
+version: "1.0"
+status: FROZEN
+processor: instagram_organic_performance_profile
+owner_engine: instagram_intelligence
+owning_branch: performance
+source_scope: INSTAGRAM_OWNED
+authority: CREATOR_SHOP_DERIVED
+public_object_contract_version: "1.0"
+public_payload_output_contract_version: "1.0"
+objects: [instagram_organic_performance_profile]
+processor_definition: intelligence/engines/instagram_intelligence/branches/performance/processors/instagram_organic_performance_profile.yaml
+reasoning_authority: intelligence/engines/instagram_intelligence/branches/performance/artifacts/instagram_organic_performance_profile/reasoning.yaml
+object_authority: intelligence/engines/instagram_intelligence/branches/performance/objects.yaml
+shared_metadata_authority: intelligence/engines/instagram_intelligence/branches/performance/shared_metadata_contract.yaml
+response:
+  type: object
+  required: [semanticId, objectContractVersion, outputContractVersion, sourceScope, state, readiness, freshness, currentPreserved, generatedAt, window, results, signals, learnings, components, coverage, evidenceRefs]
+  additional_properties: false
+  properties:
+    semanticId: {type: enum, values: [instagram_organic_performance_profile]}
+    objectContractVersion: {type: enum, values: ["1.0"]}
+    outputContractVersion: {type: enum, values: ["1.0"]}
+    sourceScope: {type: enum, values: [INSTAGRAM_OWNED]}
+    state: {type: enum, values: [PARTIAL_CURRENT, CURRENT]}
+    readiness: {type: enum, values: [PARTIAL, READY]}
+    freshness: {type: enum, values: [CURRENT]}
+    currentPreserved: {type: enum, values: [false]}
+    generatedAt: {type: string, min_length: 1}
+    window: {type: object}
+    results: {type: array, item_type: object}
+    signals: {type: array, item_type: object}
+    learnings: {type: array, item_type: object}
+    components: {type: object, required_keys: [window, account_results, metric_coverage, format_baselines, response_distribution, high_response_cohorts, low_response_cohorts, content_performance_signals, snapshot_change, representative_media_refs, bounded_learnings, coverage]}
+    coverage: {type: object}
+    evidenceRefs: {type: array, unique_items: true, item_type: string}
+shared_generated_metadata:
+  fields:
+    authority: {type: enum, values: [CREATOR_SHOP_DERIVED]}

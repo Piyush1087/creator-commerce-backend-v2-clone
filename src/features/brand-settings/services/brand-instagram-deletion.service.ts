@@ -18,6 +18,7 @@ import { randomBytes } from "node:crypto";
 import { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
 import { BrandSettingsAccessService } from "./brand-settings-access.service";
+import { InstagramDerivedDataPurgeService } from "../../data-extraction/evidence/instagram/instagram-derived-data-purge.service";
 
 const DELETE_POLICY_VERSION = "BS06_P1_V1";
 
@@ -26,6 +27,7 @@ export class BrandInstagramDeletionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: BrandSettingsAccessService,
+    private readonly instagramDerivedData: InstagramDerivedDataPurgeService,
   ) {}
 
   async requestByUser(user: AuthUser, integrationId: string) {
@@ -329,6 +331,12 @@ export class BrandInstagramDeletionService {
   }
 
   private async completePurge(requestId: string): Promise<void> {
+    const pending =
+      await this.prisma.brandInstagramDeletionRequest.findUniqueOrThrow({
+        where: { id: requestId },
+        select: { brandProfileId: true },
+      });
+    await this.instagramDerivedData.purgeTemporaryScope(pending.brandProfileId);
     await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT deletion_request_id FROM brand_instagram_deletion_requests WHERE deletion_request_id = ${requestId}::uuid FOR UPDATE`;
       const request = await tx.brandInstagramDeletionRequest.findUniqueOrThrow({
@@ -345,6 +353,11 @@ export class BrandInstagramDeletionService {
           startedAt: request.startedAt ?? new Date(),
         },
       });
+      const derived =
+        await this.instagramDerivedData.purgePersistentInTransaction(
+          tx,
+          request.brandProfileId,
+        );
       const profileResult = await tx.brandProfile.updateMany({
         where: {
           id: request.brandProfileId,
@@ -363,7 +376,12 @@ export class BrandInstagramDeletionService {
           state: InstagramDeletionState.COMPLETED,
           completedAt: new Date(),
           resultSummary: {
-            deleted: ["CREDENTIAL_OR_AUTH"],
+            deleted: [
+              "CREDENTIAL_OR_AUTH",
+              ...(derived.resources || derived.captures || derived.evidenceItems
+                ? ["INSTAGRAM_DERIVED_DATA"]
+                : []),
+            ],
             sanitized: [
               "BrandIntegration.provider_display_identity",
               ...(profileResult.count ? ["BrandProfile.igHandle"] : []),

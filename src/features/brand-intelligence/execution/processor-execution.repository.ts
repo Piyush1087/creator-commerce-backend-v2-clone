@@ -104,6 +104,83 @@ export class ProcessorExecutionRepository {
     );
   }
 
+  /** Direct bounded execution path for an already-created exact processor identity. */
+  async claimExact(
+    processorExecutionId: string,
+    workerIdentity: string,
+    leaseDurationMs: number,
+  ): Promise<ClaimedProcessorWork | null> {
+    this.assertLeaseDuration(leaseDurationMs);
+    return executionErrorBoundary(
+      () =>
+        this.prisma.$transaction(async (tx) => {
+          const now = await this.databaseNow(tx);
+          const rows = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT "processor_execution_id" AS "id"
+        FROM "intelligence_processor_executions"
+        WHERE "processor_execution_id" = ${processorExecutionId}
+          AND "status" = 'QUEUED'::"IntelligenceProcessorExecutionStatus"
+          AND "eligible_at" IS NOT NULL
+          AND "eligible_at" <= ${now}
+          AND "lease_token" IS NULL
+          AND "attempt_count" < "max_attempts"
+        FOR UPDATE SKIP LOCKED
+      `);
+          if (!rows[0]) return null;
+          const current =
+            await tx.intelligenceProcessorExecution.findUniqueOrThrow({
+              where: { id: rows[0].id },
+            });
+          const attemptNumber = current.attemptCount + 1;
+          const leaseToken = randomUUID();
+          const leaseExpiresAt = new Date(now.getTime() + leaseDurationMs);
+          const processorExecution =
+            await tx.intelligenceProcessorExecution.update({
+              where: { id: current.id },
+              data: {
+                status: IntelligenceProcessorExecutionStatus.RUNNING,
+                attemptCount: attemptNumber,
+                leaseToken,
+                leaseOwnerRef: workerIdentity,
+                leaseExpiresAt,
+                lastHeartbeatAt: now,
+                startedAt: current.startedAt ?? now,
+                completedAt: null,
+              },
+            });
+          const attempt = await tx.intelligenceProcessorAttempt.create({
+            data: {
+              processorExecutionId: current.id,
+              brandId: current.brandId,
+              attemptNumber,
+              workerIdentityRef: workerIdentity,
+              leaseToken,
+              leaseAcquiredAt: now,
+              leaseExpiresAt,
+              lastHeartbeatAt: now,
+            },
+          });
+          await tx.intelligenceExecution.updateMany({
+            where: {
+              id: current.executionId,
+              status: {
+                in: [
+                  IntelligenceExecutionStatus.PENDING,
+                  IntelligenceExecutionStatus.RUNNING,
+                ],
+              },
+            },
+            data: {
+              status: IntelligenceExecutionStatus.RUNNING,
+              startedAt: now,
+            },
+          });
+          return { processorExecution, attempt };
+        }),
+      "Exact Processor claim failed a persistence invariant",
+    );
+  }
+
   async heartbeat(
     lease: LeaseIdentity,
     leaseDurationMs: number,

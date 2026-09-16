@@ -19,6 +19,8 @@ import { BrandInstagramDeletionScheduler } from "./schedulers/brand-instagram-de
 import { BrandInstagramDeletionService } from "./services/brand-instagram-deletion.service";
 import { MetaInstagramDeletionCallbackService } from "./services/meta-instagram-deletion-callback.service";
 import { ProviderOAuthModule } from "../provider-oauth/provider-oauth.module";
+import { DataExtractionModule } from "../data-extraction/data-extraction.module";
+import { BrandSettingsConsumerModule } from "./brand-settings-consumer.module";
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { ProviderOAuthModule } from "../provider-oauth/provider-oauth.module";
     AuthModule,
     MailModule,
     ProviderOAuthModule,
+    DataExtractionModule,
+    forwardRef(() => BrandSettingsConsumerModule),
     forwardRef(() => NotificationsModule),
   ],
   controllers: [

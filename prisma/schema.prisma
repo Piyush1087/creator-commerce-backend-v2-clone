@@ -885,6 +885,28 @@ enum InstagramSyncInvitationStatus {
   EXPIRED
 }
 
+enum InstagramSyncCapabilityClass {
+  INITIAL_30_DAY
+  PROFILE_MEDIA_PERFORMANCE
+  AUDIENCE
+}
+
+enum InstagramSyncCoordinatorStatus {
+  PENDING
+  DUE
+  RUNNING
+  BACKOFF
+  BLOCKED_AUTHORIZATION
+  COMPLETED
+}
+
+enum InstagramSyncTrigger {
+  INITIAL_CONNECT
+  SCHEDULED
+  MANUAL
+  RECONNECT
+}
+
 enum CreatorTeamRole {
   OWNER
   MANAGER
@@ -1367,11 +1389,14 @@ enum IntelligenceSubjectType {
 
 enum DataExtractionSourceClass {
   OWNED_WEBSITE
+  INSTAGRAM_OWNED
 }
 
 enum DataExtractionResourceType {
   OWNED_WEB_PAGE
   OWNED_WEB_FRAGMENT
+  INSTAGRAM_ACCOUNT
+  INSTAGRAM_MEDIA
 }
 
 enum DataExtractionPageRole {
@@ -1463,6 +1488,14 @@ enum DataExtractionFreshnessIntent {
   FORCE_RECAPTURE
 }
 
+enum DataExtractionCaptureMethodClass {
+  DIRECT_FETCH
+  RENDERED_FETCH
+  PROVIDER_MEDIATED_FETCH
+  DETERMINISTIC_DERIVATION
+  MODEL_DERIVATION
+}
+
 enum DataExtractionFreshnessTargetType {
   RESOURCE
   CAPTURE
@@ -1514,6 +1547,7 @@ model User {
   discoveryLeads                     DiscoveryLead[]
   creatorProfile                     CreatorProfile?
   creatorWorkspaceMemberships        CreatorWorkspaceMember[]          @relation("CreatorWorkspaceMemberUser")
+  uceCampaignCreators                UceCampaignCreator[]               @relation("UceCampaignCreatorUser")
   creatorOnboardingTrack             CreatorOnboardingTrack?
   userProfile                        UserProfile?
   historicChatThreads                HistoricChatThread[]
@@ -2023,6 +2057,7 @@ model BrandProfile {
   providerOAuthTransactions ProviderOAuthTransaction[]
   instagramSyncInvitations  InstagramSyncInvitation[]
   instagramDeletionRequests BrandInstagramDeletionRequest[]
+  instagramIntelligenceSyncJobs InstagramIntelligenceSyncJob[]
 
   @@map("brand_profiles")
 }
@@ -2095,6 +2130,7 @@ model BrandIntegration {
   authorizationLossOpenedAt      DateTime?                     @map("authorization_loss_opened_at")
   createdAt                      DateTime                      @default(now()) @map("created_at")
   updatedAt                      DateTime                      @updatedAt @map("updated_at")
+  instagramIntelligenceSyncJobs  InstagramIntelligenceSyncJob[]
 
   @@unique([brandProfileId, provider], map: "uq_brand_provider_pair")
   @@index([brandProfileId, provider, status], map: "idx_brand_integrations_lookup")
@@ -2132,6 +2168,44 @@ model BrandInstagramDeletionRequest {
   @@index([confirmationCode], map: "idx_instagram_delete_confirmation")
   @@index([state, requestedAt], map: "idx_instagram_delete_worker")
   @@map("brand_instagram_deletion_requests")
+}
+
+model InstagramIntelligenceSyncJob {
+  id                         String                         @id @default(uuid()) @map("sync_job_id")
+  brandProfileId             String                         @map("brand_id")
+  brandProfile               BrandProfile                   @relation(fields: [brandProfileId], references: [id], onDelete: Cascade)
+  integrationId              String                         @map("integration_id")
+  integration                BrandIntegration               @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  providerAccountId          String                         @map("provider_account_id") @db.VarChar(100)
+  authorizationGeneration    Int                            @map("authorization_generation")
+  capabilityClass            InstagramSyncCapabilityClass   @map("capability_class")
+  status                     InstagramSyncCoordinatorStatus @default(PENDING)
+  trigger                    InstagramSyncTrigger
+  executionWindowStart       DateTime?                      @map("execution_window_start")
+  executionWindowEnd         DateTime?                      @map("execution_window_end")
+  requestIdentity            String                         @map("request_identity") @db.VarChar(255)
+  cursor                     Json?
+  leaseToken                 String?                        @unique @map("lease_token") @db.Uuid
+  leaseOwnerRef              String?                        @map("lease_owner_ref") @db.VarChar(255)
+  leaseExpiresAt             DateTime?                      @map("lease_expires_at")
+  lastHeartbeatAt            DateTime?                      @map("last_heartbeat_at")
+  lastAttemptAt              DateTime?                      @map("last_attempt_at")
+  lastSuccessAt              DateTime?                      @map("last_success_at")
+  lastManualRequestedAt      DateTime?                      @map("last_manual_requested_at")
+  manualPending              Boolean                        @default(false) @map("manual_pending")
+  nextDueAt                  DateTime?                      @map("next_due_at")
+  backoffUntil               DateTime?                      @map("backoff_until")
+  attemptCount               Int                            @default(0) @map("attempt_count")
+  consecutiveFailureCount    Int                            @default(0) @map("consecutive_failure_count")
+  lastCompletedGenerationIds String[]                       @default([]) @map("last_completed_generation_ids")
+  reasonCodes                String[]                       @default([]) @map("reason_codes")
+  createdAt                  DateTime                       @default(now()) @map("created_at")
+  updatedAt                  DateTime                       @updatedAt @map("updated_at")
+
+  @@unique([brandProfileId, integrationId, providerAccountId, authorizationGeneration, capabilityClass], map: "uq_instagram_sync_generation_class")
+  @@index([status, nextDueAt, backoffUntil, leaseExpiresAt], map: "idx_instagram_sync_due")
+  @@index([brandProfileId, integrationId, authorizationGeneration], map: "idx_instagram_sync_fence")
+  @@map("instagram_intelligence_sync_jobs")
 }
 
 /// Temporary agent invites for onboarding Instagram sync (no permanent User).
@@ -2950,6 +3024,8 @@ model UceCampaignCreator {
   source                 UceCampaignCreatorSource          @default(MANUAL)
   ingestionMethod        UceCampaignCreatorIngestionMethod @default(MANUAL_SINGLE) @map("ingestion_method")
   reviewState            UceCampaignCreatorReviewState     @default(PENDING_REVIEW) @map("review_state")
+  creatorUserId          String?                            @map("creator_user_id")
+  creatorUser            User?                              @relation("UceCampaignCreatorUser", fields: [creatorUserId], references: [id], onDelete: Restrict)
   applications           UceApplication[]
   archivedAt             DateTime?                         @map("archived_at")
   createdAt              DateTime                          @default(now()) @map("created_at")
@@ -6411,6 +6487,7 @@ model DataExtractionResource {
   brandProfile             BrandProfile               @relation(fields: [brandId], references: [id], onDelete: Cascade)
   sourceClass              DataExtractionSourceClass  @default(OWNED_WEBSITE) @map("source_class")
   resourceType             DataExtractionResourceType @map("resource_type")
+  providerAccountId        String?                    @map("provider_account_id") @db.VarChar(100)
   pageRole                 DataExtractionPageRole?    @map("page_role")
   canonicalResourceKey     String                     @map("canonical_resource_key") @db.Text
   canonicalResourceKeyHash String                     @map("canonical_resource_key_hash") @db.VarChar(64)
@@ -6424,6 +6501,7 @@ model DataExtractionResource {
   @@unique([brandId, resourceRef], map: "uq_de_resource_brand_ref")
   @@unique([brandId, sourceClass, canonicalResourceKeyHash], map: "uq_de_resource_identity")
   @@index([brandId, resourceRef], map: "idx_de_resource_brand_ref")
+  @@index([brandId, providerAccountId], map: "idx_de_resource_brand_provider_account")
   @@map("data_extraction_resources")
 }
 
@@ -6436,6 +6514,9 @@ model DataExtractionCapture {
   resource                 DataExtractionResource             @relation(fields: [brandId, resourceRef], references: [brandId, resourceRef], onDelete: Cascade)
   capabilityExecutionRef   String?                            @map("capability_execution_ref")
   capabilityExecution      DataExtractionCapabilityExecution? @relation(fields: [brandId, capabilityExecutionRef], references: [brandId, capabilityExecutionRef], onDelete: Restrict)
+  providerIntegrationId    String?                            @map("provider_integration_id")
+  providerAccountId        String?                            @map("provider_account_id") @db.VarChar(100)
+  authorizationGeneration  Int?                               @map("authorization_generation")
   acquisitionRequestKey    String                             @map("acquisition_request_key") @db.VarChar(255)
   status                   DataExtractionCaptureStatus        @default(RUNNING)
   startedAt                DateTime                           @map("started_at")
@@ -6458,6 +6539,7 @@ model DataExtractionCapture {
   @@unique([brandId, acquisitionRequestKey], map: "uq_de_capture_request")
   @@index([resourceRef, capturedAt], map: "idx_de_capture_resource_time")
   @@index([brandId, captureRef], map: "idx_de_capture_brand_ref")
+  @@index([brandId, providerAccountId, authorizationGeneration], map: "idx_de_capture_instagram_fence")
   @@map("data_extraction_captures")
 }
 
@@ -6489,6 +6571,9 @@ model DataExtractionCapabilityExecution {
   capabilityExecutionRef       String                               @unique @map("capability_execution_ref")
   brandId                      String                               @map("brand_id")
   brandProfile                 BrandProfile                         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  providerIntegrationId        String?                              @map("provider_integration_id")
+  providerAccountId            String?                              @map("provider_account_id") @db.VarChar(100)
+  authorizationGeneration      Int?                                 @map("authorization_generation")
   capabilityId                 String                               @map("capability_id") @db.VarChar(100)
   normalizationContractVersion String                               @map("normalization_contract_version") @db.VarChar(100)
   resourceScopeHash            String                               @map("resource_scope_hash") @db.VarChar(128)
@@ -6514,6 +6599,7 @@ model DataExtractionCapabilityExecution {
   @@unique([brandId, capabilityExecutionRef, capabilityId], map: "uq_de_capexec_brand_ref_capability")
   @@unique([brandId, requestKey], map: "uq_de_capexec_request")
   @@index([brandId, capabilityId], map: "idx_de_capexec_brand_capability")
+  @@index([brandId, providerAccountId, authorizationGeneration], map: "idx_de_capexec_instagram_fence")
   @@map("data_extraction_capability_executions")
 }
 
@@ -6532,34 +6618,36 @@ model DataExtractionCapabilityResource {
 }
 
 model DataExtractionEvidenceItem {
-  id                           String                           @id @default(uuid())
-  evidenceRef                  String                           @unique @map("evidence_ref")
-  brandId                      String                           @map("brand_id")
-  brandProfile                 BrandProfile                     @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  capabilityId                 String                           @map("capability_id") @db.VarChar(100)
-  normalizationContractVersion String                           @map("normalization_contract_version") @db.VarChar(100)
-  resourceRef                  String                           @map("resource_ref")
-  resource                     DataExtractionResource           @relation(fields: [brandId, resourceRef], references: [brandId, resourceRef], onDelete: Restrict)
-  captureRef                   String                           @map("capture_ref")
-  capture                      DataExtractionCapture            @relation(fields: [brandId, captureRef, resourceRef], references: [brandId, captureRef, resourceRef], onDelete: Restrict)
-  contentArtifactRef           String?                          @map("content_artifact_ref")
-  contentArtifact              DataExtractionContentArtifact?   @relation(fields: [brandId, contentArtifactRef], references: [brandId, contentArtifactRef], onDelete: Restrict)
-  boundedPayload               Json?                            @map("bounded_payload")
-  contentHash                  String                           @map("content_hash") @db.VarChar(128)
+  id                           String                            @id @default(uuid())
+  evidenceRef                  String                            @unique @map("evidence_ref")
+  brandId                      String                            @map("brand_id")
+  brandProfile                 BrandProfile                      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  capabilityId                 String                            @map("capability_id") @db.VarChar(100)
+  normalizationContractVersion String                            @map("normalization_contract_version") @db.VarChar(100)
+  resourceRef                  String                            @map("resource_ref")
+  resource                     DataExtractionResource            @relation(fields: [brandId, resourceRef], references: [brandId, resourceRef], onDelete: Restrict)
+  captureRef                   String                            @map("capture_ref")
+  capture                      DataExtractionCapture             @relation(fields: [brandId, captureRef, resourceRef], references: [brandId, captureRef, resourceRef], onDelete: Restrict)
+  contentArtifactRef           String?                           @map("content_artifact_ref")
+  contentArtifact              DataExtractionContentArtifact?    @relation(fields: [brandId, contentArtifactRef], references: [brandId, contentArtifactRef], onDelete: Restrict)
+  boundedPayload               Json?                             @map("bounded_payload")
+  contentHash                  String                            @map("content_hash") @db.VarChar(128)
   polarity                     DataExtractionPolarity?
   representativeness           DataExtractionRepresentativeness
-  coverageSnapshot             DataExtractionCoverage           @map("coverage_snapshot")
-  freshnessAtEmission          DataExtractionFreshness          @map("freshness_at_emission")
-  freshnessBasis               String                           @map("freshness_basis") @db.Text
-  freshnessEvaluatedAt         DateTime                         @map("freshness_evaluated_at")
-  freshnessPriorCaptureRef     String?                          @map("freshness_prior_capture_ref")
-  freshnessSourceRevisionRef   String?                          @map("freshness_source_revision_ref") @db.VarChar(255)
-  qualitySnapshot              DataExtractionAcquisitionQuality @map("quality_snapshot")
-  qualityFailureCategories     String[]                         @default([]) @map("quality_failure_categories")
-  qualityDetailCodes           String[]                         @default([]) @map("quality_detail_codes")
-  itemFingerprint              String                           @map("item_fingerprint") @db.VarChar(128)
-  semanticObservationKey       String?                          @map("semantic_observation_key") @db.VarChar(255)
-  createdAt                    DateTime                         @default(now()) @map("created_at")
+  coverageSnapshot             DataExtractionCoverage            @map("coverage_snapshot")
+  freshnessAtEmission          DataExtractionFreshness           @map("freshness_at_emission")
+  freshnessBasis               String                            @map("freshness_basis") @db.Text
+  freshnessEvaluatedAt         DateTime                          @map("freshness_evaluated_at")
+  freshnessPriorCaptureRef     String?                           @map("freshness_prior_capture_ref")
+  freshnessSourceRevisionRef   String?                           @map("freshness_source_revision_ref") @db.VarChar(255)
+  qualitySnapshot              DataExtractionAcquisitionQuality  @map("quality_snapshot")
+  qualityFailureCategories     String[]                          @default([]) @map("quality_failure_categories")
+  qualityDetailCodes           String[]                          @default([]) @map("quality_detail_codes")
+  captureMethodClass           DataExtractionCaptureMethodClass? @map("capture_method_class")
+  parentEvidenceRefs           String[]                          @default([]) @map("parent_evidence_refs")
+  itemFingerprint              String                            @map("item_fingerprint") @db.VarChar(128)
+  semanticObservationKey       String?                           @map("semantic_observation_key") @db.VarChar(255)
+  createdAt                    DateTime                          @default(now()) @map("created_at")
 
   capabilityMemberships DataExtractionCapabilityEvidence[]
   observationSupports   DataExtractionObservationSupport[]
