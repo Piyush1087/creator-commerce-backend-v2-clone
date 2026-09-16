@@ -6,13 +6,7 @@ import {
   type CanonicalObjective,
   resolveCanonicalCampaignReadiness,
 } from "./canonical-campaign-readiness.resolver";
-
-const CANONICAL_OBJECTIVES = new Set<CanonicalObjective>([
-  "PULSE",
-  "PROOF",
-  "PRODUCTION",
-  "PUSH",
-]);
+import { canonicalCampaignObjectiveSchema } from "../schemas/canonical-campaign-objective.schema";
 
 function savedObjective(definition: unknown): CanonicalObjective | null {
   if (
@@ -31,11 +25,8 @@ function savedObjective(definition: unknown): CanonicalObjective | null {
     return null;
   }
 
-  const objective = (strategy as { core_objective?: unknown }).core_objective;
-  return typeof objective === "string" &&
-    CANONICAL_OBJECTIVES.has(objective as CanonicalObjective)
-    ? (objective as CanonicalObjective)
-    : null;
+  const objective = (strategy as { objective?: unknown }).objective;
+  return canonicalCampaignObjectiveSchema.safeParse(objective).data ?? null;
 }
 
 @Injectable()

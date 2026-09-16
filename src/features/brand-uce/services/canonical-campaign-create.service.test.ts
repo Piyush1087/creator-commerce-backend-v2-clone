@@ -7,6 +7,7 @@ import {
   canonicalDerivedProjection,
   resolveCanonicalCampaignReadiness,
 } from "./canonical-campaign-readiness.resolver";
+import { hashCanonicalCampaignDefinition } from "./canonical-campaign-definition";
 
 const payload = {
   strategy: {
@@ -14,7 +15,7 @@ const payload = {
     publishing_schedule: "EVERGREEN",
     publish_from: null,
     publish_until: null,
-    core_objective: "PULSE",
+    objective: "AWARENESS",
     platforms: ["INSTAGRAM"],
     campaign_visibility: "PUBLIC",
   },
@@ -137,15 +138,33 @@ describe("CanonicalCampaignCreateService publication readiness integration", () 
 
   it("persists the exact projection returned by the shared resolver", async () => {
     const { service, tx } = setup();
-    const readiness = resolveCanonicalCampaignReadiness("PULSE", "D2C", "IN");
+    const readiness = resolveCanonicalCampaignReadiness(
+      "AWARENESS",
+      "D2C",
+      "IN",
+    );
     if (readiness.status !== "READY") throw new Error("fixture must be ready");
 
     await service.publishDraft("brand-1", "campaign-1", payload);
 
     const update = tx.uceCampaign.update.mock.calls[0][0] as {
-      data: { canonicalDefinition: { derived: unknown } };
+      data: {
+        canonicalDefinition: {
+          version: string;
+          strategy: { objective: string };
+          derived: unknown;
+        };
+        canonicalDefinitionHash: string;
+        strategy: { upsert: { create: { coreObjective: string } } };
+      };
     };
     const canonicalDefinition = update.data.canonicalDefinition;
+    expect(canonicalDefinition.version).toBe("2.0");
+    expect(canonicalDefinition.strategy.objective).toBe("AWARENESS");
+    expect(update.data.strategy.upsert.create.coreObjective).toBe("AWARENESS");
+    expect(update.data.canonicalDefinitionHash).toBe(
+      hashCanonicalCampaignDefinition(canonicalDefinition),
+    );
     expect(canonicalDefinition.derived).toEqual(
       canonicalDerivedProjection(readiness),
     );

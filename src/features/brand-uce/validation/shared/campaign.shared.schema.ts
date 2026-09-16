@@ -24,10 +24,10 @@ export const campaignCreationSourceSchema = z.enum([
 ]);
 export const publishingScheduleSchema = z.enum(["EVERGREEN", "SCHEDULED"]);
 export const campaignObjectiveSchema = z.enum([
-  "PULSE",
-  "PROOF",
-  "PRODUCTION",
-  "PUSH",
+  "AWARENESS",
+  "TRUST",
+  "ASSETS",
+  "ACTION",
 ]);
 export const mediaPlatformSchema = z.enum(["INSTAGRAM", "TIKTOK", "YOUTUBE"]);
 // Persistence remains future-ready, while Brand-writable MVP Campaign publication is Instagram-only.

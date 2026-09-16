@@ -7,10 +7,10 @@ import {
 } from "./canonical-campaign-readiness.resolver";
 
 const OBJECTIVES: CanonicalObjective[] = [
-  "PULSE",
-  "PROOF",
-  "PRODUCTION",
-  "PUSH",
+  "AWARENESS",
+  "TRUST",
+  "ASSETS",
+  "ACTION",
 ];
 const INDUSTRIES = ["D2C", "SAAS_AI", "HEALTHCARE"] as const;
 
@@ -42,7 +42,7 @@ describe("canonical Campaign readiness resolver", () => {
     [null, "USD"],
   ] as const)("maps country %s to %s", (countryCode, currency) => {
     const result = resolveCanonicalCampaignReadiness(
-      "PULSE",
+      "AWARENESS",
       "D2C",
       countryCode,
     );
@@ -52,28 +52,28 @@ describe("canonical Campaign readiness resolver", () => {
 
   it("returns a stable non-retryable configuration failure", () => {
     expect(
-      resolveCanonicalCampaignReadiness("PULSE", "UNSUPPORTED", "IN"),
+      resolveCanonicalCampaignReadiness("AWARENESS", "UNSUPPORTED", "IN"),
     ).toEqual({
-      objective: "PULSE",
+      objective: "AWARENESS",
       status: "FAILED",
       reason: "SUPPORTING_KPI_CONFIGURATION_UNAVAILABLE",
       retryable: false,
-      revision: "objective:PULSE",
+      revision: "objective:AWARENESS",
     });
   });
 
   it("is deterministic and does not expose mutable configuration arrays", () => {
-    const first = resolveCanonicalCampaignReadiness("PROOF", "D2C", "IN");
-    const second = resolveCanonicalCampaignReadiness("PROOF", "D2C", "IN");
+    const first = resolveCanonicalCampaignReadiness("TRUST", "D2C", "IN");
+    const second = resolveCanonicalCampaignReadiness("TRUST", "D2C", "IN");
     expect(first).toEqual(second);
     if (first.status === "READY") first.supportingKpis.push("MUTATED");
-    const third = resolveCanonicalCampaignReadiness("PROOF", "D2C", "IN");
+    const third = resolveCanonicalCampaignReadiness("TRUST", "D2C", "IN");
     expect(third).toEqual(second);
   });
 
   it("produces the exact projection consumed by publication", () => {
     const readiness = resolveCanonicalCampaignReadiness(
-      "PUSH",
+      "ACTION",
       "SAAS_AI",
       "US",
     );

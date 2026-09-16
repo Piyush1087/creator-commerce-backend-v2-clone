@@ -5,13 +5,14 @@ import {
   canonicalAudienceGeographiesSchema,
   canonicalCreatorArchetypeIdSchema,
 } from "./canonical-campaign-taxonomy";
+import { canonicalCampaignObjectiveSchema } from "./canonical-campaign-objective.schema";
 
 export const canonicalCampaignDraftPathSchema = z.enum([
   "strategy.campaign_name",
   "strategy.publishing_schedule",
   "strategy.publish_from",
   "strategy.publish_until",
-  "strategy.core_objective",
+  "strategy.objective",
   "strategy.campaign_visibility",
   "targeting.creator_archetypes",
   "targeting.minimum_followers",
@@ -45,25 +46,34 @@ const valueSchemas: Record<CanonicalCampaignDraftPath, z.ZodTypeAny> = {
   "strategy.publishing_schedule": z.enum(["EVERGREEN", "SCHEDULED"]),
   "strategy.publish_from": z.string().datetime().nullable(),
   "strategy.publish_until": z.string().datetime().nullable(),
-  "strategy.core_objective": z.enum(["PULSE", "PROOF", "PRODUCTION", "PUSH"]),
+  "strategy.objective": canonicalCampaignObjectiveSchema,
   "strategy.campaign_visibility": z.enum([
     "PUBLIC",
     "ELIGIBLE_CREATORS_ONLY",
     "INVITE_ONLY",
   ]),
-  "targeting.creator_archetypes": z.array(canonicalCreatorArchetypeIdSchema).min(1).max(5),
+  "targeting.creator_archetypes": z
+    .array(canonicalCreatorArchetypeIdSchema)
+    .min(1)
+    .max(5),
   "targeting.minimum_followers": z.number().int().min(0),
   "targeting.maximum_followers": z.number().int().min(0).nullable(),
   "targeting.audience_age_min": z.number().int().min(13).max(65),
   "targeting.audience_age_max": z.number().int().min(13).max(65),
   "targeting.audience_gender": z.enum(["ALL", "FEMALE", "MALE"]),
-  "targeting.audience_affinity_ids": z.array(canonicalAudienceAffinityIdSchema).max(5),
+  "targeting.audience_affinity_ids": z
+    .array(canonicalAudienceAffinityIdSchema)
+    .max(5),
   "targeting.audience_geographies": canonicalAudienceGeographiesSchema,
   "commercials.receives_brand_support": z.boolean(),
   "commercials.brand_support_type": z
     .enum(["PRODUCT", "SERVICE", "EXPERIENCE", "ACCESS_SUBSCRIPTION", "OTHER"])
     .nullable(),
-  "commercials.brand_support_estimated_value": z.number().finite().min(0).nullable(),
+  "commercials.brand_support_estimated_value": z
+    .number()
+    .finite()
+    .min(0)
+    .nullable(),
   "commercials.compensation_model": z.enum(["FIXED", "NEGOTIABLE"]),
   "commercials.commercial_offer": z.number().finite().min(0),
   "commercials.total_campaign_budget": z.number().finite().min(0),
@@ -74,7 +84,13 @@ const valueSchemas: Record<CanonicalCampaignDraftPath, z.ZodTypeAny> = {
     z.literal(75),
     z.literal(100),
   ]),
-  "commercials.payout_terms": z.enum(["NET_7", "NET_15", "NET_30", "NET_45", "NET_60"]),
+  "commercials.payout_terms": z.enum([
+    "NET_7",
+    "NET_15",
+    "NET_30",
+    "NET_45",
+    "NET_60",
+  ]),
 };
 
 export function parseCanonicalDraftValue(

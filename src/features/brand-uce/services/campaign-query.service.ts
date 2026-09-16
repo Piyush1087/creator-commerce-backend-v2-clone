@@ -436,7 +436,11 @@ export class CampaignQueryService {
       },
       details: {
         state: "READY" as SurfaceState,
-        objective: campaign.strategy?.coreObjective ?? null,
+        objective: canonicalRead.campaign.objective,
+        objectiveConfigurationState:
+          canonicalRead.campaign.objective == null
+            ? "CAMPAIGN_OBJECTIVE_REAUTHOR_REQUIRED"
+            : "AVAILABLE",
         platforms: canonicalRead.campaign.platforms,
         visibilityScopes:
           canonicalRead.campaign.visibility.state === "AVAILABLE"
