@@ -76,6 +76,119 @@ export type CanonicalCampaignObjectiveHandoff = Readonly<{
   }>;
 }>;
 
+export type CampaignObjectiveHandoffV1 =
+  | Readonly<{
+      status: "AVAILABLE";
+      objective: CanonicalCampaignObjective;
+      objectiveContract: typeof CAMPAIGN_OBJECTIVE_CONTRACT;
+      campaignDefinition: Readonly<{
+        version: typeof CANONICAL_CAMPAIGN_DEFINITION_VERSION;
+        snapshotRef: string;
+        hash: `sha256:${string}`;
+      }>;
+    }>
+  | Readonly<{
+      status: "UNAVAILABLE";
+      reason:
+        | "CANONICAL_OBJECTIVE_REQUIRED"
+        | "LEGACY_OBJECTIVE_UNRESOLVED"
+        | "CAMPAIGN_DEFINITION_INTEGRITY_INVALID";
+    }>;
+
+const LEGACY_CAMPAIGN_OBJECTIVES = new Set([
+  "PULSE",
+  "PROOF",
+  "PRODUCTION",
+  "PUSH",
+  "BRAND_AWARENESS",
+  "TRAFFIC_CLICKS",
+  "SALES_CONVERSIONS",
+]);
+
+const DEFINITION_HASH_PATTERN = /^sha256:[0-9a-f]{64}$/u;
+
+export function projectCampaignObjectiveHandoffV1(input: {
+  campaignId: string;
+  coreObjective: unknown;
+  canonicalDefinition: unknown;
+  canonicalDefinitionHash: string | null;
+}): CampaignObjectiveHandoffV1 {
+  if (
+    typeof input.coreObjective === "string" &&
+    LEGACY_CAMPAIGN_OBJECTIVES.has(input.coreObjective)
+  ) {
+    return { status: "UNAVAILABLE", reason: "LEGACY_OBJECTIVE_UNRESOLVED" };
+  }
+
+  const objective = canonicalCampaignObjectiveSchema.safeParse(
+    input.coreObjective,
+  );
+  if (!objective.success) {
+    return { status: "UNAVAILABLE", reason: "CANONICAL_OBJECTIVE_REQUIRED" };
+  }
+
+  const definition = z
+    .object({
+      version: z.literal(CANONICAL_CAMPAIGN_DEFINITION_VERSION),
+      strategy: z
+        .object({ objective: canonicalCampaignObjectiveSchema })
+        .passthrough(),
+    })
+    .passthrough()
+    .safeParse(input.canonicalDefinition);
+  if (
+    !definition.success ||
+    definition.data.strategy.objective !== objective.data ||
+    !input.campaignId.trim() ||
+    !input.canonicalDefinitionHash ||
+    !DEFINITION_HASH_PATTERN.test(input.canonicalDefinitionHash)
+  ) {
+    return {
+      status: "UNAVAILABLE",
+      reason: "CAMPAIGN_DEFINITION_INTEGRITY_INVALID",
+    };
+  }
+
+  let recomputed: `sha256:${string}`;
+  try {
+    recomputed = hashCanonicalCampaignDefinition(input.canonicalDefinition);
+  } catch {
+    return {
+      status: "UNAVAILABLE",
+      reason: "CAMPAIGN_DEFINITION_INTEGRITY_INVALID",
+    };
+  }
+  if (input.canonicalDefinitionHash !== recomputed) {
+    return {
+      status: "UNAVAILABLE",
+      reason: "CAMPAIGN_DEFINITION_INTEGRITY_INVALID",
+    };
+  }
+
+  const snapshotRef = campaignDefinitionSnapshotRef(
+    input.campaignId,
+    definition.data.version,
+    recomputed,
+  );
+  if (!snapshotRef) {
+    return {
+      status: "UNAVAILABLE",
+      reason: "CAMPAIGN_DEFINITION_INTEGRITY_INVALID",
+    };
+  }
+
+  return {
+    status: "AVAILABLE",
+    objective: objective.data,
+    objectiveContract: CAMPAIGN_OBJECTIVE_CONTRACT,
+    campaignDefinition: {
+      version: definition.data.version,
+      snapshotRef,
+      hash: recomputed,
+    },
+  };
+}
+
 export function projectCanonicalCampaignObjective(input: {
   campaignId: string;
   coreObjective: unknown;
@@ -89,57 +202,22 @@ export function projectCanonicalCampaignObjective(input: {
         | "CAMPAIGN_OBJECTIVE_REAUTHOR_REQUIRED"
         | "CAMPAIGN_DEFINITION_INTEGRITY_INVALID";
     } {
-  const objective = canonicalCampaignObjectiveSchema.safeParse(
-    input.coreObjective,
-  );
-  if (!objective.success) {
+  const handoff = projectCampaignObjectiveHandoffV1(input);
+  if (handoff.status === "UNAVAILABLE") {
     return {
       state: "UNAVAILABLE",
-      reason: "CAMPAIGN_OBJECTIVE_REAUTHOR_REQUIRED",
-    };
-  }
-  const definition = z
-    .object({
-      version: z.literal(CANONICAL_CAMPAIGN_DEFINITION_VERSION),
-      strategy: z
-        .object({ objective: canonicalCampaignObjectiveSchema })
-        .passthrough(),
-    })
-    .passthrough()
-    .safeParse(input.canonicalDefinition);
-  if (
-    !definition.success ||
-    definition.data.strategy.objective !== objective.data
-  ) {
-    return {
-      state: "UNAVAILABLE",
-      reason: "CAMPAIGN_DEFINITION_INTEGRITY_INVALID",
-    };
-  }
-  const recomputed = hashCanonicalCampaignDefinition(input.canonicalDefinition);
-  if (
-    !input.canonicalDefinitionHash ||
-    input.canonicalDefinitionHash !== recomputed
-  ) {
-    return {
-      state: "UNAVAILABLE",
-      reason: "CAMPAIGN_DEFINITION_INTEGRITY_INVALID",
+      reason:
+        handoff.reason === "CAMPAIGN_DEFINITION_INTEGRITY_INVALID"
+          ? handoff.reason
+          : "CAMPAIGN_OBJECTIVE_REAUTHOR_REQUIRED",
     };
   }
   return {
     state: "AVAILABLE",
     value: {
-      objective: objective.data,
-      objectiveContract: CAMPAIGN_OBJECTIVE_CONTRACT,
-      campaignDefinition: {
-        version: CANONICAL_CAMPAIGN_DEFINITION_VERSION,
-        snapshotRef: campaignDefinitionSnapshotRef(
-          input.campaignId,
-          CANONICAL_CAMPAIGN_DEFINITION_VERSION,
-          recomputed,
-        ),
-        hash: recomputed,
-      },
+      objective: handoff.objective,
+      objectiveContract: handoff.objectiveContract,
+      campaignDefinition: handoff.campaignDefinition,
     },
   };
 }

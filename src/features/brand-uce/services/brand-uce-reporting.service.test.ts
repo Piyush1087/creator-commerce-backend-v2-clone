@@ -1,17 +1,22 @@
-import { NotFoundException } from "@nestjs/common";
+import { ConflictException, NotFoundException } from "@nestjs/common";
 import { UceCampaignObjective } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
-import { BrandUceReportingService } from "./brand-uce-reporting.service";
+import {
+  BrandUceReportingService,
+  CAMPAIGN_REPORTING_CANONICAL_OBJECTIVE_UNAVAILABLE,
+} from "./brand-uce-reporting.service";
 
 const decimal = (value: number) => ({ toString: () => String(value) });
 
-function harness() {
+function harness(
+  objective: UceCampaignObjective = UceCampaignObjective.BRAND_AWARENESS,
+) {
   const lastSync = new Date("2026-08-15T00:00:00.000Z");
   const prisma = {
     uceCampaignStrategy: {
       findUnique: vi.fn().mockResolvedValue({
-        coreObjective: UceCampaignObjective.BRAND_AWARENESS,
+        coreObjective: objective,
       }),
     },
     uceCampaignReportingSnapshot: {
@@ -58,6 +63,55 @@ function harness() {
 }
 
 describe("BrandUceReportingService legacy compatibility contract", () => {
+  it.each([
+    UceCampaignObjective.AWARENESS,
+    UceCampaignObjective.TRUST,
+    UceCampaignObjective.ASSETS,
+    UceCampaignObjective.ACTION,
+  ])(
+    "fails the legacy dashboard closed for canonical objective %s",
+    async (objective) => {
+      const { service, prisma } = harness(objective);
+
+      const error = await service
+        .getDashboard("brand-1", "campaign-1")
+        .catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).getResponse()).toEqual({
+        code: CAMPAIGN_REPORTING_CANONICAL_OBJECTIVE_UNAVAILABLE,
+      });
+      expect(
+        prisma.uceCampaignReportingSnapshot.findFirst,
+      ).not.toHaveBeenCalled();
+      expect(
+        prisma.uceCampaignReportingTimeseriesHourly.findMany,
+      ).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    UceCampaignObjective.AWARENESS,
+    UceCampaignObjective.TRUST,
+    UceCampaignObjective.ASSETS,
+    UceCampaignObjective.ACTION,
+  ])(
+    "fails legacy refresh closed for canonical objective %s without a write",
+    async (objective) => {
+      const { service, prisma } = harness(objective);
+
+      const error = await service
+        .forceRefreshSync("brand-1", "campaign-1")
+        .catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).getResponse()).toEqual({
+        code: CAMPAIGN_REPORTING_CANONICAL_OBJECTIVE_UNAVAILABLE,
+      });
+      expect(prisma.uceCampaignReportingSnapshot.create).not.toHaveBeenCalled();
+    },
+  );
+
   it("preserves the existing dashboard payload for the legacy Reporting tab", async () => {
     const { service } = harness();
 

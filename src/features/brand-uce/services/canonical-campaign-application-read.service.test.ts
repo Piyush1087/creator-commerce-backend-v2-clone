@@ -6,6 +6,10 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { projectCanonicalCampaignForApplication } from "./canonical-campaign-application-read.service";
+import {
+  campaignDefinitionSnapshotRef,
+  hashCanonicalCampaignDefinition,
+} from "./canonical-campaign-definition";
 
 function campaignFixture() {
   return {
@@ -15,6 +19,7 @@ function campaignFixture() {
     status: UceCampaignStatus.PUBLISHED,
     creationSource: "MANUAL",
     canonicalDefinition: null,
+    canonicalDefinitionHash: null,
     liveAt: null,
     applicationDeadline: null,
     strategy: { platforms: ["INSTAGRAM"] },
@@ -77,6 +82,69 @@ function campaignFixture() {
 }
 
 describe("C03 canonical Campaign-for-Application adapter", () => {
+  it.each(["AWARENESS", "TRUST", "ASSETS", "ACTION"] as const)(
+    "preserves the complete Campaign objective handoff for %s",
+    (objective) => {
+      const fixture = campaignFixture();
+      const canonicalDefinition = {
+        version: "2.0",
+        creationSource: "MANUAL",
+        strategy: {
+          objective,
+          platforms: ["INSTAGRAM"],
+          campaign_visibility: "PUBLIC",
+        },
+        targeting: {},
+        commercials: {
+          compensation_model: "FIXED",
+          receives_brand_support: false,
+          brand_support_type: null,
+          brand_support_estimated_value: null,
+          commercial_offer: 100,
+          total_campaign_budget: 1000,
+        },
+        derived: { currency: "INR" },
+      };
+      const hash = hashCanonicalCampaignDefinition(canonicalDefinition);
+      fixture.canonicalDefinition = canonicalDefinition as never;
+      fixture.canonicalDefinitionHash = hash;
+      fixture.strategy = {
+        ...fixture.strategy,
+        coreObjective: objective,
+      } as never;
+
+      const result = projectCanonicalCampaignForApplication(fixture as never);
+
+      expect(result.campaign.objectiveHandoff).toEqual({
+        status: "AVAILABLE",
+        objective,
+        objectiveContract: "CAMPAIGN_OBJECTIVE_V1",
+        campaignDefinition: {
+          version: "2.0",
+          snapshotRef: campaignDefinitionSnapshotRef("campaign-1", "2.0", hash),
+          hash,
+        },
+      });
+      expect(result.campaign.objective).toBe(objective);
+    },
+  );
+
+  it("preserves the unavailable handoff and keeps compatibility objective null", () => {
+    const fixture = campaignFixture();
+    fixture.strategy = {
+      ...fixture.strategy,
+      coreObjective: "BRAND_AWARENESS",
+    } as never;
+
+    const result = projectCanonicalCampaignForApplication(fixture as never);
+
+    expect(result.campaign.objectiveHandoff).toEqual({
+      status: "UNAVAILABLE",
+      reason: "LEGACY_OBJECTIVE_UNRESOLVED",
+    });
+    expect(result.campaign.objective).toBeNull();
+  });
+
   it("preserves Brand Assets and repeated Deliverable formats", () => {
     const result = projectCanonicalCampaignForApplication(
       campaignFixture() as never,

@@ -9,7 +9,7 @@ import {
 } from "../schemas/canonical-campaign-brief.schema";
 import {
   CANONICAL_CAMPAIGN_DEFINITION_VERSION,
-  projectCanonicalCampaignObjective,
+  projectCampaignObjectiveHandoffV1,
 } from "./canonical-campaign-definition";
 import { canonicalCampaignObjectiveSchema } from "../schemas/canonical-campaign-objective.schema";
 
@@ -235,7 +235,7 @@ export function projectCanonicalCampaignForApplication(
       : validDefinition.strategy.platforms
     : [];
   const commercial = resolveCommercial(campaign, validDefinition);
-  const canonicalObjective = projectCanonicalCampaignObjective({
+  const objectiveHandoff = projectCampaignObjectiveHandoffV1({
     campaignId: campaign.id,
     coreObjective: campaign.strategy?.coreObjective,
     canonicalDefinition: campaign.canonicalDefinition,
@@ -249,9 +249,10 @@ export function projectCanonicalCampaignForApplication(
       brandProfileId: campaign.brandProfileId,
       name: campaign.name,
       brand: campaign.brandProfile ?? null,
+      objectiveHandoff,
       objective:
-        canonicalObjective.state === "AVAILABLE"
-          ? canonicalObjective.value.objective
+        objectiveHandoff.status === "AVAILABLE"
+          ? objectiveHandoff.objective
           : null,
       publishingStart: campaign.strategy?.fixedStartDate ?? null,
       publishingEnd: campaign.strategy?.fixedEndDate ?? null,
