@@ -15,7 +15,8 @@ INSERT INTO "users" (
   "email_verified_at", "auth_state", "created_at", "updated_at"
 ) VALUES
   ('94000000-0000-4000-8000-000000000011', 'brand-owner@fixture.invalid', 'brand-owner@fixture.invalid', 'BRAND', '94000000-0000-4000-8000-000000000001', 'Synthetic Brand Owner', '2026-01-01T00:00:00Z', 'ACTIVE', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
-  ('94000000-0000-4000-8000-000000000012', 'creator-owner@fixture.invalid', 'creator-owner@fixture.invalid', 'CREATOR', '94000000-0000-4000-8000-000000000002', 'Synthetic Creator Owner', '2026-01-01T00:00:00Z', 'ACTIVE', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
+  ('94000000-0000-4000-8000-000000000012', 'creator-owner@fixture.invalid', 'creator-owner@fixture.invalid', 'CREATOR', '94000000-0000-4000-8000-000000000002', 'Synthetic Creator Owner', '2026-01-01T00:00:00Z', 'ACTIVE', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+  ('94000000-0000-4000-8000-000000000099', 'unaffected-control@fixture.invalid', 'unaffected-control@fixture.invalid', 'ADMIN', NULL, 'Synthetic Unaffected Control', NULL, 'DISABLED', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
 
 INSERT INTO "brand_profiles" (
   "id", "organization_id", "domain", "brand_name", "industry", "description",

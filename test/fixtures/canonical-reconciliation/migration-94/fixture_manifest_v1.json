@@ -1,11 +1,13 @@
 {
-  "schemaVersion": 1,
-  "fixtureVersion": "canonical-migration-94-fixture-v1",
-  "purpose": "Deterministic synthetic input for the canonical reconciliation migration 94 to 106 upgrade gate",
+  "format": "canonical-reconciliation-synthetic-sql-fixture",
+  "formatVersion": 1,
+  "fixtureName": "canonical-migration-94-fixture-v1",
+  "generationMethod": "Manually specified deterministic SQL governed by the statically inspected migration 95-106 coverage matrix",
   "authority": {
     "repository": "Piyush1087/dummy_tcs",
-    "registerCommit": "346ae2a065825fab8112f684c112290ae9f408bc",
-    "registerBlob": "c9e0349d12df17bfc87e206f30f7fe7298261c5c"
+    "registerCommit": "346ae2a5ec58506870036db832223c996311fc29",
+    "registerTree": "215528f9b1e077f576ef29e5b61119b08d398107",
+    "registerBlob": "c9e0343794aad4a46e27882b58b98381dd4c9dcf"
   },
   "backendBase": {
     "repository": "Piyush1087/creator-commerce-backend-v2-clone",
@@ -17,23 +19,72 @@
     "commit": "da1d19d15198699465040c32ce075b6be1c85faf",
     "tree": "560e2b90e95c3456ac7eef7ce9351861ab04a576",
     "migrationCount": 106,
+    "affectedMigrationRange": "95-106",
     "executedByGateA0": false
   },
   "fixtureFile": {
     "path": "test/fixtures/canonical-reconciliation/migration-94/canonical_migration_94_fixture_v1.sql",
-    "sha256": "c103589aa5e6c9220e25b428458069509ebfdaf59e7ff32c22e51739bd6b8e5f",
-    "bytes": 19562,
-    "lines": 242,
-    "insertedRows": 43,
-    "insertedTables": 24
+    "sha256": "fe27a4fed67a5cb02b507efc7dc86aaf4a17c2b281ec660f95a92f16bc488706",
+    "bytes": 19795,
+    "lines": 243,
+    "insertedRows": 44,
+    "insertedTables": 24,
+    "fixedIdNamespace": "Fixed UUID-shaped text identifiers prefixed 94000000-0000-4000-8000; suffixes partition deterministic fixture entities"
+  },
+  "tableRowCounts": {
+    "brand_profiles": 1,
+    "creator_profiles": 1,
+    "creator_workspace_members": 1,
+    "creator_workspaces": 1,
+    "data_extraction_capability_evidence": 4,
+    "data_extraction_capability_executions": 3,
+    "data_extraction_capability_resources": 3,
+    "data_extraction_captures": 1,
+    "data_extraction_content_artifacts": 1,
+    "data_extraction_evidence_items": 4,
+    "data_extraction_freshness_assessments": 1,
+    "data_extraction_observation_relations": 1,
+    "data_extraction_observation_support": 4,
+    "data_extraction_provider_execution_links": 1,
+    "data_extraction_resources": 1,
+    "data_extraction_semantic_observations": 5,
+    "intelligence_actions": 1,
+    "intelligence_component_generations": 1,
+    "intelligence_current_components": 1,
+    "intelligence_evidence_references": 1,
+    "intelligence_object_generations": 1,
+    "intelligence_subjects": 1,
+    "organizations": 2,
+    "users": 3
   },
   "validation": {
-    "databaseEngine": "PostgreSQL 16",
+    "operatingSystem": "Microsoft Windows NT 10.0.26200.0",
+    "gitVersion": "2.55.0.windows.3",
+    "dockerClientVersion": "29.7.2",
+    "dockerServerVersion": "29.7.2",
+    "nodeVersion": "24.19.0",
+    "npmVersion": "11.17.0",
+    "prismaVersion": "6.19.3",
+    "postgresqlClientVersion": "16.15",
+    "postgresqlServerVersion": "16.15",
     "independentCleanBuilds": 2,
     "completedMigrationCountPerBuild": 94,
-    "canonicalSnapshotSha256": "30888a28f4fe1caa8c7893c26825d6d488d127655ed0f02eeb80eb17c14aaf60",
-    "canonicalSnapshotRows": 43,
-    "deterministicMatch": true
+    "failedPendingOrRolledBackMigrationsPerBuild": 0,
+    "expectedMigrationHistoryAfterLoad": "Exactly 94 completed, non-rolled-back entries; no migration 95-106 entry",
+    "canonicalSnapshotSha256": "e606dde5add59ab5863725390ccffc4fad15545988ffba91062971b234265d99",
+    "canonicalSnapshotRows": 44,
+    "deterministicMatch": true,
+    "commandsWithSecretsRedacted": [
+      "npm ci",
+      "docker run --name <unique-name> -e POSTGRES_PASSWORD=<redacted> -p <local-port>:5432 postgres:16-alpine",
+      "docker exec <unique-name> createdb -U postgres <disposable-db>",
+      "DATABASE_URL=<redacted> npm run db:migrate:deploy",
+      "psql -v ON_ERROR_STOP=1 -U postgres -d <disposable-db> -f canonical_migration_94_fixture_v1.sql",
+      "psql -v ON_ERROR_STOP=1 -U postgres -d <disposable-db> -c <fixture-verification-queries>",
+      "repeat create, migrate, load, and verify for a second independent disposable database",
+      "compare ordered table-name plus to_jsonb(row) snapshots for every row in the fixed ID namespace",
+      "sha256 canonical_migration_94_fixture_v1.sql"
+    ]
   },
   "coverage": {
     "capabilityFamilies": [
@@ -59,6 +110,7 @@
       "current component",
       "evidence reference"
     ],
+    "unaffectedControl": "Isolated DISABLED synthetic ADMIN user with null organization and null verification timestamp",
     "laterMigrations": [
       "20260911020000_instagram_de_persistence_foundation",
       "20260912090000_c3_r0_evidence_model_derivation_provenance",
@@ -76,11 +128,22 @@
   },
   "attestations": {
     "fullySynthetic": true,
+    "providerOrNetworkCallRequired": false,
     "containsProductionOrStagingData": false,
     "containsRealProviderIdentifiersOrTokens": false,
     "containsSecretsOrCredentials": false,
     "containsCustomerOrPersonalData": false,
     "sharedDatabaseUsed": false,
     "migrations95Through106Executed": false
-  }
+  },
+  "explicitExclusions": [
+    "No binary database dump",
+    "No migration-history insert or update",
+    "No schema DDL",
+    "No migration 95-106 object",
+    "No runtime application code, generated client, dependency, lockfile, or provider configuration",
+    "No real financial authority or payout data",
+    "No campaign fixture because migrations 95-106 do not require a campaign prerequisite",
+    "No Gate A upgrade execution or reconciliation implementation"
+  ]
 }

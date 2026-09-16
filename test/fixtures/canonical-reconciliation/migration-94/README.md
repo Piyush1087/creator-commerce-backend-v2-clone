@@ -17,7 +17,40 @@ psql -v ON_ERROR_STOP=1 "$DATABASE_URL" \
 
 Do not load this file into a shared, production, staging, developer, or populated database. Do not run migrations 95-106 as part of Gate A0. The SQL uses a single transaction and is intentionally not idempotent: a second load must fail rather than conceal a non-clean test database.
 
-Verify the SQL file against `fixture_manifest_v1.json` before use. V1 contains 43 inserted rows across 24 tables. Two independent clean builds produced the same canonical fixture snapshot SHA-256: `30888a28f4fe1caa8c7893c26825d6d488d127655ed0f02eeb80eb17c14aaf60`.
+Verify the SQL file against `fixture_manifest_v1.json` before use. V1 contains 44 inserted rows across 24 tables. Two independent clean builds produced the same canonical fixture snapshot SHA-256: `e606dde5add59ab5863725390ccffc4fad15545988ffba91062971b234265d99`.
+
+Gate A0 proves only that the input fixture can be reproduced at migration 94. It does **not** prove the `94 → 106` upgrade, does not rerun Gate A, and is not production seed data.
+
+## Verification queries
+
+After loading, the disposable database must report 94 completed migrations, no failed or rolled-back migration, and the expected synthetic rows:
+
+```sql
+SELECT count(*)
+FROM "_prisma_migrations"
+WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL;
+
+SELECT count(*)
+FROM "_prisma_migrations"
+WHERE finished_at IS NULL OR rolled_back_at IS NOT NULL;
+
+SELECT count(*) FROM users WHERE id LIKE '94000000-%';
+SELECT count(*) FROM data_extraction_evidence_items WHERE id LIKE '94000000-%';
+SELECT count(*) FROM intelligence_current_components WHERE current_component_id LIKE '94000000-%';
+SELECT to_regclass('public.intelligence_owner_scopes');
+```
+
+Expected results are `94`, `0`, `3`, `4`, `1`, and `NULL`, respectively. The provider columns introduced by migration 95 must also be absent from `information_schema.columns`.
+
+## Inserted inventory
+
+| Tables | Rows |
+| --- | ---: |
+| `organizations`, `brand_profiles`, `creator_profiles`, `creator_workspaces`, `creator_workspace_members` | 6 |
+| `users` (including one isolated, disabled unaffected-control user) | 3 |
+| Data Extraction/Evidence tables | 29 |
+| Intelligence subject/action/generation/current/evidence tables | 6 |
+| **Total across 24 tables** | **44** |
 
 ## Coverage matrix
 
@@ -40,7 +73,7 @@ The fixture deliberately does not invent rows for tables or enum values that do 
 
 ## Determinism and safety checks
 
-Gate A0 validation used two independently created PostgreSQL 16 databases, migrated each from empty through exactly migration 94, loaded this SQL once, and compared canonical JSON snapshots of every fixture-owned row. Both snapshots contained 43 rows and had the same SHA-256 recorded above.
+Gate A0 validation used two independently created PostgreSQL 16 databases, migrated each from empty through exactly migration 94, loaded this SQL once, and compared canonical JSON snapshots of every fixture-owned row. Both snapshots contained 44 rows and had the same SHA-256 recorded above.
 
 Before publication, verify:
 
@@ -51,3 +84,4 @@ Before publication, verify:
 - the worktree contains only the three files in this directory;
 - secret and PII scans find only the intentional `.invalid` synthetic addresses.
 
+The later, separately authorized Gate A runner must fetch the published backend fixture commit by immutable SHA, resolve each file blob with `git ls-tree`, extract the SQL with `git show <fixture-commit>:<fixture-path>`, and verify the raw SHA-256 against the manifest before use. Do not trust the movable branch tip as authority; the final immutable commit and blob tuples are recorded in the Gate A0 authority evidence publication.
