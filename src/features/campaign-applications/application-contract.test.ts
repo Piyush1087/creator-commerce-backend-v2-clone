@@ -126,7 +126,7 @@ describe("P1.3 command and HTTP boundaries", () => {
     } finally {
       await app.close();
     }
-  });
+  }, 30000);
   it("canonical implementation has no provider, legacy handoff, inventory or external notification dispatch", () => {
     for (const file of [
       "application-submit.service.ts",

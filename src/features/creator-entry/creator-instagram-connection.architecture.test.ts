@@ -64,7 +64,6 @@ describe("C01-I3 Creator Instagram architecture", () => {
     const guarded = [
       "src/features/creator-centre/creator-centre.controller.ts",
       "src/features/creator-co-pilot/creator-co-pilot.controller.ts",
-      "src/features/creator-payouts/creator-payouts.controller.ts",
       "src/features/creator-marketplace/creator-marketplace.controller.ts",
       "src/features/creator-marketplace/creator-campaigns.controller.ts",
       "src/features/creator-uce/creator-uce.controller.ts",
@@ -78,6 +77,11 @@ describe("C01-I3 Creator Instagram architecture", () => {
     expect(
       source("src/features/creator-settings/creator-settings.controller.ts"),
     ).not.toContain("CreatorPlatformAccessGuard");
+    const creatorPayouts = source(
+      "src/features/creator-payouts/creator-payouts.controller.ts",
+    );
+    expect(creatorPayouts).not.toContain("CreatorPlatformAccessGuard");
+    expect(creatorPayouts).toContain("CreatorPayoutsAuthorizationService");
   });
 
   it("keeps initial connection free of I4, I5, intelligence, and media authority", () => {

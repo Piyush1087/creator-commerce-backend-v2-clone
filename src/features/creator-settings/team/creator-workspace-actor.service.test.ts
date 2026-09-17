@@ -129,6 +129,10 @@ describe("C05 Creator subject/actor resolution", () => {
     expect(context.allowedActions).toEqual(
       creatorWorkspaceActionsForRole(role),
     );
+    expect(
+      context.allowedActions.includes("PAYOUT_WORKSPACE_READ"),
+    ).toBe(role !== CreatorTeamRole.ASSISTANT);
+    expect(context.authorizationVersion).toMatch(/^membership:/u);
   });
 
   it.each([
