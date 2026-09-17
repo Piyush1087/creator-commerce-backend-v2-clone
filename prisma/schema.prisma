@@ -3378,7 +3378,6 @@ model UceBriefDeliverable {
   createdAt                  DateTime              @default(now()) @map("created_at")
   updatedAt                  DateTime              @updatedAt @map("updated_at")
 
-  collaborationExecutions CollaborationDeliverableExecution[]
 
   @@index([briefId, displayOrder])
   @@index([amplifyTargetDeliverableId])
@@ -4776,8 +4775,6 @@ model CollaborationDeliverableExecution {
   hardStoppedAt            DateTime?                         @map("hard_stopped_at")
   createdAt                DateTime                          @default(now()) @map("created_at")
   updatedAt                DateTime                          @updatedAt @map("updated_at")
-  uceBriefDeliverable      UceBriefDeliverable?              @relation(fields: [uceBriefDeliverableId], references: [id])
-  uceBriefDeliverableId    String?
 
   @@unique([collaborationId, sourceBriefDeliverableId])
   @@index([collaborationId, state])
