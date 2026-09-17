@@ -35,7 +35,7 @@ describe("CanonicalCampaignCreateController readiness route", () => {
     );
 
     await controller.getCanonicalDraftReadiness(
-      { user, body: { objective: "PUSH", currency: "USD" } } as never,
+      { user, body: { objective: "ACTION", currency: "USD" } } as never,
       "campaign-1",
     );
 

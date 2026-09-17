@@ -419,6 +419,10 @@ enum UceCampaignObjective {
   BRAND_AWARENESS
   TRAFFIC_CLICKS
   SALES_CONVERSIONS
+  AWARENESS
+  TRUST
+  ASSETS
+  ACTION
 }
 
 enum UceCompensationType {
@@ -2805,6 +2809,7 @@ model UceCampaign {
   status                      UceCampaignStatus                  @default(DRAFT) @map("current_status")
   creationSource              String                             @default("MANUAL") @map("creation_source")
   canonicalDefinition         Json?                              @map("canonical_definition")
+  canonicalDefinitionHash     String?                            @map("canonical_definition_hash") @db.VarChar(71)
   liveAt                      DateTime?                          @map("live_at")
   applicationDeadline         DateTime?                          @map("application_deadline")
   createdAt                   DateTime                           @default(now()) @map("created_at")

@@ -7,13 +7,19 @@ import {
   storedCanonicalBriefPublishSchema,
   validateCanonicalDeliverableGraph,
 } from "../schemas/canonical-campaign-brief.schema";
+import {
+  CANONICAL_CAMPAIGN_DEFINITION_VERSION,
+  projectCampaignObjectiveHandoffV1,
+} from "./canonical-campaign-definition";
+import { canonicalCampaignObjectiveSchema } from "../schemas/canonical-campaign-objective.schema";
 
 const storedDefinitionSchema = z
   .object({
-    version: z.literal("1.2"),
+    version: z.enum(["1.2", CANONICAL_CAMPAIGN_DEFINITION_VERSION]),
     creationSource: z.enum(["MANUAL", "AI_RECOMMENDED"]),
     strategy: z
       .object({
+        objective: canonicalCampaignObjectiveSchema.optional(),
         platforms: z.array(z.enum(["INSTAGRAM", "TIKTOK", "YOUTUBE"])).min(1),
         campaign_visibility: z.enum([
           "PUBLIC",
@@ -229,6 +235,12 @@ export function projectCanonicalCampaignForApplication(
       : validDefinition.strategy.platforms
     : [];
   const commercial = resolveCommercial(campaign, validDefinition);
+  const objectiveHandoff = projectCampaignObjectiveHandoffV1({
+    campaignId: campaign.id,
+    coreObjective: campaign.strategy?.coreObjective,
+    canonicalDefinition: campaign.canonicalDefinition,
+    canonicalDefinitionHash: campaign.canonicalDefinitionHash,
+  });
 
   return {
     adapterVersion: "C03_CAMPAIGN_APPLICATION_READ_V1" as const,
@@ -237,7 +249,11 @@ export function projectCanonicalCampaignForApplication(
       brandProfileId: campaign.brandProfileId,
       name: campaign.name,
       brand: campaign.brandProfile ?? null,
-      objective: campaign.strategy?.coreObjective ?? null,
+      objectiveHandoff,
+      objective:
+        objectiveHandoff.status === "AVAILABLE"
+          ? objectiveHandoff.objective
+          : null,
       publishingStart: campaign.strategy?.fixedStartDate ?? null,
       publishingEnd: campaign.strategy?.fixedEndDate ?? null,
       status: campaign.status,

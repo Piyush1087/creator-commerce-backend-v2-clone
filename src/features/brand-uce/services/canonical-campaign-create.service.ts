@@ -3,7 +3,6 @@ import {
   Prisma,
   UceApplicationScope,
   UceBrandSupportType,
-  UceCampaignObjective,
   UceCampaignStatus,
   UceCompensationType,
   UceMediaPlatform,
@@ -28,10 +27,14 @@ import {
   canonicalDerivedProjection,
   resolveCanonicalCampaignReadiness,
 } from "./canonical-campaign-readiness.resolver";
+import {
+  CANONICAL_CAMPAIGN_DEFINITION_VERSION,
+  hashCanonicalCampaignDefinition,
+} from "./canonical-campaign-definition";
 
 type DraftSection = Record<string, unknown>;
 type CanonicalDraftDefinition = {
-  version: "1.2";
+  version: typeof CANONICAL_CAMPAIGN_DEFINITION_VERSION;
   creationSource: "MANUAL";
   draft: {
     strategy: DraftSection;
@@ -42,17 +45,10 @@ type CanonicalDraftDefinition = {
 
 function emptyDraftDefinition(): CanonicalDraftDefinition {
   return {
-    version: "1.2",
+    version: CANONICAL_CAMPAIGN_DEFINITION_VERSION,
     creationSource: "MANUAL",
     draft: { strategy: {}, targeting: {}, commercials: {} },
   };
-}
-
-function legacyObjective(
-  objective: CanonicalCampaignWizardPayload["strategy"]["core_objective"],
-): UceCampaignObjective {
-  if (objective === "PUSH") return UceCampaignObjective.SALES_CONVERSIONS;
-  return UceCampaignObjective.BRAND_AWARENESS;
 }
 
 function legacyVisibility(
@@ -242,7 +238,10 @@ export class CanonicalCampaignCreateService {
       }
       await tx.uceCampaign.update({
         where: { id: campaignId },
-        data: { canonicalDefinition: definition as Prisma.InputJsonValue },
+        data: {
+          canonicalDefinition: definition as Prisma.InputJsonValue,
+          canonicalDefinitionHash: null,
+        },
       });
     });
 
@@ -282,7 +281,7 @@ export class CanonicalCampaignCreateService {
     });
     if (!brand) throw new BadRequestException("Brand profile not found");
 
-    const objective = payload.strategy.core_objective;
+    const objective = payload.strategy.objective;
     const readiness = resolveCanonicalCampaignReadiness(
       objective,
       brand.industry,
@@ -295,11 +294,13 @@ export class CanonicalCampaignCreateService {
     }
 
     const canonicalDefinition = {
-      version: "1.2",
+      version: CANONICAL_CAMPAIGN_DEFINITION_VERSION,
       creationSource: "MANUAL",
       ...payload,
       derived: canonicalDerivedProjection(readiness),
     };
+    const canonicalDefinitionHash =
+      hashCanonicalCampaignDefinition(canonicalDefinition);
 
     const visibility = legacyVisibility(payload.strategy.campaign_visibility);
     const isScheduled = payload.strategy.publishing_schedule === "SCHEDULED";
@@ -316,11 +317,10 @@ export class CanonicalCampaignCreateService {
         ? new Date(payload.strategy.publish_until)
         : null,
       dynamicDaysLimit: isScheduled ? null : 1,
-      coreObjective: legacyObjective(objective),
+      coreObjective: objective,
       platformDeliverables: {
-        compatibility: "CANONICAL_CAMPAIGN_V1_2",
+        compatibility: "CANONICAL_CAMPAIGN_V2_0",
         platforms: ["INSTAGRAM"],
-        canonicalObjective: objective,
       } as Prisma.InputJsonValue,
       platforms: [UceMediaPlatform.INSTAGRAM],
     };
@@ -385,6 +385,7 @@ export class CanonicalCampaignCreateService {
           status: UceCampaignStatus.PUBLISHED,
           creationSource: "MANUAL",
           canonicalDefinition: canonicalDefinition as Prisma.InputJsonValue,
+          canonicalDefinitionHash,
           performanceAggregate: { upsert: { create: {}, update: {} } },
           strategy: { upsert: { create: strategyData, update: strategyData } },
           targeting: {
@@ -399,7 +400,7 @@ export class CanonicalCampaignCreateService {
       await tx.uceCampaignReportingSnapshot.create({
         data: {
           campaignId,
-          primaryObjective: legacyObjective(objective),
+          primaryObjective: objective,
           lastApiSyncTimestamp: new Date(),
         },
       });

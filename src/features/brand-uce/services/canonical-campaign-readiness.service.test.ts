@@ -6,8 +6,8 @@ import { CanonicalCampaignReadinessService } from "./canonical-campaign-readines
 
 function definition(objective?: string) {
   return {
-    version: "1.2",
-    draft: { strategy: objective ? { core_objective: objective } : {} },
+    version: "2.0",
+    draft: { strategy: objective ? { objective } : {} },
   };
 }
 
@@ -73,13 +73,13 @@ describe("CanonicalCampaignReadinessService", () => {
   });
 
   it("returns the authoritative saved Objective and resolver-derived projection", async () => {
-    const { service } = setup({ objective: "PULSE" });
+    const { service } = setup({ objective: "AWARENESS" });
 
     await expect(
       service.getReadiness("brand-1", "campaign-1"),
     ).resolves.toEqual({
       campaignId: "campaign-1",
-      objective: "PULSE",
+      objective: "AWARENESS",
       status: "READY",
       currency: "INR",
       primaryKpi: "REACH",
@@ -89,30 +89,30 @@ describe("CanonicalCampaignReadinessService", () => {
         "PROFILE_VISITS",
         "NEW_FOLLOWERS",
       ],
-      revision: "objective:PULSE",
+      revision: "objective:AWARENESS",
     });
   });
 
   it("uses Brand country context rather than request data", async () => {
-    const { service } = setup({ objective: "PROOF", countryCode: "US" });
+    const { service } = setup({ objective: "TRUST", countryCode: "US" });
 
     const result = await service.getReadiness("brand-1", "campaign-1");
 
-    expect(result).toMatchObject({ objective: "PROOF", currency: "USD" });
+    expect(result).toMatchObject({ objective: "TRUST", currency: "USD" });
   });
 
   it("returns a stable non-retryable failure without internal configuration text", async () => {
-    const { service } = setup({ objective: "PULSE", industry: "UNKNOWN" });
+    const { service } = setup({ objective: "AWARENESS", industry: "UNKNOWN" });
 
     const result = await service.getReadiness("brand-1", "campaign-1");
 
     expect(result).toEqual({
       campaignId: "campaign-1",
-      objective: "PULSE",
+      objective: "AWARENESS",
       status: "FAILED",
       reason: "SUPPORTING_KPI_CONFIGURATION_UNAVAILABLE",
       retryable: false,
-      revision: "objective:PULSE",
+      revision: "objective:AWARENESS",
     });
     expect(JSON.stringify(result)).not.toContain("UNKNOWN");
   });
@@ -142,7 +142,7 @@ describe("CanonicalCampaignReadinessService", () => {
   });
 
   it("uses only reads and never mutates, publishes, snapshots, or persists derivation", async () => {
-    const { service, prisma } = setup({ objective: "PUSH" });
+    const { service, prisma } = setup({ objective: "ACTION" });
 
     await service.getReadiness("brand-1", "campaign-1");
 
@@ -154,7 +154,7 @@ describe("CanonicalCampaignReadinessService", () => {
   });
 
   it("propagates unexpected operational failures to the application error layer", async () => {
-    const { service, prisma } = setup({ objective: "PULSE" });
+    const { service, prisma } = setup({ objective: "AWARENESS" });
     prisma.uceCampaign.findFirst.mockRejectedValueOnce(
       new Error("database unavailable"),
     );

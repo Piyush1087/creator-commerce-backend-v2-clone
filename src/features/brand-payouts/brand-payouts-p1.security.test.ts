@@ -774,40 +774,7 @@ describe.skipIf(process.env.BRAND_PAYOUTS_DATABASE_TEST !== "true")(
       queries.length = 0;
     });
 
-    afterAll(async () => {
-      try {
-        await prisma.creatorPayoutObligation.deleteMany({
-          where: { brandProfileId: { in: testIds.brands } },
-        });
-        await prisma.collaboration.deleteMany({
-          where: { brandProfileId: { in: testIds.brands } },
-        });
-        await prisma.uceCampaignBrief.deleteMany({
-          where: { campaign: { brandProfileId: { in: testIds.brands } } },
-        });
-        await prisma.uceCampaign.deleteMany({
-          where: { brandProfileId: { in: testIds.brands } },
-        });
-        await prisma.escrowTransactionLedger.deleteMany({
-          where: { brandProfileId: { in: testIds.brands } },
-        });
-        await prisma.brandEscrowVault.deleteMany({
-          where: { brandProfileId: { in: testIds.brands } },
-        });
-        await prisma.brandTeamMember.deleteMany({
-          where: { brandProfileId: { in: testIds.brands } },
-        });
-        await prisma.user.deleteMany({ where: { id: { in: testIds.users } } });
-        await prisma.brandProfile.deleteMany({
-          where: { id: { in: testIds.brands } },
-        });
-        await prisma.organization.deleteMany({
-          where: { id: { in: testIds.organizations } },
-        });
-      } finally {
-        await prisma.$disconnect();
-      }
-    });
+    afterAll(() => prisma.$disconnect());
 
     it.each([
       ["Owner", () => ownerId, "BRAND_OWNER"],

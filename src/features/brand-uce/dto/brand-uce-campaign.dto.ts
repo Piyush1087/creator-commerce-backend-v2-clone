@@ -29,8 +29,8 @@ export class ListCampaignsQueryDto {
   search?: string;
 
   @IsOptional()
-  @IsIn(["BRAND_AWARENESS", "TRAFFIC_CLICKS", "SALES_CONVERSIONS"])
-  objective?: "BRAND_AWARENESS" | "TRAFFIC_CLICKS" | "SALES_CONVERSIONS";
+  @IsIn(["AWARENESS", "TRUST", "ASSETS", "ACTION"])
+  objective?: "AWARENESS" | "TRUST" | "ASSETS" | "ACTION";
 }
 
 /** Nested shape is validated in the service via Zod; `@Allow()` keeps keys through global whitelist. */
@@ -70,7 +70,10 @@ export class PatchDraftCampaignWizardDto {
 
   @IsOptional()
   @IsIn(["BRAND_AWARENESS", "TRAFFIC_CLICKS", "SALES_CONVERSIONS"])
-  marketing_objective?: "BRAND_AWARENESS" | "TRAFFIC_CLICKS" | "SALES_CONVERSIONS";
+  marketing_objective?:
+    | "BRAND_AWARENESS"
+    | "TRAFFIC_CLICKS"
+    | "SALES_CONVERSIONS";
 }
 
 export class PatchCampaignProductInventoryDto {

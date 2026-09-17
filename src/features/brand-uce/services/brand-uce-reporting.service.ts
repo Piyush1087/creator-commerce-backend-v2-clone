@@ -1,10 +1,28 @@
-import { Injectable } from "@nestjs/common";
+import { ConflictException, Injectable } from "@nestjs/common";
 import { UceCampaignObjective } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 
 import { PrismaService } from "../../../prisma/prisma.service";
 import { decimalToNumber } from "../utils/uce-decimal.util";
 import { BrandUceAccessService } from "./brand-uce-access.service";
+
+export const CAMPAIGN_REPORTING_CANONICAL_OBJECTIVE_UNAVAILABLE =
+  "CAMPAIGN_REPORTING_CANONICAL_OBJECTIVE_UNAVAILABLE" as const;
+
+const CANONICAL_OBJECTIVES = new Set<UceCampaignObjective>([
+  UceCampaignObjective.AWARENESS,
+  UceCampaignObjective.TRUST,
+  UceCampaignObjective.ASSETS,
+  UceCampaignObjective.ACTION,
+]);
+
+function assertLegacyReportingObjective(objective: UceCampaignObjective) {
+  if (CANONICAL_OBJECTIVES.has(objective)) {
+    throw new ConflictException({
+      code: CAMPAIGN_REPORTING_CANONICAL_OBJECTIVE_UNAVAILABLE,
+    });
+  }
+}
 
 @Injectable()
 export class BrandUceReportingService {
@@ -19,8 +37,14 @@ export class BrandUceReportingService {
       campaignId,
     );
 
-    const [strategy, snapshot, timeseries, assets, collabs] = await Promise.all([
-      this.prisma.uceCampaignStrategy.findUnique({ where: { campaignId } }),
+    const strategy = await this.prisma.uceCampaignStrategy.findUnique({
+      where: { campaignId },
+    });
+    const primaryObjective =
+      strategy?.coreObjective ?? UceCampaignObjective.BRAND_AWARENESS;
+    assertLegacyReportingObjective(primaryObjective);
+
+    const [snapshot, timeseries, assets, collabs] = await Promise.all([
       this.prisma.uceCampaignReportingSnapshot.findFirst({
         where: { campaignId },
         orderBy: { updatedAt: "desc" },
@@ -41,9 +65,6 @@ export class BrandUceReportingService {
         take: 20,
       }),
     ]);
-
-    const primaryObjective =
-      strategy?.coreObjective ?? UceCampaignObjective.BRAND_AWARENESS;
 
     const lastSync = snapshot?.lastApiSyncTimestamp ?? new Date();
     const roiSummary = this.buildRoiSummary(primaryObjective, snapshot);
@@ -99,6 +120,7 @@ export class BrandUceReportingService {
     });
     const primaryObjective =
       strategy?.coreObjective ?? UceCampaignObjective.BRAND_AWARENESS;
+    assertLegacyReportingObjective(primaryObjective);
 
     const snapshot = await this.prisma.uceCampaignReportingSnapshot.create({
       data: {
@@ -178,9 +200,7 @@ export class BrandUceReportingService {
       total_verified_impressions: snapshot
         ? Number(snapshot.totalVerifiedImpressions)
         : 0,
-      total_verified_reach: snapshot
-        ? Number(snapshot.totalVerifiedReach)
-        : 0,
+      total_verified_reach: snapshot ? Number(snapshot.totalVerifiedReach) : 0,
       calculated_cpm_rate: snapshot
         ? decimalToNumber(snapshot.calculatedCpmRate as never)
         : 0,

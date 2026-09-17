@@ -11,7 +11,7 @@ const validStrategy = {
   publishingSchedule: "SCHEDULED" as const,
   publishFrom: new Date("2030-01-01T00:00:00.000Z"),
   publishUntil: new Date("2030-01-31T00:00:00.000Z"),
-  coreObjective: "PULSE" as const,
+  coreObjective: "AWARENESS" as const,
   platforms: ["INSTAGRAM"] as const,
   campaignVisibility: "PUBLIC" as const,
 };

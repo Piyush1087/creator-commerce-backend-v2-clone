@@ -27,6 +27,7 @@ import { decimalToNumber } from "../utils/uce-decimal.util";
 import { BrandUceAccessService } from "./brand-uce-access.service";
 import { CampaignLifecycleLockService } from "./campaign-lifecycle-lock.service";
 import { isApplicationSelectableBrief } from "./canonical-campaign-application-read.service";
+import { projectCanonicalCampaignObjective } from "./canonical-campaign-definition";
 
 const PROSPECT_STATUSES = ["PROSPECT_CURATED", "PROSPECT_INVITED"] as const;
 
@@ -157,12 +158,21 @@ export class BrandUceCampaignService {
         ? decimalToNumber(c.commercials.totalCampaignBudgetPool)
         : 0;
       const spend = agg ? decimalToNumber(agg.totalSpendToDate) : 0;
+      const objective = projectCanonicalCampaignObjective({
+        campaignId: c.id,
+        coreObjective: c.strategy?.coreObjective,
+        canonicalDefinition: c.canonicalDefinition,
+        canonicalDefinitionHash: c.canonicalDefinitionHash,
+      });
 
       return {
         campaign_id: c.id,
         campaign_name: c.name,
         current_status: c.status,
-        core_objective: c.strategy?.coreObjective ?? null,
+        core_objective:
+          objective.state === "AVAILABLE" ? objective.value.objective : null,
+        objective_configuration_state:
+          objective.state === "AVAILABLE" ? "AVAILABLE" : objective.reason,
         product_count: c._count.products,
         brief_count: c._count.briefs,
         prospects_count: prospects,
@@ -601,6 +611,7 @@ export class BrandUceCampaignService {
       await this.campaignLock.lockCampaign(tx, campaignId);
       const existing = await tx.uceCampaign.findFirst({
         where: { id: campaignId, brandProfileId },
+        include: { strategy: true },
       });
       if (!existing) {
         throw new BadRequestException("Campaign not found");
@@ -659,6 +670,25 @@ export class BrandUceCampaignService {
         throw new BadRequestException(
           "Only COMPLETED campaigns can be archived.",
         );
+      }
+
+      if (
+        status === UceCampaignStatus.PUBLISHED ||
+        status === UceCampaignStatus.LIVE
+      ) {
+        const objective = projectCanonicalCampaignObjective({
+          campaignId: existing.id,
+          coreObjective: existing.strategy?.coreObjective,
+          canonicalDefinition: existing.canonicalDefinition,
+          canonicalDefinitionHash: existing.canonicalDefinitionHash,
+        });
+        if (objective.state !== "AVAILABLE") {
+          throw new BadRequestException({
+            message:
+              "Campaign requires a canonical objective before publication.",
+            reason: objective.reason,
+          });
+        }
       }
 
       const updated = await tx.uceCampaign.update({

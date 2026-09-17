@@ -1,4 +1,6 @@
-export type CanonicalObjective = "PULSE" | "PROOF" | "PRODUCTION" | "PUSH";
+import type { CanonicalCampaignObjective } from "../schemas/canonical-campaign-objective.schema";
+
+export type CanonicalObjective = CanonicalCampaignObjective;
 export type CanonicalCurrency = "INR" | "USD";
 
 export type CanonicalReadinessReady = {
@@ -30,10 +32,10 @@ export type CanonicalCampaignReadiness =
   | CanonicalReadinessConfigurationUnavailable;
 
 const PRIMARY_KPI: Record<CanonicalObjective, string> = {
-  PULSE: "REACH",
-  PROOF: "MEANINGFUL_ENGAGEMENT",
-  PRODUCTION: "ASSET_QUALITY_SCORE",
-  PUSH: "UNIQUE_CTA_CLICKS",
+  AWARENESS: "REACH",
+  TRUST: "MEANINGFUL_ENGAGEMENT",
+  ASSETS: "ASSET_QUALITY_SCORE",
+  ACTION: "UNIQUE_CTA_CLICKS",
 };
 
 const SUPPORTING_KPIS: Record<
@@ -41,26 +43,36 @@ const SUPPORTING_KPIS: Record<
   Record<CanonicalObjective, readonly string[]>
 > = {
   D2C: {
-    PULSE: ["DISCOVER_REACH", "IMPRESSIONS", "PROFILE_VISITS", "NEW_FOLLOWERS"],
-    PROOF: ["SAVES", "SHARES", "COMMENT_SENTIMENT", "UGC_MENTIONS"],
-    PRODUCTION: [
+    AWARENESS: [
+      "DISCOVER_REACH",
+      "IMPRESSIONS",
+      "PROFILE_VISITS",
+      "NEW_FOLLOWERS",
+    ],
+    TRUST: ["SAVES", "SHARES", "COMMENT_SENTIMENT", "UGC_MENTIONS"],
+    ASSETS: [
       "BRAND_COMPLIANCE",
       "CREATIVE_VARIETY",
       "VISUAL_QUALITY",
       "ASSET_REUSABILITY",
     ],
-    PUSH: ["CTR", "TOTAL_CTA_CLICKS", "REPEAT_CLICKS", "PROMO_LINK_CLICKS"],
+    ACTION: ["CTR", "TOTAL_CTA_CLICKS", "REPEAT_CLICKS", "PROMO_LINK_CLICKS"],
   },
   SAAS_AI: {
-    PULSE: ["IMPRESSIONS", "PROFILE_VISITS", "WEBSITE_CLICKS", "NEW_FOLLOWERS"],
-    PROOF: ["STORY_COMPLETION_RATE", "SAVES", "PROFILE_VISITS", "DM_INQUIRIES"],
-    PRODUCTION: [
+    AWARENESS: [
+      "IMPRESSIONS",
+      "PROFILE_VISITS",
+      "WEBSITE_CLICKS",
+      "NEW_FOLLOWERS",
+    ],
+    TRUST: ["STORY_COMPLETION_RATE", "SAVES", "PROFILE_VISITS", "DM_INQUIRIES"],
+    ASSETS: [
       "FEATURE_CLARITY",
       "SCREEN_RECORDING_QUALITY",
       "TECHNICAL_ACCURACY",
       "ASSET_REUSABILITY",
     ],
-    PUSH: [
+    ACTION: [
       "CTR",
       "LANDING_PAGE_VISITS",
       "DOCUMENTATION_CLICKS",
@@ -68,20 +80,20 @@ const SUPPORTING_KPIS: Record<
     ],
   },
   HEALTHCARE: {
-    PULSE: [
+    AWARENESS: [
       "LOCAL_REACH",
       "PROFILE_VISITS",
       "NEW_FOLLOWERS",
       "LOCAL_AUDIENCE_PERCENT",
     ],
-    PROOF: ["DM_INQUIRIES", "SAVES", "SHARES", "COMMENT_SENTIMENT"],
-    PRODUCTION: [
+    TRUST: ["DM_INQUIRIES", "SAVES", "SHARES", "COMMENT_SENTIMENT"],
+    ASSETS: [
       "MEDICAL_COMPLIANCE",
       "BRAND_COMPLIANCE",
       "EDUCATIONAL_ACCURACY",
       "ASSET_REUSABILITY",
     ],
-    PUSH: [
+    ACTION: [
       "WHATSAPP_CLICKS",
       "BOOKING_PAGE_CLICKS",
       "MAPS_CLICKS",

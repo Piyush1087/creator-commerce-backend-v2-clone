@@ -8,7 +8,7 @@ const validPayload = {
     publishing_schedule: "EVERGREEN" as const,
     publish_from: null,
     publish_until: null,
-    core_objective: "PROOF" as const,
+    objective: "TRUST" as const,
     platforms: ["INSTAGRAM"] as const,
     campaign_visibility: "PUBLIC" as const,
   },
@@ -45,15 +45,50 @@ const validPayload = {
 };
 
 describe("canonical Campaign wizard taxonomy boundary", () => {
+  it.each(["AWARENESS", "TRUST", "ASSETS", "ACTION"] as const)(
+    "accepts canonical objective %s",
+    (objective) => {
+      expect(
+        canonicalCampaignWizardSchema.safeParse({
+          ...validPayload,
+          strategy: { ...validPayload.strategy, objective },
+        }).success,
+      ).toBe(true);
+    },
+  );
+
+  it.each([
+    "PULSE",
+    "PROOF",
+    "PRODUCTION",
+    "PUSH",
+    "BRAND_AWARENESS",
+    "TRAFFIC_CLICKS",
+    "SALES_CONVERSIONS",
+    "UNKNOWN",
+  ])("rejects compatibility or unknown objective %s", (objective) => {
+    expect(
+      canonicalCampaignWizardSchema.safeParse({
+        ...validPayload,
+        strategy: { ...validPayload.strategy, objective },
+      }).success,
+    ).toBe(false);
+  });
+
   it("accepts canonical affinities and normalized geography", () => {
-    expect(canonicalCampaignWizardSchema.safeParse(validPayload).success).toBe(true);
+    expect(canonicalCampaignWizardSchema.safeParse(validPayload).success).toBe(
+      true,
+    );
   });
 
   it("rejects free-form affinity IDs", () => {
     expect(
       canonicalCampaignWizardSchema.safeParse({
         ...validPayload,
-        targeting: { ...validPayload.targeting, audience_affinity_ids: ["MY_CUSTOM_INTEREST"] },
+        targeting: {
+          ...validPayload.targeting,
+          audience_affinity_ids: ["MY_CUSTOM_INTEREST"],
+        },
       }).success,
     ).toBe(false);
   });
@@ -62,7 +97,10 @@ describe("canonical Campaign wizard taxonomy boundary", () => {
     expect(
       canonicalCampaignWizardSchema.safeParse({
         ...validPayload,
-        targeting: { ...validPayload.targeting, audience_geographies: [{ label: "Mumbai" }] },
+        targeting: {
+          ...validPayload.targeting,
+          audience_geographies: [{ label: "Mumbai" }],
+        },
       }).success,
     ).toBe(false);
   });
@@ -80,7 +118,10 @@ describe("canonical Campaign wizard taxonomy boundary", () => {
     expect(
       canonicalCampaignWizardSchema.safeParse({
         ...validPayload,
-        targeting: { ...validPayload.targeting, audience_geographies: [global] },
+        targeting: {
+          ...validPayload.targeting,
+          audience_geographies: [global],
+        },
       }).success,
     ).toBe(true);
     expect(
@@ -88,7 +129,10 @@ describe("canonical Campaign wizard taxonomy boundary", () => {
         ...validPayload,
         targeting: {
           ...validPayload.targeting,
-          audience_geographies: [global, ...validPayload.targeting.audience_geographies],
+          audience_geographies: [
+            global,
+            ...validPayload.targeting.audience_geographies,
+          ],
         },
       }).success,
     ).toBe(false);
