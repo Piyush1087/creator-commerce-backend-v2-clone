@@ -3,8 +3,8 @@
 ```text
 TARGET_BRANCH = integration/c06-creator-payouts (from freeze/mvp-canonical-application-v1)
 PRE_INTEGRATION_SHA = 460fd3e
-POST_INTEGRATION_SHA = (this branch tip after C-06 port)
-POST_INTEGRATION_TREE = (see git rev-parse HEAD^{tree})
+POST_INTEGRATION_SHA = d5aeadc133bed9cc1b8bba63231b317531c3fd49
+POST_INTEGRATION_TREE = see `git rev-parse d5aeadc^{tree}`
 
 INTEGRATION_ROUTE = ALREADY_SUBSUMED_BY_ACCEPTED_C04
 
