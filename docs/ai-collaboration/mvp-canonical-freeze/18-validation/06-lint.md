@@ -30,3 +30,25 @@ rule: prettier/prettier (CRLF / wrapping), auto-fixable
 **Classification:** `PREEXISTING_ACCEPTED_DEBT` — **accepted this freeze** (Parent 2026-09-09; amendment restated). Do not `--fix`.
 
 A later eslint run with prettier disabled is allowed. If findings are still only this prettier farm, keep **PASS classified**. New non-prettier eslint findings are not auto-accepted.
+
+## C-06 overlay — 2026-09-17
+
+```text
+cwd: creator-commerce-backend-v2
+branch: integration/c06-creator-payouts
+command: npm run lint:eslint
+exit_code: 0
+elapsed: ~945s
+```
+
+No non-prettier findings. Prettier 712 remains accepted. Do not `--fix`.
+
+Frontend overlay (same date):
+
+```text
+cwd: creator-commerce-frontend-v2
+branch: integration/c06-creator-payouts
+command: npm run lint
+exit_code: 0
+elapsed: ~564s
+```

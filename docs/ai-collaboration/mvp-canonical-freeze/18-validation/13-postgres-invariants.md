@@ -17,3 +17,11 @@ OTP codes appeared in test logs and are **not** recorded here.
 | INV-06/07 | `c03_p14_handoff` | `C03_P14_DATABASE_TEST=true` | **PASS** 34/34 (2026-09-09 isolated retry) | Must use hostname `localhost`. Default Vitest 5s timed out OWNER/MANAGER/ASSISTANT query tests. Dirty DB + overlapping runs caused leftover `user`/`creatorProfile`/`creatorWorkspace` count asserts. Recreated DB, `prisma migrate deploy` 87/87, `--testTimeout=30000 --fileParallelism=false --maxWorkers=1`: handoff 30/30 + legacy 4/4. `thecreatorshop` not touched. |
 
 INV-03 postgres is PASS 29/29 (harness ctor leftover closed). INV-06/07 postgres remains PASS.
+
+## C-06 overlay P6 — 2026-09-17
+
+Not RUN 5. Disposable `postgres:16-alpine` `c06-recovery-r0-pg16` bound to `127.0.0.1:55490`. Database `c06_recovery`. `thecreatorshop` / `creatorshop-postgres-v2` not migrated. Container deleted after.
+
+| INV | DB | Flag | Result | Notes |
+| --- | --- | --- | --- | --- |
+| INV-08 C-06 remainder | `c06_recovery` | `C06_PAYOUTS_DATABASE_TEST=true` | **PASS** 1/1 | `creator-payouts-p6.postgres.test.ts`. `migrate deploy` **94/94**. Hostname `127.0.0.1`. PG 16.15 UTC. Owner/Manager read; Assistant denied; outsider empty; `PROVIDER_UNAVAILABLE`; zero `routeTransferAttempt`. |

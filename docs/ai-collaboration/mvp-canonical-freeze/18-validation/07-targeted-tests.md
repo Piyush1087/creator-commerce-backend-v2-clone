@@ -164,3 +164,63 @@ FE  npx vitest run --config vitest.config.ts
 C-04 destination postgres (`C04_B2_DATABASE_TEST` / `c04_b2_runtime_20260906`) was **not** re-run.
 
 Per-INV mapping: `11-invariant-results.md`.
+
+## C-06 overlay — 2026-09-17
+
+Does not rewrite RUN 1–12. Not freeze PASS. Overlay charter: `../../charters/canonical_application_freeze_ai_worker_charter.v1-amendment-c06.md`.
+
+Prisma first (`npx vitest` has no pretest generate):
+
+```text
+npx prisma validate
+npx prisma generate
+PASS
+```
+
+Backend affected unit (P6 env-gated at this step):
+
+```text
+npx vitest run --config vitest.config.ts
+  src/features/creator-payouts/creator-payouts-p1.test.ts
+  src/features/creator-payouts/creator-payouts-p2.test.ts
+  src/features/creator-payouts/creator-payouts-p3.test.ts
+  + C-05 P2 / team policy / brand authz / Brand Payouts P0/P1/controller/wave-b / INV-09 static
+Test Files  14 passed | 1 skipped (15)
+Tests       109 passed | 6 skipped (115)
+```
+
+Backend C-06 P6 postgres (disposable PG16 only; not `thecreatorshop`, not `postgres:17`):
+
+```text
+docker postgres:16-alpine c06-recovery-r0-pg16  127.0.0.1:55490/c06_recovery  TZ=UTC
+DATABASE_URL=postgresql://postgres:password@127.0.0.1:55490/c06_recovery?schema=public
+npx prisma migrate deploy                       94/94
+$env:C06_PAYOUTS_DATABASE_TEST="true"
+npx vitest run --config vitest.config.ts src/features/creator-payouts/creator-payouts-p6.postgres.test.ts
+Test Files  1 passed (1)
+Tests       1 passed (1)
+Duration    7.39s
+container deleted after; creatorshop-postgres-v2 left running
+```
+
+Frontend affected unit:
+
+```text
+npx vitest run --config vitest.config.ts
+  src/features/creator-payouts
+  src/layouts/app-shell/bottom-nav-items.test.ts
+  src/layouts/app-shell/creator-shell-capabilities.test.ts
+  src/layouts/app-shell/creator-shell-rendering.test.ts
+  src/features/creator-onboarding/creator-settings-guard-scope.test.ts
+  src/features/creator-onboarding/creator-entry-architecture.test.ts
+  src/routes/c05-frontend-convergence.architecture.test.ts
+  src/routes/inv-11-backend-authority.architecture.test.ts
+  src/shared/auth/require-auth.test.ts
+  src/features/auth/post-login-redirect.test.ts
+  src/features/collaboration/utils/collaboration-route-access.test.ts
+  src/features/collaboration/utils/collaboration-g1c-bank-cutover.test.ts
+Test Files  13 passed (13)
+Tests       91 passed (91)
+```
+
+Lint overlay: `06-lint.md`. INV-08 / INV-11: `11-invariant-results.md`.
