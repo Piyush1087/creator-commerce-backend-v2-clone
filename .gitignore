@@ -7,3 +7,4 @@ sst-env.d.ts
 !.env.example
 coverage
 *.tsbuildinfo
+.artifacts/
