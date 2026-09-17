@@ -12,6 +12,7 @@ export const CREATOR_WORKSPACE_ACTIONS = [
   "INSTAGRAM_SETTINGS_MANAGE",
   "PAYOUT_SETTINGS_READ",
   "PAYOUT_SETTINGS_MANAGE",
+  "PAYOUT_WORKSPACE_READ",
   "LEGAL_PROFILE_READ",
   "LEGAL_PROFILE_MANAGE",
 ] as const;
@@ -31,6 +32,7 @@ export type CreatorWorkspaceActorContext = {
   readonly actorUserId: string;
   readonly actorMembershipId: string;
   readonly actorRole: CreatorWorkspaceActorRole;
+  readonly authorizationVersion?: string;
   readonly workspaceId: string;
   readonly organizationId: string;
   readonly subjectCreatorProfileId: string;
