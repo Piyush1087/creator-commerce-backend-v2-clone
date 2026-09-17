@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { PrismaService } from "../../../prisma/prisma.service";
 import type { AuthUser } from "../../auth/types/auth-user";
+import { creatorWorkspaceActionsForRole } from "./creator-team.policy";
 import { CreatorWorkspaceActorService } from "./creator-workspace-actor.service";
 
 const ownerUser = {
@@ -113,35 +114,22 @@ function serviceFixture(input: {
 
 describe("C05 Creator subject/actor resolution", () => {
   it.each([
-    [CreatorTeamRole.OWNER, 20],
-    [CreatorTeamRole.MANAGER, 20],
-    [CreatorTeamRole.ASSISTANT, 4],
-  ])(
-    "projects %s with its exact Settings capabilities",
-    async (role, count) => {
-      const actorId =
-        role === CreatorTeamRole.OWNER ? ownerUser.id : `${role}-user`;
-      const { service } = serviceFixture({ actorId, role });
-      const context = await service.resolve(authUser(actorId));
-      expect(context.actorUserId).toBe(actorId);
-      expect(context.actorRole).toBe(role);
-      expect(context.subjectCreatorProfileId).toBe(workspace.ownerProfileId);
-      expect(context.subjectOwnerUserId).toBe(ownerUser.id);
-      expect(
-        context.allowedActions.filter(
-          (action) => !action.startsWith("CAMPAIGN_"),
-        ),
-      ).toHaveLength(count);
-      expect(context.allowedActions).toContain("CAMPAIGN_OPPORTUNITY_VIEW");
-      expect(context.allowedActions).toContain("CAMPAIGN_APPLICATION_APPLY");
-      expect(context.allowedActions).toContain("INSIGHTS_CONTENT_READ");
-      expect(
-        context.allowedActions.includes(
-          "CAMPAIGN_APPLICATION_WITHDRAW_PENDING",
-        ),
-      ).toBe(role !== CreatorTeamRole.ASSISTANT);
-    },
-  );
+    CreatorTeamRole.OWNER,
+    CreatorTeamRole.MANAGER,
+    CreatorTeamRole.ASSISTANT,
+  ])("projects %s with its exact Settings capabilities", async (role) => {
+    const actorId =
+      role === CreatorTeamRole.OWNER ? ownerUser.id : `${role}-user`;
+    const { service } = serviceFixture({ actorId, role });
+    const context = await service.resolve(authUser(actorId));
+    expect(context.actorUserId).toBe(actorId);
+    expect(context.actorRole).toBe(role);
+    expect(context.subjectCreatorProfileId).toBe(workspace.ownerProfileId);
+    expect(context.subjectOwnerUserId).toBe(ownerUser.id);
+    expect(context.allowedActions).toEqual(
+      creatorWorkspaceActionsForRole(role),
+    );
+  });
 
   it.each([
     ["email-only", false, true],

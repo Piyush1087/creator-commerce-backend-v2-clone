@@ -28,12 +28,20 @@ describe("Creator Home ownership and persistence boundaries", () => {
   });
 
   it("adds no migration or Home persistence", () => {
-    expect(
-      readdirSync(resolve("prisma/migrations"), { withFileTypes: true }).filter(
-        (entry) => entry.isDirectory(),
-      ),
-    ).toHaveLength(94);
+    const homePersistence =
+      /CreatorHome|HomeActivity|HomeEvent|HomeCache|creator_home|home_activity|home_event|home_cache/u;
+    const migrations = readdirSync(resolve("prisma/migrations"), {
+      withFileTypes: true,
+    }).filter((entry) => entry.isDirectory());
+    for (const migration of migrations) {
+      expect(migration.name).not.toMatch(/creator[-_]?home/iu);
+      const sql = readFileSync(
+        resolve("prisma/migrations", migration.name, "migration.sql"),
+        "utf8",
+      );
+      expect(sql, migration.name).not.toMatch(homePersistence);
+    }
     const schema = readFileSync(resolve("prisma/schema.prisma"), "utf8");
-    expect(schema).not.toMatch(/model (Creator)?Home(Activity|Event|Cache)?\b/);
+    expect(schema).not.toMatch(homePersistence);
   });
 });

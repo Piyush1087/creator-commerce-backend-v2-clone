@@ -70,24 +70,21 @@ describe("brand_meaning activation boundaries", () => {
       "website_url",
       "industry",
     ]);
-    expect(
-      registry.registrations().map((r) => [r.processorId, r.executionEnabled]),
-    ).toEqual([
-      ["instagram_content_behavior", false],
-      ["instagram_content_behavior", true],
-      ["instagram_audience_profile", true],
-      ["instagram_organic_performance_profile", true],
-      ["brand_communication", true],
-      ["brand_meaning", true],
-      ["brand_character", true],
-      ["audience_persona_synthesis", true],
-      ["brand_differentiation", true],
-      ["visual_style_synthesis", true],
-      ["serviceability_synthesis", true],
-      ["offering_factual_synthesis", true],
-      ["offering_creator_communication", true],
-      ["offering_actionability_synthesis", true],
-    ]);
+    expect(bundle.manifest.processorId).toBe(registryKey.processorId);
+    expect(bundle.manifest.outputContractId).toBe(registryKey.outputContractId);
+    expect(bundle.manifest.ownedObjectSemanticIds).not.toEqual(
+      expect.arrayContaining([
+        "creator_audience",
+        "creator_content",
+        "creator_brand_suggestions",
+      ]),
+    );
+    expect(() =>
+      registry.getVerifiedBundle({
+        ...registryKey,
+        processorId: "creator_audience_v0",
+      }),
+    ).toThrow("not allow-listed");
   });
   it("retains explicit prompt restrictions and only wires existing runtime services", () => {
     for (const text of [

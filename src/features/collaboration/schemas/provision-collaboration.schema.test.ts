@@ -16,6 +16,19 @@ import { provisionCollaborationSchema } from "./provision-collaboration.schema";
 
 const applicationId = "11111111-1111-4111-8111-111111111111";
 const deliverableId = "22222222-2222-4222-8222-222222222222";
+const ACTIVE_SECUREMENT_STATES = [
+  "NOT_REQUIRED",
+  "AWAITING_ESCROW_FUNDING",
+  "PROCESSING_FUNDING",
+  "AWAITING_PAYOUT_DETAILS",
+  "COMPLETED",
+  "BLOCKED",
+] as const;
+const LEGACY_SECUREMENT_STATES = [
+  "AWAITING_BRAND_PAYMENT",
+  "AWAITING_CREATOR_CONFIRMATION",
+  "PAYMENT_DISPUTED",
+] as const;
 
 test("requires explicit publishing applicability", () => {
   assert.equal(
@@ -85,7 +98,7 @@ test("Prisma identity is Application-based and publishingRequired has no default
   );
 });
 
-test("uses the frozen canonical Collaboration enum vocabulary", () => {
+test("distinguishes active C04 securement vocabulary from legacy compatibility", () => {
   assert.deepEqual(Object.values(CollaborationNegotiationState), [
     "NOT_REQUIRED",
     "AWAITING_CREATOR_PROPOSAL",
@@ -95,12 +108,8 @@ test("uses the frozen canonical Collaboration enum vocabulary", () => {
     "FAILED",
   ]);
   assert.deepEqual(Object.values(CollaborationSecurementState), [
-    "NOT_REQUIRED",
-    "AWAITING_ESCROW_FUNDING",
-    "PROCESSING_FUNDING",
-    "AWAITING_PAYOUT_DETAILS",
-    "COMPLETED",
-    "BLOCKED",
+    ...ACTIVE_SECUREMENT_STATES,
+    ...LEGACY_SECUREMENT_STATES,
   ]);
   assert.ok(Object.values(CollaborationFulfillmentState).includes("HARD_STOP"));
   assert.ok(Object.values(CollaborationFulfillmentState).includes("SKIPPED"));
@@ -112,6 +121,28 @@ test("uses the frozen canonical Collaboration enum vocabulary", () => {
     "AUDIT",
     "INTEGRATION",
   ]);
+});
+
+test("active C04 commands cannot emit legacy securement or provider-payment authority", () => {
+  const activeSources = [
+    "src/features/collaboration/services/collaboration-provision.service.ts",
+    "src/features/collaboration/services/collaboration-negotiation.service.ts",
+    "src/features/collaboration/services/collaboration-securement.service.ts",
+  ].map((path) => readFileSync(join(process.cwd(), path), "utf8"));
+  for (const source of activeSources) {
+    for (const legacy of LEGACY_SECUREMENT_STATES) {
+      assert.doesNotMatch(
+        source,
+        new RegExp(`CollaborationSecurementState\\.${legacy}\\b`, "u"),
+      );
+    }
+  }
+  const securement = activeSources[2];
+  assert.match(securement, /MANUAL_PAYMENT_DISABLED/u);
+  assert.doesNotMatch(
+    securement,
+    /stripe|adyen|paypal|razorpay|payoutProvider|executePayout/iu,
+  );
 });
 
 test("does not impose Collaboration product policy on Campaign advance percentages", () => {

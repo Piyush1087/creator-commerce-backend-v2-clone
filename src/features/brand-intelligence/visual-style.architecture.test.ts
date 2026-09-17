@@ -13,21 +13,21 @@ describe("visual_style_synthesis architecture boundaries", () => {
   it("pins the visual executable to authority and owns exactly 22 frozen paths", () => {
     const runtime = contracts(),
       bundle = runtime.getVerifiedBundle(registryKey);
-    expect(
-      runtime
-        .registrations()
-        .filter(
-          (r) => r.executionEnabled && !r.processorId.startsWith("offering_"),
-        ),
-    ).toHaveLength(10);
-    expect(
-      runtime
-        .registrations()
-        .some(
-          (r) =>
-            r.processorId === "serviceability_synthesis" && r.executionEnabled,
-        ),
-    ).toBe(true);
+    expect(bundle.manifest.processorId).toBe(registryKey.processorId);
+    expect(bundle.manifest.outputContractId).toBe(registryKey.outputContractId);
+    expect(bundle.manifest.ownedObjectSemanticIds).not.toEqual(
+      expect.arrayContaining([
+        "creator_audience",
+        "creator_content",
+        "creator_brand_suggestions",
+      ]),
+    );
+    expect(() =>
+      runtime.getVerifiedBundle({
+        ...registryKey,
+        processorId: "creator_audience_v1",
+      }),
+    ).toThrow("not allow-listed");
     expect(bundle.manifest.architectureCommitSha).toBe(
       "a6bed1f28564c002f7d76931de0b4dd960ea5ae1",
     );

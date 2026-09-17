@@ -3,7 +3,7 @@ import { BrandIntelligenceModule } from "../brand-intelligence/brand-intelligenc
 import { CreatorAudienceModule } from "../creator-audience/creator-audience.module";
 import { CreatorTeamModule } from "../creator-settings/team/creator-team.module";
 import { IntelligenceOwnerScopeRepository } from "../data-extraction/evidence/ownership/intelligence-owner-scope.repository";
-import { InstagramProviderClientModule } from "../instagram/instagram-provider-client.module";
+import { InstagramIntelligenceProviderModule } from "../instagram/instagram-intelligence-provider.module";
 import { CreatorContentController } from "./creator-content.controller";
 import { CreatorContentPipelineService } from "./creator-content-pipeline.service";
 import { CreatorContentRepository } from "./creator-content.repository";
@@ -35,7 +35,7 @@ import { CreatorContentService } from "./creator-content.service";
   imports: [
     CreatorTeamModule,
     CreatorAudienceModule,
-    InstagramProviderClientModule,
+    InstagramIntelligenceProviderModule,
     BrandIntelligenceModule,
   ],
   controllers: [CreatorContentController],

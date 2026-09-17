@@ -11,7 +11,7 @@ import { ComponentPathCodec } from "./semantic-path/component-path.codec";
 import { READ_ONLY_OBJECT_CONTRACTS } from "./projection/current-read-contracts.generated";
 
 describe("Audience processor boundaries", () => {
-  it("owns the frozen Audience paths while retaining active Brand, Product, and Instagram processors", () => {
+  it("owns only the frozen Audience bundle selected by its compiled key", () => {
     const runtime = contracts(),
       bundle = runtime.getVerifiedBundle(registryKey);
     expect(bundle.manifest.architectureCommitSha).toBe(
@@ -31,27 +31,21 @@ describe("Audience processor boundaries", () => {
         )!.ownedPathPatterns,
       ].sort(),
     );
-    expect(
-      runtime
-        .registrations()
-        .filter((r) => r.executionEnabled)
-        .map((r) => r.processorId)
-        .sort(),
-    ).toEqual([
-      "audience_persona_synthesis",
-      "brand_character",
-      "brand_communication",
-      "brand_differentiation",
-      "brand_meaning",
-      "instagram_audience_profile",
-      "instagram_content_behavior",
-      "instagram_organic_performance_profile",
-      "offering_actionability_synthesis",
-      "offering_creator_communication",
-      "offering_factual_synthesis",
-      "serviceability_synthesis",
-      "visual_style_synthesis",
-    ]);
+    expect(bundle.manifest.processorId).toBe(registryKey.processorId);
+    expect(bundle.manifest.outputContractId).toBe(registryKey.outputContractId);
+    expect(bundle.manifest.ownedObjectSemanticIds).not.toEqual(
+      expect.arrayContaining([
+        "creator_audience",
+        "creator_content",
+        "creator_brand_suggestions",
+      ]),
+    );
+    expect(() =>
+      runtime.getVerifiedBundle({
+        ...registryKey,
+        processorId: "creator_audience_v1",
+      }),
+    ).toThrow("not allow-listed");
     const ownership = new BundlePathOwnershipRegistry(
       runtime,
       new ComponentPathCodec(),

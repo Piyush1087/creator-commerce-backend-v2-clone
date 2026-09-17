@@ -11,30 +11,24 @@ import { ProcessorDependencyProfileRegistry } from "./input/dependency/processor
 import { PROCESSOR_ARCHITECTURE_COMMITS } from "./contracts/bundle/contract-source.spec";
 
 describe("brand_differentiation architecture boundaries", () => {
-  it("retains Brand, Product, and active Instagram processors with six differentiation paths", () => {
+  it("selects only its compiled bundle and owns six differentiation paths", () => {
     const runtime = contracts(),
       bundle = runtime.getVerifiedBundle(registryKey);
-    expect(
-      runtime
-        .registrations()
-        .filter((r) => r.executionEnabled)
-        .map((r) => r.processorId)
-        .sort(),
-    ).toEqual([
-      "audience_persona_synthesis",
-      "brand_character",
-      "brand_communication",
-      "brand_differentiation",
-      "brand_meaning",
-      "instagram_audience_profile",
-      "instagram_content_behavior",
-      "instagram_organic_performance_profile",
-      "offering_actionability_synthesis",
-      "offering_creator_communication",
-      "offering_factual_synthesis",
-      "serviceability_synthesis",
-      "visual_style_synthesis",
-    ]);
+    expect(bundle.manifest.processorId).toBe(registryKey.processorId);
+    expect(bundle.manifest.outputContractId).toBe(registryKey.outputContractId);
+    expect(bundle.manifest.ownedObjectSemanticIds).not.toEqual(
+      expect.arrayContaining([
+        "creator_audience",
+        "creator_content",
+        "creator_brand_suggestions",
+      ]),
+    );
+    expect(() =>
+      runtime.getVerifiedBundle({
+        ...registryKey,
+        processorId: "creator_content_v0",
+      }),
+    ).toThrow("not allow-listed");
     expect(PROCESSOR_ARCHITECTURE_COMMITS).toEqual({
       brand_communication: "017dbceac494f0861ec9a6bea7af3129b70fa5cb",
       brand_meaning: "2e13fa40235094d127f72b38f43c510232e38be4",

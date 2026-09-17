@@ -89,31 +89,57 @@ describe("contract runtime registry and startup integrity", () => {
     const runtime = registry();
     runtime.verifyAtRoot(GENERATED_ROOT);
     expect(runtime.isReady()).toBe(true);
-    expect(runtime.registrations()).toHaveLength(18);
+    const registrations = runtime.registrations();
+    expect(registrations).toHaveLength(18);
     expect(
-      runtime
-        .registrations()
-        .map((entry) => [entry.processorId, entry.executionEnabled]),
+      registrations.map((entry) => [
+        entry.processorId,
+        entry.executionEnabled,
+        entry.processorId.startsWith("creator_")
+          ? "CREATOR"
+          : entry.processorId.startsWith("instagram_")
+            ? "INSTAGRAM"
+            : entry.processorId.startsWith("offering_")
+              ? "PRODUCT"
+              : "BRAND",
+      ]),
     ).toEqual([
-      ["instagram_content_behavior", false],
-      ["instagram_content_behavior", true],
-      ["instagram_audience_profile", true],
-      ["instagram_organic_performance_profile", true],
-      ["brand_communication", true],
-      ["brand_meaning", true],
-      ["brand_character", true],
-      ["audience_persona_synthesis", true],
-      ["brand_differentiation", true],
-      ["visual_style_synthesis", true],
-      ["serviceability_synthesis", true],
-      ["offering_factual_synthesis", true],
-      ["offering_creator_communication", true],
-      ["offering_actionability_synthesis", true],
-      ["creator_audience_v0", true],
-      ["creator_content_v0", true],
-      ["creator_brand_suggestions_v0", true],
-      ["creator_audience_v1", true],
+      ["instagram_content_behavior", false, "INSTAGRAM"],
+      ["instagram_content_behavior", true, "INSTAGRAM"],
+      ["instagram_audience_profile", true, "INSTAGRAM"],
+      ["instagram_organic_performance_profile", true, "INSTAGRAM"],
+      ["brand_communication", true, "BRAND"],
+      ["brand_meaning", true, "BRAND"],
+      ["brand_character", true, "BRAND"],
+      ["audience_persona_synthesis", true, "BRAND"],
+      ["brand_differentiation", true, "BRAND"],
+      ["visual_style_synthesis", true, "BRAND"],
+      ["serviceability_synthesis", true, "BRAND"],
+      ["offering_factual_synthesis", true, "PRODUCT"],
+      ["offering_creator_communication", true, "PRODUCT"],
+      ["offering_actionability_synthesis", true, "PRODUCT"],
+      ["creator_audience_v0", true, "CREATOR"],
+      ["creator_content_v0", true, "CREATOR"],
+      ["creator_brand_suggestions_v0", true, "CREATOR"],
+      ["creator_audience_v1", true, "CREATOR"],
     ]);
+    const exactKeys = registrations.map((entry) =>
+      [
+        entry.processorId,
+        entry.processorVersion,
+        entry.outputContractId,
+        entry.outputContractVersion,
+      ].join("\u0000"),
+    );
+    expect(new Set(exactKeys).size).toBe(exactKeys.length);
+    const activeOwnedPaths = registrations
+      .filter((entry) => entry.executionEnabled)
+      .flatMap((entry) =>
+        entry.ownedPathPatterns.map((path) =>
+          [path.objectSemanticId, path.componentPathPattern].join("\u0000"),
+        ),
+      );
+    expect(new Set(activeOwnedPaths).size).toBe(activeOwnedPaths.length);
     expect(
       runtime.getVerifiedBundle({
         processorId: "brand_communication",

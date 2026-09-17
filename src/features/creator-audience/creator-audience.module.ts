@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { CreatorTeamModule } from "../creator-settings/team/creator-team.module";
 import { IntelligenceOwnerScopeRepository } from "../data-extraction/evidence/ownership/intelligence-owner-scope.repository";
-import { InstagramProviderClientModule } from "../instagram/instagram-provider-client.module";
+import { InstagramIntelligenceProviderModule } from "../instagram/instagram-intelligence-provider.module";
 import { BrandIntelligenceModule } from "../brand-intelligence/brand-intelligence.module";
 import { CreatorAudienceController } from "./creator-audience.controller";
 import { CreatorAudienceCredentialFenceService } from "./creator-audience-credential-fence.service";
@@ -14,7 +14,7 @@ import { AudienceV1ConsumerService } from "../creator-audience-v1/creator-audien
 @Module({
   imports: [
     CreatorTeamModule,
-    InstagramProviderClientModule,
+    InstagramIntelligenceProviderModule,
     BrandIntelligenceModule,
   ],
   controllers: [CreatorAudienceController],

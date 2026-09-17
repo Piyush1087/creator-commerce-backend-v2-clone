@@ -16,8 +16,34 @@ import {
   effectiveCreatorInvitationStatus,
 } from "./creator-team.policy";
 import { resolveCreatorTeamReadmission } from "./creator-team-invitations.service";
+import { CREATOR_WORKSPACE_ACTIONS } from "../../../shared/creator/creator-workspace-actor.contract";
+
+const ASSISTANT_ACTIONS = [
+  "PORTFOLIO_READ",
+  "CAMPAIGN_OPPORTUNITY_VIEW",
+  "CAMPAIGN_APPLICATION_APPLY",
+  "INSIGHTS_AUDIENCE_READ",
+  "INSIGHTS_CONTENT_READ",
+  "CREATOR_BRAND_READ",
+  "COMMERCIAL_SETUP_READ",
+  "MEDIA_KIT_READ",
+] as const;
+
+const ASSISTANT_FORBIDDEN_ACTIONS = CREATOR_WORKSPACE_ACTIONS.filter(
+  (action) =>
+    !ASSISTANT_ACTIONS.includes(action as (typeof ASSISTANT_ACTIONS)[number]),
+);
 
 describe("C05 Creator Team policy", () => {
+  it.each([CreatorTeamRole.OWNER, CreatorTeamRole.MANAGER])(
+    "grants %s exactly the complete accepted action contract",
+    (role) => {
+      expect(creatorWorkspaceActionsForRole(role)).toEqual(
+        CREATOR_WORKSPACE_ACTIONS,
+      );
+    },
+  );
+
   it.each([CreatorTeamRole.OWNER, CreatorTeamRole.MANAGER])(
     "allows %s to administer non-Owner Team actors",
     (role) => {
@@ -27,16 +53,14 @@ describe("C05 Creator Team policy", () => {
   );
 
   it("denies Assistant Team and workspace administration", () => {
-    expect(creatorWorkspaceActionsForRole(CreatorTeamRole.ASSISTANT)).toEqual([
-      "PORTFOLIO_READ",
-      "CAMPAIGN_OPPORTUNITY_VIEW",
-      "CAMPAIGN_APPLICATION_APPLY",
-      "INSIGHTS_AUDIENCE_READ",
-      "INSIGHTS_CONTENT_READ",
-      "CREATOR_BRAND_READ",
-      "COMMERCIAL_SETUP_READ",
-      "MEDIA_KIT_READ",
-    ]);
+    const allowed = creatorWorkspaceActionsForRole(CreatorTeamRole.ASSISTANT);
+    expect(allowed).toEqual(ASSISTANT_ACTIONS);
+    for (const action of ASSISTANT_FORBIDDEN_ACTIONS) {
+      expect(allowed).not.toContain(action);
+      expect(() => assertCreatorWorkspaceAction(allowed, action)).toThrow(
+        ForbiddenException,
+      );
+    }
     expect(() => assertCreatorTeamManager(CreatorTeamRole.ASSISTANT)).toThrow(
       ForbiddenException,
     );
