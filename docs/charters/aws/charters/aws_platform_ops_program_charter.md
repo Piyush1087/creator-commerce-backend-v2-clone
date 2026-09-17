@@ -56,6 +56,7 @@ Standing posture = what the worker may do on a normal assignment **without** a P
 | `INSTALL_BUDGETS` | Named human or Cost **only for that assignment** | AWS Budgets + anomaly subscription → email | Delete compute, deploy, secrets |
 | `MUTATE_CAPACITY` | Capacity **only if Product unlocks allow-list** | Exact allow-list items only (e.g. ECS desired count band, Aurora max ACU band, stop bastion) | Expand allow-list, delete ALB/VPC, prod `sst deploy`, migrate reset, secrets |
 | `MUTATE_COST_STOP` | Cost **only if Product unlocks** | e.g. stop bastion / jumpbox if listed | Anything not listed |
+| `RETURN_TO_PLACEHOLDER` | Deploy / Product (not standing ops workers) | Teardown per `return-to-placeholder.md` | Ops workers executing delete under read-only |
 
 If the human has AdministratorAccess SSO but the charter says read-only, the **charter wins**: do not perform writes.
 

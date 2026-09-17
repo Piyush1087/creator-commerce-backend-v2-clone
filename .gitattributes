@@ -1,1 +1,2 @@
 src/features/brand-intelligence/generated/contract-bundles/** text eol=lf
+scripts/*.sh text eol=lf

@@ -45,7 +45,8 @@ COPY --from=builder /usr/src/app/dist ./dist
 COPY --from=builder /usr/src/app/tsconfig*.json ./
 COPY --from=builder /usr/src/app/scripts ./scripts
 COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Windows checkouts may copy CRLF; shebang then fails with "No such file or directory".
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 ENV PORT=80
