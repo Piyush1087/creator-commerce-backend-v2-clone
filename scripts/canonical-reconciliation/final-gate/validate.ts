@@ -6,6 +6,7 @@ import {
   FINAL_GATE_IDENTITIES,
   FINAL_GATE_IDS,
   FINAL_GATE_OBJECTIVES,
+  requireFinalGateScenario,
   type FinalGateManifest,
 } from "./contracts";
 import {
@@ -17,6 +18,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   requireDisposableFinalGateDatabase();
+  const scenario = requireFinalGateScenario();
   const manifest = JSON.parse(
     await readFile(requireRunArtifactPath("fixture-manifest.json"), "utf8"),
   ) as FinalGateManifest;
@@ -64,16 +66,23 @@ async function main() {
   if (legacyProjection.status !== "UNAVAILABLE")
     throw new Error("LEGACY_OBJECTIVE_DID_NOT_FAIL_CLOSED");
 
-  const application = await prisma.uceApplication.findUniqueOrThrow({
+  const application = await prisma.uceApplication.findUnique({
     where: { id: FINAL_GATE_IDS.application },
     include: { collaboration: true },
   });
-  if (
-    application.authorityVersion !== "C03_CANONICAL" ||
+  if (scenario === "B08") {
+    if (application) throw new Error("B08_PREACTION_APPLICATION_PRESENT");
+  } else if (!application || application.authorityVersion !== "C03_CANONICAL" ||
     application.collaboration?.authorityVersion !== "CANONICAL_V1" ||
     application.collaboration.sourceApplicationId !== application.id
   )
     throw new Error("CANONICAL_C03_C04_HANDOFF_MISMATCH");
+
+  const b06Offering = await prisma.offering.findUnique({
+    where: { id: FINAL_GATE_IDS.b06Offering },
+  });
+  if (!b06Offering || b06Offering.canonicalLifecycle !== "ACTIVE")
+    throw new Error("B06_ELIGIBLE_BRAND_CENTRE_ENTITY_MISSING");
 
   const [providerMappings, financialInstructions, payoutReceipts] =
     await Promise.all([
@@ -89,7 +98,10 @@ async function main() {
       identities: users.length,
       canonicalObjectives: FINAL_GATE_OBJECTIVES,
       legacyObjective: "UNAVAILABLE",
-      handoff: "C03_CANONICAL_TO_C04_CANONICAL_V1",
+      handoff:
+        scenario === "B08"
+          ? "PREACTION_EMPTY"
+          : "C03_CANONICAL_TO_C04_CANONICAL_V1",
       providerMappings,
       financialInstructions,
       payoutReceipts,

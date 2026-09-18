@@ -32,6 +32,7 @@ export const FINAL_GATE_IDS = {
   mediaKit: "f1000000-0000-4000-8000-000000000119",
   applicationSubmittedTransition: "f1000000-0000-4000-8000-000000000120",
   applicationApprovedTransition: "f1000000-0000-4000-8000-000000000121",
+  b06Offering: "f1000000-0000-4000-8000-000000000122",
 } as const;
 
 export const FINAL_GATE_IDENTITIES = {
@@ -53,7 +54,8 @@ export const FINAL_GATE_OBJECTIVES = [
 export const FINAL_GATE_PUBLIC_MEDIA_KIT_ID = "finalgatecreator00000001";
 
 export type FinalGateManifest = {
-  version: "FINAL_GATE_FIXTURE_V1";
+  version: "FINAL_GATE_FIXTURE_V2";
+  scenario: FinalGateScenarioId;
   database: string;
   identities: typeof FINAL_GATE_IDENTITIES;
   objectives: readonly string[];
@@ -66,4 +68,20 @@ export type FinalGateManifest = {
   providerMode: "DISABLED_SYNTHETIC_ONLY";
   reporting: "FAIL_CLOSED_UNIMPLEMENTED";
   creatorChat: "DEFERRED_ABSENT";
+  b06EligibleEntityId: string;
 };
+
+export const FINAL_GATE_SCENARIOS = [
+  "B01", "B02", "B03", "B04", "B05", "B06",
+  "B07", "B08", "B09", "B10", "B11", "B12",
+] as const;
+
+export type FinalGateScenarioId = (typeof FINAL_GATE_SCENARIOS)[number];
+
+export function requireFinalGateScenario(): FinalGateScenarioId {
+  const value = process.env.FINAL_GATE_SCENARIO ?? "B01";
+  if (!(FINAL_GATE_SCENARIOS as readonly string[]).includes(value)) {
+    throw new Error(`FINAL_GATE_SCENARIO_INVALID:${value}`);
+  }
+  return value as FinalGateScenarioId;
+}

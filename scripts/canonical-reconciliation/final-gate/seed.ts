@@ -22,12 +22,23 @@ import {
   UceBriefStatus,
   UceCampaignAssetKind,
   UceCampaignAssetStatus,
+  UceApplicationScope,
+  UceCompensationType,
   UceCampaignObjective,
+  UcePayoutTerms,
   UceCampaignStatus,
+  UceVisibilityScope,
   UceMediaPlatform,
   UceTimelineStructure,
   UserAuthState,
   UserRole,
+  OfferingKind,
+  OfferingLifecycle,
+  OfferingType,
+  OAuthTokenStatus,
+  ProviderAuthorizationHealth,
+  ProviderCapabilityState,
+  SocialNetworkProvider,
 } from "@prisma/client";
 import { writeFile } from "node:fs/promises";
 
@@ -38,6 +49,7 @@ import {
   FINAL_GATE_IDS,
   FINAL_GATE_OBJECTIVES,
   FINAL_GATE_PUBLIC_MEDIA_KIT_ID,
+  requireFinalGateScenario,
   type FinalGateManifest,
 } from "./contracts";
 import {
@@ -80,6 +92,7 @@ async function createPasswordUser(input: {
 
 async function main() {
   const url = requireDisposableFinalGateDatabase();
+  const scenario = requireFinalGateScenario();
   const password = process.env.FINAL_GATE_FIXTURE_PASSWORD;
   if (!password) throw new Error("FINAL_GATE_FIXTURE_PASSWORD is required");
   if (
@@ -165,6 +178,21 @@ async function main() {
       billingCountryCode: "IN",
       currencyPreference: "INR",
       configuredAt: new Date("2026-09-17T00:00:00.000Z"),
+    },
+  });
+
+  await prisma.offering.create({
+    data: {
+      id: FINAL_GATE_IDS.b06Offering,
+      brandProfileId: FINAL_GATE_IDS.brandProfile,
+      type: OfferingType.PRODUCT,
+      canonicalKind: OfferingKind.PRODUCT,
+      canonicalLifecycle: OfferingLifecycle.ACTIVE,
+      name: "Final Gate Unlinked Product",
+      description: "Eligible Brand Centre entity for the canonical Add Product reference flow.",
+      url: "https://final-gate-brand.example.test/products/unlinked",
+      currency: "INR",
+      locationIds: [],
     },
   });
 
@@ -306,6 +334,30 @@ async function main() {
             platforms: [UceMediaPlatform.INSTAGRAM],
           },
         },
+        targeting: {
+          create: {
+            industryVertical: "D2C",
+            creatorArchetypes: ["EDUCATOR"],
+            followerTiers: ["MICRO"],
+            visibilityScopes: [UceVisibilityScope.EVERYONE],
+            visibilityScope: UceVisibilityScope.EVERYONE,
+            targetingVersion: 1,
+            applicationScope: UceApplicationScope.EVERYONE,
+          },
+        },
+        commercials: {
+          create: {
+            compensationType: UceCompensationType.FIXED_FEE,
+            fixedFeeAmount: new Prisma.Decimal(10000),
+            totalCampaignBudgetPool: new Prisma.Decimal(100000),
+            advancePaymentPercentage: 0,
+            finalBalanceTerms: UcePayoutTerms.NET_30,
+            canonicalVersion: 1,
+            commercialOffer: new Prisma.Decimal(10000),
+            currency: "INR",
+            receivesBrandSupport: false,
+          },
+        },
       },
     });
     campaignIds[objective] = id;
@@ -372,7 +424,9 @@ async function main() {
       campaignAssetId: FINAL_GATE_IDS.canonicalAsset,
       status: UceBriefStatus.PUBLISHED,
       briefName: "Final Gate Canonical Brief",
+      creativeIntent: "Demonstrate the accepted local-only campaign application flow.",
       creatorBrief: "Create one local-only acceptance Reel.",
+      briefType: "BRAND_LED",
       platform: UceMediaPlatform.INSTAGRAM,
       deliverables: {
         create: {
@@ -398,7 +452,24 @@ async function main() {
       reviewState: "REVIEWED",
     },
   });
-  await prisma.$transaction(async (tx) => {
+  if (scenario === "B08") {
+    await prisma.creatorSocialIntegration.create({
+      data: {
+        creatorProfileId: FINAL_GATE_IDS.creatorProfile,
+        platformNetwork: SocialNetworkProvider.INSTAGRAM,
+        nativePlatformUserId: "final-gate-instagram-native-id",
+        channelHandleString: "final_gate_creator",
+        oauthAccessTokenEncrypted: "validation-only-synthetic-token",
+        tokenScopePermissions: ["instagram_basic"],
+        tokenStateCondition: OAuthTokenStatus.ACTIVE,
+        authorizationGeneration: 1,
+        authorizationHealth: ProviderAuthorizationHealth.USABLE,
+        basicAuthorizationCapability: ProviderCapabilityState.AVAILABLE,
+        insightsCapability: ProviderCapabilityState.AVAILABLE,
+      },
+    });
+  }
+  if (scenario !== "B08") await prisma.$transaction(async (tx) => {
     await tx.uceApplication.create({
       data: {
         id: FINAL_GATE_IDS.application,
@@ -461,7 +532,7 @@ async function main() {
       },
     });
   });
-  await prisma.$transaction(async (tx) => {
+  if (scenario !== "B08") await prisma.$transaction(async (tx) => {
     await tx.uceApplication.update({
       where: { id: FINAL_GATE_IDS.application },
       data: {
@@ -544,7 +615,8 @@ async function main() {
   });
 
   const manifest: FinalGateManifest = {
-    version: "FINAL_GATE_FIXTURE_V1",
+    version: "FINAL_GATE_FIXTURE_V2",
+    scenario,
     database: decodeURIComponent(url.pathname.slice(1)),
     identities: FINAL_GATE_IDENTITIES,
     objectives: FINAL_GATE_OBJECTIVES,
@@ -557,6 +629,7 @@ async function main() {
     providerMode: "DISABLED_SYNTHETIC_ONLY",
     reporting: "FAIL_CLOSED_UNIMPLEMENTED",
     creatorChat: "DEFERRED_ABSENT",
+    b06EligibleEntityId: FINAL_GATE_IDS.b06Offering,
   };
   await writeFile(
     requireRunArtifactPath("fixture-manifest.json"),
@@ -566,6 +639,7 @@ async function main() {
   process.stdout.write(
     JSON.stringify({
       fixture: manifest.version,
+      scenario,
       identities: 6,
       objectives: 4,
       providerMode: manifest.providerMode,
