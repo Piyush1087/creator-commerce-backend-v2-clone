@@ -1,0 +1,12 @@
+The Creator Shop
+
+{{title}}
+
+Hi {{name}},
+
+{{body}}
+
+Open:
+{{action_url}}
+
+Event: {{event_type}}

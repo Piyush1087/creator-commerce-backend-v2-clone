@@ -1,0 +1,11 @@
+The Creator Shop
+
+You’re invited to join {{brand_name}}
+
+You’ve been invited to join the {{brand_name}} workspace as {{invited_role}}.
+This invitation expires at {{expires_at}}.
+
+Accept invitation:
+{{acceptance_url}}
+
+If you were not expecting this invite, you can ignore this email.

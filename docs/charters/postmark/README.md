@@ -19,6 +19,8 @@ Direct links (current v2 runtime templates):
 | --- | --- | --- |
 | Login / verification OTP | `auth-otp-v2` | [Open](https://account.postmarkapp.com/servers/15113300/templates/47730317) |
 | Password reset | `password-reset-v2` | [Open](https://account.postmarkapp.com/servers/15113300/templates/47730338) |
+| Team invite | `team-invite-v2` | [Open](https://account.postmarkapp.com/servers/15113300/templates/47822341) |
+| Notification (default) | `notification-default-v2` | [Open](https://account.postmarkapp.com/servers/15113300/templates/47822367) |
 
 In the editor, use **Preview** with sample values. We usually do **not** send a real test email while sending is paused.
 
