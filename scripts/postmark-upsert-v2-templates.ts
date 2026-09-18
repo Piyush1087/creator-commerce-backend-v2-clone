@@ -1,6 +1,7 @@
 /**
  * One-shot: upsert Postmark *-v2 templates from docs/charters/postmark/templates.
  * Uses POSTMARK_SERVER_TOKEN from gitignored .env. Does not send live email.
+ * Does not attach Layout `basic` / `basic-2` (v2 HTML is self-contained).
  *
  * Usage: npx ts-node -r dotenv/config scripts/postmark-upsert-v2-templates.ts
  */
@@ -21,6 +22,31 @@ const ROOT = path.resolve(__dirname, "..");
 const TEMPLATES = path.join(ROOT, "docs/charters/postmark/templates");
 
 const SPECS: Spec[] = [
+  {
+    alias: "auth-otp-v2",
+    name: "Auth OTP v2",
+    subject: "Your Creator Shop code is {{otp}}",
+    htmlFile: "auth-otp-v2.html",
+    textFile: "auth-otp-v2.txt",
+    sampleModel: {
+      name: "Alex",
+      otp: "482917",
+      expires_in_minutes: 10,
+    },
+  },
+  {
+    alias: "password-reset-v2",
+    name: "Password reset v2",
+    subject: "Reset your Creator Shop password",
+    htmlFile: "password-reset-v2.html",
+    textFile: "password-reset-v2.txt",
+    sampleModel: {
+      name: "Alex",
+      reset_url:
+        "https://dashboard.dev.thecreatorshop.in/reset-password#token=sample",
+      expires_in_minutes: 30,
+    },
+  },
   {
     alias: "team-invite-v2",
     name: "Team invite v2",
@@ -128,6 +154,12 @@ async function main(): Promise<void> {
   console.log(
     JSON.stringify(
       {
+        POSTMARK_AUTH_OTP_TEMPLATE_ID: results.find(
+          (r) => r.alias === "auth-otp-v2",
+        )?.templateId,
+        POSTMARK_PASSWORD_RESET_TEMPLATE_ID: results.find(
+          (r) => r.alias === "password-reset-v2",
+        )?.templateId,
         POSTMARK_TEAM_INVITE_TEMPLATE_ID: results.find(
           (r) => r.alias === "team-invite-v2",
         )?.templateId,

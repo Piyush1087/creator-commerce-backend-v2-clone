@@ -2,7 +2,10 @@
 
 **Status:** TBD (living — update here before restyling templates)  
 **Scope:** Transactional HTML/text under `docs/charters/postmark/templates/`  
-**Charter:** `postmark_template_ai_worker_charter.md`
+**Charter:** `postmark_template_ai_worker_charter.md`  
+**Visual source:** Postmark layouts `basic` / `basic-2` (Basic With Logo) used by
+legacy `user-invitation` (`41019457`). v2 templates stay **self-contained**
+(no Layout alias) so runtime TemplateId mail does not depend on `{{{ @content }}}`.
 
 When visual style changes, edit **this file first**, then update template sources
 and republish Postmark `*-v2` templates. Do not invent one-off colors in a
@@ -14,61 +17,67 @@ single template.
 | --- | --- |
 | Product name | The Creator Shop |
 | Default from | `no-reply@thecreatorshop.in` |
+| Product URL | `https://thecreatorshop.in` |
+| Logo | `https://stratus.campaign-image.in/images/252780000000136109_zc_v1_1759554983059_creator_shop_white_logo.png.png` (150px wide, centered masthead) |
+| Footer | `© 2026 The Creator Shop. All rights reserved.` then `GrowthVerse` |
 | Voice | Direct, calm, no hype. One job per email. |
 
 ## Color
 
 | Token | Hex | Use |
 | --- | --- | --- |
-| `--mail-bg` | `#f3f1ec` | Page / outer background |
-| `--mail-surface` | `#ffffff` | Content card |
-| `--mail-border` | `#e4e0d8` | Card border |
-| `--mail-ink` | `#111111` | Headlines, primary CTA fill |
-| `--mail-body` | `#333333` | Body copy |
-| `--mail-muted` | `#6b665c` | Fine print, fallback links |
-| `--mail-eyebrow` | `#5c574e` | Brand eyebrow |
-| `--mail-on-ink` | `#ffffff` | Text on primary CTA / OTP block |
+| `--mail-bg` | `#F2F4F6` | Page / outer background (Postmark Basic) |
+| `--mail-surface` | `#FFFFFF` | Content card |
+| `--mail-border` | `#EAEAEC` | Footer rule / card edges |
+| `--mail-ink` | `#333333` | Headlines |
+| `--mail-body` | `#51545E` | Body copy |
+| `--mail-muted` | `#A8AAAF` | Footer, masthead fallback name |
+| `--mail-link` | `#3869D4` | Links and primary CTA fill |
+| `--mail-on-link` | `#FFFFFF` | Text on primary CTA |
+| `--mail-code-bg` | `#F4F4F7` | OTP / attribute well |
 
-Avoid purple gradients, glow, and decorative sticker overlays.
+Keep the Postmark Basic blue button (`#3869D4`). Do not switch v2 back to
+black CTAs or cream `#f3f1ec` page background.
 
 ## Typography
 
 | Role | Stack | Size / weight |
 | --- | --- | --- |
-| Brand eyebrow | Georgia, Times New Roman, serif | 13px, uppercase, letter-spacing `0.08em` |
-| Headline | Georgia, Times New Roman, serif | 24px, line-height 1.3 |
-| Body | Arial, Helvetica, sans-serif | 16px, line-height 1.5 |
-| Fine print | Arial, Helvetica, sans-serif | 12–13px, line-height 1.5 |
+| Body / UI | Nunito Sans, Helvetica, Arial, sans-serif | 16px, line-height 1.625 |
+| Headline | same stack | 22px, bold, color `--mail-ink` |
+| Fine print | same stack | 13px, `--mail-muted` |
 | OTP code | Courier New, Courier, monospace | 28px, letter-spacing `0.28em` |
-| CTA label | Arial, Helvetica, sans-serif | 15px |
-
-Email clients are unreliable with webfonts — stick to these stacks.
+| CTA label | Nunito Sans, Helvetica, Arial, sans-serif | 15px, white on `--mail-link` |
 
 ## Layout shell
 
-1. Full-width outer table, padding `32px 16px`, background `--mail-bg`.
-2. Centered card, `max-width: 520px`, `--mail-surface`, `1px solid --mail-border`.
-3. Card padding rhythm: brand `28px 28px 8px` → headline `8px 28px 0` → body
-   `16px/12px 28px 0` → primary action `28px` → footer `0 28px 28px`.
-4. One headline, one short body, one primary action (code or button). No cards
-   inside cards, no stat strips, no hero imagery for auth mail.
+1. Full-width wrapper, background `--mail-bg`.
+2. Centered masthead: logo 150px, link to product URL. No serif eyebrow.
+3. Inner card `570px` (`100%` under 600px), `--mail-surface`, content padding `45px`.
+4. One headline, short body, one primary action (button or OTP well).
+5. Footer under the card: copyright + GrowthVerse.
+
+v2 HTML inlines this shell. Do not attach Postmark Layout `basic` / `basic-2` to
+runtime v2 templates (those layouts use `{{{ @content }}}` and extra mustache
+keys the backend does not send).
 
 ## Components
 
-### Brand eyebrow
+### Logo masthead
 
-Uppercase product name in `--mail-eyebrow` at top of card.
+Centered `<img>` with alt `The Creator Shop`. Always include the product name in
+plaintext as well.
 
 ### Primary button (links)
 
-Inline-block link: padding `14px 24px`, background `--mail-ink`, color
-`--mail-on-ink`, no border-radius required, no shadow. Always include a
-plaintext fallback URL below for clients that strip buttons.
+Postmark Basic bordered button: background `#3869D4`, padding via 10px/18px
+solid borders, `border-radius: 3px`, white label. Always include a plaintext
+fallback URL below.
 
 ### OTP code block
 
-Centered inline-block: padding `14px 28px`, background `--mail-ink`, color
-`--mail-on-ink`, monospace OTP. Never put the code only in an image.
+Centered well, background `--mail-code-bg`, padding `16px`, monospace OTP.
+Never put the code only in an image.
 
 ### Subject lines
 
@@ -78,7 +87,7 @@ Short, specific, include the variable that helps triage when useful
 ## Text / plaintext
 
 Every HTML template has a matching `.txt` with the same mustache keys, same
-order of information, and the raw URL when a button is used.
+order of information, the raw URL when a button is used, and the footer lines.
 
 ## Naming (see charter)
 

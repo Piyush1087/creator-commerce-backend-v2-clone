@@ -28,6 +28,8 @@ In the editor, use **Preview** with sample values. We usually do **not** send a 
 
 The server already had older templates. New work is published as **`something-v2`** so we never confuse new designs with old ones, and so we do not overwrite legacy templates by accident.
 
+v2 HTML is **self-contained**: it inlines the Postmark Basic shell (logo masthead, 570px card, Nunito, blue CTA) instead of attaching Layout `basic` / `basic-2`. Visual source is legacy `user-invitation` (`41019457`).
+
 Runtime env vars (for example `POSTMARK_AUTH_OTP_TEMPLATE_ID`) should point at the **v2** TemplateId listed in `register.md`.
 
 ## Files in this folder

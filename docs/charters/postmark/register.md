@@ -12,10 +12,10 @@ TemplateIds are safe to record. Server tokens are not.
 
 | Alias | Name | Env key | TemplateId | Layout | Model keys | Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `auth-otp-v2` | Auth OTP v2 | `POSTMARK_AUTH_OTP_TEMPLATE_ID` | `47730317` | none | `name`, `otp`, `expires_in_minutes` | 2026-09-13 | Validate OK |
-| `password-reset-v2` | Password reset v2 | `POSTMARK_PASSWORD_RESET_TEMPLATE_ID` | `47730338` | none | `name`, `reset_url`, `expires_in_minutes` | 2026-09-13 | Validate OK; does not edit legacy `password-reset` |
-| `team-invite-v2` | Team invite v2 | `POSTMARK_TEAM_INVITE_TEMPLATE_ID` | `47822341` | none | `brand_name`, `invited_role`, `expires_at`, `acceptance_url` | 2026-09-18 | Validate OK |
-| `notification-default-v2` | Notification default v2 | `POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID` | `47822367` | none | `name`, `title`, `body`, `action_url`, `event_type` | 2026-09-18 | Validate OK; per-event `POSTMARK_TEMPLATE_*` may override |
+| `auth-otp-v2` | Auth OTP v2 | `POSTMARK_AUTH_OTP_TEMPLATE_ID` | `47730317` | none | `name`, `otp`, `expires_in_minutes` | 2026-09-18 | Restyled to Basic + logo; Validate OK |
+| `password-reset-v2` | Password reset v2 | `POSTMARK_PASSWORD_RESET_TEMPLATE_ID` | `47730338` | none | `name`, `reset_url`, `expires_in_minutes` | 2026-09-18 | Restyled to Basic + logo; does not edit legacy `password-reset` |
+| `team-invite-v2` | Team invite v2 | `POSTMARK_TEAM_INVITE_TEMPLATE_ID` | `47822341` | none | `brand_name`, `invited_role`, `expires_at`, `acceptance_url` | 2026-09-18 | Restyled to Basic + logo; does not edit legacy `user-invitation` |
+| `notification-default-v2` | Notification default v2 | `POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID` | `47822367` | none | `name`, `title`, `body`, `action_url`, `event_type` | 2026-09-18 | Restyled to Basic + logo; per-event `POSTMARK_TEMPLATE_*` may override |
 
 ## Legacy (do not overwrite)
 
@@ -23,6 +23,7 @@ TemplateIds are safe to record. Server tokens are not.
 | --- | --- | --- |
 | `auth-otp` (pilot, pre-suffix) | `47730333` | Superseded by `auth-otp-v2`; leave in Postmark |
 | `password-reset` | `38645456` | Pre-existing; briefly edited during pilot — prefer `password-reset-v2` for runtime |
+| `user-invitation` | `41019457` | Visual source (Layout `basic` + logo). Leave alone; v2 invite is self-contained |
 
 ## Verify in Postmark UI
 
@@ -58,3 +59,4 @@ Cursor MCP config example (token only in local MCP env / user settings, never in
 | 2026-09-13 | Naming + design system | Charter v0.2: always `*-v2`; added `template-design-system.md` |
 | 2026-09-13 | Publish v2 pair | Created `auth-otp-v2` `47730317`, `password-reset-v2` `47730338` |
 | 2026-09-18 | Publish invite + notification default | Created `team-invite-v2` `47822341`, `notification-default-v2` `47822367` |
+| 2026-09-18 | Restyle v2 to Basic + logo | Inlined masthead/logo/570px/Nunito/`#3869D4` from `user-invitation` Layout `basic`; all four `*-v2` aliases updated |
