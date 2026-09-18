@@ -59,6 +59,32 @@ import {
 
 const prisma = new PrismaClient();
 
+export const FINAL_GATE_CONNECTED_INSTAGRAM_SCENARIOS = ["B08", "B11"] as const;
+
+export function requiresConnectedInstagram(scenario: string): boolean {
+  return (
+    FINAL_GATE_CONNECTED_INSTAGRAM_SCENARIOS as readonly string[]
+  ).includes(scenario);
+}
+
+export function finalGateSyntheticInstagramIntegration(
+  creatorProfileId: string,
+): Prisma.CreatorSocialIntegrationUncheckedCreateInput {
+  return {
+    creatorProfileId,
+    platformNetwork: SocialNetworkProvider.INSTAGRAM,
+    nativePlatformUserId: "final-gate-instagram-native-id",
+    channelHandleString: "final_gate_creator",
+    oauthAccessTokenEncrypted: "validation-only-synthetic-token",
+    tokenScopePermissions: ["instagram_basic"],
+    tokenStateCondition: OAuthTokenStatus.ACTIVE,
+    authorizationGeneration: 1,
+    authorizationHealth: ProviderAuthorizationHealth.USABLE,
+    basicAuthorizationCapability: ProviderCapabilityState.AVAILABLE,
+    insightsCapability: ProviderCapabilityState.AVAILABLE,
+  };
+}
+
 const json = (value: unknown): Prisma.InputJsonValue =>
   value as Prisma.InputJsonValue;
 
@@ -452,21 +478,11 @@ async function main() {
       reviewState: "REVIEWED",
     },
   });
-  if (scenario === "B08") {
+  if (requiresConnectedInstagram(scenario)) {
     await prisma.creatorSocialIntegration.create({
-      data: {
-        creatorProfileId: FINAL_GATE_IDS.creatorProfile,
-        platformNetwork: SocialNetworkProvider.INSTAGRAM,
-        nativePlatformUserId: "final-gate-instagram-native-id",
-        channelHandleString: "final_gate_creator",
-        oauthAccessTokenEncrypted: "validation-only-synthetic-token",
-        tokenScopePermissions: ["instagram_basic"],
-        tokenStateCondition: OAuthTokenStatus.ACTIVE,
-        authorizationGeneration: 1,
-        authorizationHealth: ProviderAuthorizationHealth.USABLE,
-        basicAuthorizationCapability: ProviderCapabilityState.AVAILABLE,
-        insightsCapability: ProviderCapabilityState.AVAILABLE,
-      },
+      data: finalGateSyntheticInstagramIntegration(
+        FINAL_GATE_IDS.creatorProfile,
+      ),
     });
   }
   if (scenario !== "B08") await prisma.$transaction(async (tx) => {
@@ -647,11 +663,13 @@ async function main() {
   );
 }
 
-main()
-  .finally(() => prisma.$disconnect())
-  .catch((error: unknown) => {
-    console.error(
-      error instanceof Error ? error.message : "FINAL_GATE_FIXTURE_FAILED",
-    );
-    process.exitCode = 1;
-  });
+if (require.main === module) {
+  void main()
+    .finally(() => prisma.$disconnect())
+    .catch((error: unknown) => {
+      console.error(
+        error instanceof Error ? error.message : "FINAL_GATE_FIXTURE_FAILED",
+      );
+      process.exitCode = 1;
+    });
+}

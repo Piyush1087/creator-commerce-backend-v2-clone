@@ -1,4 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import {
+  OrganizationKind,
+  ProviderAuthorizationHealth,
+  ProviderCapabilityState,
+  SocialNetworkProvider,
+  UserAuthState,
+  UserRole,
+} from "@prisma/client";
 
 import {
   FINAL_GATE_IDENTITIES,
@@ -8,6 +16,11 @@ import {
 import { assertB05DraftHashes, assertPublishedCanonicalHashes } from "./audit";
 import { requireDisposableFinalGateDatabase } from "./guard";
 import { hashCanonicalCampaignDefinition } from "../../../src/features/brand-uce/services/canonical-campaign-definition";
+import { CreatorEntryStateService } from "../../../src/features/creator-entry/creator-entry-state.service";
+import {
+  finalGateSyntheticInstagramIntegration,
+  requiresConnectedInstagram,
+} from "./seed";
 
 describe("Final Gate validation-only contracts", () => {
   it("freezes six unique role identities and four canonical objectives", () => {
@@ -35,6 +48,69 @@ describe("Final Gate validation-only contracts", () => {
       "B11",
       "B12",
     ]);
+  });
+
+  it("makes only B08 and B11 synthetic Instagram-ready for Creator entry", async () => {
+    expect(requiresConnectedInstagram("B08")).toBe(true);
+    expect(requiresConnectedInstagram("B11")).toBe(true);
+    for (const scenario of FINAL_GATE_SCENARIOS.filter(
+      (value) => value !== "B08" && value !== "B11",
+    )) {
+      expect(requiresConnectedInstagram(scenario)).toBe(false);
+    }
+
+    const integration = finalGateSyntheticInstagramIntegration(
+      "final-gate-creator-profile",
+    );
+    expect(integration).toMatchObject({
+      platformNetwork: SocialNetworkProvider.INSTAGRAM,
+      nativePlatformUserId: "final-gate-instagram-native-id",
+      oauthAccessTokenEncrypted: "validation-only-synthetic-token",
+      tokenStateCondition: "ACTIVE",
+      authorizationHealth: ProviderAuthorizationHealth.USABLE,
+      basicAuthorizationCapability: ProviderCapabilityState.AVAILABLE,
+      insightsCapability: ProviderCapabilityState.AVAILABLE,
+    });
+    expect(JSON.stringify(integration)).not.toMatch(/https?:\/\//);
+
+    const prisma = {
+      user: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "final-gate-creator-owner",
+          role: UserRole.CREATOR,
+          authState: UserAuthState.ACTIVE,
+          organizationId: "final-gate-creator-organization",
+          organization: { kind: OrganizationKind.CREATOR },
+          creatorProfile: {
+            id: "final-gate-creator-profile",
+            ownedWorkspaces: [
+              {
+                organizationId: "final-gate-creator-organization",
+                members: [{ assignedProfileId: "final-gate-creator-profile" }],
+              },
+            ],
+            socialIntegrations: [integration],
+          },
+        }),
+      },
+    };
+    const state = await new CreatorEntryStateService(
+      prisma as never,
+    ).readCanonicalOwner("final-gate-creator-owner");
+
+    expect(state).toMatchObject({
+      accountContext: "CREATOR_READY",
+      onboardingStatus: "COMPLETE",
+      canEnterCreatorPlatform: true,
+      nextAction: "CREATOR_WORKSPACE_ENTRY",
+      instagram: {
+        identityConnection: "CONNECTED",
+        basicAuthorization: ProviderCapabilityState.AVAILABLE,
+        insightsCapability: ProviderCapabilityState.AVAILABLE,
+        authorizationHealth: ProviderAuthorizationHealth.USABLE,
+      },
+    });
+    expect(prisma.user.findUnique).toHaveBeenCalledTimes(1);
   });
 
   it("fails closed without the disposable-run marker", () => {
