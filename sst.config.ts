@@ -133,20 +133,22 @@ export default $config({
       AWS_REGION: process.env.AWS_REGION ?? "ap-south-1",
       POSTMARK_SERVER_TOKEN: process.env.POSTMARK_SERVER_TOKEN as string,
       POSTMARK_OTP_TEMPLATE_ID: process.env.POSTMARK_OTP_TEMPLATE_ID as string,
-      POSTMARK_AUTH_OTP_TEMPLATE_ID: process.env
-        .POSTMARK_AUTH_OTP_TEMPLATE_ID as string,
-      POSTMARK_PASSWORD_RESET_TEMPLATE_ID: process.env
-        .POSTMARK_PASSWORD_RESET_TEMPLATE_ID as string,
+      // TemplateIds from docs/charters/postmark/register.md (not secrets)
+      POSTMARK_AUTH_OTP_TEMPLATE_ID:
+        process.env.POSTMARK_AUTH_OTP_TEMPLATE_ID?.trim() || "47730317",
+      POSTMARK_PASSWORD_RESET_TEMPLATE_ID:
+        process.env.POSTMARK_PASSWORD_RESET_TEMPLATE_ID?.trim() || "47730338",
+      POSTMARK_TEAM_INVITE_TEMPLATE_ID:
+        process.env.POSTMARK_TEAM_INVITE_TEMPLATE_ID?.trim() || "47822341",
+      POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID:
+        process.env.POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID?.trim() ||
+        "47822367",
       POSTMARK_AUTH_FROM:
         process.env.POSTMARK_AUTH_FROM ?? "no-reply@thecreatorshop.in",
       POSTMARK_AUTH_MESSAGE_STREAM:
         process.env.POSTMARK_AUTH_MESSAGE_STREAM ?? "outbound",
       POSTMARK_NOTIFICATION_FROM:
         process.env.POSTMARK_NOTIFICATION_FROM ?? "no-reply@thecreatorshop.in",
-      POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID:
-        process.env.POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID ??
-        process.env.POSTMARK_OTP_TEMPLATE_ID ??
-        "",
       NOTIFICATIONS_DEV_EMIT_ENABLED:
         $app.stage === "prod"
           ? "false"
@@ -257,8 +259,6 @@ export default $config({
           : $app.stage === "dev"
             ? "https://api.dev.thecreatorshop.in"
             : "http://localhost:3000"),
-      POSTMARK_TEAM_INVITE_TEMPLATE_ID:
-        process.env.POSTMARK_TEAM_INVITE_TEMPLATE_ID ?? "",
       EXTERNAL_API_TIMEOUT_MS: process.env.EXTERNAL_API_TIMEOUT_MS ?? "10000",
     };
 
