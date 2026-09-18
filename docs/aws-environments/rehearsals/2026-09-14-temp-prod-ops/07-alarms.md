@@ -8,19 +8,19 @@
 
 | Code | ARN/ID | Notes |
 | --- | --- | --- |
-| SNS | `arn:aws:sns:ap-south-1:250037328530:creatorshop-prod-ops-rehearsal` | Email sub **PendingConfirmation** |
+| SNS | `arn:aws:sns:ap-south-1:250037328530:creatorshop-prod-ops-rehearsal` | Email sub **Confirmed** → `brian@growthverse.in` |
 | `ALB-UNHEALTHY` | `creatorshop-prod-ALB-UNHEALTHY` | UnHealthyHostCount ≥ 1 / 2×60s |
 | `ALB-5XX` | `creatorshop-prod-ALB-5XX` | Target 5xx sum ≥ 10 / 5×60s |
 | `ECS-CPU` | `creatorshop-prod-ECS-CPU` | CPU avg > 80% / 3×300s |
 | `AURORA-ACU` | `creatorshop-prod-AURORA-ACU` | ACU avg ≥ 1.8 / 3×300s |
 
-SNS topic → `brian@growthverse.in` **created**, confirmation **not yet clicked** (AWS will not deliver alarm mail until confirmed).
+SNS topic → `brian@growthverse.in` **created and confirmed**. Inbox delivery **PASS** for the forced alarm test.
 
 ## Tests performed
 
 | Test | How triggered | Email received? | Cleared? |
 | --- | --- | --- | --- |
-| Forced unhealthy / alarm | `set-alarm-state ALARM` on `ALB-UNHEALTHY` | **Not proven** (sub pending) | Yes — `set-alarm-state OK` |
+| Forced unhealthy / alarm | `set-alarm-state ALARM` on `ALB-UNHEALTHY` | **Yes** — `brian@growthverse.in` | Yes — `set-alarm-state OK` |
 | OK state (no false page) | Restored OK | n/a | **PASS** (state OK) |
 | Budget threshold | skipped | | |
 

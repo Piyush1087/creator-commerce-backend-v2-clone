@@ -36,7 +36,7 @@ Vs PLACEHOLDER (~$2 / ~₹190): delta = **full-stack band while up**; overnight 
 
 - Alarms installed? **Yes** (4 + SNS)  
 - Test firings? **Forced ALARM then OK** on `ALB-UNHEALTHY`  
-- Email received at `brian@growthverse.in`? **Not proven** — SNS subscription PendingConfirmation (confirm the AWS email)  
+- Email received at `brian@growthverse.in`? **Yes** — SNS subscription confirmed; inbox delivery **PASS**  
 
 ## Capacity snapshot
 
@@ -55,6 +55,6 @@ Vs PLACEHOLDER (~$2 / ~₹190): delta = **full-stack band while up**; overnight 
 
 ## Actions / follow-ups
 
-- Confirm SNS email so a later LIVE install can prove inbox.  
+- SNS alarm email inbox proof: **CLOSED** (confirmed + received).  
 - `RETURN_TO_PLACEHOLDER` — CLI delete bill drivers (`sst.config` `removal: retain` blocks `sst remove` from deleting).  
 - Next deploy must expect stale Pulumi ARNs (same class as bring-up attempt 1) unless state is cleaned.

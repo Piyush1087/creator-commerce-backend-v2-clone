@@ -6,7 +6,7 @@
 
 ## One-paragraph summary
 
-We stood up prod under TEMP_PROD_OPS_REHEARSAL (ALB DNS only, no Wix, no login). After an entrypoint CRLF crash, Aurora pause (P1001), and a one-shot Prisma migrate, non-auth smoke passed (health + gatekeeper admit). Monitor/Cost/Capacity each ran once read-only. Four rehearsal alarms were installed; a forced ALARM→OK worked in CloudWatch, but the SNS email is **unconfirmed** so inbox delivery was not proven. Stack was torn back to PLACEHOLDER (no ALB/ECS/Aurora; bastion stopped).
+We stood up prod under TEMP_PROD_OPS_REHEARSAL (ALB DNS only, no Wix, no login). After an entrypoint CRLF crash, Aurora pause (P1001), and a one-shot Prisma migrate, non-auth smoke passed (health + gatekeeper admit). Monitor/Cost/Capacity each ran once read-only. Four rehearsal alarms were installed; a forced ALARM→OK worked in CloudWatch, and the SNS email to `brian@growthverse.in` **was confirmed and received** (alarm + mail PASS). Stack was torn back to PLACEHOLDER (no ALB/ECS/Aurora; bastion stopped).
 
 ## Results
 
@@ -18,7 +18,7 @@ We stood up prod under TEMP_PROD_OPS_REHEARSAL (ALB DNS only, no Wix, no login).
 | Monitor (read-only) | Yes | Healthy; flagged bastion left on |
 | Cost (USD+INR) | Yes | MTD ~$1.26 / ~₹120 lagging; run-rate ~$25–45/mo while up |
 | Capacity (recommend-only) | Yes | Oversized for traffic; did not scale |
-| Alarms + email to brian@ | Partial | Alarms + forced state **PASS**; SNS **PendingConfirmation** |
+| Alarms + email to brian@ | Yes | Alarms + forced state **PASS**; SNS confirmed; inbox delivery **PASS** |
 | Boundary refusals | Yes | No standing-worker writes |
 | Return to PLACEHOLDER | Yes | ECS/ALB/Aurora gone; bastion stopped |
 
@@ -33,7 +33,7 @@ We stood up prod under TEMP_PROD_OPS_REHEARSAL (ALB DNS only, no Wix, no login).
 
 ## Follow-ups
 
-- Confirm or ignore the AWS SNS subscription email to `brian@growthverse.in`.  
+- SNS alarm email to `brian@growthverse.in`: **CLOSED** — confirmed; inbox delivery proven during rehearsal.  
 - Next prod deploy: expect stale SST/Pulumi ARNs; refresh/state-remove before recreate.  
 - Aurora min ACU 0.5 was a pause workaround — decide at real LIVE.  
 - Overnight ALB: tear down same calendar day next time.

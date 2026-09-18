@@ -20,7 +20,7 @@
 
 | Step | Result | Notes |
 | --- | --- | --- |
-| Alarms/SNS | **PASS** | 4 alarms deleted; topic `creatorshop-prod-ops-rehearsal` deleted (sub was PendingConfirmation) |
+| Alarms/SNS | **PASS** | 4 alarms deleted; topic `creatorshop-prod-ops-rehearsal` deleted (sub had been **Confirmed**; inbox proven earlier) |
 | ECS | **PASS** | desired 0 → service `api` DRAINING/deleted → cluster **INACTIVE** |
 | ALB | **PASS** | `apiLoadBalancer-hmkxnkxh` deleted; TG deleted after LB gone (`ResourceInUse` on first TG try) |
 | Aurora | **PASS** | instance `…-coreinstance-ctbevuzr` deleted; cluster `…-corecluster-xobvxxnw` delete submitted; after-auditor lists **0** clusters/instances |
