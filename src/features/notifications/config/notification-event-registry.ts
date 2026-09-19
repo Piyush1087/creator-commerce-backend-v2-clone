@@ -46,7 +46,7 @@ export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
     actionable: true,
     inAppPolicy: "REQUIRED",
     emailPolicy: "MANDATORY",
-    deepLinkPath: "/brand/settings/billing?action=dunning",
+    deepLinkPath: "/brand/settings/billing",
     title: "Subscription payment failed",
   }),
   "billing.subscription_payment_recovered": billing({
@@ -55,7 +55,7 @@ export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
     actionable: false,
     inAppPolicy: "YES",
     emailPolicy: "OPTIONAL",
-    deepLinkPath: "/brand/settings/billing?focus=plan",
+    deepLinkPath: "/brand/settings/billing",
     title: "Subscription payment recovered",
   }),
   "billing.trial_expired": billing({
@@ -64,7 +64,7 @@ export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
     actionable: true,
     inAppPolicy: "REQUIRED",
     emailPolicy: "MANDATORY",
-    deepLinkPath: "/brand/settings/billing?view=pricing_matrix",
+    deepLinkPath: "/brand/settings/billing",
     title: "Trial expired",
   }),
   "billing.subscription_halted": billing({
@@ -73,7 +73,7 @@ export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
     actionable: true,
     inAppPolicy: "REQUIRED",
     emailPolicy: "MANDATORY",
-    deepLinkPath: "/brand/settings/billing?action=update_payment",
+    deepLinkPath: "/brand/settings/billing",
     title: "Subscription halted",
   }),
   "billing.cancellation_scheduled": billing({
@@ -82,7 +82,7 @@ export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
     actionable: false,
     inAppPolicy: "YES",
     emailPolicy: "MANDATORY",
-    deepLinkPath: "/brand/settings/billing?focus=plan",
+    deepLinkPath: "/brand/settings/billing",
     title: "Cancellation scheduled",
   }),
   "billing.cancellation_effective": billing({
@@ -91,7 +91,7 @@ export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
     actionable: false,
     inAppPolicy: "YES",
     emailPolicy: "MANDATORY",
-    deepLinkPath: "/brand/settings/billing?focus=plan",
+    deepLinkPath: "/brand/settings/billing",
     title: "Cancellation effective",
   }),
   "billing.cancellation_reactivated": billing({
@@ -100,7 +100,7 @@ export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
     actionable: false,
     inAppPolicy: "YES",
     emailPolicy: "MANDATORY",
-    deepLinkPath: "/brand/settings/billing?focus=plan",
+    deepLinkPath: "/brand/settings/billing",
     title: "Subscription reactivated",
   }),
   "billing.invoice_ready": billing({
@@ -109,7 +109,7 @@ export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
     actionable: false,
     inAppPolicy: "YES",
     emailPolicy: "OPTIONAL",
-    deepLinkPath: "/brand/settings/billing?focus=invoices",
+    deepLinkPath: "/brand/settings/billing",
     title: "Invoice ready",
   }),
   "escrow.funding_credited": event({
@@ -131,7 +131,7 @@ export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
     inAppPolicy: "REQUIRED",
     emailPolicy: "OPTIONAL",
     recipientPolicy: "OWNER_FINANCE_PLUS_ACTIVE_TRIGGERING_CM",
-    deepLinkPath: "/brand/collaborations/{collaboration_id}",
+    deepLinkPath: "/brand/collaborations?thread={collaboration_id}",
     title: "Collaboration awaiting funds",
   }),
   "escrow.collaboration_refunded": event({
@@ -142,7 +142,7 @@ export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
     inAppPolicy: "YES",
     emailPolicy: "OPTIONAL",
     recipientPolicy: "OWNER_FINANCE_PLUS_ACTIVE_TRIGGERING_CM",
-    deepLinkPath: "/brand/collaborations/{collaboration_id}",
+    deepLinkPath: "/brand/collaborations?thread={collaboration_id}",
     title: "Collaboration funds refunded",
   }),
   "escrow.creator_payout_action_required": event({
@@ -266,7 +266,7 @@ export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
     inAppPolicy: "REQUIRED",
     emailPolicy: "OPTIONAL",
     recipientPolicy: "OWNER_CAMPAIGN_MANAGERS",
-    deepLinkPath: "/brand/campaigns/{campaign_id}/applications",
+    deepLinkPath: "/brand/uce/campaigns/{campaign_id}",
     title: "Campaign application received",
   }),
   "collaborations.media_submitted_for_review": event({
@@ -277,7 +277,7 @@ export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
     inAppPolicy: "REQUIRED",
     emailPolicy: "OPTIONAL",
     recipientPolicy: "OWNER_CAMPAIGN_MANAGERS",
-    deepLinkPath: "/brand/collaborations/{collaboration_id}",
+    deepLinkPath: "/brand/collaborations?thread={collaboration_id}",
     title: "Media submitted for review",
   }),
   "intelligence.execution_completed": event({
@@ -288,7 +288,7 @@ export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
     inAppPolicy: "YES",
     emailPolicy: "OPTIONAL",
     recipientPolicy: "OWNER_CAMPAIGN_MANAGERS",
-    deepLinkPath: "/brand/intelligence",
+    deepLinkPath: "/brand-centre",
     title: "Brand Intelligence execution completed",
   }),
   "intelligence.execution_failed": event({
@@ -299,7 +299,7 @@ export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
     inAppPolicy: "REQUIRED",
     emailPolicy: "OPTIONAL",
     recipientPolicy: "OWNER_CAMPAIGN_MANAGERS",
-    deepLinkPath: "/brand/intelligence",
+    deepLinkPath: "/brand-centre",
     title: "Brand Intelligence execution failed",
   }),
   "team.member_access_revoked": event({
@@ -310,7 +310,7 @@ export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
     inAppPolicy: "NONE",
     emailPolicy: "MANDATORY",
     recipientPolicy: "AFFECTED_USER_EMAIL_ONLY",
-    deepLinkPath: "/",
+    deepLinkPath: "/login",
     title: "Brand workspace access revoked",
   }),
   "integration.instagram_token_expired": event({
@@ -321,7 +321,7 @@ export const NOTIFICATION_EVENT_REGISTRY = Object.freeze({
     inAppPolicy: "REQUIRED",
     emailPolicy: "OPTIONAL",
     recipientPolicy: "OWNER_CAMPAIGN_MANAGERS",
-    deepLinkPath: "/brand/settings/integrations?state=token_error",
+    deepLinkPath: "/brand/settings/integrations?tab=instagram",
     title: "Instagram connection expired",
   }),
 } satisfies Record<string, Readonly<NotificationEventDefinition>>);

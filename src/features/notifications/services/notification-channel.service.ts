@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { MailService } from "../../../mail/mail.service";
+import { buildNotificationEmailCopy } from "../config/notification-email-copy";
 import { resolveNotificationTemplateIdFromEnv } from "../config/notification-postmark-env";
 import {
   getEventDefinition,
@@ -31,13 +32,14 @@ export class NotificationChannelService {
     const base =
       this.config.get<string>("APP_FRONTEND_URL") ?? "http://localhost:5173";
     const actionUrl = `${base.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+    const copy = buildNotificationEmailCopy(definition.eventType, args.payload);
     return this.mail.sendNotificationEmail({
       to: args.targetEmail,
       eventType: definition.eventType,
       templateModel: {
         name: args.recipientName ?? args.targetEmail,
-        title: definition.title,
-        body: `You have a new notification: ${definition.eventType}.`,
+        title: copy.title,
+        body: copy.body,
         action_url: actionUrl,
         event_type: definition.eventType,
       },

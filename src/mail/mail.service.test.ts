@@ -61,6 +61,45 @@ describe("shared Team invitation mail routing", () => {
         rawToken,
       );
       expect(payload.TrackOpens).toBe(false);
+      expect(payload).toMatchObject({
+        Tag: "team-invite",
+        Metadata: { mail_kind: "team-invite" },
+      });
     },
   );
+});
+
+describe("notification mail analytics", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("tags the default template send with the event type", async () => {
+    vi.stubEnv("POSTMARK_NOTIFICATION_DEFAULT_TEMPLATE_ID", "47822367");
+    const send = vi.fn().mockResolvedValue({
+      ErrorCode: 0,
+      MessageID: "notify-message",
+    });
+    const mail = new MailService({
+      sendEmailWithTemplate: send,
+    } as unknown as ServerClient);
+    await mail.sendNotificationEmail({
+      to: "owner@example.test",
+      eventType: "escrow.funding_credited",
+      templateModel: {
+        name: "Owner",
+        title: "Escrow funding credited",
+        body: "Escrow funding has been credited.",
+        action_url: "https://dashboard.example.test/brand/payouts",
+        event_type: "escrow.funding_credited",
+      },
+    });
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        TemplateId: 47822367,
+        Tag: "escrow.funding_credited",
+        Metadata: { event_type: "escrow.funding_credited" },
+      }),
+    );
+  });
 });

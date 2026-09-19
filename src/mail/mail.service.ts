@@ -1,6 +1,10 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { Models, ServerClient } from "postmark";
 
+import {
+  notificationPostmarkMetadata,
+  notificationPostmarkTag,
+} from "../features/notifications/config/notification-email-copy";
 import { resolveNotificationTemplateIdFromEnv } from "../features/notifications/config/notification-postmark-env";
 
 export type AuthMailDeliveryClassification = "REJECTED" | "DELIVERY_UNKNOWN";
@@ -51,6 +55,8 @@ export class MailService {
         MessageStream: process.env.POSTMARK_AUTH_MESSAGE_STREAM ?? "outbound",
         TrackLinks: Models.LinkTrackingOptions.None,
         TrackOpens: false,
+        Tag: "auth-otp",
+        Metadata: { mail_kind: "auth-otp" },
       }),
     );
   }
@@ -81,6 +87,8 @@ export class MailService {
         MessageStream: process.env.POSTMARK_AUTH_MESSAGE_STREAM ?? "outbound",
         TrackLinks: Models.LinkTrackingOptions.None,
         TrackOpens: false,
+        Tag: "password-reset",
+        Metadata: { mail_kind: "password-reset" },
       }),
     );
   }
@@ -161,6 +169,8 @@ export class MailService {
         MessageStream: "outbound",
         TrackLinks: Models.LinkTrackingOptions.None,
         TrackOpens: false,
+        Tag: "team-invite",
+        Metadata: { mail_kind: "team-invite" },
       });
       if (response.ErrorCode !== 0)
         throw new Error("Provider rejected invitation");
@@ -204,6 +214,8 @@ export class MailService {
         TemplateId: templateId,
         TemplateModel: args.templateModel,
         MessageStream: payload.MessageStream,
+        Tag: notificationPostmarkTag(args.eventType),
+        Metadata: notificationPostmarkMetadata(args.eventType),
       });
 
       this.logger.log(

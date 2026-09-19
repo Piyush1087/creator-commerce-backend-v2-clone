@@ -37,6 +37,7 @@ Runtime env vars (for example `POSTMARK_AUTH_OTP_TEMPLATE_ID`) should point at t
 | File / folder | Who cares | Purpose |
 | --- | --- | --- |
 | `README.md` | Everyone | This overview |
+| `templates-and-notification-messages.md` | Product + eng | Four templates, why one notification shell, full title/body catalog |
 | `register.md` | Devs / ops | Alias ↔ TemplateId ↔ env var map |
 | `template-design-system.md` | Design + anyone changing look | Colors, fonts, layout rules for all new templates |
 | `templates/` | Devs | HTML + plaintext sources we publish to Postmark |

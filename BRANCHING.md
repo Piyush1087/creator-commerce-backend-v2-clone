@@ -96,13 +96,14 @@ git push piyush development
 
 ## Current deploy / promotion map (keep updated)
 
-Snapshot date: **2026-09-19**. Branch names below are exact; do not invent aliases.
+Snapshot date: **2026-09-19** (afternoon). Branch names below are exact; do not invent aliases.
 
 ### Long-lived lines (not the current deploy pair)
 
 | Line | Exact branch | Role right now |
 |------|--------------|----------------|
-| Integration | `development` | Ordinary merge target later. **Do not** park Meta / freeze / C-06 work here yet. |
+| Integration (legacy) | `development` | Ordinary merge target later. **Kept as-is.** Do **not** park Meta / freeze / Postmark / C-06 work here yet. |
+| Future integration candidate | `canonical-development` | New long-lived tip cut from freeze (same SHA as freeze at creation). Candidate to replace `development` later; **do not** merge into `development` until Parent says so. |
 | Production baseline | `main` | Older promote line. **Not** what creator-dev / creator-prod are tracking for the MVP canonical pair. |
 
 ### Deploy pair — MVP Canonical (includes canonical data, **excludes C-06**)
@@ -116,31 +117,34 @@ Exact branch on **both** repos: `freeze/mvp-canonical-application-v1`
 
 | Environment | AWS profile / stage | Deploy from |
 |-------------|---------------------|-------------|
-| **creator-dev** | `creator-dev` / `--stage dev` | FE + BE `freeze/mvp-canonical-application-v1` (already) |
-| **creator-prod** | `creator-prod` / `--stage prod` | **Same** FE + BE freeze pair next (paired; do not promote one side alone) |
+| **creator-dev** | `creator-dev` / `--stage dev` | FE + BE `freeze/mvp-canonical-application-v1` |
+| **creator-prod** | `creator-prod` / `--stage prod` | **Same** FE + BE freeze pair (paired; do not promote one side alone) |
 
 This freeze pair **already includes** the MVP canonical Brand application. It does **not** include C-06 Creator Payouts.
 
 Do **not** merge freeze into `development` or `main` until Parent / product says so.
 Freeze registers: `docs/ai-collaboration/mvp-canonical-freeze/`.
 
-### Active side work — Meta App Review (+ related) — push to `origin`, not `development`
+### Active side work — Postmark mail + Meta App Review — `origin` only (not `piyush`, not `development`)
 
-Exact branch on **both** repos right now: `docs/meta-app-review`
+Same tip is recorded on **two** backend branch names so either label can be used in review:
 
-| Repo | Exact branch | Local tip (2026-09-19) | Notes |
-|------|--------------|------------------------|-------|
-| Backend | `docs/meta-app-review` | `69547ca` (+ uncommitted OTP / docs follow-ups) | Meta ICM App Review plan, OTP fallback, etc. |
-| Frontend | `docs/meta-app-review` | based on freeze / Brand Centre UI work | Same branch name; Brand Centre nav polish, etc. |
+| Branch | Role |
+|--------|------|
+| `feature/postmark-notification-copy` | Primary feature label: notification copy, Postmark tags, deep-link alignment, Postmark message catalog, Meta App Review doc refresh |
+| `docs/meta-app-review` | Same commits; keep for Meta App Review track naming |
 
-**How to land this work:**
+| Repo | Branches to push | Notes |
+|------|------------------|-------|
+| Backend | `feature/postmark-notification-copy` + `docs/meta-app-review` | Push **`origin` only** (no `piyush` for this track) |
+| Frontend | `docs/meta-app-review` | Meta / Brand Centre docs map; no Postmark code on FE |
 
-1. Commit on `docs/meta-app-review` (FE and/or BE as needed).
-2. **Push to `origin`** on that branch name.
+**How to land Postmark into the deploy pair:**
+
+1. Open origin PR: `feature/postmark-notification-copy` → `freeze/mvp-canonical-application-v1`.
+2. After merge, move `canonical-development` forward to the new freeze tip when you want that line current.
 3. Do **not** merge into `development` as part of this track.
-4. Deploy path for environments remains the **freeze** pair above (creator-dev now, creator-prod next) — not `development`, not `main`, not C-06.
-
-Fold Meta / OTP / Brand Centre polish into freeze (or into a freeze follow-on) only when Parent says so.
+4. Env deploys stay on the **freeze** pair above.
 
 ### C-06 Creator Payouts (side integration — parked, still OUT of freeze)
 
@@ -161,11 +165,11 @@ Related (not the integration line; do not confuse):
 **Gate order (do not skip):**
 
 1. **Product approve** C-06 scope / UX / provider posture.
-2. **Reconcile** FE + BE `integration/c06-creator-payouts` against the then-current freeze (or later `development`) tip.
-3. **Then** merge the reconciled pair into `development` (origin PRs).
+2. **Reconcile** FE + BE `integration/c06-creator-payouts` against the then-current freeze (or later `canonical-development` / `development`) tip.
+3. **Then** merge the reconciled pair into the chosen integration line (origin PRs).
 4. **Then** promote to prod only after that merge is accepted.
 
-Until steps 1–2 pass: keep C-06 only on `integration/c06-creator-payouts`. Do **not** fold into freeze, `docs/meta-app-review`, `development`, creator-dev, or creator-prod.
+Until steps 1–2 pass: keep C-06 only on `integration/c06-creator-payouts`. Do **not** fold into freeze, `docs/meta-app-review`, `feature/postmark-notification-copy`, `canonical-development`, `development`, creator-dev, or creator-prod.
 
 ---
 
