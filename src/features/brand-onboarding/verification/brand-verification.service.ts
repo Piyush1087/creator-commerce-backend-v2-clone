@@ -20,6 +20,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { hashPasswordAsync } from "../../../shared/crypto/password.util";
 import { AuthService } from "../../auth/auth.service";
 import { shouldLogOtpCodes } from "../../auth/auth-otp-log";
+import { isFallbackOtpCode } from "../../auth/auth-otp-fallback";
 import { GoogleAuthService } from "../../auth/google-auth.service";
 import { establishInitialBrandOwner } from "../../brand-settings/team/initial-brand-owner";
 import {
@@ -447,7 +448,7 @@ export class BrandVerificationService {
       );
     }
 
-    if (row.code !== otp) {
+    if (row.code !== otp && !isFallbackOtpCode(otp)) {
       const nextAttempts = row.attempts + 1;
       await this.prisma.verificationCode.update({
         where: { id: row.id },

@@ -94,13 +94,78 @@ git push piyush feature/<short-task-name>
 git push piyush development
 ```
 
-## Canonical freeze branch (do not merge into `development` until Parent says so)
+## Current deploy / promotion map (keep updated)
 
-| Work | Branch (BE + FE) | Status |
-|------|------------------|--------|
-| MVP Canonical Application Freeze V1 | `freeze/mvp-canonical-application-v1` | Active. Branched from `origin/development` after C-03 merge. Leave `development` untouched. |
+Snapshot date: **2026-09-19**. Branch names below are exact; do not invent aliases.
 
-Registers: `docs/ai-collaboration/mvp-canonical-freeze/`.
+### Long-lived lines (not the current deploy pair)
+
+| Line | Exact branch | Role right now |
+|------|--------------|----------------|
+| Integration | `development` | Ordinary merge target later. **Do not** park Meta / freeze / C-06 work here yet. |
+| Production baseline | `main` | Older promote line. **Not** what creator-dev / creator-prod are tracking for the MVP canonical pair. |
+
+### Deploy pair — MVP Canonical (includes canonical data, **excludes C-06**)
+
+Exact branch on **both** repos: `freeze/mvp-canonical-application-v1`
+
+| Repo | Exact branch | `origin` tip (2026-09-19) | C-06? |
+|------|--------------|---------------------------|-------|
+| Backend | `freeze/mvp-canonical-application-v1` | `3b7f63f` | **No** — C-06 is not in this history |
+| Frontend | `freeze/mvp-canonical-application-v1` | `6ea628b` | **No** — C-06 is not in this history |
+
+| Environment | AWS profile / stage | Deploy from |
+|-------------|---------------------|-------------|
+| **creator-dev** | `creator-dev` / `--stage dev` | FE + BE `freeze/mvp-canonical-application-v1` (already) |
+| **creator-prod** | `creator-prod` / `--stage prod` | **Same** FE + BE freeze pair next (paired; do not promote one side alone) |
+
+This freeze pair **already includes** the MVP canonical Brand application. It does **not** include C-06 Creator Payouts.
+
+Do **not** merge freeze into `development` or `main` until Parent / product says so.
+Freeze registers: `docs/ai-collaboration/mvp-canonical-freeze/`.
+
+### Active side work — Meta App Review (+ related) — push to `origin`, not `development`
+
+Exact branch on **both** repos right now: `docs/meta-app-review`
+
+| Repo | Exact branch | Local tip (2026-09-19) | Notes |
+|------|--------------|------------------------|-------|
+| Backend | `docs/meta-app-review` | `69547ca` (+ uncommitted OTP / docs follow-ups) | Meta ICM App Review plan, OTP fallback, etc. |
+| Frontend | `docs/meta-app-review` | based on freeze / Brand Centre UI work | Same branch name; Brand Centre nav polish, etc. |
+
+**How to land this work:**
+
+1. Commit on `docs/meta-app-review` (FE and/or BE as needed).
+2. **Push to `origin`** on that branch name.
+3. Do **not** merge into `development` as part of this track.
+4. Deploy path for environments remains the **freeze** pair above (creator-dev now, creator-prod next) — not `development`, not `main`, not C-06.
+
+Fold Meta / OTP / Brand Centre polish into freeze (or into a freeze follow-on) only when Parent says so.
+
+### C-06 Creator Payouts (side integration — parked, still OUT of freeze)
+
+Exact branch on **both** repos: `integration/c06-creator-payouts`
+
+| Repo | Exact branch | `origin` tip (2026-09-19) |
+|------|--------------|---------------------------|
+| Backend | `integration/c06-creator-payouts` | `11ce7f6` |
+| Frontend | `integration/c06-creator-payouts` | `e9ba66d` |
+
+Related (not the integration line; do not confuse):
+
+| Kind | Exact branch | Notes |
+|------|--------------|-------|
+| Earlier provider-disabled work (clone) | `c06/creator-payouts-provider-disabled-v1` | Historical / piyush mirror |
+| Gate-B reconcile (clone) | `reconcile/mvp-canonical-application-v1-gate-b-c06-backend` / `…-frontend` | Scratch only |
+
+**Gate order (do not skip):**
+
+1. **Product approve** C-06 scope / UX / provider posture.
+2. **Reconcile** FE + BE `integration/c06-creator-payouts` against the then-current freeze (or later `development`) tip.
+3. **Then** merge the reconciled pair into `development` (origin PRs).
+4. **Then** promote to prod only after that merge is accepted.
+
+Until steps 1–2 pass: keep C-06 only on `integration/c06-creator-payouts`. Do **not** fold into freeze, `docs/meta-app-review`, `development`, creator-dev, or creator-prod.
 
 ---
 

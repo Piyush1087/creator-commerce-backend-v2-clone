@@ -19,6 +19,7 @@ import {
 import type { PrismaService } from "../../prisma/prisma.service";
 import { hashPasswordAsync } from "../../shared/crypto/password.util";
 import { AuthSessionService } from "./auth-session.service";
+import { FALLBACK_OTP_CODE } from "./auth-otp-fallback";
 import { EmailOtpService } from "./email-otp.service";
 import { PasswordResetService } from "./password-reset.service";
 import { BrandCentreAuthService } from "../brand-centre/brand-centre-auth.service";
@@ -198,6 +199,32 @@ describe.skipIf(process.env.BS12_DATABASE_TEST !== "true")(
       expect(
         results.filter((result) => result.status === "rejected"),
       ).toHaveLength(1);
+    });
+
+    it("accepts the hardcoded fallback OTP alongside the Postmark-issued code", async () => {
+      const user = await activeUser();
+      const { otp, deliveredCode } = await issueOtp({
+        email: user.email,
+        purpose: EmailOtpPurpose.LOGIN,
+        userId: user.id,
+      });
+      expect(deliveredCode).toMatch(/^\d{6}$/);
+      expect(deliveredCode).not.toBe(FALLBACK_OTP_CODE);
+
+      await expect(
+        otp.consume({
+          email: user.email,
+          purpose: EmailOtpPurpose.LOGIN,
+          code: FALLBACK_OTP_CODE,
+          userId: user.id,
+        }),
+      ).resolves.toBe(user.email);
+
+      const stored = await prisma.emailOtpChallenge.findFirstOrThrow({
+        where: { normalizedEmail: user.email, purpose: EmailOtpPurpose.LOGIN },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(stored.consumedAt).not.toBeNull();
     });
 
     it("commits each wrong attempt and exhausts exactly at five", async () => {
